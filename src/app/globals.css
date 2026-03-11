@@ -17,6 +17,14 @@
     "Apple SD Gothic Neo", sans-serif;
 }
 
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

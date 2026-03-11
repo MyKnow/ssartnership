@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
 import CategoryTabs, { CategoryTabOption } from "@/components/CategoryTabs";
 import PartnerCard from "@/components/PartnerCard";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function HomeView({
   categories,
@@ -39,28 +40,31 @@ export default function HomeView({
   }, [activeCategory, partners]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
               SSAFY 15기 서울 캠퍼스
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+            <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
               제휴 혜택 카드뷰
             </h1>
           </div>
-          <a
-            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300"
-            href="/admin"
-          >
-            Admin 관리
-          </a>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <a
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:text-slate-200"
+              href="/admin"
+            >
+              Admin 관리
+            </a>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-10">
-        <section className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-8 py-10 text-white">
+        <section className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-8 py-10 text-white shadow-lg">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-300">
               Partnership Board
@@ -79,10 +83,10 @@ export default function HomeView({
 
         <section className="mt-10 flex flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <h3 className="text-xl font-semibold text-slate-900">
+            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
               카테고리별 혜택
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               신규 카테고리는 Admin에서 추가될 예정입니다.
             </p>
           </div>
@@ -95,8 +99,8 @@ export default function HomeView({
 
         <section className="mt-10">
           {filteredPartners.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-              <p className="text-sm text-slate-500">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 아직 등록된 제휴가 없습니다.
               </p>
             </div>

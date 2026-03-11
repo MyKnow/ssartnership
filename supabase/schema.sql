@@ -1,0 +1,36 @@
+create extension if not exists "uuid-ossp";
+
+create table if not exists categories (
+  id uuid primary key default uuid_generate_v4(),
+  key text not null unique,
+  label text not null,
+  description text,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists partners (
+  id uuid primary key default uuid_generate_v4(),
+  category_id uuid not null references categories(id) on delete cascade,
+  name text not null,
+  location text not null,
+  map_url text,
+  contact text not null,
+  period_start date,
+  period_end date,
+  benefits text[] not null default '{}',
+  tags text[] not null default '{}',
+  created_at timestamp with time zone default now()
+);
+
+create index if not exists partners_category_id_idx on partners(category_id);
+
+alter table categories enable row level security;
+alter table partners enable row level security;
+
+create policy "Public read categories" on categories
+  for select
+  using (true);
+
+create policy "Public read partners" on partners
+  for select
+  using (true);

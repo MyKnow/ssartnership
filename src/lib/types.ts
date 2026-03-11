@@ -1,4 +1,4 @@
-export type CategoryKey = "health" | "restaurant" | "cafe" | "space";
+export type CategoryKey = string;
 
 export type Category = {
   key: CategoryKey;
