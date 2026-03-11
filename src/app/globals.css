@@ -1,0 +1,27 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --brand: #111827;
+  --brand-soft: #1f2937;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --font-sans: "Pretendard Variable", "Pretendard", "Noto Sans KR",
+    "Apple SD Gothic Neo", sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+* {
+  box-sizing: border-box;
+}
