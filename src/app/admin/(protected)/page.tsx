@@ -45,7 +45,7 @@ export default async function AdminPage() {
   const { data: partners } = await supabase
     .from("partners")
     .select(
-      "id,name,location,map_url,contact,period_start,period_end,benefits,tags,categories(id,key,label)"
+      "id,name,category_id,location,map_url,contact,period_start,period_end,benefits,tags"
     )
     .order("created_at", { ascending: false });
 
@@ -164,7 +164,7 @@ export default async function AdminPage() {
                     <Input name="name" defaultValue={partner.name} required />
                     <Select
                       name="categoryId"
-                      defaultValue={partner.categories?.id}
+                      defaultValue={partner.category_id}
                       required
                     >
                       {safeCategories.map((category) => (
