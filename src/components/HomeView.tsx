@@ -37,7 +37,12 @@ export default function HomeView({
   }, [categories]);
 
   const categoryMap = useMemo(() => {
-    return new Map(categories.map((category) => [category.key, category.label]));
+    return new Map(
+      categories.map((category) => [
+        category.key,
+        { label: category.label, color: category.color },
+      ]),
+    );
   }, [categories]);
 
   const filteredPartners = useMemo(() => {
@@ -123,8 +128,9 @@ export default function HomeView({
                   key={partner.id}
                   partner={partner}
                   categoryLabel={
-                    categoryMap.get(partner.category) ?? "알 수 없음"
+                    categoryMap.get(partner.category)?.label ?? "알 수 없음"
                   }
+                  categoryColor={categoryMap.get(partner.category)?.color}
                 />
               ))}
             </div>

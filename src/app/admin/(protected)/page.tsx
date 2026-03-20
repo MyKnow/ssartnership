@@ -42,7 +42,7 @@ export default async function AdminPage() {
 
   const { data: categories } = await supabase
     .from("categories")
-    .select("id,key,label,description")
+    .select("id,key,label,description,color")
     .order("created_at", { ascending: true });
 
   const { data: partners } = await supabase
@@ -84,12 +84,19 @@ export default async function AdminPage() {
             />
 
             <form
-              className="mt-6 grid gap-4 lg:grid-cols-[160px_200px_1fr_auto]"
+              className="mt-6 grid gap-4 lg:grid-cols-[160px_200px_1fr_120px_auto]"
               action={createCategory}
             >
               <Input name="key" placeholder="category-key" required />
               <Input name="label" placeholder="라벨" required />
               <Input name="description" placeholder="설명" />
+              <input
+                type="color"
+                name="color"
+                defaultValue="#0f172a"
+                className="h-10 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
+                title="카테고리 색상"
+              />
               <SubmitButton pendingText="추가 중">추가</SubmitButton>
             </form>
 
@@ -100,7 +107,7 @@ export default async function AdminPage() {
                   className="rounded-2xl border border-border bg-surface-muted p-4"
                 >
                   <form
-                    className="grid gap-3 lg:grid-cols-[160px_200px_1fr_auto]"
+                    className="grid gap-3 lg:grid-cols-[160px_200px_1fr_120px_auto]"
                     action={updateCategory}
                   >
                     <input type="hidden" name="id" value={category.id} />
@@ -109,6 +116,13 @@ export default async function AdminPage() {
                     <Input
                       name="description"
                       defaultValue={category.description ?? ""}
+                    />
+                    <input
+                      type="color"
+                      name="color"
+                      defaultValue={category.color ?? "#0f172a"}
+                      className="h-10 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
+                      title="카테고리 색상"
                     />
                     <SubmitButton variant="ghost" pendingText="수정 중">
                       수정

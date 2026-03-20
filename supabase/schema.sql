@@ -5,8 +5,11 @@ create table if not exists categories (
   key text not null unique,
   label text not null,
   description text,
+  color text,
   created_at timestamp with time zone default now()
 );
+
+alter table categories add column if not exists color text;
 
 create table if not exists partners (
   id uuid primary key default uuid_generate_v4(),

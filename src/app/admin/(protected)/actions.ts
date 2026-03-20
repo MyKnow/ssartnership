@@ -17,13 +17,14 @@ export async function createCategory(formData: FormData) {
   const key = String(formData.get("key") || "").trim();
   const label = String(formData.get("label") || "").trim();
   const description = String(formData.get("description") || "").trim();
+  const color = String(formData.get("color") || "").trim();
 
   if (!key || !label) {
     return;
   }
 
   const supabase = getSupabaseServerClient();
-  await supabase.from("categories").insert({ key, label, description });
+  await supabase.from("categories").insert({ key, label, description, color });
 
   revalidatePath("/");
   revalidatePath("/admin");
@@ -35,6 +36,7 @@ export async function updateCategory(formData: FormData) {
   const key = String(formData.get("key") || "").trim();
   const label = String(formData.get("label") || "").trim();
   const description = String(formData.get("description") || "").trim();
+  const color = String(formData.get("color") || "").trim();
 
   if (!id || !key || !label) {
     return;
@@ -43,7 +45,7 @@ export async function updateCategory(formData: FormData) {
   const supabase = getSupabaseServerClient();
   await supabase
     .from("categories")
-    .update({ key, label, description })
+    .update({ key, label, description, color })
     .eq("id", id);
 
   revalidatePath("/");

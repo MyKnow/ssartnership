@@ -4,6 +4,7 @@ export type Category = {
   key: CategoryKey;
   label: string;
   description: string;
+  color?: string;
 };
 
 export type Partner = {

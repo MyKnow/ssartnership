@@ -2,33 +2,44 @@ import type { Partner } from "@/lib/types";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
 
-const categoryToneMap: Record<string, string> = {
-  health: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200",
-  restaurant:
-    "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200",
-  cafe: "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-200",
-  space: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200",
-};
-
-function getCategoryTone(categoryKey: string) {
-  return (
-    categoryToneMap[categoryKey] ??
-    "bg-surface-muted text-foreground dark:bg-surface-muted dark:text-foreground"
-  );
+function withAlpha(color: string, alphaHex: string) {
+  if (!color.startsWith("#") || color.length !== 7) {
+    return color;
+  }
+  return `${color}${alphaHex}`;
 }
 
 export default function PartnerCard({
   partner,
   categoryLabel,
+  categoryColor,
 }: {
   partner: Partner;
   categoryLabel: string;
+  categoryColor?: string;
 }) {
+  const badgeStyle = categoryColor
+    ? {
+        backgroundColor: withAlpha(categoryColor, "1f"),
+        color: categoryColor,
+      }
+    : undefined;
+  const chipStyle = categoryColor
+    ? {
+        backgroundColor: withAlpha(categoryColor, "14"),
+        borderColor: withAlpha(categoryColor, "55"),
+        color: categoryColor,
+      }
+    : undefined;
+
   return (
     <article className="flex h-full flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
-          <Badge className={getCategoryTone(partner.category)}>
+          <Badge
+            className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
+            style={badgeStyle}
+          >
             {categoryLabel}
           </Badge>
           <span className="text-xs font-medium text-muted-foreground">
@@ -63,7 +74,12 @@ export default function PartnerCard({
         {partner.tags && partner.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {partner.tags.map((tag) => (
-              <Chip key={tag}>#{tag}</Chip>
+              <Chip
+                key={tag}
+                style={chipStyle}
+              >
+                #{tag}
+              </Chip>
             ))}
           </div>
         )}

@@ -24,7 +24,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const supabase = getSupabaseServerClient();
     const { data, error } = await supabase
       .from("categories")
-      .select("key,label,description")
+      .select("key,label,description,color")
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -36,6 +36,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
         key: item.key,
         label: item.label,
         description: item.description ?? "",
+        color: item.color ?? undefined,
       })) ?? []
     );
   }

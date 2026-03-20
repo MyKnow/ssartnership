@@ -6,21 +6,25 @@ const categories: Category[] = [
     key: "health",
     label: "헬스",
     description: "운동, PT, 스튜디오",
+    color: "#10b981",
   },
   {
     key: "restaurant",
     label: "음식점",
     description: "식사, 술집, 다이닝",
+    color: "#f97316",
   },
   {
     key: "cafe",
     label: "카페",
     description: "커피, 디저트, 작업",
+    color: "#38bdf8",
   },
   {
     key: "space",
     label: "공간제휴",
     description: "스터디, 회의, 협업",
+    color: "#8b5cf6",
   },
 ];
 
