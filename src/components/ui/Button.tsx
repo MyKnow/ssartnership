@@ -19,6 +19,7 @@ type ButtonProps = {
   target?: string;
   rel?: string;
   onClick?: () => void;
+  disabled?: boolean;
 };
 
 export default function Button({
@@ -30,8 +31,14 @@ export default function Button({
   target,
   rel,
   onClick,
+  disabled,
 }: ButtonProps) {
-  const classes = cn(base, variants[variant], className);
+  const classes = cn(
+    base,
+    variants[variant],
+    disabled ? "cursor-not-allowed opacity-60" : null,
+    className,
+  );
 
   if (href) {
     return (
@@ -42,7 +49,12 @@ export default function Button({
   }
 
   return (
-    <button type={type} className={classes} onClick={onClick}>
+    <button
+      type={type}
+      className={classes}
+      onClick={onClick}
+      disabled={disabled}
+    >
       {children}
     </button>
   );

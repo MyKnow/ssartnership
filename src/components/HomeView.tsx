@@ -8,6 +8,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import Spinner from "@/components/ui/Spinner";
 
 const suggestionUrl = process.env.NEXT_PUBLIC_MATTERMOST_DM_URL ?? "";
 
@@ -22,6 +23,7 @@ export default function HomeView({
     "all",
   );
   const [isSuggestOpen, setSuggestOpen] = useState(false);
+  const [isSuggesting, setSuggesting] = useState(false);
 
   const tabOptions: CategoryTabOption[] = useMemo(() => {
     return [
@@ -44,6 +46,14 @@ export default function HomeView({
     }
     return partners.filter((partner) => partner.category === activeCategory);
   }, [activeCategory, partners]);
+
+  const handleSuggest = () => {
+    if (!suggestionUrl) {
+      return;
+    }
+    setSuggesting(true);
+    window.location.href = suggestionUrl;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,15 +141,11 @@ export default function HomeView({
         <Button variant="ghost" onClick={() => setSuggestOpen(false)}>
           취소
         </Button>
-        <Button
-          onClick={() => {
-            if (!suggestionUrl) {
-              return;
-            }
-            window.location.href = suggestionUrl;
-          }}
-        >
-          제안하기
+        <Button onClick={handleSuggest} disabled={isSuggesting}>
+          <span className="inline-flex items-center gap-2">
+            {isSuggesting ? <Spinner /> : null}
+            {isSuggesting ? "이동 중" : "제안하기"}
+          </span>
         </Button>
       </Modal>
     </div>

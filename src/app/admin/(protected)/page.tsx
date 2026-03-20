@@ -14,6 +14,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
+import SubmitButton from "@/components/ui/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -66,11 +67,7 @@ export default async function AdminPage() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <form action={logout}>
-              <Button variant="ghost" type="submit">
-                로그아웃
-              </Button>
-            </form>
+            <form action={logout}><SubmitButton variant="ghost" pendingText="로그아웃 중">로그아웃</SubmitButton></form>
             <Button variant="ghost" href="/">
               사용자 화면
             </Button>
@@ -93,7 +90,7 @@ export default async function AdminPage() {
               <Input name="key" placeholder="category-key" required />
               <Input name="label" placeholder="라벨" required />
               <Input name="description" placeholder="설명" />
-              <Button type="submit">추가</Button>
+              <SubmitButton pendingText="추가 중">추가</SubmitButton>
             </form>
 
             <div className="mt-6 grid gap-3">
@@ -113,15 +110,15 @@ export default async function AdminPage() {
                       name="description"
                       defaultValue={category.description ?? ""}
                     />
-                    <Button variant="ghost" type="submit">
+                    <SubmitButton variant="ghost" pendingText="수정 중">
                       수정
-                    </Button>
+                    </SubmitButton>
                   </form>
                   <form className="mt-2" action={deleteCategory}>
                     <input type="hidden" name="id" value={category.id} />
-                    <Button variant="danger" type="submit">
+                    <SubmitButton variant="danger" pendingText="삭제 중">
                       삭제
-                    </Button>
+                    </SubmitButton>
                   </form>
                 </div>
               ))}
@@ -150,7 +147,7 @@ export default async function AdminPage() {
               <Input name="periodEnd" placeholder="종료일" />
               <Input name="benefits" placeholder="혜택 목록" />
               <Input name="tags" placeholder="태그" />
-              <Button type="submit">제휴 추가</Button>
+              <SubmitButton pendingText="등록 중">제휴 추가</SubmitButton>
             </form>
 
             <div className="mt-6 grid gap-4">
@@ -199,15 +196,15 @@ export default async function AdminPage() {
                       name="tags"
                       defaultValue={(partner.tags ?? []).join(", ")}
                     />
-                    <Button variant="ghost" type="submit">
+                    <SubmitButton variant="ghost" pendingText="수정 중">
                       수정
-                    </Button>
+                    </SubmitButton>
                   </form>
                   <form className="mt-2" action={deletePartner}>
                     <input type="hidden" name="id" value={partner.id} />
-                    <Button variant="danger" type="submit">
+                    <SubmitButton variant="danger" pendingText="삭제 중">
                       삭제
-                    </Button>
+                    </SubmitButton>
                   </form>
                 </div>
               ))}

@@ -5,7 +5,7 @@ import { isBlocked, recordAttempt } from "@/lib/rate-limit";
 import ThemeToggle from "@/components/ThemeToggle";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
+import SubmitButton from "@/components/ui/SubmitButton";
 import PasswordInput from "@/components/ui/PasswordInput";
 
 async function loginAction(formData: FormData) {
@@ -78,9 +78,9 @@ export default async function AdminLoginPage({
             </p>
           ) : null}
 
-          <Button className="mt-2 w-full" type="submit">
+          <SubmitButton className="mt-2 w-full" pendingText="로그인 중">
             로그인
-          </Button>
+          </SubmitButton>
         </form>
       </Card>
     </div>
