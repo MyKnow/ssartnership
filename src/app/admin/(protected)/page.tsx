@@ -15,6 +15,8 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
   const hasSupabaseEnv =
     !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -44,9 +46,7 @@ export default async function AdminPage() {
 
   const { data: partners } = await supabase
     .from("partners")
-    .select(
-      "id,name,category_id,location,map_url,contact,period_start,period_end,benefits,tags"
-    )
+    .select("id,name,category_id,location,map_url,contact,period_start,period_end,benefits,tags")
     .order("created_at", { ascending: false });
 
   const safeCategories = categories ?? [];
@@ -162,11 +162,7 @@ export default async function AdminPage() {
                   <form className="grid gap-3 lg:grid-cols-3" action={updatePartner}>
                     <input type="hidden" name="id" value={partner.id} />
                     <Input name="name" defaultValue={partner.name} required />
-                    <Select
-                      name="categoryId"
-                      defaultValue={partner.category_id}
-                      required
-                    >
+                    <Select name="categoryId" defaultValue={partner.category_id} required>
                       {safeCategories.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.label}

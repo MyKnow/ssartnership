@@ -41,10 +41,14 @@ export async function updateCategory(formData: FormData) {
   }
 
   const supabase = getSupabaseServerClient();
-  await supabase.from("categories").update({ key, label, description }).eq("id", id);
+  await supabase
+    .from("categories")
+    .update({ key, label, description })
+    .eq("id", id);
 
   revalidatePath("/");
   revalidatePath("/admin");
+  redirect("/admin");
 }
 
 export async function deleteCategory(formData: FormData) {
@@ -129,6 +133,7 @@ export async function updatePartner(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/admin");
+  redirect("/admin");
 }
 
 export async function deletePartner(formData: FormData) {

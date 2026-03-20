@@ -12,5 +12,12 @@ export function getSupabaseServerClient() {
     auth: {
       persistSession: false,
     },
+    global: {
+      fetch: (input, init) =>
+        fetch(input, {
+          ...init,
+          cache: "no-store",
+        }),
+    },
   });
 }
