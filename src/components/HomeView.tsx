@@ -5,6 +5,11 @@ import type { Category, CategoryKey, Partner } from "@/lib/types";
 import CategoryTabs, { CategoryTabOption } from "@/components/CategoryTabs";
 import PartnerCard from "@/components/PartnerCard";
 import ThemeToggle from "@/components/ThemeToggle";
+import SectionHeading from "@/components/ui/SectionHeading";
+import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+
+const suggestionUrl = process.env.NEXT_PUBLIC_MATTERMOST_DM_URL ?? "";
 
 export default function HomeView({
   categories,
@@ -16,6 +21,7 @@ export default function HomeView({
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
     "all",
   );
+  const [isSuggestOpen, setSuggestOpen] = useState(false);
 
   const tabOptions: CategoryTabOption[] = useMemo(() => {
     return [
@@ -40,25 +46,25 @@ export default function HomeView({
   }, [activeCategory, partners]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-surface/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               SSAFY 15기 서울 캠퍼스
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+            <h1 className="mt-2 text-2xl font-semibold text-foreground">
               제휴 혜택 카드뷰
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={() => setSuggestOpen(true)}>
+              제안하기
+            </Button>
             <ThemeToggle />
-            <a
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:text-slate-200"
-              href="/admin"
-            >
+            <Button variant="ghost" href="/admin">
               Admin 관리
-            </a>
+            </Button>
           </div>
         </div>
       </header>
@@ -82,14 +88,10 @@ export default function HomeView({
         </section>
 
         <section className="mt-10 flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-              카테고리별 혜택
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              신규 카테고리는 Admin에서 추가될 예정입니다.
-            </p>
-          </div>
+          <SectionHeading
+            title="카테고리별 혜택"
+            description="신규 카테고리는 Admin에서 추가될 예정입니다."
+          />
           <CategoryTabs
             options={tabOptions}
             activeKey={activeCategory}
@@ -99,8 +101,8 @@ export default function HomeView({
 
         <section className="mt-10">
           {filteredPartners.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-700 dark:bg-slate-900">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+            <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">
+              <p className="text-sm text-muted-foreground">
                 아직 등록된 제휴가 없습니다.
               </p>
             </div>
@@ -119,6 +121,27 @@ export default function HomeView({
           )}
         </section>
       </main>
+
+      <Modal
+        open={isSuggestOpen}
+        title="제휴 제안"
+        description="제휴를 추진했으면 하는 카테고리나 업체가 있으신가요?"
+        onClose={() => setSuggestOpen(false)}
+      >
+        <Button variant="ghost" onClick={() => setSuggestOpen(false)}>
+          취소
+        </Button>
+        <Button
+          onClick={() => {
+            if (!suggestionUrl) {
+              return;
+            }
+            window.location.href = suggestionUrl;
+          }}
+        >
+          제안하기
+        </Button>
+      </Modal>
     </div>
   );
 }

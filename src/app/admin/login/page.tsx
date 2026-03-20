@@ -1,37 +1,56 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { setAdminSession, validateAdminCredentials } from "@/lib/auth";
+import { isBlocked, recordAttempt } from "@/lib/rate-limit";
 import ThemeToggle from "@/components/ThemeToggle";
+import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 async function loginAction(formData: FormData) {
   "use server";
   const id = String(formData.get("id") || "");
   const password = String(formData.get("password") || "");
 
-  if (validateAdminCredentials(id, password)) {
+  const headerStore = await headers();
+  const forwardedFor = headerStore.get("x-forwarded-for");
+  const clientIp = forwardedFor?.split(",")[0]?.trim() || "local";
+
+  if (await isBlocked(clientIp)) {
+    redirect(`/admin/login?error=rate&id=${encodeURIComponent(id)}`);
+  }
+
+  const ok = validateAdminCredentials(id, password);
+  await recordAttempt(clientIp, ok);
+
+  if (ok) {
     await setAdminSession();
     redirect("/admin");
   }
 
-  redirect("/admin/login?error=1");
+  redirect(`/admin/login?error=1&id=${encodeURIComponent(id)}`);
 }
 
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<{ error?: string; id?: string }>;
 }) {
   const params = (await searchParams) ?? {};
   const hasError = params.error === "1";
+  const isRateLimited = params.error === "rate";
+  const defaultId = params.id ?? "";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 dark:bg-slate-950">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="flex min-h-screen items-center justify-center bg-background px-6">
+      <Card className="w-full max-w-md">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               SSAFY 15기 Admin
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+            <h1 className="mt-2 text-2xl font-semibold text-foreground">
               관리자 로그인
             </h1>
           </div>
@@ -39,40 +58,31 @@ export default async function AdminLoginPage({
         </div>
 
         <form className="mt-6 flex flex-col gap-4" action={loginAction}>
-          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             ID
-            <input
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
-              name="id"
-              placeholder="운영진 ID"
-              required
-            />
+            <Input name="id" placeholder="운영진 ID" required defaultValue={defaultId} />
           </label>
-          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             Password
-            <input
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
-              name="password"
-              type="password"
-              placeholder="비밀번호"
-              required
-            />
+            <PasswordInput name="password" placeholder="비밀번호" required />
           </label>
 
           {hasError ? (
-            <p className="text-xs font-semibold text-rose-500">
+            <p className="text-xs font-semibold text-danger">
               로그인 정보가 일치하지 않습니다.
             </p>
           ) : null}
+          {isRateLimited ? (
+            <p className="text-xs font-semibold text-danger">
+              로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.
+            </p>
+          ) : null}
 
-          <button
-            className="mt-2 rounded-2xl bg-slate-900 py-3 text-sm font-semibold text-white"
-            type="submit"
-          >
+          <Button className="mt-2 w-full" type="submit">
             로그인
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -1,18 +1,45 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8fafc;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
   --foreground: #0f172a;
-  --brand: #111827;
-  --brand-soft: #1f2937;
+  --muted-foreground: #64748b;
+  --primary: #0f172a;
+  --primary-foreground: #ffffff;
+  --danger: #f43f5e;
+}
+
+html.dark {
+  --background: #05070f;
+  --surface: #0f172a;
+  --surface-muted: #111827;
+  --border: #1f2937;
+  --border-strong: #334155;
+  --foreground: #f8fafc;
+  --muted-foreground: #94a3b8;
+  --primary: #f8fafc;
+  --primary-foreground: #0f172a;
+  --danger: #fb7185;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-strong: var(--border-strong);
   --color-foreground: var(--foreground);
-  --color-brand: var(--brand);
-  --color-brand-soft: var(--brand-soft);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-danger: var(--danger);
   --font-sans: "Pretendard Variable", "Pretendard", "Noto Sans KR",
     "Apple SD Gothic Neo", sans-serif;
 }
