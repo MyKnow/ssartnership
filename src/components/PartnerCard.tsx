@@ -174,10 +174,7 @@ export default function PartnerCard({
           </div>
         )}
       </div>
-      <div className="mt-5 flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          제휴 문의는 운영진에게 전달
-        </p>
+      <div className="mt-5 flex items-center justify-end">
         {partner.mapUrl ? (
           <a
             className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-strong"

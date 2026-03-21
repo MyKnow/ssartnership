@@ -1,35 +1,29 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { MoonIcon, SunIcon } from "@heroicons/react/24/solid";
 import Button from "@/components/ui/Button";
 
 export default function ThemeToggle() {
-  const { theme, setTheme, systemTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="h-9 w-20 rounded-full border border-border bg-surface" />
-    );
-  }
-
-  const resolvedTheme = theme === "system" ? systemTheme : theme;
+  const { theme, setTheme, systemTheme, resolvedTheme } = useTheme();
+  const activeTheme =
+    resolvedTheme ?? (theme === "system" ? systemTheme : theme) ?? "light";
 
   return (
     <Button
       type="button"
       variant="ghost"
-      className="px-3 py-2 text-xs"
-      onClick={() =>
-        setTheme(resolvedTheme === "dark" ? "light" : "dark")
-      }
+      size="icon"
+      onClick={() => setTheme(activeTheme === "dark" ? "light" : "dark")}
+      ariaLabel="테마 변경"
+      title="테마 변경"
     >
-      {resolvedTheme === "dark" ? "다크" : "라이트"}
+      <span className="block dark:hidden">
+        <MoonIcon className="h-5 w-5" />
+      </span>
+      <span className="hidden dark:block">
+        <SunIcon className="h-5 w-5" />
+      </span>
     </Button>
   );
 }
