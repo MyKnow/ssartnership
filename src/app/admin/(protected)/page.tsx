@@ -59,7 +59,7 @@ export default async function AdminPage() {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              SSAFY 15기 운영
+              SSARTNERSHIP
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-foreground">
               Admin 제휴 관리

@@ -4,7 +4,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SSAFY 15기 제휴 혜택",
+  title: "SSAFY 제휴 혜택 플랫폼 - SSARTNERSHIP",
   description: "카테고리별 제휴 업체와 혜택을 카드뷰로 확인하세요.",
 };
 
