@@ -12,13 +12,13 @@ import {
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 import EmptyState from "@/components/ui/EmptyState";
 import { ADMIN_COPY } from "@/lib/content";
+import PartnerCard from "@/components/PartnerCard";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +56,11 @@ export default async function AdminPage() {
 
   const safeCategories = categories ?? [];
   const safePartners = partners ?? [];
+  const categoryOptions = safeCategories.map((category) => ({
+    id: category.id,
+    label: category.label,
+  }));
+  const defaultCategoryId = categoryOptions[0]?.id ?? "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -156,90 +161,56 @@ export default async function AdminPage() {
               title="제휴 업체 관리"
               description="혜택/태그는 콤마(,)로 구분해 입력합니다."
             />
+            <div className="mt-6 grid gap-6">
+              <PartnerCard
+                mode="create"
+                partner={{
+                  name: "",
+                  location: "",
+                  mapUrl: "",
+                  contact: "",
+                  period: { start: "", end: "" },
+                  benefits: [],
+                  tags: [],
+                }}
+                categoryOptions={categoryOptions}
+                categoryId={defaultCategoryId}
+                formAction={createPartner}
+                submitLabel="제휴 추가"
+              />
 
-            <form className="mt-6 grid gap-4 lg:grid-cols-3" action={createPartner}>
-              <Input name="name" placeholder="업체명" required />
-              <Select name="categoryId" required>
-                {safeCategories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.label}
-                  </option>
-                ))}
-              </Select>
-              <Input name="location" placeholder="위치" required />
-              <Input name="mapUrl" placeholder="지도 URL" />
-              <Input name="contact" placeholder="연락처" required />
-              <Input name="periodStart" placeholder="시작일" />
-              <Input name="periodEnd" placeholder="종료일" />
-              <Input name="benefits" placeholder="혜택 목록" />
-              <Input name="tags" placeholder="태그" />
-              <SubmitButton pendingText="등록 중">제휴 추가</SubmitButton>
-            </form>
-
-            <div className="mt-6 grid gap-4">
               {safePartners.length === 0 ? (
                 <EmptyState
                   title={ADMIN_COPY.emptyPartnerTitle}
                   description={ADMIN_COPY.emptyPartnerDescription}
                 />
               ) : (
-                safePartners.map((partner) => (
-                  <div
-                    key={partner.id}
-                    className="rounded-2xl border border-border bg-surface-muted p-4"
-                  >
-                    <form className="grid gap-3 lg:grid-cols-3" action={updatePartner}>
-                      <input type="hidden" name="id" value={partner.id} />
-                      <Input name="name" defaultValue={partner.name} required />
-                      <Select name="categoryId" defaultValue={partner.category_id} required>
-                        {safeCategories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.label}
-                          </option>
-                        ))}
-                      </Select>
-                      <Input
-                        name="location"
-                        defaultValue={partner.location}
-                        required
-                      />
-                      <Input
-                        name="mapUrl"
-                        defaultValue={partner.map_url ?? ""}
-                      />
-                      <Input
-                        name="contact"
-                        defaultValue={partner.contact}
-                        required
-                      />
-                      <Input
-                        name="periodStart"
-                        defaultValue={partner.period_start ?? ""}
-                      />
-                      <Input
-                        name="periodEnd"
-                        defaultValue={partner.period_end ?? ""}
-                      />
-                      <Input
-                        name="benefits"
-                        defaultValue={(partner.benefits ?? []).join(", ")}
-                      />
-                      <Input
-                        name="tags"
-                        defaultValue={(partner.tags ?? []).join(", ")}
-                      />
-                      <SubmitButton variant="ghost" pendingText="수정 중">
-                        수정
-                      </SubmitButton>
-                    </form>
-                    <form className="mt-2" action={deletePartner}>
-                      <input type="hidden" name="id" value={partner.id} />
-                      <SubmitButton variant="danger" pendingText="삭제 중">
-                        삭제
-                      </SubmitButton>
-                    </form>
-                  </div>
-                ))
+                <div className="grid gap-6 md:grid-cols-2">
+                  {safePartners.map((partner) => (
+                    <PartnerCard
+                      key={partner.id}
+                      mode="edit"
+                      partner={{
+                        id: partner.id,
+                        name: partner.name ?? "",
+                        location: partner.location ?? "",
+                        mapUrl: partner.map_url ?? "",
+                        contact: partner.contact ?? "",
+                        period: {
+                          start: partner.period_start ?? "",
+                          end: partner.period_end ?? "",
+                        },
+                        benefits: partner.benefits ?? [],
+                        tags: partner.tags ?? [],
+                      }}
+                      categoryOptions={categoryOptions}
+                      categoryId={partner.category_id ?? defaultCategoryId}
+                      formAction={updatePartner}
+                      deleteAction={deletePartner}
+                      submitLabel="수정"
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </Card>

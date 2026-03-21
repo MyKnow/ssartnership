@@ -4,6 +4,31 @@ import type { Partner } from "@/lib/types";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import SubmitButton from "@/components/ui/SubmitButton";
+import { cn } from "@/lib/cn";
+
+type CategoryOption = {
+  id: string;
+  label: string;
+};
+
+type PartnerFormValues = {
+  id?: string;
+  name?: string;
+  location?: string;
+  mapUrl?: string;
+  contact?: string;
+  period?: {
+    start?: string;
+    end?: string;
+  };
+  benefits?: string[];
+  tags?: string[];
+};
+
+type PartnerCardMode = "view" | "edit" | "create";
 
 function isPhone(value: string) {
   return /^[+0-9()\-\s]{7,}$/.test(value);
@@ -114,11 +139,164 @@ export default function PartnerCard({
   partner,
   categoryLabel,
   categoryColor,
+  mode = "view",
+  categoryOptions,
+  categoryId,
+  formAction,
+  deleteAction,
+  submitLabel,
+  className,
 }: {
-  partner: Partner;
-  categoryLabel: string;
+  partner: Partner | PartnerFormValues;
+  categoryLabel?: string;
   categoryColor?: string;
+  mode?: PartnerCardMode;
+  categoryOptions?: CategoryOption[];
+  categoryId?: string;
+  formAction?: (formData: FormData) => void | Promise<void>;
+  deleteAction?: (formData: FormData) => void | Promise<void>;
+  submitLabel?: string;
+  className?: string;
 }) {
+  if (mode !== "view") {
+    const formPartner = partner as PartnerFormValues;
+    const benefitsValue = (formPartner.benefits ?? []).join(", ");
+    const tagsValue = (formPartner.tags ?? []).join(", ");
+    const periodStart = formPartner.period?.start ?? "";
+    const periodEnd = formPartner.period?.end ?? "";
+
+    return (
+      <article
+        className={cn(
+          "flex h-full w-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-sm",
+          className,
+        )}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-foreground">
+            {mode === "create" ? "새 제휴 추가" : "제휴 정보 수정"}
+          </p>
+          <span className="text-xs text-muted-foreground">
+            {periodStart || periodEnd ? `${periodStart} ~ ${periodEnd}` : ""}
+          </span>
+        </div>
+
+        <form action={formAction} className="grid gap-3">
+          {mode === "edit" && formPartner.id ? (
+            <input type="hidden" name="id" value={formPartner.id} />
+          ) : null}
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              업체명
+            </span>
+            <Input name="name" defaultValue={formPartner.name ?? ""} required />
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              카테고리
+            </span>
+            <Select
+              name="categoryId"
+              defaultValue={categoryId}
+              required
+            >
+              {(categoryOptions ?? []).map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              위치
+            </span>
+            <Input
+              name="location"
+              defaultValue={formPartner.location ?? ""}
+              required
+            />
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              지도 URL
+            </span>
+            <Input name="mapUrl" defaultValue={formPartner.mapUrl ?? ""} />
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              예약/문의 링크
+            </span>
+            <Input
+              name="contact"
+              defaultValue={formPartner.contact ?? ""}
+              required
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                시작일
+              </span>
+              <Input
+                type="date"
+                name="periodStart"
+                defaultValue={periodStart}
+              />
+            </div>
+            <div className="grid gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                종료일
+              </span>
+              <Input type="date" name="periodEnd" defaultValue={periodEnd} />
+            </div>
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              혜택
+            </span>
+            <Input
+              name="benefits"
+              defaultValue={benefitsValue}
+              placeholder="혜택1, 혜택2"
+            />
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              태그
+            </span>
+            <Input
+              name="tags"
+              defaultValue={tagsValue}
+              placeholder="태그1, 태그2"
+            />
+          </div>
+
+          <SubmitButton pendingText="저장 중" className="w-full">
+            {submitLabel ?? (mode === "create" ? "제휴 추가" : "수정")}
+          </SubmitButton>
+        </form>
+
+        {mode === "edit" && deleteAction && formPartner.id ? (
+          <form action={deleteAction}>
+            <input type="hidden" name="id" value={formPartner.id} />
+            <SubmitButton variant="danger" pendingText="삭제 중" className="w-full">
+              삭제
+            </SubmitButton>
+          </form>
+        ) : null}
+      </article>
+    );
+  }
+
   const badgeStyle = categoryColor
     ? {
         backgroundColor: withAlpha(categoryColor, "1f"),
@@ -133,12 +311,25 @@ export default function PartnerCard({
       }
     : undefined;
 
-  const action = getReservationAction(partner.contact);
-  const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name);
-  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
+  const viewPartner = partner as Partner;
+  const action = getReservationAction(viewPartner.contact);
+  const mapLink = getMapLink(
+    viewPartner.mapUrl,
+    viewPartner.location,
+    viewPartner.name,
+  );
+  const isActive = isWithinPeriod(
+    viewPartner.period.start,
+    viewPartner.period.end,
+  );
 
   return (
-    <article className="relative flex h-full w-full max-w-sm flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:max-w-none">
+    <article
+      className={cn(
+        "relative flex h-full w-full max-w-sm flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:max-w-none",
+        className,
+      )}
+    >
       {!isActive ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-950/60 text-sm font-semibold text-white">
           제휴 기간이 아닙니다.
@@ -153,15 +344,15 @@ export default function PartnerCard({
             {categoryLabel}
           </Badge>
           <span className="text-xs font-medium text-muted-foreground">
-            {partner.period.start} ~ {partner.period.end}
+            {viewPartner.period.start} ~ {viewPartner.period.end}
           </span>
         </div>
         <div>
           <h3 className="text-lg font-semibold text-foreground">
-            {partner.name}
+            {viewPartner.name}
           </h3>
           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{partner.location}</span>
+            <span>{viewPartner.location}</span>
             {mapLink ? (
               <a
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
@@ -193,7 +384,7 @@ export default function PartnerCard({
         <div className="text-sm text-foreground">
           <p className="font-medium text-foreground">혜택</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {partner.benefits.map((benefit) => (
+            {viewPartner.benefits.map((benefit) => (
               <Badge
                 key={benefit}
                 className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
@@ -203,9 +394,9 @@ export default function PartnerCard({
             ))}
           </div>
         </div>
-        {partner.tags && partner.tags.length > 0 && (
+        {viewPartner.tags && viewPartner.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {partner.tags.map((tag) => (
+            {viewPartner.tags.map((tag) => (
               <Chip
                 key={tag}
                 style={chipStyle}
