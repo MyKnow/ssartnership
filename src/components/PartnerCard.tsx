@@ -1,14 +1,9 @@
 "use client";
 
 import type { Partner } from "@/lib/types";
-import { Copy } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
-import { useToast } from "@/components/ui/Toast";
-
-function isEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
+import Button from "@/components/ui/Button";
 
 function isPhone(value: string) {
   return /^[+0-9()\-\s]{7,}$/.test(value);
@@ -24,6 +19,18 @@ function isUrl(value: string) {
 
 function isInstagram(value: string) {
   return /instagram\.com/i.test(value) || /^@[\w.]+$/.test(value);
+}
+
+function isKakaoPlus(value: string) {
+  return /pf\.kakao\.com/i.test(value) || /plus\.kakao\.com/i.test(value);
+}
+
+function isBookingLink(value: string) {
+  return (
+    /booking\.naver\.com/i.test(value) ||
+    /booking\.kakao\.com/i.test(value) ||
+    /reserve\.kakao\.com/i.test(value)
+  );
 }
 
 function toInstagramUrl(value: string) {
@@ -43,6 +50,66 @@ function withAlpha(color: string, alphaHex: string) {
   return `${color}${alphaHex}`;
 }
 
+function parseDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  return new Date(`${value}T00:00:00`);
+}
+
+function isWithinPeriod(start: string, end: string) {
+  const startDate = parseDate(start);
+  const endDate = parseDate(end);
+  if (!startDate && !endDate) {
+    return true;
+  }
+  const today = new Date();
+  const todayDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  if (startDate && todayDate < startDate) {
+    return false;
+  }
+  if (endDate && todayDate > endDate) {
+    return false;
+  }
+  return true;
+}
+
+function isNationwide(location: string) {
+  return /전국/.test(location);
+}
+
+function getMapLink(mapUrl: string | undefined, location: string, name: string) {
+  if (mapUrl) {
+    return mapUrl;
+  }
+  if (isNationwide(location)) {
+    return `https://map.naver.com/p/search/${encodeURIComponent(name)}`;
+  }
+  return undefined;
+}
+
+function getReservationAction(contact: string) {
+  if (isBookingLink(contact)) {
+    return { label: "예약하기", href: contact };
+  }
+  if (isKakaoPlus(contact)) {
+    return { label: "카카오톡 문의하기", href: contact };
+  }
+  if (isInstagram(contact)) {
+    return { label: "인스타그램 보기", href: toInstagramUrl(contact) };
+  }
+  if (isPhone(contact)) {
+    return { label: "전화 예약하기", href: `tel:${normalizePhone(contact)}` };
+  }
+  if (isUrl(contact)) {
+    return { label: "문의하기", href: contact };
+  }
+  return null;
+}
 export default function PartnerCard({
   partner,
   categoryLabel,
@@ -66,10 +133,17 @@ export default function PartnerCard({
       }
     : undefined;
 
-  const { notify } = useToast();
+  const action = getReservationAction(partner.contact);
+  const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name);
+  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
 
   return (
-    <article className="flex h-full flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article className="relative flex h-full w-full max-w-sm flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:max-w-none">
+      {!isActive ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-950/60 text-sm font-semibold text-white">
+          제휴 기간이 아닙니다.
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <Badge
@@ -86,66 +160,34 @@ export default function PartnerCard({
           <h3 className="text-lg font-semibold text-foreground">
             {partner.name}
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {partner.location}
-          </p>
-        </div>
-        <div className="text-sm text-foreground">
-          <p className="font-medium text-foreground">연락처</p>
-          <div className="mt-1 flex items-center gap-2 text-muted-foreground">
-            {isEmail(partner.contact) ? (
+          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{partner.location}</span>
+            {mapLink ? (
               <a
-                href={`mailto:${partner.contact}`}
-                className="font-medium text-foreground hover:opacity-80"
-              >
-                {partner.contact}
-              </a>
-            ) : isPhone(partner.contact) ? (
-              <a
-                href={`tel:${normalizePhone(partner.contact)}`}
-                className="font-medium text-foreground hover:opacity-80"
-              >
-                {partner.contact}
-              </a>
-            ) : isInstagram(partner.contact) ? (
-              <a
-                href={toInstagramUrl(partner.contact)}
-                className="font-medium text-foreground hover:opacity-80"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
+                href={mapLink}
                 target="_blank"
                 rel="noreferrer"
+                aria-label="지도 보기"
+                title="지도 보기"
               >
-                {partner.contact}
+                <svg
+                  width={14}
+                  height={14}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+                  <path d="M9 3v15" />
+                  <path d="M15 6v15" />
+                </svg>
               </a>
-            ) : isUrl(partner.contact) ? (
-              <a
-                href={partner.contact}
-                className="font-medium text-foreground hover:opacity-80"
-                target="_blank"
-                rel="noreferrer"
-              >
-                {partner.contact}
-              </a>
-            ) : (
-              <span className="font-medium text-foreground">
-                {partner.contact}
-              </span>
-            )}
-            <button
-              type="button"
-              className="rounded-full border border-border p-1 text-foreground hover:border-strong"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(partner.contact);
-                  notify("연락처가 복사되었습니다.");
-                } catch {
-                  notify("복사에 실패했습니다.");
-                }
-              }}
-              aria-label="연락처 복사"
-              title="복사"
-            >
-              <Copy size={14} />
-            </button>
+            ) : null}
           </div>
         </div>
         <div className="text-sm text-foreground">
@@ -154,7 +196,7 @@ export default function PartnerCard({
             {partner.benefits.map((benefit) => (
               <Badge
                 key={benefit}
-                className="bg-surface-muted text-foreground"
+                className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
               >
                 {benefit}
               </Badge>
@@ -174,17 +216,19 @@ export default function PartnerCard({
           </div>
         )}
       </div>
-      <div className="mt-5 flex items-center justify-end">
-        {partner.mapUrl ? (
-          <a
-            className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground hover:border-strong"
-            href={partner.mapUrl}
-            target="_blank"
-            rel="noreferrer"
+      <div className="mt-5 flex flex-col gap-2">
+        {action ? (
+          <Button
+            variant="ghost"
+            href={action.href}
+            target={action.href.startsWith("http") ? "_blank" : undefined}
+            rel={action.href.startsWith("http") ? "noreferrer" : undefined}
+            className="w-full justify-center"
           >
-            지도 보기
-          </a>
+            {action.label}
+          </Button>
         ) : null}
+        {null}
       </div>
     </article>
   );

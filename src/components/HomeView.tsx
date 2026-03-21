@@ -82,14 +82,13 @@ export default function HomeView({
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-300">
               SSAFY Partnership
             </p>
-            <h2 className="mt-4 text-3xl font-semibold leading-tight">
-              캠퍼스 인근 제휴를 한눈에 보고,
-              <br />
-              합리적으로 이용하세요.
+            <h2 className="mt-4 text-4xl font-semibold leading-tight">
+              교육생들을 위한 제휴 혜택
             </h2>
-            <p className="mt-4 text-base text-slate-200">
-              혜택, 연락처, 위치를
-              빠르게 확인하세요.
+            <p className="mt-4 text-sm text-slate-200">
+              SSAFY 학생들을 위한 다양한 제휴 혜택을 한눈에 확인하세요. 
+              <br />
+              카테고리별로 원하는 혜택을 쉽게 찾아볼 수 있습니다.
             </p>
           </div>
         </section>
@@ -114,7 +113,7 @@ export default function HomeView({
               </p>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid justify-items-center gap-y-6 gap-x-4 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
               {filteredPartners.map((partner) => (
                 <PartnerCard
                   key={partner.id}

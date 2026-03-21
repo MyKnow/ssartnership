@@ -26,7 +26,7 @@ export default function Footer() {
             >
               <FaGithub className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" href="mailto:myknow00@naver.com">
+            <Button variant="ghost" href={suggestionUrl}>
               버그 제보
             </Button>
             <Button variant="ghost" href={suggestionUrl}>
