@@ -3,21 +3,26 @@
 import { FaGithub } from "react-icons/fa";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
-
-const suggestionUrl = process.env.NEXT_PUBLIC_MATTERMOST_DM_URL ?? "#";
+import Container from "@/components/ui/Container";
+import {
+  BUG_REPORT_EMAIL,
+  GITHUB_URL,
+  SITE_NAME,
+  SUGGESTION_URL,
+} from "@/lib/site";
 
 export default function Footer() {
   return (
     <footer className="border-t border-border bg-surface/90 py-6 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 text-sm text-muted-foreground">
+      <Container className="flex flex-col gap-4 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground">
-            SSARTNERSHIP
+            {SITE_NAME}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="ghost"
-              href="https://github.com/MyKnow"
+              href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
               size="icon"
@@ -26,10 +31,10 @@ export default function Footer() {
             >
               <FaGithub className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" href={suggestionUrl}>
+            <Button variant="ghost" href={`mailto:${BUG_REPORT_EMAIL}`}>
               버그 제보
             </Button>
-            <Button variant="ghost" href={suggestionUrl}>
+            <Button variant="ghost" href={SUGGESTION_URL}>
               제휴 제안하기
             </Button>
             <Button
@@ -44,15 +49,15 @@ export default function Footer() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>Copyright © 2026 SSARTNERSHIP. All rights reserved.</p>
+          <p>Copyright © 2026 {SITE_NAME}. All rights reserved.</p>
           <a
-            href="mailto:myknow00@naver.com"
+            href={`mailto:${BUG_REPORT_EMAIL}`}
             className="font-medium text-foreground hover:opacity-80"
           >
-            myknow00@naver.com
+            {BUG_REPORT_EMAIL}
           </a>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }

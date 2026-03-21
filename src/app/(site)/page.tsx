@@ -1,9 +1,8 @@
 import { partnerRepository } from "@/lib/repositories";
 import HomeView from "@/components/HomeView";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const revalidate = 300;
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app";
 
 export default async function Home() {
   const [categories, partners] = await Promise.all([
@@ -14,9 +13,9 @@ export default async function Home() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "SSARTNERSHIP",
-    url: siteUrl,
-    description: "SSAFY 15기 서울 캠퍼스 제휴 혜택 안내",
+    name: SITE_NAME,
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
   };
 
   return (

@@ -1,30 +1,28 @@
 import type { Metadata } from "next";
 import ThemeProvider from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/ui/Toast";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app";
-
 export const metadata: Metadata = {
-  title: "SSAFY 제휴 혜택 플랫폼 - SSARTNERSHIP",
-  description: "카테고리별 제휴 업체와 혜택을 카드뷰로 확인하세요.",
-  metadataBase: new URL(siteUrl),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  metadataBase: new URL(SITE_URL),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "SSAFY 제휴 혜택 플랫폼 - SSARTNERSHIP",
-    description: "카테고리별 제휴 업체와 혜택을 카드뷰로 확인하세요.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     url: "/",
-    siteName: "SSARTNERSHIP",
+    siteName: SITE_NAME,
     locale: "ko_KR",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SSAFY 제휴 혜택 플랫폼 - SSARTNERSHIP",
-    description: "카테고리별 제휴 업체와 혜택을 카드뷰로 확인하세요.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
   robots: {
     index: true,
@@ -39,7 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className="bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+      <body className="bg-background text-foreground antialiased">
         <ThemeProvider>
           <ToastProvider>{children}</ToastProvider>
         </ThemeProvider>

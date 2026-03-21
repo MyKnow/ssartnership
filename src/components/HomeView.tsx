@@ -4,13 +4,16 @@ import { useMemo, useState } from "react";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
 import CategoryTabs, { CategoryTabOption } from "@/components/CategoryTabs";
 import PartnerCard from "@/components/PartnerCard";
-import ThemeToggle from "@/components/ThemeToggle";
+import HeroSection from "@/components/HeroSection";
+import SiteHeader from "@/components/SiteHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
-
-const suggestionUrl = process.env.NEXT_PUBLIC_MATTERMOST_DM_URL ?? "";
+import Container from "@/components/ui/Container";
+import { SUGGESTION_URL } from "@/lib/site";
+import EmptyState from "@/components/ui/EmptyState";
+import { HOME_COPY } from "@/lib/content";
 
 export default function HomeView({
   categories,
@@ -53,95 +56,87 @@ export default function HomeView({
   }, [activeCategory, partners]);
 
   const handleSuggest = () => {
-    if (!suggestionUrl) {
+    if (!SUGGESTION_URL) {
       return;
     }
     setSuggesting(true);
-    window.location.href = suggestionUrl;
+    window.location.href = SUGGESTION_URL;
+  };
+
+  const renderLines = (value: string) => {
+    const lines = value.split("\n");
+    return lines.map((line, index) => (
+      <span key={`${line}-${index}`}>
+        {line}
+        {index < lines.length - 1 ? <br /> : null}
+      </span>
+    ));
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-6 py-4">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground">
-            SSARTNERSHIP
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => setSuggestOpen(true)}>
-              제안하기
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+      <SiteHeader onSuggest={() => setSuggestOpen(true)} />
 
-      <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-10">
-        <section className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-8 py-10 text-white shadow-lg">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-300">
-              SSAFY Partnership
-            </p>
-            <h2 className="mt-4 text-4xl font-semibold leading-tight">
-              교육생들을 위한 제휴 혜택
-            </h2>
-            <p className="mt-4 text-sm text-slate-200">
-              SSAFY 학생들을 위한 다양한 제휴 혜택을 한눈에 확인하세요. 
-              <br />
-              카테고리별로 원하는 혜택을 쉽게 찾아볼 수 있습니다.
-            </p>
-          </div>
-        </section>
-
-        <section className="mt-10 flex flex-col gap-6">
-          <SectionHeading
-            title="카테고리별 혜택"
-            description="원하는 카테고리를 선택해보세요."
+      <main>
+        <Container className="pb-16 pt-10">
+          <HeroSection
+            eyebrow={HOME_COPY.heroEyebrow}
+            title={HOME_COPY.heroTitle}
+            description={renderLines(HOME_COPY.heroDescription)}
           />
-          <CategoryTabs
-            options={tabOptions}
-            activeKey={activeCategory}
-            onChange={setActiveCategory}
-          />
-        </section>
 
-        <section className="mt-10">
-          {filteredPartners.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                아직 등록된 제휴가 없습니다.
-              </p>
-            </div>
-          ) : (
-            <div className="grid justify-items-center gap-y-6 gap-x-4 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
-              {filteredPartners.map((partner) => (
-                <PartnerCard
-                  key={partner.id}
-                  partner={partner}
-                  categoryLabel={
-                    categoryMap.get(partner.category)?.label ?? "알 수 없음"
-                  }
-                  categoryColor={categoryMap.get(partner.category)?.color}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+          <section className="mt-10 flex flex-col gap-6">
+            <SectionHeading
+              title={HOME_COPY.categoryTitle}
+              description={HOME_COPY.categoryDescription}
+            />
+            <CategoryTabs
+              options={tabOptions}
+              activeKey={activeCategory}
+              onChange={setActiveCategory}
+            />
+          </section>
+
+          <section className="mt-10">
+            {filteredPartners.length === 0 ? (
+              <EmptyState
+                title={HOME_COPY.emptyTitle}
+                description={HOME_COPY.emptyDescription}
+              />
+            ) : (
+              <div className="grid justify-items-center gap-x-4 gap-y-6 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
+                {filteredPartners.map((partner) => (
+                  <PartnerCard
+                    key={partner.id}
+                    partner={partner}
+                    categoryLabel={
+                      categoryMap.get(partner.category)?.label ?? "알 수 없음"
+                    }
+                    categoryColor={categoryMap.get(partner.category)?.color}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </Container>
       </main>
 
       <Modal
         open={isSuggestOpen}
-        title="제휴 제안"
-        description="제휴를 추진했으면 하는 카테고리나 업체가 있으신가요?"
+        title={HOME_COPY.suggestionTitle}
+        description={HOME_COPY.suggestionDescription}
         onClose={() => setSuggestOpen(false)}
       >
         <Button variant="ghost" onClick={() => setSuggestOpen(false)}>
-          취소
+          {HOME_COPY.suggestionCancel}
         </Button>
-        <Button onClick={handleSuggest} disabled={isSuggesting}>
+        <Button
+          onClick={handleSuggest}
+          disabled={isSuggesting || !SUGGESTION_URL}
+        >
           <span className="inline-flex items-center gap-2">
             {isSuggesting ? <Spinner /> : null}
-            {isSuggesting ? "이동 중" : "제안하기"}
+            {isSuggesting ? "이동 중" : HOME_COPY.suggestionPrimary}
           </span>
         </Button>
       </Modal>

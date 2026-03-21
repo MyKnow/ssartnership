@@ -14,6 +14,11 @@
   --primary: #0f172a;
   --primary-foreground: #ffffff;
   --danger: #f43f5e;
+  --hero-from: #0f172a;
+  --hero-via: #1e293b;
+  --hero-to: #334155;
+  --hero-foreground: #ffffff;
+  --hero-muted: #cbd5e1;
 }
 
 html.dark {
@@ -27,6 +32,11 @@ html.dark {
   --primary: #f8fafc;
   --primary-foreground: #0f172a;
   --danger: #fb7185;
+  --hero-from: #0b1120;
+  --hero-via: #111827;
+  --hero-to: #1f2937;
+  --hero-foreground: #f8fafc;
+  --hero-muted: #cbd5f5;
 }
 
 @theme inline {
@@ -59,4 +69,21 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+@layer utilities {
+  .hero-surface {
+    background: linear-gradient(
+      135deg,
+      var(--hero-from),
+      var(--hero-via),
+      var(--hero-to)
+    );
+    color: var(--hero-foreground);
+  }
+
+  .hero-eyebrow,
+  .hero-body {
+    color: var(--hero-muted);
+  }
 }

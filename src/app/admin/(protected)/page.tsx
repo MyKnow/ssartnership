@@ -15,6 +15,10 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Container from "@/components/ui/Container";
+import { SITE_NAME } from "@/lib/site";
+import EmptyState from "@/components/ui/EmptyState";
+import { ADMIN_COPY } from "@/lib/content";
 
 export const dynamic = "force-dynamic";
 
@@ -56,10 +60,10 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-5">
+        <Container className="flex items-center justify-between gap-4 py-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              SSARTNERSHIP
+              {SITE_NAME}
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-foreground">
               Admin 제휴 관리
@@ -72,10 +76,11 @@ export default async function AdminPage() {
               사용자 화면
             </Button>
           </div>
-        </div>
+        </Container>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-10">
+      <main>
+        <Container className="pb-16 pt-10">
         <section className="grid gap-6">
           <Card>
             <SectionHeading
@@ -101,41 +106,48 @@ export default async function AdminPage() {
             </form>
 
             <div className="mt-6 grid gap-3">
-              {safeCategories.map((category) => (
-                <div
-                  key={category.id}
-                  className="rounded-2xl border border-border bg-surface-muted p-4"
-                >
-                  <form
-                    className="grid gap-3 lg:grid-cols-[160px_200px_1fr_120px_auto]"
-                    action={updateCategory}
+              {safeCategories.length === 0 ? (
+                <EmptyState
+                  title={ADMIN_COPY.emptyCategoryTitle}
+                  description={ADMIN_COPY.emptyCategoryDescription}
+                />
+              ) : (
+                safeCategories.map((category) => (
+                  <div
+                    key={category.id}
+                    className="rounded-2xl border border-border bg-surface-muted p-4"
                   >
-                    <input type="hidden" name="id" value={category.id} />
-                    <Input name="key" defaultValue={category.key} />
-                    <Input name="label" defaultValue={category.label} />
-                    <Input
-                      name="description"
-                      defaultValue={category.description ?? ""}
-                    />
-                    <input
-                      type="color"
-                      name="color"
-                      defaultValue={category.color ?? "#0f172a"}
-                      className="h-10 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
-                      title="카테고리 색상"
-                    />
-                    <SubmitButton variant="ghost" pendingText="수정 중">
-                      수정
-                    </SubmitButton>
-                  </form>
-                  <form className="mt-2" action={deleteCategory}>
-                    <input type="hidden" name="id" value={category.id} />
-                    <SubmitButton variant="danger" pendingText="삭제 중">
-                      삭제
-                    </SubmitButton>
-                  </form>
-                </div>
-              ))}
+                    <form
+                      className="grid gap-3 lg:grid-cols-[160px_200px_1fr_120px_auto]"
+                      action={updateCategory}
+                    >
+                      <input type="hidden" name="id" value={category.id} />
+                      <Input name="key" defaultValue={category.key} />
+                      <Input name="label" defaultValue={category.label} />
+                      <Input
+                        name="description"
+                        defaultValue={category.description ?? ""}
+                      />
+                      <input
+                        type="color"
+                        name="color"
+                        defaultValue={category.color ?? "#0f172a"}
+                        className="h-10 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
+                        title="카테고리 색상"
+                      />
+                      <SubmitButton variant="ghost" pendingText="수정 중">
+                        수정
+                      </SubmitButton>
+                    </form>
+                    <form className="mt-2" action={deleteCategory}>
+                      <input type="hidden" name="id" value={category.id} />
+                      <SubmitButton variant="danger" pendingText="삭제 중">
+                        삭제
+                      </SubmitButton>
+                    </form>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
 
@@ -165,66 +177,74 @@ export default async function AdminPage() {
             </form>
 
             <div className="mt-6 grid gap-4">
-              {safePartners.map((partner) => (
-                <div
-                  key={partner.id}
-                  className="rounded-2xl border border-border bg-surface-muted p-4"
-                >
-                  <form className="grid gap-3 lg:grid-cols-3" action={updatePartner}>
-                    <input type="hidden" name="id" value={partner.id} />
-                    <Input name="name" defaultValue={partner.name} required />
-                    <Select name="categoryId" defaultValue={partner.category_id} required>
-                      {safeCategories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.label}
-                        </option>
-                      ))}
-                    </Select>
-                    <Input
-                      name="location"
-                      defaultValue={partner.location}
-                      required
-                    />
-                    <Input
-                      name="mapUrl"
-                      defaultValue={partner.map_url ?? ""}
-                    />
-                    <Input
-                      name="contact"
-                      defaultValue={partner.contact}
-                      required
-                    />
-                    <Input
-                      name="periodStart"
-                      defaultValue={partner.period_start ?? ""}
-                    />
-                    <Input
-                      name="periodEnd"
-                      defaultValue={partner.period_end ?? ""}
-                    />
-                    <Input
-                      name="benefits"
-                      defaultValue={(partner.benefits ?? []).join(", ")}
-                    />
-                    <Input
-                      name="tags"
-                      defaultValue={(partner.tags ?? []).join(", ")}
-                    />
-                    <SubmitButton variant="ghost" pendingText="수정 중">
-                      수정
-                    </SubmitButton>
-                  </form>
-                  <form className="mt-2" action={deletePartner}>
-                    <input type="hidden" name="id" value={partner.id} />
-                    <SubmitButton variant="danger" pendingText="삭제 중">
-                      삭제
-                    </SubmitButton>
-                  </form>
-                </div>
-              ))}
+              {safePartners.length === 0 ? (
+                <EmptyState
+                  title={ADMIN_COPY.emptyPartnerTitle}
+                  description={ADMIN_COPY.emptyPartnerDescription}
+                />
+              ) : (
+                safePartners.map((partner) => (
+                  <div
+                    key={partner.id}
+                    className="rounded-2xl border border-border bg-surface-muted p-4"
+                  >
+                    <form className="grid gap-3 lg:grid-cols-3" action={updatePartner}>
+                      <input type="hidden" name="id" value={partner.id} />
+                      <Input name="name" defaultValue={partner.name} required />
+                      <Select name="categoryId" defaultValue={partner.category_id} required>
+                        {safeCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Input
+                        name="location"
+                        defaultValue={partner.location}
+                        required
+                      />
+                      <Input
+                        name="mapUrl"
+                        defaultValue={partner.map_url ?? ""}
+                      />
+                      <Input
+                        name="contact"
+                        defaultValue={partner.contact}
+                        required
+                      />
+                      <Input
+                        name="periodStart"
+                        defaultValue={partner.period_start ?? ""}
+                      />
+                      <Input
+                        name="periodEnd"
+                        defaultValue={partner.period_end ?? ""}
+                      />
+                      <Input
+                        name="benefits"
+                        defaultValue={(partner.benefits ?? []).join(", ")}
+                      />
+                      <Input
+                        name="tags"
+                        defaultValue={(partner.tags ?? []).join(", ")}
+                      />
+                      <SubmitButton variant="ghost" pendingText="수정 중">
+                        수정
+                      </SubmitButton>
+                    </form>
+                    <form className="mt-2" action={deletePartner}>
+                      <input type="hidden" name="id" value={partner.id} />
+                      <SubmitButton variant="danger" pendingText="삭제 중">
+                        삭제
+                      </SubmitButton>
+                    </form>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
         </section>
+        </Container>
       </main>
     </div>
   );
