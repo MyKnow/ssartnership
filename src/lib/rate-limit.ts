@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type AttemptState = {
   id: string;
@@ -16,7 +16,7 @@ function toISOString(date: Date) {
 }
 
 export async function isBlocked(identifier: string) {
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("admin_login_attempts")
     .select("blocked_until")
@@ -31,7 +31,7 @@ export async function isBlocked(identifier: string) {
 }
 
 export async function recordAttempt(identifier: string, success: boolean) {
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
 
   if (success) {
     await supabase

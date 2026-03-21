@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
 
 function parseList(value: string) {
@@ -23,7 +23,7 @@ export async function createCategory(formData: FormData) {
     return;
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
   await supabase.from("categories").insert({ key, label, description, color });
 
   revalidatePath("/");
@@ -42,7 +42,7 @@ export async function updateCategory(formData: FormData) {
     return;
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
   await supabase
     .from("categories")
     .update({ key, label, description, color })
@@ -60,7 +60,7 @@ export async function deleteCategory(formData: FormData) {
     return;
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
   await supabase.from("categories").delete().eq("id", id);
 
   revalidatePath("/");
@@ -83,7 +83,7 @@ export async function createPartner(formData: FormData) {
     return;
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
   await supabase.from("partners").insert({
     name,
     category_id: categoryId,
@@ -117,7 +117,7 @@ export async function updatePartner(formData: FormData) {
     return;
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
   await supabase
     .from("partners")
     .update({
@@ -145,7 +145,7 @@ export async function deletePartner(formData: FormData) {
     return;
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
   await supabase.from("partners").delete().eq("id", id);
 
   revalidatePath("/");

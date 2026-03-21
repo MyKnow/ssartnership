@@ -1,6 +1,6 @@
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerRepository } from "@/lib/repositories/partner-repository";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabasePublicClient } from "@/lib/supabase/server";
 
 function normalizeDate(value: string | null) {
   return value ?? "미정";
@@ -21,7 +21,7 @@ function extractCategoryKey(categories: unknown) {
 
 export class SupabasePartnerRepository implements PartnerRepository {
   async getCategories(): Promise<Category[]> {
-    const supabase = getSupabaseServerClient();
+    const supabase = getSupabasePublicClient();
     const { data, error } = await supabase
       .from("categories")
       .select("key,label,description,color")
@@ -42,7 +42,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
   }
 
   async getPartners(): Promise<Partner[]> {
-    const supabase = getSupabaseServerClient();
+    const supabase = getSupabasePublicClient();
     const { data, error } = await supabase
       .from("partners")
       .select(

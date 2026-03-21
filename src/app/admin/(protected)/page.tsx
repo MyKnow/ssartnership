@@ -1,5 +1,5 @@
 import ThemeToggle from "@/components/ThemeToggle";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   createCategory,
   createPartner,
@@ -38,7 +38,7 @@ export default async function AdminPage() {
     );
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
 
   const { data: categories } = await supabase
     .from("categories")

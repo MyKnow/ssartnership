@@ -9,6 +9,13 @@ import Button from "@/components/ui/Button";
 import SubmitButton from "@/components/ui/SubmitButton";
 import PasswordInput from "@/components/ui/PasswordInput";
 
+export const metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
 async function loginAction(formData: FormData) {
   "use server";
   const id = String(formData.get("id") || "");
