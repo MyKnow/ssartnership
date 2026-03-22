@@ -10,6 +10,7 @@ import Card from "@/components/ui/Card";
 import { getContactDisplay, getMapLink } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import ContactCopyRow from "@/components/ContactCopyRow";
+import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -143,6 +144,11 @@ export default async function PartnerDetailPage({
                 </div>
               ) : null}
             </Card>
+
+            <PartnerImageCarousel
+              images={partner.images ?? []}
+              name={partner.name}
+            />
 
             <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
               <Card className="p-6">

@@ -11,6 +11,7 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import { cn } from "@/lib/cn";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { getMapLink, getReservationAction } from "@/lib/partner-links";
+import ImageListEditor from "@/components/admin/ImageListEditor";
 
 type CategoryOption = {
   id: string;
@@ -29,6 +30,7 @@ type PartnerFormValues = {
   };
   benefits?: string[];
   conditions?: string[];
+  images?: string[];
   tags?: string[];
 };
 
@@ -200,6 +202,13 @@ export default function PartnerCard({
             />
           </div>
 
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              이미지
+            </span>
+            <ImageListEditor name="images" initial={formPartner.images ?? []} />
+          </div>
+
           <SubmitButton pendingText="저장 중" className="w-full">
             {submitLabel ?? (mode === "create" ? "제휴 추가" : "수정")}
           </SubmitButton>
@@ -293,24 +302,20 @@ export default function PartnerCard({
             {viewPartner.period.start} ~ {viewPartner.period.end}
           </span>
         </div>
-        <div>
-          <h3 className="text-xl font-semibold text-foreground">
-            {viewPartner.name}
-          </h3>
-          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{viewPartner.location}</span>
-            {mapLink ? (
-              <a
-                className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
-                href={mapLink}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="지도 보기"
-                title="지도 보기"
-              >
+        <div className="flex items-start gap-4">
+          <div className="aspect-square w-28 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
+            {viewPartner.images && viewPartner.images.length > 0 ? (
+              <img
+                src={viewPartner.images[0]}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                 <svg
-                  width={14}
-                  height={14}
+                  width={28}
+                  height={28}
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -319,12 +324,48 @@ export default function PartnerCard({
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
-                  <path d="M9 3v15" />
-                  <path d="M15 6v15" />
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 16l4-4 4 4 4-4 5 5" />
+                  <circle cx="9" cy="9" r="2" />
                 </svg>
-              </a>
-            ) : null}
+              </div>
+            )}
+          </div>
+          <div className="grid flex-1 gap-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-semibold leading-none text-foreground line-clamp-2">
+                {viewPartner.name}
+              </h3>
+              {mapLink ? (
+                <a
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
+                  href={mapLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="지도 보기"
+                  title="지도 보기"
+                >
+                  <svg
+                    width={14}
+                    height={14}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+                    <path d="M9 3v15" />
+                    <path d="M15 6v15" />
+                  </svg>
+                </a>
+              ) : null}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <span className="line-clamp-2">{viewPartner.location}</span>
+            </div>
           </div>
         </div>
         <div className="text-sm text-foreground">

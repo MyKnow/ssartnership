@@ -30,6 +30,7 @@ type AdminPartner = {
   period_end?: string | null;
   benefits?: string[] | null;
   conditions?: string[] | null;
+  images?: string[] | null;
   tags?: string[] | null;
 };
 
@@ -161,6 +162,7 @@ export default function AdminPartnerManager({
             period: { start: "", end: "" },
             benefits: [],
             conditions: [],
+            images: [],
             tags: [],
           }}
           categoryOptions={categoryOptions}
@@ -202,6 +204,7 @@ export default function AdminPartnerManager({
                 },
                 benefits: partner.benefits ?? [],
                 conditions: partner.conditions ?? [],
+                images: partner.images ?? [],
                 tags: partner.tags ?? [],
               }}
               categoryOptions={categoryOptions}

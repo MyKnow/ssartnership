@@ -20,6 +20,7 @@ export type Partner = {
   };
   benefits: string[];
   conditions?: string[];
+  images?: string[];
   tags?: string[];
   notes?: string;
 };

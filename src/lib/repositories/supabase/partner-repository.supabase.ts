@@ -46,7 +46,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,location,map_url,contact,period_start,period_end,benefits,conditions,tags,categories!inner(key)"
+        "id,name,location,map_url,contact,period_start,period_end,benefits,conditions,images,tags,categories!inner(key)"
       )
       .order("created_at", { ascending: false });
 
@@ -70,6 +70,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
           },
           benefits: item.benefits ?? [],
           conditions: item.conditions ?? [],
+          images: item.images ?? [],
           tags: item.tags ?? [],
         };
       }) ?? []
@@ -84,7 +85,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,category_id,name,location,map_url,contact,period_start,period_end,benefits,conditions,tags"
+        "id,category_id,name,location,map_url,contact,period_start,period_end,benefits,conditions,images,tags"
       )
       .eq("id", id)
       .maybeSingle();
@@ -120,6 +121,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
       },
       benefits: data.benefits ?? [],
       conditions: data.conditions ?? [],
+      images: data.images ?? [],
       tags: data.tags ?? [],
     };
   }

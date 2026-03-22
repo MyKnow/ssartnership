@@ -12,6 +12,13 @@ function parseList(value: string) {
     .filter(Boolean);
 }
 
+function parseMultiLine(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export async function createCategory(formData: FormData) {
   await requireAdmin();
   const key = String(formData.get("key") || "").trim();
@@ -78,6 +85,7 @@ export async function createPartner(formData: FormData) {
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
   const conditions = String(formData.get("conditions") || "").trim();
+  const images = String(formData.get("images") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
 
   if (!name || !categoryId || !location || !contact) {
@@ -95,6 +103,7 @@ export async function createPartner(formData: FormData) {
     period_end: periodEnd || null,
     benefits: parseList(benefits),
     conditions: parseList(conditions),
+    images: parseMultiLine(images),
     tags: parseList(tags),
   });
 
@@ -114,6 +123,7 @@ export async function updatePartner(formData: FormData) {
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
   const conditions = String(formData.get("conditions") || "").trim();
+  const images = String(formData.get("images") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
 
   if (!id || !name || !categoryId || !location || !contact) {
@@ -133,6 +143,7 @@ export async function updatePartner(formData: FormData) {
       period_end: periodEnd || null,
       benefits: parseList(benefits),
       conditions: parseList(conditions),
+      images: parseMultiLine(images),
       tags: parseList(tags),
     })
     .eq("id", id);

@@ -38,6 +38,7 @@ const partners: Partner[] = [
     contact: "02-123-4567",
     period: { start: "2026-03-01", end: "2026-08-31" },
     benefits: ["월 이용권 20% 할인", "PT 5회 패키지 10% 할인"],
+    images: [],
     tags: ["샤워실", "야간운영"],
   },
   {
@@ -49,6 +50,7 @@ const partners: Partner[] = [
     contact: "02-222-3344",
     period: { start: "2026-03-10", end: "2026-12-31" },
     benefits: ["식사 10% 할인", "평일 런치 음료 제공"],
+    images: [],
     tags: ["점심추천", "단체석"],
   },
   {
@@ -60,6 +62,7 @@ const partners: Partner[] = [
     contact: "010-9988-7766",
     period: { start: "2026-02-15", end: "2026-09-30" },
     benefits: ["아메리카노 15% 할인", "샌드위치 세트 1,000원 할인"],
+    images: [],
     tags: ["콘센트", "회의존"],
   },
   {
@@ -71,6 +74,7 @@ const partners: Partner[] = [
     contact: "02-789-0000",
     period: { start: "2026-01-01", end: "2026-06-30" },
     benefits: ["2시간 무료 이용", "시간권 30% 할인"],
+    images: [],
     tags: ["스터디룸", "프로젝터"],
   },
 ];
