@@ -77,6 +77,7 @@ export async function createPartner(formData: FormData) {
   const periodStart = String(formData.get("periodStart") || "").trim();
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
+  const conditions = String(formData.get("conditions") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
 
   if (!name || !categoryId || !location || !contact) {
@@ -93,6 +94,7 @@ export async function createPartner(formData: FormData) {
     period_start: periodStart || null,
     period_end: periodEnd || null,
     benefits: parseList(benefits),
+    conditions: parseList(conditions),
     tags: parseList(tags),
   });
 
@@ -111,6 +113,7 @@ export async function updatePartner(formData: FormData) {
   const periodStart = String(formData.get("periodStart") || "").trim();
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
+  const conditions = String(formData.get("conditions") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
 
   if (!id || !name || !categoryId || !location || !contact) {
@@ -129,6 +132,7 @@ export async function updatePartner(formData: FormData) {
       period_start: periodStart || null,
       period_end: periodEnd || null,
       benefits: parseList(benefits),
+      conditions: parseList(conditions),
       tags: parseList(tags),
     })
     .eq("id", id);

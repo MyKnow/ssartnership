@@ -46,7 +46,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,location,map_url,contact,period_start,period_end,benefits,tags,categories!inner(key)"
+        "id,name,location,map_url,contact,period_start,period_end,benefits,conditions,tags,categories!inner(key)"
       )
       .order("created_at", { ascending: false });
 
@@ -69,6 +69,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
             end: normalizeDate(item.period_end),
           },
           benefits: item.benefits ?? [],
+          conditions: item.conditions ?? [],
           tags: item.tags ?? [],
         };
       }) ?? []

@@ -21,9 +21,12 @@ create table if not exists partners (
   period_start date,
   period_end date,
   benefits text[] not null default '{}',
+  conditions text[] not null default '{}',
   tags text[] not null default '{}',
   created_at timestamp with time zone default now()
 );
+
+alter table partners add column if not exists conditions text[] not null default '{}';
 
 create table if not exists admin_login_attempts (
   id uuid primary key default uuid_generate_v4(),

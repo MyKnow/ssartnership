@@ -29,6 +29,7 @@ type AdminPartner = {
   period_start?: string | null;
   period_end?: string | null;
   benefits?: string[] | null;
+  conditions?: string[] | null;
   tags?: string[] | null;
 };
 
@@ -73,6 +74,7 @@ export default function AdminPartnerManager({
     const normalized = partners.map((partner, index) => {
       const categoryKey = categoryKeyById.get(partner.category_id) ?? "unknown";
       const benefits = partner.benefits ?? [];
+      const conditions = partner.conditions ?? [];
       const tags = partner.tags ?? [];
 
       return {
@@ -85,6 +87,7 @@ export default function AdminPartnerManager({
           partner.location,
           partner.contact,
           benefits.join(" "),
+          conditions.join(" "),
           tags.join(" "),
         ]
           .join(" ")
@@ -157,6 +160,7 @@ export default function AdminPartnerManager({
             contact: "",
             period: { start: "", end: "" },
             benefits: [],
+            conditions: [],
             tags: [],
           }}
           categoryOptions={categoryOptions}
@@ -197,6 +201,7 @@ export default function AdminPartnerManager({
                   end: partner.period_end ?? "",
                 },
                 benefits: partner.benefits ?? [],
+                conditions: partner.conditions ?? [],
                 tags: partner.tags ?? [],
               }}
               categoryOptions={categoryOptions}

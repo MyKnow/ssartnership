@@ -53,6 +53,7 @@ export default function HomeView({
         partner.location,
         partner.contact,
         partner.benefits.join(" "),
+        (partner.conditions ?? []).join(" "),
         (partner.tags ?? []).join(" "),
       ]
         .join(" ")

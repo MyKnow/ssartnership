@@ -26,6 +26,7 @@ type PartnerFormValues = {
     end?: string;
   };
   benefits?: string[];
+  conditions?: string[];
   tags?: string[];
 };
 
@@ -134,6 +135,7 @@ export default function PartnerCard({
   if (mode !== "view") {
     const formPartner = partner as PartnerFormValues;
     const benefitsValue = (formPartner.benefits ?? []).join(", ");
+    const conditionsValue = (formPartner.conditions ?? []).join(", ");
     const tagsValue = (formPartner.tags ?? []).join(", ");
     const periodStart = formPartner.period?.start ?? "";
     const periodEnd = formPartner.period?.end ?? "";
@@ -239,6 +241,17 @@ export default function PartnerCard({
               name="benefits"
               defaultValue={benefitsValue}
               placeholder="혜택1, 혜택2"
+            />
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              이용 조건
+            </span>
+            <Input
+              name="conditions"
+              defaultValue={conditionsValue}
+              placeholder="조건1, 조건2"
             />
           </div>
 
@@ -367,16 +380,31 @@ export default function PartnerCard({
             ))}
           </div>
         </div>
+        {viewPartner.conditions && viewPartner.conditions.length > 0 && (
+          <div className="text-sm text-foreground">
+            <p className="font-medium text-foreground">이용 조건</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {viewPartner.conditions.map((condition) => (
+                <Badge
+                  key={condition}
+                  className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {condition}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
         {viewPartner.tags && viewPartner.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {viewPartner.tags.map((tag) => (
-              <Chip
-                key={tag}
-                style={chipStyle}
-              >
-                #{tag}
-              </Chip>
-            ))}
+          <div className="text-sm text-foreground">
+            <p className="font-medium text-foreground">태그</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {viewPartner.tags.map((tag) => (
+                <Chip key={tag} style={chipStyle}>
+                  #{tag}
+                </Chip>
+              ))}
+            </div>
           </div>
         )}
       </div>
