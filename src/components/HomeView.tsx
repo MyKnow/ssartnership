@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
 import PartnerFilters, {
   PartnerSortOption,
@@ -9,14 +9,11 @@ import PartnerCard from "@/components/PartnerCard";
 import HeroSection from "@/components/HeroSection";
 import SiteHeader from "@/components/SiteHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
-import Button from "@/components/ui/Button";
-import Modal from "@/components/ui/Modal";
-import Spinner from "@/components/ui/Spinner";
 import Container from "@/components/ui/Container";
-import { SUGGESTION_URL } from "@/lib/site";
 import EmptyState from "@/components/ui/EmptyState";
 import { HOME_COPY } from "@/lib/content";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
+import { useToast } from "@/components/ui/Toast";
 
 export default function HomeView({
   categories,
@@ -30,8 +27,7 @@ export default function HomeView({
   );
   const [searchValue, setSearchValue] = useState("");
   const [sortValue, setSortValue] = useState<PartnerSortOption>("recent");
-  const [isSuggestOpen, setSuggestOpen] = useState(false);
-  const [isSuggesting, setSuggesting] = useState(false);
+  const { notify } = useToast();
 
   const categoryMap = useMemo(() => {
     return new Map(
@@ -83,14 +79,6 @@ export default function HomeView({
     });
   }, [activeCategory, partners, searchValue, sortValue]);
 
-  const handleSuggest = () => {
-    if (!SUGGESTION_URL) {
-      return;
-    }
-    setSuggesting(true);
-    window.location.href = SUGGESTION_URL;
-  };
-
   const renderLines = (value: string) => {
     const lines = value.split("\n");
     return lines.map((line, index) => (
@@ -101,9 +89,20 @@ export default function HomeView({
     ));
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const flag = sessionStorage.getItem("suggest:submitted");
+    if (flag) {
+      sessionStorage.removeItem("suggest:submitted");
+      notify("정상적으로 제출되었습니다.");
+    }
+  }, [notify]);
+
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader onSuggest={() => setSuggestOpen(true)} />
+      <SiteHeader />
 
       <main>
         <Container className="pb-16 pt-10">
@@ -161,25 +160,6 @@ export default function HomeView({
         </Container>
       </main>
 
-      <Modal
-        open={isSuggestOpen}
-        title={HOME_COPY.suggestionTitle}
-        description={HOME_COPY.suggestionDescription}
-        onClose={() => setSuggestOpen(false)}
-      >
-        <Button variant="ghost" onClick={() => setSuggestOpen(false)}>
-          {HOME_COPY.suggestionCancel}
-        </Button>
-        <Button
-          onClick={handleSuggest}
-          disabled={isSuggesting || !SUGGESTION_URL}
-        >
-          <span className="inline-flex items-center gap-2">
-            {isSuggesting ? <Spinner /> : null}
-            {isSuggesting ? "이동 중" : HOME_COPY.suggestionPrimary}
-          </span>
-        </Button>
-      </Modal>
     </div>
   );
 }

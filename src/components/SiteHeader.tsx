@@ -6,9 +6,9 @@ import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 
 export default function SiteHeader({
-  onSuggest,
+  suggestHref = "/suggest",
 }: {
-  onSuggest: () => void;
+  suggestHref?: string;
 }) {
   return (
     <header className="border-b border-border bg-surface/90 backdrop-blur">
@@ -17,8 +17,8 @@ export default function SiteHeader({
           {SITE_NAME}
         </p>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={onSuggest}>
-            제안하기
+          <Button variant="ghost" href={suggestHref}>
+            제휴 제안하기
           </Button>
           <ThemeToggle />
         </div>

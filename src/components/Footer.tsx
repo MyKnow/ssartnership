@@ -35,7 +35,7 @@ export default function Footer() {
               버그 제보
             </Button>
             <Button variant="ghost" href={SUGGESTION_URL}>
-              제휴 제안하기
+              업체 추천하기
             </Button>
             <Button
               variant="ghost"
