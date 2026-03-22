@@ -15,7 +15,7 @@ export default function SiteHeader({
       <Container className="flex items-center justify-between gap-3 py-4">
         <a
           href="/"
-          className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground hover:opacity-80"
+          className="inline-flex min-h-12 items-center text-sm font-semibold uppercase tracking-[0.24em] text-foreground hover:opacity-80"
         >
           {SITE_NAME}
         </a>

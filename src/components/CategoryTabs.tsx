@@ -26,7 +26,7 @@ export default function CategoryTabs({
             type="button"
             onClick={() => onChange(option.key)}
             className={cn(
-              "flex flex-col gap-1 rounded-2xl border px-4 py-3 text-left transition",
+              "flex min-h-12 min-w-12 flex-col gap-1 rounded-2xl border px-4 py-3 text-left transition",
               isActive
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-surface text-foreground hover:border-strong",

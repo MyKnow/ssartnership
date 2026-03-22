@@ -1,13 +1,13 @@
 import { cn } from "@/lib/cn";
 
 const base =
-  "inline-flex items-center justify-center rounded-full font-semibold leading-none transition";
+  "inline-flex min-h-12 min-w-12 items-center justify-center rounded-full font-semibold leading-none transition";
 
 const sizes = {
-  sm: "h-8 px-3 text-xs",
-  md: "h-9 px-4 text-sm",
-  lg: "h-11 px-5 text-base",
-  icon: "h-9 w-9 p-0 text-sm",
+  sm: "h-12 px-4 text-xs",
+  md: "h-12 px-5 text-sm",
+  lg: "h-12 px-6 text-base",
+  icon: "h-12 w-12 p-0 text-sm",
 };
 
 const variants = {

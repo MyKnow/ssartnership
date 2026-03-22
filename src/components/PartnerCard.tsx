@@ -341,7 +341,7 @@ export default function PartnerCard({
             <span>{viewPartner.location}</span>
             {mapLink ? (
               <a
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
+                className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
                 href={mapLink}
                 target="_blank"
                 rel="noreferrer"
