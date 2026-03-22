@@ -32,16 +32,12 @@ export default async function PartnerDetailPage({
   if (!rawId) {
     notFound();
   }
-  const [categories, partnerById, allPartners] = await Promise.all([
+  const [categories, partnerById] = await Promise.all([
     partnerRepository.getCategories(),
     partnerRepository.getPartnerById(rawId),
-    partnerRepository.getPartners(),
   ]);
 
-  const partner =
-    partnerById ??
-    allPartners.find((item) => item.id === rawId) ??
-    null;
+  const partner = partnerById ?? null;
 
   if (!partner) {
     notFound();

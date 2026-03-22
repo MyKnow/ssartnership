@@ -4,7 +4,8 @@ import type { PartnerRepository } from "@/lib/repositories/partner-repository";
 
 const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
 const hasSupabaseEnv =
-  !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  !!process.env.SUPABASE_URL &&
+  (!!process.env.SUPABASE_ANON_KEY || !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const repository: PartnerRepository =
   dataSource === "mock" || !hasSupabaseEnv
