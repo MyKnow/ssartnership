@@ -11,11 +11,14 @@ export default function SiteHeader({
   suggestHref?: string;
 }) {
   return (
-    <header className="border-b border-border bg-surface/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
       <Container className="flex items-center justify-between gap-3 py-4">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground">
+        <a
+          href="/"
+          className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground hover:opacity-80"
+        >
           {SITE_NAME}
-        </p>
+        </a>
         <div className="flex items-center gap-2">
           <Button variant="ghost" href={suggestHref}>
             제휴 제안하기
