@@ -11,25 +11,31 @@ export function parseDate(value?: string | null) {
   return new Date(`${value}T00:00:00`);
 }
 
+function getKstDateString() {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const year = kst.getUTCFullYear();
+  const month = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(kst.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function isWithinPeriod(
   start?: string | null,
   end?: string | null,
 ): boolean {
-  const startDate = parseDate(start ?? undefined);
-  const endDate = parseDate(end ?? undefined);
-  if (!startDate && !endDate) {
+  if (!start && !end) {
     return true;
   }
-  const today = new Date();
-  const todayDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
-  if (startDate && todayDate < startDate) {
+
+  const today = getKstDateString();
+  const startValue = start && /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : null;
+  const endValue = end && /^\d{4}-\d{2}-\d{2}$/.test(end) ? end : null;
+
+  if (startValue && today < startValue) {
     return false;
   }
-  if (endDate && todayDate > endDate) {
+  if (endValue && today > endValue) {
     return false;
   }
   return true;
