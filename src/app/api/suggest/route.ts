@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { BUG_REPORT_EMAIL } from "@/lib/site";
+import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,8 +30,24 @@ function toHtml(value: string) {
   return escapeHtml(value).replace(/\n/g, "<br />");
 }
 
+function getClientIdentifier(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() ?? "unknown";
+  }
+  return request.headers.get("x-real-ip") ?? "unknown";
+}
+
 export async function POST(request: Request) {
   try {
+    const identifier = getClientIdentifier(request);
+    if (await isBlocked(identifier, SUGGEST_RATE_LIMIT)) {
+      return NextResponse.json(
+        { message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+        { status: 429 },
+      );
+    }
+
     const payload = (await request.json()) as {
       companyName?: string;
       businessArea?: string;
@@ -62,6 +79,8 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    await recordAttempt(identifier, false, SUGGEST_RATE_LIMIT);
 
     const smtpUser = process.env.NAVER_SMTP_USER;
     const smtpPass = process.env.NAVER_SMTP_PASS;

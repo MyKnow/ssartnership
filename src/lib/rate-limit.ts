@@ -7,18 +7,31 @@ type AttemptState = {
   blockedUntil?: string | null;
 };
 
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 5;
-const BLOCK_MS = 15 * 60 * 1000;
+type RateLimitConfig = {
+  table: string;
+  windowMs: number;
+  maxAttempts: number;
+  blockMs: number;
+};
+
+const ADMIN_RATE_LIMIT: RateLimitConfig = {
+  table: "admin_login_attempts",
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 5,
+  blockMs: 15 * 60 * 1000,
+};
 
 function toISOString(date: Date) {
   return date.toISOString();
 }
 
-export async function isBlocked(identifier: string) {
+export async function isBlocked(
+  identifier: string,
+  config: RateLimitConfig = ADMIN_RATE_LIMIT,
+) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
-    .from("admin_login_attempts")
+    .from(config.table)
     .select("blocked_until")
     .eq("identifier", identifier)
     .maybeSingle();
@@ -30,19 +43,23 @@ export async function isBlocked(identifier: string) {
   return new Date(data.blocked_until).getTime() > Date.now();
 }
 
-export async function recordAttempt(identifier: string, success: boolean) {
+export async function recordAttempt(
+  identifier: string,
+  success: boolean,
+  config: RateLimitConfig = ADMIN_RATE_LIMIT,
+) {
   const supabase = getSupabaseAdminClient();
 
   if (success) {
     await supabase
-      .from("admin_login_attempts")
+      .from(config.table)
       .delete()
       .eq("identifier", identifier);
     return;
   }
 
   const { data } = await supabase
-    .from("admin_login_attempts")
+    .from(config.table)
     .select("id,count,first_attempt_at,blocked_until")
     .eq("identifier", identifier)
     .maybeSingle();
@@ -50,7 +67,7 @@ export async function recordAttempt(identifier: string, success: boolean) {
   const now = new Date();
 
   if (!data) {
-    await supabase.from("admin_login_attempts").insert({
+    await supabase.from(config.table).insert({
       identifier,
       count: 1,
       first_attempt_at: toISOString(now),
@@ -66,9 +83,9 @@ export async function recordAttempt(identifier: string, success: boolean) {
   };
 
   const windowStart = new Date(state.firstAttemptAt).getTime();
-  if (now.getTime() - windowStart > WINDOW_MS) {
+  if (now.getTime() - windowStart > config.windowMs) {
     await supabase
-      .from("admin_login_attempts")
+      .from(config.table)
       .update({
         count: 1,
         first_attempt_at: toISOString(now),
@@ -86,14 +103,21 @@ export async function recordAttempt(identifier: string, success: boolean) {
     count: nextCount,
   };
 
-  if (nextCount >= MAX_ATTEMPTS) {
+  if (nextCount >= config.maxAttempts) {
     updatePayload.blocked_until = toISOString(
-      new Date(now.getTime() + BLOCK_MS),
+      new Date(now.getTime() + config.blockMs),
     );
   }
 
   await supabase
-    .from("admin_login_attempts")
+    .from(config.table)
     .update(updatePayload)
     .eq("id", state.id);
 }
+
+export const SUGGEST_RATE_LIMIT: RateLimitConfig = {
+  table: "suggestion_attempts",
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 5,
+  blockMs: 30 * 60 * 1000,
+};

@@ -10,6 +10,11 @@ function getSecret() {
   if (!secret) {
     throw new Error("ADMIN_SESSION_SECRET 환경 변수가 필요합니다.");
   }
+  if (secret.length < 32) {
+    throw new Error(
+      "ADMIN_SESSION_SECRET는 최소 32자 이상의 난수여야 합니다.",
+    );
+  }
   return secret;
 }
 
