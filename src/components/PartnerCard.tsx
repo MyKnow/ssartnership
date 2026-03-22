@@ -8,6 +8,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { cn } from "@/lib/cn";
+import { isWithinPeriod } from "@/lib/partner-utils";
 
 type CategoryOption = {
   id: string;
@@ -73,34 +74,6 @@ function withAlpha(color: string, alphaHex: string) {
     return color;
   }
   return `${color}${alphaHex}`;
-}
-
-function parseDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null;
-  }
-  return new Date(`${value}T00:00:00`);
-}
-
-function isWithinPeriod(start: string, end: string) {
-  const startDate = parseDate(start);
-  const endDate = parseDate(end);
-  if (!startDate && !endDate) {
-    return true;
-  }
-  const today = new Date();
-  const todayDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
-  if (startDate && todayDate < startDate) {
-    return false;
-  }
-  if (endDate && todayDate > endDate) {
-    return false;
-  }
-  return true;
 }
 
 function isNationwide(location: string) {

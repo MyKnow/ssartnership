@@ -7,6 +7,8 @@ export const HOME_COPY = {
   categoryDescription: "원하는 카테고리를 선택해보세요.",
   emptyTitle: "아직 등록된 제휴가 없습니다.",
   emptyDescription: "새로운 제휴가 추가되면 바로 안내할게요.",
+  noResultsTitle: "검색 결과가 없습니다.",
+  noResultsDescription: "다른 키워드나 카테고리를 선택해보세요.",
   suggestionTitle: "제휴 제안",
   suggestionDescription: "제휴를 추진했으면 하는 카테고리나 업체가 있으신가요?",
   suggestionPrimary: "제안하기",
@@ -18,4 +20,6 @@ export const ADMIN_COPY = {
   emptyCategoryDescription: "새 카테고리를 추가해 주세요.",
   emptyPartnerTitle: "등록된 제휴 업체가 없습니다.",
   emptyPartnerDescription: "새 제휴를 등록해 주세요.",
+  noResultsTitle: "검색 결과가 없습니다.",
+  noResultsDescription: "필터 조건을 변경해보세요.",
 };

@@ -18,7 +18,7 @@ import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 import EmptyState from "@/components/ui/EmptyState";
 import { ADMIN_COPY } from "@/lib/content";
-import PartnerCard from "@/components/PartnerCard";
+import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
 
 export const dynamic = "force-dynamic";
 
@@ -56,11 +56,6 @@ export default async function AdminPage() {
 
   const safeCategories = categories ?? [];
   const safePartners = partners ?? [];
-  const categoryOptions = safeCategories.map((category) => ({
-    id: category.id,
-    label: category.label,
-  }));
-  const defaultCategoryId = categoryOptions[0]?.id ?? "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -161,58 +156,13 @@ export default async function AdminPage() {
               title="제휴 업체 관리"
               description="혜택/태그는 콤마(,)로 구분해 입력합니다."
             />
-            <div className="mt-6 grid gap-6">
-              <PartnerCard
-                mode="create"
-                partner={{
-                  name: "",
-                  location: "",
-                  mapUrl: "",
-                  contact: "",
-                  period: { start: "", end: "" },
-                  benefits: [],
-                  tags: [],
-                }}
-                categoryOptions={categoryOptions}
-                categoryId={defaultCategoryId}
-                formAction={createPartner}
-                submitLabel="제휴 추가"
-              />
-
-              {safePartners.length === 0 ? (
-                <EmptyState
-                  title={ADMIN_COPY.emptyPartnerTitle}
-                  description={ADMIN_COPY.emptyPartnerDescription}
-                />
-              ) : (
-                <div className="grid gap-6 md:grid-cols-2">
-                  {safePartners.map((partner) => (
-                    <PartnerCard
-                      key={partner.id}
-                      mode="edit"
-                      partner={{
-                        id: partner.id,
-                        name: partner.name ?? "",
-                        location: partner.location ?? "",
-                        mapUrl: partner.map_url ?? "",
-                        contact: partner.contact ?? "",
-                        period: {
-                          start: partner.period_start ?? "",
-                          end: partner.period_end ?? "",
-                        },
-                        benefits: partner.benefits ?? [],
-                        tags: partner.tags ?? [],
-                      }}
-                      categoryOptions={categoryOptions}
-                      categoryId={partner.category_id ?? defaultCategoryId}
-                      formAction={updatePartner}
-                      deleteAction={deletePartner}
-                      submitLabel="수정"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            <AdminPartnerManager
+              categories={safeCategories}
+              partners={safePartners}
+              createPartner={createPartner}
+              updatePartner={updatePartner}
+              deletePartner={deletePartner}
+            />
           </Card>
         </section>
         </Container>
