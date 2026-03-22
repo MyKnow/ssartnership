@@ -36,6 +36,17 @@ function toInstagramUrl(value: string) {
   return `https://instagram.com/${value}`;
 }
 
+function toInstagramLabel(value: string) {
+  if (value.startsWith("@")) {
+    return value;
+  }
+  const match = value.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
+  if (match?.[1]) {
+    return `@${match[1]}`;
+  }
+  return "@instagram";
+}
+
 function isNationwide(location: string) {
   return /전국/.test(location);
 }
@@ -52,6 +63,38 @@ export function getMapLink(
     return `https://map.naver.com/p/search/${encodeURIComponent(name)}`;
   }
   return undefined;
+}
+
+export function getContactDisplay(contact: string) {
+  if (isInstagram(contact)) {
+    return {
+      label: toInstagramLabel(contact),
+      href: toInstagramUrl(contact),
+      type: "instagram" as const,
+    };
+  }
+  if (isPhone(contact)) {
+    return {
+      label: contact,
+      href: `tel:${normalizePhone(contact)}`,
+      type: "phone" as const,
+    };
+  }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+    return {
+      label: contact,
+      href: `mailto:${contact}`,
+      type: "email" as const,
+    };
+  }
+  if (isUrl(contact)) {
+    return {
+      label: contact,
+      href: contact,
+      type: "web" as const,
+    };
+  }
+  return null;
 }
 
 export function getReservationAction(contact: string) {

@@ -7,8 +7,9 @@ import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import { getMapLink, getReservationAction } from "@/lib/partner-links";
+import { getContactDisplay, getMapLink } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
+import ContactCopyRow from "@/components/ContactCopyRow";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -60,7 +61,7 @@ export default async function PartnerDetailPage({
     : undefined;
 
   const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name);
-  const action = getReservationAction(partner.contact);
+  const contactDisplay = getContactDisplay(partner.contact);
   const isActive = isWithinPeriod(partner.period.start, partner.period.end);
 
   return (
@@ -69,9 +70,25 @@ export default async function PartnerDetailPage({
       <main>
         <Container className="pb-16 pt-10">
           <div className="flex flex-col gap-6">
-            <Button variant="ghost" href="/">
-              목록으로
-            </Button>
+            <a
+              href="/"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
+              aria-label="목록으로 돌아가기"
+            >
+              <svg
+                width={20}
+                height={20}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </a>
 
             <Card className="p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -129,10 +146,7 @@ export default async function PartnerDetailPage({
 
             <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
               <Card className="p-6">
-                <SectionHeading
-                  title="혜택"
-                  description="제휴 혜택 내용을 확인하세요."
-                />
+                <SectionHeading title="혜택" />
                 <div className="mt-4 flex flex-wrap gap-2">
                   {partner.benefits.map((benefit) => (
                     <Badge
@@ -175,20 +189,13 @@ export default async function PartnerDetailPage({
               </Card>
 
               <Card className="p-6">
-                <SectionHeading
-                  title="예약/문의"
-                  description="바로 연결할 수 있는 채널입니다."
-                />
-                {action ? (
-                  <Button
-                    className="mt-4 w-full justify-center"
-                    variant="ghost"
-                    href={action.href}
-                    target={action.href.startsWith("http") ? "_blank" : undefined}
-                    rel={action.href.startsWith("http") ? "noreferrer" : undefined}
-                  >
-                    {action.label}
-                  </Button>
+                <SectionHeading title="예약/문의" />
+                {contactDisplay ? (
+                  <ContactCopyRow
+                    href={contactDisplay.href}
+                    label={contactDisplay.label}
+                    rawValue={partner.contact}
+                  />
                 ) : (
                   <p className="mt-4 text-sm text-muted-foreground">
                     등록된 예약/문의 링크가 없습니다.
