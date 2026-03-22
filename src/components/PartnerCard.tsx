@@ -1,6 +1,7 @@
 "use client";
 
 import type { Partner } from "@/lib/types";
+import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
@@ -9,6 +10,7 @@ import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { cn } from "@/lib/cn";
 import { isWithinPeriod } from "@/lib/partner-utils";
+import { getMapLink, getReservationAction } from "@/lib/partner-links";
 
 type CategoryOption = {
   id: string;
@@ -32,44 +34,6 @@ type PartnerFormValues = {
 
 type PartnerCardMode = "view" | "edit" | "create";
 
-function isPhone(value: string) {
-  return /^[+0-9()\-\s]{7,}$/.test(value);
-}
-
-function normalizePhone(value: string) {
-  return value.replace(/[^\d+]/g, "");
-}
-
-function isUrl(value: string) {
-  return /^https?:\/\//i.test(value);
-}
-
-function isInstagram(value: string) {
-  return /instagram\.com/i.test(value) || /^@[\w.]+$/.test(value);
-}
-
-function isKakaoPlus(value: string) {
-  return /pf\.kakao\.com/i.test(value) || /plus\.kakao\.com/i.test(value);
-}
-
-function isBookingLink(value: string) {
-  return (
-    /booking\.naver\.com/i.test(value) ||
-    /booking\.kakao\.com/i.test(value) ||
-    /reserve\.kakao\.com/i.test(value)
-  );
-}
-
-function toInstagramUrl(value: string) {
-  if (/instagram\.com/i.test(value)) {
-    return value;
-  }
-  if (value.startsWith("@")) {
-    return `https://instagram.com/${value.slice(1)}`;
-  }
-  return `https://instagram.com/${value}`;
-}
-
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
     return color;
@@ -77,38 +41,7 @@ function withAlpha(color: string, alphaHex: string) {
   return `${color}${alphaHex}`;
 }
 
-function isNationwide(location: string) {
-  return /전국/.test(location);
-}
 
-function getMapLink(mapUrl: string | undefined, location: string, name: string) {
-  if (mapUrl) {
-    return mapUrl;
-  }
-  if (isNationwide(location)) {
-    return `https://map.naver.com/p/search/${encodeURIComponent(name)}`;
-  }
-  return undefined;
-}
-
-function getReservationAction(contact: string) {
-  if (isBookingLink(contact)) {
-    return { label: "예약하기", href: contact };
-  }
-  if (isKakaoPlus(contact)) {
-    return { label: "카카오톡 문의하기", href: contact };
-  }
-  if (isInstagram(contact)) {
-    return { label: "인스타그램 보기", href: toInstagramUrl(contact) };
-  }
-  if (isPhone(contact)) {
-    return { label: "전화 예약하기", href: `tel:${normalizePhone(contact)}` };
-  }
-  if (isUrl(contact)) {
-    return { label: "문의하기", href: contact };
-  }
-  return null;
-}
 export default function PartnerCard({
   partner,
   categoryLabel,
@@ -132,6 +65,7 @@ export default function PartnerCard({
   submitLabel?: string;
   className?: string;
 }) {
+  const router = useRouter();
   if (mode !== "view") {
     const formPartner = partner as PartnerFormValues;
     const benefitsValue = (formPartner.benefits ?? []).join(", ");
@@ -308,13 +242,39 @@ export default function PartnerCard({
     viewPartner.period.start,
     viewPartner.period.end,
   );
+  const detailHref = viewPartner.id
+    ? `/partners/${encodeURIComponent(viewPartner.id)}`
+    : null;
 
   return (
     <article
       className={cn(
         "relative flex h-full w-full max-w-sm flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:max-w-none",
+        detailHref ? "cursor-pointer" : null,
         className,
       )}
+      role={detailHref ? "link" : undefined}
+      tabIndex={detailHref ? 0 : undefined}
+      aria-label={detailHref ? `${viewPartner.name} 상세 보기` : undefined}
+      onClick={(event) => {
+        if (!detailHref) {
+          return;
+        }
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("a,button,input,select,textarea,label")) {
+          return;
+        }
+        router.push(detailHref);
+      }}
+      onKeyDown={(event) => {
+        if (!detailHref) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          router.push(detailHref);
+        }
+      }}
     >
       {!isActive ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-950/60 text-sm font-semibold text-white">
@@ -334,7 +294,7 @@ export default function PartnerCard({
           </span>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground">
+          <h3 className="text-xl font-semibold text-foreground">
             {viewPartner.name}
           </h3>
           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">

@@ -75,4 +75,52 @@ export class SupabasePartnerRepository implements PartnerRepository {
       }) ?? []
     );
   }
+
+  async getPartnerById(id: string): Promise<Partner | null> {
+    if (!id) {
+      return null;
+    }
+    const supabase = getSupabasePublicClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(
+        "id,category_id,name,location,map_url,contact,period_start,period_end,benefits,conditions,tags"
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return null;
+    }
+
+    let categoryKey = "health";
+    if (data.category_id) {
+      const { data: categoryData } = await supabase
+        .from("categories")
+        .select("key")
+        .eq("id", data.category_id)
+        .maybeSingle();
+      if (categoryData?.key) {
+        categoryKey = categoryData.key;
+      }
+    }
+    return {
+      id: data.id,
+      name: data.name,
+      category: categoryKey,
+      location: data.location,
+      mapUrl: data.map_url ?? undefined,
+      contact: data.contact,
+      period: {
+        start: normalizeDate(data.period_start),
+        end: normalizeDate(data.period_end),
+      },
+      benefits: data.benefits ?? [],
+      conditions: data.conditions ?? [],
+      tags: data.tags ?? [],
+    };
+  }
 }
