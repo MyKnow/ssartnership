@@ -261,8 +261,8 @@ export default function PartnerCard({
   );
   const detailHref = viewPartner.id
     ? `/partners/${encodeURIComponent(viewPartner.id)}`
-    : null;
-  const canNavigate = Boolean(detailHref) && isActive;
+    : "";
+  const canNavigate = detailHref.length > 0 && isActive;
   const handleCategoryClick = onCategoryClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
