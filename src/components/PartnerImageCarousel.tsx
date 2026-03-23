@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { getCachedImageUrl } from "@/lib/image-cache";
 
 const placeholder = (
   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -36,6 +37,7 @@ export default function PartnerImageCarousel({
   const safeImages = images.filter(Boolean);
   const hasImages = safeImages.length > 0;
   const activeImage = hasImages ? safeImages[activeIndex] : "";
+  const cachedActiveImage = activeImage ? getCachedImageUrl(activeImage) : "";
 
   return (
     <div className="grid gap-3">
@@ -51,9 +53,10 @@ export default function PartnerImageCarousel({
       >
         {hasImages ? (
           <img
-            src={activeImage}
+            src={cachedActiveImage}
             alt={name}
             className="h-full w-full object-cover"
+            loading="lazy"
           />
         ) : (
           placeholder
@@ -74,9 +77,10 @@ export default function PartnerImageCarousel({
               aria-label={`이미지 ${index + 1}`}
             >
               <img
-                src={image}
+                src={getCachedImageUrl(image)}
                 alt=""
                 className="h-full w-full object-cover"
+                loading="lazy"
               />
             </button>
           ))}
@@ -95,12 +99,13 @@ export default function PartnerImageCarousel({
           </button>
           <div className="h-full w-full overflow-auto p-6">
             <div className="mx-auto flex h-full w-full items-center justify-center">
-              {activeImage ? (
+              {cachedActiveImage ? (
                 <img
-                  src={activeImage}
+                  src={cachedActiveImage}
                   alt={name}
                   className="max-h-none max-w-none"
                   style={{ touchAction: "pinch-zoom" }}
+                  loading="lazy"
                 />
               ) : (
                 placeholder

@@ -152,6 +152,9 @@ export default function HomeView({
                       categoryMap.get(partner.category)?.label ?? "알 수 없음"
                     }
                     categoryColor={categoryMap.get(partner.category)?.color}
+                    onCategoryClick={(categoryKey) =>
+                      setActiveCategory(categoryKey)
+                    }
                   />
                 ))}
               </div>

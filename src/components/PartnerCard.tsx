@@ -1,6 +1,7 @@
 "use client";
 
 import type { Partner } from "@/lib/types";
+import type { MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
@@ -12,6 +13,7 @@ import { cn } from "@/lib/cn";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { getMapLink, getReservationAction } from "@/lib/partner-links";
 import ImageListEditor from "@/components/admin/ImageListEditor";
+import { getCachedImageUrl } from "@/lib/image-cache";
 
 type CategoryOption = {
   id: string;
@@ -55,6 +57,7 @@ export default function PartnerCard({
   deleteAction,
   submitLabel,
   className,
+  onCategoryClick,
 }: {
   partner: Partner | PartnerFormValues;
   categoryLabel?: string;
@@ -66,6 +69,7 @@ export default function PartnerCard({
   deleteAction?: (formData: FormData) => void | Promise<void>;
   submitLabel?: string;
   className?: string;
+  onCategoryClick?: (categoryKey: string) => void;
 }) {
   const router = useRouter();
   if (mode !== "view") {
@@ -247,12 +251,23 @@ export default function PartnerCard({
     viewPartner.location,
     viewPartner.name,
   );
+  const thumbnailUrl =
+    viewPartner.images && viewPartner.images.length > 0
+      ? getCachedImageUrl(viewPartner.images[0])
+      : "";
   const isActive = isWithinPeriod(
     viewPartner.period.start,
     viewPartner.period.end,
   );
   const detailHref = viewPartner.id
     ? `/partners/${encodeURIComponent(viewPartner.id)}`
+    : null;
+  const handleCategoryClick = onCategoryClick
+    ? (event: MouseEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onCategoryClick(viewPartner.category);
+      }
     : null;
 
   return (
@@ -292,21 +307,39 @@ export default function PartnerCard({
       ) : null}
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
-          <Badge
-            className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
-            style={badgeStyle}
-          >
-            {categoryLabel}
-          </Badge>
+          {handleCategoryClick ? (
+            <button
+              type="button"
+              onClick={handleCategoryClick}
+              className="inline-flex min-h-12 min-w-12 items-center"
+              aria-label={`${categoryLabel ?? "카테고리"} 필터 적용`}
+            >
+              <Badge
+                className={
+                  badgeStyle ? undefined : "bg-surface-muted text-foreground"
+                }
+                style={badgeStyle}
+              >
+                {categoryLabel}
+              </Badge>
+            </button>
+          ) : (
+            <Badge
+              className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
+              style={badgeStyle}
+            >
+              {categoryLabel}
+            </Badge>
+          )}
           <span className="text-xs font-medium text-muted-foreground">
             {viewPartner.period.start} ~ {viewPartner.period.end}
           </span>
         </div>
         <div className="flex items-start gap-4">
           <div className="aspect-square w-28 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
-            {viewPartner.images && viewPartner.images.length > 0 ? (
+            {thumbnailUrl ? (
               <img
-                src={viewPartner.images[0]}
+                src={thumbnailUrl}
                 alt=""
                 className="h-full w-full object-cover"
                 loading="lazy"
