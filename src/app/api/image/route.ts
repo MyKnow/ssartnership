@@ -79,10 +79,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Blocked host" }, { status: 400 });
   }
 
-  const response = await fetch(parsed.toString(), {
-    cache: "force-cache",
-    next: { revalidate: WEEK_SECONDS },
-  });
+  let response: Response;
+  try {
+    response = await fetch(parsed.toString(), {
+      cache: "force-cache",
+      next: { revalidate: WEEK_SECONDS },
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to fetch image" },
+      { status: 502 },
+    );
+  }
 
   if (!response.ok) {
     return NextResponse.json(
@@ -91,9 +99,24 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const body = await response.arrayBuffer();
   const contentType =
     response.headers.get("content-type") ?? "application/octet-stream";
+  if (!contentType.startsWith("image/")) {
+    return NextResponse.json(
+      { error: "Unsupported media type" },
+      { status: 415 },
+    );
+  }
+
+  const contentLength = Number(response.headers.get("content-length") ?? "0");
+  if (contentLength > 10 * 1024 * 1024) {
+    return NextResponse.json(
+      { error: "Image too large" },
+      { status: 413 },
+    );
+  }
+
+  const body = await response.arrayBuffer();
 
   return new NextResponse(body, {
     status: 200,

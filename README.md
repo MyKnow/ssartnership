@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## SSARTNERSHIP
+SSAFY 15기(서울 캠퍼스) 구성원을 위한 제휴 업체 정보를 모아 보여주는 웹 서비스입니다.  
+카테고리별로 제휴 업체를 조회하고, 상세 페이지에서 혜택/조건/연락처/이미지를 확인할 수 있습니다.  
+관리자는 Admin 페이지에서 제휴 업체와 카테고리를 관리할 수 있습니다.
 
-## Getting Started
+## 주요 기능
+- 카테고리별 제휴 업체 조회, 검색, 정렬(현재 제휴 우선/등록순/종료일 마감순)
+- 제휴 기간 외 카드 비활성화 표시
+- 파트너 상세 페이지(혜택/이용 조건/태그/이미지 캐러셀)
+- 제안하기 폼(이메일 발송)
+- Admin 로그인 및 CRUD 관리
+- 다크모드 지원
+- Vercel Analytics / Speed Insights 연동
 
-First, run the development server:
+## 기술 스택
+- Next.js 16 (App Router)
+- React 19
+- Supabase (DB)
+- Tailwind CSS
+- Vercel (배포/분석)
 
+## 로컬 실행
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 환경 변수
+`.env` 파일을 생성하고 `.env.example`을 참고하여 설정하세요.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+# Admin credentials
+ADMIN_ID=admin
+ADMIN_PASSWORD=change-me
+ADMIN_SESSION_SECRET=replace-with-long-random-string
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-## Learn More
+# Naver SMTP (제안 메일 발송)
+NAVER_SMTP_USER=your-naver-id@naver.com
+NAVER_SMTP_PASS=your-naver-smtp-password
+SUGGEST_NOTIFY_EMAIL=your-naver-id@naver.com
 
-To learn more about Next.js, take a look at the following resources:
+# Site URL (SEO)
+NEXT_PUBLIC_SITE_URL=https://your-deployment-url.com
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 배포
+- Vercel을 기준으로 설정되었습니다.
+- Vercel 환경 변수에 `.env` 내용을 동일하게 등록하세요.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 릴리즈(태그 포함)
+```bash
+npm run release -- patch
+```
 
-## Deploy on Vercel
+## 관리자 기능
+- `/admin/login`에서 로그인 후 `/admin`에서 관리
+- 카테고리/파트너 CRUD
+- 이미지 URL 추가/정렬/삭제
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 라이선스
+CC BY-NC 4.0 (비상업적 목적에 한해 사용 가능)

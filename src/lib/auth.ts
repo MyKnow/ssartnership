@@ -85,5 +85,18 @@ export async function requireAdmin() {
 export function validateAdminCredentials(id: string, password: string) {
   const expectedId = process.env.ADMIN_ID ?? "";
   const expectedPassword = process.env.ADMIN_PASSWORD ?? "";
-  return id === expectedId && password === expectedPassword;
+  const safeCompare = (a: string, b: string) => {
+    const aBuffer = Buffer.from(a);
+    const bBuffer = Buffer.from(b);
+    if (aBuffer.length !== bBuffer.length) {
+      const max = Math.max(aBuffer.length, bBuffer.length);
+      const paddedA = Buffer.concat([aBuffer, Buffer.alloc(max - aBuffer.length)]);
+      const paddedB = Buffer.concat([bBuffer, Buffer.alloc(max - bBuffer.length)]);
+      crypto.timingSafeEqual(paddedA, paddedB);
+      return false;
+    }
+    return crypto.timingSafeEqual(aBuffer, bBuffer);
+  };
+
+  return safeCompare(id, expectedId) && safeCompare(password, expectedPassword);
 }
