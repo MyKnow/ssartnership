@@ -112,7 +112,7 @@ export default function HomeView({
             description={renderLines(HOME_COPY.heroDescription)}
           />
 
-          <section className="mt-10 flex flex-col gap-6">
+          <section className="mt-10 flex flex-col gap-6" data-nosnippet>
             <SectionHeading
               title={HOME_COPY.categoryTitle}
               description={HOME_COPY.categoryDescription}

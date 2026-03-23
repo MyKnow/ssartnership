@@ -32,6 +32,14 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  images: {
+    formats: ["image/avif", "image/webp"],
+    localPatterns: [
+      {
+        pathname: "/api/image",
+      },
+    ],
+  },
   async headers() {
     return [
       {

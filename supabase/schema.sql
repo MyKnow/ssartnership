@@ -64,3 +64,8 @@ create policy "Public read categories" on categories
 create policy "Public read partners" on partners
   for select
   using (true);
+
+revoke all on table admin_login_attempts from anon;
+revoke all on table admin_login_attempts from authenticated;
+revoke all on table suggestion_attempts from anon;
+revoke all on table suggestion_attempts from authenticated;

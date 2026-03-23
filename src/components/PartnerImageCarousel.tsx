@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { getCachedImageUrl } from "@/lib/image-cache";
+import Image from "next/image";
+import { getBlurDataURL } from "@/lib/image-blur";
 
 const placeholder = (
   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -38,6 +40,7 @@ export default function PartnerImageCarousel({
   const hasImages = safeImages.length > 0;
   const activeImage = hasImages ? safeImages[activeIndex] : "";
   const cachedActiveImage = activeImage ? getCachedImageUrl(activeImage) : "";
+  const blurDataURL = getBlurDataURL(32, 32);
 
   return (
     <div className="grid gap-3">
@@ -52,11 +55,15 @@ export default function PartnerImageCarousel({
         aria-label={`${name} 이미지 크게 보기`}
       >
         {hasImages ? (
-          <img
+          <Image
             src={cachedActiveImage}
             alt={name}
-            className="h-full w-full object-cover"
-            loading="lazy"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 720px"
+            className="object-cover"
+            priority={false}
+            placeholder="blur"
+            blurDataURL={blurDataURL}
           />
         ) : (
           placeholder
@@ -76,11 +83,15 @@ export default function PartnerImageCarousel({
               onClick={() => setActiveIndex(index)}
               aria-label={`이미지 ${index + 1}`}
             >
-              <img
+              <Image
                 src={getCachedImageUrl(image)}
                 alt=""
+                width={80}
+                height={64}
                 className="h-full w-full object-cover"
-                loading="lazy"
+                sizes="80px"
+                placeholder="blur"
+                blurDataURL={blurDataURL}
               />
             </button>
           ))}

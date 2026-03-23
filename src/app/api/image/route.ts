@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
     status: 200,
     headers: {
       "content-type": contentType,
-      "cache-control": `public, max-age=${DAY_SECONDS}, s-maxage=${WEEK_SECONDS}, stale-while-revalidate=${WEEK_SECONDS}`,
+      "cache-control": `public, max-age=${5 * 60}, s-maxage=${WEEK_SECONDS}, stale-while-revalidate=${WEEK_SECONDS}`,
     },
   });
 }

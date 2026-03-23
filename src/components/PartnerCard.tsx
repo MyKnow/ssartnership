@@ -2,6 +2,8 @@
 
 import type { Partner } from "@/lib/types";
 import type { MouseEvent } from "react";
+import Image from "next/image";
+import { getBlurDataURL } from "@/lib/image-blur";
 import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
@@ -255,6 +257,7 @@ export default function PartnerCard({
     viewPartner.images && viewPartner.images.length > 0
       ? getCachedImageUrl(viewPartner.images[0])
       : "";
+  const blurDataURL = getBlurDataURL(32, 32);
   const isActive = isWithinPeriod(
     viewPartner.period.start,
     viewPartner.period.end,
@@ -337,13 +340,16 @@ export default function PartnerCard({
           </span>
         </div>
         <div className="flex items-start gap-4">
-          <div className="aspect-square w-28 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
+          <div className="relative aspect-square w-28 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
             {thumbnailUrl ? (
-              <img
+              <Image
                 src={thumbnailUrl}
                 alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
+                fill
+                sizes="112px"
+                className="object-cover"
+                placeholder="blur"
+                blurDataURL={blurDataURL}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">

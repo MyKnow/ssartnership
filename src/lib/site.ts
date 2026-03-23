@@ -1,7 +1,7 @@
 export const SITE_NAME = "SSARTNERSHIP";
-export const SITE_TITLE = "SSAFY 제휴 혜택 플랫폼 - SSARTNERSHIP";
+export const SITE_TITLE = "SSAFY(싸피) 제휴 혜택 플랫폼 - SSARTNERSHIP";
 export const SITE_DESCRIPTION =
-  "카테고리별 제휴 업체와 혜택을 카드뷰로 확인하세요.";
+  "SSAFY(싸피) 서울 캠퍼스 제휴 혜택을 한곳에서 확인하고, 카테고리별로 빠르게 찾아보세요.";
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app";
 
