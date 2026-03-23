@@ -262,6 +262,7 @@ export default function PartnerCard({
   const detailHref = viewPartner.id
     ? `/partners/${encodeURIComponent(viewPartner.id)}`
     : null;
+  const canNavigate = Boolean(detailHref) && isActive;
   const handleCategoryClick = onCategoryClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
@@ -274,14 +275,14 @@ export default function PartnerCard({
     <article
       className={cn(
         "relative flex h-full w-full max-w-sm flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:max-w-none",
-        detailHref ? "cursor-pointer" : null,
+        canNavigate ? "cursor-pointer" : null,
         className,
       )}
-      role={detailHref ? "link" : undefined}
-      tabIndex={detailHref ? 0 : undefined}
-      aria-label={detailHref ? `${viewPartner.name} 상세 보기` : undefined}
+      role={canNavigate ? "link" : undefined}
+      tabIndex={canNavigate ? 0 : undefined}
+      aria-label={canNavigate ? `${viewPartner.name} 상세 보기` : undefined}
       onClick={(event) => {
-        if (!detailHref) {
+        if (!canNavigate) {
           return;
         }
         const target = event.target as HTMLElement | null;
@@ -291,7 +292,7 @@ export default function PartnerCard({
         router.push(detailHref);
       }}
       onKeyDown={(event) => {
-        if (!detailHref) {
+        if (!canNavigate) {
           return;
         }
         if (event.key === "Enter" || event.key === " ") {

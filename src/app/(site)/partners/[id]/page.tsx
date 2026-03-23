@@ -11,6 +11,7 @@ import { getContactDisplay, getMapLink } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import ContactCopyRow from "@/components/ContactCopyRow";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
+import ShareLinkButton from "@/components/ShareLinkButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -71,25 +72,28 @@ export default async function PartnerDetailPage({
       <main>
         <Container className="pb-16 pt-10">
           <div className="flex flex-col gap-6">
-            <a
-              href="/"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
-              aria-label="목록으로 돌아가기"
-            >
-              <svg
-                width={20}
-                height={20}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            <div className="flex items-center gap-2">
+              <a
+                href="/"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
+                aria-label="목록으로 돌아가기"
               >
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </a>
+                <svg
+                  width={20}
+                  height={20}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </a>
+              <ShareLinkButton />
+            </div>
 
             <Card className="p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
