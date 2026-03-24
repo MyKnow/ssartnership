@@ -25,7 +25,8 @@ type AdminPartner = {
   category_id: string;
   location: string;
   map_url?: string | null;
-  contact: string;
+  reservation_link?: string | null;
+  inquiry_link?: string | null;
   period_start?: string | null;
   period_end?: string | null;
   benefits?: string[] | null;
@@ -86,7 +87,10 @@ export default function AdminPartnerManager({
         _search: [
           partner.name,
           partner.location,
-          partner.contact,
+          partner.reservation_link ?? "",
+          partner.inquiry_link ?? "",
+          partner.reservation_link,
+          partner.inquiry_link,
           benefits.join(" "),
           conditions.join(" "),
           tags.join(" "),
@@ -158,7 +162,8 @@ export default function AdminPartnerManager({
             name: "",
             location: "",
             mapUrl: "",
-            contact: "",
+            reservationLink: "",
+            inquiryLink: "",
             period: { start: "", end: "" },
             benefits: [],
             conditions: [],
@@ -197,7 +202,8 @@ export default function AdminPartnerManager({
                 name: partner.name ?? "",
                 location: partner.location ?? "",
                 mapUrl: partner.map_url ?? "",
-                contact: partner.contact ?? "",
+                reservationLink: partner.reservation_link ?? "",
+                inquiryLink: partner.inquiry_link ?? "",
                 period: {
                   start: partner.period_start ?? "",
                   end: partner.period_end ?? "",

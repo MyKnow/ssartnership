@@ -13,7 +13,8 @@ export type Partner = {
   category: CategoryKey;
   location: string;
   mapUrl?: string;
-  contact: string;
+  reservationLink?: string;
+  inquiryLink?: string;
   period: {
     start: string;
     end: string;

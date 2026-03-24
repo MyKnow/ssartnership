@@ -13,7 +13,12 @@ import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { cn } from "@/lib/cn";
 import { isWithinPeriod } from "@/lib/partner-utils";
-import { getMapLink, getReservationAction } from "@/lib/partner-links";
+import {
+  getInquiryAction,
+  getMapLink,
+  getReservationAction,
+  normalizeReservationInquiry,
+} from "@/lib/partner-links";
 import ImageListEditor from "@/components/admin/ImageListEditor";
 import { getCachedImageUrl } from "@/lib/image-cache";
 
@@ -27,7 +32,8 @@ type PartnerFormValues = {
   name?: string;
   location?: string;
   mapUrl?: string;
-  contact?: string;
+  reservationLink?: string;
+  inquiryLink?: string;
   period?: {
     start?: string;
     end?: string;
@@ -147,12 +153,20 @@ export default function PartnerCard({
 
           <div className="grid gap-1">
             <span className="text-xs font-medium text-muted-foreground">
-              예약/문의 링크
+              예약 링크
             </span>
             <Input
-              name="contact"
-              defaultValue={formPartner.contact ?? ""}
-              required
+              name="reservationLink"
+              defaultValue={formPartner.reservationLink ?? ""}
+            />
+          </div>
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              문의 링크
+            </span>
+            <Input
+              name="inquiryLink"
+              defaultValue={formPartner.inquiryLink ?? ""}
             />
           </div>
 
@@ -247,7 +261,12 @@ export default function PartnerCard({
     : undefined;
 
   const viewPartner = partner as Partner;
-  const action = getReservationAction(viewPartner.contact);
+  const normalizedLinks = normalizeReservationInquiry(
+    viewPartner.reservationLink,
+    viewPartner.inquiryLink,
+  );
+  const reservationAction = getReservationAction(normalizedLinks.reservationLink);
+  const inquiryAction = getInquiryAction(normalizedLinks.inquiryLink);
   const mapLink = getMapLink(
     viewPartner.mapUrl,
     viewPartner.location,
@@ -449,20 +468,38 @@ export default function PartnerCard({
           </div>
         )}
       </div>
-      <div className="mt-5 flex flex-col gap-2">
-        {action ? (
-          <Button
-            variant="ghost"
-            href={action.href}
-            target={action.href.startsWith("http") ? "_blank" : undefined}
-            rel={action.href.startsWith("http") ? "noreferrer" : undefined}
-            className="w-full justify-center"
-          >
-            {action.label}
-          </Button>
-        ) : null}
-        {null}
-      </div>
+      {(reservationAction || inquiryAction) ? (
+        <div className="mt-5 flex flex-col gap-2">
+          {reservationAction ? (
+            <Button
+              variant="ghost"
+              href={reservationAction.href}
+              target={
+                reservationAction.href.startsWith("http") ? "_blank" : undefined
+              }
+              rel={
+                reservationAction.href.startsWith("http") ? "noreferrer" : undefined
+              }
+              className="w-full justify-center"
+            >
+              {reservationAction.label}
+            </Button>
+          ) : null}
+          {inquiryAction ? (
+            <Button
+              variant="ghost"
+              href={inquiryAction.href}
+              target={
+                inquiryAction.href.startsWith("http") ? "_blank" : undefined
+              }
+              rel={inquiryAction.href.startsWith("http") ? "noreferrer" : undefined}
+              className="w-full justify-center"
+            >
+              {inquiryAction.label}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

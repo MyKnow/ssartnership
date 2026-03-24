@@ -7,7 +7,11 @@ import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import { getContactDisplay, getMapLink } from "@/lib/partner-links";
+import {
+  getContactDisplay,
+  getMapLink,
+  normalizeReservationInquiry,
+} from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import ContactCopyRow from "@/components/ContactCopyRow";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
@@ -63,7 +67,12 @@ export default async function PartnerDetailPage({
     : undefined;
 
   const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name);
-  const contactDisplay = getContactDisplay(partner.contact);
+  const normalizedLinks = normalizeReservationInquiry(
+    partner.reservationLink,
+    partner.inquiryLink,
+  );
+  const reservationDisplay = getContactDisplay(normalizedLinks.reservationLink);
+  const inquiryDisplay = getContactDisplay(normalizedLinks.inquiryLink);
   const isActive = isWithinPeriod(partner.period.start, partner.period.end);
 
   return (
@@ -198,20 +207,27 @@ export default async function PartnerDetailPage({
                 ) : null}
               </Card>
 
-              <Card className="p-6">
-                <SectionHeading title="예약/문의" />
-                {contactDisplay ? (
+              {reservationDisplay ? (
+                <Card className="p-6">
+                  <SectionHeading title="예약" />
                   <ContactCopyRow
-                    href={contactDisplay.href}
-                    label={contactDisplay.label}
-                    rawValue={partner.contact}
+                    href={reservationDisplay.href}
+                    label={reservationDisplay.label}
+                    rawValue={normalizedLinks.reservationLink ?? ""}
                   />
-                ) : (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    등록된 예약/문의 링크가 없습니다.
-                  </p>
-                )}
-              </Card>
+                </Card>
+              ) : null}
+
+              {inquiryDisplay ? (
+                <Card className="p-6">
+                  <SectionHeading title="문의" />
+                  <ContactCopyRow
+                    href={inquiryDisplay.href}
+                    label={inquiryDisplay.label}
+                    rawValue={normalizedLinks.inquiryLink ?? ""}
+                  />
+                </Card>
+              ) : null}
             </div>
           </div>
         </Container>

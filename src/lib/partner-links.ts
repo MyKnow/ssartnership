@@ -65,53 +65,82 @@ export function getMapLink(
   return undefined;
 }
 
-export function getContactDisplay(contact: string) {
-  if (isInstagram(contact)) {
+export function getContactDisplay(link?: string) {
+  if (!link) {
+    return null;
+  }
+  if (isInstagram(link)) {
     return {
-      label: toInstagramLabel(contact),
-      href: toInstagramUrl(contact),
+      label: toInstagramLabel(link),
+      href: toInstagramUrl(link),
       type: "instagram" as const,
     };
   }
-  if (isPhone(contact)) {
+  if (isPhone(link)) {
     return {
-      label: contact,
-      href: `tel:${normalizePhone(contact)}`,
+      label: link,
+      href: `tel:${normalizePhone(link)}`,
       type: "phone" as const,
     };
   }
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(link)) {
     return {
-      label: contact,
-      href: `mailto:${contact}`,
+      label: link,
+      href: `mailto:${link}`,
       type: "email" as const,
     };
   }
-  if (isUrl(contact)) {
+  if (isUrl(link)) {
     return {
-      label: contact,
-      href: contact,
+      label: link,
+      href: link,
       type: "web" as const,
     };
   }
   return null;
 }
 
-export function getReservationAction(contact: string) {
-  if (isBookingLink(contact)) {
-    return { label: "예약하기", href: contact };
+function toLinkHref(link: string) {
+  if (isInstagram(link)) {
+    return toInstagramUrl(link);
   }
-  if (isKakaoPlus(contact)) {
-    return { label: "카카오톡 문의하기", href: contact };
+  if (isPhone(link)) {
+    return `tel:${normalizePhone(link)}`;
   }
-  if (isInstagram(contact)) {
-    return { label: "인스타그램 보기", href: toInstagramUrl(contact) };
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(link)) {
+    return `mailto:${link}`;
   }
-  if (isPhone(contact)) {
-    return { label: "전화 예약하기", href: `tel:${normalizePhone(contact)}` };
+  return link;
+}
+
+export function getReservationAction(link?: string) {
+  if (!link) {
+    return null;
   }
-  if (isUrl(contact)) {
-    return { label: "문의하기", href: contact };
+  return { label: "예약하기", href: toLinkHref(link) };
+}
+
+export function getInquiryAction(link?: string) {
+  if (!link) {
+    return null;
+  }
+  if (isKakaoPlus(link) || isInstagram(link) || isPhone(link) || isUrl(link)) {
+    return { label: "문의하기", href: toLinkHref(link) };
+  }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(link)) {
+    return { label: "문의하기", href: toLinkHref(link) };
   }
   return null;
+}
+
+export function normalizeReservationInquiry(
+  reservationLink?: string,
+  inquiryLink?: string,
+) {
+  const reservation = reservationLink?.trim() ?? "";
+  const inquiry = inquiryLink?.trim() ?? "";
+  if (!reservation && inquiry && isBookingLink(inquiry)) {
+    return { reservationLink: inquiry, inquiryLink: "" };
+  }
+  return { reservationLink: reservation, inquiryLink: inquiry };
 }

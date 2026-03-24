@@ -17,7 +17,8 @@ create table if not exists partners (
   name text not null,
   location text not null,
   map_url text,
-  contact text not null,
+  reservation_link text,
+  inquiry_link text,
   period_start date,
   period_end date,
   benefits text[] not null default '{}',
@@ -29,6 +30,8 @@ create table if not exists partners (
 
 alter table partners add column if not exists conditions text[] not null default '{}';
 alter table partners add column if not exists images text[] not null default '{}';
+alter table partners add column if not exists reservation_link text;
+alter table partners add column if not exists inquiry_link text;
 
 create table if not exists admin_login_attempts (
   id uuid primary key default uuid_generate_v4(),

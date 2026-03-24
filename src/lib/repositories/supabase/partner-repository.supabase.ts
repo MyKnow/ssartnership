@@ -46,7 +46,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,location,map_url,contact,period_start,period_end,benefits,conditions,images,tags,categories!inner(key)"
+        "id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,categories!inner(key)"
       )
       .order("created_at", { ascending: false });
 
@@ -63,7 +63,8 @@ export class SupabasePartnerRepository implements PartnerRepository {
           category: categoryKey,
           location: item.location,
           mapUrl: item.map_url ?? undefined,
-          contact: item.contact,
+          reservationLink: item.reservation_link ?? undefined,
+          inquiryLink: item.inquiry_link ?? undefined,
           period: {
             start: normalizeDate(item.period_start),
             end: normalizeDate(item.period_end),
@@ -85,7 +86,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,category_id,name,location,map_url,contact,period_start,period_end,benefits,conditions,images,tags"
+        "id,category_id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags"
       )
       .eq("id", id)
       .maybeSingle();
@@ -114,7 +115,8 @@ export class SupabasePartnerRepository implements PartnerRepository {
       category: categoryKey,
       location: data.location,
       mapUrl: data.map_url ?? undefined,
-      contact: data.contact,
+      reservationLink: data.reservation_link ?? undefined,
+      inquiryLink: data.inquiry_link ?? undefined,
       period: {
         start: normalizeDate(data.period_start),
         end: normalizeDate(data.period_end),

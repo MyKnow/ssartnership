@@ -47,7 +47,8 @@ export default function HomeView({
       _search: [
         partner.name,
         partner.location,
-        partner.contact,
+        partner.reservationLink ?? "",
+        partner.inquiryLink ?? "",
         partner.benefits.join(" "),
         (partner.conditions ?? []).join(" "),
         (partner.tags ?? []).join(" "),
