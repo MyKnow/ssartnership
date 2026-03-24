@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { getCachedImageUrl } from "@/lib/image-cache";
 import Image from "next/image";
@@ -40,6 +40,13 @@ export default function PartnerImageCarousel({
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
   const offsetStartRef = useRef({ x: 0, y: 0 });
+  const pinchRef = useRef({
+    distance: 0,
+    zoom: 1,
+    center: { x: 0, y: 0 },
+    offset: { x: 0, y: 0 },
+  });
+  const lastTapRef = useRef(0);
 
   const safeImages = images.filter(Boolean);
   const hasImages = safeImages.length > 0;
@@ -47,6 +54,23 @@ export default function PartnerImageCarousel({
   const cachedActiveImage = activeImage ? getCachedImageUrl(activeImage) : "";
   const blurDataURL = getBlurDataURL(32, 32);
   const canNavigate = safeImages.length > 1;
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+    return;
+  }, [isOpen]);
 
   const goNext = () => {
     if (!canNavigate) {
@@ -67,7 +91,7 @@ export default function PartnerImageCarousel({
   };
 
   const handleZoom = (delta: number) => {
-    setZoom((prev) => Math.min(3, Math.max(1, prev + delta)));
+    setZoom((prev) => Math.min(4, Math.max(1, prev + delta)));
   };
 
   const handlePanStart = (x: number, y: number) => {
@@ -93,6 +117,17 @@ export default function PartnerImageCarousel({
 
   const handlePanEnd = () => {
     isPanningRef.current = false;
+  };
+
+  const clampZoom = (value: number) => Math.min(4, Math.max(1, value));
+
+  const getDistance = (
+    a: { clientX: number; clientY: number },
+    b: { clientX: number; clientY: number },
+  ) => {
+    const dx = a.clientX - b.clientX;
+    const dy = a.clientY - b.clientY;
+    return Math.hypot(dx, dy);
   };
 
   return (
@@ -210,7 +245,7 @@ export default function PartnerImageCarousel({
             </>
           ) : null}
           <div
-            className="h-full w-full overflow-hidden p-6"
+            className="h-full w-full overflow-hidden p-6 touch-none overscroll-contain"
             onWheel={(event) => {
               if (event.deltaY > 0) {
                 handleZoom(-0.1);
@@ -232,32 +267,78 @@ export default function PartnerImageCarousel({
             onMouseUp={handlePanEnd}
             onMouseLeave={handlePanEnd}
             onTouchStart={(event) => {
+              event.preventDefault();
+              if (event.touches.length === 2) {
+                const [a, b] = Array.from(event.touches);
+                pinchRef.current.distance = getDistance(a, b);
+                pinchRef.current.zoom = zoom;
+                pinchRef.current.center = {
+                  x: (a.clientX + b.clientX) / 2,
+                  y: (a.clientY + b.clientY) / 2,
+                };
+                pinchRef.current.offset = { ...offset };
+                isPanningRef.current = false;
+                return;
+              }
               const touch = event.touches[0];
               if (touch) {
                 handlePanStart(touch.clientX, touch.clientY);
               }
             }}
             onTouchMove={(event) => {
+              event.preventDefault();
+              if (event.touches.length === 2) {
+                const [a, b] = Array.from(event.touches);
+                const distance = getDistance(a, b);
+                if (pinchRef.current.distance === 0) {
+                  return;
+                }
+                const scale = distance / pinchRef.current.distance;
+                const nextZoom = clampZoom(pinchRef.current.zoom * scale);
+                setZoom(nextZoom);
+                setOffset(pinchRef.current.offset);
+                return;
+              }
               const touch = event.touches[0];
               if (touch) {
                 handlePanMove(touch.clientX, touch.clientY);
               }
             }}
-            onTouchEnd={handlePanEnd}
+            onTouchEnd={(event) => {
+              handlePanEnd();
+              if (event.touches.length === 0) {
+                const now = Date.now();
+                if (now - lastTapRef.current < 300) {
+                  setZoom((prev) => (prev > 1 ? 1 : 2));
+                  setOffset({ x: 0, y: 0 });
+                  lastTapRef.current = 0;
+                  return;
+                }
+                lastTapRef.current = now;
+              }
+            }}
           >
             <div className="mx-auto flex h-full w-full items-center justify-center">
               {cachedActiveImage ? (
-                <img
-                  src={cachedActiveImage}
-                  alt={name}
-                  className="max-h-none max-w-none"
+                <div
+                  className="relative"
                   style={{
-                    touchAction: "none",
+                    width: "min(92vw, 1100px)",
+                    height: "min(80vh, 760px)",
                     transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
                     transition: "transform 120ms ease-out",
+                    touchAction: "none",
                   }}
-                  loading="lazy"
-                />
+                >
+                  <Image
+                    src={cachedActiveImage}
+                    alt={name}
+                    fill
+                    sizes="100vw"
+                    className="object-contain"
+                    priority={false}
+                  />
+                </div>
               ) : (
                 placeholder
               )}
