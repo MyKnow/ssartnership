@@ -8,6 +8,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import SubmitButton from "@/components/ui/SubmitButton";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { validateAdminIdentifier } from "@/lib/validation";
 
 export const metadata = {
   robots: {
@@ -20,8 +21,8 @@ async function loginAction(formData: FormData) {
   "use server";
   const id = String(formData.get("id") || "");
   const password = String(formData.get("password") || "");
-  const invalidId = id.trim().startsWith("@") || id.includes("@");
-  if (invalidId) {
+  const idError = validateAdminIdentifier(id);
+  if (idError) {
     redirect(`/admin/login?error=invalid&id=${encodeURIComponent(id)}`);
   }
 
@@ -96,7 +97,15 @@ export default async function AdminLoginPage({
         <form className="mt-6 flex flex-col gap-4" action={loginAction}>
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             ID
-            <Input name="id" placeholder="운영진 ID" required defaultValue={defaultId} />
+            <Input
+              name="id"
+              placeholder="운영진 ID"
+              required
+              defaultValue={defaultId}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
           </label>
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             Password

@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { sanitizeHttpUrl } from "@/lib/validation";
 
 const WEEK_SECONDS = 60 * 60 * 24 * 7;
-const DAY_SECONDS = 60 * 60 * 24;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 function isIpv4(hostname: string) {
@@ -64,18 +65,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing url" }, { status: 400 });
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(target);
-  } catch {
-    return NextResponse.json({ error: "Invalid url" }, { status: 400 });
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+  const safeTarget = sanitizeHttpUrl(target);
+  if (!safeTarget) {
     return NextResponse.json({ error: "Unsupported protocol" }, { status: 400 });
   }
+  const parsed = new URL(safeTarget);
 
-  if (isBlockedHost(parsed.hostname)) {
+  if (isBlockedHost(parsed.hostname.toLowerCase())) {
     return NextResponse.json({ error: "Blocked host" }, { status: 400 });
   }
 
@@ -84,6 +80,11 @@ export async function GET(request: NextRequest) {
     response = await fetch(parsed.toString(), {
       cache: "force-cache",
       next: { revalidate: WEEK_SECONDS },
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Accept: "image/*",
+      },
     });
   } catch {
     return NextResponse.json(
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
   }
 
   const contentLength = Number(response.headers.get("content-length") ?? "0");
-  if (contentLength > 10 * 1024 * 1024) {
+  if (contentLength > MAX_IMAGE_BYTES) {
     return NextResponse.json(
       { error: "Image too large" },
       { status: 413 },
@@ -117,6 +118,12 @@ export async function GET(request: NextRequest) {
   }
 
   const body = await response.arrayBuffer();
+  if (body.byteLength > MAX_IMAGE_BYTES) {
+    return NextResponse.json(
+      { error: "Image too large" },
+      { status: 413 },
+    );
+  }
 
   return new NextResponse(body, {
     status: 200,

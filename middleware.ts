@@ -31,7 +31,23 @@ async function verifyToken(token: string) {
     if (expected !== signature) {
       return null;
     }
-    return JSON.parse(payload) as { userId: string; mustChangePassword?: boolean };
+    const parsed = JSON.parse(payload) as {
+      userId?: string;
+      mustChangePassword?: boolean;
+      issuedAt?: number;
+      expiresAt?: number;
+    };
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.issuedAt !== "number" ||
+      typeof parsed.expiresAt !== "number"
+    ) {
+      return null;
+    }
+    if (parsed.issuedAt > Date.now() || parsed.expiresAt <= Date.now()) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }

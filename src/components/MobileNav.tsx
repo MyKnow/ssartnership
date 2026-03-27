@@ -3,24 +3,24 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
-import ThemeToggle from "@/components/ThemeToggle";
 import UserMenu from "@/components/auth/UserMenu";
 import { cn } from "@/lib/cn";
 
 export default function MobileNav({ suggestHref }: { suggestHref: string }) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const portalRoot = typeof document === "undefined" ? null : document.body;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          setOpen(false);
+        }
+      };
+      window.addEventListener("keydown", onKeyDown);
       return () => {
         document.body.style.overflow = "";
+        window.removeEventListener("keydown", onKeyDown);
       };
     }
     return;
@@ -51,7 +51,7 @@ export default function MobileNav({ suggestHref }: { suggestHref: string }) {
         </svg>
       </button>
 
-      {mounted && portalRoot
+      {open && typeof document !== "undefined"
         ? createPortal(
             <div
               className={cn(
@@ -98,7 +98,7 @@ export default function MobileNav({ suggestHref }: { suggestHref: string }) {
                 </div>
               </aside>
             </div>,
-            portalRoot
+            document.body
           )
         : null}
     </>

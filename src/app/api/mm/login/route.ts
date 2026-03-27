@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
+import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -12,10 +13,13 @@ export async function POST(request: Request) {
       password?: string;
     };
 
-    const username = String(payload.username ?? "").trim().replace(/^@/, "");
+    const username = normalizeMmUsername(String(payload.username ?? ""));
     const password = String(payload.password ?? "").trim();
     if (!username || !password) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
+    }
+    if (validateMmUsername(username)) {
+      return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
 
     const supabase = getSupabaseAdminClient();

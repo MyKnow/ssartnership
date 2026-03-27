@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
+import { sanitizeHttpUrl, sanitizePartnerLinkValue } from "@/lib/validation";
 
 function parseList(value: string) {
   return value
@@ -17,6 +18,20 @@ function parseMultiLine(value: string) {
     .split(/[\n,]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseOptionalUrl(value: string) {
+  return sanitizeHttpUrl(value) ?? null;
+}
+
+function parsePartnerLink(value: string) {
+  return sanitizePartnerLinkValue(value) ?? null;
+}
+
+function parseImageUrls(value: string) {
+  return parseMultiLine(value)
+    .map((item) => sanitizeHttpUrl(item))
+    .filter((item): item is string => Boolean(item));
 }
 
 export async function createCategory(formData: FormData) {
@@ -98,14 +113,14 @@ export async function createPartner(formData: FormData) {
     name,
     category_id: categoryId,
     location,
-    map_url: mapUrl || null,
-    reservation_link: reservationLink || null,
-    inquiry_link: inquiryLink || null,
+    map_url: parseOptionalUrl(mapUrl),
+    reservation_link: parsePartnerLink(reservationLink),
+    inquiry_link: parsePartnerLink(inquiryLink),
     period_start: periodStart || null,
     period_end: periodEnd || null,
     benefits: parseList(benefits),
     conditions: parseList(conditions),
-    images: parseMultiLine(images),
+    images: parseImageUrls(images),
     tags: parseList(tags),
   });
 
@@ -144,14 +159,14 @@ export async function updatePartner(formData: FormData) {
       name,
       category_id: categoryId,
       location,
-      map_url: mapUrl || null,
-      reservation_link: reservationLink || null,
-      inquiry_link: inquiryLink || null,
+      map_url: parseOptionalUrl(mapUrl),
+      reservation_link: parsePartnerLink(reservationLink),
+      inquiry_link: parsePartnerLink(inquiryLink),
       period_start: periodStart || null,
       period_end: periodEnd || null,
       benefits: parseList(benefits),
       conditions: parseList(conditions),
-      images: parseMultiLine(images),
+      images: parseImageUrls(images),
       tags: parseList(tags),
     })
     .eq("id", id);

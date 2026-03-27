@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { partnerRepository } from "@/lib/repositories";
 import SiteHeader from "@/components/SiteHeader";
@@ -5,7 +6,6 @@ import Container from "@/components/ui/Container";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import {
   getContactDisplay,
@@ -82,7 +82,7 @@ export default async function PartnerDetailPage({
         <Container className="pb-16 pt-10">
           <div className="flex flex-col gap-6">
             <div className="flex items-center gap-2">
-              <a
+              <Link
                 href="/"
                 className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
                 aria-label="목록으로 돌아가기"
@@ -100,7 +100,7 @@ export default async function PartnerDetailPage({
                 >
                   <path d="M15 18l-6-6 6-6" />
                 </svg>
-              </a>
+              </Link>
               <ShareLinkButton />
             </div>
 

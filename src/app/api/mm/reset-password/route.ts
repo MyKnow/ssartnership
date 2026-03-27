@@ -9,6 +9,7 @@ import {
   createDirectChannel,
   sendPost,
 } from "@/lib/mattermost";
+import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -19,9 +20,12 @@ const RESEND_COOLDOWN_SECONDS = 60;
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as { username?: string };
-    const username = String(payload.username ?? "").trim().replace(/^@/, "");
+    const username = normalizeMmUsername(String(payload.username ?? ""));
     if (!username) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
+    }
+    if (validateMmUsername(username)) {
+      return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
 
     const supabase = getSupabaseAdminClient();

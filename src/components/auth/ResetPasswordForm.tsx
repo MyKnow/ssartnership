@@ -1,19 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import MmUsernameInput from "@/components/auth/MmUsernameInput";
+import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 export default function ResetPasswordForm() {
   const [username, setUsername] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { notify } = useToast();
-  const invalidId = (value: string) => {
-    const trimmed = value.trim();
-    return trimmed.startsWith("@") || trimmed.includes("@");
-  };
 
   const handleReset = async () => {
     if (pending) {
@@ -23,16 +20,18 @@ export default function ResetPasswordForm() {
       setError("MM 아이디를 입력해 주세요.");
       return;
     }
-    if (invalidId(username)) {
-      setError("MM 아이디는 @ 없이 입력해 주세요.");
+    const usernameError = validateMmUsername(username);
+    if (usernameError) {
+      setError(usernameError);
       return;
     }
     setPending(true);
+    const normalizedUsername = normalizeMmUsername(username);
     try {
       const response = await fetch("/api/mm/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username: normalizedUsername }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -52,6 +51,10 @@ export default function ResetPasswordForm() {
           setError("해당 아이디는 교육생 채널에 존재하지 않습니다.");
           return;
         }
+        if (data.error === "invalid_username") {
+          setError("MM 아이디 형식을 확인해 주세요.");
+          return;
+        }
         setError("비밀번호 재설정에 실패했습니다.");
         return;
       }
@@ -68,11 +71,9 @@ export default function ResetPasswordForm() {
     <div className="mt-6 flex flex-col gap-4">
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         MM 아이디
-        <Input
+        <MmUsernameInput
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          placeholder="MM 아이디"
-          required
         />
       </label>
       {error ? (

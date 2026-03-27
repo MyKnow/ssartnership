@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { parseSsafyProfile } from "@/lib/mm-profile";
 
 type Member = {
   mm_username: string;
@@ -14,8 +15,14 @@ type Member = {
   avatar_base64?: string | null;
 };
 
-export default function CertificationView({ member }: { member: Member }) {
-  const [now, setNow] = useState(new Date());
+export default function CertificationView({
+  member,
+  initialTimestamp,
+}: {
+  member: Member;
+  initialTimestamp: string;
+}) {
+  const [now, setNow] = useState(() => new Date(initialTimestamp));
   const { notify } = useToast();
 
   useEffect(() => {
@@ -32,6 +39,7 @@ export default function CertificationView({ member }: { member: Member }) {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
+      timeZone: "Asia/Seoul",
     });
   }, [now]);
 
@@ -39,6 +47,7 @@ export default function CertificationView({ member }: { member: Member }) {
     member.avatar_base64 && member.avatar_content_type
       ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
       : null;
+  const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
 
   return (
     <div className="mt-6">
@@ -59,7 +68,7 @@ export default function CertificationView({ member }: { member: Member }) {
                 SSAFY Trainee
               </p>
               <h2 className="mt-2 text-2xl font-semibold">
-                {member.display_name ?? member.mm_username}
+                {profile.displayName ?? member.display_name ?? member.mm_username}
               </h2>
               <p className="mt-1 text-sm text-slate-200">
                 {member.campus ?? member.region ?? "캠퍼스"}{" "}

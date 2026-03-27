@@ -187,6 +187,21 @@ export async function getChannelMembers(
   return response.json() as Promise<Array<{ user_id: string }>>;
 }
 
+export async function getChannelMember(
+  token: string,
+  channelId: string,
+  userId: string,
+) {
+  const response = await mmFetch(
+    `/api/v4/channels/${channelId}/members/${userId}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) {
+    return null;
+  }
+  return response.json() as Promise<{ user_id: string }>;
+}
+
 export async function getUsersByIds(token: string, ids: string[]) {
   const response = await mmFetch("/api/v4/users/ids", {
     method: "POST",
@@ -205,37 +220,18 @@ export async function findUserInChannelByUsername(
   channelName: string,
   username: string,
 ) {
+  const safeUsername = username.replace(/^@/, "").trim().toLowerCase();
+  const directUser = await getUserByUsername(token, safeUsername);
+  if (!directUser) {
+    return null;
+  }
   const team = await getTeamByName(token, teamName);
   const channel = await getChannelByName(token, team.id, channelName);
-  const perPage = 200;
-  let page = 0;
-  const userIds: string[] = [];
-  // paginate
-  while (true) {
-    const members = await getChannelMembers(token, channel.id, page, perPage);
-    if (!members.length) {
-      break;
-    }
-    userIds.push(...members.map((member) => member.user_id));
-    if (members.length < perPage) {
-      break;
-    }
-    page += 1;
+  const membership = await getChannelMember(token, channel.id, directUser.id);
+  if (!membership) {
+    return null;
   }
-  const chunks: string[][] = [];
-  for (let i = 0; i < userIds.length; i += 200) {
-    chunks.push(userIds.slice(i, i + 200));
-  }
-  for (const chunk of chunks) {
-    const users = await getUsersByIds(token, chunk);
-    const match = users.find(
-      (user) => user.username.toLowerCase() === username.toLowerCase(),
-    );
-    if (match) {
-      return match;
-    }
-  }
-  return null;
+  return directUser;
 }
 
 export function getSenderCredentials() {

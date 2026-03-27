@@ -3,6 +3,7 @@ import crypto from "crypto";
 
 const COOKIE_NAME = "user_session";
 const SESSION_TTL_DAYS = 7;
+const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 function getSecret() {
   const secret = process.env.USER_SESSION_SECRET;
@@ -41,21 +42,35 @@ function verifyToken(token: string) {
     return null;
   }
   try {
-    return JSON.parse(payload) as {
+    const parsed = JSON.parse(payload) as {
       userId: string;
       issuedAt: number;
+      expiresAt: number;
       mustChangePassword?: boolean;
     };
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.issuedAt !== "number" ||
+      typeof parsed.expiresAt !== "number"
+    ) {
+      return null;
+    }
+    if (parsed.expiresAt <= Date.now() || parsed.issuedAt > Date.now()) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
 }
 
 export async function setUserSession(userId: string, mustChangePassword = false) {
+  const now = Date.now();
   const payload = JSON.stringify({
     userId,
     mustChangePassword,
-    issuedAt: Date.now(),
+    issuedAt: now,
+    expiresAt: now + SESSION_TTL_MS,
   });
   const token = signPayload(payload);
   const store = await cookies();

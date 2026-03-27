@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
@@ -15,12 +16,12 @@ export default function SiteHeader({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
       <Container className="flex items-center justify-between gap-3 py-4">
-        <a
+        <Link
           href="/"
           className="inline-flex min-h-12 items-center text-sm font-semibold uppercase tracking-[0.24em] text-foreground hover:opacity-80"
         >
           {SITE_NAME}
-        </a>
+        </Link>
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-2">
             <Button variant="ghost" href={suggestHref}>

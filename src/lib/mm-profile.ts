@@ -17,16 +17,18 @@ export function parseSsafyProfile(displayName?: string): ParsedProfile {
   if (!displayName) {
     return {};
   }
+  const cleanedDisplayName =
+    displayName.replace(/\[[^\]]+\]/g, "").trim() || displayName;
   const match = displayName.match(/\[([가-힣]+)_?(\d{1,2})반\]/);
   if (!match) {
-    return { displayName };
+    return { displayName: cleanedDisplayName };
   }
   const regionRaw = match[1];
   const classNumber = Number(match[2]);
   const region = REGION_MAP[regionRaw] ?? regionRaw;
   const campus = region === "서울" ? "서울" : region;
   return {
-    displayName,
+    displayName: cleanedDisplayName,
     region,
     campus,
     classNumber: Number.isNaN(classNumber) ? undefined : classNumber,

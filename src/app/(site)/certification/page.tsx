@@ -11,6 +11,7 @@ export const metadata = {
 };
 
 export default async function CertificationPage() {
+  const initialTimestamp = new Date().toISOString();
   const session = await getUserSession();
   if (!session?.userId) {
     redirect("/auth/login");
@@ -41,7 +42,10 @@ export default async function CertificationPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               Mattermost 인증 정보를 기반으로 SSAFY 교육생임을 확인합니다.
             </p>
-            <CertificationView member={member} />
+            <CertificationView
+              member={member}
+              initialTimestamp={initialTimestamp}
+            />
           </Card>
         </Container>
       </main>

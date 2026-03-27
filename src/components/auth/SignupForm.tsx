@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import PasswordInput from "@/components/ui/PasswordInput";
+import Input from "@/components/ui/Input";
+import MmUsernameInput from "@/components/auth/MmUsernameInput";
+import { isValidPassword } from "@/lib/password";
+import {
+  normalizeMmUsername,
+  PASSWORD_POLICY_MESSAGE,
+  validateMmUsername,
+} from "@/lib/validation";
 
 type Step = "request" | "verify";
 
@@ -16,10 +23,6 @@ export default function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
-  const invalidId = (value: string) => {
-    const trimmed = value.trim();
-    return trimmed.startsWith("@") || trimmed.includes("@");
-  };
 
   const requestCode = async () => {
     if (pending) {
@@ -29,30 +32,26 @@ export default function SignupForm() {
       setError("MM 아이디를 입력해 주세요.");
       return;
     }
-    if (invalidId(username)) {
-      setError("MM 아이디는 @ 없이 입력해 주세요.");
+    const usernameError = validateMmUsername(username);
+    if (usernameError) {
+      setError(usernameError);
       return;
     }
     if (!password) {
       setError("사이트 비밀번호를 입력해 주세요.");
       return;
     }
-    const passwordOk =
-      password.length >= 8 &&
-      password.length <= 64 &&
-      /[A-Za-z]/.test(password) &&
-      /\d/.test(password) &&
-      /[^A-Za-z0-9]/.test(password);
-    if (!passwordOk) {
-      setError("비밀번호는 영문/숫자/특수문자 포함 8자 이상이어야 합니다.");
+    if (!isValidPassword(password)) {
+      setError(PASSWORD_POLICY_MESSAGE);
       return;
     }
     setPending(true);
+    const normalizedUsername = normalizeMmUsername(username);
     try {
       const response = await fetch("/api/mm/request-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username: normalizedUsername }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -69,6 +68,11 @@ export default function SignupForm() {
         if (data.error === "not_student") {
           setError("해당 아이디는 교육생 채널에 존재하지 않습니다.");
           notify("교육생 채널에 없는 아이디입니다.");
+          return;
+        }
+        if (data.error === "invalid_username") {
+          setError("MM 아이디 형식을 확인해 주세요.");
+          notify("MM 아이디 형식을 확인해 주세요.");
           return;
         }
         if (data.error === "request_failed") {
@@ -92,16 +96,22 @@ export default function SignupForm() {
     if (pending) {
       return;
     }
-    if (invalidId(username)) {
-      setError("MM 아이디는 @ 없이 입력해 주세요.");
+    const usernameError = validateMmUsername(username);
+    if (usernameError) {
+      setError(usernameError);
       return;
     }
     setPending(true);
+    const normalizedUsername = normalizeMmUsername(username);
     try {
       const response = await fetch("/api/mm/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, code, password }),
+        body: JSON.stringify({
+          username: normalizedUsername,
+          code,
+          password,
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -117,8 +127,13 @@ export default function SignupForm() {
           return;
         }
         if (data.error === "invalid_password") {
-          setError("비밀번호 정책에 맞지 않습니다.");
-          notify("비밀번호 정책에 맞지 않습니다.");
+          setError(data.message ?? PASSWORD_POLICY_MESSAGE);
+          notify(data.message ?? PASSWORD_POLICY_MESSAGE);
+          return;
+        }
+        if (data.error === "invalid_username") {
+          setError("MM 아이디 형식을 확인해 주세요.");
+          notify("MM 아이디 형식을 확인해 주세요.");
           return;
         }
         setError("인증코드가 올바르지 않습니다.");
@@ -137,11 +152,9 @@ export default function SignupForm() {
     <div className="mt-6 flex flex-col gap-4">
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         MM 아이디
-        <Input
+        <MmUsernameInput
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          placeholder="MM 아이디"
-          required
         />
       </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
@@ -173,8 +186,8 @@ export default function SignupForm() {
       ) : null}
 
       <p className="text-xs text-muted-foreground">
-        비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다. 인증코드는
-        5분간 유효하며, 5회 실패 시 1시간 동안 인증이 제한됩니다.
+        {PASSWORD_POLICY_MESSAGE} 인증코드는 5분간 유효하며, 5회 실패 시
+        1시간 동안 인증이 제한됩니다.
       </p>
 
       {step === "request" ? (

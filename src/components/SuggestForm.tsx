@@ -6,6 +6,7 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { sanitizeHttpUrl } from "@/lib/validation";
 
 const initialState = {
   companyName: "",
@@ -32,18 +33,6 @@ export default function SuggestForm() {
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  const buildSummary = () => {
-    return [
-      `업체명: ${formState.companyName}`,
-      `업체분야 소개: ${formState.businessArea}`,
-      `제안 제휴 조건: ${formState.partnershipConditions}`,
-      `담당자 이름: ${formState.contactName}`,
-      `담당자 직위: ${formState.contactRole}`,
-      `담당자 이메일: ${formState.contactEmail}`,
-      `회사 사이트 URL: ${formState.companyUrl || "-"}`,
-    ].join("\n");
-  };
-
   const handleSubmit = async () => {
     if (isSubmitting) {
       return;
@@ -51,19 +40,13 @@ export default function SuggestForm() {
     setSubmitting(true);
     setConfirmOpen(false);
 
-    const summary = buildSummary();
-    const payload = {
-      ...formState,
-      summary,
-    };
-
     try {
       const response = await fetch("/api/suggest", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formState),
       });
 
       if (!response.ok) {
@@ -91,6 +74,10 @@ export default function SuggestForm() {
         event.preventDefault();
         if (!emailRegex.test(formState.contactEmail)) {
           notify("이메일 형식을 확인해 주세요.");
+          return;
+        }
+        if (formState.companyUrl.trim() && !sanitizeHttpUrl(formState.companyUrl)) {
+          notify("회사 사이트 URL 형식을 확인해 주세요.");
           return;
         }
         if (event.currentTarget.reportValidity()) {

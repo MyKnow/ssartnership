@@ -11,6 +11,7 @@ import {
   sendPost,
 } from "@/lib/mattermost";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -23,9 +24,12 @@ export async function POST(request: Request) {
       username?: string;
     };
 
-    const username = String(payload.username ?? "").trim().replace(/^@/, "");
+    const username = normalizeMmUsername(String(payload.username ?? ""));
     if (!username) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
+    }
+    if (validateMmUsername(username)) {
+      return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
 
     const supabase = getSupabaseAdminClient();
@@ -85,13 +89,17 @@ export async function POST(request: Request) {
     const code = generateCode();
     const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
 
+    await supabase.from("mm_verification_attempts").delete().eq("identifier", username);
+    await supabase.from("mm_verification_codes").delete().eq("mm_username", username);
+
     await supabase.from("mm_verification_codes").insert({
       email: null,
       code_hash: hashCode(code),
       expires_at: expiresAt.toISOString(),
       mm_user_id: targetUser.id,
       mm_username: targetUser.username,
-      display_name: targetUser.nickname ?? targetUser.username,
+      display_name:
+        profile.displayName ?? targetUser.nickname ?? targetUser.username,
       region: profile.region ?? null,
       campus: profile.campus ?? null,
       class_number: profile.classNumber ?? null,

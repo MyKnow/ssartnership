@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
 export default function ChangePasswordForm() {
   const [current, setCurrent] = useState("");
@@ -31,7 +31,7 @@ export default function ChangePasswordForm() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         if (data.error === "invalid_password") {
-          setError("비밀번호 정책에 맞지 않습니다.");
+          setError(PASSWORD_POLICY_MESSAGE);
           return;
         }
         if (data.error === "wrong_password") {
@@ -74,6 +74,7 @@ export default function ChangePasswordForm() {
           {error}
         </p>
       ) : null}
+      <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_MESSAGE}</p>
       <Button onClick={handleChange} disabled={pending}>
         비밀번호 변경
       </Button>

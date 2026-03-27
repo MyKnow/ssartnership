@@ -4,6 +4,7 @@ import crypto from "crypto";
 
 const COOKIE_NAME = "admin_session";
 const SESSION_TTL_DAYS = 7;
+const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 function getSecret() {
   const secret = process.env.ADMIN_SESSION_SECRET;
@@ -36,15 +37,32 @@ function verifyToken(token: string) {
     .createHmac("sha256", getSecret())
     .update(payload)
     .digest("hex");
-  return crypto.timingSafeEqual(
+  const validSignature = crypto.timingSafeEqual(
     Buffer.from(signature),
     Buffer.from(expected),
   );
+  if (!validSignature) {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(payload) as { issuedAt?: number; expiresAt?: number };
+    if (
+      typeof parsed.issuedAt !== "number" ||
+      typeof parsed.expiresAt !== "number"
+    ) {
+      return false;
+    }
+    return parsed.expiresAt > Date.now() && parsed.issuedAt <= Date.now();
+  } catch {
+    return false;
+  }
 }
 
 export async function setAdminSession() {
+  const now = Date.now();
   const payload = JSON.stringify({
-    issuedAt: Date.now(),
+    issuedAt: now,
+    expiresAt: now + SESSION_TTL_MS,
   });
   const token = signPayload(payload);
   const cookieStore = await cookies();

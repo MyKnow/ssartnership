@@ -1,3 +1,5 @@
+import { sanitizeHttpUrl } from "@/lib/validation";
+
 function isPhone(value: string) {
   return /^[+0-9()\-\s]{7,}$/.test(value);
 }
@@ -28,7 +30,7 @@ function isBookingLink(value: string) {
 
 function toInstagramUrl(value: string) {
   if (/instagram\.com/i.test(value)) {
-    return value;
+    return sanitizeHttpUrl(value);
   }
   if (value.startsWith("@")) {
     return `https://instagram.com/${value.slice(1)}`;
@@ -57,7 +59,7 @@ export function getMapLink(
   name: string,
 ) {
   if (mapUrl) {
-    return mapUrl;
+    return sanitizeHttpUrl(mapUrl);
   }
   if (isNationwide(location)) {
     return `https://map.naver.com/p/search/${encodeURIComponent(name)}`;
@@ -70,9 +72,13 @@ export function getContactDisplay(link?: string) {
     return null;
   }
   if (isInstagram(link)) {
+    const href = toInstagramUrl(link);
+    if (!href) {
+      return null;
+    }
     return {
       label: toInstagramLabel(link),
-      href: toInstagramUrl(link),
+      href,
       type: "instagram" as const,
     };
   }
@@ -91,9 +97,13 @@ export function getContactDisplay(link?: string) {
     };
   }
   if (isUrl(link)) {
+    const href = sanitizeHttpUrl(link);
+    if (!href) {
+      return null;
+    }
     return {
       label: link,
-      href: link,
+      href,
       type: "web" as const,
     };
   }
@@ -110,25 +120,33 @@ function toLinkHref(link: string) {
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(link)) {
     return `mailto:${link}`;
   }
-  return link;
+  return sanitizeHttpUrl(link);
 }
 
 export function getReservationAction(link?: string) {
   if (!link) {
     return null;
   }
-  return { label: "예약하기", href: toLinkHref(link) };
+  const href = toLinkHref(link);
+  if (!href) {
+    return null;
+  }
+  return { label: "예약하기", href };
 }
 
 export function getInquiryAction(link?: string) {
   if (!link) {
     return null;
   }
+  const href = toLinkHref(link);
+  if (!href) {
+    return null;
+  }
   if (isKakaoPlus(link) || isInstagram(link) || isPhone(link) || isUrl(link)) {
-    return { label: "문의하기", href: toLinkHref(link) };
+    return { label: "문의하기", href };
   }
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(link)) {
-    return { label: "문의하기", href: toLinkHref(link) };
+    return { label: "문의하기", href };
   }
   return null;
 }

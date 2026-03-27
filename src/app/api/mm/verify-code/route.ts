@@ -3,6 +3,11 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { hashCode } from "@/lib/mm-verification";
 import { setUserSession } from "@/lib/user-auth";
 import { hashPassword, isValidPassword } from "@/lib/password";
+import {
+  normalizeMmUsername,
+  PASSWORD_POLICY_MESSAGE,
+  validateMmUsername,
+} from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -17,14 +22,20 @@ export async function POST(request: Request) {
       password?: string;
     };
 
-    const username = String(payload.username ?? "").trim().replace(/^@/, "");
+    const username = normalizeMmUsername(String(payload.username ?? ""));
     const code = String(payload.code ?? "").trim().toUpperCase();
     const password = String(payload.password ?? "").trim();
     if (!username || !code || !password) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
+    if (validateMmUsername(username)) {
+      return NextResponse.json({ error: "invalid_username" }, { status: 400 });
+    }
     if (!isValidPassword(password)) {
-      return NextResponse.json({ error: "invalid_password" }, { status: 400 });
+      return NextResponse.json(
+        { error: "invalid_password", message: PASSWORD_POLICY_MESSAGE },
+        { status: 400 },
+      );
     }
 
     const supabase = getSupabaseAdminClient();
@@ -133,6 +144,9 @@ export async function POST(request: Request) {
         await setUserSession(inserted.id, false);
       }
     }
+
+    await supabase.from("mm_verification_attempts").delete().eq("identifier", username);
+    await supabase.from("mm_verification_codes").delete().eq("mm_username", username);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

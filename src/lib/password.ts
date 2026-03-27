@@ -15,6 +15,9 @@ export function verifyPassword(password: string, salt: string, hash: string) {
   const compare = crypto
     .pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, "sha256")
     .toString("hex");
+  if (compare.length !== hash.length) {
+    return false;
+  }
   return crypto.timingSafeEqual(Buffer.from(compare), Buffer.from(hash));
 }
 
@@ -33,13 +36,14 @@ export function generateTempPassword(length = 12) {
   const numbers = "0123456789";
   const symbols = "!@#$%^&*_-+=?";
   const all = letters + numbers + symbols;
-  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
-  let result = pick(letters) + pick(numbers) + pick(symbols);
-  while (result.length < length) {
-    result += pick(all);
+  const pick = (set: string) => set[crypto.randomInt(0, set.length)];
+  const chars = [pick(letters), pick(numbers), pick(symbols)];
+  while (chars.length < length) {
+    chars.push(pick(all));
   }
-  return result
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
+  for (let index = chars.length - 1; index > 0; index -= 1) {
+    const swapIndex = crypto.randomInt(0, index + 1);
+    [chars[index], chars[swapIndex]] = [chars[swapIndex], chars[index]];
+  }
+  return chars.join("");
 }
