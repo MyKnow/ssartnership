@@ -32,6 +32,7 @@ alter table partners add column if not exists conditions text[] not null default
 alter table partners add column if not exists images text[] not null default '{}';
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;
+alter table partners alter column contact drop not null;
 
 create table if not exists admin_login_attempts (
   id uuid primary key default uuid_generate_v4(),

@@ -94,7 +94,7 @@ export async function createPartner(formData: FormData) {
   }
 
   const supabase = getSupabaseAdminClient();
-  await supabase.from("partners").insert({
+  const { error } = await supabase.from("partners").insert({
     name,
     category_id: categoryId,
     location,
@@ -108,6 +108,10 @@ export async function createPartner(formData: FormData) {
     images: parseMultiLine(images),
     tags: parseList(tags),
   });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   revalidatePath("/");
   revalidatePath("/admin");
@@ -134,7 +138,7 @@ export async function updatePartner(formData: FormData) {
   }
 
   const supabase = getSupabaseAdminClient();
-  await supabase
+  const { error } = await supabase
     .from("partners")
     .update({
       name,
@@ -151,6 +155,10 @@ export async function updatePartner(formData: FormData) {
       tags: parseList(tags),
     })
     .eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   revalidatePath("/");
   revalidatePath("/admin");
