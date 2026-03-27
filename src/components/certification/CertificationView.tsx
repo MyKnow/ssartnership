@@ -24,12 +24,31 @@ export default function CertificationView({
   initialTimestamp: string;
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
+  const [isAvatarOpen, setAvatarOpen] = useState(false);
   const { notify } = useToast();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isAvatarOpen) {
+      return;
+    }
+    const originalOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAvatarOpen(false);
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isAvatarOpen]);
 
   const timeLabel = useMemo(() => {
     return now.toLocaleString("ko-KR", {
@@ -76,16 +95,23 @@ export default function CertificationView({
                 {member.class_number ? `${member.class_number}반` : ""}
               </p>
             </div>
-            <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-[0_12px_30px_rgba(14,165,233,0.35)]">
+            <div className="relative h-28 w-28 overflow-hidden rounded-3xl border border-white/20 bg-white/10 shadow-[0_12px_30px_rgba(14,165,233,0.35)]">
               {avatarSrc ? (
-                <Image
-                  src={avatarSrc}
-                  alt="프로필"
-                  fill
-                  sizes="80px"
-                  unoptimized
-                  className="object-cover"
-                />
+                <button
+                  type="button"
+                  className="relative block h-full w-full"
+                  onClick={() => setAvatarOpen(true)}
+                  aria-label="프로필 이미지 크게 보기"
+                >
+                  <Image
+                    src={avatarSrc}
+                    alt="프로필"
+                    fill
+                    sizes="112px"
+                    unoptimized
+                    className="object-cover"
+                  />
+                </button>
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-xs text-slate-200">
                   사진 없음
@@ -150,6 +176,35 @@ export default function CertificationView({
           </div>
         </div>
       </div>
+
+      {avatarSrc && isAvatarOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
+          <button
+            type="button"
+            className="absolute inset-0"
+            onClick={() => setAvatarOpen(false)}
+            aria-label="확대 이미지 닫기"
+          />
+          <button
+            type="button"
+            className="absolute right-6 top-6 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
+            onClick={() => setAvatarOpen(false)}
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+          <div className="relative z-10 aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-white/5 shadow-2xl">
+            <Image
+              src={avatarSrc}
+              alt="프로필 확대 이미지"
+              fill
+              sizes="(max-width: 768px) 90vw, 448px"
+              unoptimized
+              className="object-contain"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
