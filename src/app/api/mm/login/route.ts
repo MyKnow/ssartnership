@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
     const ok = verifyPassword(password, member.password_salt, member.password_hash);
     if (!ok) {
-      return NextResponse.json({ error: "not_registered" }, { status: 401 });
+      return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
     }
 
     await setUserSession(member.id, Boolean(member.must_change_password));

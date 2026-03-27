@@ -4,6 +4,7 @@ import { useState } from "react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 type Step = "request" | "verify";
 
@@ -15,6 +16,10 @@ export default function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
+  const invalidId = (value: string) => {
+    const trimmed = value.trim();
+    return trimmed.startsWith("@") || trimmed.includes("@");
+  };
 
   const requestCode = async () => {
     if (pending) {
@@ -22,6 +27,10 @@ export default function SignupForm() {
     }
     if (!username) {
       setError("MM 아이디를 입력해 주세요.");
+      return;
+    }
+    if (invalidId(username)) {
+      setError("MM 아이디는 @ 없이 입력해 주세요.");
       return;
     }
     if (!password) {
@@ -83,6 +92,10 @@ export default function SignupForm() {
     if (pending) {
       return;
     }
+    if (invalidId(username)) {
+      setError("MM 아이디는 @ 없이 입력해 주세요.");
+      return;
+    }
     setPending(true);
     try {
       const response = await fetch("/api/mm/verify-code", {
@@ -127,14 +140,13 @@ export default function SignupForm() {
         <Input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          placeholder="myknow"
+          placeholder="MM 아이디"
           required
         />
       </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         사이트 비밀번호
-        <Input
-          type="password"
+        <PasswordInput
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="영문/숫자/특수문자 포함 8자 이상"

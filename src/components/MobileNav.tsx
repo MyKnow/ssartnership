@@ -94,7 +94,6 @@ export default function MobileNav({ suggestHref }: { suggestHref: string }) {
                       제휴 제안하기
                     </Button>
                     <UserMenu />
-                    <ThemeToggle />
                   </div>
                 </div>
               </aside>

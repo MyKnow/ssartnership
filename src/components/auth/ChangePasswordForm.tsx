@@ -4,6 +4,7 @@ import { useState } from "react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function ChangePasswordForm() {
   const [current, setCurrent] = useState("");
@@ -52,8 +53,7 @@ export default function ChangePasswordForm() {
     <div className="mt-6 flex flex-col gap-4">
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         현재 비밀번호
-        <Input
-          type="password"
+        <PasswordInput
           value={current}
           onChange={(event) => setCurrent(event.target.value)}
           placeholder="현재 비밀번호"
@@ -62,8 +62,7 @@ export default function ChangePasswordForm() {
       </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         새 비밀번호
-        <Input
-          type="password"
+        <PasswordInput
           value={nextPassword}
           onChange={(event) => setNextPassword(event.target.value)}
           placeholder="영문/숫자/특수문자 포함 8자 이상"

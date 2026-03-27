@@ -22,13 +22,21 @@ export default function SiteHeader({
           {SITE_NAME}
         </a>
         <div className="flex items-center gap-2">
-          <MobileNav suggestHref={suggestHref} />
-          <div className="hidden sm:flex">
+          <div className="hidden sm:flex items-center gap-2">
+            <Button variant="ghost" href={suggestHref}>
+              제휴 제안하기
+            </Button>
+          </div>
+          <div className="hidden sm:flex items-center gap-2">
             <UserMenu />
           </div>
           <div className="hidden sm:flex">
             <ThemeToggle />
           </div>
+          <div className="sm:hidden">
+            <ThemeToggle />
+          </div>
+          <MobileNav suggestHref={suggestHref} />
         </div>
       </Container>
     </header>

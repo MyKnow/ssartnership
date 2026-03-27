@@ -19,6 +19,7 @@ import { SITE_NAME } from "@/lib/site";
 import EmptyState from "@/components/ui/EmptyState";
 import { ADMIN_COPY } from "@/lib/content";
 import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
+import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,7 @@ export default async function AdminPage() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <form action={logout}><SubmitButton variant="ghost" pendingText="로그아웃 중">로그아웃</SubmitButton></form>
+            <AdminLogoutButton action={logout} />
             <Button variant="ghost" href="/">
               사용자 화면
             </Button>

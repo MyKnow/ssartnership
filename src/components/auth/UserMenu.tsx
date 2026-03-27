@@ -28,6 +28,12 @@ export default function UserMenu() {
   }, []);
 
   const handleLogout = async () => {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm("로그아웃하시겠습니까?");
+      if (!ok) {
+        return;
+      }
+    }
     await fetch("/api/mm/logout", { method: "POST" });
     notify("로그아웃되었습니다.");
     window.location.href = "/";
@@ -49,7 +55,7 @@ export default function UserMenu() {
   return (
     <>
       <Button variant="ghost" href="/certification">
-        {session.mmUsername ? `@${session.mmUsername}` : "교육생 인증"}
+        교육생 인증하기
       </Button>
       <Button variant="ghost" onClick={handleLogout}>
         로그아웃

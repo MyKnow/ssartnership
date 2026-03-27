@@ -10,6 +10,10 @@ export default function ResetPasswordForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { notify } = useToast();
+  const invalidId = (value: string) => {
+    const trimmed = value.trim();
+    return trimmed.startsWith("@") || trimmed.includes("@");
+  };
 
   const handleReset = async () => {
     if (pending) {
@@ -17,6 +21,10 @@ export default function ResetPasswordForm() {
     }
     if (!username) {
       setError("MM 아이디를 입력해 주세요.");
+      return;
+    }
+    if (invalidId(username)) {
+      setError("MM 아이디는 @ 없이 입력해 주세요.");
       return;
     }
     setPending(true);
@@ -63,7 +71,7 @@ export default function ResetPasswordForm() {
         <Input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          placeholder="myknow"
+          placeholder="MM 아이디"
           required
         />
       </label>

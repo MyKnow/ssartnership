@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function LoginForm() {
   const [username, setUsername] = useState("");
@@ -11,6 +12,10 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
+  const invalidId = (value: string) => {
+    const trimmed = value.trim();
+    return trimmed.startsWith("@") || trimmed.includes("@");
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -31,6 +36,10 @@ export default function LoginForm() {
       setError("아이디와 비밀번호를 입력해 주세요.");
       return;
     }
+    if (invalidId(username)) {
+      setError("아이디는 @ 없이 입력해 주세요.");
+      return;
+    }
     setPending(true);
     try {
       const response = await fetch("/api/mm/login", {
@@ -44,6 +53,11 @@ export default function LoginForm() {
           setError("회원가입이 필요합니다.");
           notify("회원가입이 필요합니다.");
           window.location.href = "/auth/signup";
+          return;
+        }
+        if (data.error === "invalid_credentials") {
+          setError("아이디 또는 비밀번호가 올바르지 않습니다.");
+          notify("아이디 또는 비밀번호가 올바르지 않습니다.");
           return;
         }
         if (data.error === "login_failed") {
@@ -71,14 +85,13 @@ export default function LoginForm() {
         <Input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          placeholder="myknow"
+          placeholder="MM 아이디"
           required
         />
       </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         사이트 비밀번호
-        <Input
-          type="password"
+        <PasswordInput
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="사이트 비밀번호"

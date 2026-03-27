@@ -20,6 +20,10 @@ async function loginAction(formData: FormData) {
   "use server";
   const id = String(formData.get("id") || "");
   const password = String(formData.get("password") || "");
+  const invalidId = id.trim().startsWith("@") || id.includes("@");
+  if (invalidId) {
+    redirect(`/admin/login?error=invalid&id=${encodeURIComponent(id)}`);
+  }
 
   const headerStore = await headers();
   const forwardedFor = headerStore.get("x-forwarded-for");
@@ -48,6 +52,7 @@ export default async function AdminLoginPage({
   const params = (await searchParams) ?? {};
   const hasError = params.error === "1";
   const isRateLimited = params.error === "rate";
+  const invalidId = params.error === "invalid";
   const defaultId = params.id ?? "";
 
   return (
@@ -106,6 +111,11 @@ export default async function AdminLoginPage({
           {isRateLimited ? (
             <p className="text-xs font-semibold text-danger">
               로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.
+            </p>
+          ) : null}
+          {invalidId ? (
+            <p className="text-xs font-semibold text-danger">
+              아이디는 @ 없이 입력해 주세요.
             </p>
           ) : null}
 
