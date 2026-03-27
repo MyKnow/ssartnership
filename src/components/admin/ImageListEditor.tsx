@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
+import { getCachedImageUrl } from "@/lib/image-cache";
 
 function normalize(value: string) {
   return value.trim();
@@ -112,12 +114,15 @@ export default function ImageListEditor({
               </div>
               <div className="h-24 w-full overflow-hidden rounded-xl border border-border bg-surface-muted">
                 {url ? (
-                  <img
-                    src={url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
+                  <div className="relative h-full w-full">
+                    <Image
+                      src={getCachedImageUrl(url)}
+                      alt=""
+                      fill
+                      sizes="320px"
+                      className="object-cover"
+                    />
+                  </div>
                 ) : null}
               </div>
             </div>

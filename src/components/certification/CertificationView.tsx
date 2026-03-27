@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -77,10 +78,13 @@ export default function CertificationView({
             </div>
             <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-[0_12px_30px_rgba(14,165,233,0.35)]">
               {avatarSrc ? (
-                <img
+                <Image
                   src={avatarSrc}
                   alt="프로필"
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="80px"
+                  unoptimized
+                  className="object-cover"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-xs text-slate-200">
