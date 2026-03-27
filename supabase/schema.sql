@@ -52,14 +52,73 @@ create table if not exists suggestion_attempts (
   created_at timestamp with time zone default now()
 );
 
+create table if not exists members (
+  id uuid primary key default uuid_generate_v4(),
+  email text,
+  mm_user_id text not null unique,
+  mm_username text not null,
+  password_hash text,
+  password_salt text,
+  must_change_password boolean not null default false,
+  display_name text,
+  region text,
+  campus text,
+  class_number integer,
+  avatar_content_type text,
+  avatar_base64 text,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+create table if not exists mm_verification_codes (
+  id uuid primary key default uuid_generate_v4(),
+  email text,
+  code_hash text not null,
+  expires_at timestamp with time zone not null,
+  mm_user_id text not null,
+  mm_username text not null,
+  display_name text,
+  region text,
+  campus text,
+  class_number integer,
+  avatar_content_type text,
+  avatar_base64 text,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists mm_verification_attempts (
+  id uuid primary key default uuid_generate_v4(),
+  identifier text not null unique,
+  count integer not null default 0,
+  first_attempt_at timestamp with time zone not null default now(),
+  blocked_until timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists password_reset_attempts (
+  id uuid primary key default uuid_generate_v4(),
+  identifier text not null unique,
+  count integer not null default 0,
+  first_attempt_at timestamp with time zone not null default now(),
+  blocked_until timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
 create index if not exists partners_category_id_idx on partners(category_id);
 create index if not exists admin_login_attempts_identifier_idx on admin_login_attempts(identifier);
 create index if not exists suggestion_attempts_identifier_idx on suggestion_attempts(identifier);
+create index if not exists mm_verification_codes_email_idx on mm_verification_codes(email);
+create index if not exists mm_verification_attempts_identifier_idx on mm_verification_attempts(identifier);
+create index if not exists password_reset_attempts_identifier_idx on password_reset_attempts(identifier);
 
 alter table categories enable row level security;
 alter table partners enable row level security;
 alter table admin_login_attempts enable row level security;
 alter table suggestion_attempts enable row level security;
+alter table members enable row level security;
+alter table mm_verification_codes enable row level security;
+alter table mm_verification_attempts enable row level security;
+alter table password_reset_attempts enable row level security;
 
 create policy "Public read categories" on categories
   for select
@@ -73,3 +132,11 @@ revoke all on table admin_login_attempts from anon;
 revoke all on table admin_login_attempts from authenticated;
 revoke all on table suggestion_attempts from anon;
 revoke all on table suggestion_attempts from authenticated;
+revoke all on table members from anon;
+revoke all on table members from authenticated;
+revoke all on table mm_verification_codes from anon;
+revoke all on table mm_verification_codes from authenticated;
+revoke all on table mm_verification_attempts from anon;
+revoke all on table mm_verification_attempts from authenticated;
+revoke all on table password_reset_attempts from anon;
+revoke all on table password_reset_attempts from authenticated;

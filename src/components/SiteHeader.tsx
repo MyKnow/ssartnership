@@ -4,6 +4,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
+import UserMenu from "@/components/auth/UserMenu";
 
 export default function SiteHeader({
   suggestHref = "/suggest",
@@ -23,6 +24,7 @@ export default function SiteHeader({
           <Button variant="ghost" href={suggestHref}>
             제휴 제안하기
           </Button>
+          <UserMenu />
           <ThemeToggle />
         </div>
       </Container>
