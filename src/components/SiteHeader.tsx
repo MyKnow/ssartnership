@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 import UserMenu from "@/components/auth/UserMenu";
+import MobileNav from "@/components/MobileNav";
 
 export default function SiteHeader({
   suggestHref = "/suggest",
@@ -21,11 +22,13 @@ export default function SiteHeader({
           {SITE_NAME}
         </a>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" href={suggestHref}>
-            제휴 제안하기
-          </Button>
-          <UserMenu />
-          <ThemeToggle />
+          <MobileNav suggestHref={suggestHref} />
+          <div className="hidden sm:flex">
+            <UserMenu />
+          </div>
+          <div className="hidden sm:flex">
+            <ThemeToggle />
+          </div>
         </div>
       </Container>
     </header>
