@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import PwaInstallButton from "@/components/PwaInstallButton";
 import Button from "@/components/ui/Button";
 import UserMenu from "@/components/auth/UserMenu";
 import { cn } from "@/lib/cn";
@@ -93,6 +94,7 @@ export default function MobileNav({ suggestHref }: { suggestHref: string }) {
                     <Button variant="ghost" href={suggestHref}>
                       제휴 제안하기
                     </Button>
+                    <PwaInstallButton />
                     <UserMenu />
                   </div>
                 </div>

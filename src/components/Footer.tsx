@@ -2,6 +2,7 @@
 
 import { FaGithub } from "react-icons/fa";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
+import PwaInstallButton from "@/components/PwaInstallButton";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import {
@@ -37,6 +38,7 @@ export default function Footer() {
             <Button variant="ghost" href={SUGGESTION_URL}>
               업체 추천하기
             </Button>
+            <PwaInstallButton />
             <Button
               variant="ghost"
               href="/admin"
