@@ -400,7 +400,7 @@ export default function PartnerCard({
                   className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
                   href={mapLink}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   aria-label="지도 보기"
                   title="지도 보기"
                 >

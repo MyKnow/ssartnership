@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Input from "@/components/ui/Input";
 import MmUsernameInput from "@/components/auth/MmUsernameInput";
+import FormMessage from "@/components/ui/FormMessage";
 import { isValidPassword } from "@/lib/password";
 import {
   normalizeMmUsername,
@@ -23,6 +25,7 @@ export default function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
+  const router = useRouter();
 
   const requestCode = async () => {
     if (pending) {
@@ -142,7 +145,8 @@ export default function SignupForm() {
       }
       setError(null);
       notify("회원가입이 완료되었습니다.");
-      window.location.href = "/certification";
+      router.replace("/certification");
+      router.refresh();
     } finally {
       setPending(false);
     }
@@ -179,16 +183,12 @@ export default function SignupForm() {
         </label>
       ) : null}
 
-      {error ? (
-        <p className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <FormMessage variant="error">{error}</FormMessage> : null}
 
-      <p className="text-xs text-muted-foreground">
+      <FormMessage>
         {PASSWORD_POLICY_MESSAGE} 인증코드는 5분간 유효하며, 5회 실패 시
         1시간 동안 인증이 제한됩니다.
-      </p>
+      </FormMessage>
 
       {step === "request" ? (
         <Button onClick={requestCode} disabled={pending}>

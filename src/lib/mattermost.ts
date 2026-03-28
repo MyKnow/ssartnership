@@ -108,31 +108,6 @@ export async function getUserImage(
   return { contentType, base64: buffer.toString("base64") };
 }
 
-export async function searchUsersByEmail(token: string, email: string) {
-  const response = await mmFetch("/api/v4/users/search", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ term: email, allow_inactive: true }),
-  });
-  if (!response.ok) {
-    throw new Error("MM 유저 검색 실패");
-  }
-  const users = (await response.json()) as MMUser[];
-  const exact = users.find(
-    (user) => user.email?.toLowerCase() === email.toLowerCase(),
-  );
-  if (exact) {
-    return { user: exact, ambiguous: false, users };
-  }
-  if (users.length === 1) {
-    return { user: users[0], ambiguous: false, users };
-  }
-  if (users.length > 1) {
-    return { user: null, ambiguous: true, users };
-  }
-  return { user: null, ambiguous: false, users };
-}
-
 export async function getUserByUsername(token: string, username: string) {
   const safe = username.replace(/^@/, "").trim();
   const response = await mmFetch(`/api/v4/users/username/${safe}`, {
@@ -171,22 +146,6 @@ export async function getChannelByName(
   return response.json() as Promise<{ id: string }>;
 }
 
-export async function getChannelMembers(
-  token: string,
-  channelId: string,
-  page: number,
-  perPage: number,
-) {
-  const response = await mmFetch(
-    `/api/v4/channels/${channelId}/members?page=${page}&per_page=${perPage}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!response.ok) {
-    throw new Error("MM 채널 멤버 조회 실패");
-  }
-  return response.json() as Promise<Array<{ user_id: string }>>;
-}
-
 export async function getChannelMember(
   token: string,
   channelId: string,
@@ -200,18 +159,6 @@ export async function getChannelMember(
     return null;
   }
   return response.json() as Promise<{ user_id: string }>;
-}
-
-export async function getUsersByIds(token: string, ids: string[]) {
-  const response = await mmFetch("/api/v4/users/ids", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(ids),
-  });
-  if (!response.ok) {
-    throw new Error("MM 사용자 조회 실패");
-  }
-  return response.json() as Promise<MMUser[]>;
 }
 
 export async function findUserInChannelByUsername(

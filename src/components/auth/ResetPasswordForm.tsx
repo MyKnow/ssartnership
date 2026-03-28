@@ -1,9 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import MmUsernameInput from "@/components/auth/MmUsernameInput";
+import FormMessage from "@/components/ui/FormMessage";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 export default function ResetPasswordForm() {
@@ -11,6 +13,7 @@ export default function ResetPasswordForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { notify } = useToast();
+  const router = useRouter();
 
   const handleReset = async () => {
     if (pending) {
@@ -61,7 +64,7 @@ export default function ResetPasswordForm() {
       setError(null);
       notify("임시 비밀번호가 MM DM으로 전송되었습니다.");
       sessionStorage.setItem("reset:success", "1");
-      window.location.href = "/auth/login";
+      router.push("/auth/login");
     } finally {
       setPending(false);
     }
@@ -76,11 +79,7 @@ export default function ResetPasswordForm() {
           onChange={(event) => setUsername(event.target.value)}
         />
       </label>
-      {error ? (
-        <p className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <FormMessage variant="error">{error}</FormMessage> : null}
       <Button onClick={handleReset} disabled={pending}>
         임시 비밀번호 발급
       </Button>

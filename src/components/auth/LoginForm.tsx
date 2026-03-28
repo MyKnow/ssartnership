@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import PasswordInput from "@/components/ui/PasswordInput";
 import MmUsernameInput from "@/components/auth/MmUsernameInput";
+import FormMessage from "@/components/ui/FormMessage";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 export default function LoginForm() {
@@ -13,6 +15,7 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -51,7 +54,7 @@ export default function LoginForm() {
         if (data.error === "not_registered") {
           setError("회원가입이 필요합니다.");
           notify("회원가입이 필요합니다.");
-          window.location.href = "/auth/signup";
+          router.push("/auth/signup");
           return;
         }
         if (data.error === "invalid_username") {
@@ -75,7 +78,8 @@ export default function LoginForm() {
       }
       setError(null);
       notify("로그인되었습니다.");
-      window.location.href = "/certification";
+      router.replace("/certification");
+      router.refresh();
     } finally {
       setPending(false);
     }
@@ -106,11 +110,7 @@ export default function LoginForm() {
       <Button variant="ghost" href="/auth/reset">
         비밀번호 재설정
       </Button>
-      {error ? (
-        <p className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
+      {error ? <FormMessage variant="error">{error}</FormMessage> : null}
     </div>
   );
 }

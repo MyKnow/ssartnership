@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import { getUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
+import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
 
 export const metadata = {
   title: "교육생 인증 | SSARTNERSHIP",
@@ -47,6 +48,7 @@ export default async function CertificationPage() {
               initialTimestamp={initialTimestamp}
             />
           </Card>
+          <CertificationFooterActions />
         </Container>
       </main>
     </div>

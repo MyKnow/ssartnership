@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -25,6 +26,7 @@ export default function SuggestForm() {
   const [isSubmitting, setSubmitting] = useState(false);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const { notify } = useToast();
+  const router = useRouter();
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -64,7 +66,8 @@ export default function SuggestForm() {
       sessionStorage.setItem("suggest:submitted", "1");
     }
     setSubmitting(false);
-    window.location.href = "/";
+    router.replace("/");
+    router.refresh();
   };
 
   return (

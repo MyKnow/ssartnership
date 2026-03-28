@@ -7,5 +7,4 @@ export const SITE_URL =
 
 export const GITHUB_URL = "https://github.com/MyKnow";
 export const BUG_REPORT_EMAIL = "myknow00@naver.com";
-export const SUGGESTION_URL =
-  process.env.NEXT_PUBLIC_MATTERMOST_DM_URL ?? "";
+export const SUGGESTION_URL = "/suggest";

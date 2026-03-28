@@ -35,6 +35,7 @@ SSAFY 서울 캠퍼스 교육생을 위한 제휴 혜택 플랫폼입니다.
   - 임시 비밀번호 재발급
   - 비밀번호 변경 강제 플로우
   - 교육생 인증 카드 표시
+  - 공개 QR 검증 페이지
 
 ## 기술 스택
 
@@ -120,6 +121,7 @@ MM_STUDENT_CHANNEL=off-topic
 
 # User session
 USER_SESSION_SECRET=replace-with-long-random-string
+CERTIFICATION_QR_SECRET=replace-with-long-random-string
 
 # Site URL
 NEXT_PUBLIC_SITE_URL=https://ssartnership.myknow.xyz
@@ -149,7 +151,10 @@ NEXT_PUBLIC_SITE_URL=https://ssartnership.myknow.xyz
 - 관리자 세션과 사용자 세션은 HMAC 서명 + 만료 시각을 사용합니다.
 - 관리자 로그인 시도는 rate limit 테이블로 제한합니다.
 - 인증코드와 비밀번호 재설정 요청도 횟수 제한이 적용됩니다.
+- 교육생 인증 QR은 짧은 만료시간의 서명 토큰으로 발급됩니다.
 - 이미지 프록시는 내부망/사설 IP/비정상 프로토콜을 차단합니다.
+- 관리자 액션은 카테고리 키, 색상값, 링크, 제휴 기간을 서버에서 다시 검증합니다.
+- 외부 새 탭 링크는 `noopener noreferrer`를 강제합니다.
 - 파트너 URL은 저장 전 정규화 및 필터링됩니다.
 
 ## 스크립트
@@ -188,11 +193,11 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 
 ## 현재 상태
 
-- `npm run lint`는 통과합니다.
-- 현재 ESLint 경고 2건이 남아 있습니다.
-  - [src/components/admin/ImageListEditor.tsx](/Users/myknow/coding/ssartnership/src/components/admin/ImageListEditor.tsx)
-  - [src/components/certification/CertificationView.tsx](/Users/myknow/coding/ssartnership/src/components/certification/CertificationView.tsx)
-- 두 경고는 `img`를 `next/image`로 전환하면 해소할 수 있습니다.
+- `npm run lint` 통과
+- 내부 버튼 링크는 공통 `Button` 컴포넌트에서 클라이언트 라우팅을 사용합니다.
+- 교육생 인증 카드는 공개 QR 검증 흐름을 포함합니다.
+- 관리자 데이터 수정은 상세 페이지 캐시까지 함께 무효화합니다.
+- 인증 폼의 공통 메시지 UI를 재사용 컴포넌트로 정리했습니다.
 
 ## 라이선스
 

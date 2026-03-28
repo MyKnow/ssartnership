@@ -128,7 +128,7 @@ export default async function PartnerDetailPage({
                     className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
                     href={mapLink}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     aria-label="지도 보기"
                     title="지도 보기"
                   >

@@ -2,9 +2,8 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import Button from "@/components/ui/Button";
-import { useToast } from "@/components/ui/Toast";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import CertificationQrButton from "@/components/certification/CertificationQrButton";
 
 type Member = {
   mm_username: string;
@@ -25,7 +24,6 @@ export default function CertificationView({
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
-  const { notify } = useToast();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -138,41 +136,8 @@ export default function CertificationView({
             <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
             실시간 인증 상태
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-slate-300">
-              회원 탈퇴 시 저장된 인증 정보가 삭제됩니다.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="ghost" href="/auth/change-password">
-                비밀번호 변경하기
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={async () => {
-                  const first = window.confirm(
-                    "정말 탈퇴하시겠습니까? 저장된 인증 정보가 삭제됩니다.",
-                  );
-                  if (!first) {
-                    return;
-                  }
-                  const second = window.confirm(
-                    "한 번 더 확인합니다. 탈퇴하면 되돌릴 수 없습니다.",
-                  );
-                  if (!second) {
-                    return;
-                  }
-                  const response = await fetch("/api/mm/delete", { method: "POST" });
-                  if (response.ok) {
-                    notify("회원 탈퇴가 완료되었습니다.");
-                    window.location.href = "/";
-                    return;
-                  }
-                  notify("회원 탈퇴에 실패했습니다.");
-                }}
-              >
-                회원 탈퇴
-              </Button>
-            </div>
+          <div className="flex items-center justify-end">
+            <CertificationQrButton />
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 const base =
@@ -32,6 +33,20 @@ type ButtonProps = {
   title?: string;
 };
 
+function isInternalHref(href: string) {
+  return href.startsWith("/") && !href.startsWith("//");
+}
+
+function buildLinkRel(target?: string, rel?: string) {
+  if (target !== "_blank") {
+    return rel;
+  }
+  const values = new Set((rel ?? "").split(/\s+/).filter(Boolean));
+  values.add("noopener");
+  values.add("noreferrer");
+  return Array.from(values).join(" ");
+}
+
 export default function Button({
   children,
   variant = "primary",
@@ -46,6 +61,7 @@ export default function Button({
   ariaLabel,
   title,
 }: ButtonProps) {
+  const safeRel = buildLinkRel(target, rel);
   const classes = cn(
     base,
     variants[variant],
@@ -55,15 +71,31 @@ export default function Button({
   );
 
   if (href) {
+    const sharedProps = {
+      className: classes,
+      "aria-label": ariaLabel,
+      title,
+      target,
+      rel: safeRel,
+      "aria-disabled": disabled || undefined,
+      tabIndex: disabled ? -1 : undefined,
+      onClick: disabled
+        ? (event: React.MouseEvent<HTMLAnchorElement>) => {
+            event.preventDefault();
+          }
+        : undefined,
+    };
+
+    if (isInternalHref(href)) {
+      return (
+        <Link href={href} {...sharedProps}>
+          {children}
+        </Link>
+      );
+    }
+
     return (
-      <a
-        href={href}
-        className={classes}
-        target={target}
-        rel={rel}
-        aria-label={ariaLabel}
-        title={title}
-      >
+      <a href={href} {...sharedProps}>
         {children}
       </a>
     );

@@ -86,7 +86,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,category_id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags"
+        "id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,categories(key)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -98,17 +98,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
       return null;
     }
 
-    let categoryKey = "health";
-    if (data.category_id) {
-      const { data: categoryData } = await supabase
-        .from("categories")
-        .select("key")
-        .eq("id", data.category_id)
-        .maybeSingle();
-      if (categoryData?.key) {
-        categoryKey = categoryData.key;
-      }
-    }
+    const categoryKey = extractCategoryKey(data.categories) ?? "health";
     return {
       id: data.id,
       name: data.name,

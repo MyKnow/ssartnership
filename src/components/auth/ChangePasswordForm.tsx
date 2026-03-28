@@ -1,9 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import PasswordInput from "@/components/ui/PasswordInput";
+import FormMessage from "@/components/ui/FormMessage";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
 export default function ChangePasswordForm() {
@@ -12,6 +14,7 @@ export default function ChangePasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
+  const router = useRouter();
 
   const handleChange = async () => {
     if (pending) {
@@ -43,7 +46,8 @@ export default function ChangePasswordForm() {
       }
       setError(null);
       notify("비밀번호가 변경되었습니다.");
-      window.location.href = "/certification";
+      router.replace("/certification");
+      router.refresh();
     } finally {
       setPending(false);
     }
@@ -69,12 +73,8 @@ export default function ChangePasswordForm() {
           required
         />
       </label>
-      {error ? (
-        <p className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
-      <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_MESSAGE}</p>
+      {error ? <FormMessage variant="error">{error}</FormMessage> : null}
+      <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
       <Button onClick={handleChange} disabled={pending}>
         비밀번호 변경
       </Button>
