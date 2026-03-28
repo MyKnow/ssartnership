@@ -23,5 +23,4 @@ export type Partner = {
   conditions?: string[];
   images?: string[];
   tags?: string[];
-  notes?: string;
 };

@@ -111,7 +111,7 @@ export default async function CertificationVerifyPage({
                         {profile?.displayName ?? member.display_name ?? member.mm_username}
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {member.campus ?? "캠퍼스"}{" "}
+                        {member.campus ?? profile?.campus ?? "캠퍼스"}{" "}
                         {member.class_number ? `${member.class_number}반` : ""}
                       </p>
                     </div>

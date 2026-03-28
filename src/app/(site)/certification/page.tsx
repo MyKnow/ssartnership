@@ -22,7 +22,7 @@ export default async function CertificationPage() {
   const { data: member } = await supabase
     .from("members")
     .select(
-      "id,mm_username,display_name,region,campus,class_number,avatar_content_type,avatar_base64",
+      "id,mm_username,display_name,campus,class_number,avatar_content_type,avatar_base64",
     )
     .eq("id", session.userId)
     .maybeSingle();

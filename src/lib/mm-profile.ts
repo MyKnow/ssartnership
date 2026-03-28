@@ -1,6 +1,5 @@
 type ParsedProfile = {
   displayName?: string;
-  region?: string;
   campus?: string;
   classNumber?: number;
 };
@@ -25,11 +24,9 @@ export function parseSsafyProfile(displayName?: string): ParsedProfile {
   }
   const regionRaw = match[1];
   const classNumber = Number(match[2]);
-  const region = REGION_MAP[regionRaw] ?? regionRaw;
-  const campus = region === "서울" ? "서울" : region;
+  const campus = REGION_MAP[regionRaw] ?? regionRaw;
   return {
     displayName: cleanedDisplayName,
-    region,
     campus,
     classNumber: Number.isNaN(classNumber) ? undefined : classNumber,
   };

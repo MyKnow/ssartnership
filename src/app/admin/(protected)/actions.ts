@@ -66,6 +66,14 @@ function revalidateAdminAndPublicPaths(partnerId?: string) {
   }
 }
 
+function revalidateMemberPaths() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/members");
+  revalidatePath("/admin/partners");
+  revalidatePath("/certification");
+  revalidatePath("/auth/change-password");
+}
+
 function parseCategoryPayload(formData: FormData) {
   const key = String(formData.get("key") || "")
     .trim()
@@ -296,6 +304,91 @@ export async function deletePartner(formData: FormData) {
   }
 
   revalidateAdminAndPublicPaths(id);
+}
+
+export async function updateMember(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "").trim();
+  const displayName = String(formData.get("displayName") || "").trim();
+  const campus = String(formData.get("campus") || "").trim();
+  const classNumberRaw = String(formData.get("classNumber") || "").trim();
+  const mustChangePassword =
+    String(formData.get("mustChangePassword") || "false").trim() === "true";
+
+  if (!id) {
+    throw new Error("수정할 회원을 찾을 수 없습니다.");
+  }
+
+  let classNumber: number | null = null;
+  if (classNumberRaw) {
+    classNumber = Number.parseInt(classNumberRaw, 10);
+    if (!Number.isInteger(classNumber) || classNumber < 1 || classNumber > 30) {
+      throw new Error("반 정보는 1~30 사이의 숫자로 입력해 주세요.");
+    }
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("members")
+    .update({
+      display_name: displayName || null,
+      campus: campus || null,
+      class_number: classNumber,
+      must_change_password: mustChangePassword,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidateMemberPaths();
+  redirect("/admin");
+}
+
+export async function deleteMember(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "").trim();
+
+  if (!id) {
+    throw new Error("삭제할 회원을 찾을 수 없습니다.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: member, error: memberError } = await supabase
+    .from("members")
+    .select("mm_username")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (memberError) {
+    throw new Error(memberError.message);
+  }
+  if (!member?.mm_username) {
+    throw new Error("삭제할 회원을 찾을 수 없습니다.");
+  }
+
+  await supabase
+    .from("mm_verification_codes")
+    .delete()
+    .eq("mm_username", member.mm_username);
+  await supabase
+    .from("mm_verification_attempts")
+    .delete()
+    .eq("identifier", member.mm_username);
+  await supabase
+    .from("password_reset_attempts")
+    .delete()
+    .eq("identifier", member.mm_username);
+
+  const { error } = await supabase.from("members").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidateMemberPaths();
 }
 
 export async function logout() {

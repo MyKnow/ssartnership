@@ -38,6 +38,10 @@ Last updated: 2026-03-28
 - Added a reusable `FormMessage` component to remove duplicated auth form hint/error markup.
 - Hardened new-tab external links by automatically applying `noopener noreferrer` in the shared button component.
 - Removed unused Mattermost email/member-list helper functions left over from the older auth approach.
+- Added an Admin member management section for member search/filter/read/update/delete operations.
+- Synced `must_change_password` checks with the current member row so admin updates take effect on subsequent session reads.
+- Split the Admin root into a dashboard entry page and dedicated member/partner management pages.
+- Unified member profile handling around `campus` as the canonical location field and removed `region` usage from active flows.
 
 ## Remaining candidates
 

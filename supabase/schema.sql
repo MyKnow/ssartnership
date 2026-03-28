@@ -32,7 +32,7 @@ alter table partners add column if not exists conditions text[] not null default
 alter table partners add column if not exists images text[] not null default '{}';
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;
-alter table partners alter column contact drop not null;
+alter table partners drop column if exists contact;
 
 create table if not exists admin_login_attempts (
   id uuid primary key default uuid_generate_v4(),
@@ -54,14 +54,12 @@ create table if not exists suggestion_attempts (
 
 create table if not exists members (
   id uuid primary key default uuid_generate_v4(),
-  email text,
   mm_user_id text not null unique,
   mm_username text not null,
   password_hash text,
   password_salt text,
   must_change_password boolean not null default false,
   display_name text,
-  region text,
   campus text,
   class_number integer,
   avatar_content_type text,
@@ -70,21 +68,25 @@ create table if not exists members (
   updated_at timestamp with time zone default now()
 );
 
+alter table members drop column if exists email;
+alter table members drop column if exists region;
+
 create table if not exists mm_verification_codes (
   id uuid primary key default uuid_generate_v4(),
-  email text,
   code_hash text not null,
   expires_at timestamp with time zone not null,
   mm_user_id text not null,
   mm_username text not null,
   display_name text,
-  region text,
   campus text,
   class_number integer,
   avatar_content_type text,
   avatar_base64 text,
   created_at timestamp with time zone default now()
 );
+
+alter table mm_verification_codes drop column if exists email;
+alter table mm_verification_codes drop column if exists region;
 
 create table if not exists mm_verification_attempts (
   id uuid primary key default uuid_generate_v4(),
@@ -107,9 +109,10 @@ create table if not exists password_reset_attempts (
 create index if not exists partners_category_id_idx on partners(category_id);
 create index if not exists admin_login_attempts_identifier_idx on admin_login_attempts(identifier);
 create index if not exists suggestion_attempts_identifier_idx on suggestion_attempts(identifier);
-create index if not exists mm_verification_codes_email_idx on mm_verification_codes(email);
 create index if not exists mm_verification_attempts_identifier_idx on mm_verification_attempts(identifier);
 create index if not exists password_reset_attempts_identifier_idx on password_reset_attempts(identifier);
+
+drop index if exists mm_verification_codes_email_idx;
 
 alter table categories enable row level security;
 alter table partners enable row level security;

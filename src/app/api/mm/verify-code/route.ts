@@ -105,11 +105,9 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     const upsertPayload = {
-      email: codeRow.email ?? null,
       mm_user_id: codeRow.mm_user_id,
       mm_username: codeRow.mm_username,
       display_name: codeRow.display_name,
-      region: codeRow.region,
       campus: codeRow.campus,
       class_number: codeRow.class_number,
       avatar_content_type: codeRow.avatar_content_type,

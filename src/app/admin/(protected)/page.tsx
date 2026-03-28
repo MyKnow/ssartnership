@@ -1,27 +1,53 @@
-import ThemeToggle from "@/components/ThemeToggle";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import {
-  createCategory,
-  createPartner,
-  deleteCategory,
-  deletePartner,
-  logout,
-  updateCategory,
-  updatePartner,
-} from "@/app/admin/(protected)/actions";
+import Link from "next/link";
+import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
-import SectionHeading from "@/components/ui/SectionHeading";
-import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
-import SubmitButton from "@/components/ui/SubmitButton";
-import Container from "@/components/ui/Container";
-import { SITE_NAME } from "@/lib/site";
-import EmptyState from "@/components/ui/EmptyState";
-import { ADMIN_COPY } from "@/lib/content";
-import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
-import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+type SummaryCardProps = {
+  href: string;
+  title: string;
+  description: string;
+  meta: string;
+};
+
+function SummaryCard({ href, title, description, meta }: SummaryCardProps) {
+  return (
+    <Link href={href} className="group block">
+      <Card className="h-full transition hover:-translate-y-0.5 hover:border-strong hover:shadow-md">
+        <div className="flex h-full flex-col justify-between gap-6">
+          <div className="grid gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Admin
+            </p>
+            <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">{meta}</span>
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-muted text-foreground transition group-hover:border-strong">
+              <svg
+                width={18}
+                height={18}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </span>
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
+}
 
 export default async function AdminPage() {
   const hasSupabaseEnv =
@@ -29,145 +55,51 @@ export default async function AdminPage() {
 
   if (!hasSupabaseEnv) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-6">
+      <AdminShell title="Admin 관리 홈" description="Supabase 설정이 필요합니다.">
         <Card className="w-full max-w-xl text-center">
-          <h1 className="text-xl font-semibold text-foreground">
+          <h2 className="text-xl font-semibold text-foreground">
             Supabase 설정이 필요합니다.
-          </h1>
+          </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 환경 변수를 설정한 뒤
-            다시 접속해 주세요.
+            `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`를 설정한 뒤 다시 접속해
+            주세요.
           </p>
         </Card>
-      </div>
+      </AdminShell>
     );
   }
 
   const supabase = getSupabaseAdminClient();
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id,key,label,description,color")
-    .order("created_at", { ascending: true });
-
-  const { data: partners } = await supabase
-    .from("partners")
-    .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags")
-    .order("created_at", { ascending: false });
-
-  const safeCategories = categories ?? [];
-  const safePartners = partners ?? [];
+  const [
+    { count: memberCount },
+    { count: partnerCount },
+    { count: categoryCount },
+  ] = await Promise.all([
+    supabase.from("members").select("*", { count: "exact", head: true }),
+    supabase.from("partners").select("*", { count: "exact", head: true }),
+    supabase.from("categories").select("*", { count: "exact", head: true }),
+  ]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-surface/90 backdrop-blur">
-        <Container className="flex items-center justify-between gap-4 py-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {SITE_NAME}
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold text-foreground">
-              Admin 제휴 관리
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <AdminLogoutButton action={logout} />
-            <Button variant="ghost" href="/">
-              사용자 화면
-            </Button>
-          </div>
-        </Container>
-      </header>
-
-      <main>
-        <Container className="pb-16 pt-10">
-        <section className="grid gap-6">
-          <Card>
-            <SectionHeading
-              title="카테고리 관리"
-              description="카테고리 키는 소문자 영문/숫자 조합을 권장합니다."
-            />
-
-            <form
-              className="mt-6 grid gap-4 lg:grid-cols-[160px_200px_1fr_120px_auto]"
-              action={createCategory}
-            >
-              <Input name="key" placeholder="category-key" required />
-              <Input name="label" placeholder="라벨" required />
-              <Input name="description" placeholder="설명" />
-              <input
-                type="color"
-                name="color"
-                defaultValue="#0f172a"
-                className="h-10 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
-                title="카테고리 색상"
-              />
-              <SubmitButton pendingText="추가 중">추가</SubmitButton>
-            </form>
-
-            <div className="mt-6 grid gap-3">
-              {safeCategories.length === 0 ? (
-                <EmptyState
-                  title={ADMIN_COPY.emptyCategoryTitle}
-                  description={ADMIN_COPY.emptyCategoryDescription}
-                />
-              ) : (
-                safeCategories.map((category) => (
-                  <div
-                    key={category.id}
-                    className="rounded-2xl border border-border bg-surface-muted p-4"
-                  >
-                    <form
-                      className="grid gap-3 lg:grid-cols-[160px_200px_1fr_120px_auto]"
-                      action={updateCategory}
-                    >
-                      <input type="hidden" name="id" value={category.id} />
-                      <Input name="key" defaultValue={category.key} />
-                      <Input name="label" defaultValue={category.label} />
-                      <Input
-                        name="description"
-                        defaultValue={category.description ?? ""}
-                      />
-                      <input
-                        type="color"
-                        name="color"
-                        defaultValue={category.color ?? "#0f172a"}
-                        className="h-10 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
-                        title="카테고리 색상"
-                      />
-                      <SubmitButton variant="ghost" pendingText="수정 중">
-                        수정
-                      </SubmitButton>
-                    </form>
-                    <form className="mt-2" action={deleteCategory}>
-                      <input type="hidden" name="id" value={category.id} />
-                      <SubmitButton variant="danger" pendingText="삭제 중">
-                        삭제
-                      </SubmitButton>
-                    </form>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <SectionHeading
-              title="제휴 업체 관리"
-              description="혜택/태그는 콤마(,)로 구분해 입력합니다."
-            />
-            <AdminPartnerManager
-              categories={safeCategories}
-              partners={safePartners}
-              createPartner={createPartner}
-              updatePartner={updatePartner}
-              deletePartner={deletePartner}
-            />
-          </Card>
-        </section>
-        </Container>
-      </main>
-    </div>
+    <AdminShell
+      title="Admin 관리 홈"
+      description="회원관리와 업체관리 영역을 나눠 필요한 작업에 바로 진입할 수 있습니다."
+    >
+      <div className="grid gap-6 md:grid-cols-2">
+        <SummaryCard
+          href="/admin/members"
+          title="회원 관리"
+          description="교육생 계정을 조회하고 검색, 정렬, 필터링한 뒤 수정 또는 삭제할 수 있습니다."
+          meta={`총 ${memberCount ?? 0}명 회원`}
+        />
+        <SummaryCard
+          href="/admin/partners"
+          title="업체 관리"
+          description="카테고리와 제휴 업체를 관리하고, 등록된 혜택 정보를 수정할 수 있습니다."
+          meta={`제휴 ${partnerCount ?? 0}개 · 카테고리 ${categoryCount ?? 0}개`}
+        />
+      </div>
+    </AdminShell>
   );
 }

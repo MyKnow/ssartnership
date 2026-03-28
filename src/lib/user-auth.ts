@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const COOKIE_NAME = "user_session";
 const SESSION_TTL_DAYS = 7;
@@ -94,5 +95,24 @@ export async function getUserSession() {
   if (!token) {
     return null;
   }
-  return verifyToken(token);
+  const session = verifyToken(token);
+  if (!session?.userId) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: member } = await supabase
+    .from("members")
+    .select("id,must_change_password")
+    .eq("id", session.userId)
+    .maybeSingle();
+
+  if (!member?.id) {
+    return null;
+  }
+
+  return {
+    ...session,
+    mustChangePassword: Boolean(member.must_change_password),
+  };
 }

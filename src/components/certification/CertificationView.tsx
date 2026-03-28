@@ -8,7 +8,6 @@ import CertificationQrButton from "@/components/certification/CertificationQrBut
 type Member = {
   mm_username: string;
   display_name?: string | null;
-  region?: string | null;
   campus?: string | null;
   class_number?: number | null;
   avatar_content_type?: string | null;
@@ -89,7 +88,7 @@ export default function CertificationView({
                 {profile.displayName ?? member.display_name ?? member.mm_username}
               </h2>
               <p className="mt-1 text-sm text-slate-200">
-                {member.campus ?? member.region ?? "캠퍼스"}{" "}
+                {member.campus ?? profile.campus ?? "캠퍼스"}{" "}
                 {member.class_number ? `${member.class_number}반` : ""}
               </p>
             </div>

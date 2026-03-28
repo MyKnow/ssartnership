@@ -93,14 +93,12 @@ export async function POST(request: Request) {
     await supabase.from("mm_verification_codes").delete().eq("mm_username", username);
 
     await supabase.from("mm_verification_codes").insert({
-      email: null,
       code_hash: hashCode(code),
       expires_at: expiresAt.toISOString(),
       mm_user_id: targetUser.id,
       mm_username: targetUser.username,
       display_name:
         profile.displayName ?? targetUser.nickname ?? targetUser.username,
-      region: profile.region ?? null,
       campus: profile.campus ?? null,
       class_number: profile.classNumber ?? null,
       avatar_content_type: avatar?.contentType ?? null,
