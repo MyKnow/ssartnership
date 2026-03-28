@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { partnerRepository } from "@/lib/repositories";
 import SiteHeader from "@/components/SiteHeader";
+import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Badge from "@/components/ui/Badge";
@@ -32,6 +33,7 @@ export default async function PartnerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const headerSession = await getHeaderSession();
   const resolvedParams = await params;
   const rawId = resolvedParams?.id
     ? decodeURIComponent(resolvedParams.id).trim()
@@ -77,7 +79,7 @@ export default async function PartnerDetailPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
           <div className="flex flex-col gap-6">

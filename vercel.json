@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/push-expiring-partners",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

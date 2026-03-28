@@ -1,4 +1,5 @@
 import SiteHeader from "@/components/SiteHeader";
+import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -9,10 +10,11 @@ export const metadata = {
   description: "SSAFY 제휴 제안을 남겨주세요.",
 };
 
-export default function SuggestPage() {
+export default async function SuggestPage() {
+  const headerSession = await getHeaderSession();
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader suggestHref="/suggest" />
+      <SiteHeader suggestHref="/suggest" initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
           <SectionHeading

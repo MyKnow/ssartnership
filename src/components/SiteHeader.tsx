@@ -7,11 +7,14 @@ import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 import UserMenu from "@/components/auth/UserMenu";
 import MobileNav from "@/components/MobileNav";
+import type { HeaderSession } from "@/lib/header-session";
 
 export default function SiteHeader({
   suggestHref = "/suggest",
+  initialSession,
 }: {
   suggestHref?: string;
+  initialSession?: HeaderSession | null;
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
@@ -29,7 +32,7 @@ export default function SiteHeader({
             </Button>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            <UserMenu />
+            <UserMenu initialSession={initialSession} />
           </div>
           <div className="hidden sm:flex">
             <ThemeToggle />
@@ -37,7 +40,7 @@ export default function SiteHeader({
           <div className="sm:hidden">
             <ThemeToggle />
           </div>
-          <MobileNav suggestHref={suggestHref} />
+          <MobileNav suggestHref={suggestHref} initialSession={initialSession} />
         </div>
       </Container>
     </header>

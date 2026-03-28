@@ -106,11 +106,54 @@ create table if not exists password_reset_attempts (
   created_at timestamp with time zone default now()
 );
 
+create table if not exists push_preferences (
+  member_id uuid primary key references members(id) on delete cascade,
+  enabled boolean not null default false,
+  announcement_enabled boolean not null default true,
+  new_partner_enabled boolean not null default true,
+  expiring_partner_enabled boolean not null default true,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+create table if not exists push_subscriptions (
+  id uuid primary key default uuid_generate_v4(),
+  member_id uuid not null references members(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  expiration_time timestamp with time zone,
+  user_agent text,
+  is_active boolean not null default true,
+  failure_reason text,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  last_success_at timestamp with time zone,
+  last_failure_at timestamp with time zone
+);
+
+create table if not exists push_delivery_logs (
+  id uuid primary key default uuid_generate_v4(),
+  member_id uuid references members(id) on delete set null,
+  subscription_id uuid references push_subscriptions(id) on delete set null,
+  type text not null,
+  title text not null,
+  body text not null,
+  url text,
+  status text not null,
+  error_message text,
+  created_at timestamp with time zone default now()
+);
+
 create index if not exists partners_category_id_idx on partners(category_id);
 create index if not exists admin_login_attempts_identifier_idx on admin_login_attempts(identifier);
 create index if not exists suggestion_attempts_identifier_idx on suggestion_attempts(identifier);
 create index if not exists mm_verification_attempts_identifier_idx on mm_verification_attempts(identifier);
 create index if not exists password_reset_attempts_identifier_idx on password_reset_attempts(identifier);
+create index if not exists push_subscriptions_member_id_idx on push_subscriptions(member_id);
+create index if not exists push_subscriptions_active_idx on push_subscriptions(is_active);
+create index if not exists push_delivery_logs_member_id_idx on push_delivery_logs(member_id);
+create index if not exists push_delivery_logs_created_at_idx on push_delivery_logs(created_at desc);
 
 drop index if exists mm_verification_codes_email_idx;
 
@@ -122,6 +165,9 @@ alter table members enable row level security;
 alter table mm_verification_codes enable row level security;
 alter table mm_verification_attempts enable row level security;
 alter table password_reset_attempts enable row level security;
+alter table push_preferences enable row level security;
+alter table push_subscriptions enable row level security;
+alter table push_delivery_logs enable row level security;
 
 create policy "Public read categories" on categories
   for select
@@ -143,3 +189,9 @@ revoke all on table mm_verification_attempts from anon;
 revoke all on table mm_verification_attempts from authenticated;
 revoke all on table password_reset_attempts from anon;
 revoke all on table password_reset_attempts from authenticated;
+revoke all on table push_preferences from anon;
+revoke all on table push_preferences from authenticated;
+revoke all on table push_subscriptions from anon;
+revoke all on table push_subscriptions from authenticated;
+revoke all on table push_delivery_logs from anon;
+revoke all on table push_delivery_logs from authenticated;

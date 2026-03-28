@@ -15,9 +15,11 @@ export default async function ChangePasswordPage() {
     redirect("/auth/login");
   }
 
+  const headerSession = { userId: session.userId };
+
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
           <Card className="mx-auto max-w-lg p-6">

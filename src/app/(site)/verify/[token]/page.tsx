@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
+import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -35,6 +36,7 @@ export default async function CertificationVerifyPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
+  const headerSession = await getHeaderSession();
   const resolvedParams = await params;
   const rawToken = resolvedParams?.token
     ? decodeURIComponent(resolvedParams.token).trim()
@@ -75,7 +77,7 @@ export default async function CertificationVerifyPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
           <Card className="mx-auto max-w-xl p-6">

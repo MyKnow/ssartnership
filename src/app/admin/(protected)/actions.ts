@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { isWithinPeriod } from "@/lib/partner-utils";
+import { createNewPartnerPayload, isPushConfigured, sendPushToAudience } from "@/lib/push";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
 import {
   sanitizeHexColor,
@@ -248,6 +250,27 @@ export async function createPartner(formData: FormData) {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (data?.id && isPushConfigured() && isWithinPeriod(payload.periodStart, payload.periodEnd)) {
+    const { data: category } = await supabase
+      .from("categories")
+      .select("label")
+      .eq("id", payload.categoryId)
+      .maybeSingle();
+
+    try {
+      await sendPushToAudience(
+        createNewPartnerPayload({
+          partnerId: data.id,
+          name: payload.name,
+          location: payload.location,
+          categoryLabel: category?.label ?? null,
+        }),
+      );
+    } catch (pushError) {
+      console.error("new partner push failed", pushError);
+    }
   }
 
   revalidateAdminAndPublicPaths(data?.id);

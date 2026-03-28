@@ -1,4 +1,5 @@
 import SiteHeader from "@/components/SiteHeader";
+import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
@@ -7,10 +8,11 @@ export const metadata = {
   title: "비밀번호 재설정 | SSARTNERSHIP",
 };
 
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage() {
+  const headerSession = await getHeaderSession();
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
           <Card className="mx-auto max-w-lg p-6">

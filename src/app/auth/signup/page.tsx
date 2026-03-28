@@ -1,4 +1,5 @@
 import SiteHeader from "@/components/SiteHeader";
+import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import SignupForm from "@/components/auth/SignupForm";
@@ -7,10 +8,11 @@ export const metadata = {
   title: "회원가입 | SSARTNERSHIP",
 };
 
-export default function SignupPage() {
+export default async function SignupPage() {
+  const headerSession = await getHeaderSession();
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
           <Card className="mx-auto max-w-lg p-6">

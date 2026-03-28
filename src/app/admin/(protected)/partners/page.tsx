@@ -124,6 +124,7 @@ export default async function AdminPartnersPage() {
             deletePartner={deletePartner}
           />
         </Card>
+
       </section>
     </AdminShell>
   );

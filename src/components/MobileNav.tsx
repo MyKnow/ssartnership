@@ -5,9 +5,16 @@ import { useEffect, useState } from "react";
 import PwaInstallButton from "@/components/PwaInstallButton";
 import Button from "@/components/ui/Button";
 import UserMenu from "@/components/auth/UserMenu";
+import type { HeaderSession } from "@/lib/header-session";
 import { cn } from "@/lib/cn";
 
-export default function MobileNav({ suggestHref }: { suggestHref: string }) {
+export default function MobileNav({
+  suggestHref,
+  initialSession,
+}: {
+  suggestHref: string;
+  initialSession?: HeaderSession | null;
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -95,7 +102,7 @@ export default function MobileNav({ suggestHref }: { suggestHref: string }) {
                       제휴 제안하기
                     </Button>
                     <PwaInstallButton />
-                    <UserMenu />
+                    <UserMenu initialSession={initialSession} />
                   </div>
                 </div>
               </aside>

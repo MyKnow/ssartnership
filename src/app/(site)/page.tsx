@@ -1,13 +1,15 @@
 import { partnerRepository } from "@/lib/repositories";
 import HomeView from "@/components/HomeView";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import { getHeaderSession } from "@/lib/header-session";
 
 export const revalidate = 300;
 
 export default async function Home() {
-  const [categories, partners] = await Promise.all([
+  const [categories, partners, headerSession] = await Promise.all([
     partnerRepository.getCategories(),
     partnerRepository.getPartners(),
+    getHeaderSession(),
   ]);
 
   const jsonLd = {
@@ -36,7 +38,11 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <HomeView categories={categories} partners={partners} />
+      <HomeView
+        categories={categories}
+        partners={partners}
+        initialSession={headerSession}
+      />
     </>
   );
 }

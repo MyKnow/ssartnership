@@ -12,15 +12,18 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
 import { HOME_COPY } from "@/lib/content";
+import type { HeaderSession } from "@/lib/header-session";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import { useToast } from "@/components/ui/Toast";
 
 export default function HomeView({
   categories,
   partners,
+  initialSession,
 }: {
   categories: Category[];
   partners: Partner[];
+  initialSession?: HeaderSession | null;
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
     "all",
@@ -103,7 +106,7 @@ export default function HomeView({
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader initialSession={initialSession} />
 
       <main>
         <Container className="pb-16 pt-10">

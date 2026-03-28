@@ -71,33 +71,44 @@ export default async function AdminPage() {
 
   const supabase = getSupabaseAdminClient();
 
-  const [
-    { count: memberCount },
-    { count: partnerCount },
-    { count: categoryCount },
-  ] = await Promise.all([
+  const [memberResult, partnerResult, categoryResult, pushResult] = await Promise.all([
     supabase.from("members").select("*", { count: "exact", head: true }),
     supabase.from("partners").select("*", { count: "exact", head: true }),
     supabase.from("categories").select("*", { count: "exact", head: true }),
+    supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
   ]);
+
+  const memberCount = memberResult.error ? 0 : memberResult.count ?? 0;
+  const partnerCount = partnerResult.error ? 0 : partnerResult.count ?? 0;
+  const categoryCount = categoryResult.error ? 0 : categoryResult.count ?? 0;
+  const pushSubscriptionCount = pushResult.error ? 0 : pushResult.count ?? 0;
 
   return (
     <AdminShell
       title="Admin 관리 홈"
       description="회원관리와 업체관리 영역을 나눠 필요한 작업에 바로 진입할 수 있습니다."
     >
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <SummaryCard
           href="/admin/members"
           title="회원 관리"
           description="교육생 계정을 조회하고 검색, 정렬, 필터링한 뒤 수정 또는 삭제할 수 있습니다."
-          meta={`총 ${memberCount ?? 0}명 회원`}
+          meta={`총 ${memberCount}명 회원`}
         />
         <SummaryCard
           href="/admin/partners"
           title="업체 관리"
           description="카테고리와 제휴 업체를 관리하고, 등록된 혜택 정보를 수정할 수 있습니다."
-          meta={`제휴 ${partnerCount ?? 0}개 · 카테고리 ${categoryCount ?? 0}개`}
+          meta={`제휴 ${partnerCount}개 · 카테고리 ${categoryCount}개`}
+        />
+        <SummaryCard
+          href="/admin/push"
+          title="푸시 알림 관리"
+          description="전체 공지 발송과 자동 Web Push 알림 상태를 관리합니다."
+          meta={`활성 구독 ${pushSubscriptionCount}개`}
         />
       </div>
     </AdminShell>
