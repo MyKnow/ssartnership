@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
@@ -27,20 +27,29 @@ function isIosBrowser() {
   return /iPad|iPhone|iPod/.test(ua);
 }
 
+function subscribeClient() {
+  return () => {};
+}
+
 export default function PwaInstallButton({
   className,
 }: {
   className?: string;
 }) {
+  const isClient = useSyncExternalStore(
+    subscribeClient,
+    () => true,
+    () => false,
+  );
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-  const [iosInstallHint, setIosInstallHint] = useState(false);
+  const [appInstalled, setAppInstalled] = useState(false);
   const { notify } = useToast();
 
   useEffect(() => {
-    setInstalled(isStandaloneMode());
-    setIosInstallHint(isIosBrowser());
+    if (!isClient) {
+      return;
+    }
 
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -48,7 +57,7 @@ export default function PwaInstallButton({
     };
 
     const onInstalled = () => {
-      setInstalled(true);
+      setAppInstalled(true);
       setDeferredPrompt(null);
       notify("앱이 설치되었습니다.");
     };
@@ -60,14 +69,17 @@ export default function PwaInstallButton({
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, [notify]);
+  }, [isClient, notify]);
+
+  const iosInstallHint = isClient && isIosBrowser();
+  const standalone = isClient && isStandaloneMode();
 
   const canShow = useMemo(() => {
-    if (installed) {
+    if (!isClient || standalone || appInstalled) {
       return false;
     }
     return Boolean(deferredPrompt) || iosInstallHint;
-  }, [deferredPrompt, installed, iosInstallHint]);
+  }, [appInstalled, deferredPrompt, iosInstallHint, isClient, standalone]);
 
   if (!canShow) {
     return null;
