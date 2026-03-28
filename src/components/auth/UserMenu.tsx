@@ -2,14 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { LogOut } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import type { HeaderSession } from "@/lib/header-session";
+import { cn } from "@/lib/cn";
 
 export default function UserMenu({
   initialSession = null,
+  className,
+  buttonClassName,
+  logoutIconOnly = false,
 }: {
   initialSession?: HeaderSession | null;
+  className?: string;
+  buttonClassName?: string;
+  logoutIconOnly?: boolean;
 }) {
   const [session, setSession] = useState<HeaderSession | null>(initialSession);
   const { notify } = useToast();
@@ -31,25 +39,38 @@ export default function UserMenu({
 
   if (!session) {
     return (
-      <>
-        <Button variant="ghost" href="/auth/login">
+      <div className={cn("flex items-center gap-2", className)}>
+        <Button variant="ghost" href="/auth/login" className={buttonClassName}>
           로그인
         </Button>
-        <Button variant="ghost" href="/auth/signup">
+        <Button variant="ghost" href="/auth/signup" className={buttonClassName}>
           회원가입
         </Button>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <Button variant="ghost" href="/certification">
+    <div className={cn("flex items-center gap-2", className)}>
+      <Button variant="ghost" href="/certification" className={buttonClassName}>
         내 프로필 조회
       </Button>
-      <Button variant="ghost" onClick={handleLogout}>
-        로그아웃
-      </Button>
-    </>
+      {logoutIconOnly ? (
+        <Button
+          variant="danger"
+          size="icon"
+          onClick={handleLogout}
+          className={buttonClassName}
+          ariaLabel="로그아웃"
+          title="로그아웃"
+        >
+          <LogOut className="h-5 w-5" />
+        </Button>
+      ) : (
+        <Button variant="danger" onClick={handleLogout} className={buttonClassName}>
+          로그아웃
+        </Button>
+      )}
+    </div>
   );
 }

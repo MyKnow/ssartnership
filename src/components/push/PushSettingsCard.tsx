@@ -21,6 +21,23 @@ const preferenceLabels: Record<PreferenceKey, string> = {
   expiringPartnerEnabled: "종료 7일 전",
 };
 
+function StatusMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
 function isIosDevice() {
   if (typeof navigator === "undefined") {
     return false;
@@ -77,16 +94,25 @@ function PreferenceToggle({
   return (
     <label className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
       <span className="text-sm font-medium text-foreground">{label}</span>
-      <span className="relative inline-flex items-center">
-        <input
-          type="checkbox"
-          className="peer sr-only"
-          checked={checked}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        <span className="h-7 w-12 rounded-full bg-surface-muted transition peer-checked:bg-primary peer-disabled:opacity-50" />
-        <span className="pointer-events-none absolute left-1 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5 peer-disabled:opacity-70" />
+      <span className="flex items-center gap-3">
+        <span
+          className={checked
+            ? "min-w-10 text-right text-xs font-semibold text-emerald-600 dark:text-emerald-300"
+            : "min-w-10 text-right text-xs font-semibold text-muted-foreground"}
+        >
+          {checked ? "켜짐" : "꺼짐"}
+        </span>
+        <span className="relative inline-flex items-center">
+          <input
+            type="checkbox"
+            className="peer sr-only"
+            checked={checked}
+            disabled={disabled}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+          <span className="h-7 w-12 rounded-full border border-border bg-slate-300 transition peer-checked:border-emerald-500 peer-checked:bg-emerald-500 peer-disabled:opacity-50 dark:bg-slate-700 dark:peer-checked:border-emerald-400 dark:peer-checked:bg-emerald-400" />
+          <span className="pointer-events-none absolute left-1 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5 peer-disabled:opacity-70 dark:bg-slate-950" />
+        </span>
       </span>
     </label>
   );
@@ -234,7 +260,12 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {
-        setPreferences((current) => ({ ...current, enabled: true }));
+        setPreferences({
+          enabled: true,
+          announcementEnabled: true,
+          newPartnerEnabled: true,
+          expiringPartnerEnabled: true,
+        });
       }
       notify("기기 알림을 켰습니다.");
     } catch (error) {
@@ -275,6 +306,12 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
   }
 
   async function updatePreference(key: PreferenceKey, nextValue: boolean) {
+    const nextPreferences = {
+      ...preferences,
+      enabled: true,
+      [key]: nextValue,
+    };
+
     setPending(true);
     try {
       const response = await fetch("/api/push/preferences", {
@@ -282,10 +319,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          enabled: true,
-          [key]: nextValue,
-        }),
+        body: JSON.stringify(nextPreferences),
       });
       const data = await parseJson(response);
       if (data?.preferences) {
@@ -305,8 +339,8 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
 
   return (
     <Card className="mx-auto mt-6 max-w-2xl">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold text-foreground">푸시 알림 설정</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             새 제휴 등록, 종료 7일 전 안내, 운영 공지를 이 기기의 앱 알림으로
@@ -316,13 +350,15 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         <Badge className={statusClassName}>{status.label}</Badge>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <Badge className="bg-surface-muted text-muted-foreground">
-          권한: {permission === "unsupported" ? "미지원" : permission}
-        </Badge>
-        <Badge className="bg-surface-muted text-muted-foreground">
-          기기 상태: {hasSubscription ? "구독됨" : "미구독"}
-        </Badge>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <StatusMetric
+          label="권한 상태"
+          value={permission === "unsupported" ? "미지원" : permission}
+        />
+        <StatusMetric
+          label="기기 구독"
+          value={hasSubscription ? "구독됨" : "미구독"}
+        />
       </div>
 
       <div className="mt-5 rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
@@ -337,20 +373,37 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
                 : "기기 알림을 켜면 공지와 제휴 소식을 앱처럼 받을 수 있습니다."}
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Button
-          onClick={masterEnabled ? handleUnsubscribe : handleSubscribe}
-          disabled={pending || loading}
-        >
-          <span className="inline-flex items-center gap-2">
-            {pending || loading ? <Spinner /> : null}
-            {masterEnabled ? "알림 끄기" : "알림 켜기"}
-          </span>
-        </Button>
+      <div className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">기기 알림 제어</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {masterEnabled
+                ? "이 기기에서 제휴 알림을 받고 있습니다."
+                : "이 기기에서 제휴 알림이 꺼져 있습니다."}
+            </p>
+          </div>
+          <Button
+            onClick={masterEnabled ? handleUnsubscribe : handleSubscribe}
+            disabled={pending || loading}
+          >
+            <span className="inline-flex items-center gap-2">
+              {pending || loading ? <Spinner /> : null}
+              {masterEnabled ? "알림 끄기" : "알림 켜기"}
+            </span>
+          </Button>
+        </div>
       </div>
 
       {masterEnabled ? (
-        <div className="mt-6 grid gap-3">
+        <div className="mt-6">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-foreground">세부 알림 항목</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              받고 싶은 알림만 개별적으로 켜고 끌 수 있습니다.
+            </p>
+          </div>
+          <div className="grid gap-3">
           {(Object.keys(preferenceLabels) as PreferenceKey[]).map((key) => (
             <PreferenceToggle
               key={key}
@@ -362,6 +415,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
               }}
             />
           ))}
+          </div>
         </div>
       ) : null}
     </Card>

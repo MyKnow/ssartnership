@@ -19,10 +19,10 @@ export default function ThemeToggle() {
       title="테마 변경"
     >
       <span className="block dark:hidden">
-        <MoonIcon className="h-5 w-5" />
+        <MoonIcon className="h-5 w-5 text-indigo-500" />
       </span>
       <span className="hidden dark:block">
-        <SunIcon className="h-5 w-5" />
+        <SunIcon className="h-5 w-5 text-amber-400" />
       </span>
     </Button>
   );

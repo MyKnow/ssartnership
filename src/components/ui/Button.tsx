@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 const base =
-  "inline-flex min-h-12 min-w-12 items-center justify-center rounded-full font-semibold leading-none transition";
+  "inline-flex min-h-12 min-w-12 cursor-pointer items-center justify-center rounded-full font-semibold leading-none transition";
 
 const sizes = {
   sm: "h-12 px-4 text-xs",
@@ -31,6 +31,7 @@ type ButtonProps = {
   disabled?: boolean;
   ariaLabel?: string;
   title?: string;
+  style?: React.CSSProperties;
 };
 
 function isInternalHref(href: string) {
@@ -60,6 +61,7 @@ export default function Button({
   disabled,
   ariaLabel,
   title,
+  style,
 }: ButtonProps) {
   const safeRel = buildLinkRel(target, rel);
   const classes = cn(
@@ -109,6 +111,7 @@ export default function Button({
       disabled={disabled}
       aria-label={ariaLabel}
       title={title}
+      style={style}
     >
       {children}
     </button>

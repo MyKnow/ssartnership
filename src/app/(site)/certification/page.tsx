@@ -6,8 +6,6 @@ import { getUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
-import PushSettingsCard from "@/components/push/PushSettingsCard";
-import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
 
 export const metadata = {
   title: "교육생 인증 | SSARTNERSHIP",
@@ -34,9 +32,6 @@ export default async function CertificationPage() {
   if (!member) {
     redirect("/auth/login");
   }
-
-  const pushPreferences = await getMemberPushPreferences(session.userId);
-
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
@@ -44,7 +39,7 @@ export default async function CertificationPage() {
         <Container className="pb-16 pt-10">
           <Card className="mx-auto max-w-2xl p-6">
             <h1 className="text-2xl font-semibold text-foreground">
-              내 프로필 조회
+              교육생 인증
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Mattermost 인증 정보를 기반으로 SSAFY 교육생임을 확인합니다.
@@ -54,10 +49,6 @@ export default async function CertificationPage() {
               initialTimestamp={initialTimestamp}
             />
           </Card>
-          <PushSettingsCard
-            initialPreferences={pushPreferences}
-            configured={isPushConfigured()}
-          />
           <CertificationFooterActions />
         </Container>
       </main>

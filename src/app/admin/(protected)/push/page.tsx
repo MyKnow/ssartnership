@@ -2,7 +2,7 @@ import AdminPushManager from "@/components/admin/AdminPushManager";
 import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
-import { isPushConfigured } from "@/lib/push";
+import { getRecentPushMessageLogs, isPushConfigured } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -10,23 +10,54 @@ export const dynamic = "force-dynamic";
 export default async function AdminPushPage() {
   const supabase = getSupabaseAdminClient();
 
-  const [activeSubscriptionResult, enabledMemberResult] = await Promise.all([
+  const [
+    activeSubscriptionResult,
+    activeSubscriptionMembersResult,
+    enabledPreferenceMembersResult,
+    partnerResult,
+    recentLogs,
+  ] = await Promise.all([
     supabase
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
     supabase
+      .from("push_subscriptions")
+      .select("member_id")
+      .eq("is_active", true),
+    supabase
       .from("push_preferences")
-      .select("member_id", { count: "exact", head: true })
-      .eq("enabled", true),
+      .select("member_id")
+      .eq("enabled", true)
+      .eq("announcement_enabled", true),
+    supabase.from("partners").select("id,name").order("name", { ascending: true }),
+    getRecentPushMessageLogs(200),
   ]);
 
   const activeSubscriptions = activeSubscriptionResult.error
     ? 0
     : activeSubscriptionResult.count ?? 0;
-  const enabledMembers = enabledMemberResult.error
-    ? 0
-    : enabledMemberResult.count ?? 0;
+  const partners = partnerResult.error ? [] : partnerResult.data ?? [];
+  const activeMemberIds = Array.from(
+    new Set((activeSubscriptionMembersResult.data ?? []).map((item) => item.member_id)),
+  );
+  const enabledPreferenceIds = new Set(
+    (enabledPreferenceMembersResult.data ?? []).map((item) => item.member_id),
+  );
+  const targetableMemberIds = activeMemberIds.filter((memberId) =>
+    enabledPreferenceIds.has(memberId),
+  );
+  const enabledMembers = targetableMemberIds.length;
+
+  const { data: members, error: membersError } = targetableMemberIds.length
+    ? await supabase
+        .from("members")
+        .select("id,display_name,mm_username,campus,class_number")
+        .in("id", targetableMemberIds)
+        .order("campus", { ascending: true })
+        .order("class_number", { ascending: true })
+        .order("display_name", { ascending: true })
+    : { data: [], error: null };
 
   return (
     <AdminShell
@@ -45,6 +76,9 @@ export default async function AdminPushPage() {
             configured={isPushConfigured()}
             activeSubscriptions={activeSubscriptions}
             enabledMembers={enabledMembers}
+            partners={partners}
+            members={membersError ? [] : members ?? []}
+            recentLogs={recentLogs}
           />
         </div>
       </Card>

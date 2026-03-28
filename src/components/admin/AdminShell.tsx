@@ -1,4 +1,5 @@
 import ThemeToggle from "@/components/ThemeToggle";
+import AdminMobileNav from "@/components/admin/AdminMobileNav";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
@@ -21,19 +22,21 @@ export default function AdminShell({
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-surface/90 backdrop-blur">
-        <Container className="flex items-center justify-between gap-4 py-5">
-          <div>
+        <Container className="flex items-start justify-between gap-4 py-5 sm:items-center">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               {SITE_NAME}
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-foreground">
+            <h1 className="mt-2 text-xl font-semibold text-foreground sm:text-2xl">
               {title}
             </h1>
             {description ? (
-              <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+              <p className="mt-2 hidden text-sm text-muted-foreground sm:block">
+                {description}
+              </p>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="hidden flex-wrap items-center justify-end gap-3 sm:flex">
             {backHref && backLabel ? (
               <Button variant="ghost" href={backHref}>
                 {backLabel}
@@ -44,6 +47,16 @@ export default function AdminShell({
             </Button>
             <ThemeToggle />
             <AdminLogoutButton action={logout} />
+          </div>
+          <div className="flex items-center gap-2 sm:hidden">
+            <ThemeToggle />
+            <AdminMobileNav
+              title={title}
+              description={description}
+              backHref={backHref}
+              backLabel={backLabel}
+              logoutAction={logout}
+            />
           </div>
         </Container>
       </header>

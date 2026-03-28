@@ -47,12 +47,18 @@ export default function CertificationView({
     };
   }, [isAvatarOpen]);
 
-  const timeLabel = useMemo(() => {
-    return now.toLocaleString("ko-KR", {
-      hour12: false,
+  const dateLabel = useMemo(() => {
+    return now.toLocaleDateString("ko-KR", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
+      timeZone: "Asia/Seoul",
+    });
+  }, [now]);
+
+  const timeLabel = useMemo(() => {
+    return now.toLocaleTimeString("ko-KR", {
+      hour12: false,
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
@@ -78,13 +84,13 @@ export default function CertificationView({
           <div className="absolute right-8 top-10 h-10 w-10 rounded-full border border-white/10 bg-white/5" />
           <div className="absolute bottom-8 left-10 h-12 w-12 rounded-full border border-white/10 bg-white/5" />
         </div>
-        <div className="relative flex flex-col gap-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+        <div className="relative flex flex-col pb-20 sm:pb-24">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
                 SSAFY Trainee
               </p>
-              <h2 className="mt-2 text-2xl font-semibold">
+              <h2 className="mt-2 break-keep text-xl font-semibold sm:text-2xl">
                 {profile.displayName ?? member.display_name ?? member.mm_username}
               </h2>
               <p className="mt-1 text-sm text-slate-200">
@@ -92,7 +98,7 @@ export default function CertificationView({
                 {member.class_number ? `${member.class_number}반` : ""}
               </p>
             </div>
-            <div className="relative h-28 w-28 overflow-hidden rounded-3xl border border-white/20 bg-white/10 shadow-[0_12px_30px_rgba(14,165,233,0.35)]">
+            <div className="relative h-[clamp(4.75rem,22vw,7rem)] w-[clamp(4.75rem,22vw,7rem)] shrink-0 overflow-hidden rounded-3xl border border-white/20 bg-white/10 shadow-[0_12px_30px_rgba(14,165,233,0.35)]">
               {avatarSrc ? (
                 <button
                   type="button"
@@ -117,25 +123,32 @@ export default function CertificationView({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-slate-300">MM 아이디</span>
-              <span className="font-medium">@{member.mm_username}</span>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
+            <div className="min-w-0 flex-auto">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-slate-300">MM 아이디</span>
+                <span className="break-all font-medium">@{member.mm_username}</span>
+              </div>
             </div>
-            <div className="flex flex-col gap-1 text-right">
+            <div className="ml-auto flex shrink-0 flex-col gap-1 text-right">
               <span className="text-xs text-slate-300">인증 시간</span>
-              <span className="font-semibold">{timeLabel}</span>
+              <span className="whitespace-nowrap font-semibold">
+                {dateLabel} {timeLabel}
+              </span>
             </div>
           </div>
 
-          <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="absolute inset-y-0 left-0 w-1/3 animate-[cert-slide_3s_linear_infinite] rounded-full bg-cyan-300/70" />
+          <div className="mt-4 grid gap-4">
+            <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="absolute inset-y-0 left-0 w-1/3 animate-[cert-slide_3s_linear_infinite] rounded-full bg-cyan-300/70" />
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+              실시간 인증 상태
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-            실시간 인증 상태
-          </div>
-          <div className="flex items-center justify-end">
+
+          <div className="absolute bottom-0 right-0 flex justify-end">
             <CertificationQrButton />
           </div>
         </div>

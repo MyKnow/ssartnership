@@ -4,6 +4,7 @@ import {
   createAnnouncementPayload,
   getPushDestinationLabel,
   isPushConfigured,
+  parsePushAudience,
   sendPushToAudience,
 } from "@/lib/push";
 
@@ -38,13 +39,18 @@ export async function POST(request: NextRequest) {
       title?: string;
       body?: string;
       url?: string | null;
+      audience?: unknown;
     };
     const payload = createAnnouncementPayload({
       title: body.title ?? "",
       body: body.body ?? "",
       url: body.url ?? null,
     });
-    const result = await sendPushToAudience(payload);
+    const audience = parsePushAudience(body.audience);
+    const result = await sendPushToAudience(payload, {
+      source: "manual",
+      audience,
+    });
 
     return NextResponse.json({
       ok: true,

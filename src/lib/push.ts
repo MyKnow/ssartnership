@@ -29,6 +29,48 @@ export type PushPayload = {
   tag?: string | null;
 };
 
+export type PushAudienceScope = "all" | "campus" | "class" | "member";
+
+export type PushAudience =
+  | { scope: "all" }
+  | { scope: "campus"; campus: string }
+  | { scope: "class"; campus: string; classNumber: number }
+  | { scope: "member"; memberId: string };
+
+export type PushMessageLog = {
+  id: string;
+  type: PushNotificationType;
+  source: "manual" | "automatic";
+  target_scope: PushAudienceScope;
+  target_label: string;
+  target_campus: string | null;
+  target_class_number: number | null;
+  target_member_id: string | null;
+  title: string;
+  body: string;
+  url: string | null;
+  status: "pending" | "sent" | "partial_failed" | "failed" | "no_target";
+  targeted: number;
+  delivered: number;
+  failed: number;
+  created_at: string;
+  completed_at: string | null;
+};
+
+type PushSendOptions = {
+  source?: "manual" | "automatic";
+  audience?: PushAudience;
+};
+
+type ResolvedPushAudience = {
+  scope: PushAudienceScope;
+  label: string;
+  campus: string | null;
+  classNumber: number | null;
+  memberId: string | null;
+  memberIds: string[] | null;
+};
+
 type SubscriptionInput = {
   endpoint?: string;
   expirationTime?: number | null;
@@ -84,6 +126,134 @@ export function isPushConfigured() {
       process.env.VAPID_PRIVATE_KEY &&
       process.env.VAPID_SUBJECT,
   );
+}
+
+export function getDefaultPushAudience(): PushAudience {
+  return { scope: "all" };
+}
+
+export function parsePushAudience(input: unknown): PushAudience {
+  if (!input || typeof input !== "object") {
+    return getDefaultPushAudience();
+  }
+
+  const scope = String((input as { scope?: unknown }).scope ?? "all").trim();
+
+  if (scope === "all") {
+    return { scope: "all" };
+  }
+
+  if (scope === "campus") {
+    const campus = String((input as { campus?: unknown }).campus ?? "").trim();
+    if (!campus) {
+      throw new Error("캠퍼스를 선택해 주세요.");
+    }
+    return { scope: "campus", campus };
+  }
+
+  if (scope === "class") {
+    const campus = String((input as { campus?: unknown }).campus ?? "").trim();
+    const classNumberValue = String(
+      (input as { classNumber?: unknown }).classNumber ?? "",
+    ).trim();
+    const classNumber = Number.parseInt(classNumberValue, 10);
+    if (!campus) {
+      throw new Error("캠퍼스를 선택해 주세요.");
+    }
+    if (!Number.isInteger(classNumber) || classNumber <= 0) {
+      throw new Error("반을 선택해 주세요.");
+    }
+    return { scope: "class", campus, classNumber };
+  }
+
+  if (scope === "member") {
+    const memberId = String((input as { memberId?: unknown }).memberId ?? "").trim();
+    if (!memberId) {
+      throw new Error("개인 발송 대상을 선택해 주세요.");
+    }
+    return { scope: "member", memberId };
+  }
+
+  throw new Error("알림 발송 대상을 확인해 주세요.");
+}
+
+async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPushAudience> {
+  const supabase = getSupabaseAdminClient();
+
+  if (audience.scope === "all") {
+    return {
+      scope: "all",
+      label: "전체",
+      campus: null,
+      classNumber: null,
+      memberId: null,
+      memberIds: null,
+    };
+  }
+
+  if (audience.scope === "campus") {
+    const { data, error } = await supabase
+      .from("members")
+      .select("id")
+      .eq("campus", audience.campus);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      scope: "campus",
+      label: `${audience.campus} 캠퍼스`,
+      campus: audience.campus,
+      classNumber: null,
+      memberId: null,
+      memberIds: (data ?? []).map((item) => item.id),
+    };
+  }
+
+  if (audience.scope === "class") {
+    const { data, error } = await supabase
+      .from("members")
+      .select("id")
+      .eq("campus", audience.campus)
+      .eq("class_number", audience.classNumber);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      scope: "class",
+      label: `${audience.campus} ${audience.classNumber}반`,
+      campus: audience.campus,
+      classNumber: audience.classNumber,
+      memberId: null,
+      memberIds: (data ?? []).map((item) => item.id),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("members")
+    .select("id,display_name,mm_username")
+    .eq("id", audience.memberId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new Error("개인 발송 대상을 찾을 수 없습니다.");
+  }
+
+  const memberName = data.display_name?.trim() || data.mm_username;
+  return {
+    scope: "member",
+    label: `${memberName} (@${data.mm_username})`,
+    campus: null,
+    classNumber: null,
+    memberId: data.id,
+    memberIds: [data.id],
+  };
 }
 
 async function getWebPush() {
@@ -150,7 +320,14 @@ export async function upsertMemberPushPreferences(
   value: Partial<PushPreferenceState>,
 ) {
   const current = await getMemberPushPreferences(memberId);
-  const next = getPushPreferencesOrDefault({ ...current, ...value });
+  const next: PushPreferenceState = {
+    enabled: value.enabled ?? current.enabled,
+    announcementEnabled:
+      value.announcementEnabled ?? current.announcementEnabled,
+    newPartnerEnabled: value.newPartnerEnabled ?? current.newPartnerEnabled,
+    expiringPartnerEnabled:
+      value.expiringPartnerEnabled ?? current.expiringPartnerEnabled,
+  };
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("push_preferences").upsert(
     {
@@ -222,7 +399,12 @@ export async function upsertPushSubscription(params: {
     throw new Error(error.message);
   }
 
-  return upsertMemberPushPreferences(memberId, { enabled: true });
+  return upsertMemberPushPreferences(memberId, {
+    enabled: true,
+    announcementEnabled: true,
+    newPartnerEnabled: true,
+    expiringPartnerEnabled: true,
+  });
 }
 
 export async function deactivatePushSubscription(params: {
@@ -297,6 +479,7 @@ function buildNotificationPayload(payload: PushPayload) {
 }
 
 async function logPushDelivery(params: {
+  messageLogId?: string | null;
   memberId: string;
   subscriptionId: string;
   payload: PushPayload;
@@ -305,6 +488,7 @@ async function logPushDelivery(params: {
 }) {
   const supabase = getSupabaseAdminClient();
   await supabase.from("push_delivery_logs").insert({
+    message_log_id: params.messageLogId ?? null,
     member_id: params.memberId,
     subscription_id: params.subscriptionId,
     type: params.payload.type,
@@ -314,6 +498,101 @@ async function logPushDelivery(params: {
     status: params.status,
     error_message: params.errorMessage ?? null,
   });
+}
+
+async function createPushMessageLog(params: {
+  payload: PushPayload;
+  source: "manual" | "automatic";
+  audience: ResolvedPushAudience;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("push_message_logs")
+    .insert({
+      type: params.payload.type,
+      source: params.source,
+      target_scope: params.audience.scope,
+      target_label: params.audience.label,
+      target_campus: params.audience.campus,
+      target_class_number: params.audience.classNumber,
+      target_member_id: params.audience.memberId,
+      title: params.payload.title,
+      body: params.payload.body,
+      url: params.payload.url ?? null,
+      status: "pending",
+    })
+    .select(
+      "id,type,source,target_scope,target_label,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
+    )
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as PushMessageLog;
+}
+
+async function finalizePushMessageLog(params: {
+  id: string;
+  targeted: number;
+  delivered: number;
+  failed: number;
+}) {
+  const status =
+    params.targeted === 0
+      ? "no_target"
+      : params.delivered === 0
+        ? "failed"
+        : params.failed > 0
+          ? "partial_failed"
+          : "sent";
+
+  const supabase = getSupabaseAdminClient();
+  await supabase
+    .from("push_message_logs")
+    .update({
+      status,
+      targeted: params.targeted,
+      delivered: params.delivered,
+      failed: params.failed,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", params.id);
+}
+
+export async function getRecentPushMessageLogs(limit = 200) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("push_message_logs")
+    .select(
+      "id,type,source,target_scope,target_label,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingPushTableError(error)) {
+      return [] as PushMessageLog[];
+    }
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as PushMessageLog[];
+}
+
+export async function deletePushMessageLog(logId: string) {
+  const id = logId.trim();
+  if (!id) {
+    throw new Error("삭제할 로그를 찾을 수 없습니다.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.from("push_message_logs").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 async function markPushSuccess(subscriptionId: string) {
@@ -345,16 +624,48 @@ async function markPushFailure(
     .eq("id", subscription.id);
 }
 
-export async function sendPushToAudience(payload: PushPayload) {
+export async function sendPushToAudience(
+  payload: PushPayload,
+  options: PushSendOptions = {},
+) {
   if (!isPushConfigured()) {
     throw new Error("Web Push 환경 변수가 설정되지 않았습니다.");
   }
 
+  const resolvedAudience = await resolvePushAudience(
+    options.audience ?? getDefaultPushAudience(),
+  );
+
+  const messageLog = await createPushMessageLog({
+    payload,
+    source: options.source ?? "automatic",
+    audience: resolvedAudience,
+  });
+
   const supabase = getSupabaseAdminClient();
-  const { data: subscriptions, error: subscriptionError } = await supabase
+  let subscriptionQuery = supabase
     .from("push_subscriptions")
     .select("id,member_id,endpoint,p256dh,auth")
     .eq("is_active", true);
+
+  if (resolvedAudience.memberIds && resolvedAudience.memberIds.length > 0) {
+    subscriptionQuery = subscriptionQuery.in(
+      "member_id",
+      resolvedAudience.memberIds,
+    );
+  }
+
+  if (resolvedAudience.memberIds && resolvedAudience.memberIds.length === 0) {
+    await finalizePushMessageLog({
+      id: messageLog.id,
+      targeted: 0,
+      delivered: 0,
+      failed: 0,
+    });
+    return { targeted: 0, delivered: 0, failed: 0 } satisfies DeliveryResult;
+  }
+
+  const { data: subscriptions, error: subscriptionError } = await subscriptionQuery;
 
   if (subscriptionError) {
     throw new Error(subscriptionError.message);
@@ -362,6 +673,12 @@ export async function sendPushToAudience(payload: PushPayload) {
 
   const safeSubscriptions = (subscriptions ?? []) as StoredSubscription[];
   if (safeSubscriptions.length === 0) {
+    await finalizePushMessageLog({
+      id: messageLog.id,
+      targeted: 0,
+      delivered: 0,
+      failed: 0,
+    });
     return { targeted: 0, delivered: 0, failed: 0 } satisfies DeliveryResult;
   }
 
@@ -396,6 +713,12 @@ export async function sendPushToAudience(payload: PushPayload) {
   });
 
   if (targets.length === 0) {
+    await finalizePushMessageLog({
+      id: messageLog.id,
+      targeted: 0,
+      delivered: 0,
+      failed: 0,
+    });
     return { targeted: 0, delivered: 0, failed: 0 } satisfies DeliveryResult;
   }
 
@@ -425,6 +748,7 @@ export async function sendPushToAudience(payload: PushPayload) {
       await Promise.all([
         markPushSuccess(subscription.id),
         logPushDelivery({
+          messageLogId: messageLog.id,
           memberId: subscription.member_id,
           subscriptionId: subscription.id,
           payload,
@@ -443,6 +767,7 @@ export async function sendPushToAudience(payload: PushPayload) {
       await Promise.all([
         markPushFailure(subscription, errorMessage, deactivate),
         logPushDelivery({
+          messageLogId: messageLog.id,
           memberId: subscription.member_id,
           subscriptionId: subscription.id,
           payload,
@@ -452,6 +777,13 @@ export async function sendPushToAudience(payload: PushPayload) {
       ]);
     }
   }
+
+  await finalizePushMessageLog({
+    id: messageLog.id,
+    targeted: targets.length,
+    delivered,
+    failed,
+  });
 
   return {
     targeted: targets.length,

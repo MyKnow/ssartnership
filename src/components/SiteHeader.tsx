@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BellIcon } from "@heroicons/react/24/outline";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
@@ -32,8 +33,21 @@ export default function SiteHeader({
             </Button>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            <UserMenu initialSession={initialSession} />
+            <UserMenu initialSession={initialSession} logoutIconOnly />
           </div>
+          {initialSession ? (
+            <div className="hidden sm:flex items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                href="/notifications"
+                ariaLabel="알림 설정"
+                title="알림 설정"
+              >
+                <BellIcon className="h-5 w-5" />
+              </Button>
+            </div>
+          ) : null}
           <div className="hidden sm:flex">
             <ThemeToggle />
           </div>
