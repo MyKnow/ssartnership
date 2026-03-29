@@ -40,7 +40,6 @@ export default function UserMenu({
       setSession(null);
       notify("로그아웃되었습니다.");
       router.replace("/");
-      router.refresh();
     } finally {
       setLoggingOut(false);
     }

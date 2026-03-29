@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { getUserSession, setUserSession } from "@/lib/user-auth";
+import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
 import { hashPassword, isValidPassword, verifyPassword } from "@/lib/password";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const session = await getUserSession();
+    const session = await getSignedUserSession();
     if (!session?.userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }

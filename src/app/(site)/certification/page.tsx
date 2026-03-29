@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
-import { getUserSession } from "@/lib/user-auth";
+import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
@@ -13,7 +13,7 @@ export const metadata = {
 
 export default async function CertificationPage() {
   const initialTimestamp = new Date().toISOString();
-  const session = await getUserSession();
+  const session = await getSignedUserSession();
   if (!session?.userId) {
     redirect("/auth/login");
   }

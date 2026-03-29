@@ -54,7 +54,6 @@ export default function CertificationFooterActions() {
               if (response.ok) {
                 notify("회원 탈퇴가 완료되었습니다.");
                 router.replace("/");
-                router.refresh();
                 return;
               }
               notify("회원 탈퇴에 실패했습니다.");

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUserSession } from "@/lib/user-auth";
+import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   getCertificationQrVerificationUrl,
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await getUserSession();
+  const session = await getSignedUserSession();
   if (!session?.userId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

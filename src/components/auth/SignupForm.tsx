@@ -146,7 +146,6 @@ export default function SignupForm() {
       setError(null);
       notify("회원가입이 완료되었습니다.");
       router.replace("/certification");
-      router.refresh();
     } finally {
       setPending(false);
     }

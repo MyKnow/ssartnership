@@ -1,7 +1,7 @@
 import { partnerRepository } from "@/lib/repositories";
 import HomeView from "@/components/HomeView";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
-import { getUserSession } from "@/lib/user-auth";
+import { getSignedUserSession } from "@/lib/user-auth";
 import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
 
 export const revalidate = 300;
@@ -10,7 +10,7 @@ export default async function Home() {
   const [categories, partners, session] = await Promise.all([
     partnerRepository.getCategories(),
     partnerRepository.getPartners(),
-    getUserSession(),
+    getSignedUserSession(),
   ]);
   const headerSession = session?.userId ? { userId: session.userId } : null;
   const showPushOptInBanner =

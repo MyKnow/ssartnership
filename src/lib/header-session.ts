@@ -1,11 +1,11 @@
-import { getUserSession } from "@/lib/user-auth";
+import { getSignedUserSession } from "@/lib/user-auth";
 
 export type HeaderSession = {
   userId: string;
 };
 
 export async function getHeaderSession(): Promise<HeaderSession | null> {
-  const session = await getUserSession();
+  const session = await getSignedUserSession();
   if (!session?.userId) {
     return null;
   }

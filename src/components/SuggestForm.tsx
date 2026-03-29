@@ -67,7 +67,6 @@ export default function SuggestForm() {
     }
     setSubmitting(false);
     router.replace("/");
-    router.refresh();
   };
 
   return (

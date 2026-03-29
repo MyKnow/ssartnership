@@ -3,14 +3,14 @@ import SiteHeader from "@/components/SiteHeader";
 import PushSettingsCard from "@/components/push/PushSettingsCard";
 import Container from "@/components/ui/Container";
 import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
-import { getUserSession } from "@/lib/user-auth";
+import { getSignedUserSession } from "@/lib/user-auth";
 
 export const metadata = {
   title: "알림 설정 | SSARTNERSHIP",
 };
 
 export default async function NotificationsPage() {
-  const session = await getUserSession();
+  const session = await getSignedUserSession();
   if (!session?.userId) {
     redirect("/auth/login");
   }

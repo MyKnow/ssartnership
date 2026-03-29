@@ -47,7 +47,6 @@ export default function ChangePasswordForm() {
       setError(null);
       notify("비밀번호가 변경되었습니다.");
       router.replace("/certification");
-      router.refresh();
     } finally {
       setPending(false);
     }

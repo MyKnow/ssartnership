@@ -33,7 +33,7 @@ export default async function AdminPushPage() {
       .from("push_preferences")
       .select("member_id,enabled,announcement_enabled"),
     supabase.from("partners").select("id,name").order("name", { ascending: true }),
-    getRecentPushMessageLogs(200),
+    getRecentPushMessageLogs(50),
   ]);
 
   const activeSubscriptions = activeSubscriptionResult.error
