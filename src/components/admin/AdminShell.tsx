@@ -1,3 +1,4 @@
+import { HomeIcon } from "@heroicons/react/24/outline";
 import ThemeToggle from "@/components/ThemeToggle";
 import AdminMobileNav from "@/components/admin/AdminMobileNav";
 import Button from "@/components/ui/Button";
@@ -8,7 +9,6 @@ import { logout } from "@/app/admin/(protected)/actions";
 
 export default function AdminShell({
   title,
-  description,
   backHref,
   backLabel,
   children,
@@ -30,11 +30,6 @@ export default function AdminShell({
             <h1 className="mt-2 text-xl font-semibold text-foreground sm:text-2xl">
               {title}
             </h1>
-            {description ? (
-              <p className="mt-2 hidden text-sm text-muted-foreground sm:block">
-                {description}
-              </p>
-            ) : null}
           </div>
           <div className="hidden flex-wrap items-center justify-end gap-3 sm:flex">
             {backHref && backLabel ? (
@@ -49,10 +44,18 @@ export default function AdminShell({
             <AdminLogoutButton action={logout} />
           </div>
           <div className="flex items-center gap-2 sm:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              href="/admin"
+              ariaLabel="관리 홈으로 이동"
+              title="관리 홈"
+            >
+              <HomeIcon className="h-5 w-5" />
+            </Button>
             <ThemeToggle />
             <AdminMobileNav
               title={title}
-              description={description}
               backHref={backHref}
               backLabel={backLabel}
               logoutAction={logout}

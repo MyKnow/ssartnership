@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import { ADMIN_COPY } from "@/lib/content";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
+import AdminPartnerEditorCard from "@/components/admin/AdminPartnerEditorCard";
 
 type AdminCategory = {
   id: string;
@@ -194,30 +195,12 @@ export default function AdminPartnerManager({
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
           {filteredPartners.map((partner) => (
-            <PartnerCard
+            <AdminPartnerEditorCard
               key={partner.id}
-              mode="edit"
-              partner={{
-                id: partner.id,
-                name: partner.name ?? "",
-                location: partner.location ?? "",
-                mapUrl: partner.map_url ?? "",
-                reservationLink: partner.reservation_link ?? "",
-                inquiryLink: partner.inquiry_link ?? "",
-                period: {
-                  start: partner.period_start ?? "",
-                  end: partner.period_end ?? "",
-                },
-                benefits: partner.benefits ?? [],
-                conditions: partner.conditions ?? [],
-                images: partner.images ?? [],
-                tags: partner.tags ?? [],
-              }}
+              partner={partner}
               categoryOptions={categoryOptions}
-              categoryId={partner.category_id ?? defaultCategoryId}
               formAction={updatePartner}
               deleteAction={deletePartner}
-              submitLabel="수정"
             />
           ))}
         </div>

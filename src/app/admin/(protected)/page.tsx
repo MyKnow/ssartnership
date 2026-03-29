@@ -55,7 +55,7 @@ export default async function AdminPage() {
 
   if (!hasSupabaseEnv) {
     return (
-      <AdminShell title="Admin 관리 홈" description="Supabase 설정이 필요합니다.">
+      <AdminShell title="Admin 관리 홈">
         <Card className="w-full max-w-xl text-center">
           <h2 className="text-xl font-semibold text-foreground">
             Supabase 설정이 필요합니다.
@@ -89,7 +89,6 @@ export default async function AdminPage() {
   return (
     <AdminShell
       title="Admin 관리 홈"
-      description="회원관리와 업체관리 영역을 나눠 필요한 작업에 바로 진입할 수 있습니다."
     >
       <div className="grid gap-6 md:grid-cols-3">
         <SummaryCard

@@ -204,7 +204,7 @@ export async function updateCategory(formData: FormData) {
   }
 
   revalidateAdminAndPublicPaths();
-  redirect("/admin");
+  redirect("/admin/partners");
 }
 
 export async function deleteCategory(formData: FormData) {
@@ -309,7 +309,7 @@ export async function updatePartner(formData: FormData) {
   }
 
   revalidateAdminAndPublicPaths(id);
-  redirect("/admin");
+  redirect("/admin/partners");
 }
 
 export async function deletePartner(formData: FormData) {
@@ -367,7 +367,7 @@ export async function updateMember(formData: FormData) {
   }
 
   revalidateMemberPaths();
-  redirect("/admin");
+  redirect("/admin/members");
 }
 
 export async function deleteMember(formData: FormData) {

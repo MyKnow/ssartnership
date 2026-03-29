@@ -22,7 +22,6 @@ export default async function AdminMembersPage() {
   return (
     <AdminShell
       title="회원 관리"
-      description="회원 조회, 검색, 정렬, 필터, 수정, 삭제를 한 곳에서 처리합니다."
       backHref="/admin"
       backLabel="관리 홈"
     >

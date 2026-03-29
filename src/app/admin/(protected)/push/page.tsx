@@ -62,7 +62,6 @@ export default async function AdminPushPage() {
   return (
     <AdminShell
       title="푸시 알림 관리"
-      description="전체 공지 발송과 자동 Web Push 알림 상태를 관리합니다."
       backHref="/admin"
       backLabel="관리 홈"
     >
