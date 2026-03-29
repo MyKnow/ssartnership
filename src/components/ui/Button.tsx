@@ -14,8 +14,7 @@ const sizes = {
 const variants = {
   primary: "bg-primary text-primary-foreground hover:opacity-90",
   ghost: "border border-border bg-surface text-foreground hover:border-strong",
-  danger:
-    "border border-danger/40 text-danger hover:border-danger/70 dark:border-danger/40",
+  danger: "border border-border bg-surface text-danger hover:border-strong",
 };
 
 type ButtonProps = {
@@ -32,6 +31,7 @@ type ButtonProps = {
   ariaLabel?: string;
   title?: string;
   style?: React.CSSProperties;
+  form?: string;
 };
 
 function isInternalHref(href: string) {
@@ -62,6 +62,7 @@ export default function Button({
   ariaLabel,
   title,
   style,
+  form,
 }: ButtonProps) {
   const safeRel = buildLinkRel(target, rel);
   const classes = cn(
@@ -112,6 +113,7 @@ export default function Button({
       aria-label={ariaLabel}
       title={title}
       style={style}
+      form={form}
     >
       {children}
     </button>

@@ -15,15 +15,18 @@ import { HOME_COPY } from "@/lib/content";
 import type { HeaderSession } from "@/lib/header-session";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import { useToast } from "@/components/ui/Toast";
+import PushOptInBanner from "@/components/PushOptInBanner";
 
 export default function HomeView({
   categories,
   partners,
   initialSession,
+  showPushOptInBanner = false,
 }: {
   categories: Category[];
   partners: Partner[];
   initialSession?: HeaderSession | null;
+  showPushOptInBanner?: boolean;
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
     "all",
@@ -115,6 +118,8 @@ export default function HomeView({
             title={HOME_COPY.heroTitle}
             description={renderLines(HOME_COPY.heroDescription)}
           />
+
+          <PushOptInBanner visible={showPushOptInBanner} />
 
           <section className="mt-10 flex flex-col gap-6" data-nosnippet>
             <SectionHeading

@@ -7,6 +7,7 @@
   --background: #f8fafc;
   --surface: #ffffff;
   --surface-muted: #f1f5f9;
+  --surface-elevated: #fdfefe;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
   --foreground: #0f172a;
@@ -25,6 +26,7 @@ html.dark {
   --background: #05070f;
   --surface: #0f172a;
   --surface-muted: #111827;
+  --surface-elevated: #162235;
   --border: #1f2937;
   --border-strong: #334155;
   --foreground: #f8fafc;
@@ -43,6 +45,7 @@ html.dark {
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-elevated: var(--surface-elevated);
   --color-border: var(--border);
   --color-strong: var(--border-strong);
   --color-foreground: var(--foreground);
@@ -56,10 +59,12 @@ html.dark {
 
 html {
   color-scheme: light;
+  background: var(--background);
 }
 
 html.dark {
   color-scheme: dark;
+  background: var(--background);
 }
 
 body {

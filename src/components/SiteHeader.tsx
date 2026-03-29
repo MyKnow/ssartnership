@@ -18,7 +18,7 @@ export default function SiteHeader({
   initialSession?: HeaderSession | null;
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
       <Container className="flex items-center justify-between gap-3 py-4">
         <Link
           href="/"

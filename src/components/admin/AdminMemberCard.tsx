@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -61,6 +60,7 @@ export default function AdminMemberCard({
       ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
       : null;
   const topPanelSizeClass = "md:h-[196px]";
+  const updateFormId = `member-update-${member.id}`;
 
   const handleDeleteSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     const ok = window.confirm(
@@ -72,7 +72,7 @@ export default function AdminMemberCard({
   };
 
   return (
-    <Card className="grid gap-5">
+    <Card className="grid gap-5 bg-surface-elevated shadow-md">
       <div className="grid gap-5 md:grid-cols-[196px_minmax(0,1fr)] md:items-stretch">
         <div
           className={`relative aspect-square w-full max-w-[196px] overflow-hidden rounded-[28px] border border-border bg-surface-muted md:max-w-none ${topPanelSizeClass}`}
@@ -104,15 +104,6 @@ export default function AdminMemberCard({
                   @{member.mm_username}
                 </span>
               </div>
-              <Badge
-                className={
-                  member.must_change_password
-                    ? "border border-danger/30 bg-danger/10 text-danger"
-                    : "bg-surface text-foreground"
-                }
-              >
-                {member.must_change_password ? "비밀번호 변경 필요" : "정상"}
-              </Badge>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-medium text-foreground">캠퍼스/반</span>
@@ -134,7 +125,7 @@ export default function AdminMemberCard({
         </div>
       </div>
 
-      <form action={updateAction} className="grid gap-3">
+      <form id={updateFormId} action={updateAction} className="grid gap-3">
         <input type="hidden" name="id" value={member.id} />
 
         <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -175,24 +166,24 @@ export default function AdminMemberCard({
             </Select>
           </label>
         </div>
-
-        <p className="text-xs text-muted-foreground">
-          MM 아이디는 인증 연동 기준값이라 여기서는 읽기 전용으로 유지합니다.
-        </p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <SubmitButton variant="ghost" pendingText="저장 중">
-            저장
-          </SubmitButton>
-        </div>
       </form>
 
-      <form action={deleteAction} onSubmit={handleDeleteSubmit}>
-        <input type="hidden" name="id" value={member.id} />
-        <SubmitButton variant="danger" pendingText="삭제 중">
-          회원 삭제
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <SubmitButton
+          form={updateFormId}
+          variant="ghost"
+          pendingText="저장 중"
+        >
+          저장
         </SubmitButton>
-      </form>
+
+        <form action={deleteAction} onSubmit={handleDeleteSubmit}>
+          <input type="hidden" name="id" value={member.id} />
+          <SubmitButton variant="danger" pendingText="삭제 중">
+            회원 삭제
+          </SubmitButton>
+        </form>
+      </div>
     </Card>
   );
 }

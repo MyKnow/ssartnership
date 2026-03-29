@@ -21,7 +21,7 @@ export default function AdminShell({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-surface/90 backdrop-blur">
+      <header className="border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
         <Container className="flex items-start justify-between gap-4 py-5 sm:items-center">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">

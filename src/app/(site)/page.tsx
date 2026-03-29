@@ -1,16 +1,22 @@
 import { partnerRepository } from "@/lib/repositories";
 import HomeView from "@/components/HomeView";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
-import { getHeaderSession } from "@/lib/header-session";
+import { getUserSession } from "@/lib/user-auth";
+import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
 
 export const revalidate = 300;
 
 export default async function Home() {
-  const [categories, partners, headerSession] = await Promise.all([
+  const [categories, partners, session] = await Promise.all([
     partnerRepository.getCategories(),
     partnerRepository.getPartners(),
-    getHeaderSession(),
+    getUserSession(),
   ]);
+  const headerSession = session?.userId ? { userId: session.userId } : null;
+  const showPushOptInBanner =
+    session?.userId && isPushConfigured()
+      ? !(await getMemberPushPreferences(session.userId)).enabled
+      : false;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -42,6 +48,7 @@ export default async function Home() {
         categories={categories}
         partners={partners}
         initialSession={headerSession}
+        showPushOptInBanner={showPushOptInBanner}
       />
     </>
   );
