@@ -9,6 +9,13 @@ export const DEFAULT_PUSH_PREFERENCES = {
   expiringPartnerEnabled: true,
 } as const;
 
+export const ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES = {
+  enabled: true,
+  announcementEnabled: true,
+  newPartnerEnabled: true,
+  expiringPartnerEnabled: true,
+} as const;
+
 export type PushPreferenceState = {
   enabled: boolean;
   announcementEnabled: boolean;
@@ -315,6 +322,23 @@ export async function getMemberPushPreferences(memberId: string) {
   );
 }
 
+export function getActiveSubscriptionPushPreferences(
+  value?: Partial<PushPreferenceState> | null,
+): PushPreferenceState {
+  return {
+    enabled: value?.enabled ?? ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES.enabled,
+    announcementEnabled:
+      value?.announcementEnabled ??
+      ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES.announcementEnabled,
+    newPartnerEnabled:
+      value?.newPartnerEnabled ??
+      ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES.newPartnerEnabled,
+    expiringPartnerEnabled:
+      value?.expiringPartnerEnabled ??
+      ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES.expiringPartnerEnabled,
+  };
+}
+
 export async function upsertMemberPushPreferences(
   memberId: string,
   value: Partial<PushPreferenceState>,
@@ -427,6 +451,23 @@ export async function deactivatePushSubscription(params: {
   }
 
   const { error } = await query;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return getMemberPushPreferences(memberId);
+}
+
+export async function deactivateAllPushSubscriptions(memberId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .update({
+      is_active: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("member_id", memberId);
+
   if (error) {
     throw new Error(error.message);
   }
@@ -708,7 +749,9 @@ export async function sendPushToAudience(
   );
 
   const targets = safeSubscriptions.filter((subscription) => {
-    const preference = preferenceMap.get(subscription.member_id);
+    const preference = getActiveSubscriptionPushPreferences(
+      preferenceMap.get(subscription.member_id),
+    );
     return Boolean(preference?.enabled && preference[preferenceKey]);
   });
 

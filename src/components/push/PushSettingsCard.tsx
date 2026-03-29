@@ -151,14 +151,15 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
   const { notify } = useToast();
   const [preferences, setPreferences] = useState(initialPreferences);
   const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    null | "subscribe" | "device-off" | "all-off" | "preference" | "share"
+  >(null);
   const [supported, setSupported] = useState(false);
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     "default",
   );
   const [hasSubscription, setHasSubscription] = useState(false);
-  const [sharePending, setSharePending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,8 +229,11 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
   }, []);
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
-  const masterEnabled = preferences.enabled && hasSubscription;
+  const deviceEnabled = hasSubscription;
+  const accountEnabled = preferences.enabled;
+  const isReceivingOnThisDevice = accountEnabled && deviceEnabled;
   const canControlPush = configured && supported && !iosNeedsInstall;
+  const hasPendingAction = pendingAction !== null;
   const canOpenShareDialog =
     typeof window !== "undefined" &&
     typeof navigator !== "undefined" &&
@@ -248,11 +252,14 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
     if (iosNeedsInstall) {
       return { label: "홈 화면 설치 필요", tone: "warn" as const };
     }
-    if (masterEnabled) {
+    if (isReceivingOnThisDevice) {
       return { label: "알림 수신 중", tone: "success" as const };
     }
+    if (accountEnabled) {
+      return { label: "다른 기기에서만 수신 중", tone: "muted" as const };
+    }
     return { label: "알림 꺼짐", tone: "muted" as const };
-  }, [configured, iosNeedsInstall, masterEnabled, supported]);
+  }, [accountEnabled, configured, iosNeedsInstall, isReceivingOnThisDevice, supported]);
 
   const statusClassName =
     status.tone === "success"
@@ -294,7 +301,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       return;
     }
 
-    setPending(true);
+    setPendingAction("subscribe");
     try {
       await requestNotificationPermission();
       const registration = await getServiceWorkerRegistration();
@@ -329,7 +336,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
     } catch (error) {
       notify(error instanceof Error ? error.message : "알림 구독에 실패했습니다.");
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -347,7 +354,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
     }
 
     try {
-      setSharePending(true);
+      setPendingAction("share");
       const payload = getSharePayload(window.location.href);
       if (typeof navigator.canShare === "function" && !navigator.canShare(payload)) {
         throw new Error("공유 데이터가 현재 브라우저에서 지원되지 않습니다.");
@@ -359,12 +366,12 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       }
       notify("공유 메뉴를 열지 못했습니다. 브라우저의 공유 버튼을 직접 눌러 주세요.");
     } finally {
-      setSharePending(false);
+      setPendingAction(null);
     }
   }
 
-  async function handleUnsubscribe() {
-    setPending(true);
+  async function handleUnsubscribeDevice() {
+    setPendingAction("device-off");
     try {
       const registration = await getServiceWorkerRegistration();
       const subscription = await registration.pushManager.getSubscription();
@@ -373,7 +380,48 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ endpoint: subscription?.endpoint ?? null }),
+        body: JSON.stringify({
+          scope: "device",
+          endpoint: subscription?.endpoint ?? null,
+        }),
+      });
+      const data = await parseJson(response);
+      if (subscription) {
+        await subscription.unsubscribe().catch(() => undefined);
+      }
+      setHasSubscription(false);
+      if (data?.preferences) {
+        setPreferences(data.preferences);
+      }
+      notify("이 기기 알림을 껐습니다.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "알림 해제에 실패했습니다.");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handleUnsubscribeAll() {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm("모든 기기에서 알림을 끄시겠습니까?");
+      if (!ok) {
+        return;
+      }
+    }
+
+    setPendingAction("all-off");
+    try {
+      const registration = await getServiceWorkerRegistration();
+      const subscription = await registration.pushManager.getSubscription();
+      const response = await fetch("/api/push/unsubscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          scope: "all",
+          endpoint: subscription?.endpoint ?? null,
+        }),
       });
       const data = await parseJson(response);
       if (subscription) {
@@ -385,11 +433,11 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       } else {
         setPreferences((current) => ({ ...current, enabled: false }));
       }
-      notify("기기 알림을 껐습니다.");
+      notify("모든 기기에서 알림을 껐습니다.");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "알림 해제에 실패했습니다.");
+      notify(error instanceof Error ? error.message : "전체 알림 해제에 실패했습니다.");
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -400,7 +448,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       [key]: nextValue,
     };
 
-    setPending(true);
+    setPendingAction("preference");
     try {
       const response = await fetch("/api/push/preferences", {
         method: "POST",
@@ -421,7 +469,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         error instanceof Error ? error.message : "알림 설정 저장에 실패했습니다.",
       );
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -493,7 +541,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
             {canOpenShareDialog ? (
               <Button
                 onClick={() => void handleOpenShareDialog()}
-                loading={sharePending}
+                loading={pendingAction === "share"}
                 loadingText="공유 메뉴 여는 중"
               >
                 공유 메뉴 열기
@@ -509,27 +557,53 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
 
       {canControlPush ? (
         <div className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3">
             <div>
               <p className="text-sm font-semibold text-foreground">기기 알림 제어</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {masterEnabled
+                {isReceivingOnThisDevice
                   ? "이 기기에서 제휴 알림을 받고 있습니다."
-                  : "이 기기에서 제휴 알림이 꺼져 있습니다."}
+                  : accountEnabled
+                    ? "이 기기에서는 알림이 꺼져 있지만, 다른 기기에서는 수신 중일 수 있습니다."
+                    : "모든 기기에서 제휴 알림이 꺼져 있습니다."}
               </p>
             </div>
-            <Button
-              onClick={masterEnabled ? handleUnsubscribe : handleSubscribe}
-              loading={pending || loading}
-              loadingText={masterEnabled ? "알림 끄는 중" : "알림 켜는 중"}
-            >
-              {masterEnabled ? "알림 끄기" : "알림 켜기"}
-            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                onClick={deviceEnabled ? handleUnsubscribeDevice : handleSubscribe}
+                loading={
+                  loading ||
+                  pendingAction === "subscribe" ||
+                  pendingAction === "device-off"
+                }
+                loadingText={
+                  loading
+                    ? "상태 확인 중"
+                    : deviceEnabled
+                      ? "이 기기 끄는 중"
+                      : "이 기기 켜는 중"
+                }
+                disabled={hasPendingAction && pendingAction !== "subscribe" && pendingAction !== "device-off"}
+              >
+                {deviceEnabled ? "이 기기 알림 끄기" : "이 기기 알림 켜기"}
+              </Button>
+              {accountEnabled ? (
+                <Button
+                  variant="danger"
+                  onClick={handleUnsubscribeAll}
+                  loading={pendingAction === "all-off"}
+                  loadingText="전체 끄는 중"
+                  disabled={hasPendingAction && pendingAction !== "all-off"}
+                >
+                  모든 기기에서 알림 끄기
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
 
-      {canControlPush && masterEnabled ? (
+      {canControlPush && accountEnabled ? (
         <div className="mt-6">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-foreground">세부 알림 항목</h3>
@@ -543,7 +617,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
               key={key}
               label={preferenceLabels[key]}
               checked={preferences[key]}
-              disabled={pending}
+              disabled={hasPendingAction}
               onChange={(next) => {
                 void updatePreference(key, next);
               }}

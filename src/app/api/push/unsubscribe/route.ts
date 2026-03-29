@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserSession } from "@/lib/user-auth";
-import { deactivatePushSubscription } from "@/lib/push";
+import {
+  deactivateAllPushSubscriptions,
+  deactivatePushSubscription,
+} from "@/lib/push";
 
 export const runtime = "nodejs";
 
@@ -20,11 +23,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as { endpoint?: string | null };
-    const preferences = await deactivatePushSubscription({
-      memberId: session.userId,
-      endpoint: body?.endpoint ?? null,
-    });
+    const body = (await request.json()) as {
+      endpoint?: string | null;
+      scope?: "device" | "all";
+    };
+    const scope = body?.scope === "all" ? "all" : "device";
+    const preferences =
+      scope === "all"
+        ? await deactivateAllPushSubscriptions(session.userId)
+        : await deactivatePushSubscription({
+            memberId: session.userId,
+            endpoint: body?.endpoint ?? null,
+          });
 
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {

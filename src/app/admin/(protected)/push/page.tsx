@@ -2,7 +2,11 @@ import AdminPushManager from "@/components/admin/AdminPushManager";
 import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
-import { getRecentPushMessageLogs, isPushConfigured } from "@/lib/push";
+import {
+  getActiveSubscriptionPushPreferences,
+  getRecentPushMessageLogs,
+  isPushConfigured,
+} from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +31,7 @@ export default async function AdminPushPage() {
       .eq("is_active", true),
     supabase
       .from("push_preferences")
-      .select("member_id")
-      .eq("enabled", true)
-      .eq("announcement_enabled", true),
+      .select("member_id,enabled,announcement_enabled"),
     supabase.from("partners").select("id,name").order("name", { ascending: true }),
     getRecentPushMessageLogs(200),
   ]);
@@ -41,12 +43,21 @@ export default async function AdminPushPage() {
   const activeMemberIds = Array.from(
     new Set((activeSubscriptionMembersResult.data ?? []).map((item) => item.member_id)),
   );
-  const enabledPreferenceIds = new Set(
-    (enabledPreferenceMembersResult.data ?? []).map((item) => item.member_id),
+  const preferenceMap = new Map(
+    (enabledPreferenceMembersResult.data ?? []).map((item) => [
+      item.member_id,
+      getActiveSubscriptionPushPreferences({
+        enabled: item.enabled,
+        announcementEnabled: item.announcement_enabled,
+      }),
+    ]),
   );
-  const targetableMemberIds = activeMemberIds.filter((memberId) =>
-    enabledPreferenceIds.has(memberId),
-  );
+  const targetableMemberIds = activeMemberIds.filter((memberId) => {
+    const preference = getActiveSubscriptionPushPreferences(
+      preferenceMap.get(memberId),
+    );
+    return Boolean(preference.enabled && preference.announcementEnabled);
+  });
   const enabledMembers = targetableMemberIds.length;
 
   const { data: members, error: membersError } = targetableMemberIds.length
