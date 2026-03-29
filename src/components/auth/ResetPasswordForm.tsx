@@ -80,7 +80,11 @@ export default function ResetPasswordForm() {
         />
       </label>
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
-      <Button onClick={handleReset} disabled={pending}>
+      <Button
+        onClick={handleReset}
+        loading={pending}
+        loadingText="임시 비밀번호 발급 중"
+      >
         임시 비밀번호 발급
       </Button>
     </div>

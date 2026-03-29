@@ -7,7 +7,6 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
-import Spinner from "@/components/ui/Spinner";
 import Textarea from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
 import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
@@ -164,6 +163,7 @@ export default function AdminPushManager({
   const [audienceFilter, setAudienceFilter] = useState<PushAudienceScope | "all">("all");
   const [sort, setSort] = useState<SortOption>("newest");
   const [pending, setPending] = useState(false);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
 
   useEffect(() => {
     setLogs(recentLogs);
@@ -387,12 +387,16 @@ export default function AdminPushManager({
   }
 
   async function deleteLog(logId: string) {
+    if (deletingLogId) {
+      return;
+    }
     const ok = window.confirm("이 푸시 메시지 로그를 삭제하시겠습니까?");
     if (!ok) {
       return;
     }
 
     try {
+      setDeletingLogId(logId);
       const response = await fetch(`/api/push/admin/logs/${logId}`, {
         method: "DELETE",
       });
@@ -412,6 +416,8 @@ export default function AdminPushManager({
           ? error.message
           : "푸시 메시지 로그 삭제에 실패했습니다.",
       );
+    } finally {
+      setDeletingLogId(null);
     }
   }
 
@@ -580,12 +586,11 @@ export default function AdminPushManager({
             </div>
             <Button
               type="submit"
-              disabled={pending || !configured || targetableCount === 0}
+              loading={pending}
+              loadingText="공지 발송 중"
+              disabled={!configured || targetableCount === 0}
             >
-              <span className="inline-flex items-center gap-2">
-                {pending ? <Spinner /> : null}
-                공지 발송
-              </span>
+              공지 발송
             </Button>
           </div>
         </form>
@@ -712,7 +717,13 @@ export default function AdminPushManager({
                     <Button variant="ghost" onClick={() => loadLog(log)}>
                       메시지 불러오기
                     </Button>
-                    <Button variant="danger" onClick={() => void deleteLog(log.id)}>
+                    <Button
+                      variant="danger"
+                      onClick={() => void deleteLog(log.id)}
+                      loading={deletingLogId === log.id}
+                      loadingText="삭제 중"
+                      disabled={Boolean(deletingLogId && deletingLogId !== log.id)}
+                    >
                       삭제
                     </Button>
                   </div>

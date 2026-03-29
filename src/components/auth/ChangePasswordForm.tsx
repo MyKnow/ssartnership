@@ -75,7 +75,11 @@ export default function ChangePasswordForm() {
       </label>
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
       <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
-      <Button onClick={handleChange} disabled={pending}>
+      <Button
+        onClick={handleChange}
+        loading={pending}
+        loadingText="비밀번호 변경 중"
+      >
         비밀번호 변경
       </Button>
     </div>

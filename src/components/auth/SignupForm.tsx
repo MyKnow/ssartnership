@@ -191,15 +191,23 @@ export default function SignupForm() {
       </FormMessage>
 
       {step === "request" ? (
-        <Button onClick={requestCode} disabled={pending}>
+        <Button
+          onClick={requestCode}
+          loading={pending}
+          loadingText="코드 전송 중"
+        >
           인증코드 요청
         </Button>
       ) : (
         <div className="flex flex-col gap-2">
-          <Button onClick={verifyCode} disabled={pending}>
+          <Button
+            onClick={verifyCode}
+            loading={pending}
+            loadingText="가입 처리 중"
+          >
             회원가입 완료
           </Button>
-          <Button variant="ghost" onClick={() => setStep("request")}>
+          <Button variant="ghost" onClick={() => setStep("request")} disabled={pending}>
             다시 요청하기
           </Button>
         </div>

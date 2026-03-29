@@ -44,6 +44,7 @@ export default function PwaInstallButton({
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [appInstalled, setAppInstalled] = useState(false);
+  const [pending, setPending] = useState(false);
   const { notify } = useToast();
 
   useEffect(() => {
@@ -86,25 +87,40 @@ export default function PwaInstallButton({
   }
 
   const handleInstall = async () => {
-    if (deferredPrompt) {
-      await deferredPrompt.prompt();
-      const result = await deferredPrompt.userChoice;
-      if (result.outcome === "accepted") {
-        notify("설치가 시작되었습니다.");
-      } else {
-        notify("설치를 취소했습니다.");
-      }
-      setDeferredPrompt(null);
+    if (pending) {
       return;
+    }
+    setPending(true);
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const result = await deferredPrompt.userChoice;
+        if (result.outcome === "accepted") {
+          notify("설치가 시작되었습니다.");
+        } else {
+          notify("설치를 취소했습니다.");
+        }
+        setDeferredPrompt(null);
+        return;
+      } finally {
+        setPending(false);
+      }
     }
 
     if (iosInstallHint) {
       notify("브라우저의 공유 버튼에서 '홈 화면에 추가'를 선택해 설치해 주세요.");
     }
+    setPending(false);
   };
 
   return (
-    <Button variant="ghost" onClick={() => void handleInstall()} className={className}>
+    <Button
+      variant="ghost"
+      onClick={() => void handleInstall()}
+      loading={pending}
+      loadingText="설치 준비 중"
+      className={className}
+    >
       앱 설치
     </Button>
   );

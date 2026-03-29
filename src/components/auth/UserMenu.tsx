@@ -20,21 +20,30 @@ export default function UserMenu({
   logoutIconOnly?: boolean;
 }) {
   const [session, setSession] = useState<HeaderSession | null>(initialSession);
+  const [loggingOut, setLoggingOut] = useState(false);
   const { notify } = useToast();
   const router = useRouter();
 
   const handleLogout = async () => {
+    if (loggingOut) {
+      return;
+    }
     if (typeof window !== "undefined") {
       const ok = window.confirm("로그아웃하시겠습니까?");
       if (!ok) {
         return;
       }
     }
-    await fetch("/api/mm/logout", { method: "POST" });
-    setSession(null);
-    notify("로그아웃되었습니다.");
-    router.replace("/");
-    router.refresh();
+    setLoggingOut(true);
+    try {
+      await fetch("/api/mm/logout", { method: "POST" });
+      setSession(null);
+      notify("로그아웃되었습니다.");
+      router.replace("/");
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   if (!session) {
@@ -60,6 +69,7 @@ export default function UserMenu({
           variant="danger"
           size="icon"
           onClick={handleLogout}
+          loading={loggingOut}
           className={buttonClassName}
           ariaLabel="로그아웃"
           title="로그아웃"
@@ -67,7 +77,13 @@ export default function UserMenu({
           <LogOut className="h-5 w-5" />
         </Button>
       ) : (
-        <Button variant="danger" onClick={handleLogout} className={buttonClassName}>
+        <Button
+          variant="danger"
+          onClick={handleLogout}
+          loading={loggingOut}
+          loadingText="로그아웃 중"
+          className={buttonClassName}
+        >
           로그아웃
         </Button>
       )}

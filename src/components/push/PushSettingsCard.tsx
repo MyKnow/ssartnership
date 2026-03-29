@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import Spinner from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import type { PushPreferenceState } from "@/lib/push";
 
@@ -159,6 +158,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
     "default",
   );
   const [hasSubscription, setHasSubscription] = useState(false);
+  const [sharePending, setSharePending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -347,6 +347,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
     }
 
     try {
+      setSharePending(true);
       const payload = getSharePayload(window.location.href);
       if (typeof navigator.canShare === "function" && !navigator.canShare(payload)) {
         throw new Error("공유 데이터가 현재 브라우저에서 지원되지 않습니다.");
@@ -357,6 +358,8 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         return;
       }
       notify("공유 메뉴를 열지 못했습니다. 브라우저의 공유 버튼을 직접 눌러 주세요.");
+    } finally {
+      setSharePending(false);
     }
   }
 
@@ -488,7 +491,11 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
           </div>
           <div className="mt-5 flex justify-end">
             {canOpenShareDialog ? (
-              <Button onClick={() => void handleOpenShareDialog()}>
+              <Button
+                onClick={() => void handleOpenShareDialog()}
+                loading={sharePending}
+                loadingText="공유 메뉴 여는 중"
+              >
                 공유 메뉴 열기
               </Button>
             ) : (
@@ -513,12 +520,10 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
             </div>
             <Button
               onClick={masterEnabled ? handleUnsubscribe : handleSubscribe}
-              disabled={pending || loading}
+              loading={pending || loading}
+              loadingText={masterEnabled ? "알림 끄는 중" : "알림 켜는 중"}
             >
-              <span className="inline-flex items-center gap-2">
-                {pending || loading ? <Spinner /> : null}
-                {masterEnabled ? "알림 끄기" : "알림 켜기"}
-              </span>
+              {masterEnabled ? "알림 끄기" : "알림 켜기"}
             </Button>
           </div>
         </div>

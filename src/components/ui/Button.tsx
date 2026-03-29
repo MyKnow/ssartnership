@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import Spinner from "@/components/ui/Spinner";
 
 const base =
   "inline-flex min-h-12 min-w-12 cursor-pointer items-center justify-center rounded-full font-semibold leading-none transition";
@@ -28,6 +29,8 @@ type ButtonProps = {
   rel?: string;
   onClick?: () => void;
   disabled?: boolean;
+  loading?: boolean;
+  loadingText?: string;
   ariaLabel?: string;
   title?: string;
   style?: React.CSSProperties;
@@ -59,18 +62,27 @@ export default function Button({
   rel,
   onClick,
   disabled,
+  loading,
+  loadingText,
   ariaLabel,
   title,
   style,
   form,
 }: ButtonProps) {
+  const isDisabled = Boolean(disabled || loading);
   const safeRel = buildLinkRel(target, rel);
   const classes = cn(
     base,
     variants[variant],
     sizes[size],
-    disabled ? "cursor-not-allowed opacity-60" : null,
+    isDisabled ? "cursor-not-allowed opacity-60" : null,
     className,
+  );
+  const content = (
+    <span className="inline-flex items-center gap-2">
+      {loading ? <Spinner /> : null}
+      {loading ? (size === "icon" ? null : (loadingText ?? children)) : children}
+    </span>
   );
 
   if (href) {
@@ -80,9 +92,9 @@ export default function Button({
       title,
       target,
       rel: safeRel,
-      "aria-disabled": disabled || undefined,
-      tabIndex: disabled ? -1 : undefined,
-      onClick: disabled
+      "aria-disabled": isDisabled || undefined,
+      tabIndex: isDisabled ? -1 : undefined,
+      onClick: isDisabled
         ? (event: React.MouseEvent<HTMLAnchorElement>) => {
             event.preventDefault();
           }
@@ -92,14 +104,14 @@ export default function Button({
     if (isInternalHref(href)) {
       return (
         <Link href={href} {...sharedProps}>
-          {children}
+          {content}
         </Link>
       );
     }
 
     return (
       <a href={href} {...sharedProps}>
-        {children}
+        {content}
       </a>
     );
   }
@@ -109,13 +121,14 @@ export default function Button({
       type={type}
       className={classes}
       onClick={onClick}
-      disabled={disabled}
+      disabled={isDisabled}
       aria-label={ariaLabel}
       title={title}
       style={style}
       form={form}
+      aria-busy={loading || undefined}
     >
-      {children}
+      {content}
     </button>
   );
 }

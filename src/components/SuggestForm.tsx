@@ -183,9 +183,10 @@ export default function SuggestForm() {
         <Button
           type="submit"
           className="min-w-[140px] justify-center"
-          disabled={isSubmitting}
+          loading={isSubmitting}
+          loadingText="제출 중"
         >
-          {isSubmitting ? "제출 중" : "제안 제출"}
+          제안 제출
         </Button>
       </div>
       <Modal
@@ -194,11 +195,11 @@ export default function SuggestForm() {
         description="제안을 제출할까요? 제출 후 홈 화면으로 이동합니다."
         onClose={() => setConfirmOpen(false)}
       >
-        <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+        <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={isSubmitting}>
           취소
         </Button>
-        <Button onClick={handleSubmit} disabled={isSubmitting}>
-          {isSubmitting ? "제출 중" : "제출하기"}
+        <Button onClick={handleSubmit} loading={isSubmitting} loadingText="제출 중">
+          제출하기
         </Button>
       </Modal>
     </form>

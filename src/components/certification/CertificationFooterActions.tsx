@@ -1,12 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
 export default function CertificationFooterActions() {
   const { notify } = useToast();
   const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <div className="mx-auto mt-4 flex w-full max-w-2xl flex-wrap items-center gap-3 rounded-3xl border border-border bg-surface p-4">
@@ -23,12 +25,17 @@ export default function CertificationFooterActions() {
         <Button
           variant="ghost"
           className="hover:opacity-90"
+          loading={deleting}
+          loadingText="회원 탈퇴 중"
           style={{
             backgroundColor: "var(--danger)",
             borderColor: "var(--danger)",
             color: "var(--background)",
           }}
           onClick={async () => {
+            if (deleting) {
+              return;
+            }
             const first = window.confirm(
               "정말 탈퇴하시겠습니까? 저장된 인증 정보가 삭제됩니다.",
             );
@@ -41,14 +48,19 @@ export default function CertificationFooterActions() {
             if (!second) {
               return;
             }
-            const response = await fetch("/api/mm/delete", { method: "POST" });
-            if (response.ok) {
-              notify("회원 탈퇴가 완료되었습니다.");
-              router.replace("/");
-              router.refresh();
-              return;
+            setDeleting(true);
+            try {
+              const response = await fetch("/api/mm/delete", { method: "POST" });
+              if (response.ok) {
+                notify("회원 탈퇴가 완료되었습니다.");
+                router.replace("/");
+                router.refresh();
+                return;
+              }
+              notify("회원 탈퇴에 실패했습니다.");
+            } finally {
+              setDeleting(false);
             }
-            notify("회원 탈퇴에 실패했습니다.");
           }}
         >
           회원 탈퇴

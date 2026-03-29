@@ -78,7 +78,7 @@ export default function LoginForm() {
       }
       setError(null);
       notify("로그인되었습니다.");
-      router.replace("/certification");
+      router.replace("/");
       router.refresh();
     } finally {
       setPending(false);
@@ -104,7 +104,7 @@ export default function LoginForm() {
           required
         />
       </label>
-      <Button onClick={handleLogin} disabled={pending}>
+      <Button onClick={handleLogin} loading={pending} loadingText="로그인 중">
         로그인
       </Button>
       <Button variant="ghost" href="/auth/reset">
