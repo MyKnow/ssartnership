@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
+import { trackProductEvent } from "@/lib/product-events";
 import type { PushPreferenceState } from "@/lib/push";
 
 type Props = {
@@ -160,6 +161,21 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
     "default",
   );
   const [hasSubscription, setHasSubscription] = useState(false);
+  const hasTrackedViewRef = useRef(false);
+
+  useEffect(() => {
+    if (hasTrackedViewRef.current) {
+      return;
+    }
+    hasTrackedViewRef.current = true;
+    trackProductEvent({
+      eventName: "push_settings_view",
+      targetType: "push_settings",
+      properties: {
+        configured,
+      },
+    });
+  }, [configured]);
 
   useEffect(() => {
     let cancelled = false;
@@ -474,10 +490,12 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
   }
 
   return (
-    <Card className="mx-auto mt-6 max-w-2xl">
+    <Card className="mx-auto mt-6 max-w-2xl min-w-0 overflow-hidden">
       <div className="border-b border-border pb-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <h2 className="text-lg font-semibold text-foreground">푸시 알림 설정</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="min-w-0 text-lg font-semibold text-foreground">
+            푸시 알림 설정
+          </h2>
           <Badge className={statusClassName}>{status.label}</Badge>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -486,7 +504,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         </p>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid grid-cols-2 gap-3">
         <StatusMetric
           label="권한 상태"
           value={permission === "unsupported" ? "미지원" : permission}
@@ -497,17 +515,21 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         />
       </div>
 
-      <div className="mt-5 rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
-        {!configured
-          ? "서버에 VAPID 키와 CRON 시크릿이 설정되면 알림 기능을 바로 사용할 수 있습니다."
-          : !supported
-            ? "이 브라우저는 Web Push를 지원하지 않습니다. 최신 Chrome, Edge 또는 iOS/iPadOS 설치형 앱에서 확인해 주세요."
-            : iosNeedsInstall
-              ? "iPhone/iPad에서는 브라우저의 공유 메뉴에서 홈 화면에 추가한 뒤, 설치된 앱 안에서 알림을 켤 수 있습니다."
-              : permission === "denied"
-                ? "브라우저 설정에서 알림 권한을 다시 허용한 뒤 재시도해 주세요."
-                : "기기 알림을 켜면 공지와 제휴 소식을 앱처럼 받을 수 있습니다."}
-      </div>
+      {!isReceivingOnThisDevice ? (
+        <div className="mt-5 rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
+          {!configured
+            ? "서버에 VAPID 키와 CRON 시크릿이 설정되면 알림 기능을 바로 사용할 수 있습니다."
+            : !supported
+              ? "이 브라우저는 Web Push를 지원하지 않습니다. 최신 Chrome, Edge 또는 iOS/iPadOS 설치형 앱에서 확인해 주세요."
+              : iosNeedsInstall
+                ? "iPhone/iPad에서는 브라우저의 공유 메뉴에서 홈 화면에 추가한 뒤, 설치된 앱 안에서 알림을 켤 수 있습니다."
+                : permission === "denied"
+                  ? "브라우저 설정에서 알림 권한을 다시 허용한 뒤 재시도해 주세요."
+                  : accountEnabled
+                    ? "이 계정은 다른 기기에서 알림을 받고 있습니다. 현재 기기에서도 필요하면 알림을 켜 주세요."
+                    : "기기 알림을 켜면 공지와 제휴 소식을 앱처럼 받을 수 있습니다."}
+        </div>
+      ) : null}
 
       {iosNeedsInstall ? (
         <div className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
@@ -540,6 +562,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
           <div className="mt-5 flex justify-end">
             {canOpenShareDialog ? (
               <Button
+                className="w-full sm:w-auto"
                 onClick={() => void handleOpenShareDialog()}
                 loading={pendingAction === "share"}
                 loadingText="공유 메뉴 여는 중"
@@ -547,7 +570,12 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
                 공유 메뉴 열기
               </Button>
             ) : (
-              <Button variant="ghost" disabled title="브라우저 공유 버튼을 직접 사용해 주세요.">
+              <Button
+                variant="ghost"
+                className="w-full sm:w-auto"
+                disabled
+                title="브라우저 공유 버튼을 직접 사용해 주세요."
+              >
                 브라우저 공유 버튼 사용
               </Button>
             )}
@@ -558,7 +586,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       {canControlPush ? (
         <div className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
           <div className="flex flex-col gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">기기 알림 제어</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {isReceivingOnThisDevice
@@ -568,8 +596,9 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
                     : "모든 기기에서 제휴 알림이 꺼져 있습니다."}
               </p>
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
               <Button
+                className="w-full justify-center sm:w-auto"
                 onClick={deviceEnabled ? handleUnsubscribeDevice : handleSubscribe}
                 loading={
                   loading ||
@@ -590,6 +619,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
               {accountEnabled ? (
                 <Button
                   variant="danger"
+                  className="w-full justify-center sm:w-auto"
                   onClick={handleUnsubscribeAll}
                   loading={pendingAction === "all-off"}
                   loadingText="전체 끄는 중"

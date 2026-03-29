@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
 import PartnerFilters, {
   PartnerSortOption,
@@ -14,6 +14,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { HOME_COPY } from "@/lib/content";
 import type { HeaderSession } from "@/lib/header-session";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
+import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 import PushOptInBanner from "@/components/PushOptInBanner";
 
@@ -33,6 +34,8 @@ export default function HomeView({
   );
   const [searchValue, setSearchValue] = useState("");
   const [sortValue, setSortValue] = useState<PartnerSortOption>("recent");
+  const searchTimeoutRef = useRef<number | null>(null);
+  const lastLoggedSearchRef = useRef("");
   const { notify } = useToast();
 
   const categoryMap = useMemo(() => {
@@ -107,6 +110,68 @@ export default function HomeView({
     }
   }, [notify]);
 
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      window.clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+
+    const query = searchValue.trim();
+    if (!query) {
+      lastLoggedSearchRef.current = "";
+      return;
+    }
+
+    searchTimeoutRef.current = window.setTimeout(() => {
+      const dedupeKey = `${activeCategory}:${sortValue}:${query}`;
+      if (lastLoggedSearchRef.current === dedupeKey) {
+        return;
+      }
+      lastLoggedSearchRef.current = dedupeKey;
+      trackProductEvent({
+        eventName: "search_execute",
+        targetType: "partner_search",
+        properties: {
+          query,
+          categoryKey: activeCategory,
+          sortValue,
+          resultCount: filteredPartners.length,
+        },
+      });
+    }, 450);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        window.clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+    };
+  }, [activeCategory, filteredPartners.length, searchValue, sortValue]);
+
+  const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
+    setActiveCategory(nextCategory);
+    trackProductEvent({
+      eventName: "category_filter_change",
+      targetType: "category",
+      targetId: nextCategory === "all" ? null : nextCategory,
+      properties: {
+        categoryKey: nextCategory,
+      },
+    });
+  };
+
+  const handleSortChange = (nextSort: PartnerSortOption) => {
+    setSortValue(nextSort);
+    trackProductEvent({
+      eventName: "sort_change",
+      targetType: "partner_sort",
+      targetId: nextSort,
+      properties: {
+        sortValue: nextSort,
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={initialSession} />
@@ -129,11 +194,11 @@ export default function HomeView({
             <PartnerFilters
               categories={categories}
               activeCategory={activeCategory}
-              onCategoryChange={setActiveCategory}
+              onCategoryChange={handleCategoryChange}
               searchValue={searchValue}
               onSearchChange={setSearchValue}
               sortValue={sortValue}
-              onSortChange={setSortValue}
+              onSortChange={handleSortChange}
             />
           </section>
 
@@ -152,7 +217,7 @@ export default function HomeView({
                 }
               />
             ) : (
-              <div className="grid justify-items-center gap-x-4 gap-y-6 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
+              <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-6">
                 {filteredPartners.map((partner) => (
                   <PartnerCard
                     key={partner.id}
@@ -161,9 +226,7 @@ export default function HomeView({
                       categoryMap.get(partner.category)?.label ?? "알 수 없음"
                     }
                     categoryColor={categoryMap.get(partner.category)?.color}
-                    onCategoryClick={(categoryKey) =>
-                      setActiveCategory(categoryKey)
-                    }
+                    onCategoryClick={handleCategoryChange}
                   />
                 ))}
               </div>

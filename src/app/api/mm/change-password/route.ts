@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
 import { hashPassword, isValidPassword, verifyPassword } from "@/lib/password";
@@ -6,9 +7,17 @@ import { hashPassword, isValidPassword, verifyPassword } from "@/lib/password";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const context = getRequestLogContext(request);
   try {
     const session = await getSignedUserSession();
     if (!session?.userId) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "unauthorized" },
+      });
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
     const payload = (await request.json()) as {
@@ -18,9 +27,25 @@ export async function POST(request: Request) {
     const currentPassword = String(payload.currentPassword ?? "").trim();
     const nextPassword = String(payload.nextPassword ?? "").trim();
     if (!currentPassword || !nextPassword) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "member",
+        actorId: session.userId,
+        properties: { reason: "missing_fields" },
+      });
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (!isValidPassword(nextPassword)) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "member",
+        actorId: session.userId,
+        properties: { reason: "invalid_password" },
+      });
       return NextResponse.json({ error: "invalid_password" }, { status: 400 });
     }
 
@@ -32,6 +57,14 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!member?.password_hash || !member.password_salt) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "member",
+        actorId: session.userId,
+        properties: { reason: "wrong_password" },
+      });
       return NextResponse.json({ error: "wrong_password" }, { status: 400 });
     }
 
@@ -41,6 +74,14 @@ export async function POST(request: Request) {
       member.password_hash,
     );
     if (!ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "member",
+        actorId: session.userId,
+        properties: { reason: "wrong_password" },
+      });
       return NextResponse.json({ error: "wrong_password" }, { status: 400 });
     }
 
@@ -56,8 +97,25 @@ export async function POST(request: Request) {
       .eq("id", session.userId);
 
     await setUserSession(session.userId, false);
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_password_change",
+      status: "success",
+      actorType: "member",
+      actorId: session.userId,
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_password_change",
+      status: "failure",
+      actorType: "guest",
+      properties: {
+        reason: "exception",
+        message: (error as Error).message,
+      },
+    });
     return NextResponse.json(
       { error: "change_failed", message: (error as Error).message },
       { status: 500 },

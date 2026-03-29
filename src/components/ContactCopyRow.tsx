@@ -1,16 +1,24 @@
 "use client";
 
 import Button from "@/components/ui/Button";
+import type { ProductEventName } from "@/lib/event-catalog";
+import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 
 export default function ContactCopyRow({
   href,
   label,
   rawValue,
+  eventName,
+  targetType,
+  targetId,
 }: {
   href: string;
   label: string;
   rawValue: string;
+  eventName?: ProductEventName;
+  targetType?: string;
+  targetId?: string | null;
 }) {
   const { notify } = useToast();
 
@@ -21,6 +29,19 @@ export default function ContactCopyRow({
         className="text-sm font-medium text-foreground hover:opacity-80"
         target={href.startsWith("http") ? "_blank" : undefined}
         rel={href.startsWith("http") ? "noreferrer" : undefined}
+        onClick={() => {
+          if (!eventName) {
+            return;
+          }
+          trackProductEvent({
+            eventName,
+            targetType: targetType ?? null,
+            targetId: targetId ?? null,
+            properties: {
+              source: "detail",
+            },
+          });
+        }}
       >
         {label}
       </a>

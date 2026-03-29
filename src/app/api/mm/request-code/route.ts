@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { generateCode, hashCode } from "@/lib/mm-verification";
 import {
@@ -19,6 +20,7 @@ const CODE_TTL_MINUTES = 5;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 export async function POST(request: Request) {
+  const context = getRequestLogContext(request);
   try {
     const payload = (await request.json()) as {
       username?: string;
@@ -26,9 +28,24 @@ export async function POST(request: Request) {
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
     if (!username) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "missing_fields" },
+      });
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (validateMmUsername(username)) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "invalid_username" },
+      });
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
 
@@ -46,6 +63,14 @@ export async function POST(request: Request) {
       const now = new Date();
       const diffSeconds = (now.getTime() - createdAt.getTime()) / 1000;
       if (diffSeconds < RESEND_COOLDOWN_SECONDS) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_signup_code_request",
+          status: "blocked",
+          actorType: "guest",
+          identifier: username,
+          properties: { reason: "cooldown" },
+        });
         return NextResponse.json(
           { error: "cooldown" },
           { status: 429 },
@@ -60,6 +85,15 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (existingMember?.id) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "failure",
+        actorType: "member",
+        actorId: existingMember.id,
+        identifier: username,
+        properties: { reason: "already_registered" },
+      });
       return NextResponse.json({ error: "already_registered" }, { status: 409 });
     }
 
@@ -78,6 +112,14 @@ export async function POST(request: Request) {
       username,
     );
     if (!targetUser) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "not_student" },
+      });
       return NextResponse.json({ error: "not_student" }, { status: 404 });
     }
 
@@ -116,8 +158,31 @@ export async function POST(request: Request) {
       `SSARTNERSHIP 인증코드입니다.\n\n인증코드: ${code}\n유효시간: ${CODE_TTL_MINUTES}분`,
     );
 
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_signup_code_request",
+      status: "success",
+      actorType: "guest",
+      identifier: username,
+      properties: {
+        mmUserId: targetUser.id,
+        campus: profile.campus ?? null,
+        classNumber: profile.classNumber ?? null,
+      },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (error) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_signup_code_request",
+      status: "failure",
+      actorType: "guest",
+      properties: {
+        reason: "exception",
+        message: (error as Error).message,
+      },
+    });
     return NextResponse.json(
       { error: "request_failed", message: (error as Error).message },
       { status: 500 },

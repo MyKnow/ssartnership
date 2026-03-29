@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
@@ -80,6 +81,17 @@ export default async function CertificationVerifyPage({
       <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
+          <AnalyticsEventOnMount
+            eventName="certification_qr_verify"
+            targetType="certification_qr"
+            properties={{
+              valid: isValid,
+              reason: verification.ok ? "ok" : verification.reason,
+              campus: member?.campus ?? null,
+              classNumber: member?.class_number ?? null,
+            }}
+            dedupeKey={`certification-verify:${rawToken}`}
+          />
           <Card className="mx-auto max-w-xl p-6">
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between gap-3">

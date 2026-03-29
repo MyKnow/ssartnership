@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isPushConfigured, upsertPushSubscription } from "@/lib/push";
 
@@ -10,6 +11,7 @@ function isSameOrigin(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const context = getRequestLogContext(request);
   if (!isSameOrigin(request)) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
@@ -45,6 +47,21 @@ export async function POST(request: NextRequest) {
       memberId: session.userId,
       subscription: body.subscription,
       userAgent: request.headers.get("user-agent"),
+    });
+
+    await logProductEvent({
+      ...context,
+      eventName: "push_subscribe",
+      actorType: "member",
+      actorId: session.userId,
+      targetType: "push_subscription",
+      targetId: body.subscription.endpoint ?? null,
+      properties: {
+        enabled: preferences.enabled,
+        announcementEnabled: preferences.announcementEnabled,
+        newPartnerEnabled: preferences.newPartnerEnabled,
+        expiringPartnerEnabled: preferences.expiringPartnerEnabled,
+      },
     });
 
     return NextResponse.json({ ok: true, preferences });

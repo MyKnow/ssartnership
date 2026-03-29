@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { generateTempPassword, hashPassword } from "@/lib/password";
 import {
@@ -18,13 +19,29 @@ const BLOCK_MINUTES = 60;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 export async function POST(request: Request) {
+  const context = getRequestLogContext(request);
   try {
     const payload = (await request.json()) as { username?: string };
     const username = normalizeMmUsername(String(payload.username ?? ""));
     if (!username) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_reset",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "missing_fields" },
+      });
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (validateMmUsername(username)) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_reset",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "invalid_username" },
+      });
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
 
@@ -38,6 +55,14 @@ export async function POST(request: Request) {
     if (attempt?.blocked_until) {
       const blockedUntil = new Date(attempt.blocked_until);
       if (blockedUntil > new Date()) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_password_reset",
+          status: "blocked",
+          actorType: "guest",
+          identifier: username,
+          properties: { reason: "rate_limit" },
+        });
         return NextResponse.json({ error: "blocked" }, { status: 429 });
       }
     }
@@ -46,6 +71,14 @@ export async function POST(request: Request) {
       const createdAt = new Date(attempt.created_at);
       const diffSeconds = (Date.now() - createdAt.getTime()) / 1000;
       if (diffSeconds < RESEND_COOLDOWN_SECONDS) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_password_reset",
+          status: "blocked",
+          actorType: "guest",
+          identifier: username,
+          properties: { reason: "cooldown" },
+        });
         return NextResponse.json({ error: "cooldown" }, { status: 429 });
       }
     }
@@ -57,6 +90,14 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!member?.id) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_reset",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "not_registered" },
+      });
       return NextResponse.json({ error: "not_registered" }, { status: 404 });
     }
 
@@ -75,6 +116,15 @@ export async function POST(request: Request) {
       username,
     );
     if (!mmUser) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_reset",
+        status: "failure",
+        actorType: "member",
+        actorId: member.id,
+        identifier: username,
+        properties: { reason: "not_mm" },
+      });
       return NextResponse.json({ error: "not_mm" }, { status: 404 });
     }
 
@@ -129,8 +179,30 @@ export async function POST(request: Request) {
       });
     }
 
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_password_reset",
+      status: "success",
+      actorType: "member",
+      actorId: member.id,
+      identifier: username,
+      properties: {
+        mustChangePassword: true,
+      },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (error) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_password_reset",
+      status: "failure",
+      actorType: "guest",
+      properties: {
+        reason: "exception",
+        message: (error as Error).message,
+      },
+    });
     return NextResponse.json(
       { error: "reset_failed", message: (error as Error).message },
       { status: 500 },

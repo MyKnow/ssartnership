@@ -105,6 +105,11 @@ export default function AdminMobileNav({
       label: "푸시 알림 관리",
       active: pathname === "/admin/push",
     },
+    {
+      href: "/admin/logs",
+      label: "로그 조회",
+      active: pathname === "/admin/logs",
+    },
   ];
 
   return (

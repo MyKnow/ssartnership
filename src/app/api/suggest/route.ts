@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import {
+  getRequestLogContext,
+  logProductEvent,
+  resolveCurrentActor,
+} from "@/lib/activity-logs";
 import { BUG_REPORT_EMAIL } from "@/lib/site";
 import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
 import { isValidEmail, sanitizeHttpUrl } from "@/lib/validation";
@@ -33,6 +38,7 @@ function getClientIdentifier(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const context = getRequestLogContext(request);
   try {
     const identifier = getClientIdentifier(request);
     if (await isBlocked(identifier, SUGGEST_RATE_LIMIT)) {
@@ -136,6 +142,19 @@ export async function POST(request: Request) {
       subject,
       text: bodyText,
       html: bodyHtml,
+    });
+
+    const actor = await resolveCurrentActor();
+    await logProductEvent({
+      ...context,
+      eventName: "suggest_submit",
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      targetType: "suggestion",
+      properties: {
+        companyName: payload.companyName?.trim() ?? "",
+        hasCompanyUrl: Boolean(safeCompanyUrlValue),
+      },
     });
 
     return NextResponse.json({ ok: true });

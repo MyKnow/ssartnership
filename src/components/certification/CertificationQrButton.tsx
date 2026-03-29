@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import { CERTIFICATION_QR_TTL_SECONDS } from "@/lib/certification-constants";
+import { trackProductEvent } from "@/lib/product-events";
 
 type CertificationQrResponse = {
   verifyUrl: string;
@@ -135,19 +136,28 @@ export default function CertificationQrButton() {
 
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)}>
+      <Button
+        variant="ghost"
+        onClick={() => {
+          trackProductEvent({
+            eventName: "certification_qr_open",
+            targetType: "certification_qr",
+          });
+          setOpen(true);
+        }}
+      >
         QR 표시
       </Button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 sm:p-6">
           <button
             type="button"
             className="absolute inset-0"
             aria-label="QR 닫기"
             onClick={() => setOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-sm rounded-[32px] border border-white/15 bg-white p-6 text-slate-900 shadow-2xl">
+          <div className="relative z-10 w-full max-w-sm rounded-[32px] border border-white/15 bg-white p-5 text-slate-900 shadow-2xl sm:p-6">
             <button
               type="button"
               className="absolute right-4 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900"
@@ -168,7 +178,7 @@ export default function CertificationQrButton() {
                 </p>
               </div>
 
-              <div className="flex h-[320px] w-[320px] items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex aspect-square w-full max-w-[320px] items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
                 {loading ? (
                   <Spinner className="h-8 w-8 text-slate-700" />
                 ) : error ? (
@@ -185,7 +195,7 @@ export default function CertificationQrButton() {
                       alt="교육생 검증 QR"
                       fill
                       unoptimized
-                      sizes="320px"
+                      sizes="(max-width: 640px) calc(100vw - 96px), 320px"
                       className="rounded-2xl"
                     />
                   </div>

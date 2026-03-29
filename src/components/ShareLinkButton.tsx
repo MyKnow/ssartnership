@@ -1,8 +1,15 @@
 "use client";
 
+import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 
-export default function ShareLinkButton() {
+export default function ShareLinkButton({
+  targetType = "share_target",
+  targetId = null,
+}: {
+  targetType?: string;
+  targetId?: string | null;
+}) {
   const { notify } = useToast();
 
   const handleCopy = async () => {
@@ -12,6 +19,11 @@ export default function ShareLinkButton() {
     const url = window.location.href;
     try {
       await navigator.clipboard.writeText(url);
+      trackProductEvent({
+        eventName: "share_link_copy",
+        targetType,
+        targetId,
+      });
       notify("공유 링크가 복사되었습니다.");
     } catch {
       notify("복사에 실패했습니다.");

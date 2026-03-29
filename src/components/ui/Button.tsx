@@ -86,6 +86,20 @@ export default function Button({
   );
 
   if (href) {
+    const handleLinkClick = onClick
+      ? (event: React.MouseEvent<HTMLAnchorElement>) => {
+          if (isDisabled) {
+            event.preventDefault();
+            return;
+          }
+          onClick();
+        }
+      : isDisabled
+        ? (event: React.MouseEvent<HTMLAnchorElement>) => {
+            event.preventDefault();
+          }
+        : undefined;
+
     const sharedProps = {
       className: classes,
       "aria-label": ariaLabel,
@@ -94,11 +108,7 @@ export default function Button({
       rel: safeRel,
       "aria-disabled": isDisabled || undefined,
       tabIndex: isDisabled ? -1 : undefined,
-      onClick: isDisabled
-        ? (event: React.MouseEvent<HTMLAnchorElement>) => {
-            event.preventDefault();
-          }
-        : undefined,
+      onClick: handleLinkClick,
     };
 
     if (isInternalHref(href)) {

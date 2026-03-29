@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { hashCode } from "@/lib/mm-verification";
 import { setUserSession } from "@/lib/user-auth";
@@ -15,6 +16,7 @@ const MAX_FAILS = 5;
 const BLOCK_MINUTES = 60;
 
 export async function POST(request: Request) {
+  const context = getRequestLogContext(request);
   try {
     const payload = (await request.json()) as {
       username?: string;
@@ -26,12 +28,36 @@ export async function POST(request: Request) {
     const code = String(payload.code ?? "").trim().toUpperCase();
     const password = String(payload.password ?? "").trim();
     if (!username || !code || !password) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: username || null,
+        properties: { reason: "missing_fields" },
+      });
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (validateMmUsername(username)) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "invalid_username" },
+      });
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
     if (!isValidPassword(password)) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "invalid_password" },
+      });
       return NextResponse.json(
         { error: "invalid_password", message: PASSWORD_POLICY_MESSAGE },
         { status: 400 },
@@ -49,6 +75,14 @@ export async function POST(request: Request) {
     if (attempt?.blocked_until) {
       const blockedUntil = new Date(attempt.blocked_until);
       if (blockedUntil > new Date()) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_signup_complete",
+          status: "blocked",
+          actorType: "guest",
+          identifier: username,
+          properties: { reason: "verification_blocked" },
+        });
         return NextResponse.json({ error: "blocked" }, { status: 429 });
       }
     }
@@ -62,10 +96,26 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!codeRow) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "missing_code" },
+      });
       return NextResponse.json({ error: "invalid_code" }, { status: 400 });
     }
 
     if (new Date(codeRow.expires_at) < new Date()) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "expired" },
+      });
       return NextResponse.json({ error: "expired" }, { status: 400 });
     }
 
@@ -95,6 +145,17 @@ export async function POST(request: Request) {
         });
       }
 
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: blockedUntil ? "blocked" : "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: {
+          reason: "invalid_code",
+          attemptCount: nextCount,
+        },
+      });
       return NextResponse.json({ error: "invalid_code" }, { status: 400 });
     }
 
@@ -118,6 +179,8 @@ export async function POST(request: Request) {
 
     const passwordRecord = hashPassword(password);
 
+    let authenticatedMemberId = member?.id ?? null;
+
     if (member?.id) {
       await supabase
         .from("members")
@@ -139,6 +202,7 @@ export async function POST(request: Request) {
         .select("id")
         .single();
       if (inserted?.id) {
+        authenticatedMemberId = inserted.id;
         await setUserSession(inserted.id, false);
       }
     }
@@ -146,8 +210,32 @@ export async function POST(request: Request) {
     await supabase.from("mm_verification_attempts").delete().eq("identifier", username);
     await supabase.from("mm_verification_codes").delete().eq("mm_username", username);
 
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_signup_complete",
+      status: "success",
+      actorType: "member",
+      actorId: authenticatedMemberId,
+      identifier: username,
+      properties: {
+        campus: codeRow.campus ?? null,
+        classNumber: codeRow.class_number ?? null,
+        existingMember: Boolean(member?.id),
+      },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (error) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_signup_complete",
+      status: "failure",
+      actorType: "guest",
+      properties: {
+        reason: "exception",
+        message: (error as Error).message,
+      },
+    });
     return NextResponse.json(
       { error: "verify_failed", message: (error as Error).message },
       { status: 500 },

@@ -71,7 +71,7 @@ function MetricCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface-muted px-4 py-4">
+    <div className="min-w-0 rounded-2xl border border-border bg-surface-muted px-4 py-4">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {label}
       </p>
@@ -422,8 +422,8 @@ export default function AdminPushManager({
   }
 
   return (
-    <div className="grid gap-8">
-      <section className="grid gap-3 md:grid-cols-3">
+    <div className="grid min-w-0 gap-8 overflow-x-hidden">
+      <section className="grid min-w-0 gap-3 md:grid-cols-3">
         <MetricCard
           label="활성 구독"
           value={`${activeSubscriptions}개`}
@@ -441,21 +441,21 @@ export default function AdminPushManager({
         />
       </section>
 
-      <section className="grid gap-4 rounded-3xl border border-border bg-surface-muted/50 p-5">
+      <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface-muted/50 p-4 sm:p-5">
         <SectionHeading
           title="공지 메시지 작성"
           description="발송 대상을 먼저 정하고, 직접 URL 입력 또는 등록된 제휴 업체 선택으로 이동 경로를 구성합니다."
         />
 
         <form className="grid gap-4" onSubmit={handleSubmit}>
-          <div className="grid gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
+          <div className="grid min-w-0 gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
             <SectionHeading
               title="발송 대상"
               description="전체, 캠퍼스, 반, 개인 단위로 메시지 도달 범위를 지정할 수 있습니다."
               className="gap-1"
             />
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.7fr)_repeat(3,minmax(0,1fr))]">
+            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_repeat(3,minmax(0,1fr))]">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 대상 범위
                 <Select
@@ -526,7 +526,7 @@ export default function AdminPushManager({
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <label className="grid gap-2 text-sm font-medium text-foreground">
               제목
               <Input
@@ -575,8 +575,8 @@ export default function AdminPushManager({
             />
           </label>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
-            <div className="grid gap-1">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid min-w-0 gap-1">
               <p className="text-sm text-muted-foreground">
                 신규 제휴와 종료 7일 전 알림은 자동 발송되며, 수동 공지는 위 대상 범위에 맞춰 발송됩니다.
               </p>
@@ -586,6 +586,7 @@ export default function AdminPushManager({
             </div>
             <Button
               type="submit"
+              className="w-full justify-center sm:w-auto"
               loading={pending}
               loadingText="공지 발송 중"
               disabled={!configured || targetableCount === 0}
@@ -596,14 +597,15 @@ export default function AdminPushManager({
         </form>
       </section>
 
-      <section className="grid gap-4 rounded-3xl border border-border bg-surface-muted/50 p-5">
+      <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface-muted/50 p-4 sm:p-5">
         <SectionHeading
           title="푸시 메시지 로그"
           description="과거 메시지를 검색, 정렬, 필터링하고 필요하면 입력 폼으로 다시 불러올 수 있습니다."
         />
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.7fr))]">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.35fr)_repeat(5,minmax(0,0.75fr))]">
           <Input
+            className="sm:col-span-2 xl:col-span-1"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="제목, 내용, URL, 대상 검색"
@@ -670,18 +672,18 @@ export default function AdminPushManager({
           </Select>
         </div>
 
-        <div className="grid gap-3">
+        <div className="grid min-w-0 gap-3">
           {filteredLogs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="min-w-0 overflow-hidden rounded-2xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
               조건에 맞는 푸시 메시지 로그가 없습니다.
             </div>
           ) : (
             filteredLogs.map((log) => (
               <div
                 key={log.id}
-                className="rounded-2xl border border-border bg-surface px-4 py-4"
+                className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className="bg-surface-muted text-foreground">
@@ -697,7 +699,7 @@ export default function AdminPushManager({
                         {statusLabels[log.status]}
                       </Badge>
                     </div>
-                    <p className="mt-3 text-base font-semibold text-foreground">
+                    <p className="mt-3 break-words text-base font-semibold text-foreground">
                       {log.title}
                     </p>
                     <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
@@ -705,20 +707,25 @@ export default function AdminPushManager({
                     </p>
                     <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
                       <p>발송 시각: {formatDateTime(log.created_at)}</p>
-                      <p>발송 대상: {log.target_label}</p>
-                      <p>이동 URL: {log.url || "없음"}</p>
+                      <p className="break-all">발송 대상: {log.target_label}</p>
+                      <p className="break-all">이동 URL: {log.url || "없음"}</p>
                       <p>
                         대상 {log.targeted} · 성공 {log.delivered} · 실패 {log.failed}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                    <Button variant="ghost" onClick={() => loadLog(log)}>
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                    <Button
+                      className="w-full justify-center sm:w-auto"
+                      variant="ghost"
+                      onClick={() => loadLog(log)}
+                    >
                       메시지 불러오기
                     </Button>
                     <Button
                       variant="danger"
+                      className="w-full justify-center sm:w-auto"
                       onClick={() => void deleteLog(log.id)}
                       loading={deletingLogId === log.id}
                       loadingText="삭제 중"

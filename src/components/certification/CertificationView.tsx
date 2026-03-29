@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import { trackProductEvent } from "@/lib/product-events";
 import CertificationQrButton from "@/components/certification/CertificationQrButton";
 
 type Member = {
@@ -23,11 +24,28 @@ export default function CertificationView({
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
+  const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
+  const hasTrackedViewRef = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (hasTrackedViewRef.current) {
+      return;
+    }
+    hasTrackedViewRef.current = true;
+    trackProductEvent({
+      eventName: "certification_view",
+      targetType: "member",
+      properties: {
+        campus: member.campus ?? profile.campus ?? null,
+        classNumber: member.class_number ?? profile.classNumber ?? null,
+      },
+    });
+  }, [member.campus, member.class_number, profile.campus, profile.classNumber]);
 
   useEffect(() => {
     if (!isAvatarOpen) {
@@ -70,11 +88,10 @@ export default function CertificationView({
     member.avatar_base64 && member.avatar_content_type
       ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
       : null;
-  const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
 
   return (
     <div className="mt-6">
-      <div className="relative overflow-hidden rounded-[32px] border border-white/15 bg-gradient-to-br from-[#0b1220] via-[#0f172a] to-[#111827] p-6 text-white shadow-[0_25px_80px_rgba(15,23,42,0.5)]">
+      <div className="relative min-w-0 overflow-hidden rounded-[32px] border border-white/15 bg-gradient-to-br from-[#0b1220] via-[#0f172a] to-[#111827] p-5 text-white shadow-[0_25px_80px_rgba(15,23,42,0.5)] sm:p-6">
         <div className="absolute inset-0 opacity-40">
           <div className="absolute -left-20 top-10 h-32 w-80 rotate-12 rounded-full bg-cyan-400/40 blur-3xl" />
           <div className="absolute -right-20 bottom-10 h-32 w-80 -rotate-12 rounded-full bg-sky-500/40 blur-3xl" />
@@ -123,7 +140,7 @@ export default function CertificationView({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-end gap-x-4 gap-y-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm sm:gap-x-6">
             <div className="min-w-0 flex-auto">
               <div className="flex flex-col gap-1">
                 <span className="text-xs text-slate-300">MM 아이디</span>
@@ -132,7 +149,7 @@ export default function CertificationView({
             </div>
             <div className="ml-auto flex shrink-0 flex-col gap-1 text-right">
               <span className="text-xs text-slate-300">인증 시간</span>
-              <span className="whitespace-nowrap font-semibold">
+              <span className="whitespace-nowrap text-sm font-semibold sm:text-base">
                 {dateLabel} {timeLabel}
               </span>
             </div>
@@ -155,7 +172,7 @@ export default function CertificationView({
       </div>
 
       {avatarSrc && isAvatarOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6">
           <button
             type="button"
             className="absolute inset-0"

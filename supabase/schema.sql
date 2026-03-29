@@ -166,6 +166,49 @@ create table if not exists push_delivery_logs (
   created_at timestamp with time zone default now()
 );
 
+create table if not exists event_logs (
+  id uuid primary key default uuid_generate_v4(),
+  session_id text,
+  actor_type text not null,
+  actor_id text,
+  event_name text not null,
+  path text,
+  referrer text,
+  target_type text,
+  target_id text,
+  properties jsonb not null default '{}'::jsonb,
+  user_agent text,
+  ip_address text,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists admin_audit_logs (
+  id uuid primary key default uuid_generate_v4(),
+  actor_id text,
+  action text not null,
+  path text,
+  target_type text,
+  target_id text,
+  properties jsonb not null default '{}'::jsonb,
+  user_agent text,
+  ip_address text,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists auth_security_logs (
+  id uuid primary key default uuid_generate_v4(),
+  event_name text not null,
+  status text not null,
+  actor_type text not null,
+  actor_id text,
+  identifier text,
+  path text,
+  properties jsonb not null default '{}'::jsonb,
+  user_agent text,
+  ip_address text,
+  created_at timestamp with time zone default now()
+);
+
 create index if not exists partners_category_id_idx on partners(category_id);
 create index if not exists admin_login_attempts_identifier_idx on admin_login_attempts(identifier);
 create index if not exists suggestion_attempts_identifier_idx on suggestion_attempts(identifier);
@@ -178,6 +221,21 @@ create index if not exists push_message_logs_type_idx on push_message_logs(type)
 create index if not exists push_message_logs_status_idx on push_message_logs(status);
 create index if not exists push_delivery_logs_member_id_idx on push_delivery_logs(member_id);
 create index if not exists push_delivery_logs_created_at_idx on push_delivery_logs(created_at desc);
+create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
+create index if not exists event_logs_event_name_idx on event_logs(event_name);
+create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
+create index if not exists event_logs_target_idx on event_logs(target_type, target_id);
+create index if not exists event_logs_path_idx on event_logs(path);
+create index if not exists event_logs_session_id_idx on event_logs(session_id);
+create index if not exists admin_audit_logs_created_at_idx on admin_audit_logs(created_at desc);
+create index if not exists admin_audit_logs_action_idx on admin_audit_logs(action);
+create index if not exists admin_audit_logs_actor_id_idx on admin_audit_logs(actor_id);
+create index if not exists admin_audit_logs_target_idx on admin_audit_logs(target_type, target_id);
+create index if not exists auth_security_logs_created_at_idx on auth_security_logs(created_at desc);
+create index if not exists auth_security_logs_event_name_idx on auth_security_logs(event_name);
+create index if not exists auth_security_logs_status_idx on auth_security_logs(status);
+create index if not exists auth_security_logs_actor_id_idx on auth_security_logs(actor_id);
+create index if not exists auth_security_logs_identifier_idx on auth_security_logs(identifier);
 
 drop index if exists mm_verification_codes_email_idx;
 
@@ -193,6 +251,9 @@ alter table push_preferences enable row level security;
 alter table push_subscriptions enable row level security;
 alter table push_message_logs enable row level security;
 alter table push_delivery_logs enable row level security;
+alter table event_logs enable row level security;
+alter table admin_audit_logs enable row level security;
+alter table auth_security_logs enable row level security;
 
 create policy "Public read categories" on categories
   for select
@@ -222,3 +283,9 @@ revoke all on table push_message_logs from anon;
 revoke all on table push_message_logs from authenticated;
 revoke all on table push_delivery_logs from anon;
 revoke all on table push_delivery_logs from authenticated;
+revoke all on table event_logs from anon;
+revoke all on table event_logs from authenticated;
+revoke all on table admin_audit_logs from anon;
+revoke all on table admin_audit_logs from authenticated;
+revoke all on table auth_security_logs from anon;
+revoke all on table auth_security_logs from authenticated;

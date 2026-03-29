@@ -166,8 +166,8 @@ export function AdminLoginSkeleton() {
 export function AdminOverviewSkeleton() {
   return (
     <AdminShell title="Admin 관리 홈">
-      <div className="grid gap-6 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
           <SummaryCardSkeleton key={index} />
         ))}
       </div>
@@ -282,6 +282,116 @@ export function AdminPushSkeleton() {
           <PushLogSkeleton />
         </div>
       </Card>
+    </AdminShell>
+  );
+}
+
+export function AdminLogsSkeleton() {
+  return (
+    <AdminShell title="로그 조회" backHref="/admin" backLabel="관리 홈">
+      <div className="grid gap-8">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="rounded-3xl border border-border bg-surface-elevated p-5 shadow-md"
+            >
+              <Skeleton className="h-4 w-20 rounded-lg" />
+              <Skeleton className="mt-3 h-8 w-28" />
+              <Skeleton className="mt-2 h-4 w-full max-w-[14rem]" />
+              <Skeleton className="mt-2 h-4 w-full max-w-[11rem]" />
+            </div>
+          ))}
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+          <Card className="bg-surface-elevated shadow-md">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="mt-2 h-4 w-full max-w-md" />
+            <div className="mt-5 grid gap-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-border bg-surface px-4 py-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-4 w-14" />
+                  </div>
+                  <Skeleton className="mt-3 h-3 w-full rounded-full" />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <div className="grid gap-4">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Card key={index} className="bg-surface-elevated shadow-md">
+                <Skeleton className="h-7 w-32" />
+                <Skeleton className="mt-2 h-4 w-full max-w-xs" />
+                <div className="mt-4 grid gap-2">
+                  {Array.from({ length: 3 }).map((__, rowIndex) => (
+                    <div
+                      key={rowIndex}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3"
+                    >
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-10" />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-4 rounded-3xl border border-border bg-surface-muted/50 p-5">
+          <Skeleton className="h-8 w-28" />
+          <Skeleton className="h-4 w-full max-w-md" />
+
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.75fr))]">
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+          </div>
+
+          <div className="grid gap-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index} className="bg-surface-elevated shadow-md">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Skeleton className="h-8 w-14 rounded-full" />
+                      <Skeleton className="h-8 w-16 rounded-full" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="mt-3 h-7 w-56" />
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-28" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-8 w-20 rounded-full" />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Skeleton className="h-8 w-20 rounded-full" />
+                  <Skeleton className="h-8 w-24 rounded-full" />
+                  <Skeleton className="h-8 w-28 rounded-full" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+      </div>
     </AdminShell>
   );
 }

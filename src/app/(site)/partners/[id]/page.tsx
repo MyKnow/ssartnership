@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import { partnerRepository } from "@/lib/repositories";
+import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
@@ -82,6 +84,16 @@ export default async function PartnerDetailPage({
       <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
+          <AnalyticsEventOnMount
+            eventName="partner_detail_view"
+            targetType="partner"
+            targetId={partner.id}
+            properties={{
+              categoryKey: partner.category,
+              isActive,
+            }}
+            dedupeKey={`partner-detail:${partner.id}`}
+          />
           <div className="flex flex-col gap-6">
             <div className="flex items-center gap-2">
               <Link
@@ -103,7 +115,7 @@ export default async function PartnerDetailPage({
                   <path d="M15 18l-6-6 6-6" />
                 </svg>
               </Link>
-              <ShareLinkButton />
+              <ShareLinkButton targetType="partner" targetId={partner.id} />
             </div>
 
             <Card className="p-6">
@@ -126,11 +138,15 @@ export default async function PartnerDetailPage({
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{partner.location}</span>
                 {mapLink ? (
-                  <a
+                  <TrackedAnchor
                     className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
                     href={mapLink}
                     target="_blank"
                     rel="noopener noreferrer"
+                    eventName="partner_map_click"
+                    targetType="partner"
+                    targetId={partner.id}
+                    properties={{ source: "detail" }}
                     aria-label="지도 보기"
                     title="지도 보기"
                   >
@@ -149,7 +165,7 @@ export default async function PartnerDetailPage({
                       <path d="M9 3v15" />
                       <path d="M15 6v15" />
                     </svg>
-                  </a>
+                  </TrackedAnchor>
                 ) : null}
               </div>
 
@@ -216,6 +232,9 @@ export default async function PartnerDetailPage({
                     href={reservationDisplay.href}
                     label={reservationDisplay.label}
                     rawValue={normalizedLinks.reservationLink ?? ""}
+                    eventName="reservation_click"
+                    targetType="partner"
+                    targetId={partner.id}
                   />
                 </Card>
               ) : null}
@@ -227,6 +246,9 @@ export default async function PartnerDetailPage({
                     href={inquiryDisplay.href}
                     label={inquiryDisplay.label}
                     rawValue={normalizedLinks.inquiryLink ?? ""}
+                    eventName="inquiry_click"
+                    targetType="partner"
+                    targetId={partner.id}
                   />
                 </Card>
               ) : null}

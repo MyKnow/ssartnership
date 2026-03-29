@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { trackProductEvent } from "@/lib/product-events";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
@@ -91,6 +92,14 @@ export default function PwaInstallButton({
       return;
     }
     setPending(true);
+    trackProductEvent({
+      eventName: "pwa_install_click",
+      targetType: "pwa",
+      properties: {
+        iosInstallHint,
+        hasDeferredPrompt: Boolean(deferredPrompt),
+      },
+    });
     if (deferredPrompt) {
       try {
         await deferredPrompt.prompt();

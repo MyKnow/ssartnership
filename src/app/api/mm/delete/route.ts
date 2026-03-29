@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, clearUserSession } from "@/lib/user-auth";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const context = getRequestLogContext(request);
   const session = await getSignedUserSession();
   if (!session?.userId) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_delete",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "unauthorized" },
+    });
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -34,6 +43,15 @@ export async function POST() {
 
   await supabase.from("members").delete().eq("id", session.userId);
   await clearUserSession();
+
+  await logAuthSecurity({
+    ...context,
+    eventName: "member_delete",
+    status: "success",
+    actorType: "member",
+    actorId: session.userId,
+    identifier: member?.mm_username ?? null,
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminSession } from "@/lib/auth";
+import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import {
   createAnnouncementPayload,
   getPushDestinationLabel,
@@ -16,6 +17,7 @@ function isSameOrigin(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const context = getRequestLogContext(request);
   if (!isSameOrigin(request)) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
@@ -50,6 +52,22 @@ export async function POST(request: NextRequest) {
     const result = await sendPushToAudience(payload, {
       source: "manual",
       audience,
+    });
+
+    await logAdminAudit({
+      ...context,
+      action: "push_send",
+      targetType: "push_message",
+      properties: {
+        type: payload.type,
+        title: payload.title,
+        hasUrl: Boolean(payload.url),
+        audienceScope: audience.scope,
+        destination: getPushDestinationLabel(payload.url),
+        targeted: result.targeted,
+        delivered: result.delivered,
+        failed: result.failed,
+      },
     });
 
     return NextResponse.json({

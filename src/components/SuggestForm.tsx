@@ -181,7 +181,7 @@ export default function SuggestForm() {
       <div className="flex items-center justify-end gap-2">
         <Button
           type="submit"
-          className="min-w-[140px] justify-center"
+          className="w-full justify-center sm:min-w-[140px] sm:w-auto"
           loading={isSubmitting}
           loadingText="제출 중"
         >

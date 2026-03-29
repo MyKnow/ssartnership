@@ -71,7 +71,15 @@ export default async function AdminPage() {
 
   const supabase = getSupabaseAdminClient();
 
-  const [memberResult, partnerResult, categoryResult, pushResult] = await Promise.all([
+  const [
+    memberResult,
+    partnerResult,
+    categoryResult,
+    pushResult,
+    productLogResult,
+    auditLogResult,
+    securityLogResult,
+  ] = await Promise.all([
     supabase.from("members").select("*", { count: "exact", head: true }),
     supabase.from("partners").select("*", { count: "exact", head: true }),
     supabase.from("categories").select("*", { count: "exact", head: true }),
@@ -79,18 +87,27 @@ export default async function AdminPage() {
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true),
+    supabase.from("event_logs").select("id", { count: "exact", head: true }),
+    supabase
+      .from("admin_audit_logs")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("auth_security_logs")
+      .select("id", { count: "exact", head: true }),
   ]);
 
   const memberCount = memberResult.error ? 0 : memberResult.count ?? 0;
   const partnerCount = partnerResult.error ? 0 : partnerResult.count ?? 0;
   const categoryCount = categoryResult.error ? 0 : categoryResult.count ?? 0;
   const pushSubscriptionCount = pushResult.error ? 0 : pushResult.count ?? 0;
+  const productLogCount = productLogResult.error ? 0 : productLogResult.count ?? 0;
+  const auditLogCount = auditLogResult.error ? 0 : auditLogResult.count ?? 0;
+  const securityLogCount = securityLogResult.error ? 0 : securityLogResult.count ?? 0;
+  const totalLogCount = productLogCount + auditLogCount + securityLogCount;
 
   return (
-    <AdminShell
-      title="Admin 관리 홈"
-    >
-      <div className="grid gap-6 md:grid-cols-3">
+    <AdminShell title="Admin 관리 홈">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           href="/admin/members"
           title="회원 관리"
@@ -108,6 +125,12 @@ export default async function AdminPage() {
           title="푸시 알림 관리"
           description="전체 공지 발송과 자동 Web Push 알림 상태를 관리합니다."
           meta={`활성 구독 ${pushSubscriptionCount}개`}
+        />
+        <SummaryCard
+          href="/admin/logs"
+          title="로그 조회"
+          description="집계 뷰와 대시보드, 검색·정렬·필터가 가능한 로그 탐색 화면으로 이동합니다."
+          meta={`전체 ${totalLogCount.toLocaleString()}건 로그`}
         />
       </div>
     </AdminShell>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
 import { getSignedUserSession } from "@/lib/user-auth";
 import {
   deactivateAllPushSubscriptions,
@@ -13,6 +14,7 @@ function isSameOrigin(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const context = getRequestLogContext(request);
   if (!isSameOrigin(request)) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
@@ -35,6 +37,23 @@ export async function POST(request: NextRequest) {
             memberId: session.userId,
             endpoint: body?.endpoint ?? null,
           });
+
+    await logProductEvent({
+      ...context,
+      eventName:
+        scope === "all" ? "push_unsubscribe_all" : "push_unsubscribe_device",
+      actorType: "member",
+      actorId: session.userId,
+      targetType: "push_subscription",
+      targetId: scope === "all" ? session.userId : (body?.endpoint ?? null),
+      properties: {
+        scope,
+        enabled: preferences.enabled,
+        announcementEnabled: preferences.announcementEnabled,
+        newPartnerEnabled: preferences.newPartnerEnabled,
+        expiringPartnerEnabled: preferences.expiringPartnerEnabled,
+      },
+    });
 
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {

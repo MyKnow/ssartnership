@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { createNewPartnerPayload, isPushConfigured, sendPushToAudience } from "@/lib/push";
@@ -57,6 +58,24 @@ function parseOptionalUrl(value: string) {
 
 function parsePartnerLink(value: string) {
   return sanitizePartnerLinkValue(value) ?? null;
+}
+
+async function logAdminAction(
+  action: Parameters<typeof logAdminAudit>[0]["action"],
+  input?: {
+    targetType?: string | null;
+    targetId?: string | null;
+    properties?: Record<string, unknown> | null;
+  },
+) {
+  const context = await getServerActionLogContext("/admin");
+  await logAdminAudit({
+    ...context,
+    action,
+    targetType: input?.targetType ?? null,
+    targetId: input?.targetId ?? null,
+    properties: input?.properties ?? {},
+  });
 }
 
 function revalidateAdminAndPublicPaths(partnerId?: string) {
@@ -173,14 +192,21 @@ export async function createCategory(formData: FormData) {
   const { key, label, description, color } = parseCategoryPayload(formData);
 
   const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("categories")
-    .insert({ key, label, description, color });
+    .insert({ key, label, description, color })
+    .select("id")
+    .single();
 
   if (error) {
     throw new Error(error.message);
   }
 
+  await logAdminAction("category_create", {
+    targetType: "category",
+    targetId: data?.id ?? null,
+    properties: { key, label, description, color },
+  });
   revalidateAdminAndPublicPaths();
 }
 
@@ -203,6 +229,11 @@ export async function updateCategory(formData: FormData) {
     throw new Error(error.message);
   }
 
+  await logAdminAction("category_update", {
+    targetType: "category",
+    targetId: id,
+    properties: { key, label, description, color },
+  });
   revalidateAdminAndPublicPaths();
   redirect("/admin/partners");
 }
@@ -221,6 +252,10 @@ export async function deleteCategory(formData: FormData) {
     throw new Error(error.message);
   }
 
+  await logAdminAction("category_delete", {
+    targetType: "category",
+    targetId: id,
+  });
   revalidateAdminAndPublicPaths();
 }
 
@@ -251,6 +286,25 @@ export async function createPartner(formData: FormData) {
   if (error) {
     throw new Error(error.message);
   }
+
+  await logAdminAction("partner_create", {
+    targetType: "partner",
+    targetId: data?.id ?? null,
+    properties: {
+      name: payload.name,
+      categoryId: payload.categoryId,
+      location: payload.location,
+      hasMapUrl: Boolean(payload.mapUrl),
+      hasReservationLink: Boolean(payload.reservationLink),
+      hasInquiryLink: Boolean(payload.inquiryLink),
+      periodStart: payload.periodStart,
+      periodEnd: payload.periodEnd,
+      benefitCount: payload.benefits.length,
+      conditionCount: payload.conditions.length,
+      imageCount: payload.images.length,
+      tagCount: payload.tags.length,
+    },
+  });
 
   if (data?.id && isPushConfigured() && isWithinPeriod(payload.periodStart, payload.periodEnd)) {
     const { data: category } = await supabase
@@ -308,6 +362,24 @@ export async function updatePartner(formData: FormData) {
     throw new Error(error.message);
   }
 
+  await logAdminAction("partner_update", {
+    targetType: "partner",
+    targetId: id,
+    properties: {
+      name: payload.name,
+      categoryId: payload.categoryId,
+      location: payload.location,
+      hasMapUrl: Boolean(payload.mapUrl),
+      hasReservationLink: Boolean(payload.reservationLink),
+      hasInquiryLink: Boolean(payload.inquiryLink),
+      periodStart: payload.periodStart,
+      periodEnd: payload.periodEnd,
+      benefitCount: payload.benefits.length,
+      conditionCount: payload.conditions.length,
+      imageCount: payload.images.length,
+      tagCount: payload.tags.length,
+    },
+  });
   revalidateAdminAndPublicPaths(id);
   redirect("/admin/partners");
 }
@@ -326,6 +398,10 @@ export async function deletePartner(formData: FormData) {
     throw new Error(error.message);
   }
 
+  await logAdminAction("partner_delete", {
+    targetType: "partner",
+    targetId: id,
+  });
   revalidateAdminAndPublicPaths(id);
 }
 
@@ -366,6 +442,16 @@ export async function updateMember(formData: FormData) {
     throw new Error(error.message);
   }
 
+  await logAdminAction("member_update", {
+    targetType: "member",
+    targetId: id,
+    properties: {
+      displayName,
+      campus,
+      classNumber,
+      mustChangePassword,
+    },
+  });
   revalidateMemberPaths();
   redirect("/admin/members");
 }
@@ -411,10 +497,18 @@ export async function deleteMember(formData: FormData) {
     throw new Error(error.message);
   }
 
+  await logAdminAction("member_delete", {
+    targetType: "member",
+    targetId: id,
+    properties: {
+      mmUsername: member.mm_username,
+    },
+  });
   revalidateMemberPaths();
 }
 
 export async function logout() {
+  await logAdminAction("logout");
   await clearAdminSession();
   redirect("/admin/login");
 }

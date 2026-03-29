@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { upsertMemberPushPreferences } from "@/lib/push";
 
@@ -14,6 +15,7 @@ function toOptionalBoolean(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  const context = getRequestLogContext(request);
   if (!isSameOrigin(request)) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
@@ -30,6 +32,21 @@ export async function POST(request: NextRequest) {
       announcementEnabled: toOptionalBoolean(body.announcementEnabled),
       newPartnerEnabled: toOptionalBoolean(body.newPartnerEnabled),
       expiringPartnerEnabled: toOptionalBoolean(body.expiringPartnerEnabled),
+    });
+
+    await logProductEvent({
+      ...context,
+      eventName: "push_preference_change",
+      actorType: "member",
+      actorId: session.userId,
+      targetType: "push_preferences",
+      targetId: session.userId,
+      properties: {
+        enabled: preferences.enabled,
+        announcementEnabled: preferences.announcementEnabled,
+        newPartnerEnabled: preferences.newPartnerEnabled,
+        expiringPartnerEnabled: preferences.expiringPartnerEnabled,
+      },
     });
 
     return NextResponse.json({ ok: true, preferences });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminSession } from "@/lib/auth";
+import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { deletePushMessageLog } from "@/lib/push";
 
 export const runtime = "nodejs";
@@ -13,6 +14,7 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
+  const requestContext = getRequestLogContext(request);
   if (!isSameOrigin(request)) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
@@ -27,6 +29,12 @@ export async function DELETE(
   try {
     const { id } = await context.params;
     await deletePushMessageLog(id);
+    await logAdminAudit({
+      ...requestContext,
+      action: "push_log_delete",
+      targetType: "push_message_log",
+      targetId: id,
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message =

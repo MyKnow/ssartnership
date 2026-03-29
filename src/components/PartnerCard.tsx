@@ -1,10 +1,11 @@
 "use client";
 
-import type { Partner } from "@/lib/types";
+import type { CategoryKey, Partner } from "@/lib/types";
 import type { MouseEvent } from "react";
 import Image from "next/image";
 import { getBlurDataURL } from "@/lib/image-blur";
 import { useRouter } from "next/navigation";
+import { trackProductEvent } from "@/lib/product-events";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
@@ -77,7 +78,7 @@ export default function PartnerCard({
   deleteAction?: (formData: FormData) => void | Promise<void>;
   submitLabel?: string;
   className?: string;
-  onCategoryClick?: (categoryKey: string) => void;
+  onCategoryClick?: (categoryKey: CategoryKey) => void;
 }) {
   const router = useRouter();
   if (mode !== "view") {
@@ -296,7 +297,7 @@ export default function PartnerCard({
   return (
     <article
       className={cn(
-        "relative flex h-full w-full max-w-sm flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:max-w-none",
+        "relative flex h-full w-full flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
         canNavigate ? "cursor-pointer" : null,
         className,
       )}
@@ -311,6 +312,14 @@ export default function PartnerCard({
         if (target?.closest("a,button,input,select,textarea,label")) {
           return;
         }
+        trackProductEvent({
+          eventName: "partner_card_click",
+          targetType: "partner",
+          targetId: viewPartner.id,
+          properties: {
+            categoryKey: viewPartner.category,
+          },
+        });
         router.push(detailHref);
       }}
       onKeyDown={(event) => {
@@ -319,6 +328,15 @@ export default function PartnerCard({
         }
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
+          trackProductEvent({
+            eventName: "partner_card_click",
+            targetType: "partner",
+            targetId: viewPartner.id,
+            properties: {
+              categoryKey: viewPartner.category,
+              source: "keyboard",
+            },
+          });
           router.push(detailHref);
         }
       }}
@@ -401,6 +419,17 @@ export default function PartnerCard({
                   href={mapLink}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() =>
+                    trackProductEvent({
+                      eventName: "partner_map_click",
+                      targetType: "partner",
+                      targetId: viewPartner.id,
+                      properties: {
+                        categoryKey: viewPartner.category,
+                        source: "card",
+                      },
+                    })
+                  }
                   aria-label="지도 보기"
                   title="지도 보기"
                 >
@@ -481,6 +510,17 @@ export default function PartnerCard({
                 reservationAction.href.startsWith("http") ? "noreferrer" : undefined
               }
               className="w-full justify-center"
+              onClick={() =>
+                trackProductEvent({
+                  eventName: "reservation_click",
+                  targetType: "partner",
+                  targetId: viewPartner.id,
+                  properties: {
+                    categoryKey: viewPartner.category,
+                    source: "card",
+                  },
+                })
+              }
             >
               {reservationAction.label}
             </Button>
@@ -494,6 +534,17 @@ export default function PartnerCard({
               }
               rel={inquiryAction.href.startsWith("http") ? "noreferrer" : undefined}
               className="w-full justify-center"
+              onClick={() =>
+                trackProductEvent({
+                  eventName: "inquiry_click",
+                  targetType: "partner",
+                  targetId: viewPartner.id,
+                  properties: {
+                    categoryKey: viewPartner.category,
+                    source: "card",
+                  },
+                })
+              }
             >
               {inquiryAction.label}
             </Button>

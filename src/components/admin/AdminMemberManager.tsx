@@ -124,9 +124,10 @@ export default function AdminMemberManager({
   }, [campusFilter, filterValue, members, searchValue, sortValue]);
 
   return (
-    <div className="mt-6 grid gap-6">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
+    <div className="mt-6 grid min-w-0 gap-6">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
         <Input
+          className="sm:col-span-2 xl:col-span-1"
           value={searchValue}
           onChange={(event) => setSearchValue(event.target.value)}
           placeholder="이름, MM 아이디, 캠퍼스, 반으로 검색"
@@ -171,7 +172,7 @@ export default function AdminMemberManager({
           description="검색어나 상태 필터를 조정해 다시 확인해 주세요."
         />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid min-w-0 gap-6 xl:grid-cols-2">
           {filteredMembers.map((member) => (
             <AdminMemberCard
               key={member.id}

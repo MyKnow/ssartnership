@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { setAdminSession, validateAdminCredentials } from "@/lib/auth";
+import { logAuthSecurity } from "@/lib/activity-logs";
 import { isBlocked, recordAttempt } from "@/lib/rate-limit";
 import ThemeToggle from "@/components/ThemeToggle";
 import Card from "@/components/ui/Card";
@@ -29,8 +30,24 @@ async function loginAction(formData: FormData) {
   const headerStore = await headers();
   const forwardedFor = headerStore.get("x-forwarded-for");
   const clientIp = forwardedFor?.split(",")[0]?.trim() || "local";
+  const context = {
+    path: "/admin/login",
+    referrer: headerStore.get("referer"),
+    userAgent: headerStore.get("user-agent"),
+    ipAddress: clientIp,
+  };
 
   if (await isBlocked(clientIp)) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "admin_login",
+      status: "blocked",
+      actorType: "guest",
+      identifier: id || null,
+      properties: {
+        reason: "rate_limit",
+      },
+    });
     redirect(`/admin/login?error=rate&id=${encodeURIComponent(id)}`);
   }
 
@@ -39,9 +56,27 @@ async function loginAction(formData: FormData) {
 
   if (ok) {
     await setAdminSession();
+    await logAuthSecurity({
+      ...context,
+      eventName: "admin_login",
+      status: "success",
+      actorType: "admin",
+      actorId: process.env.ADMIN_ID ?? "admin",
+      identifier: id,
+    });
     redirect("/admin");
   }
 
+  await logAuthSecurity({
+    ...context,
+    eventName: "admin_login",
+    status: "failure",
+    actorType: "guest",
+    identifier: id || null,
+    properties: {
+      reason: "invalid_credentials",
+    },
+  });
   redirect(`/admin/login?error=1&id=${encodeURIComponent(id)}`);
 }
 
