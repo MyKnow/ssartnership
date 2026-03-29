@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import RoutePageViewTracker from '@/components/analytics/RoutePageViewTracker';
 
 export default function AuthLayout({
@@ -7,7 +8,9 @@ export default function AuthLayout({
 }) {
   return (
     <>
-      <RoutePageViewTracker area="auth" />
+      <Suspense fallback={null}>
+        <RoutePageViewTracker area="auth" />
+      </Suspense>
       {children}
     </>
   );

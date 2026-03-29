@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Footer from "@/components/Footer";
 import ScrollToTopFab from "@/components/ScrollToTopFab";
@@ -15,7 +16,9 @@ export default async function SiteLayout({
   }
   return (
     <div className="flex min-h-screen flex-col">
-      <RoutePageViewTracker area="site" />
+      <Suspense fallback={null}>
+        <RoutePageViewTracker area="site" />
+      </Suspense>
       <div className="flex-1">{children}</div>
       <ScrollToTopFab />
       <Footer />

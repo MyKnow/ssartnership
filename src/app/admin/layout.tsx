@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import RoutePageViewTracker from '@/components/analytics/RoutePageViewTracker';
 
 export default function AdminLayout({
@@ -7,7 +8,9 @@ export default function AdminLayout({
 }) {
   return (
     <>
-      <RoutePageViewTracker area="admin" />
+      <Suspense fallback={null}>
+        <RoutePageViewTracker area="admin" />
+      </Suspense>
       {children}
     </>
   );
