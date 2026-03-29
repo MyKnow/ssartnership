@@ -38,6 +38,28 @@ function StatusMetric({
   );
 }
 
+function InstallGuideStep({
+  step,
+  title,
+  description,
+}: {
+  step: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-sm font-semibold text-foreground">
+        {step}
+      </span>
+      <div>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 function isIosDevice() {
   if (typeof navigator === "undefined") {
     return false;
@@ -53,6 +75,14 @@ function isStandaloneDisplay() {
     window.matchMedia("(display-mode: standalone)").matches ||
     (window.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
+}
+
+function getSharePayload(currentUrl: string) {
+  return {
+    title: "SSARTNERSHIP",
+    text: "홈 화면에 추가한 뒤 앱처럼 실행하고 알림을 켜 보세요.",
+    url: currentUrl,
+  };
 }
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -134,6 +164,27 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
     let cancelled = false;
 
     async function loadState() {
+      const iosDevice =
+        typeof window !== "undefined" &&
+        typeof navigator !== "undefined" &&
+        isIosDevice();
+      const needsInstall =
+        iosDevice &&
+        typeof window !== "undefined" &&
+        !isStandaloneDisplay();
+
+      if (needsInstall) {
+        await Promise.resolve();
+        if (!cancelled) {
+          setSupported(true);
+          setIosNeedsInstall(true);
+          setPermission("Notification" in window ? Notification.permission : "default");
+          setHasSubscription(false);
+          setLoading(false);
+        }
+        return;
+      }
+
       const canUsePush =
         typeof window !== "undefined" &&
         "serviceWorker" in navigator &&
@@ -150,11 +201,10 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         return;
       }
 
-      const needsInstall = isIosDevice() && !isStandaloneDisplay();
       await Promise.resolve();
       if (!cancelled) {
         setSupported(true);
-        setIosNeedsInstall(needsInstall);
+        setIosNeedsInstall(false);
         setPermission(Notification.permission);
       }
 
@@ -179,6 +229,14 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   const masterEnabled = preferences.enabled && hasSubscription;
+  const canControlPush = configured && supported && !iosNeedsInstall;
+  const canOpenShareDialog =
+    typeof window !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    window.isSecureContext &&
+    typeof navigator.share === "function" &&
+    (typeof navigator.canShare !== "function" ||
+      navigator.canShare(getSharePayload(window.location.href)));
 
   const status = useMemo(() => {
     if (!configured) {
@@ -228,7 +286,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       return;
     }
     if (iosNeedsInstall) {
-      notify("iPhone/iPad에서는 홈 화면에 추가한 뒤 알림을 켤 수 있습니다.");
+      notify("iPhone/iPad에서는 홈 화면에 추가한 뒤 설치된 앱에서 알림을 켤 수 있습니다.");
       return;
     }
     if (!vapidPublicKey) {
@@ -272,6 +330,33 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       notify(error instanceof Error ? error.message : "알림 구독에 실패했습니다.");
     } finally {
       setPending(false);
+    }
+  }
+
+  async function handleOpenShareDialog() {
+    if (typeof navigator === "undefined" || typeof window === "undefined") {
+      return;
+    }
+    if (typeof navigator.share !== "function") {
+      notify(
+        window.isSecureContext
+          ? "이 브라우저에서는 앱이 공유 메뉴를 직접 열 수 없습니다. 브라우저의 공유 버튼을 직접 눌러 주세요."
+          : "현재 주소가 보안 컨텍스트(HTTPS/localhost)가 아니어서 공유 메뉴를 직접 열 수 없습니다. 브라우저의 공유 버튼을 직접 눌러 주세요.",
+      );
+      return;
+    }
+
+    try {
+      const payload = getSharePayload(window.location.href);
+      if (typeof navigator.canShare === "function" && !navigator.canShare(payload)) {
+        throw new Error("공유 데이터가 현재 브라우저에서 지원되지 않습니다.");
+      }
+      await navigator.share(payload);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      notify("공유 메뉴를 열지 못했습니다. 브라우저의 공유 버튼을 직접 눌러 주세요.");
     }
   }
 
@@ -339,15 +424,15 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
 
   return (
     <Card className="mx-auto mt-6 max-w-2xl">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
-        <div className="min-w-0 flex-1">
+      <div className="border-b border-border pb-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <h2 className="text-lg font-semibold text-foreground">푸시 알림 설정</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            새 제휴 등록, 종료 7일 전 안내, 운영 공지를 이 기기의 앱 알림으로
-            받아볼 수 있습니다.
-          </p>
+          <Badge className={statusClassName}>{status.label}</Badge>
         </div>
-        <Badge className={statusClassName}>{status.label}</Badge>
+        <p className="mt-2 text-sm text-muted-foreground">
+          새 제휴 등록, 종료 7일 전 안내, 운영 공지를 이 기기의 앱 알림으로
+          받아볼 수 있습니다.
+        </p>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -365,37 +450,81 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         {!configured
           ? "서버에 VAPID 키와 CRON 시크릿이 설정되면 알림 기능을 바로 사용할 수 있습니다."
           : !supported
-            ? "이 브라우저는 Web Push를 지원하지 않습니다. 최신 Chrome, Edge, Safari 설치형 앱에서 확인해 주세요."
+            ? "이 브라우저는 Web Push를 지원하지 않습니다. 최신 Chrome, Edge 또는 iOS/iPadOS 설치형 앱에서 확인해 주세요."
             : iosNeedsInstall
-              ? "iPhone/iPad에서는 Safari에서 홈 화면에 추가한 뒤 알림을 켤 수 있습니다."
+              ? "iPhone/iPad에서는 브라우저의 공유 메뉴에서 홈 화면에 추가한 뒤, 설치된 앱 안에서 알림을 켤 수 있습니다."
               : permission === "denied"
                 ? "브라우저 설정에서 알림 권한을 다시 허용한 뒤 재시도해 주세요."
                 : "기기 알림을 켜면 공지와 제휴 소식을 앱처럼 받을 수 있습니다."}
       </div>
 
-      <div className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {iosNeedsInstall ? (
+        <div className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
           <div>
-            <p className="text-sm font-semibold text-foreground">기기 알림 제어</p>
+            <p className="text-sm font-semibold text-foreground">
+              iPhone/iPad에서 알림 켜는 방법
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {masterEnabled
-                ? "이 기기에서 제휴 알림을 받고 있습니다."
-                : "이 기기에서 제휴 알림이 꺼져 있습니다."}
+              일반 브라우저 탭에서는 알림을 바로 켤 수 없습니다. 아래 순서대로
+              설치한 뒤 다시 시도해 주세요.
             </p>
           </div>
-          <Button
-            onClick={masterEnabled ? handleUnsubscribe : handleSubscribe}
-            disabled={pending || loading}
-          >
-            <span className="inline-flex items-center gap-2">
-              {pending || loading ? <Spinner /> : null}
-              {masterEnabled ? "알림 끄기" : "알림 켜기"}
-            </span>
-          </Button>
+          <div className="mt-4 grid gap-4">
+            <InstallGuideStep
+              step="1"
+              title="현재 브라우저에서 이 사이트를 연 상태로 공유 버튼을 누르세요."
+              description="하단 또는 상단의 공유 버튼(사각형 위 화살표)을 찾으면 됩니다."
+            />
+            <InstallGuideStep
+              step="2"
+              title="홈 화면에 추가를 선택하세요."
+              description="아이폰이나 아이패드 홈 화면에 SSARTNERSHIP 앱 아이콘이 생성됩니다."
+            />
+            <InstallGuideStep
+              step="3"
+              title="설치된 앱을 열고 이 화면에서 알림 켜기를 누르세요."
+              description="설치형 앱 상태에서만 iOS/iPadOS Web Push 권한 요청이 가능합니다."
+            />
+          </div>
+          <div className="mt-5 flex justify-end">
+            {canOpenShareDialog ? (
+              <Button onClick={() => void handleOpenShareDialog()}>
+                공유 메뉴 열기
+              </Button>
+            ) : (
+              <Button variant="ghost" disabled title="브라우저 공유 버튼을 직접 사용해 주세요.">
+                브라우저 공유 버튼 사용
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {masterEnabled ? (
+      {canControlPush ? (
+        <div className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">기기 알림 제어</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {masterEnabled
+                  ? "이 기기에서 제휴 알림을 받고 있습니다."
+                  : "이 기기에서 제휴 알림이 꺼져 있습니다."}
+              </p>
+            </div>
+            <Button
+              onClick={masterEnabled ? handleUnsubscribe : handleSubscribe}
+              disabled={pending || loading}
+            >
+              <span className="inline-flex items-center gap-2">
+                {pending || loading ? <Spinner /> : null}
+                {masterEnabled ? "알림 끄기" : "알림 켜기"}
+              </span>
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {canControlPush && masterEnabled ? (
         <div className="mt-6">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-foreground">세부 알림 항목</h3>

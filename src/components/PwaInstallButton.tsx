@@ -99,7 +99,7 @@ export default function PwaInstallButton({
     }
 
     if (iosInstallHint) {
-      notify("Safari 공유 버튼에서 '홈 화면에 추가'를 선택해 설치해 주세요.");
+      notify("브라우저의 공유 버튼에서 '홈 화면에 추가'를 선택해 설치해 주세요.");
     }
   };
 
