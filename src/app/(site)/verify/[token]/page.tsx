@@ -8,6 +8,7 @@ import Badge from "@/components/ui/Badge";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyCertificationQrToken } from "@/lib/certification-qr";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import { getCurrentSsafyYear } from "@/lib/ssafy-year";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export default async function CertificationVerifyPage({
     | {
         mm_username: string;
         display_name?: string | null;
+        year?: number | null;
         campus?: string | null;
         class_number?: number | null;
         must_change_password?: boolean | null;
@@ -58,7 +60,7 @@ export default async function CertificationVerifyPage({
     const supabase = getSupabaseAdminClient();
     const { data } = await supabase
       .from("members")
-      .select("mm_username,display_name,campus,class_number,must_change_password")
+      .select("mm_username,display_name,year,campus,class_number,must_change_password")
       .eq("id", verification.payload.userId)
       .maybeSingle();
 
@@ -75,6 +77,10 @@ export default async function CertificationVerifyPage({
   const profile = member
     ? parseSsafyProfile(member.display_name ?? member.mm_username)
     : null;
+  const verifiedYear =
+    member?.year ??
+    (verification.ok ? verification.payload.year : null) ??
+    getCurrentSsafyYear();
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,6 +93,7 @@ export default async function CertificationVerifyPage({
             properties={{
               valid: isValid,
               reason: verification.ok ? "ok" : verification.reason,
+              year: member?.year ?? null,
               campus: member?.campus ?? null,
               classNumber: member?.class_number ?? null,
             }}
@@ -125,6 +132,7 @@ export default async function CertificationVerifyPage({
                         {profile?.displayName ?? member.display_name ?? member.mm_username}
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
+                        {`${verifiedYear}기 · `}
                         {member.campus ?? profile?.campus ?? "캠퍼스"}{" "}
                         {member.class_number ? `${member.class_number}반` : ""}
                       </p>

@@ -7,6 +7,7 @@ export type CertificationQrPayload = {
   userId: string;
   mmUsername: string;
   displayName?: string | null;
+  year?: number | null;
   campus?: string | null;
   classNumber?: number | null;
   issuedAt: number;
@@ -48,6 +49,7 @@ export function issueCertificationQrToken(input: {
   userId: string;
   mmUsername: string;
   displayName?: string | null;
+  year?: number | null;
   campus?: string | null;
   classNumber?: number | null;
 }) {
@@ -57,6 +59,7 @@ export function issueCertificationQrToken(input: {
     userId: input.userId,
     mmUsername: input.mmUsername,
     displayName: input.displayName ?? null,
+    year: input.year ?? null,
     campus: input.campus ?? null,
     classNumber: input.classNumber ?? null,
     issuedAt: now,

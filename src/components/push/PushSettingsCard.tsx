@@ -77,14 +77,6 @@ function isStandaloneDisplay() {
   );
 }
 
-function getSharePayload(currentUrl: string) {
-  return {
-    title: "SSARTNERSHIP",
-    text: "홈 화면에 추가한 뒤 앱처럼 실행하고 알림을 켜 보세요.",
-    url: currentUrl,
-  };
-}
-
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -153,7 +145,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
   const [preferences, setPreferences] = useState(initialPreferences);
   const [loading, setLoading] = useState(true);
   const [pendingAction, setPendingAction] = useState<
-    null | "subscribe" | "device-off" | "all-off" | "preference" | "share"
+    null | "subscribe" | "device-off" | "all-off" | "preference"
   >(null);
   const [supported, setSupported] = useState(false);
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
@@ -250,13 +242,6 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
   const isReceivingOnThisDevice = accountEnabled && deviceEnabled;
   const canControlPush = configured && supported && !iosNeedsInstall;
   const hasPendingAction = pendingAction !== null;
-  const canOpenShareDialog =
-    typeof window !== "undefined" &&
-    typeof navigator !== "undefined" &&
-    window.isSecureContext &&
-    typeof navigator.share === "function" &&
-    (typeof navigator.canShare !== "function" ||
-      navigator.canShare(getSharePayload(window.location.href)));
 
   const status = useMemo(() => {
     if (!configured) {
@@ -351,36 +336,6 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
       notify("기기 알림을 켰습니다.");
     } catch (error) {
       notify(error instanceof Error ? error.message : "알림 구독에 실패했습니다.");
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  async function handleOpenShareDialog() {
-    if (typeof navigator === "undefined" || typeof window === "undefined") {
-      return;
-    }
-    if (typeof navigator.share !== "function") {
-      notify(
-        window.isSecureContext
-          ? "이 브라우저에서는 앱이 공유 메뉴를 직접 열 수 없습니다. 브라우저의 공유 버튼을 직접 눌러 주세요."
-          : "현재 주소가 보안 컨텍스트(HTTPS/localhost)가 아니어서 공유 메뉴를 직접 열 수 없습니다. 브라우저의 공유 버튼을 직접 눌러 주세요.",
-      );
-      return;
-    }
-
-    try {
-      setPendingAction("share");
-      const payload = getSharePayload(window.location.href);
-      if (typeof navigator.canShare === "function" && !navigator.canShare(payload)) {
-        throw new Error("공유 데이터가 현재 브라우저에서 지원되지 않습니다.");
-      }
-      await navigator.share(payload);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      notify("공유 메뉴를 열지 못했습니다. 브라우저의 공유 버튼을 직접 눌러 주세요.");
     } finally {
       setPendingAction(null);
     }
@@ -545,8 +500,8 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
           <div className="mt-4 grid gap-4">
             <InstallGuideStep
               step="1"
-              title="현재 브라우저에서 이 사이트를 연 상태로 공유 버튼을 누르세요."
-              description="하단 또는 상단의 공유 버튼(사각형 위 화살표)을 찾으면 됩니다."
+              title="현재 브라우저의 기본 공유 버튼을 누르세요."
+              description="페이지 안 버튼이 아니라, 브라우저 자체의 상단 또는 하단 공유 버튼을 사용해야 합니다."
             />
             <InstallGuideStep
               step="2"
@@ -558,27 +513,6 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
               title="설치된 앱을 열고 이 화면에서 알림 켜기를 누르세요."
               description="설치형 앱 상태에서만 iOS/iPadOS Web Push 권한 요청이 가능합니다."
             />
-          </div>
-          <div className="mt-5 flex justify-end">
-            {canOpenShareDialog ? (
-              <Button
-                className="w-full sm:w-auto"
-                onClick={() => void handleOpenShareDialog()}
-                loading={pendingAction === "share"}
-                loadingText="공유 메뉴 여는 중"
-              >
-                공유 메뉴 열기
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                className="w-full sm:w-auto"
-                disabled
-                title="브라우저 공유 버튼을 직접 사용해 주세요."
-              >
-                브라우저 공유 버튼 사용
-              </Button>
-            )}
           </div>
         </div>
       ) : null}

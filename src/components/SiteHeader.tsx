@@ -71,7 +71,7 @@ export default function SiteHeader({
             <div className="sm:hidden">
               <ThemeToggle />
             </div>
-            <MobileNav suggestHref={suggestHref} initialSession={initialSession} />
+            <MobileNav initialSession={initialSession} />
           </div>
         </Container>
       </div>

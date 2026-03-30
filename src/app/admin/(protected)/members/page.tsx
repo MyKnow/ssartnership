@@ -13,7 +13,7 @@ export default async function AdminMembersPage() {
   const { data: members } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,campus,class_number,must_change_password,avatar_content_type,avatar_base64,created_at,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,campus,class_number,must_change_password,avatar_content_type,avatar_base64,created_at,updated_at",
     )
     .order("created_at", { ascending: false });
 

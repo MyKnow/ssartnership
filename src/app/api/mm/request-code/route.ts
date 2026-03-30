@@ -12,7 +12,13 @@ import {
   sendPost,
 } from "@/lib/mattermost";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
+import { getSelectableSsafyYearText, isSelectableSsafyYear } from "@/lib/ssafy-year";
+import {
+  normalizeMmUsername,
+  parseSsafyYearValue,
+  validateSsafyYear,
+  validateMmUsername,
+} from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -24,9 +30,12 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as {
       username?: string;
+      year?: string | number;
     };
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
+    const yearError = validateSsafyYear(payload.year);
+    const year = parseSsafyYearValue(payload.year);
     if (!username) {
       await logAuthSecurity({
         ...context,
@@ -47,6 +56,37 @@ export async function POST(request: Request) {
         properties: { reason: "invalid_username" },
       });
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
+    }
+    if (yearError || year === null) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "failure",
+        actorType: "guest",
+        identifier: username || null,
+        properties: { reason: "invalid_year" },
+      });
+      return NextResponse.json({ error: "invalid_year" }, { status: 400 });
+    }
+    if (!isSelectableSsafyYear(year)) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "failure",
+        actorType: "guest",
+        identifier: username || null,
+        properties: {
+          reason: "inactive_year",
+          year,
+        },
+      });
+      return NextResponse.json(
+        {
+          error: "invalid_year",
+          message: `회원가입은 현재 운영 중인 기수인 ${getSelectableSsafyYearText()}만 선택할 수 있습니다.`,
+        },
+        { status: 400 },
+      );
     }
 
     const supabase = getSupabaseAdminClient();
@@ -141,6 +181,7 @@ export async function POST(request: Request) {
       mm_username: targetUser.username,
       display_name:
         profile.displayName ?? targetUser.nickname ?? targetUser.username,
+      year,
       campus: profile.campus ?? null,
       class_number: profile.classNumber ?? null,
       avatar_content_type: avatar?.contentType ?? null,
@@ -166,6 +207,7 @@ export async function POST(request: Request) {
       identifier: username,
       properties: {
         mmUserId: targetUser.id,
+        year,
         campus: profile.campus ?? null,
         classNumber: profile.classNumber ?? null,
       },

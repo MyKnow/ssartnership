@@ -169,6 +169,7 @@ export async function POST(request: Request) {
       mm_user_id: codeRow.mm_user_id,
       mm_username: codeRow.mm_username,
       display_name: codeRow.display_name,
+      year: codeRow.year,
       campus: codeRow.campus,
       class_number: codeRow.class_number,
       avatar_content_type: codeRow.avatar_content_type,
@@ -218,6 +219,7 @@ export async function POST(request: Request) {
       actorId: authenticatedMemberId,
       identifier: username,
       properties: {
+        year: codeRow.year ?? null,
         campus: codeRow.campus ?? null,
         classNumber: codeRow.class_number ?? null,
         existingMember: Boolean(member?.id),

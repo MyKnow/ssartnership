@@ -32,10 +32,8 @@ function DrawerSection({
 }
 
 export default function MobileNav({
-  suggestHref,
   initialSession,
 }: {
-  suggestHref: string;
   initialSession?: HeaderSession | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -149,19 +147,6 @@ export default function MobileNav({
 
                   <div className="flex-1 overflow-y-auto px-6 py-5">
                     <div className="flex flex-col gap-4">
-                      <DrawerSection
-                        title="빠른 이동"
-                        description="제휴 제안 페이지로 바로 이동합니다."
-                      >
-                        <Button
-                          href={suggestHref}
-                          className="w-full justify-between rounded-2xl px-4"
-                        >
-                          제휴 제안하기
-                          <span aria-hidden="true">→</span>
-                        </Button>
-                      </DrawerSection>
-
                       <DrawerSection
                         title="계정"
                         description="로그인, 회원가입, 프로필, 알림 관련 메뉴입니다."

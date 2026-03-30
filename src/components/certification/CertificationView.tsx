@@ -4,11 +4,13 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { trackProductEvent } from "@/lib/product-events";
+import { getCurrentSsafyYear } from "@/lib/ssafy-year";
 import CertificationQrButton from "@/components/certification/CertificationQrButton";
 
 type Member = {
   mm_username: string;
   display_name?: string | null;
+  year?: number | null;
   campus?: string | null;
   class_number?: number | null;
   avatar_content_type?: string | null;
@@ -26,6 +28,7 @@ export default function CertificationView({
   const [isAvatarOpen, setAvatarOpen] = useState(false);
   const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
   const hasTrackedViewRef = useRef(false);
+  const year = member.year ?? getCurrentSsafyYear();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -41,11 +44,18 @@ export default function CertificationView({
       eventName: "certification_view",
       targetType: "member",
       properties: {
+        year,
         campus: member.campus ?? profile.campus ?? null,
         classNumber: member.class_number ?? profile.classNumber ?? null,
       },
     });
-  }, [member.campus, member.class_number, profile.campus, profile.classNumber]);
+  }, [
+    member.campus,
+    member.class_number,
+    year,
+    profile.campus,
+    profile.classNumber,
+  ]);
 
   useEffect(() => {
     if (!isAvatarOpen) {
@@ -111,7 +121,7 @@ export default function CertificationView({
                 {profile.displayName ?? member.display_name ?? member.mm_username}
               </h2>
               <p className="mt-1 text-sm text-slate-200">
-                {member.campus ?? profile.campus ?? "캠퍼스"}{" "}
+                {`${year}기 · `}{member.campus ?? profile.campus ?? "캠퍼스"}{" "}
                 {member.class_number ? `${member.class_number}반` : ""}
               </p>
             </div>

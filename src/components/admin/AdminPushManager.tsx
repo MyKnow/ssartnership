@@ -20,6 +20,7 @@ type MemberOption = {
   id: string;
   display_name: string | null;
   mm_username: string;
+  year: number | null;
   campus: string | null;
   class_number: number | null;
 };
@@ -37,6 +38,7 @@ type SortOption = "newest" | "oldest" | "delivered" | "failed";
 
 const audienceLabels: Record<PushAudienceScope, string> = {
   all: "전체",
+  year: "기수",
   campus: "캠퍼스",
   class: "반",
   member: "개인",
@@ -128,9 +130,10 @@ function extractPartnerIdFromUrl(url: string | null | undefined) {
 
 function getMemberLabel(member: MemberOption) {
   const name = member.display_name?.trim() || member.mm_username;
+  const yearLabel = member.year ? `${member.year}기` : "기수 미지정";
   const campusLabel = member.campus ?? "캠퍼스 미지정";
   const classLabel = member.class_number ? `${member.class_number}반` : "반 미지정";
-  return `${name} (@${member.mm_username}) · ${campusLabel} ${classLabel}`;
+  return `${name} (@${member.mm_username}) · ${yearLabel} · ${campusLabel} ${classLabel}`;
 }
 
 export default function AdminPushManager({
@@ -149,6 +152,7 @@ export default function AdminPushManager({
   const [url, setUrl] = useState("");
   const [selectedPartnerId, setSelectedPartnerId] = useState("");
   const [audienceScope, setAudienceScope] = useState<PushAudienceScope>("all");
+  const [selectedYear, setSelectedYear] = useState("");
   const [selectedCampus, setSelectedCampus] = useState("");
   const [selectedClassNumber, setSelectedClassNumber] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
@@ -195,10 +199,35 @@ export default function AdminPushManager({
     ).sort((a, b) => a - b);
   }, [members, selectedCampus]);
 
+  const yearOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          members
+            .map((member) => member.year)
+            .filter((value): value is number => typeof value === "number"),
+        ),
+      ).sort((a, b) => b - a),
+    [members],
+  );
+
+  const audienceYearOptions = useMemo(() => {
+    const next = new Set(yearOptions);
+    const parsedSelectedYear = Number.parseInt(selectedYear, 10);
+    if (Number.isInteger(parsedSelectedYear)) {
+      next.add(parsedSelectedYear);
+    }
+    return Array.from(next).sort((a, b) => b - a);
+  }, [selectedYear, yearOptions]);
+
   const targetableCount = useMemo(() => {
     switch (audienceScope) {
       case "all":
         return members.length;
+      case "year":
+        return members.filter(
+          (member) => String(member.year ?? "") === selectedYear,
+        ).length;
       case "campus":
         return members.filter((member) => member.campus === selectedCampus).length;
       case "class":
@@ -212,7 +241,14 @@ export default function AdminPushManager({
       default:
         return 0;
     }
-  }, [audienceScope, members, selectedCampus, selectedClassNumber, selectedMemberId]);
+  }, [
+    audienceScope,
+    members,
+    selectedCampus,
+    selectedClassNumber,
+    selectedMemberId,
+    selectedYear,
+  ]);
 
   const filteredLogs = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -286,6 +322,7 @@ export default function AdminPushManager({
           url,
           audience: {
             scope: audienceScope,
+            year: selectedYear || undefined,
             campus: selectedCampus || undefined,
             classNumber: selectedClassNumber || undefined,
             memberId: selectedMemberId || undefined,
@@ -311,6 +348,7 @@ export default function AdminPushManager({
       setUrl("");
       setSelectedPartnerId("");
       setAudienceScope("all");
+      setSelectedYear("");
       setSelectedCampus("");
       setSelectedClassNumber("");
       setSelectedMemberId("");
@@ -346,20 +384,30 @@ export default function AdminPushManager({
   function handleAudienceScopeChange(scope: PushAudienceScope) {
     setAudienceScope(scope);
     if (scope === "all") {
+      setSelectedYear("");
+      setSelectedCampus("");
+      setSelectedClassNumber("");
+      setSelectedMemberId("");
+      return;
+    }
+    if (scope === "year") {
       setSelectedCampus("");
       setSelectedClassNumber("");
       setSelectedMemberId("");
       return;
     }
     if (scope === "campus") {
+      setSelectedYear("");
       setSelectedClassNumber("");
       setSelectedMemberId("");
       return;
     }
     if (scope === "class") {
+      setSelectedYear("");
       setSelectedMemberId("");
       return;
     }
+    setSelectedYear("");
     setSelectedCampus("");
     setSelectedClassNumber("");
   }
@@ -375,6 +423,9 @@ export default function AdminPushManager({
         : "",
     );
     setAudienceScope(log.target_scope);
+    setSelectedYear(
+      typeof log.target_year === "number" ? String(log.target_year) : "",
+    );
     setSelectedCampus(log.target_campus ?? "");
     setSelectedClassNumber(
       typeof log.target_class_number === "number"
@@ -455,7 +506,7 @@ export default function AdminPushManager({
               className="gap-1"
             />
 
-            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_repeat(3,minmax(0,1fr))]">
+            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_repeat(4,minmax(0,1fr))]">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 대상 범위
                 <Select
@@ -467,6 +518,7 @@ export default function AdminPushManager({
                   }
                 >
                   <option value="all">전체</option>
+                  <option value="year">기수</option>
                   <option value="campus">캠퍼스</option>
                   <option value="class">반</option>
                   <option value="member">개인</option>
@@ -474,10 +526,30 @@ export default function AdminPushManager({
               </label>
 
               <label className="grid gap-2 text-sm font-medium text-foreground">
+                기수
+                <Select
+                  value={selectedYear}
+                  disabled={audienceScope !== "year"}
+                  onChange={(event) => setSelectedYear(event.target.value)}
+                >
+                  <option value="">기수 선택</option>
+                  {audienceYearOptions.map((year) => (
+                    <option key={year} value={String(year)}>
+                      {year}기
+                    </option>
+                  ))}
+                </Select>
+              </label>
+
+              <label className="grid gap-2 text-sm font-medium text-foreground">
                 캠퍼스
                 <Select
                   value={selectedCampus}
-                  disabled={audienceScope === "all" || audienceScope === "member"}
+                  disabled={
+                    audienceScope === "all" ||
+                    audienceScope === "year" ||
+                    audienceScope === "member"
+                  }
                   onChange={(event) => {
                     setSelectedCampus(event.target.value);
                     setSelectedClassNumber("");
@@ -642,6 +714,7 @@ export default function AdminPushManager({
             }
           >
             <option value="all">전체</option>
+            <option value="year">기수</option>
             <option value="campus">캠퍼스</option>
             <option value="class">반</option>
             <option value="member">개인</option>

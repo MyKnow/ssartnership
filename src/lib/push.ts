@@ -1,6 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { SITE_URL } from "@/lib/site";
-import { sanitizeHttpUrl } from "@/lib/validation";
+import { parseSsafyYearValue, sanitizeHttpUrl } from "@/lib/validation";
 
 export const DEFAULT_PUSH_PREFERENCES = {
   enabled: false,
@@ -36,10 +36,11 @@ export type PushPayload = {
   tag?: string | null;
 };
 
-export type PushAudienceScope = "all" | "campus" | "class" | "member";
+export type PushAudienceScope = "all" | "year" | "campus" | "class" | "member";
 
 export type PushAudience =
   | { scope: "all" }
+  | { scope: "year"; year: number }
   | { scope: "campus"; campus: string }
   | { scope: "class"; campus: string; classNumber: number }
   | { scope: "member"; memberId: string };
@@ -50,6 +51,7 @@ export type PushMessageLog = {
   source: "manual" | "automatic";
   target_scope: PushAudienceScope;
   target_label: string;
+  target_year: number | null;
   target_campus: string | null;
   target_class_number: number | null;
   target_member_id: string | null;
@@ -72,6 +74,7 @@ type PushSendOptions = {
 type ResolvedPushAudience = {
   scope: PushAudienceScope;
   label: string;
+  year: number | null;
   campus: string | null;
   classNumber: number | null;
   memberId: string | null;
@@ -150,6 +153,16 @@ export function parsePushAudience(input: unknown): PushAudience {
     return { scope: "all" };
   }
 
+  if (scope === "year") {
+    const year = parseSsafyYearValue(
+      (input as { year?: string | number | null }).year,
+    );
+    if (year === null) {
+      throw new Error("기수를 선택해 주세요.");
+    }
+    return { scope: "year", year };
+  }
+
   if (scope === "campus") {
     const campus = String((input as { campus?: unknown }).campus ?? "").trim();
     if (!campus) {
@@ -191,10 +204,32 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
     return {
       scope: "all",
       label: "전체",
+      year: null,
       campus: null,
       classNumber: null,
       memberId: null,
       memberIds: null,
+    };
+  }
+
+  if (audience.scope === "year") {
+    const { data, error } = await supabase
+      .from("members")
+      .select("id")
+      .eq("year", audience.year);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      scope: "year",
+      label: `${audience.year}기`,
+      year: audience.year,
+      campus: null,
+      classNumber: null,
+      memberId: null,
+      memberIds: (data ?? []).map((item) => item.id),
     };
   }
 
@@ -211,6 +246,7 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
     return {
       scope: "campus",
       label: `${audience.campus} 캠퍼스`,
+      year: null,
       campus: audience.campus,
       classNumber: null,
       memberId: null,
@@ -232,6 +268,7 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
     return {
       scope: "class",
       label: `${audience.campus} ${audience.classNumber}반`,
+      year: null,
       campus: audience.campus,
       classNumber: audience.classNumber,
       memberId: null,
@@ -256,6 +293,7 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
   return {
     scope: "member",
     label: `${memberName} (@${data.mm_username})`,
+    year: null,
     campus: null,
     classNumber: null,
     memberId: data.id,
@@ -554,6 +592,7 @@ async function createPushMessageLog(params: {
       source: params.source,
       target_scope: params.audience.scope,
       target_label: params.audience.label,
+      target_year: params.audience.year,
       target_campus: params.audience.campus,
       target_class_number: params.audience.classNumber,
       target_member_id: params.audience.memberId,
@@ -563,7 +602,7 @@ async function createPushMessageLog(params: {
       status: "pending",
     })
     .select(
-      "id,type,source,target_scope,target_label,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
+      "id,type,source,target_scope,target_label,target_year,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
     )
     .single();
 
@@ -607,7 +646,7 @@ export async function getRecentPushMessageLogs(limit = 200) {
   const { data, error } = await supabase
     .from("push_message_logs")
     .select(
-      "id,type,source,target_scope,target_label,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
+      "id,type,source,target_scope,target_label,target_year,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);

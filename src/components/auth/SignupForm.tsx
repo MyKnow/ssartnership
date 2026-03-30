@@ -1,17 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import MmUsernameInput from "@/components/auth/MmUsernameInput";
 import FormMessage from "@/components/ui/FormMessage";
 import { isValidPassword } from "@/lib/password";
 import {
+  getCurrentSsafyYear,
+  getSelectableSsafyYears,
+  getSelectableSsafyYearText,
+} from "@/lib/ssafy-year";
+import {
   normalizeMmUsername,
   PASSWORD_POLICY_MESSAGE,
+  parseSsafyYearValue,
+  validateSsafyYear,
   validateMmUsername,
 } from "@/lib/validation";
 
@@ -20,6 +28,12 @@ type Step = "request" | "verify";
 export default function SignupForm() {
   const [step, setStep] = useState<Step>("request");
   const [username, setUsername] = useState("");
+  const selectableYears = useMemo(
+    () => getSelectableSsafyYears().slice().sort((a, b) => b - a),
+    [],
+  );
+  const selectableYearsText = useMemo(() => getSelectableSsafyYearText(), []);
+  const [year, setYear] = useState(String(getCurrentSsafyYear()));
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +54,18 @@ export default function SignupForm() {
       setError(usernameError);
       return;
     }
+    const yearError = validateSsafyYear(year);
+    const parsedYear = parseSsafyYearValue(year);
+    if (
+      yearError ||
+      parsedYear === null ||
+      !selectableYears.includes(parsedYear)
+    ) {
+      setError(
+        `회원가입은 현재 운영 중인 기수인 ${selectableYearsText}만 선택할 수 있습니다.`,
+      );
+      return;
+    }
     if (!password) {
       setError("사이트 비밀번호를 입력해 주세요.");
       return;
@@ -54,7 +80,10 @@ export default function SignupForm() {
       const response = await fetch("/api/mm/request-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalizedUsername }),
+        body: JSON.stringify({
+          username: normalizedUsername,
+          year: parseSsafyYearValue(year),
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -76,6 +105,14 @@ export default function SignupForm() {
         if (data.error === "invalid_username") {
           setError("MM 아이디 형식을 확인해 주세요.");
           notify("MM 아이디 형식을 확인해 주세요.");
+          return;
+        }
+        if (data.error === "invalid_year") {
+          setError(
+            data.message ??
+              `회원가입은 현재 운영 중인 기수인 ${selectableYearsText}만 선택할 수 있습니다.`,
+          );
+          notify("회원가입 가능한 기수를 확인해 주세요.");
           return;
         }
         if (data.error === "request_failed") {
@@ -145,7 +182,7 @@ export default function SignupForm() {
       }
       setError(null);
       notify("회원가입이 완료되었습니다.");
-      router.replace("/certification");
+      router.replace("/notifications");
     } finally {
       setPending(false);
     }
@@ -156,9 +193,25 @@ export default function SignupForm() {
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         MM 아이디
         <MmUsernameInput
+          name="username"
           value={username}
           onChange={(event) => setUsername(event.target.value)}
         />
+      </label>
+      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+        SSAFY 기수
+        <Select
+          value={year}
+          onChange={(event) => setYear(event.target.value)}
+          disabled={step === "verify"}
+          required
+        >
+          {selectableYears.map((optionYear) => (
+            <option key={optionYear} value={String(optionYear)}>
+              {optionYear}기
+            </option>
+          ))}
+        </Select>
       </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         사이트 비밀번호
@@ -185,8 +238,9 @@ export default function SignupForm() {
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
 
       <FormMessage>
-        {PASSWORD_POLICY_MESSAGE} 인증코드는 5분간 유효하며, 5회 실패 시
-        1시간 동안 인증이 제한됩니다.
+        {PASSWORD_POLICY_MESSAGE} 회원가입 가능한 기수는 현재 운영 중인 두 기수만
+        선택할 수 있습니다. 현재 선택 가능 기수는 {selectableYearsText}입니다.
+        인증코드는 5분간 유효하며, 5회 실패 시 1시간 동안 인증이 제한됩니다.
       </FormMessage>
 
       {step === "request" ? (

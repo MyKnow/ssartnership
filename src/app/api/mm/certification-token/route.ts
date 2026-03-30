@@ -18,7 +18,7 @@ export async function GET() {
   const supabase = getSupabaseAdminClient();
   const { data: member } = await supabase
     .from("members")
-    .select("id,mm_username,display_name,campus,class_number,must_change_password")
+    .select("id,mm_username,display_name,year,campus,class_number,must_change_password")
     .eq("id", session.userId)
     .maybeSingle();
 
@@ -30,6 +30,7 @@ export async function GET() {
     userId: member.id,
     mmUsername: member.mm_username,
     displayName: member.display_name,
+    year: member.year,
     campus: member.campus,
     classNumber: member.class_number,
   });

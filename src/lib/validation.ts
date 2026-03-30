@@ -55,6 +55,26 @@ export function validateCategoryKey(value: string) {
   return null;
 }
 
+export function parseSsafyYearValue(value?: string | number | null) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return null;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 99) {
+    return null;
+  }
+  return parsed;
+}
+
+export function validateSsafyYear(value?: string | number | null, label = "기수") {
+  const parsed = parseSsafyYearValue(value);
+  if (parsed === null) {
+    return `${label}는 1~99 사이의 숫자로 입력해 주세요.`;
+  }
+  return null;
+}
+
 export function isValidEmail(value?: string | null) {
   if (!value) {
     return false;

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import { getCurrentSsafyYear } from "@/lib/ssafy-year";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -12,6 +13,7 @@ type AdminMember = {
   mm_user_id: string;
   mm_username: string;
   display_name?: string | null;
+  year?: number | null;
   campus?: string | null;
   class_number?: number | null;
   must_change_password: boolean;
@@ -53,6 +55,7 @@ export default function AdminMemberCard({
   const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
   const displayName =
     profile.displayName ?? member.display_name ?? member.mm_username;
+  const year = member.year ?? getCurrentSsafyYear();
   const campus = member.campus ?? profile.campus ?? "";
   const classNumber = member.class_number ?? profile.classNumber ?? "";
   const avatarSrc =
@@ -106,9 +109,13 @@ export default function AdminMemberCard({
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="font-medium text-foreground">캠퍼스/반</span>
+              <span className="font-medium text-foreground">기수/캠퍼스/반</span>
               <span>
-                {[campus, classNumber ? `${classNumber}반` : null]
+                {[
+                  `${year}기`,
+                  campus,
+                  classNumber ? `${classNumber}반` : null,
+                ]
                   .filter(Boolean)
                   .join(" · ") || "-"}
               </span>
@@ -142,7 +149,18 @@ export default function AdminMemberCard({
           <Input name="campus" defaultValue={campus} placeholder="서울" />
         </label>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
+            기수
+            <Input
+              type="number"
+              min={1}
+              max={99}
+              name="year"
+              defaultValue={year}
+              placeholder={String(getCurrentSsafyYear())}
+            />
+          </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             반
             <Input

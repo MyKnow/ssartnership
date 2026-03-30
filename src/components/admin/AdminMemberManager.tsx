@@ -12,6 +12,7 @@ type AdminMember = {
   mm_user_id: string;
   mm_username: string;
   display_name?: string | null;
+  year?: number | null;
   campus?: string | null;
   class_number?: number | null;
   must_change_password: boolean;
@@ -66,6 +67,7 @@ export default function AdminMemberManager({
           member.mm_user_id,
           member.display_name ?? "",
           displayName,
+          member.year ? `${member.year}` : "",
           member.campus ?? profile.campus ?? "",
           member.class_number ? `${member.class_number}` : "",
         ]
@@ -130,7 +132,7 @@ export default function AdminMemberManager({
           className="sm:col-span-2 xl:col-span-1"
           value={searchValue}
           onChange={(event) => setSearchValue(event.target.value)}
-          placeholder="이름, MM 아이디, 캠퍼스, 반으로 검색"
+          placeholder="이름, MM 아이디, 기수, 캠퍼스, 반으로 검색"
         />
         <Select
           value={sortValue}

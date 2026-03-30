@@ -60,6 +60,7 @@ create table if not exists members (
   password_salt text,
   must_change_password boolean not null default false,
   display_name text,
+  year integer not null,
   campus text,
   class_number integer,
   avatar_content_type text,
@@ -70,6 +71,10 @@ create table if not exists members (
 
 alter table members drop column if exists email;
 alter table members drop column if exists region;
+alter table members add column if not exists year integer;
+update members set year = 15 where year is null;
+alter table members alter column year set not null;
+alter table members alter column year drop default;
 
 create table if not exists mm_verification_codes (
   id uuid primary key default uuid_generate_v4(),
@@ -78,6 +83,7 @@ create table if not exists mm_verification_codes (
   mm_user_id text not null,
   mm_username text not null,
   display_name text,
+  year integer not null,
   campus text,
   class_number integer,
   avatar_content_type text,
@@ -87,6 +93,10 @@ create table if not exists mm_verification_codes (
 
 alter table mm_verification_codes drop column if exists email;
 alter table mm_verification_codes drop column if exists region;
+alter table mm_verification_codes add column if not exists year integer;
+update mm_verification_codes set year = 15 where year is null;
+alter table mm_verification_codes alter column year set not null;
+alter table mm_verification_codes alter column year drop default;
 
 create table if not exists mm_verification_attempts (
   id uuid primary key default uuid_generate_v4(),
@@ -138,6 +148,7 @@ create table if not exists push_message_logs (
   source text not null default 'automatic',
   target_scope text not null default 'all',
   target_label text not null default '전체',
+  target_year integer,
   target_campus text,
   target_class_number integer,
   target_member_id uuid references members(id) on delete set null,
@@ -151,6 +162,8 @@ create table if not exists push_message_logs (
   created_at timestamp with time zone default now(),
   completed_at timestamp with time zone
 );
+
+alter table push_message_logs add column if not exists target_year integer;
 
 create table if not exists push_delivery_logs (
   id uuid primary key default uuid_generate_v4(),

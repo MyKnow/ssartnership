@@ -63,6 +63,11 @@ export async function POST(request: NextRequest) {
         title: payload.title,
         hasUrl: Boolean(payload.url),
         audienceScope: audience.scope,
+        audienceYear: "year" in audience ? audience.year : null,
+        audienceCampus: "campus" in audience ? audience.campus : null,
+        audienceClassNumber:
+          "classNumber" in audience ? audience.classNumber : null,
+        audienceMemberId: "memberId" in audience ? audience.memberId : null,
         destination: getPushDestinationLabel(payload.url),
         targeted: result.targeted,
         delivered: result.delivered,

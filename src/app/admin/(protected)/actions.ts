@@ -11,7 +11,9 @@ import {
   sanitizeHexColor,
   sanitizeHttpUrl,
   sanitizePartnerLinkValue,
+  parseSsafyYearValue,
   validateCategoryKey,
+  validateSsafyYear,
   validateDateRange,
 } from "@/lib/validation";
 
@@ -409,6 +411,7 @@ export async function updateMember(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
   const displayName = String(formData.get("displayName") || "").trim();
+  const yearRaw = String(formData.get("year") || "").trim();
   const campus = String(formData.get("campus") || "").trim();
   const classNumberRaw = String(formData.get("classNumber") || "").trim();
   const mustChangePassword =
@@ -416,6 +419,12 @@ export async function updateMember(formData: FormData) {
 
   if (!id) {
     throw new Error("수정할 회원을 찾을 수 없습니다.");
+  }
+
+  const yearError = validateSsafyYear(yearRaw);
+  const year = parseSsafyYearValue(yearRaw);
+  if (yearError || year === null) {
+    throw new Error("기수는 1~99 사이의 숫자로 입력해 주세요.");
   }
 
   let classNumber: number | null = null;
@@ -431,6 +440,7 @@ export async function updateMember(formData: FormData) {
     .from("members")
     .update({
       display_name: displayName || null,
+      year,
       campus: campus || null,
       class_number: classNumber,
       must_change_password: mustChangePassword,
@@ -447,6 +457,7 @@ export async function updateMember(formData: FormData) {
     targetId: id,
     properties: {
       displayName,
+      year,
       campus,
       classNumber,
       mustChangePassword,
