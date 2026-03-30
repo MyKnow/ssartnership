@@ -4,7 +4,9 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { generateCode, hashCode } from "@/lib/mm-verification";
 import {
   createDirectChannel,
+  MattermostApiError,
   getMe,
+  getStudentChannelConfig,
   getSenderCredentials,
   findUserInChannelByUsername,
   getUserImage,
@@ -25,8 +27,19 @@ export const runtime = "nodejs";
 const CODE_TTL_MINUTES = 5;
 const RESEND_COOLDOWN_SECONDS = 60;
 
+function getRequestCodeLogProperties(
+  year: number | null,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    year,
+    ...extra,
+  };
+}
+
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  let year: number | null = null;
   try {
     const payload = (await request.json()) as {
       username?: string;
@@ -35,14 +48,14 @@ export async function POST(request: Request) {
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
     const yearError = validateSsafyYear(payload.year);
-    const year = parseSsafyYearValue(payload.year);
+    year = parseSsafyYearValue(payload.year);
     if (!username) {
       await logAuthSecurity({
         ...context,
         eventName: "member_signup_code_request",
         status: "failure",
         actorType: "guest",
-        properties: { reason: "missing_fields" },
+        properties: getRequestCodeLogProperties(year, { reason: "missing_fields" }),
       });
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
@@ -53,7 +66,9 @@ export async function POST(request: Request) {
         status: "failure",
         actorType: "guest",
         identifier: username,
-        properties: { reason: "invalid_username" },
+        properties: getRequestCodeLogProperties(year, {
+          reason: "invalid_username",
+        }),
       });
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
@@ -64,7 +79,7 @@ export async function POST(request: Request) {
         status: "failure",
         actorType: "guest",
         identifier: username || null,
-        properties: { reason: "invalid_year" },
+        properties: getRequestCodeLogProperties(year, { reason: "invalid_year" }),
       });
       return NextResponse.json({ error: "invalid_year" }, { status: 400 });
     }
@@ -75,10 +90,9 @@ export async function POST(request: Request) {
         status: "failure",
         actorType: "guest",
         identifier: username || null,
-        properties: {
+        properties: getRequestCodeLogProperties(year, {
           reason: "inactive_year",
-          year,
-        },
+        }),
       });
       return NextResponse.json(
         {
@@ -109,7 +123,7 @@ export async function POST(request: Request) {
           status: "blocked",
           actorType: "guest",
           identifier: username,
-          properties: { reason: "cooldown" },
+          properties: getRequestCodeLogProperties(year, { reason: "cooldown" }),
         });
         return NextResponse.json(
           { error: "cooldown" },
@@ -132,25 +146,51 @@ export async function POST(request: Request) {
         actorType: "member",
         actorId: existingMember.id,
         identifier: username,
-        properties: { reason: "already_registered" },
+        properties: getRequestCodeLogProperties(year, {
+          reason: "already_registered",
+        }),
       });
       return NextResponse.json({ error: "already_registered" }, { status: 409 });
     }
 
-    const senderCredentials = getSenderCredentials();
+    const senderCredentials = getSenderCredentials(year);
     const senderLogin = await loginWithPassword(
       senderCredentials.loginId,
       senderCredentials.password,
     );
     const sender = await getMe(senderLogin.token);
-    const teamName = process.env.MM_TEAM_NAME ?? "s15public";
-    const channelName = process.env.MM_STUDENT_CHANNEL ?? "off-topic";
-    const targetUser = await findUserInChannelByUsername(
-      senderLogin.token,
-      teamName,
-      channelName,
-      username,
-    );
+    const channelConfig = getStudentChannelConfig(year);
+    let targetUser;
+    try {
+      targetUser = await findUserInChannelByUsername(
+        senderLogin.token,
+        username,
+        channelConfig,
+      );
+    } catch (error) {
+      if (error instanceof MattermostApiError) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_signup_code_request",
+          status: "failure",
+          actorType: "guest",
+          identifier: username,
+          properties: getRequestCodeLogProperties(year, {
+            reason: "team_or_channel_inaccessible",
+            status: error.status,
+          }),
+        });
+        return NextResponse.json(
+          {
+            error: "team_or_channel_inaccessible",
+            message:
+              "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
+          },
+          { status: 403 },
+        );
+      }
+      throw error;
+    }
     if (!targetUser) {
       await logAuthSecurity({
         ...context,
@@ -158,7 +198,7 @@ export async function POST(request: Request) {
         status: "failure",
         actorType: "guest",
         identifier: username,
-        properties: { reason: "not_student" },
+        properties: getRequestCodeLogProperties(year, { reason: "not_student" }),
       });
       return NextResponse.json({ error: "not_student" }, { status: 404 });
     }
@@ -205,12 +245,11 @@ export async function POST(request: Request) {
       status: "success",
       actorType: "guest",
       identifier: username,
-      properties: {
+      properties: getRequestCodeLogProperties(year, {
         mmUserId: targetUser.id,
-        year,
         campus: profile.campus ?? null,
         classNumber: profile.classNumber ?? null,
-      },
+      }),
     });
 
     return NextResponse.json({ ok: true });
@@ -220,10 +259,10 @@ export async function POST(request: Request) {
       eventName: "member_signup_code_request",
       status: "failure",
       actorType: "guest",
-      properties: {
+      properties: getRequestCodeLogProperties(year, {
         reason: "exception",
         message: (error as Error).message,
-      },
+      }),
     });
     return NextResponse.json(
       { error: "request_failed", message: (error as Error).message },

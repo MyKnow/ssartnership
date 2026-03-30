@@ -16,9 +16,10 @@ export function parseSsafyProfile(displayName?: string): ParsedProfile {
   if (!displayName) {
     return {};
   }
+  // 14기: 이름[지역_반] 또는 이름[지역_반_팀코드]직책, 15기: 이름[지역_반]
   const cleanedDisplayName =
-    displayName.replace(/\[[^\]]+\]/g, "").trim() || displayName;
-  const match = displayName.match(/\[([가-힣]+)_?(\d{1,2})반\]/);
+    displayName.replace(/\s*\[[^\]]+\].*$/, "").trim() || displayName;
+  const match = displayName.match(/\[([가-힣]+)_(\d{1,2})반(?:_[^\]]+)?\]/);
   if (!match) {
     return { displayName: cleanedDisplayName };
   }

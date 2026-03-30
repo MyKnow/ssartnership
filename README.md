@@ -125,8 +125,16 @@ SUGGEST_NOTIFY_EMAIL=your-naver-id@naver.com
 MM_BASE_URL=https://meeting.ssafy.com
 MM_SENDER_LOGIN_ID=myknow
 MM_SENDER_PASSWORD=change-me
+MM_SENDER_LOGIN_ID_14=myknow14
+MM_SENDER_PASSWORD_14=change-me-14
+MM_SENDER_LOGIN_ID_15=myknow15
+MM_SENDER_PASSWORD_15=change-me-15
 MM_TEAM_NAME=s15public
 MM_STUDENT_CHANNEL=off-topic
+# 기수별 팀명이 다르면 아래처럼 덮어쓸 수 있습니다.
+# MM_TEAM_NAME_14=s14public
+# MM_TEAM_NAME_15=s15public
+# 채널명이 기수별로 다르면 MM_STUDENT_CHANNEL_14 / MM_STUDENT_CHANNEL_15도 함께 둘 수 있습니다.
 
 # User session
 USER_SESSION_SECRET=replace-with-long-random-string
@@ -157,10 +165,17 @@ NEXT_PUBLIC_SITE_URL=https://ssartnership.myknow.xyz
 ## Mattermost 인증 플로우
 
 1. 사용자가 MM 아이디와 사이트 비밀번호를 입력합니다.
-2. 서버가 Mattermost에서 해당 사용자가 교육생 채널에 속하는지 확인합니다.
+2. 서버가 Mattermost에서 설정된 팀과 교육생 채널을 읽을 수 있는지와, 해당 사용자가 그 팀/채널의 대상인지 확인합니다.
 3. 운영용 MM 계정이 해당 사용자에게 DM으로 인증코드를 보냅니다.
 4. 사용자가 인증코드를 입력하면 회원가입이 완료됩니다.
 5. 이후 로그인은 `MM 아이디 + 사이트 비밀번호` 조합으로 동작합니다.
+
+주의:
+
+- 운영용 MM 계정은 대상 팀의 `view_team` 권한과 대상 채널의 `read_channel` 권한이 있어야 합니다.
+- private/invite-only 팀이거나 계정이 팀 멤버가 아니면 `GET /api/v4/teams/name/{team_name}` 단계에서 403이 날 수 있습니다.
+- 팀 이름은 `MM_TEAM_NAME`, `MM_TEAM_NAME_14`처럼 기수별로 분리해서 관리하는 편이 안전합니다.
+- 운영용 계정도 `MM_SENDER_LOGIN_ID_14`/`MM_SENDER_PASSWORD_14`처럼 기수별로 분리하면 14기 대상 API에 14기 대표 계정을 쓸 수 있습니다.
 
 ## 주요 보안 포인트
 

@@ -3,6 +3,8 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { generateTempPassword, hashPassword } from "@/lib/password";
 import {
+  MattermostApiError,
+  getStudentChannelConfig,
   getSenderCredentials,
   getMe,
   findUserInChannelByUsername,
@@ -85,7 +87,7 @@ export async function POST(request: Request) {
 
     const { data: member } = await supabase
       .from("members")
-      .select("id,mm_username")
+      .select("id,mm_username,year")
       .eq("mm_username", username)
       .maybeSingle();
 
@@ -101,20 +103,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "not_registered" }, { status: 404 });
     }
 
-    const senderCredentials = getSenderCredentials();
+    const senderCredentials = getSenderCredentials(member.year);
     const senderLogin = await loginWithPassword(
       senderCredentials.loginId,
       senderCredentials.password,
     );
     const sender = await getMe(senderLogin.token);
-    const teamName = process.env.MM_TEAM_NAME ?? "s15public";
-    const channelName = process.env.MM_STUDENT_CHANNEL ?? "off-topic";
-    const mmUser = await findUserInChannelByUsername(
-      senderLogin.token,
-      teamName,
-      channelName,
-      username,
-    );
+    const channelConfig = getStudentChannelConfig(member.year);
+    let mmUser;
+    try {
+      mmUser = await findUserInChannelByUsername(
+        senderLogin.token,
+        username,
+        channelConfig,
+      );
+    } catch (error) {
+      if (error instanceof MattermostApiError) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_password_reset",
+          status: "failure",
+          actorType: "member",
+          actorId: member.id,
+          identifier: username,
+          properties: {
+            reason: "team_or_channel_inaccessible",
+            status: error.status,
+          },
+        });
+        return NextResponse.json(
+          {
+            error: "team_or_channel_inaccessible",
+            message:
+              "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
+          },
+          { status: 403 },
+        );
+      }
+      throw error;
+    }
     if (!mmUser) {
       await logAuthSecurity({
         ...context,

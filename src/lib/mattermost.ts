@@ -7,6 +7,21 @@ type MMUser = {
   position?: string;
 };
 
+export class MattermostApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "MattermostApiError";
+    this.status = status;
+  }
+}
+
+export type StudentChannelConfig = {
+  teamName: string;
+  channelName: string;
+};
+
 function getBaseUrl() {
   const base = process.env.MM_BASE_URL;
   if (!base) {
@@ -24,6 +39,32 @@ async function mmFetch(path: string, init: RequestInit = {}) {
       ...(init.headers ?? {}),
     },
   });
+}
+
+function getEnvValue(key: string) {
+  return (process.env as Record<string, string | undefined>)[key]?.trim() ?? "";
+}
+
+function toMattermostApiError(response: Response, fallbackMessage: string) {
+  return new MattermostApiError(
+    `${fallbackMessage} (status ${response.status})`,
+    response.status,
+  );
+}
+
+export function getStudentChannelConfig(year?: number): StudentChannelConfig {
+  const suffix = year ? `_${year}` : "";
+  const teamName =
+    getEnvValue(`MM_TEAM_NAME${suffix}`) || getEnvValue("MM_TEAM_NAME") || "s15public";
+  const channelName =
+    getEnvValue(`MM_STUDENT_CHANNEL${suffix}`) ||
+    getEnvValue("MM_STUDENT_CHANNEL") ||
+    "off-topic";
+
+  return {
+    teamName,
+    channelName,
+  };
 }
 
 export async function loginWithPassword(loginId: string, password: string) {
@@ -112,10 +153,13 @@ export async function getUserByUsername(token: string, username: string) {
   const response = await mmFetch(`/api/v4/users/username/${safe}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) {
+  if (response.ok) {
+    return (await response.json()) as MMUser;
+  }
+  if (response.status === 404) {
     return null;
   }
-  return (await response.json()) as MMUser;
+  throw toMattermostApiError(response, "MM 사용자 조회 실패");
 }
 
 export async function getTeamByName(token: string, teamName: string) {
@@ -123,7 +167,7 @@ export async function getTeamByName(token: string, teamName: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
-    throw new Error("MM 팀 조회 실패");
+    throw toMattermostApiError(response, "MM 팀 조회 실패");
   }
   return response.json() as Promise<{ id: string }>;
 }
@@ -140,7 +184,7 @@ export async function getChannelByName(
     },
   );
   if (!response.ok) {
-    throw new Error("MM 채널 조회 실패");
+    throw toMattermostApiError(response, "MM 채널 조회 실패");
   }
   return response.json() as Promise<{ id: string }>;
 }
@@ -154,25 +198,30 @@ export async function getChannelMember(
     `/api/v4/channels/${channelId}/members/${userId}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  if (!response.ok) {
+  if (response.ok) {
+    return response.json() as Promise<{ user_id: string }>;
+  }
+  if (response.status === 404) {
     return null;
   }
-  return response.json() as Promise<{ user_id: string }>;
+  throw toMattermostApiError(response, "MM 채널 멤버 조회 실패");
 }
 
 export async function findUserInChannelByUsername(
   token: string,
-  teamName: string,
-  channelName: string,
   username: string,
+  channelConfig: StudentChannelConfig,
 ) {
   const safeUsername = username.replace(/^@/, "").trim().toLowerCase();
   const directUser = await getUserByUsername(token, safeUsername);
   if (!directUser) {
     return null;
   }
-  const team = await getTeamByName(token, teamName);
-  const channel = await getChannelByName(token, team.id, channelName);
+  const channel = await getChannelByName(
+    token,
+    (await getTeamByName(token, channelConfig.teamName)).id,
+    channelConfig.channelName,
+  );
   const membership = await getChannelMember(token, channel.id, directUser.id);
   if (!membership) {
     return null;
@@ -180,9 +229,19 @@ export async function findUserInChannelByUsername(
   return directUser;
 }
 
-export function getSenderCredentials() {
-  const loginId = process.env.MM_SENDER_LOGIN_ID;
-  const password = process.env.MM_SENDER_PASSWORD;
+export function getSenderCredentials(year?: number) {
+  const suffix = year ? `_${year}` : "";
+  const yearLoginId = getEnvValue(`MM_SENDER_LOGIN_ID${suffix}`);
+  const yearPassword = getEnvValue(`MM_SENDER_PASSWORD${suffix}`);
+  const loginId = yearLoginId || getEnvValue("MM_SENDER_LOGIN_ID");
+  const password = yearPassword || getEnvValue("MM_SENDER_PASSWORD");
+
+  if ((yearLoginId || yearPassword) && (!yearLoginId || !yearPassword)) {
+    throw new Error(
+      `MM_SENDER_LOGIN_ID${suffix}/MM_SENDER_PASSWORD${suffix} 환경 변수가 함께 필요합니다.`,
+    );
+  }
+
   if (!loginId || !password) {
     throw new Error("MM_SENDER_LOGIN_ID/MM_SENDER_PASSWORD 환경 변수가 필요합니다.");
   }
