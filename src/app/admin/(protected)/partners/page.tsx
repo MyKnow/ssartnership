@@ -47,7 +47,7 @@ export default async function AdminPartnersPage() {
 
   const { data: partners } = await supabase
     .from("partners")
-    .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags")
+    .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility")
     .order("created_at", { ascending: false });
 
   const safeCategories = categories ?? [];

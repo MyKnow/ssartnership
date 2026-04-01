@@ -1,22 +1,122 @@
 import type { Category, Partner } from "@/lib/types";
-import type { PartnerRepository } from "@/lib/repositories/partner-repository";
-import { getSupabasePublicClient } from "@/lib/supabase/server";
+import type {
+  PartnerRepository,
+  PartnerViewContext,
+} from "@/lib/repositories/partner-repository";
+import { getSupabaseAdminClient, getSupabasePublicClient } from "@/lib/supabase/server";
+import {
+  canViewPartnerDetails,
+  normalizePartnerVisibility,
+} from "@/lib/partner-visibility";
+
+type PartnerRow = {
+  id: string;
+  name: string;
+  category_id: string;
+  location: string;
+  map_url?: string | null;
+  reservation_link?: string | null;
+  inquiry_link?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  benefits?: string[] | null;
+  conditions?: string[] | null;
+  images?: string[] | null;
+  tags?: string[] | null;
+  visibility?: string | null;
+  categories?: { key?: string | null } | Array<{ key?: string | null }> | null;
+};
 
 function normalizeDate(value: string | null) {
   return value ?? "미정";
 }
 
-function extractCategoryKey(categories: unknown) {
+function extractCategoryKey(categories: PartnerRow["categories"]) {
   if (!categories) {
     return undefined;
   }
   if (Array.isArray(categories)) {
-    return categories[0]?.key as string | undefined;
+    return categories[0]?.key ?? undefined;
   }
-  if (typeof categories === "object" && categories !== null) {
-    return (categories as { key?: string }).key;
+  if (typeof categories === "object") {
+    return categories.key ?? undefined;
   }
   return undefined;
+}
+
+function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
+  return {
+    id: row.id,
+    name: row.name,
+    category: categoryKey,
+    visibility: normalizePartnerVisibility(row.visibility),
+    location: row.location,
+    mapUrl: row.map_url ?? undefined,
+    reservationLink: row.reservation_link ?? undefined,
+    inquiryLink: row.inquiry_link ?? undefined,
+    period: {
+      start: normalizeDate(row.period_start),
+      end: normalizeDate(row.period_end),
+    },
+    benefits: row.benefits ?? [],
+    conditions: row.conditions ?? [],
+    images: row.images ?? [],
+    tags: row.tags ?? [],
+  };
+}
+
+function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
+  return {
+    id: row.id,
+    name: "",
+    category: categoryKey,
+    visibility: normalizePartnerVisibility(row.visibility),
+    location: "",
+    period: {
+      start: "",
+      end: "",
+    },
+    benefits: [],
+    conditions: [],
+    images: [],
+    tags: [],
+  };
+}
+
+function mapPartnerForList(
+  row: PartnerRow,
+  context: PartnerViewContext,
+): Partner {
+  const categoryKey = extractCategoryKey(row.categories) ?? "health";
+  const visibility = normalizePartnerVisibility(row.visibility);
+  if (canViewPartnerDetails(visibility, context.authenticated)) {
+    return toVisiblePartner(row, categoryKey);
+  }
+  return toLockedPartner(row, categoryKey);
+}
+
+async function getPartnerRow(id: string) {
+  if (!id) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("partners")
+    .select(
+      "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    return null;
+  }
+
+  return data as PartnerRow;
 }
 
 export class SupabasePartnerRepository implements PartnerRepository {
@@ -41,12 +141,14 @@ export class SupabasePartnerRepository implements PartnerRepository {
     );
   }
 
-  async getPartners(): Promise<Partner[]> {
-    const supabase = getSupabasePublicClient();
+  async getPartners(
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,categories!inner(key)"
+        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
       )
       .order("created_at", { ascending: false });
 
@@ -55,66 +157,30 @@ export class SupabasePartnerRepository implements PartnerRepository {
     }
 
     return (
-      data?.map((item) => {
-        const categoryKey = extractCategoryKey(item.categories) ?? "health";
-        return {
-          id: item.id,
-          name: item.name,
-          category: categoryKey,
-          location: item.location,
-          mapUrl: item.map_url ?? undefined,
-          reservationLink: item.reservation_link ?? undefined,
-          inquiryLink: item.inquiry_link ?? undefined,
-          period: {
-            start: normalizeDate(item.period_start),
-            end: normalizeDate(item.period_end),
-          },
-          benefits: item.benefits ?? [],
-          conditions: item.conditions ?? [],
-          images: item.images ?? [],
-          tags: item.tags ?? [],
-        };
-      }) ?? []
+      data?.map((item) =>
+        mapPartnerForList(item as PartnerRow, context),
+      ) ?? []
     );
   }
 
-  async getPartnerById(id: string): Promise<Partner | null> {
-    if (!id) {
-      return null;
-    }
-    const supabase = getSupabasePublicClient();
-    const { data, error } = await supabase
-      .from("partners")
-      .select(
-        "id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,categories(key)"
-      )
-      .eq("id", id)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-    if (!data) {
+  async getPartnerById(
+    id: string,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner | null> {
+    const row = await getPartnerRow(id);
+    if (!row) {
       return null;
     }
 
-    const categoryKey = extractCategoryKey(data.categories) ?? "health";
-    return {
-      id: data.id,
-      name: data.name,
-      category: categoryKey,
-      location: data.location,
-      mapUrl: data.map_url ?? undefined,
-      reservationLink: data.reservation_link ?? undefined,
-      inquiryLink: data.inquiry_link ?? undefined,
-      period: {
-        start: normalizeDate(data.period_start),
-        end: normalizeDate(data.period_end),
-      },
-      benefits: data.benefits ?? [],
-      conditions: data.conditions ?? [],
-      images: data.images ?? [],
-      tags: data.tags ?? [],
-    };
+    const visibility = normalizePartnerVisibility(row.visibility);
+    if (visibility === "private") {
+      return null;
+    }
+    if (visibility === "confidential" && !context.authenticated) {
+      return null;
+    }
+
+    const categoryKey = extractCategoryKey(row.categories) ?? "health";
+    return toVisiblePartner(row, categoryKey);
   }
 }

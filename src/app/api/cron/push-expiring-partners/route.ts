@@ -5,6 +5,7 @@ import {
   isPushConfigured,
   sendPushToAudience,
 } from "@/lib/push";
+import { normalizePartnerVisibility } from "@/lib/partner-visibility";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdminClient();
   const { data: partners, error } = await supabase
     .from("partners")
-    .select("id,name,period_start,period_end")
+    .select("id,name,period_start,period_end,visibility")
     .eq("period_end", targetDate);
 
   if (error) {
@@ -52,7 +53,10 @@ export async function GET(request: NextRequest) {
   }
 
   const activePartners = (partners ?? []).filter((partner) => {
-    return !partner.period_start || partner.period_start <= today;
+    return (
+      (!partner.period_start || partner.period_start <= today) &&
+      normalizePartnerVisibility(partner.visibility) !== "private"
+    );
   });
 
   const summary = {

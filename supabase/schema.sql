@@ -15,6 +15,7 @@ create table if not exists partners (
   id uuid primary key default uuid_generate_v4(),
   category_id uuid not null references categories(id) on delete cascade,
   name text not null,
+  visibility text not null default 'public',
   location text not null,
   map_url text,
   reservation_link text,
@@ -27,6 +28,20 @@ create table if not exists partners (
   tags text[] not null default '{}',
   created_at timestamp with time zone default now()
 );
+
+alter table partners add column if not exists visibility text not null default 'public';
+update partners
+set visibility = case lower(trim(coalesce(visibility, 'public')))
+  when 'public' then 'public'
+  when 'confidential' then 'confidential'
+  when 'private' then 'private'
+  else 'public'
+end;
+alter table partners alter column visibility set default 'public';
+alter table partners alter column visibility set not null;
+alter table partners drop constraint if exists partners_visibility_check;
+alter table partners add constraint partners_visibility_check
+  check (visibility in ('public', 'confidential', 'private'));
 
 alter table partners add column if not exists conditions text[] not null default '{}';
 alter table partners add column if not exists images text[] not null default '{}';
@@ -272,9 +287,10 @@ create policy "Public read categories" on categories
   for select
   using (true);
 
+drop policy if exists "Public read partners" on partners;
 create policy "Public read partners" on partners
   for select
-  using (true);
+  using (visibility = 'public');
 
 revoke all on table admin_login_attempts from anon;
 revoke all on table admin_login_attempts from authenticated;

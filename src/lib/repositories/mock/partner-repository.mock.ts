@@ -1,5 +1,6 @@
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerRepository } from "@/lib/repositories/partner-repository";
+import { canViewPartnerDetails } from "@/lib/partner-visibility";
 
 const categories: Category[] = [
   {
@@ -33,6 +34,7 @@ const partners: Partner[] = [
     id: "health-001",
     name: "바디라인 피트니스",
     category: "health",
+    visibility: "public",
     location: "서울 강남구 테헤란로 123, 4층",
     mapUrl: "https://map.kakao.com/",
     reservationLink: "https://booking.naver.com/",
@@ -46,6 +48,7 @@ const partners: Partner[] = [
     id: "restaurant-001",
     name: "역삼 국밥집",
     category: "restaurant",
+    visibility: "confidential",
     location: "서울 강남구 역삼로 45",
     mapUrl: "https://map.naver.com/",
     reservationLink: "https://booking.naver.com/",
@@ -59,6 +62,7 @@ const partners: Partner[] = [
     id: "cafe-001",
     name: "노트북 허브 카페",
     category: "cafe",
+    visibility: "private",
     location: "서울 강남구 봉은사로 12",
     mapUrl: "https://map.kakao.com/",
     reservationLink: "https://booking.kakao.com/",
@@ -72,6 +76,7 @@ const partners: Partner[] = [
     id: "space-001",
     name: "협업 스테이션",
     category: "space",
+    visibility: "public",
     location: "서울 강남구 언주로 88, 7층",
     mapUrl: "https://map.naver.com/",
     reservationLink: "https://booking.naver.com/",
@@ -88,11 +93,37 @@ export class MockPartnerRepository implements PartnerRepository {
     return categories;
   }
 
-  async getPartners(): Promise<Partner[]> {
-    return partners;
+  async getPartners(context: { authenticated: boolean } = { authenticated: false }): Promise<Partner[]> {
+    return partners.map((partner) => {
+      if (canViewPartnerDetails(partner.visibility, context.authenticated)) {
+        return partner;
+      }
+      return {
+        id: partner.id,
+        name: "",
+        category: partner.category,
+        visibility: partner.visibility,
+        location: "",
+        period: { start: "", end: "" },
+        benefits: [],
+        conditions: [],
+        images: [],
+        tags: [],
+      };
+    });
   }
 
-  async getPartnerById(id: string): Promise<Partner | null> {
-    return partners.find((partner) => partner.id === id) ?? null;
+  async getPartnerById(
+    id: string,
+    context: { authenticated: boolean } = { authenticated: false },
+  ): Promise<Partner | null> {
+    const partner = partners.find((item) => item.id === id) ?? null;
+    if (!partner) {
+      return null;
+    }
+    if (!canViewPartnerDetails(partner.visibility, context.authenticated)) {
+      return null;
+    }
+    return partner;
   }
 }

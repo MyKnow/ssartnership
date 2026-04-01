@@ -5,6 +5,10 @@ import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import PartnerCard from "@/components/PartnerCard";
 import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
+import {
+  getPartnerVisibilityBadgeClass,
+  getPartnerVisibilityLabel,
+} from "@/lib/partner-visibility";
 
 type CategoryOption = {
   id: string;
@@ -17,6 +21,7 @@ type PartnerValue = {
   id: string;
   name: string;
   category_id: string;
+  visibility: "public" | "confidential" | "private";
   location: string;
   map_url?: string | null;
   reservation_link?: string | null;
@@ -59,6 +64,9 @@ export default function AdminPartnerEditorCard({
         <div className="min-w-0">
           <p className="text-base font-semibold text-foreground">{partner.name}</p>
           <div className="mt-2 flex items-center gap-2">
+            <Badge className={getPartnerVisibilityBadgeClass(partner.visibility)}>
+              {getPartnerVisibilityLabel(partner.visibility)}
+            </Badge>
             <Badge className="bg-surface text-foreground">
               {category?.label ?? "미분류"}
             </Badge>
@@ -79,6 +87,7 @@ export default function AdminPartnerEditorCard({
             partner={{
               id: partner.id,
               name: partner.name ?? "",
+              visibility: partner.visibility,
               location: partner.location ?? "",
               mapUrl: partner.map_url ?? "",
               reservationLink: partner.reservation_link ?? "",

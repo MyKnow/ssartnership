@@ -7,10 +7,15 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { createNewPartnerPayload, isPushConfigured, sendPushToAudience } from "@/lib/push";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
+import type { PartnerVisibility } from "@/lib/types";
 import {
   buildMemberSyncLogProperties,
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
+import {
+  isPartnerVisibility,
+  normalizePartnerVisibility,
+} from "@/lib/partner-visibility";
 import {
   sanitizeHexColor,
   sanitizeHttpUrl,
@@ -34,6 +39,7 @@ type PartnerInput = {
   conditions: string[];
   images: string[];
   tags: string[];
+  visibility: PartnerVisibility;
 };
 
 function parseList(value: string) {
@@ -138,6 +144,7 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
   const rawMapUrl = String(formData.get("mapUrl") || "").trim();
   const rawReservationLink = String(formData.get("reservationLink") || "").trim();
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
+  const rawVisibility = String(formData.get("visibility") || "").trim();
   const periodStart = String(formData.get("periodStart") || "").trim();
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
@@ -169,6 +176,11 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
     throw new Error("문의 링크 형식을 확인해 주세요.");
   }
 
+  if (rawVisibility && !isPartnerVisibility(rawVisibility)) {
+    throw new Error("노출 상태는 공개, 대외비, 비공개 중 하나여야 합니다.");
+  }
+  const visibility = normalizePartnerVisibility(rawVisibility || "public");
+
   const rawImageUrls = parseMultiLine(images);
   const sanitizedImages = rawImageUrls
     .map((item) => sanitizeHttpUrl(item))
@@ -190,6 +202,7 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
     conditions: parseList(conditions),
     images: sanitizedImages,
     tags: parseList(tags),
+    visibility,
   };
 }
 
@@ -285,6 +298,7 @@ export async function createPartner(formData: FormData) {
       conditions: payload.conditions,
       images: payload.images,
       tags: payload.tags,
+      visibility: payload.visibility,
     })
     .select("id")
     .single();
@@ -305,6 +319,7 @@ export async function createPartner(formData: FormData) {
       hasInquiryLink: Boolean(payload.inquiryLink),
       periodStart: payload.periodStart,
       periodEnd: payload.periodEnd,
+      visibility: payload.visibility,
       benefitCount: payload.benefits.length,
       conditionCount: payload.conditions.length,
       imageCount: payload.images.length,
@@ -312,7 +327,12 @@ export async function createPartner(formData: FormData) {
     },
   });
 
-  if (data?.id && isPushConfigured() && isWithinPeriod(payload.periodStart, payload.periodEnd)) {
+  if (
+    data?.id &&
+    payload.visibility !== "private" &&
+    isPushConfigured() &&
+    isWithinPeriod(payload.periodStart, payload.periodEnd)
+  ) {
     const { data: category } = await supabase
       .from("categories")
       .select("label")
@@ -361,6 +381,7 @@ export async function updatePartner(formData: FormData) {
       conditions: payload.conditions,
       images: payload.images,
       tags: payload.tags,
+      visibility: payload.visibility,
     })
     .eq("id", id);
 
@@ -380,6 +401,7 @@ export async function updatePartner(formData: FormData) {
       hasInquiryLink: Boolean(payload.inquiryLink),
       periodStart: payload.periodStart,
       periodEnd: payload.periodEnd,
+      visibility: payload.visibility,
       benefitCount: payload.benefits.length,
       conditionCount: payload.conditions.length,
       imageCount: payload.images.length,

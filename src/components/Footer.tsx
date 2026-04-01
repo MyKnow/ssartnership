@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FaGithub } from "react-icons/fa";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import PwaInstallButton from "@/components/PwaInstallButton";
@@ -11,15 +12,20 @@ import {
   SITE_NAME,
   SUGGESTION_URL,
 } from "@/lib/site";
+import BrandWordmark from "@/components/BrandWordmark";
 
 export default function Footer() {
   return (
     <footer className="border-t border-border bg-surface/90 py-6 backdrop-blur">
       <Container className="flex flex-col gap-4 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground">
-            {SITE_NAME}
-          </p>
+          <Link
+            href="/"
+            aria-label={SITE_NAME}
+            className="inline-flex items-center text-foreground hover:opacity-80"
+          >
+            <BrandWordmark className="text-base sm:text-lg" />
+          </Link>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="ghost"

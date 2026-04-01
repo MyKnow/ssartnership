@@ -1,4 +1,5 @@
 export type CategoryKey = string;
+export type PartnerVisibility = "public" | "confidential" | "private";
 
 export type Category = {
   key: CategoryKey;
@@ -11,6 +12,7 @@ export type Partner = {
   id: string;
   name: string;
   category: CategoryKey;
+  visibility: PartnerVisibility;
   location: string;
   mapUrl?: string;
   reservationLink?: string;

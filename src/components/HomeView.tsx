@@ -17,16 +17,21 @@ import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 import PushOptInBanner from "@/components/PushOptInBanner";
+import {
+  getPartnerLockKind,
+} from "@/lib/partner-visibility";
 
 export default function HomeView({
   categories,
   partners,
   initialSession,
+  viewerAuthenticated,
   showPushOptInBanner = false,
 }: {
   categories: Category[];
   partners: Partner[];
   initialSession?: HeaderSession | null;
+  viewerAuthenticated: boolean;
   showPushOptInBanner?: boolean;
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
@@ -52,6 +57,7 @@ export default function HomeView({
     const normalized = partners.map((partner, index) => ({
       ...partner,
       _index: index,
+      _lockKind: getPartnerLockKind(partner.visibility, viewerAuthenticated),
       _isActive: isWithinPeriod(partner.period.start, partner.period.end),
       _search: [
         partner.name,
@@ -71,23 +77,47 @@ export default function HomeView({
         ? normalized
         : normalized.filter((partner) => partner.category === activeCategory);
 
-    const searchFiltered = query
-      ? categoryFiltered.filter((partner) => partner._search.includes(query))
-      : categoryFiltered;
+    const visibleFiltered = categoryFiltered.filter((partner) => !partner._lockKind);
+    const lockedFiltered = categoryFiltered.filter((partner) => partner._lockKind);
 
-    return [...searchFiltered].sort((a, b) => {
-      if (a._isActive !== b._isActive) {
-        return a._isActive ? -1 : 1;
-      }
-      if (sortValue === "endingSoon") {
-        const compare = compareEndDate(a.period.end, b.period.end);
-        if (compare !== 0) {
-          return compare;
+    const searchFiltered = query
+      ? visibleFiltered.filter((partner) => partner._search.includes(query))
+      : visibleFiltered;
+
+    const lockOrder = {
+      confidential: 0,
+      private: 1,
+    } as const;
+
+    const sortPartners = (items: typeof searchFiltered) =>
+      [...items].sort((a, b) => {
+        if (a._lockKind !== b._lockKind) {
+          return lockOrder[a._lockKind ?? "confidential"] - lockOrder[b._lockKind ?? "confidential"];
         }
-      }
-      return a._index - b._index;
-    });
-  }, [activeCategory, partners, searchValue, sortValue]);
+        if (a._isActive !== b._isActive) {
+          return a._isActive ? -1 : 1;
+        }
+        if (sortValue === "endingSoon") {
+          const compare = compareEndDate(a.period.end, b.period.end);
+          if (compare !== 0) {
+            return compare;
+          }
+        }
+        return a._index - b._index;
+      });
+
+    return {
+      visible: sortPartners(searchFiltered),
+      locked: sortPartners(lockedFiltered),
+    };
+  }, [activeCategory, partners, searchValue, sortValue, viewerAuthenticated]);
+
+  const displayPartners = useMemo(
+    () => [...filteredPartners.visible, ...filteredPartners.locked],
+    [filteredPartners.locked, filteredPartners.visible],
+  );
+
+  const visibleResultCount = filteredPartners.visible.length;
 
   const renderLines = (value: string) => {
     const lines = value.split("\n");
@@ -135,7 +165,7 @@ export default function HomeView({
           query,
           categoryKey: activeCategory,
           sortValue,
-          resultCount: filteredPartners.length,
+          resultCount: visibleResultCount,
         },
       });
     }, 450);
@@ -146,7 +176,7 @@ export default function HomeView({
         searchTimeoutRef.current = null;
       }
     };
-  }, [activeCategory, filteredPartners.length, searchValue, sortValue]);
+  }, [activeCategory, searchValue, sortValue, visibleResultCount]);
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
     setActiveCategory(nextCategory);
@@ -203,7 +233,7 @@ export default function HomeView({
           </section>
 
           <section className="mt-10">
-            {filteredPartners.length === 0 ? (
+            {displayPartners.length === 0 ? (
               <EmptyState
                 title={
                   partners.length === 0
@@ -218,7 +248,7 @@ export default function HomeView({
               />
             ) : (
               <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-6">
-                {filteredPartners.map((partner) => (
+                {displayPartners.map((partner) => (
                   <PartnerCard
                     key={partner.id}
                     partner={partner}
@@ -226,6 +256,7 @@ export default function HomeView({
                       categoryMap.get(partner.category)?.label ?? "알 수 없음"
                     }
                     categoryColor={categoryMap.get(partner.category)?.color}
+                    viewerAuthenticated={viewerAuthenticated}
                     onCategoryClick={handleCategoryChange}
                   />
                 ))}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import { partnerRepository } from "@/lib/repositories";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
@@ -41,17 +41,19 @@ export default async function PartnerDetailPage({
     ? decodeURIComponent(resolvedParams.id).trim()
     : "";
   if (!rawId) {
-    notFound();
+    redirect("/");
   }
   const [categories, partnerById] = await Promise.all([
     partnerRepository.getCategories(),
-    partnerRepository.getPartnerById(rawId),
+    partnerRepository.getPartnerById(rawId, {
+      authenticated: Boolean(headerSession?.userId),
+    }),
   ]);
 
   const partner = partnerById ?? null;
 
   if (!partner) {
-    notFound();
+    redirect("/");
   }
 
   const category = categories.find((item) => item.key === partner.category);

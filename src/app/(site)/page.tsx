@@ -7,11 +7,14 @@ import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
 export const revalidate = 300;
 
 export default async function Home() {
-  const [categories, partners, session] = await Promise.all([
+  const sessionPromise = getSignedUserSession();
+  const [categories, session] = await Promise.all([
     partnerRepository.getCategories(),
-    partnerRepository.getPartners(),
-    getSignedUserSession(),
+    sessionPromise,
   ]);
+  const partners = await partnerRepository.getPartners({
+    authenticated: Boolean(session?.userId),
+  });
   const headerSession = session?.userId ? { userId: session.userId } : null;
   const showPushOptInBanner =
     session?.userId && isPushConfigured()
@@ -48,6 +51,7 @@ export default async function Home() {
         categories={categories}
         partners={partners}
         initialSession={headerSession}
+        viewerAuthenticated={Boolean(session?.userId)}
         showPushOptInBanner={showPushOptInBanner}
       />
     </>

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CategoryKey, Partner } from "@/lib/types";
+import type { CategoryKey, Partner, PartnerVisibility } from "@/lib/types";
 import type { MouseEvent } from "react";
 import Image from "next/image";
 import { getBlurDataURL } from "@/lib/image-blur";
@@ -22,6 +22,12 @@ import {
 } from "@/lib/partner-links";
 import ImageListEditor from "@/components/admin/ImageListEditor";
 import { getCachedImageUrl } from "@/lib/image-cache";
+import {
+  getPartnerLockCopy,
+  getPartnerLockKind,
+  getPartnerVisibilityBadgeClass,
+  getPartnerVisibilityLabel,
+} from "@/lib/partner-visibility";
 
 type CategoryOption = {
   id: string;
@@ -31,6 +37,7 @@ type CategoryOption = {
 type PartnerFormValues = {
   id?: string;
   name?: string;
+  visibility?: PartnerVisibility;
   location?: string;
   mapUrl?: string;
   reservationLink?: string;
@@ -67,6 +74,7 @@ export default function PartnerCard({
   submitLabel,
   className,
   onCategoryClick,
+  viewerAuthenticated = false,
 }: {
   partner: Partner | PartnerFormValues;
   categoryLabel?: string;
@@ -79,6 +87,7 @@ export default function PartnerCard({
   submitLabel?: string;
   className?: string;
   onCategoryClick?: (categoryKey: CategoryKey) => void;
+  viewerAuthenticated?: boolean;
 }) {
   const router = useRouter();
   if (mode !== "view") {
@@ -100,9 +109,21 @@ export default function PartnerCard({
           <p className="text-sm font-semibold text-foreground">
             {mode === "create" ? "새 제휴 추가" : "제휴 정보 수정"}
           </p>
-          <span className="text-xs text-muted-foreground">
-            {periodStart || periodEnd ? `${periodStart} ~ ${periodEnd}` : ""}
-          </span>
+          <div className="flex items-center gap-2">
+            <Badge
+              className={cn(
+                "text-xs",
+                getPartnerVisibilityBadgeClass(
+                  formPartner.visibility ?? "public",
+                ),
+              )}
+            >
+              {getPartnerVisibilityLabel(formPartner.visibility ?? "public")}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {periodStart || periodEnd ? `${periodStart} ~ ${periodEnd}` : ""}
+            </span>
+          </div>
         </div>
 
         <form action={formAction} className="grid gap-3">
@@ -115,6 +136,21 @@ export default function PartnerCard({
               업체명
             </span>
             <Input name="name" defaultValue={formPartner.name ?? ""} required />
+          </div>
+
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              노출 상태
+            </span>
+            <Select
+              name="visibility"
+              defaultValue={formPartner.visibility ?? "public"}
+              required
+            >
+              <option value="public">공개</option>
+              <option value="confidential">대외비</option>
+              <option value="private">비공개</option>
+            </Select>
           </div>
 
           <div className="grid gap-1">
@@ -262,6 +298,7 @@ export default function PartnerCard({
     : undefined;
 
   const viewPartner = partner as Partner;
+  const lockKind = getPartnerLockKind(viewPartner.visibility, viewerAuthenticated);
   const normalizedLinks = normalizeReservationInquiry(
     viewPartner.reservationLink,
     viewPartner.inquiryLink,
@@ -285,7 +322,7 @@ export default function PartnerCard({
   const detailHref = viewPartner.id
     ? `/partners/${encodeURIComponent(viewPartner.id)}`
     : "";
-  const canNavigate = detailHref.length > 0 && isActive;
+  const canNavigate = detailHref.length > 0 && isActive && !lockKind;
   const handleCategoryClick = onCategoryClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
@@ -293,6 +330,65 @@ export default function PartnerCard({
         onCategoryClick(viewPartner.category);
       }
     : null;
+
+  if (lockKind) {
+    const lockCopy = getPartnerLockCopy(lockKind);
+
+    return (
+      <article
+        className={cn(
+          "relative flex h-full w-full overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-sm",
+          className,
+        )}
+        aria-label={lockCopy.title}
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.22),_transparent_60%),linear-gradient(180deg,rgba(15,23,42,0.04),rgba(15,23,42,0.14))]"
+        />
+        <div
+          aria-hidden="true"
+          className="relative flex w-full flex-col gap-4 blur-[2px] saturate-50"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="h-7 w-20 rounded-full bg-slate-300/40 dark:bg-slate-700/50" />
+            <div className="h-4 w-24 rounded-full bg-slate-300/30 dark:bg-slate-700/40" />
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="aspect-square w-28 shrink-0 rounded-2xl bg-slate-300/35 dark:bg-slate-700/45" />
+            <div className="grid flex-1 gap-3 pt-2">
+              <div className="h-6 w-3/4 rounded-full bg-slate-300/35 dark:bg-slate-700/45" />
+              <div className="h-4 w-full rounded-full bg-slate-300/30 dark:bg-slate-700/40" />
+              <div className="h-4 w-5/6 rounded-full bg-slate-300/20 dark:bg-slate-700/30" />
+            </div>
+          </div>
+          <div className="grid gap-3">
+            <div className="h-4 w-24 rounded-full bg-slate-300/35 dark:bg-slate-700/45" />
+            <div className="flex flex-wrap gap-2">
+              <div className="h-8 w-24 rounded-full bg-slate-300/30 dark:bg-slate-700/40" />
+              <div className="h-8 w-20 rounded-full bg-slate-300/20 dark:bg-slate-700/30" />
+            </div>
+          </div>
+        </div>
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-950/65 px-6 text-center backdrop-blur-2xl">
+          <div className="max-w-xs">
+            <Badge
+              className={cn(
+                "mb-3",
+                getPartnerVisibilityBadgeClass(viewPartner.visibility),
+              )}
+            >
+              {lockCopy.badge}
+            </Badge>
+            <p className="text-lg font-semibold text-white">{lockCopy.title}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-200">
+              {lockCopy.description}
+            </p>
+          </div>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article
@@ -347,7 +443,7 @@ export default function PartnerCard({
         </div>
       ) : null}
       <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           {handleCategoryClick ? (
             <button
               type="button"
@@ -372,7 +468,7 @@ export default function PartnerCard({
               {categoryLabel}
             </Badge>
           )}
-          <span className="text-xs font-medium text-muted-foreground">
+          <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
             {viewPartner.period.start} ~ {viewPartner.period.end}
           </span>
         </div>
