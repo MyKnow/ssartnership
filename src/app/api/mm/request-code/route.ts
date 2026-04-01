@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import {
+  getRequestLogContext,
+  logAdminAudit,
+  logAuthSecurity,
+} from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { generateCode, hashCode } from "@/lib/mm-verification";
 import {
@@ -14,6 +18,10 @@ import {
   sendPost,
 } from "@/lib/mattermost";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import {
+  buildMemberSyncLogProperties,
+  syncMemberSnapshot,
+} from "@/lib/mm-member-sync";
 import { getSelectableSsafyYearText, isSelectableSsafyYear } from "@/lib/ssafy-year";
 import {
   normalizeMmUsername,
@@ -104,55 +112,6 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdminClient();
-    const { data: existing } = await supabase
-      .from("mm_verification_codes")
-      .select("created_at")
-      .eq("mm_username", username)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existing?.created_at) {
-      const createdAt = new Date(existing.created_at);
-      const now = new Date();
-      const diffSeconds = (now.getTime() - createdAt.getTime()) / 1000;
-      if (diffSeconds < RESEND_COOLDOWN_SECONDS) {
-        await logAuthSecurity({
-          ...context,
-          eventName: "member_signup_code_request",
-          status: "blocked",
-          actorType: "guest",
-          identifier: username,
-          properties: getRequestCodeLogProperties(year, { reason: "cooldown" }),
-        });
-        return NextResponse.json(
-          { error: "cooldown" },
-          { status: 429 },
-        );
-      }
-    }
-
-    const { data: existingMember } = await supabase
-      .from("members")
-      .select("id")
-      .eq("mm_username", username)
-      .maybeSingle();
-
-    if (existingMember?.id) {
-      await logAuthSecurity({
-        ...context,
-        eventName: "member_signup_code_request",
-        status: "failure",
-        actorType: "member",
-        actorId: existingMember.id,
-        identifier: username,
-        properties: getRequestCodeLogProperties(year, {
-          reason: "already_registered",
-        }),
-      });
-      return NextResponse.json({ error: "already_registered" }, { status: 409 });
-    }
-
     const senderCredentials = getSenderCredentials(year);
     const senderLogin = await loginWithPassword(
       senderCredentials.loginId,
@@ -203,16 +162,91 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "not_student" }, { status: 404 });
     }
 
+    const { data: existing } = await supabase
+      .from("mm_verification_codes")
+      .select("created_at")
+      .eq("mm_user_id", targetUser.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.created_at) {
+      const createdAt = new Date(existing.created_at);
+      const now = new Date();
+      const diffSeconds = (now.getTime() - createdAt.getTime()) / 1000;
+      if (diffSeconds < RESEND_COOLDOWN_SECONDS) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_signup_code_request",
+          status: "blocked",
+          actorType: "guest",
+          identifier: username,
+          properties: getRequestCodeLogProperties(year, { reason: "cooldown" }),
+        });
+        return NextResponse.json({ error: "cooldown" }, { status: 429 });
+      }
+    }
+
     const profile = parseSsafyProfile(
       targetUser.nickname || targetUser.username,
     );
     const avatar = await getUserImage(senderLogin.token, targetUser.id);
+    const snapshot = {
+      mmUserId: targetUser.id,
+      mmUsername: targetUser.username,
+      displayName:
+        profile.displayName ?? targetUser.nickname ?? targetUser.username,
+      campus: profile.campus ?? null,
+      classNumber: profile.classNumber ?? null,
+      avatarFetched: Boolean(avatar),
+      avatarContentType: avatar?.contentType ?? null,
+      avatarBase64: avatar?.base64 ?? null,
+    };
 
     const code = generateCode();
     const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
 
-    await supabase.from("mm_verification_attempts").delete().eq("identifier", username);
-    await supabase.from("mm_verification_codes").delete().eq("mm_username", username);
+    await supabase.from("mm_verification_attempts").delete().eq("identifier", targetUser.id);
+    await supabase.from("mm_verification_codes").delete().eq("mm_user_id", targetUser.id);
+
+    const { data: existingMember } = await supabase
+      .from("members")
+      .select(
+        "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at",
+      )
+      .eq("mm_user_id", targetUser.id)
+      .maybeSingle();
+
+    if (existingMember?.id) {
+      const syncResult = await syncMemberSnapshot(existingMember, snapshot);
+      if (syncResult.updated) {
+        await logAdminAudit({
+          ...context,
+          action: "member_sync",
+          actorId: process.env.ADMIN_ID ?? "admin",
+          targetType: "member",
+          targetId: existingMember.id,
+          properties: buildMemberSyncLogProperties(syncResult, {
+            source: "signup_request",
+          }),
+        });
+      }
+
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "failure",
+        actorType: "member",
+        actorId: existingMember.id,
+        identifier: username,
+        properties: getRequestCodeLogProperties(year, {
+          reason: "already_registered",
+          mmUserId: targetUser.id,
+          mmUsername: targetUser.username,
+        }),
+      });
+      return NextResponse.json({ error: "already_registered" }, { status: 409 });
+    }
 
     await supabase.from("mm_verification_codes").insert({
       code_hash: hashCode(code),
@@ -247,6 +281,7 @@ export async function POST(request: Request) {
       identifier: username,
       properties: getRequestCodeLogProperties(year, {
         mmUserId: targetUser.id,
+        mmUsername: targetUser.username,
         campus: profile.campus ?? null,
         classNumber: profile.classNumber ?? null,
       }),

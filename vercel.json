@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/push-expiring-partners",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/member-sync",
+      "schedule": "0 * * * *"
     }
   ]
 }

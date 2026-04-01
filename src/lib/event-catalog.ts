@@ -33,6 +33,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_update',
   'partner_delete',
   'member_update',
+  'member_sync',
   'member_delete',
   'push_send',
   'push_log_delete',

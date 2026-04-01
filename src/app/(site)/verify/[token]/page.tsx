@@ -60,15 +60,11 @@ export default async function CertificationVerifyPage({
     const supabase = getSupabaseAdminClient();
     const { data } = await supabase
       .from("members")
-      .select("mm_username,display_name,year,campus,class_number,must_change_password")
+      .select("id,mm_username,display_name,year,campus,class_number,must_change_password")
       .eq("id", verification.payload.userId)
       .maybeSingle();
 
-    if (
-      data?.mm_username &&
-      !data.must_change_password &&
-      data.mm_username === verification.payload.mmUsername
-    ) {
+    if (data?.id && !data.must_change_password) {
       member = data;
     }
   }

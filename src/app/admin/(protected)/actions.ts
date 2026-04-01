@@ -8,6 +8,10 @@ import { isWithinPeriod } from "@/lib/partner-utils";
 import { createNewPartnerPayload, isPushConfigured, sendPushToAudience } from "@/lib/push";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
 import {
+  buildMemberSyncLogProperties,
+  syncMembersBySelectableYears,
+} from "@/lib/mm-member-sync";
+import {
   sanitizeHexColor,
   sanitizeHttpUrl,
   sanitizePartnerLinkValue,
@@ -407,6 +411,56 @@ export async function deletePartner(formData: FormData) {
   revalidateAdminAndPublicPaths(id);
 }
 
+export async function backfillMemberProfiles() {
+  await requireAdmin();
+
+  const context = await getServerActionLogContext("/admin/members");
+  let status = "success";
+  let summary = {
+    checked: 0,
+    updated: 0,
+    skipped: 0,
+    failures: 0,
+  };
+
+  try {
+    const result = await syncMembersBySelectableYears();
+    const actorId = process.env.ADMIN_ID ?? "admin";
+    summary = {
+      checked: result.checked,
+      updated: result.updated,
+      skipped: result.skipped,
+      failures: result.failures.length,
+    };
+
+    for (const syncResult of result.results) {
+      await logAdminAudit({
+        ...context,
+        action: "member_sync",
+        actorId,
+        targetType: "member",
+        targetId: syncResult.member.id,
+        properties: buildMemberSyncLogProperties(syncResult, {
+          source: "manual_backfill",
+        }),
+      });
+    }
+    status = result.failures.length > 0 ? "partial" : "success";
+  } catch (error) {
+    console.error("member backfill failed", error);
+    status = "error";
+  }
+
+  revalidateMemberPaths();
+  if (status === "error") {
+    redirect("/admin/members?backfill=error");
+  }
+
+  redirect(
+    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}`,
+  );
+}
+
 export async function updateMember(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
@@ -478,29 +532,45 @@ export async function deleteMember(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("mm_username")
+    .select("mm_user_id,mm_username")
     .eq("id", id)
     .maybeSingle();
 
   if (memberError) {
     throw new Error(memberError.message);
   }
-  if (!member?.mm_username) {
+  if (!member?.mm_user_id && !member?.mm_username) {
     throw new Error("삭제할 회원을 찾을 수 없습니다.");
   }
 
-  await supabase
-    .from("mm_verification_codes")
-    .delete()
-    .eq("mm_username", member.mm_username);
-  await supabase
-    .from("mm_verification_attempts")
-    .delete()
-    .eq("identifier", member.mm_username);
-  await supabase
-    .from("password_reset_attempts")
-    .delete()
-    .eq("identifier", member.mm_username);
+  if (member.mm_user_id) {
+    await supabase
+      .from("mm_verification_codes")
+      .delete()
+      .eq("mm_user_id", member.mm_user_id);
+    await supabase
+      .from("mm_verification_attempts")
+      .delete()
+      .eq("identifier", member.mm_user_id);
+    await supabase
+      .from("password_reset_attempts")
+      .delete()
+      .eq("identifier", member.mm_user_id);
+  }
+  if (member.mm_username && member.mm_username !== member.mm_user_id) {
+    await supabase
+      .from("mm_verification_codes")
+      .delete()
+      .eq("mm_username", member.mm_username);
+    await supabase
+      .from("mm_verification_attempts")
+      .delete()
+      .eq("identifier", member.mm_username);
+    await supabase
+      .from("password_reset_attempts")
+      .delete()
+      .eq("identifier", member.mm_username);
+  }
 
   const { error } = await supabase.from("members").delete().eq("id", id);
 
@@ -512,6 +582,7 @@ export async function deleteMember(formData: FormData) {
     targetType: "member",
     targetId: id,
     properties: {
+      mmUserId: member.mm_user_id,
       mmUsername: member.mm_username,
     },
   });

@@ -22,11 +22,25 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdminClient();
   const { data: member } = await supabase
     .from("members")
-    .select("mm_username")
+    .select("mm_user_id,mm_username")
     .eq("id", session.userId)
     .maybeSingle();
 
-  if (member?.mm_username) {
+  if (member?.mm_user_id) {
+    await supabase
+      .from("mm_verification_codes")
+      .delete()
+      .eq("mm_user_id", member.mm_user_id);
+    await supabase
+      .from("mm_verification_attempts")
+      .delete()
+      .eq("identifier", member.mm_user_id);
+    await supabase
+      .from("password_reset_attempts")
+      .delete()
+      .eq("identifier", member.mm_user_id);
+  }
+  if (member?.mm_username && member.mm_username !== member.mm_user_id) {
     await supabase
       .from("mm_verification_codes")
       .delete()
@@ -50,7 +64,7 @@ export async function POST(request: Request) {
     status: "success",
     actorType: "member",
     actorId: session.userId,
-    identifier: member?.mm_username ?? null,
+    identifier: member?.mm_user_id ?? member?.mm_username ?? null,
   });
 
   return NextResponse.json({ ok: true });

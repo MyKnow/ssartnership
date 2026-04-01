@@ -1,4 +1,6 @@
-type MMUser = {
+import { getSelectableSsafyYears } from "@/lib/ssafy-year";
+
+export type MMUser = {
   id: string;
   username: string;
   nickname?: string;
@@ -148,6 +150,19 @@ export async function getUserImage(
   return { contentType, base64: buffer.toString("base64") };
 }
 
+export async function getUserById(token: string, userId: string) {
+  const response = await mmFetch(`/api/v4/users/${userId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.ok) {
+    return (await response.json()) as MMUser;
+  }
+  if (response.status === 404) {
+    return null;
+  }
+  throw toMattermostApiError(response, "MM 사용자 조회 실패");
+}
+
 export async function getUserByUsername(token: string, username: string) {
   const safe = username.replace(/^@/, "").trim();
   const response = await mmFetch(`/api/v4/users/username/${safe}`, {
@@ -207,6 +222,27 @@ export async function getChannelMember(
   throw toMattermostApiError(response, "MM 채널 멤버 조회 실패");
 }
 
+export async function findUserInChannelByUserId(
+  token: string,
+  userId: string,
+  channelConfig: StudentChannelConfig,
+) {
+  const directUser = await getUserById(token, userId);
+  if (!directUser) {
+    return null;
+  }
+  const channel = await getChannelByName(
+    token,
+    (await getTeamByName(token, channelConfig.teamName)).id,
+    channelConfig.channelName,
+  );
+  const membership = await getChannelMember(token, channel.id, directUser.id);
+  if (!membership) {
+    return null;
+  }
+  return directUser;
+}
+
 export async function findUserInChannelByUsername(
   token: string,
   username: string,
@@ -227,6 +263,56 @@ export async function findUserInChannelByUsername(
     return null;
   }
   return directUser;
+}
+
+export type SelectableStudentMatch = {
+  year: number;
+  senderToken: string;
+  user: MMUser;
+  channelConfig: StudentChannelConfig;
+};
+
+export async function resolveSelectableStudentByUsername(
+  username: string,
+): Promise<SelectableStudentMatch | null> {
+  const safeUsername = username.replace(/^@/, "").trim().toLowerCase();
+  const years = getSelectableSsafyYears().sort((a, b) => b - a);
+  let lastError: unknown = null;
+
+  for (const year of years) {
+    try {
+      const senderCredentials = getSenderCredentials(year);
+      const senderLogin = await loginWithPassword(
+        senderCredentials.loginId,
+        senderCredentials.password,
+      );
+      const channelConfig = getStudentChannelConfig(year);
+      const user = await findUserInChannelByUsername(
+        senderLogin.token,
+        safeUsername,
+        channelConfig,
+      );
+      if (!user) {
+        continue;
+      }
+      return {
+        year,
+        senderToken: senderLogin.token,
+        user,
+        channelConfig,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("MM 사용자 조회 실패");
+  }
+
+  return null;
 }
 
 export function getSenderCredentials(year?: number) {

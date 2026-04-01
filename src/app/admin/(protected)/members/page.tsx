@@ -2,13 +2,29 @@ import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
+import SubmitButton from "@/components/ui/SubmitButton";
 import SectionHeading from "@/components/ui/SectionHeading";
-import { deleteMember, updateMember } from "@/app/admin/(protected)/actions";
+import {
+  backfillMemberProfiles,
+  deleteMember,
+  updateMember,
+} from "@/app/admin/(protected)/actions";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminMembersPage() {
+export default async function AdminMembersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    backfill?: string;
+    checked?: string;
+    updated?: string;
+    skipped?: string;
+    failures?: string;
+  }>;
+}) {
+  const params = (await searchParams) ?? {};
   const supabase = getSupabaseAdminClient();
   const { data: members } = await supabase
     .from("members")
@@ -26,10 +42,44 @@ export default async function AdminMembersPage() {
       backLabel="관리 홈"
     >
       <Card>
-        <SectionHeading
-          title="회원 관리"
-          description="교육생 계정의 표시 정보, 반, 비밀번호 변경 강제 여부를 관리할 수 있습니다."
-        />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <SectionHeading
+            title="회원 관리"
+            description="교육생 계정의 표시 정보, 반, 비밀번호 변경 강제 여부를 관리할 수 있습니다."
+          />
+          <form action={backfillMemberProfiles} className="shrink-0">
+            <SubmitButton pendingText="백필 중">
+              지금 백필 실행
+            </SubmitButton>
+          </form>
+        </div>
+
+        {params.backfill ? (
+          <div
+            className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${
+              params.backfill === "partial"
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                : params.backfill === "error"
+                  ? "border-danger/30 bg-danger/10 text-danger"
+                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+            }`}
+          >
+            <p className="font-semibold">
+              {params.backfill === "partial"
+                ? "백필이 일부만 완료되었습니다."
+                : params.backfill === "error"
+                  ? "백필 중 오류가 발생했습니다."
+                  : "백필이 완료되었습니다."}
+            </p>
+            <p className="mt-1 text-xs leading-5">
+              {params.checked ? `대상 ${params.checked}명 · ` : ""}
+              {params.updated ? `변경 ${params.updated}명 · ` : ""}
+              {params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}
+              {params.failures ? `실패 ${params.failures}명` : ""}
+            </p>
+          </div>
+        ) : null}
+
         {safeMembers.length === 0 ? (
           <div className="mt-6">
             <EmptyState

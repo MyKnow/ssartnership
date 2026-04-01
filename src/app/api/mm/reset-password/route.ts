@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import {
+  getRequestLogContext,
+  logAdminAudit,
+  logAuthSecurity,
+} from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { generateTempPassword, hashPassword } from "@/lib/password";
 import {
@@ -7,12 +11,19 @@ import {
   getStudentChannelConfig,
   getSenderCredentials,
   getMe,
-  findUserInChannelByUsername,
+  findUserInChannelByUserId,
   loginWithPassword,
   createDirectChannel,
   sendPost,
+  resolveSelectableStudentByUsername,
+  getUserImage,
 } from "@/lib/mattermost";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
+import {
+  buildMemberSyncLogProperties,
+  syncMemberSnapshot,
+} from "@/lib/mm-member-sync";
+import { parseSsafyProfile } from "@/lib/mm-profile";
 
 export const runtime = "nodejs";
 
@@ -48,48 +59,51 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdminClient();
-    const { data: attempt } = await supabase
-      .from("password_reset_attempts")
-      .select("id,count,blocked_until,first_attempt_at,created_at")
-      .eq("identifier", username)
-      .maybeSingle();
-
-    if (attempt?.blocked_until) {
-      const blockedUntil = new Date(attempt.blocked_until);
-      if (blockedUntil > new Date()) {
-        await logAuthSecurity({
-          ...context,
-          eventName: "member_password_reset",
-          status: "blocked",
-          actorType: "guest",
-          identifier: username,
-          properties: { reason: "rate_limit" },
-        });
-        return NextResponse.json({ error: "blocked" }, { status: 429 });
-      }
-    }
-
-    if (attempt?.created_at) {
-      const createdAt = new Date(attempt.created_at);
-      const diffSeconds = (Date.now() - createdAt.getTime()) / 1000;
-      if (diffSeconds < RESEND_COOLDOWN_SECONDS) {
-        await logAuthSecurity({
-          ...context,
-          eventName: "member_password_reset",
-          status: "blocked",
-          actorType: "guest",
-          identifier: username,
-          properties: { reason: "cooldown" },
-        });
-        return NextResponse.json({ error: "cooldown" }, { status: 429 });
-      }
-    }
-
-    const { data: member } = await supabase
+    const memberSelect =
+      "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at";
+    const { data: memberByUsername } = await supabase
       .from("members")
-      .select("id,mm_username,year")
+      .select(memberSelect)
       .eq("mm_username", username)
       .maybeSingle();
+
+    let member = memberByUsername;
+    if (!member) {
+      try {
+        const resolved = await resolveSelectableStudentByUsername(username);
+        if (resolved) {
+          const { data: memberById } = await supabase
+            .from("members")
+            .select(memberSelect)
+            .eq("mm_user_id", resolved.user.id)
+            .maybeSingle();
+          member = memberById ?? null;
+        }
+      } catch (error) {
+        if (error instanceof MattermostApiError) {
+          await logAuthSecurity({
+            ...context,
+            eventName: "member_password_reset",
+            status: "failure",
+            actorType: "guest",
+            identifier: username,
+            properties: {
+              reason: "team_or_channel_inaccessible",
+              status: error.status,
+            },
+          });
+          return NextResponse.json(
+            {
+              error: "team_or_channel_inaccessible",
+              message:
+                "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
+            },
+            { status: 403 },
+          );
+        }
+        throw error;
+      }
+    }
 
     if (!member?.id) {
       await logAuthSecurity({
@@ -112,9 +126,9 @@ export async function POST(request: Request) {
     const channelConfig = getStudentChannelConfig(member.year);
     let mmUser;
     try {
-      mmUser = await findUserInChannelByUsername(
+      mmUser = await findUserInChannelByUserId(
         senderLogin.token,
-        username,
+        member.mm_user_id,
         channelConfig,
       );
     } catch (error) {
@@ -123,9 +137,8 @@ export async function POST(request: Request) {
           ...context,
           eventName: "member_password_reset",
           status: "failure",
-          actorType: "member",
-          actorId: member.id,
-          identifier: username,
+          actorType: "guest",
+          identifier: member.mm_user_id,
           properties: {
             reason: "team_or_channel_inaccessible",
             status: error.status,
@@ -142,6 +155,7 @@ export async function POST(request: Request) {
       }
       throw error;
     }
+
     if (!mmUser) {
       await logAuthSecurity({
         ...context,
@@ -149,10 +163,76 @@ export async function POST(request: Request) {
         status: "failure",
         actorType: "member",
         actorId: member.id,
-        identifier: username,
+        identifier: member.mm_user_id,
         properties: { reason: "not_mm" },
       });
       return NextResponse.json({ error: "not_mm" }, { status: 404 });
+    }
+
+    const profile = parseSsafyProfile(mmUser.nickname || mmUser.username);
+    const avatar = await getUserImage(senderLogin.token, member.mm_user_id);
+    const syncResult = await syncMemberSnapshot(member, {
+      mmUserId: member.mm_user_id,
+      mmUsername: mmUser.username,
+      displayName: profile.displayName ?? mmUser.nickname ?? mmUser.username,
+      campus: profile.campus ?? null,
+      classNumber: profile.classNumber ?? null,
+      avatarFetched: Boolean(avatar),
+      avatarContentType: avatar?.contentType ?? null,
+      avatarBase64: avatar?.base64 ?? null,
+    });
+
+    if (syncResult.updated) {
+      await logAdminAudit({
+        ...context,
+        action: "member_sync",
+        actorId: process.env.ADMIN_ID ?? "admin",
+        targetType: "member",
+        targetId: member.id,
+        properties: buildMemberSyncLogProperties(syncResult, {
+          source: "password_reset",
+        }),
+      });
+      member = syncResult.member;
+    }
+
+    const { data: attempt } = await supabase
+      .from("password_reset_attempts")
+      .select("id,count,blocked_until,first_attempt_at,created_at")
+      .eq("identifier", member.mm_user_id)
+      .maybeSingle();
+
+    if (attempt?.blocked_until) {
+      const blockedUntil = new Date(attempt.blocked_until);
+      if (blockedUntil > new Date()) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_password_reset",
+          status: "blocked",
+          actorType: "member",
+          actorId: member.id,
+          identifier: member.mm_user_id,
+          properties: { reason: "rate_limit" },
+        });
+        return NextResponse.json({ error: "blocked" }, { status: 429 });
+      }
+    }
+
+    if (attempt?.created_at) {
+      const createdAt = new Date(attempt.created_at);
+      const diffSeconds = (Date.now() - createdAt.getTime()) / 1000;
+      if (diffSeconds < RESEND_COOLDOWN_SECONDS) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_password_reset",
+          status: "blocked",
+          actorType: "member",
+          actorId: member.id,
+          identifier: member.mm_user_id,
+          properties: { reason: "cooldown" },
+        });
+        return NextResponse.json({ error: "cooldown" }, { status: 429 });
+      }
     }
 
     const tempPassword = generateTempPassword(12);
@@ -198,7 +278,7 @@ export async function POST(request: Request) {
         .eq("id", attempt.id);
     } else {
       await supabase.from("password_reset_attempts").insert({
-        identifier: username,
+        identifier: member.mm_user_id,
         count: nextCount,
         blocked_until: blockedUntil,
         first_attempt_at: firstAttemptAt,
@@ -212,9 +292,12 @@ export async function POST(request: Request) {
       status: "success",
       actorType: "member",
       actorId: member.id,
-      identifier: username,
+      identifier: member.mm_user_id,
       properties: {
         mustChangePassword: true,
+        mmUserId: member.mm_user_id,
+        mmUsername: member.mm_username,
+        year: member.year,
       },
     });
 

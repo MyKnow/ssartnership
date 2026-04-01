@@ -84,6 +84,7 @@ const auditLabels: Record<string, string> = {
   partner_update: '업체 수정',
   partner_delete: '업체 삭제',
   member_update: '회원 수정',
+  member_sync: '회원 정보 동기화',
   member_delete: '회원 삭제',
   push_send: '푸시 발송',
   push_log_delete: '푸시 로그 삭제',
