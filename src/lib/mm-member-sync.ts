@@ -9,7 +9,7 @@ import {
   loginWithPassword,
 } from "@/lib/mattermost";
 
-type MemberRow = {
+export type MemberRow = {
   id: string;
   mm_user_id: string;
   mm_username: string;

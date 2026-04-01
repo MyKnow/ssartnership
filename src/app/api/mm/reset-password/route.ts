@@ -21,6 +21,7 @@ import {
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 import {
   buildMemberSyncLogProperties,
+  type MemberRow,
   syncMemberSnapshot,
 } from "@/lib/mm-member-sync";
 import { parseSsafyProfile } from "@/lib/mm-profile";
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
       .eq("mm_username", username)
       .maybeSingle();
 
-    let member = memberByUsername;
+    let member: MemberRow | null = memberByUsername ?? null;
     if (!member) {
       try {
         const resolved = await resolveSelectableStudentByUsername(username);
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
             .select(memberSelect)
             .eq("mm_user_id", resolved.user.id)
             .maybeSingle();
-          member = memberById ?? null;
+          member = (memberById as MemberRow | null) ?? null;
         }
       } catch (error) {
         if (error instanceof MattermostApiError) {

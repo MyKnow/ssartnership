@@ -11,6 +11,7 @@ import { hashPassword, isValidPassword } from "@/lib/password";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import {
   buildMemberSyncLogProperties,
+  type MemberRow,
   syncMemberSnapshot,
 } from "@/lib/mm-member-sync";
 import {
@@ -213,13 +214,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_code" }, { status: 400 });
     }
 
-    const { data: member } = await supabase
+    const { data: memberData } = await supabase
       .from("members")
       .select(
         "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at",
       )
       .eq("mm_user_id", mmUserId)
       .maybeSingle();
+    const member = (memberData as MemberRow | null) ?? null;
 
     const avatar = await getUserImage(resolvedStudent.senderToken, mmUserId);
     const profile = parseSsafyProfile(
@@ -243,7 +245,7 @@ export async function POST(request: Request) {
     const year = codeRow.year ?? member?.year ?? null;
 
     let authenticatedMemberId = member?.id ?? null;
-    let nextMember = member ?? null;
+    let nextMember: MemberRow | null = member ?? null;
 
     if (member?.id) {
       const syncResult = await syncMemberSnapshot(member, snapshot);

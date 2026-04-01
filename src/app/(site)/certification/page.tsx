@@ -16,6 +16,18 @@ export const metadata = {
   title: "교육생 인증 | SSARTNERSHIP",
 };
 
+type CertificationMember = {
+  id: string;
+  mm_user_id: string;
+  mm_username: string;
+  display_name?: string | null;
+  year?: number | null;
+  campus?: string | null;
+  class_number?: number | null;
+  avatar_content_type?: string | null;
+  avatar_base64?: string | null;
+};
+
 export default async function CertificationPage() {
   const initialTimestamp = new Date().toISOString();
   const session = await getSignedUserSession();
@@ -38,7 +50,7 @@ export default async function CertificationPage() {
     redirect("/auth/login");
   }
 
-  let currentMember = member;
+  let currentMember: CertificationMember = member as CertificationMember;
   try {
     const syncResult = await syncMemberById(member.id);
     if (syncResult?.member) {

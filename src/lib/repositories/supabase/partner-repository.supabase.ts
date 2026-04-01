@@ -27,7 +27,7 @@ type PartnerRow = {
   categories?: { key?: string | null } | Array<{ key?: string | null }> | null;
 };
 
-function normalizeDate(value: string | null) {
+function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
 }
 
