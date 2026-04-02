@@ -44,6 +44,9 @@ export default function Footer() {
             <Button variant="ghost" href={SUGGESTION_URL}>
               제휴 제안
             </Button>
+            <Button variant="ghost" href="/rss.xml">
+              RSS
+            </Button>
             <PwaInstallButton />
             <Button
               variant="ghost"

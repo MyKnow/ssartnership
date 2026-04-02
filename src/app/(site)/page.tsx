@@ -6,6 +6,7 @@ import {
   SITE_DESCRIPTION,
   SITE_KEYWORDS,
   SITE_NAME,
+  SITE_RSS_URL,
   SITE_TITLE,
   SITE_URL,
 } from "@/lib/site";
@@ -20,6 +21,9 @@ export const metadata: Metadata = {
   keywords: SITE_KEYWORDS,
   alternates: {
     canonical: "/",
+    types: {
+      "application/rss+xml": SITE_RSS_URL,
+    },
   },
   openGraph: {
     title: SITE_TITLE,

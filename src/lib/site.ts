@@ -24,6 +24,7 @@ export const SITE_ALTERNATE_NAMES = [
 ];
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app";
+export const SITE_RSS_URL = "/rss.xml";
 
 export const GITHUB_URL = "https://github.com/MyKnow";
 export const BUG_REPORT_EMAIL = "myknow00@naver.com";
