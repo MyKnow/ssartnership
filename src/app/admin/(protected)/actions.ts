@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -97,6 +97,14 @@ function revalidateAdminAndPublicPaths(partnerId?: string) {
   if (partnerId) {
     revalidatePath(`/partners/${partnerId}`);
   }
+}
+
+function revalidateCategoryData() {
+  revalidateTag("categories", "max");
+}
+
+function revalidatePartnerData() {
+  revalidateTag("partners", "max");
 }
 
 function revalidateMemberPaths() {
@@ -226,6 +234,7 @@ export async function createCategory(formData: FormData) {
     targetId: data?.id ?? null,
     properties: { key, label, description, color },
   });
+  revalidateCategoryData();
   revalidateAdminAndPublicPaths();
 }
 
@@ -253,6 +262,7 @@ export async function updateCategory(formData: FormData) {
     targetId: id,
     properties: { key, label, description, color },
   });
+  revalidateCategoryData();
   revalidateAdminAndPublicPaths();
   redirect("/admin/partners");
 }
@@ -275,6 +285,7 @@ export async function deleteCategory(formData: FormData) {
     targetType: "category",
     targetId: id,
   });
+  revalidateCategoryData();
   revalidateAdminAndPublicPaths();
 }
 
@@ -353,6 +364,7 @@ export async function createPartner(formData: FormData) {
     }
   }
 
+  revalidatePartnerData();
   revalidateAdminAndPublicPaths(data?.id);
 }
 
@@ -408,6 +420,7 @@ export async function updatePartner(formData: FormData) {
       tagCount: payload.tags.length,
     },
   });
+  revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
   redirect("/admin/partners");
 }
@@ -430,6 +443,7 @@ export async function deletePartner(formData: FormData) {
     targetType: "partner",
     targetId: id,
   });
+  revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
 }
 

@@ -59,14 +59,24 @@ export default async function Home() {
     partnerRepository.getCategories(),
     sessionPromise,
   ]);
-  const partners = await partnerRepository.getPartners({
+  const partnersPromise = partnerRepository.getPartners({
     authenticated: Boolean(session?.userId),
   });
   const headerSession = session?.userId ? { userId: session.userId } : null;
-  const showPushOptInBanner =
+  const pushPreferencesPromise =
     session?.userId && isPushConfigured()
-      ? !(await getMemberPushPreferences(session.userId)).enabled
-      : false;
+      ? getMemberPushPreferences(session.userId)
+      : Promise.resolve(null);
+  const [partners, pushPreferences] = await Promise.all([
+    partnersPromise,
+    pushPreferencesPromise,
+  ]);
+  const showPushOptInBanner = Boolean(
+    session?.userId &&
+      isPushConfigured() &&
+      pushPreferences &&
+      !pushPreferences.enabled,
+  );
 
   const jsonLd = {
     "@context": "https://schema.org",

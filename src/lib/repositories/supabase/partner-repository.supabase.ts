@@ -3,6 +3,7 @@ import type {
   PartnerRepository,
   PartnerViewContext,
 } from "@/lib/repositories/partner-repository";
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdminClient, getSupabasePublicClient } from "@/lib/supabase/server";
 import {
   canViewPartnerDetails,
@@ -27,6 +28,13 @@ type PartnerRow = {
   categories?: { key?: string | null } | Array<{ key?: string | null }> | null;
 };
 
+type CategoryRow = {
+  key?: string | null;
+  label?: string | null;
+  description?: string | null;
+  color?: string | null;
+};
+
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
 }
@@ -43,6 +51,81 @@ function extractCategoryKey(categories: PartnerRow["categories"]) {
   }
   return undefined;
 }
+
+const getCachedCategories = unstable_cache(
+  async (): Promise<CategoryRow[]> => {
+    const supabase = getSupabasePublicClient();
+    const { data, error } = await supabase
+      .from("categories")
+      .select("key,label,description,color")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as CategoryRow[];
+  },
+  ["partner-repository", "categories"],
+  {
+    revalidate: 300,
+    tags: ["categories"],
+  },
+);
+
+const getCachedPartnerRows = unstable_cache(
+  async (): Promise<PartnerRow[]> => {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(
+        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PartnerRow[];
+  },
+  ["partner-repository", "partners"],
+  {
+    revalidate: 300,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPartnerRowById = unstable_cache(
+  async (id: string): Promise<PartnerRow | null> => {
+    if (!id) {
+      return null;
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(
+        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return null;
+    }
+
+    return data as PartnerRow;
+  },
+  ["partner-repository", "partner-by-id"],
+  {
+    revalidate: 300,
+    tags: ["partners"],
+  },
+);
 
 function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
   return {
@@ -96,71 +179,25 @@ function mapPartnerForList(
 }
 
 async function getPartnerRow(id: string) {
-  if (!id) {
-    return null;
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("partners")
-    .select(
-      "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
-    )
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-  if (!data) {
-    return null;
-  }
-
-  return data as PartnerRow;
+  return getCachedPartnerRowById(id);
 }
 
 export class SupabasePartnerRepository implements PartnerRepository {
   async getCategories(): Promise<Category[]> {
-    const supabase = getSupabasePublicClient();
-    const { data, error } = await supabase
-      .from("categories")
-      .select("key,label,description,color")
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return (
-      data?.map((item) => ({
-        key: item.key,
-        label: item.label,
-        description: item.description ?? "",
-        color: item.color ?? undefined,
-      })) ?? []
-    );
+    const data = await getCachedCategories();
+    return data.map((item) => ({
+      key: item.key ?? "",
+      label: item.label ?? "",
+      description: item.description ?? "",
+      color: item.color ?? undefined,
+    }));
   }
 
   async getPartners(
     context: PartnerViewContext = { authenticated: false },
   ): Promise<Partner[]> {
-    const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from("partners")
-      .select(
-        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
-      )
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return (
-      data?.map((item) =>
-        mapPartnerForList(item as PartnerRow, context),
-      ) ?? []
-    );
+    const rows = await getCachedPartnerRows();
+    return rows.map((item) => mapPartnerForList(item, context));
   }
 
   async getPartnerById(

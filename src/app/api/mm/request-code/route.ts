@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-import {
-  getRequestLogContext,
-  logAdminAudit,
-  logAuthSecurity,
-} from "@/lib/activity-logs";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { generateCode, hashCode } from "@/lib/mm-verification";
 import {
   createDirectChannel,
   MattermostApiError,
-  getMe,
   getStudentChannelConfig,
   getSenderCredentials,
   findUserInChannelByUsername,
@@ -18,10 +13,6 @@ import {
   sendPost,
 } from "@/lib/mattermost";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import {
-  buildMemberSyncLogProperties,
-  syncMemberSnapshot,
-} from "@/lib/mm-member-sync";
 import { getSelectableSsafyYearText, isSelectableSsafyYear } from "@/lib/ssafy-year";
 import {
   normalizeMmUsername,
@@ -117,7 +108,6 @@ export async function POST(request: Request) {
       senderCredentials.loginId,
       senderCredentials.password,
     );
-    const sender = await getMe(senderLogin.token);
     const channelConfig = getStudentChannelConfig(year);
     let targetUser;
     try {
@@ -187,27 +177,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const profile = parseSsafyProfile(
-      targetUser.nickname || targetUser.username,
-    );
-    const avatar = await getUserImage(senderLogin.token, targetUser.id);
-    const snapshot = {
-      mmUserId: targetUser.id,
-      mmUsername: targetUser.username,
-      displayName:
-        profile.displayName ?? targetUser.nickname ?? targetUser.username,
-      campus: profile.campus ?? null,
-      classNumber: profile.classNumber ?? null,
-      avatarFetched: Boolean(avatar),
-      avatarContentType: avatar?.contentType ?? null,
-      avatarBase64: avatar?.base64 ?? null,
-    };
-
-    const code = generateCode();
-    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
-
-    await supabase.from("mm_verification_attempts").delete().eq("identifier", targetUser.id);
-    await supabase.from("mm_verification_codes").delete().eq("mm_user_id", targetUser.id);
+    await supabase
+      .from("mm_verification_attempts")
+      .delete()
+      .eq("identifier", targetUser.id);
+    await supabase
+      .from("mm_verification_codes")
+      .delete()
+      .eq("mm_user_id", targetUser.id);
 
     const { data: existingMember } = await supabase
       .from("members")
@@ -218,20 +195,6 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (existingMember?.id) {
-      const syncResult = await syncMemberSnapshot(existingMember, snapshot);
-      if (syncResult.updated) {
-        await logAdminAudit({
-          ...context,
-          action: "member_sync",
-          actorId: process.env.ADMIN_ID ?? "admin",
-          targetType: "member",
-          targetId: existingMember.id,
-          properties: buildMemberSyncLogProperties(syncResult, {
-            source: "signup_request",
-          }),
-        });
-      }
-
       await logAuthSecurity({
         ...context,
         eventName: "member_signup_code_request",
@@ -247,6 +210,14 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ error: "already_registered" }, { status: 409 });
     }
+
+    const avatarPromise = getUserImage(senderLogin.token, targetUser.id);
+    const profile = parseSsafyProfile(
+      targetUser.nickname || targetUser.username,
+    );
+    const avatar = await avatarPromise;
+    const code = generateCode();
+    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
 
     await supabase.from("mm_verification_codes").insert({
       code_hash: hashCode(code),
@@ -264,7 +235,7 @@ export async function POST(request: Request) {
 
     const dmChannel = await createDirectChannel(
       senderLogin.token,
-      sender.id,
+      senderLogin.user.id,
       targetUser.id,
     );
     await sendPost(

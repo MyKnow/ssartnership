@@ -132,8 +132,10 @@ export default async function PartnerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const headerSession = await getHeaderSession();
-  const resolvedParams = await params;
+  const [headerSession, resolvedParams] = await Promise.all([
+    getHeaderSession(),
+    params,
+  ]);
   const rawId = resolvedParams?.id
     ? decodeURIComponent(resolvedParams.id).trim()
     : "";

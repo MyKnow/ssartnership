@@ -214,16 +214,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_code" }, { status: 400 });
     }
 
-    const { data: memberData } = await supabase
+    const memberPromise = supabase
       .from("members")
       .select(
         "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at",
       )
       .eq("mm_user_id", mmUserId)
       .maybeSingle();
+    const avatarPromise = getUserImage(resolvedStudent.senderToken, mmUserId);
+    const passwordRecord = hashPassword(password);
+    const { data: memberData } = await memberPromise;
     const member = (memberData as MemberRow | null) ?? null;
-
-    const avatar = await getUserImage(resolvedStudent.senderToken, mmUserId);
+    const avatar = await avatarPromise;
     const profile = parseSsafyProfile(
       resolvedStudent.user.nickname || resolvedStudent.user.username,
     );
@@ -241,7 +243,6 @@ export async function POST(request: Request) {
       avatarBase64: avatar?.base64 ?? null,
     };
 
-    const passwordRecord = hashPassword(password);
     const year = codeRow.year ?? member?.year ?? null;
 
     let authenticatedMemberId = member?.id ?? null;

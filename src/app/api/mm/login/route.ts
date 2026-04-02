@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
-import {
-  getRequestLogContext,
-  logAdminAudit,
-  logAuthSecurity,
-} from "@/lib/activity-logs";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
-import {
-  buildMemberSyncLogProperties,
-  syncMemberById,
-} from "@/lib/mm-member-sync";
 import {
   MattermostApiError,
   resolveSelectableStudentByUsername,
@@ -128,24 +120,6 @@ export async function POST(request: Request) {
     }
 
     await setUserSession(member.id, Boolean(member.must_change_password));
-
-    try {
-      const syncResult = await syncMemberById(member.id);
-      if (syncResult?.updated) {
-        await logAdminAudit({
-          ...context,
-          action: "member_sync",
-          actorId: process.env.ADMIN_ID ?? "admin",
-          targetType: "member",
-          targetId: member.id,
-          properties: buildMemberSyncLogProperties(syncResult, {
-            source: "login",
-          }),
-        });
-      }
-    } catch (error) {
-      console.error("member sync failed", error);
-    }
 
     await logAuthSecurity({
       ...context,

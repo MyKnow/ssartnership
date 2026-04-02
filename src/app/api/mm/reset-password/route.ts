@@ -10,7 +10,6 @@ import {
   MattermostApiError,
   getStudentChannelConfig,
   getSenderCredentials,
-  getMe,
   findUserInChannelByUserId,
   loginWithPassword,
   createDirectChannel,
@@ -123,7 +122,6 @@ export async function POST(request: Request) {
       senderCredentials.loginId,
       senderCredentials.password,
     );
-    const sender = await getMe(senderLogin.token);
     const channelConfig = getStudentChannelConfig(member.year);
     let mmUser;
     try {
@@ -170,33 +168,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "not_mm" }, { status: 404 });
     }
 
-    const profile = parseSsafyProfile(mmUser.nickname || mmUser.username);
-    const avatar = await getUserImage(senderLogin.token, member.mm_user_id);
-    const syncResult = await syncMemberSnapshot(member, {
-      mmUserId: member.mm_user_id,
-      mmUsername: mmUser.username,
-      displayName: profile.displayName ?? mmUser.nickname ?? mmUser.username,
-      campus: profile.campus ?? null,
-      classNumber: profile.classNumber ?? null,
-      avatarFetched: Boolean(avatar),
-      avatarContentType: avatar?.contentType ?? null,
-      avatarBase64: avatar?.base64 ?? null,
-    });
-
-    if (syncResult.updated) {
-      await logAdminAudit({
-        ...context,
-        action: "member_sync",
-        actorId: process.env.ADMIN_ID ?? "admin",
-        targetType: "member",
-        targetId: member.id,
-        properties: buildMemberSyncLogProperties(syncResult, {
-          source: "password_reset",
-        }),
-      });
-      member = syncResult.member;
-    }
-
     const { data: attempt } = await supabase
       .from("password_reset_attempts")
       .select("id,count,blocked_until,first_attempt_at,created_at")
@@ -236,6 +207,34 @@ export async function POST(request: Request) {
       }
     }
 
+    const avatarPromise = getUserImage(senderLogin.token, member.mm_user_id);
+    const profile = parseSsafyProfile(mmUser.nickname || mmUser.username);
+    const avatar = await avatarPromise;
+    const syncResult = await syncMemberSnapshot(member, {
+      mmUserId: member.mm_user_id,
+      mmUsername: mmUser.username,
+      displayName: profile.displayName ?? mmUser.nickname ?? mmUser.username,
+      campus: profile.campus ?? null,
+      classNumber: profile.classNumber ?? null,
+      avatarFetched: Boolean(avatar),
+      avatarContentType: avatar?.contentType ?? null,
+      avatarBase64: avatar?.base64 ?? null,
+    });
+
+    if (syncResult.updated) {
+      await logAdminAudit({
+        ...context,
+        action: "member_sync",
+        actorId: process.env.ADMIN_ID ?? "admin",
+        targetType: "member",
+        targetId: member.id,
+        properties: buildMemberSyncLogProperties(syncResult, {
+          source: "password_reset",
+        }),
+      });
+      member = syncResult.member;
+    }
+
     const tempPassword = generateTempPassword(12);
     const record = hashPassword(tempPassword);
 
@@ -251,7 +250,7 @@ export async function POST(request: Request) {
 
     const dmChannel = await createDirectChannel(
       senderLogin.token,
-      sender.id,
+      senderLogin.user.id,
       mmUser.id,
     );
     await sendPost(

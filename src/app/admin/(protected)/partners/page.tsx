@@ -40,18 +40,19 @@ function FieldGroup({
 export default async function AdminPartnersPage() {
   const supabase = getSupabaseAdminClient();
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id,key,label,description,color")
-    .order("created_at", { ascending: true });
+  const [categoriesResult, partnersResult] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id,key,label,description,color")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("partners")
+      .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility")
+      .order("created_at", { ascending: false }),
+  ]);
 
-  const { data: partners } = await supabase
-    .from("partners")
-    .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility")
-    .order("created_at", { ascending: false });
-
-  const safeCategories = categories ?? [];
-  const safePartners = partners ?? [];
+  const safeCategories = categoriesResult.data ?? [];
+  const safePartners = partnersResult.data ?? [];
 
   return (
     <AdminShell
