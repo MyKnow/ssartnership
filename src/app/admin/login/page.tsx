@@ -10,11 +10,13 @@ import Button from "@/components/ui/Button";
 import SubmitButton from "@/components/ui/SubmitButton";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { validateAdminIdentifier } from "@/lib/validation";
+import { SITE_NAME } from "@/lib/site";
 
 export const metadata = {
+  title: `관리자 로그인 | ${SITE_NAME}`,
   robots: {
     index: false,
-    follow: false,
+    follow: true,
   },
 };
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
@@ -19,9 +20,105 @@ import { isWithinPeriod } from "@/lib/partner-utils";
 import ContactCopyRow from "@/components/ContactCopyRow";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import ShareLinkButton from "@/components/ShareLinkButton";
+import {
+  SITE_KEYWORDS,
+  SITE_LEGACY_NAME,
+  SITE_NAME,
+  SITE_URL,
+} from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const resolvedParams = await params;
+  const rawId = resolvedParams?.id
+    ? decodeURIComponent(resolvedParams.id).trim()
+    : "";
+
+  if (!rawId) {
+    return {
+      title: `제휴 정보 | ${SITE_NAME}`,
+      robots: {
+        index: false,
+        follow: true,
+      },
+    };
+  }
+
+  const [categories, partner] = await Promise.all([
+    partnerRepository.getCategories(),
+    partnerRepository.getPartnerById(rawId, {
+      authenticated: false,
+    }),
+  ]);
+
+  if (!partner) {
+    return {
+      title: `제휴 정보 | ${SITE_NAME}`,
+      robots: {
+        index: false,
+        follow: true,
+      },
+    };
+  }
+
+  const categoryLabel =
+    categories.find((item) => item.key === partner.category)?.label ?? "제휴";
+  const canonicalPath = `/partners/${encodeURIComponent(rawId)}`;
+  const title = `${partner.name} | SSAFY(싸피) ${categoryLabel} 제휴 | ${SITE_NAME}(${SITE_LEGACY_NAME})`;
+  const description = `싸트너십(SSARTNERSHIP)에서 ${partner.name}을 확인하세요. SSAFY(싸피) 서울 캠퍼스 ${categoryLabel} 제휴이며, ${partner.location}에서 이용 가능한 혜택과 제휴 기간을 확인할 수 있습니다.`;
+
+  return {
+    title,
+    description,
+    keywords: [
+      partner.name,
+      categoryLabel,
+      "싸트너십",
+      "SSARTNERSHIP",
+      "SSAFY",
+      "싸피",
+      "싸피 제휴",
+      "SSAFY 제휴",
+      "서울 캠퍼스 제휴",
+      ...SITE_KEYWORDS,
+    ],
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonicalPath,
+      siteName: SITE_NAME,
+      locale: "ko_KR",
+      type: "article",
+      images: [
+        {
+          url: "/icon-512.png",
+          width: 512,
+          height: 512,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/icon-512.png"],
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
+}
 
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
@@ -80,12 +177,37 @@ export default async function PartnerDetailPage({
   const reservationDisplay = getContactDisplay(normalizedLinks.reservationLink);
   const inquiryDisplay = getContactDisplay(normalizedLinks.inquiryLink);
   const isActive = isWithinPeriod(partner.period.start, partner.period.end);
+  const partnerUrl = `${SITE_URL}/partners/${encodeURIComponent(partner.id)}`;
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "홈",
+        item: SITE_URL,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: partner.name,
+        item: partnerUrl,
+      },
+    ],
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(breadcrumbJsonLd),
+            }}
+          />
           <AnalyticsEventOnMount
             eventName="partner_detail_view"
             targetType="partner"

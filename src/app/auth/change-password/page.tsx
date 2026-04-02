@@ -1,12 +1,18 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import { getUserSession } from "@/lib/user-auth";
 import ChangePasswordForm from "@/components/auth/ChangePasswordForm";
+import { SITE_NAME } from "@/lib/site";
 
-export const metadata = {
-  title: "비밀번호 변경 | SSARTNERSHIP",
+export const metadata: Metadata = {
+  title: `비밀번호 변경 | ${SITE_NAME}`,
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 export default async function ChangePasswordPage() {

@@ -1,11 +1,17 @@
+import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import LoginForm from "@/components/auth/LoginForm";
+import { SITE_NAME } from "@/lib/site";
 
-export const metadata = {
-  title: "로그인 | SSARTNERSHIP",
+export const metadata: Metadata = {
+  title: `로그인 | ${SITE_NAME}`,
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 export default async function LoginPage() {

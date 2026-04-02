@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
@@ -11,9 +12,14 @@ import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
+import { SITE_NAME } from "@/lib/site";
 
-export const metadata = {
-  title: "교육생 인증 | SSARTNERSHIP",
+export const metadata: Metadata = {
+  title: `교육생 인증 | ${SITE_NAME}`,
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 type CertificationMember = {

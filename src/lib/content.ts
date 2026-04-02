@@ -1,16 +1,18 @@
+import { SITE_LEGACY_NAME, SITE_NAME } from "@/lib/site";
+
 export const HOME_COPY = {
-  heroEyebrow: "SSAFY Partnership",
-  heroTitle: "교육생들을 위한 제휴 혜택",
-  heroDescription:
-    "SSAFY 학생들을 위한 다양한 제휴 혜택을 한눈에 확인하세요.\n카테고리별로 원하는 혜택을 쉽게 찾아볼 수 있습니다.",
+  heroEyebrow: `${SITE_NAME} · SSAFY(싸피) 제휴`,
+  heroTitle: "SSAFY(싸피) 서울 캠퍼스 제휴 혜택을 한곳에서",
+  heroDescription: `${SITE_NAME}(${SITE_LEGACY_NAME})은 SSAFY(싸피) 서울 캠퍼스 교육생을 위한 제휴 혜택 플랫폼입니다.\n공개, 대외비, 비공개 제휴 업체를 카테고리별로 빠르게 찾아보세요.`,
   categoryTitle: "카테고리별 혜택",
-  categoryDescription: "원하는 카테고리를 선택해보세요.",
+  categoryDescription: "원하는 카테고리를 선택해 SSAFY 제휴 혜택을 찾아보세요.",
   emptyTitle: "아직 등록된 제휴가 없습니다.",
   emptyDescription: "새로운 제휴가 추가되면 바로 안내할게요.",
   noResultsTitle: "검색 결과가 없습니다.",
   noResultsDescription: "다른 키워드나 카테고리를 선택해보세요.",
   suggestionTitle: "제휴 제안",
-  suggestionDescription: "제휴를 추진했으면 하는 카테고리나 업체가 있으신가요?",
+  suggestionDescription:
+    "SSAFY 제휴를 추진했으면 하는 카테고리나 업체가 있으신가요?",
   suggestionPrimary: "제안하기",
   suggestionCancel: "취소",
 };

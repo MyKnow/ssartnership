@@ -1,12 +1,18 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import PushSettingsCard from "@/components/push/PushSettingsCard";
 import Container from "@/components/ui/Container";
 import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { SITE_NAME } from "@/lib/site";
 
-export const metadata = {
-  title: "알림 설정 | SSARTNERSHIP",
+export const metadata: Metadata = {
+  title: `알림 설정 | ${SITE_NAME}`,
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 export default async function NotificationsPage() {

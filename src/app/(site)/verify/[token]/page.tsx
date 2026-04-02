@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import SiteHeader from "@/components/SiteHeader";
@@ -9,16 +10,17 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyCertificationQrToken } from "@/lib/certification-qr";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { getCurrentSsafyYear } from "@/lib/ssafy-year";
+import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "교육생 QR 검증 | SSARTNERSHIP",
+  title: `교육생 QR 검증 | ${SITE_NAME}`,
   robots: {
     index: false,
-    follow: false,
+    follow: true,
   },
-};
+} satisfies Metadata;
 
 function formatDate(value: number) {
   return new Date(value).toLocaleString("ko-KR", {

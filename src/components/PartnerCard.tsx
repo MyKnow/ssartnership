@@ -2,6 +2,7 @@
 
 import type { CategoryKey, Partner, PartnerVisibility } from "@/lib/types";
 import type { MouseEvent } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { getBlurDataURL } from "@/lib/image-blur";
 import { useRouter } from "next/navigation";
@@ -506,9 +507,30 @@ export default function PartnerCard({
           </div>
           <div className="grid flex-1 gap-2">
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-semibold leading-none text-foreground line-clamp-2">
-                {viewPartner.name}
-              </h3>
+              {canNavigate ? (
+                <Link
+                  href={detailHref}
+                  className="min-w-0 flex-1 text-left text-xl font-semibold leading-none text-foreground line-clamp-2 hover:underline"
+                  aria-label={`${viewPartner.name} 상세 보기`}
+                  onClick={() =>
+                    trackProductEvent({
+                      eventName: "partner_card_click",
+                      targetType: "partner",
+                      targetId: viewPartner.id,
+                      properties: {
+                        categoryKey: viewPartner.category,
+                        source: "title_link",
+                      },
+                    })
+                  }
+                >
+                  {viewPartner.name}
+                </Link>
+              ) : (
+                <h3 className="min-w-0 flex-1 text-xl font-semibold leading-none text-foreground line-clamp-2">
+                  {viewPartner.name}
+                </h3>
+              )}
               {mapLink ? (
                 <a
                   className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"

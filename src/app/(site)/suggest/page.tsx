@@ -1,13 +1,19 @@
+import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SuggestForm from "@/components/SuggestForm";
+import { SITE_NAME } from "@/lib/site";
 
-export const metadata = {
-  title: "제휴 제안하기 - SSARTNERSHIP",
-  description: "SSAFY 제휴 제안을 남겨주세요.",
+export const metadata: Metadata = {
+  title: `제휴 제안하기 | ${SITE_NAME}`,
+  description: `${SITE_NAME}에 SSAFY 제휴 제안을 남겨주세요.`,
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 export default async function SuggestPage() {

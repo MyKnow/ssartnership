@@ -1,10 +1,53 @@
+import type { Metadata } from "next";
 import { partnerRepository } from "@/lib/repositories";
 import HomeView from "@/components/HomeView";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import {
+  SITE_ALTERNATE_NAMES,
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
+} from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
 
 export const revalidate = 300;
+
+export const metadata: Metadata = {
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    siteName: SITE_NAME,
+    locale: "ko_KR",
+    type: "website",
+    images: [
+      {
+        url: "/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: SITE_TITLE,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/icon-512.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default async function Home() {
   const sessionPromise = getSignedUserSession();
@@ -27,7 +70,7 @@ export default async function Home() {
       {
         "@type": "WebSite",
         name: SITE_NAME,
-        alternateName: ["싸트너십", "SSAFY 제휴", "싸피 제휴"],
+        alternateName: SITE_ALTERNATE_NAMES,
         url: SITE_URL,
         description: SITE_DESCRIPTION,
       },

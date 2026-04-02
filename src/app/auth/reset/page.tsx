@@ -1,11 +1,17 @@
+import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import { SITE_NAME } from "@/lib/site";
 
-export const metadata = {
-  title: "비밀번호 재설정 | SSARTNERSHIP",
+export const metadata: Metadata = {
+  title: `비밀번호 재설정 | ${SITE_NAME}`,
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 export default async function ResetPasswordPage() {
