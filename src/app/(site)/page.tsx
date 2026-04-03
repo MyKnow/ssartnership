@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { partnerRepository } from "@/lib/repositories";
 import HomeView from "@/components/HomeView";
+import { isWithinPeriod } from "@/lib/partner-utils";
 import {
   SITE_ALTERNATE_NAMES,
   SITE_DESCRIPTION,
@@ -71,6 +72,16 @@ export default async function Home() {
     partnersPromise,
     pushPreferencesPromise,
   ]);
+  const viewPartners = partners.map((partner) => {
+    if (isWithinPeriod(partner.period.start, partner.period.end)) {
+      return partner;
+    }
+    return {
+      ...partner,
+      reservationLink: undefined,
+      inquiryLink: undefined,
+    };
+  });
   const showPushOptInBanner = Boolean(
     session?.userId &&
       isPushConfigured() &&
@@ -106,7 +117,7 @@ export default async function Home() {
       />
       <HomeView
         categories={categories}
-        partners={partners}
+        partners={viewPartners}
         initialSession={headerSession}
         viewerAuthenticated={Boolean(session?.userId)}
         showPushOptInBanner={showPushOptInBanner}

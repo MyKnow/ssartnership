@@ -155,8 +155,10 @@ export default async function PartnerDetailPage({
     redirect("/");
   }
 
+  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
   const category = categories.find((item) => item.key === partner.category);
   const categoryLabel = category?.label ?? "알 수 없음";
+  const viewPartner = partner;
   const badgeStyle = category?.color
     ? {
         backgroundColor: withAlpha(category.color, "1f"),
@@ -168,17 +170,22 @@ export default async function PartnerDetailPage({
         backgroundColor: withAlpha(category.color, "14"),
         borderColor: withAlpha(category.color, "55"),
         color: category.color,
-      }
+    }
     : undefined;
 
-  const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name);
-  const normalizedLinks = normalizeReservationInquiry(
-    partner.reservationLink,
-    partner.inquiryLink,
-  );
-  const reservationDisplay = getContactDisplay(normalizedLinks.reservationLink);
-  const inquiryDisplay = getContactDisplay(normalizedLinks.inquiryLink);
-  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
+  const mapLink = getMapLink(viewPartner.mapUrl, viewPartner.location, viewPartner.name);
+  const normalizedLinks = isActive
+    ? normalizeReservationInquiry(
+        viewPartner.reservationLink,
+        viewPartner.inquiryLink,
+      )
+    : { reservationLink: "", inquiryLink: "" };
+  const reservationDisplay = isActive
+    ? getContactDisplay(normalizedLinks.reservationLink)
+    : null;
+  const inquiryDisplay = isActive
+    ? getContactDisplay(normalizedLinks.inquiryLink)
+    : null;
   const partnerUrl = `${SITE_URL}/partners/${encodeURIComponent(partner.id)}`;
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -253,16 +260,16 @@ export default async function PartnerDetailPage({
                   {categoryLabel}
                 </Badge>
                 <span className="text-xs font-medium text-muted-foreground">
-                  {partner.period.start} ~ {partner.period.end}
+                  {viewPartner.period.start} ~ {viewPartner.period.end}
                 </span>
               </div>
 
               <h1 className="mt-4 text-3xl font-semibold text-foreground">
-                {partner.name}
+                {viewPartner.name}
               </h1>
 
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>{partner.location}</span>
+                <span>{viewPartner.location}</span>
                 {mapLink ? (
                   <TrackedAnchor
                     className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
@@ -295,23 +302,18 @@ export default async function PartnerDetailPage({
                 ) : null}
               </div>
 
-              {!isActive ? (
-                <div className="mt-4 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
-                  현재 제휴 기간이 아닙니다.
-                </div>
-              ) : null}
             </Card>
 
             <PartnerImageCarousel
-              images={partner.images ?? []}
-              name={partner.name}
+              images={viewPartner.images ?? []}
+              name={viewPartner.name}
             />
 
             <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
               <Card className="p-6">
                 <SectionHeading title="혜택" />
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {partner.benefits.map((benefit) => (
+                  {viewPartner.benefits.map((benefit) => (
                     <Badge
                       key={benefit}
                       className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
@@ -321,11 +323,11 @@ export default async function PartnerDetailPage({
                   ))}
                 </div>
 
-                {partner.conditions && partner.conditions.length > 0 ? (
+                {viewPartner.conditions && viewPartner.conditions.length > 0 ? (
                   <div className="mt-6">
                     <SectionHeading title="이용 조건" />
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {partner.conditions.map((condition) => (
+                      {viewPartner.conditions.map((condition) => (
                         <Badge
                           key={condition}
                           className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
@@ -337,11 +339,11 @@ export default async function PartnerDetailPage({
                   </div>
                 ) : null}
 
-                {partner.tags && partner.tags.length > 0 ? (
+                {viewPartner.tags && viewPartner.tags.length > 0 ? (
                   <div className="mt-6">
                     <SectionHeading title="태그" />
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {partner.tags.map((tag) => (
+                      {viewPartner.tags.map((tag) => (
                         <Chip key={tag} style={chipStyle}>
                           #{tag}
                         </Chip>
@@ -351,33 +353,44 @@ export default async function PartnerDetailPage({
                 ) : null}
               </Card>
 
-              {reservationDisplay ? (
-                <Card className="p-6">
-                  <SectionHeading title="예약" />
-                  <ContactCopyRow
-                    href={reservationDisplay.href}
-                    label={reservationDisplay.label}
-                    rawValue={normalizedLinks.reservationLink ?? ""}
-                    eventName="reservation_click"
-                    targetType="partner"
-                    targetId={partner.id}
-                  />
-                </Card>
-              ) : null}
+              {isActive ? (
+                <>
+                  {reservationDisplay ? (
+                    <Card className="p-6">
+                      <SectionHeading title="예약" />
+                      <ContactCopyRow
+                        href={reservationDisplay.href}
+                        label={reservationDisplay.label}
+                        rawValue={normalizedLinks.reservationLink ?? ""}
+                        eventName="reservation_click"
+                        targetType="partner"
+                        targetId={partner.id}
+                      />
+                    </Card>
+                  ) : null}
 
-              {inquiryDisplay ? (
-                <Card className="p-6">
-                  <SectionHeading title="문의" />
-                  <ContactCopyRow
-                    href={inquiryDisplay.href}
-                    label={inquiryDisplay.label}
-                    rawValue={normalizedLinks.inquiryLink ?? ""}
-                    eventName="inquiry_click"
-                    targetType="partner"
-                    targetId={partner.id}
-                  />
+                  {inquiryDisplay ? (
+                    <Card className="p-6">
+                      <SectionHeading title="문의" />
+                      <ContactCopyRow
+                        href={inquiryDisplay.href}
+                        label={inquiryDisplay.label}
+                        rawValue={normalizedLinks.inquiryLink ?? ""}
+                        eventName="inquiry_click"
+                        targetType="partner"
+                        targetId={partner.id}
+                      />
+                    </Card>
+                  ) : null}
+                </>
+              ) : (
+                <Card className="p-6 lg:col-span-2">
+                  <SectionHeading title="예약/문의" />
+                  <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
+                    현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.
+                  </div>
                 </Card>
-              ) : null}
+              )}
             </div>
           </div>
         </Container>

@@ -300,17 +300,6 @@ export default function PartnerCard({
 
   const viewPartner = partner as Partner;
   const lockKind = getPartnerLockKind(viewPartner.visibility, viewerAuthenticated);
-  const normalizedLinks = normalizeReservationInquiry(
-    viewPartner.reservationLink,
-    viewPartner.inquiryLink,
-  );
-  const reservationAction = getReservationAction(normalizedLinks.reservationLink);
-  const inquiryAction = getInquiryAction(normalizedLinks.inquiryLink);
-  const mapLink = getMapLink(
-    viewPartner.mapUrl,
-    viewPartner.location,
-    viewPartner.name,
-  );
   const thumbnailUrl =
     viewPartner.images && viewPartner.images.length > 0
       ? getCachedImageUrl(viewPartner.images[0])
@@ -320,10 +309,27 @@ export default function PartnerCard({
     viewPartner.period.start,
     viewPartner.period.end,
   );
+  const normalizedLinks = isActive
+    ? normalizeReservationInquiry(
+        viewPartner.reservationLink,
+        viewPartner.inquiryLink,
+      )
+    : { reservationLink: "", inquiryLink: "" };
+  const reservationAction = isActive
+    ? getReservationAction(normalizedLinks.reservationLink)
+    : null;
+  const inquiryAction = isActive
+    ? getInquiryAction(normalizedLinks.inquiryLink)
+    : null;
+  const mapLink = getMapLink(
+    viewPartner.mapUrl,
+    viewPartner.location,
+    viewPartner.name,
+  );
   const detailHref = viewPartner.id
     ? `/partners/${encodeURIComponent(viewPartner.id)}`
     : "";
-  const canNavigate = detailHref.length > 0 && isActive && !lockKind;
+  const canNavigate = detailHref.length > 0 && !lockKind;
   const handleCategoryClick = onCategoryClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
@@ -438,11 +444,6 @@ export default function PartnerCard({
         }
       }}
     >
-      {!isActive ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-950/60 text-sm font-semibold text-white">
-          제휴 기간이 아닙니다.
-        </div>
-      ) : null}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           {handleCategoryClick ? (
@@ -615,7 +616,7 @@ export default function PartnerCard({
           </div>
         )}
       </div>
-      {(reservationAction || inquiryAction) ? (
+      {isActive && (reservationAction || inquiryAction) ? (
         <div className="mt-5 flex flex-col gap-2">
           {reservationAction ? (
             <Button
@@ -667,6 +668,10 @@ export default function PartnerCard({
               {inquiryAction.label}
             </Button>
           ) : null}
+        </div>
+      ) : !isActive ? (
+        <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
+          현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.
         </div>
       ) : null}
     </article>
