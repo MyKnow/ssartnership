@@ -1,59 +1,25 @@
 "use client";
 
-import type { CategoryKey, Partner, PartnerVisibility } from "@/lib/types";
+import type { CategoryKey, Partner } from "@/lib/types";
 import type { MouseEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { getBlurDataURL } from "@/lib/image-blur";
 import { useRouter } from "next/navigation";
-import { trackProductEvent } from "@/lib/product-events";
 import Badge from "@/components/ui/Badge";
-import Chip from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
-import SubmitButton from "@/components/ui/SubmitButton";
+import Chip from "@/components/ui/Chip";
 import { cn } from "@/lib/cn";
-import { isWithinPeriod } from "@/lib/partner-utils";
+import { getBlurDataURL } from "@/lib/image-blur";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import {
   getInquiryAction,
   getMapLink,
   getReservationAction,
   normalizeReservationInquiry,
 } from "@/lib/partner-links";
-import ImageListEditor from "@/components/admin/ImageListEditor";
-import { getCachedImageUrl } from "@/lib/image-cache";
-import {
-  getPartnerLockCopy,
-  getPartnerLockKind,
-  getPartnerVisibilityBadgeClass,
-  getPartnerVisibilityLabel,
-} from "@/lib/partner-visibility";
-
-type CategoryOption = {
-  id: string;
-  label: string;
-};
-
-type PartnerFormValues = {
-  id?: string;
-  name?: string;
-  visibility?: PartnerVisibility;
-  location?: string;
-  mapUrl?: string;
-  reservationLink?: string;
-  inquiryLink?: string;
-  period?: {
-    start?: string;
-    end?: string;
-  };
-  benefits?: string[];
-  conditions?: string[];
-  images?: string[];
-  tags?: string[];
-};
-
-type PartnerCardMode = "view" | "edit" | "create";
+import { getPartnerLockCopy, getPartnerLockKind, getPartnerVisibilityBadgeClass } from "@/lib/partner-visibility";
+import { isWithinPeriod } from "@/lib/partner-utils";
+import { trackProductEvent } from "@/lib/product-events";
 
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
@@ -62,228 +28,22 @@ function withAlpha(color: string, alphaHex: string) {
   return `${color}${alphaHex}`;
 }
 
-
-export default function PartnerCard({
+export default function PartnerCardView({
   partner,
   categoryLabel,
   categoryColor,
-  mode = "view",
-  categoryOptions,
-  categoryId,
-  formAction,
-  deleteAction,
-  submitLabel,
   className,
   onCategoryClick,
   viewerAuthenticated = false,
 }: {
-  partner: Partner | PartnerFormValues;
+  partner: Partner;
   categoryLabel?: string;
   categoryColor?: string;
-  mode?: PartnerCardMode;
-  categoryOptions?: CategoryOption[];
-  categoryId?: string;
-  formAction?: (formData: FormData) => void | Promise<void>;
-  deleteAction?: (formData: FormData) => void | Promise<void>;
-  submitLabel?: string;
   className?: string;
   onCategoryClick?: (categoryKey: CategoryKey) => void;
   viewerAuthenticated?: boolean;
 }) {
   const router = useRouter();
-  if (mode !== "view") {
-    const formPartner = partner as PartnerFormValues;
-    const benefitsValue = (formPartner.benefits ?? []).join(", ");
-    const conditionsValue = (formPartner.conditions ?? []).join(", ");
-    const tagsValue = (formPartner.tags ?? []).join(", ");
-    const periodStart = formPartner.period?.start ?? "";
-    const periodEnd = formPartner.period?.end ?? "";
-
-    return (
-      <article
-        className={cn(
-          "flex h-full w-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-sm",
-          className,
-        )}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground">
-            {mode === "create" ? "새 제휴 추가" : "제휴 정보 수정"}
-          </p>
-          <div className="flex items-center gap-2">
-            <Badge
-              className={cn(
-                "text-xs",
-                getPartnerVisibilityBadgeClass(
-                  formPartner.visibility ?? "public",
-                ),
-              )}
-            >
-              {getPartnerVisibilityLabel(formPartner.visibility ?? "public")}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {periodStart || periodEnd ? `${periodStart} ~ ${periodEnd}` : ""}
-            </span>
-          </div>
-        </div>
-
-        <form action={formAction} className="grid gap-3">
-          {mode === "edit" && formPartner.id ? (
-            <input type="hidden" name="id" value={formPartner.id} />
-          ) : null}
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              업체명
-            </span>
-            <Input name="name" defaultValue={formPartner.name ?? ""} required />
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              노출 상태
-            </span>
-            <Select
-              name="visibility"
-              defaultValue={formPartner.visibility ?? "public"}
-              required
-            >
-              <option value="public">공개</option>
-              <option value="confidential">대외비</option>
-              <option value="private">비공개</option>
-            </Select>
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              카테고리
-            </span>
-            <Select
-              name="categoryId"
-              defaultValue={categoryId}
-              required
-            >
-              {(categoryOptions ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              위치
-            </span>
-            <Input
-              name="location"
-              defaultValue={formPartner.location ?? ""}
-              required
-            />
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              지도 URL
-            </span>
-            <Input name="mapUrl" defaultValue={formPartner.mapUrl ?? ""} />
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              예약 링크
-            </span>
-            <Input
-              name="reservationLink"
-              defaultValue={formPartner.reservationLink ?? ""}
-            />
-          </div>
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              문의 링크
-            </span>
-            <Input
-              name="inquiryLink"
-              defaultValue={formPartner.inquiryLink ?? ""}
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                시작일
-              </span>
-              <Input
-                type="date"
-                name="periodStart"
-                defaultValue={periodStart}
-              />
-            </div>
-            <div className="grid gap-1">
-              <span className="text-xs font-medium text-muted-foreground">
-                종료일
-              </span>
-              <Input type="date" name="periodEnd" defaultValue={periodEnd} />
-            </div>
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              혜택
-            </span>
-            <Input
-              name="benefits"
-              defaultValue={benefitsValue}
-              placeholder="혜택1, 혜택2"
-            />
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              이용 조건
-            </span>
-            <Input
-              name="conditions"
-              defaultValue={conditionsValue}
-              placeholder="조건1, 조건2"
-            />
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              태그
-            </span>
-            <Input
-              name="tags"
-              defaultValue={tagsValue}
-              placeholder="태그1, 태그2"
-            />
-          </div>
-
-          <div className="grid gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              이미지
-            </span>
-            <ImageListEditor name="images" initial={formPartner.images ?? []} />
-          </div>
-
-          <SubmitButton pendingText="저장 중" className="w-full">
-            {submitLabel ?? (mode === "create" ? "제휴 추가" : "수정")}
-          </SubmitButton>
-        </form>
-
-        {mode === "edit" && deleteAction && formPartner.id ? (
-          <form action={deleteAction}>
-            <input type="hidden" name="id" value={formPartner.id} />
-            <SubmitButton variant="danger" pendingText="삭제 중" className="w-full">
-              삭제
-            </SubmitButton>
-          </form>
-        ) : null}
-      </article>
-    );
-  }
-
   const badgeStyle = categoryColor
     ? {
         backgroundColor: withAlpha(categoryColor, "1f"),
@@ -298,21 +58,17 @@ export default function PartnerCard({
       }
     : undefined;
 
-  const viewPartner = partner as Partner;
-  const lockKind = getPartnerLockKind(viewPartner.visibility, viewerAuthenticated);
+  const lockKind = getPartnerLockKind(partner.visibility, viewerAuthenticated);
   const thumbnailUrl =
-    viewPartner.images && viewPartner.images.length > 0
-      ? getCachedImageUrl(viewPartner.images[0])
+    partner.images && partner.images.length > 0
+      ? getCachedImageUrl(partner.images[0])
       : "";
   const blurDataURL = getBlurDataURL(32, 32);
-  const isActive = isWithinPeriod(
-    viewPartner.period.start,
-    viewPartner.period.end,
-  );
+  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
   const normalizedLinks = isActive
     ? normalizeReservationInquiry(
-        viewPartner.reservationLink,
-        viewPartner.inquiryLink,
+        partner.reservationLink,
+        partner.inquiryLink,
       )
     : { reservationLink: "", inquiryLink: "" };
   const reservationAction = isActive
@@ -322,19 +78,19 @@ export default function PartnerCard({
     ? getInquiryAction(normalizedLinks.inquiryLink)
     : null;
   const mapLink = getMapLink(
-    viewPartner.mapUrl,
-    viewPartner.location,
-    viewPartner.name,
+    partner.mapUrl,
+    partner.location,
+    partner.name,
   );
-  const detailHref = viewPartner.id
-    ? `/partners/${encodeURIComponent(viewPartner.id)}`
+  const detailHref = partner.id
+    ? `/partners/${encodeURIComponent(partner.id)}`
     : "";
   const canNavigate = detailHref.length > 0 && !lockKind;
   const handleCategoryClick = onCategoryClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        onCategoryClick(viewPartner.category);
+        onCategoryClick(partner.category);
       }
     : null;
 
@@ -382,7 +138,7 @@ export default function PartnerCard({
             <Badge
               className={cn(
                 "mb-3",
-                getPartnerVisibilityBadgeClass(viewPartner.visibility),
+                getPartnerVisibilityBadgeClass(partner.visibility),
               )}
             >
               {lockCopy.badge}
@@ -406,7 +162,7 @@ export default function PartnerCard({
       )}
       role={canNavigate ? "link" : undefined}
       tabIndex={canNavigate ? 0 : undefined}
-      aria-label={canNavigate ? `${viewPartner.name} 상세 보기` : undefined}
+      aria-label={canNavigate ? `${partner.name} 상세 보기` : undefined}
       onClick={(event) => {
         if (!canNavigate) {
           return;
@@ -418,9 +174,9 @@ export default function PartnerCard({
         trackProductEvent({
           eventName: "partner_card_click",
           targetType: "partner",
-          targetId: viewPartner.id,
+          targetId: partner.id,
           properties: {
-            categoryKey: viewPartner.category,
+            categoryKey: partner.category,
           },
         });
         router.push(detailHref);
@@ -434,9 +190,9 @@ export default function PartnerCard({
           trackProductEvent({
             eventName: "partner_card_click",
             targetType: "partner",
-            targetId: viewPartner.id,
+            targetId: partner.id,
             properties: {
-              categoryKey: viewPartner.category,
+              categoryKey: partner.category,
               source: "keyboard",
             },
           });
@@ -471,7 +227,7 @@ export default function PartnerCard({
             </Badge>
           )}
           <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
-            {viewPartner.period.start} ~ {viewPartner.period.end}
+            {partner.period.start} ~ {partner.period.end}
           </span>
         </div>
         <div className="flex items-start gap-4">
@@ -512,24 +268,24 @@ export default function PartnerCard({
                 <Link
                   href={detailHref}
                   className="min-w-0 flex-1 text-left text-xl font-semibold leading-none text-foreground line-clamp-2 hover:underline"
-                  aria-label={`${viewPartner.name} 상세 보기`}
+                  aria-label={`${partner.name} 상세 보기`}
                   onClick={() =>
                     trackProductEvent({
                       eventName: "partner_card_click",
                       targetType: "partner",
-                      targetId: viewPartner.id,
+                      targetId: partner.id,
                       properties: {
-                        categoryKey: viewPartner.category,
+                        categoryKey: partner.category,
                         source: "title_link",
                       },
                     })
                   }
                 >
-                  {viewPartner.name}
+                  {partner.name}
                 </Link>
               ) : (
                 <h3 className="min-w-0 flex-1 text-xl font-semibold leading-none text-foreground line-clamp-2">
-                  {viewPartner.name}
+                  {partner.name}
                 </h3>
               )}
               {mapLink ? (
@@ -542,9 +298,9 @@ export default function PartnerCard({
                     trackProductEvent({
                       eventName: "partner_map_click",
                       targetType: "partner",
-                      targetId: viewPartner.id,
+                      targetId: partner.id,
                       properties: {
-                        categoryKey: viewPartner.category,
+                        categoryKey: partner.category,
                         source: "card",
                       },
                     })
@@ -571,14 +327,14 @@ export default function PartnerCard({
               ) : null}
             </div>
             <div className="text-sm text-muted-foreground">
-              <span className="line-clamp-2">{viewPartner.location}</span>
+              <span className="line-clamp-2">{partner.location}</span>
             </div>
           </div>
         </div>
         <div className="text-sm text-foreground">
           <p className="font-medium text-foreground">혜택</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {viewPartner.benefits.map((benefit) => (
+            {partner.benefits.map((benefit) => (
               <Badge
                 key={benefit}
                 className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
@@ -588,11 +344,11 @@ export default function PartnerCard({
             ))}
           </div>
         </div>
-        {viewPartner.conditions && viewPartner.conditions.length > 0 && (
+        {partner.conditions && partner.conditions.length > 0 ? (
           <div className="text-sm text-foreground">
             <p className="font-medium text-foreground">이용 조건</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {viewPartner.conditions.map((condition) => (
+              {partner.conditions.map((condition) => (
                 <Badge
                   key={condition}
                   className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
@@ -602,19 +358,19 @@ export default function PartnerCard({
               ))}
             </div>
           </div>
-        )}
-        {viewPartner.tags && viewPartner.tags.length > 0 && (
+        ) : null}
+        {partner.tags && partner.tags.length > 0 ? (
           <div className="text-sm text-foreground">
             <p className="font-medium text-foreground">태그</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {viewPartner.tags.map((tag) => (
+              {partner.tags.map((tag) => (
                 <Chip key={tag} style={chipStyle}>
                   #{tag}
                 </Chip>
               ))}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
       {isActive && (reservationAction || inquiryAction) ? (
         <div className="mt-5 flex flex-col gap-2">
@@ -633,9 +389,9 @@ export default function PartnerCard({
                 trackProductEvent({
                   eventName: "reservation_click",
                   targetType: "partner",
-                  targetId: viewPartner.id,
+                  targetId: partner.id,
                   properties: {
-                    categoryKey: viewPartner.category,
+                    categoryKey: partner.category,
                     source: "card",
                   },
                 })
@@ -657,9 +413,9 @@ export default function PartnerCard({
                 trackProductEvent({
                   eventName: "inquiry_click",
                   targetType: "partner",
-                  targetId: viewPartner.id,
+                  targetId: partner.id,
                   properties: {
-                    categoryKey: viewPartner.category,
+                    categoryKey: partner.category,
                     source: "card",
                   },
                 })

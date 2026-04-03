@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { CategoryKey } from "@/lib/types";
-import PartnerCard from "@/components/PartnerCard";
+import PartnerCardForm from "@/components/PartnerCardForm";
 import PartnerFilters, {
   PartnerSortOption,
 } from "@/components/PartnerFilters";
@@ -188,7 +188,7 @@ export default function AdminPartnerManager({
       </div>
 
       {isCreateOpen ? (
-        <PartnerCard
+        <PartnerCardForm
           mode="create"
           partner={{
             name: "",

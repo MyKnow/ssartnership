@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
 import PartnerFilters, {
   PartnerSortOption,
 } from "@/components/PartnerFilters";
-import PartnerCard from "@/components/PartnerCard";
+import PartnerCardView from "@/components/PartnerCardView";
 import HeroSection from "@/components/HeroSection";
 import SiteHeader from "@/components/SiteHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -17,9 +24,12 @@ import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 import PushOptInBanner from "@/components/PushOptInBanner";
-import {
-  getPartnerLockKind,
-} from "@/lib/partner-visibility";
+import { getPartnerLockKind } from "@/lib/partner-visibility";
+
+const LOCK_ORDER = {
+  confidential: 0,
+  private: 1,
+} as const;
 
 export default function HomeView({
   categories,
@@ -39,6 +49,7 @@ export default function HomeView({
   );
   const [searchValue, setSearchValue] = useState("");
   const [sortValue, setSortValue] = useState<PartnerSortOption>("recent");
+  const deferredSearchValue = useDeferredValue(searchValue);
   const searchTimeoutRef = useRef<number | null>(null);
   const lastLoggedSearchRef = useRef("");
   const { notify } = useToast();
@@ -52,30 +63,34 @@ export default function HomeView({
     );
   }, [categories]);
 
-  const filteredPartners = useMemo(() => {
-    const query = searchValue.trim().toLowerCase();
-    const normalized = partners.map((partner, index) => ({
-      ...partner,
-      _index: index,
-      _lockKind: getPartnerLockKind(partner.visibility, viewerAuthenticated),
-      _isActive: isWithinPeriod(partner.period.start, partner.period.end),
-      _search: [
-        partner.name,
-        partner.location,
-        partner.reservationLink ?? "",
-        partner.inquiryLink ?? "",
-        partner.benefits.join(" "),
-        (partner.conditions ?? []).join(" "),
-        (partner.tags ?? []).join(" "),
-      ]
-        .join(" ")
-        .toLowerCase(),
-    }));
+  const normalizedPartners = useMemo(
+    () =>
+      partners.map((partner, index) => ({
+        ...partner,
+        _index: index,
+        _lockKind: getPartnerLockKind(partner.visibility, viewerAuthenticated),
+        _isActive: isWithinPeriod(partner.period.start, partner.period.end),
+        _search: [
+          partner.name,
+          partner.location,
+          partner.reservationLink ?? "",
+          partner.inquiryLink ?? "",
+          partner.benefits.join(" "),
+          (partner.conditions ?? []).join(" "),
+          (partner.tags ?? []).join(" "),
+        ]
+          .join(" ")
+          .toLowerCase(),
+      })),
+    [partners, viewerAuthenticated],
+  );
 
+  const filteredPartners = useMemo(() => {
+    const query = deferredSearchValue.trim().toLowerCase();
     const categoryFiltered =
       activeCategory === "all"
-        ? normalized
-        : normalized.filter((partner) => partner.category === activeCategory);
+        ? normalizedPartners
+        : normalizedPartners.filter((partner) => partner.category === activeCategory);
 
     const visibleFiltered = categoryFiltered.filter((partner) => !partner._lockKind);
     const lockedFiltered = categoryFiltered.filter((partner) => partner._lockKind);
@@ -84,15 +99,13 @@ export default function HomeView({
       ? visibleFiltered.filter((partner) => partner._search.includes(query))
       : visibleFiltered;
 
-    const lockOrder = {
-      confidential: 0,
-      private: 1,
-    } as const;
-
     const sortPartners = (items: typeof searchFiltered) =>
       [...items].sort((a, b) => {
         if (a._lockKind !== b._lockKind) {
-          return lockOrder[a._lockKind ?? "confidential"] - lockOrder[b._lockKind ?? "confidential"];
+          return (
+            LOCK_ORDER[a._lockKind ?? "confidential"] -
+            LOCK_ORDER[b._lockKind ?? "confidential"]
+          );
         }
         if (a._isActive !== b._isActive) {
           return a._isActive ? -1 : 1;
@@ -110,7 +123,7 @@ export default function HomeView({
       visible: sortPartners(searchFiltered),
       locked: sortPartners(lockedFiltered),
     };
-  }, [activeCategory, partners, searchValue, sortValue, viewerAuthenticated]);
+  }, [activeCategory, deferredSearchValue, normalizedPartners, sortValue]);
 
   const displayPartners = useMemo(
     () => [...filteredPartners.visible, ...filteredPartners.locked],
@@ -146,7 +159,7 @@ export default function HomeView({
       searchTimeoutRef.current = null;
     }
 
-    const query = searchValue.trim();
+    const query = deferredSearchValue.trim();
     if (!query) {
       lastLoggedSearchRef.current = "";
       return;
@@ -176,10 +189,12 @@ export default function HomeView({
         searchTimeoutRef.current = null;
       }
     };
-  }, [activeCategory, searchValue, sortValue, visibleResultCount]);
+  }, [activeCategory, deferredSearchValue, sortValue, visibleResultCount]);
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
-    setActiveCategory(nextCategory);
+    startTransition(() => {
+      setActiveCategory(nextCategory);
+    });
     trackProductEvent({
       eventName: "category_filter_change",
       targetType: "category",
@@ -191,7 +206,9 @@ export default function HomeView({
   };
 
   const handleSortChange = (nextSort: PartnerSortOption) => {
-    setSortValue(nextSort);
+    startTransition(() => {
+      setSortValue(nextSort);
+    });
     trackProductEvent({
       eventName: "sort_change",
       targetType: "partner_sort",
@@ -200,6 +217,10 @@ export default function HomeView({
         sortValue: nextSort,
       },
     });
+  };
+
+  const handleSearchChange = (nextValue: string) => {
+    setSearchValue(nextValue);
   };
 
   return (
@@ -226,7 +247,7 @@ export default function HomeView({
               activeCategory={activeCategory}
               onCategoryChange={handleCategoryChange}
               searchValue={searchValue}
-              onSearchChange={setSearchValue}
+              onSearchChange={handleSearchChange}
               sortValue={sortValue}
               onSortChange={handleSortChange}
             />
@@ -249,7 +270,7 @@ export default function HomeView({
             ) : (
               <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-6">
                 {displayPartners.map((partner) => (
-                  <PartnerCard
+                  <PartnerCardView
                     key={partner.id}
                     partner={partner}
                     categoryLabel={
@@ -265,7 +286,6 @@ export default function HomeView({
           </section>
         </Container>
       </main>
-
     </div>
   );
 }

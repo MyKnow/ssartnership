@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { FaGithub } from "react-icons/fa";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";

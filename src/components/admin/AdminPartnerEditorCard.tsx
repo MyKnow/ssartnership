@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
-import PartnerCard from "@/components/PartnerCard";
+import PartnerCardForm from "@/components/PartnerCardForm";
 import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
 import {
@@ -82,7 +82,7 @@ export default function AdminPartnerEditorCard({
 
       {open ? (
         <div className="mt-4 border-t border-border pt-4">
-          <PartnerCard
+          <PartnerCardForm
             mode="edit"
             partner={{
               id: partner.id,
