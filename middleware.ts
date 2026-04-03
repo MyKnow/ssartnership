@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  getForwardedClientIp,
+  hasValidAdminBasicAuth,
+  isAllowedAdminIp,
+  isProtectedAdminPath,
+} from "@/lib/admin-security";
+
 const COOKIE_NAME = "user_session";
 
 function getSecret() {
@@ -56,9 +63,35 @@ async function verifyToken(token: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (isProtectedAdminPath(pathname)) {
+    const clientIp = getForwardedClientIp(request.headers);
+
+    if (!isAllowedAdminIp(clientIp)) {
+      console.warn("[admin-edge-guard] blocked by ip allowlist", {
+        path: pathname,
+        ipAddress: clientIp,
+      });
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    if (!hasValidAdminBasicAuth(request.headers.get("authorization"))) {
+      console.warn("[admin-edge-guard] blocked by basic auth", {
+        path: pathname,
+        ipAddress: clientIp,
+      });
+      return new NextResponse("Authentication required", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Basic realm="Admin Area"',
+        },
+      });
+    }
+
+    return NextResponse.next();
+  }
+
   if (
     pathname.startsWith("/api") ||
-    pathname.startsWith("/admin") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icon") ||

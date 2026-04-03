@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminSession } from '@/lib/auth';
+import { ensureAdminApiAccess } from '@/lib/admin-access';
 import { exportAdminLogsCsv, type LogGroup } from '@/lib/log-insights';
 
 export const runtime = 'nodejs';
@@ -21,11 +21,9 @@ function parseGroups(rawValue: string | null): LogGroup[] {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await isAdminSession())) {
-    return NextResponse.json(
-      { message: '관리자 인증이 필요합니다.' },
-      { status: 401 },
-    );
+  const accessDenied = await ensureAdminApiAccess(request);
+  if (accessDenied) {
+    return accessDenied;
   }
 
   const searchParams = request.nextUrl.searchParams;

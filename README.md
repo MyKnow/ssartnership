@@ -107,6 +107,11 @@ http://localhost:3000
 ADMIN_ID=admin
 ADMIN_PASSWORD=change-me
 ADMIN_SESSION_SECRET=replace-with-long-random-string
+# Optional: restrict admin paths to fixed client IPs
+# ADMIN_ALLOWED_IPS=127.0.0.1,203.0.113.10
+# Optional: add HTTP Basic Auth in front of /admin and admin APIs
+# ADMIN_BASIC_AUTH_USERNAME=admin-gateway
+# ADMIN_BASIC_AUTH_PASSWORD=change-me-too
 
 # Supabase
 SUPABASE_URL=https://your-project.supabase.co
@@ -223,6 +228,7 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 
 - Production 환경에서 `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`는 최소 32자 이상 난수 사용
 - `ADMIN_ID`, `ADMIN_PASSWORD`, `MM_SENDER_PASSWORD`, SMTP 계정 정보는 절대 클라이언트에 노출되지 않도록 관리
+- 필요하면 `ADMIN_ALLOWED_IPS`로 `/admin` 접근 IP를 제한하고, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`로 2차 게이트를 추가
 
 ## 현재 상태
 

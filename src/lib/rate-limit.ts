@@ -21,6 +21,13 @@ const ADMIN_RATE_LIMIT: RateLimitConfig = {
   blockMs: 15 * 60 * 1000,
 };
 
+export const ADMIN_ACCOUNT_RATE_LIMIT: RateLimitConfig = {
+  table: "admin_login_attempts",
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 3,
+  blockMs: 30 * 60 * 1000,
+};
+
 function toISOString(date: Date) {
   return date.toISOString();
 }
@@ -113,6 +120,53 @@ export async function recordAttempt(
     .from(config.table)
     .update(updatePayload)
     .eq("id", state.id);
+}
+
+export async function getBlockingState(
+  identifiers: string[],
+  config: RateLimitConfig = ADMIN_RATE_LIMIT,
+) {
+  const uniqueIdentifiers = [...new Set(identifiers.filter(Boolean))];
+  if (uniqueIdentifiers.length === 0) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from(config.table)
+    .select("identifier,blocked_until")
+    .in("identifier", uniqueIdentifiers);
+
+  if (error || !data) {
+    return null;
+  }
+
+  const activeBlock = data.find((row) => {
+    if (!row.blocked_until) {
+      return false;
+    }
+    return new Date(row.blocked_until).getTime() > Date.now();
+  });
+
+  if (!activeBlock?.identifier || !activeBlock.blocked_until) {
+    return null;
+  }
+
+  return {
+    identifier: activeBlock.identifier,
+    blockedUntil: activeBlock.blocked_until,
+  };
+}
+
+export async function recordAttemptBatch(
+  identifiers: string[],
+  success: boolean,
+  config: RateLimitConfig = ADMIN_RATE_LIMIT,
+) {
+  const uniqueIdentifiers = [...new Set(identifiers.filter(Boolean))];
+  await Promise.all(
+    uniqueIdentifiers.map((identifier) => recordAttempt(identifier, success, config)),
+  );
 }
 
 export const SUGGEST_RATE_LIMIT: RateLimitConfig = {

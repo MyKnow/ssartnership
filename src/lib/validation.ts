@@ -1,16 +1,22 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const IDENTIFIER_REGEX = /^[A-Za-z0-9._-]+$/;
+const ADMIN_IDENTIFIER_REGEX = /^[A-Za-z0-9._-]{3,64}$/;
 const PHONE_REGEX = /^[+0-9()\-\s]{7,}$/;
 const INSTAGRAM_HANDLE_REGEX = /^@[\w.]+$/;
 const CATEGORY_KEY_REGEX = /^[a-z0-9][a-z0-9_-]*$/;
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u007F]/;
 
 export const PASSWORD_POLICY_MESSAGE =
   "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.";
 
 export function normalizeMmUsername(value: string) {
   return value.trim().toLowerCase();
+}
+
+export function normalizeAdminIdentifier(value: string) {
+  return value.trim();
 }
 
 export function validateMmUsername(value: string, label = "MM 아이디") {
@@ -31,7 +37,7 @@ export function validateMmUsername(value: string, label = "MM 아이디") {
 }
 
 export function validateAdminIdentifier(value: string) {
-  const normalized = value.trim();
+  const normalized = normalizeAdminIdentifier(value);
   if (!normalized) {
     return "아이디를 입력해 주세요.";
   }
@@ -40,6 +46,22 @@ export function validateAdminIdentifier(value: string) {
   }
   if (/\s/.test(normalized)) {
     return "아이디에 공백을 넣을 수 없습니다.";
+  }
+  if (!ADMIN_IDENTIFIER_REGEX.test(normalized)) {
+    return "아이디는 3~64자의 영문, 숫자, ., _, -만 사용할 수 있습니다.";
+  }
+  return null;
+}
+
+export function validateAdminPasswordInput(value: string) {
+  if (!value) {
+    return "비밀번호를 입력해 주세요.";
+  }
+  if (value.length > 256) {
+    return "비밀번호 형식이 올바르지 않습니다.";
+  }
+  if (CONTROL_CHARACTER_REGEX.test(value)) {
+    return "비밀번호 형식이 올바르지 않습니다.";
   }
   return null;
 }

@@ -50,6 +50,7 @@ export const AUTH_SECURITY_EVENT_NAMES = [
   'member_password_change',
   'member_delete',
   'admin_login',
+  'admin_access',
 ] as const;
 
 export type AuthSecurityEventName = (typeof AUTH_SECURITY_EVENT_NAMES)[number];

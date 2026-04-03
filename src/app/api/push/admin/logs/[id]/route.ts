@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
+import { ensureAdminApiAccess } from "@/lib/admin-access";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { deletePushMessageLog } from "@/lib/push";
 
@@ -19,11 +19,9 @@ export async function DELETE(
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  if (!(await isAdminSession())) {
-    return NextResponse.json(
-      { message: "관리자 인증이 필요합니다." },
-      { status: 401 },
-    );
+  const accessDenied = await ensureAdminApiAccess(request);
+  if (accessDenied) {
+    return accessDenied;
   }
 
   try {

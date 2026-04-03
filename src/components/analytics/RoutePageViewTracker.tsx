@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { trackProductEvent } from '@/lib/product-events';
 
 let previousTrackedPath: string | null = null;
@@ -12,12 +12,10 @@ export default function RoutePageViewTracker({
   area: 'site' | 'admin' | 'auth';
 }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const lastTrackedRef = useRef<string>('');
 
   useEffect(() => {
-    const query = searchParams.toString();
-    const path = query ? `${pathname}?${query}` : pathname;
+    const path = pathname;
     if (!path || lastTrackedRef.current === path) {
       return;
     }
@@ -31,7 +29,7 @@ export default function RoutePageViewTracker({
       },
     });
     previousTrackedPath = path;
-  }, [area, pathname, searchParams]);
+  }, [area, pathname]);
 
   return null;
 }
