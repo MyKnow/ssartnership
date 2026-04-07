@@ -1,6 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import { getSelectableSsafyYears } from "@/lib/ssafy-year";
+import { getBackfillableSsafyYears } from "@/lib/ssafy-year";
 import {
   type MMUser,
   getSenderCredentials,
@@ -120,6 +120,8 @@ export async function syncMemberSnapshot(
   member: MemberRow,
   snapshot: MemberSyncSnapshot,
 ) {
+  const nextCampus = snapshot.campus ?? member.campus ?? null;
+  const nextClassNumber = snapshot.classNumber ?? member.class_number ?? null;
   const nextAvatarContentType = snapshot.avatarFetched
     ? snapshot.avatarContentType
     : member.avatar_content_type ?? null;
@@ -138,13 +140,13 @@ export async function syncMemberSnapshot(
     changedFields.push("displayName");
     changes.displayName = `${member.display_name ?? "-"} → ${snapshot.displayName}`;
   }
-  if ((member.campus ?? null) !== snapshot.campus) {
+  if ((member.campus ?? null) !== nextCampus) {
     changedFields.push("campus");
-    changes.campus = `${member.campus ?? "-"} → ${snapshot.campus ?? "-"}`;
+    changes.campus = `${member.campus ?? "-"} → ${nextCampus ?? "-"}`;
   }
-  if ((member.class_number ?? null) !== snapshot.classNumber) {
+  if ((member.class_number ?? null) !== nextClassNumber) {
     changedFields.push("classNumber");
-    changes.classNumber = `${member.class_number ?? "-"} → ${snapshot.classNumber ?? "-"}`;
+    changes.classNumber = `${member.class_number ?? "-"} → ${nextClassNumber ?? "-"}`;
   }
 
   const avatarChanged =
@@ -171,8 +173,8 @@ export async function syncMemberSnapshot(
     ...member,
     mm_username: snapshot.mmUsername,
     display_name: snapshot.displayName,
-    campus: snapshot.campus,
-    class_number: snapshot.classNumber,
+    campus: nextCampus,
+    class_number: nextClassNumber,
     avatar_content_type: nextAvatarContentType,
     avatar_base64: nextAvatarBase64,
     updated_at: updatedAt,
@@ -242,7 +244,7 @@ export async function syncMemberById(
 
 export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchResult> {
   const supabase = getSupabaseAdminClient();
-  const years = getSelectableSsafyYears();
+  const years = getBackfillableSsafyYears();
   const { data: members, error } = await supabase
     .from("members")
     .select(

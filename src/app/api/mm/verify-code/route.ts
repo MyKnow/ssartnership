@@ -271,8 +271,8 @@ export async function POST(request: Request) {
           mm_username: snapshot.mmUsername,
           display_name: snapshot.displayName,
           year: year ?? codeRow.year,
-          campus: snapshot.campus,
-          class_number: snapshot.classNumber,
+          campus: nextMember.campus ?? null,
+          class_number: nextMember.class_number ?? null,
           avatar_content_type: snapshot.avatarFetched
             ? snapshot.avatarContentType
             : nextMember.avatar_content_type ?? null,
@@ -329,8 +329,8 @@ export async function POST(request: Request) {
       identifier: mmUserId,
       properties: {
         year: year ?? codeRow.year ?? null,
-        campus: snapshot.campus,
-        classNumber: snapshot.classNumber,
+        campus: nextMember?.campus ?? snapshot.campus,
+        classNumber: nextMember?.class_number ?? snapshot.classNumber,
         existingMember: Boolean(member?.id),
         mmUsername: snapshot.mmUsername,
         mmUserId,

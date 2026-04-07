@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import { getCurrentSsafyYear } from "@/lib/ssafy-year";
+import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -112,7 +112,7 @@ export default function AdminMemberCard({
               <span className="font-medium text-foreground">기수/캠퍼스/반</span>
               <span>
                 {[
-                  `${year}기`,
+                  formatSsafyYearLabel(year),
                   campus,
                   classNumber ? `${classNumber}반` : null,
                 ]
@@ -154,7 +154,7 @@ export default function AdminMemberCard({
             기수
             <Input
               type="number"
-              min={1}
+              min={0}
               max={99}
               name="year"
               defaultValue={year}

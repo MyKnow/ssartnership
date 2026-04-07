@@ -1,7 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+RELEASE_TYPE="${1:-}"
+COMMIT_MESSAGE="${*:2}"
+
+normalize_release_type() {
+  case "${1:-}" in
+    1|patch|PATCH)
+      echo "patch"
+      ;;
+    2|minor|MINOR)
+      echo "minor"
+      ;;
+    3|major|MAJOR)
+      echo "major"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+trim_trailing_newlines() {
+  local value="$1"
+  while [[ "$value" == *$'\n' ]]; do
+    value="${value%$'\n'}"
+  done
+  printf '%s' "$value"
+}
+
 prompt_release_type() {
+  if normalized_release_type="$(normalize_release_type "$RELEASE_TYPE")"; then
+    RELEASE_TYPE="$normalized_release_type"
+    return
+  fi
+
   while true; do
     echo "릴리즈 타입을 선택하세요."
     echo "1) patch"
@@ -30,8 +63,38 @@ prompt_release_type() {
 }
 
 prompt_commit_message() {
+  if [[ -n "${COMMIT_MESSAGE// }" ]]; then
+    COMMIT_MESSAGE="$(trim_trailing_newlines "$COMMIT_MESSAGE")"
+    return
+  fi
+
+  if [[ ! -t 0 ]]; then
+    COMMIT_MESSAGE="$(trim_trailing_newlines "$(cat)")"
+    if [[ -n "${COMMIT_MESSAGE// }" ]]; then
+      return
+    fi
+  fi
+
   while true; do
-    read -r -p "커밋 메시지를 입력하세요: " COMMIT_MESSAGE
+    echo "커밋 메시지를 입력하세요."
+    echo "- 여러 줄 붙여넣기를 지원합니다."
+    echo "- 입력이 끝나면 빈 줄을 한 번 더 입력하세요."
+
+    local line=""
+    local lines=()
+
+    while IFS= read -r line; do
+      if [[ -z "$line" ]]; then
+        if [[ ${#lines[@]} -eq 0 ]]; then
+          echo "커밋 메시지는 비워둘 수 없습니다."
+          continue
+        fi
+        break
+      fi
+      lines+=("$line")
+    done
+
+    COMMIT_MESSAGE="$(trim_trailing_newlines "$(printf '%s\n' "${lines[@]}")")"
     if [[ -n "${COMMIT_MESSAGE// }" ]]; then
       return
     fi
@@ -81,7 +144,8 @@ echo
 echo "현재 브랜치: $CURRENT_BRANCH"
 echo "현재 버전: $CURRENT_VERSION"
 echo "릴리즈 타입: $RELEASE_TYPE"
-echo "커밋 메시지: $COMMIT_MESSAGE"
+echo "커밋 메시지:"
+printf '%s\n' "$COMMIT_MESSAGE"
 echo
 
 if ! prompt_confirm; then

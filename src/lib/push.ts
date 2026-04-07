@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { SITE_URL } from "@/lib/site";
-import { parseSsafyYearValue, sanitizeHttpUrl } from "@/lib/validation";
+import { formatSsafyYearLabel } from "@/lib/ssafy-year";
+import { parseMemberYearValue, sanitizeHttpUrl } from "@/lib/validation";
 
 export const DEFAULT_PUSH_PREFERENCES = {
   enabled: false,
@@ -154,7 +155,7 @@ export function parsePushAudience(input: unknown): PushAudience {
   }
 
   if (scope === "year") {
-    const year = parseSsafyYearValue(
+    const year = parseMemberYearValue(
       (input as { year?: string | number | null }).year,
     );
     if (year === null) {
@@ -224,7 +225,7 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
 
     return {
       scope: "year",
-      label: `${audience.year}기`,
+      label: formatSsafyYearLabel(audience.year),
       year: audience.year,
       campus: null,
       classNumber: null,

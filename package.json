@@ -1,12 +1,14 @@
 {
   "name": "ssartnership",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:mm-profile": "node --test tests/mm-profile-csv.test.mts",
     "release": "bash scripts/release.sh"
   },
   "dependencies": {

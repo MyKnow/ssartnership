@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { trackProductEvent } from "@/lib/product-events";
-import { getCurrentSsafyYear } from "@/lib/ssafy-year";
+import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
 import CertificationQrButton from "@/components/certification/CertificationQrButton";
 
 type Member = {
@@ -20,9 +20,11 @@ type Member = {
 export default function CertificationView({
   member,
   initialTimestamp,
+  disableTracking = false,
 }: {
   member: Member;
   initialTimestamp: string;
+  disableTracking?: boolean;
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
@@ -36,6 +38,9 @@ export default function CertificationView({
   }, []);
 
   useEffect(() => {
+    if (disableTracking) {
+      return;
+    }
     if (hasTrackedViewRef.current) {
       return;
     }
@@ -50,6 +55,7 @@ export default function CertificationView({
       },
     });
   }, [
+    disableTracking,
     member.campus,
     member.class_number,
     year,
@@ -121,7 +127,8 @@ export default function CertificationView({
                 {profile.displayName ?? member.display_name ?? member.mm_username}
               </h2>
               <p className="mt-1 text-sm text-slate-200">
-                {`${year}기 · `}{member.campus ?? profile.campus ?? "캠퍼스"}{" "}
+                {`${formatSsafyYearLabel(year)} · `}
+                {member.campus ?? profile.campus ?? "캠퍼스"}{" "}
                 {member.class_number ? `${member.class_number}반` : ""}
               </p>
             </div>

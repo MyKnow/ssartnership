@@ -10,6 +10,7 @@ import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
 import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
+import { formatOptionalSsafyYearLabel, formatSsafyYearLabel } from "@/lib/ssafy-year";
 
 type PartnerOption = {
   id: string;
@@ -130,7 +131,7 @@ function extractPartnerIdFromUrl(url: string | null | undefined) {
 
 function getMemberLabel(member: MemberOption) {
   const name = member.display_name?.trim() || member.mm_username;
-  const yearLabel = member.year ? `${member.year}기` : "기수 미지정";
+  const yearLabel = formatOptionalSsafyYearLabel(member.year);
   const campusLabel = member.campus ?? "캠퍼스 미지정";
   const classLabel = member.class_number ? `${member.class_number}반` : "반 미지정";
   return `${name} (@${member.mm_username}) · ${yearLabel} · ${campusLabel} ${classLabel}`;
@@ -535,7 +536,7 @@ export default function AdminPushManager({
                   <option value="">기수 선택</option>
                   {audienceYearOptions.map((year) => (
                     <option key={year} value={String(year)}>
-                      {year}기
+                      {formatSsafyYearLabel(year)}
                     </option>
                   ))}
                 </Select>

@@ -4,6 +4,8 @@ const SSAFY_YEAR_RULE = {
   anchorMonth: 7,
 } as const;
 
+export const SSAFY_STAFF_YEAR = 0;
+
 function getSeoulDateParts(now: Date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -39,6 +41,10 @@ export function getSelectableSsafyYears(now: Date = new Date()) {
   return [currentYear - 1, currentYear];
 }
 
+export function getBackfillableSsafyYears(now: Date = new Date()) {
+  return [SSAFY_STAFF_YEAR, ...getSelectableSsafyYears(now)];
+}
+
 export function isSelectableSsafyYear(
   year: number,
   now: Date = new Date(),
@@ -47,7 +53,17 @@ export function isSelectableSsafyYear(
 }
 
 export function formatSsafyYearLabel(year: number) {
+  if (year === SSAFY_STAFF_YEAR) {
+    return "운영진";
+  }
   return `${year}기`;
+}
+
+export function formatOptionalSsafyYearLabel(
+  year?: number | null,
+  fallback = "기수 미지정",
+) {
+  return typeof year === "number" ? formatSsafyYearLabel(year) : fallback;
 }
 
 export function getSelectableSsafyYearText(now: Date = new Date()) {

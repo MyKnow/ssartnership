@@ -20,9 +20,9 @@ import {
   sanitizeHexColor,
   sanitizeHttpUrl,
   sanitizePartnerLinkValue,
-  parseSsafyYearValue,
+  parseMemberYearValue,
   validateCategoryKey,
-  validateSsafyYear,
+  validateMemberYear,
   validateDateRange,
 } from "@/lib/validation";
 
@@ -511,10 +511,10 @@ export async function updateMember(formData: FormData) {
     throw new Error("수정할 회원을 찾을 수 없습니다.");
   }
 
-  const yearError = validateSsafyYear(yearRaw);
-  const year = parseSsafyYearValue(yearRaw);
+  const yearError = validateMemberYear(yearRaw);
+  const year = parseMemberYearValue(yearRaw);
   if (yearError || year === null) {
-    throw new Error("기수는 1~99 사이의 숫자로 입력해 주세요.");
+    throw new Error("기수는 0~99 사이의 숫자로 입력해 주세요.");
   }
 
   let classNumber: number | null = null;

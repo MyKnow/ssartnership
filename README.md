@@ -212,6 +212,25 @@ npm run release -- patch
 - commit + tag 생성
 - `git push`
 - `git push --tags`
+- 커밋 메시지는 여러 줄 붙여넣기를 지원하며, 입력 종료는 빈 줄 1회로 처리합니다.
+- `patch` 뒤에 오는 나머지 인자는 모두 커밋 메시지로 합쳐 한 줄 메시지로 바로 사용할 수 있습니다.
+
+예시:
+
+```bash
+npm run release -- patch "feat: 운영진 지원과 MM 닉네임 파싱 확장"
+```
+
+여러 줄 메시지는 heredoc으로 한 번에 넣을 수 있습니다.
+
+```bash
+npm run release -- patch <<'EOF'
+feat: 운영진 지원과 MM 닉네임 파싱 확장
+
+- MM 닉네임 파서를 확장해 운영진 역할 표식을 인식하도록 개선
+- 운영진 year=0 표시와 mock UI 미리보기를 추가
+EOF
+```
 
 구현은 [scripts/release.sh](/Users/myknow/coding/ssartnership/scripts/release.sh)에 있습니다.
 

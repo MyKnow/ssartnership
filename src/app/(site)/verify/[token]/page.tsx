@@ -9,7 +9,7 @@ import Badge from "@/components/ui/Badge";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyCertificationQrToken } from "@/lib/certification-qr";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import { getCurrentSsafyYear } from "@/lib/ssafy-year";
+import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
 import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -130,7 +130,7 @@ export default async function CertificationVerifyPage({
                         {profile?.displayName ?? member.display_name ?? member.mm_username}
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {`${verifiedYear}기 · `}
+                        {`${formatSsafyYearLabel(verifiedYear)} · `}
                         {member.campus ?? profile?.campus ?? "캠퍼스"}{" "}
                         {member.class_number ? `${member.class_number}반` : ""}
                       </p>

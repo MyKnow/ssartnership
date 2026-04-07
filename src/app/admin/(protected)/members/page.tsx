@@ -1,5 +1,6 @@
 import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
+import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -47,11 +48,16 @@ export default async function AdminMembersPage({
             title="회원 관리"
             description="교육생 계정의 표시 정보, 반, 비밀번호 변경 강제 여부를 관리할 수 있습니다."
           />
-          <form action={backfillMemberProfiles} className="shrink-0">
-            <SubmitButton pendingText="백필 중">
-              지금 백필 실행
-            </SubmitButton>
-          </form>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Button variant="ghost" href="/admin/members/mock">
+              운영진 Mock 미리보기
+            </Button>
+            <form action={backfillMemberProfiles}>
+              <SubmitButton pendingText="백필 중">
+                지금 백필 실행
+              </SubmitButton>
+            </form>
+          </div>
         </div>
 
         {params.backfill ? (
