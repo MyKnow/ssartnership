@@ -7,6 +7,12 @@ import SignupForm from "@/components/auth/SignupForm";
 import FormMessage from "@/components/ui/FormMessage";
 import { getActiveRequiredPolicies } from "@/lib/policy-documents";
 import { SITE_NAME } from "@/lib/site";
+import {
+  getConfiguredCurrentSsafyYear,
+  getConfiguredSelectableSsafyYears,
+  getConfiguredSignupSsafyYearText,
+  getSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 
 export const metadata: Metadata = {
   title: `회원가입 | ${SITE_NAME}`,
@@ -20,6 +26,10 @@ export default async function SignupPage() {
   const headerSession = await getHeaderSession();
   let policies = null;
   let policyError: string | null = null;
+  const cycleSettings = await getSsafyCycleSettings();
+  const selectableYears = getConfiguredSelectableSsafyYears(cycleSettings).slice().sort((a, b) => a - b);
+  const currentYear = getConfiguredCurrentSsafyYear(cycleSettings);
+  const signupYearsText = getConfiguredSignupSsafyYearText(cycleSettings);
 
   try {
     policies = await getActiveRequiredPolicies();
@@ -38,7 +48,12 @@ export default async function SignupPage() {
               Mattermost 아이디로 본인 인증을 진행합니다.
             </p>
             {policies ? (
-              <SignupForm policies={policies} />
+              <SignupForm
+                policies={policies}
+                selectableYears={selectableYears}
+                signupYearsText={signupYearsText}
+                defaultYear={selectableYears[selectableYears.length - 1] ?? currentYear}
+              />
             ) : (
               <div className="mt-6">
                 <FormMessage variant="error">

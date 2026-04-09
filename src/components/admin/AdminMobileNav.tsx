@@ -110,6 +110,11 @@ export default function AdminMobileNav({
       label: "로그 조회",
       active: pathname === "/admin/logs",
     },
+    {
+      href: "/admin/cycle",
+      label: "기수 관리",
+      active: pathname === "/admin/cycle",
+    },
   ];
 
   return (

@@ -2,7 +2,11 @@
 
 import Image from "next/image";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
+import {
+  formatSsafyMemberLifecycleLabel,
+  formatSsafyYearLabel,
+  getCurrentSsafyYear,
+} from "@/lib/ssafy-year";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -56,6 +60,7 @@ export default function AdminMemberCard({
   const displayName =
     profile.displayName ?? member.display_name ?? member.mm_username;
   const year = member.year ?? getCurrentSsafyYear();
+  const yearLabel = formatSsafyMemberLifecycleLabel(year);
   const staffSourceYear = member.staff_source_year ?? null;
   const campus = member.campus ?? profile.campus ?? "";
   const avatarSrc =
@@ -104,7 +109,7 @@ export default function AdminMemberCard({
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-medium text-foreground">기수</span>
-              <span>{formatSsafyYearLabel(year)}</span>
+              <span>{yearLabel}</span>
             </div>
             {year === 0 && staffSourceYear !== null ? (
               <div className="flex flex-wrap items-center justify-between gap-3">

@@ -1,4 +1,5 @@
-import { getSelectableSsafyYears } from "@/lib/ssafy-year";
+import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
+import { getConfiguredSelectableSsafyYears } from "@/lib/ssafy-cycle-settings";
 
 export type MMUser = {
   id: string;
@@ -295,33 +296,47 @@ export async function resolveSelectableMemberByUsername(
   username: string,
 ): Promise<SelectableStudentMatch | null> {
   const safeUsername = username.replace(/^@/, "").trim().toLowerCase();
-  const years = getSelectableSsafyYears().sort((a, b) => b - a);
+  const studentYears = (await getConfiguredSelectableSsafyYears()).sort(
+    (a, b) => b - a,
+  );
+  const searchPlans = [
+    { years: studentYears, expectStaff: false },
+    { years: [15, 14], expectStaff: true },
+  ] as const;
   let lastError: unknown = null;
 
-  for (const year of years) {
-    try {
-      const senderCredentials = getSenderCredentials(year);
-      const senderLogin = await loginWithPassword(
-        senderCredentials.loginId,
-        senderCredentials.password,
-      );
-      const channelConfig = getStudentChannelConfig(year);
-      const user = await findUserInChannelByUsername(
-        senderLogin.token,
-        safeUsername,
-        channelConfig,
-      );
-      if (!user) {
-        continue;
+  for (const plan of searchPlans) {
+    for (const year of plan.years) {
+      try {
+        const senderCredentials = getSenderCredentials(year);
+        const senderLogin = await loginWithPassword(
+          senderCredentials.loginId,
+          senderCredentials.password,
+        );
+        const channelConfig = getStudentChannelConfig(year);
+        const user = await findUserInChannelByUsername(
+          senderLogin.token,
+          safeUsername,
+          channelConfig,
+        );
+        if (!user) {
+          continue;
+        }
+
+        const profile = parseSsafyProfileFromUser(user);
+        if (plan.expectStaff !== Boolean(profile.isStaff)) {
+          continue;
+        }
+
+        return {
+          year,
+          senderToken: senderLogin.token,
+          user,
+          channelConfig,
+        };
+      } catch (error) {
+        lastError = error;
       }
-      return {
-        year,
-        senderToken: senderLogin.token,
-        user,
-        channelConfig,
-      };
-    } catch (error) {
-      lastError = error;
     }
   }
 

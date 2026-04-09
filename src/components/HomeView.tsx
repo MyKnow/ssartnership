@@ -25,6 +25,12 @@ import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 import PushOptInBanner from "@/components/PushOptInBanner";
 import { getPartnerLockKind } from "@/lib/partner-visibility";
+import {
+  getPartnerAudienceLabel,
+  type PartnerAudienceFilter,
+} from "@/lib/partner-audience";
+
+const APPLIES_TO_FILTER_STORAGE_KEY = "home:partner-applies-to-filter";
 
 const LOCK_ORDER = {
   confidential: 0,
@@ -46,6 +52,24 @@ export default function HomeView({
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
     "all",
+  );
+  const [appliesToFilter, setAppliesToFilter] = useState<PartnerAudienceFilter>(
+    () => {
+      if (typeof window === "undefined") {
+        return "all";
+      }
+      try {
+        const saved = window.localStorage.getItem(
+          APPLIES_TO_FILTER_STORAGE_KEY,
+        );
+        if (saved === "all" || saved === "staff" || saved === "student" || saved === "graduate") {
+          return saved;
+        }
+      } catch {
+        return "all";
+      }
+      return "all";
+    },
   );
   const [searchValue, setSearchValue] = useState("");
   const [sortValue, setSortValue] = useState<PartnerSortOption>("recent");
@@ -76,7 +100,7 @@ export default function HomeView({
           partner.reservationLink ?? "",
           partner.inquiryLink ?? "",
           partner.benefits.join(" "),
-          (partner.conditions ?? []).join(" "),
+          partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
           (partner.tags ?? []).join(" "),
         ]
           .join(" ")
@@ -92,8 +116,15 @@ export default function HomeView({
         ? normalizedPartners
         : normalizedPartners.filter((partner) => partner.category === activeCategory);
 
-    const visibleFiltered = categoryFiltered.filter((partner) => !partner._lockKind);
-    const lockedFiltered = categoryFiltered.filter((partner) => partner._lockKind);
+    const appliesFiltered =
+      appliesToFilter === "all"
+        ? categoryFiltered
+        : categoryFiltered.filter((partner) =>
+            partner.appliesTo.includes(appliesToFilter),
+          );
+
+    const visibleFiltered = appliesFiltered.filter((partner) => !partner._lockKind);
+    const lockedFiltered = appliesFiltered.filter((partner) => partner._lockKind);
 
     const searchFiltered = query
       ? visibleFiltered.filter((partner) => partner._search.includes(query))
@@ -123,7 +154,7 @@ export default function HomeView({
       visible: sortPartners(searchFiltered),
       locked: sortPartners(lockedFiltered),
     };
-  }, [activeCategory, deferredSearchValue, normalizedPartners, sortValue]);
+  }, [activeCategory, appliesToFilter, deferredSearchValue, normalizedPartners, sortValue]);
 
   const displayPartners = useMemo(
     () => [...filteredPartners.visible, ...filteredPartners.locked],
@@ -141,6 +172,17 @@ export default function HomeView({
       </span>
     ));
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      window.localStorage.setItem(APPLIES_TO_FILTER_STORAGE_KEY, appliesToFilter);
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [appliesToFilter]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -166,7 +208,7 @@ export default function HomeView({
     }
 
     searchTimeoutRef.current = window.setTimeout(() => {
-      const dedupeKey = `${activeCategory}:${sortValue}:${query}`;
+      const dedupeKey = `${activeCategory}:${appliesToFilter}:${sortValue}:${query}`;
       if (lastLoggedSearchRef.current === dedupeKey) {
         return;
       }
@@ -177,6 +219,7 @@ export default function HomeView({
         properties: {
           query,
           categoryKey: activeCategory,
+          appliesToFilter,
           sortValue,
           resultCount: visibleResultCount,
         },
@@ -189,7 +232,7 @@ export default function HomeView({
         searchTimeoutRef.current = null;
       }
     };
-  }, [activeCategory, deferredSearchValue, sortValue, visibleResultCount]);
+  }, [activeCategory, appliesToFilter, deferredSearchValue, sortValue, visibleResultCount]);
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
     startTransition(() => {
@@ -248,6 +291,8 @@ export default function HomeView({
               onCategoryChange={handleCategoryChange}
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
+              appliesToFilter={appliesToFilter}
+              onAppliesToFilterChange={setAppliesToFilter}
               sortValue={sortValue}
               onSortChange={handleSortChange}
             />

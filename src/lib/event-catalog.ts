@@ -37,6 +37,9 @@ export const ADMIN_AUDIT_ACTIONS = [
   'member_sync',
   'member_manual_add',
   'member_delete',
+  'cycle_settings_update',
+  'cycle_settings_early_start',
+  'cycle_settings_restore',
   'push_send',
   'push_log_delete',
 ] as const;

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import PartnerCardForm from "@/components/PartnerCardForm";
 import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
@@ -29,7 +30,7 @@ type PartnerValue = {
   period_start?: string | null;
   period_end?: string | null;
   benefits?: string[] | null;
-  conditions?: string[] | null;
+  applies_to?: string[] | null;
   images?: string[] | null;
   tags?: string[] | null;
 };
@@ -71,6 +72,11 @@ export default function AdminPartnerEditorCard({
               {category?.label ?? "미분류"}
             </Badge>
           </div>
+          <PartnerAudienceChips
+            appliesTo={partner.applies_to ?? []}
+            className="mt-2"
+            chipClassName="bg-surface-muted text-foreground"
+          />
         </div>
         <div className="inline-flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
           <span>{open ? "접기" : "펼치기"}</span>
@@ -97,7 +103,7 @@ export default function AdminPartnerEditorCard({
                 end: partner.period_end ?? "",
               },
               benefits: partner.benefits ?? [],
-              conditions: partner.conditions ?? [],
+              appliesTo: partner.applies_to ?? [],
               images: partner.images ?? [],
               tags: partner.tags ?? [],
             }}

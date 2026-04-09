@@ -1,4 +1,7 @@
 import type { Category, Partner } from "@/lib/types";
+import {
+  normalizePartnerAudience,
+} from "@/lib/partner-audience";
 import type {
   PartnerRepository,
   PartnerViewContext,
@@ -21,7 +24,7 @@ type PartnerRow = {
   period_start?: string | null;
   period_end?: string | null;
   benefits?: string[] | null;
-  conditions?: string[] | null;
+  applies_to?: string[] | null;
   images?: string[] | null;
   tags?: string[] | null;
   visibility?: string | null;
@@ -79,7 +82,7 @@ const getCachedPartnerRows = unstable_cache(
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
+        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,applies_to,images,tags,visibility,categories(key)",
       )
       .order("created_at", { ascending: false });
 
@@ -106,7 +109,7 @@ const getCachedPartnerRowById = unstable_cache(
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,conditions,images,tags,visibility,categories(key)",
+        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,applies_to,images,tags,visibility,categories(key)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -142,7 +145,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
       end: normalizeDate(row.period_end),
     },
     benefits: row.benefits ?? [],
-    conditions: row.conditions ?? [],
+    appliesTo: normalizePartnerAudience(row.applies_to),
     images: row.images ?? [],
     tags: row.tags ?? [],
   };
@@ -160,7 +163,7 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
       end: "",
     },
     benefits: [],
-    conditions: [],
+    appliesTo: normalizePartnerAudience(row.applies_to),
     images: [],
     tags: [],
   };

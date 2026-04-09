@@ -5,6 +5,10 @@ import CategoryTabs, { CategoryTabOption } from "@/components/CategoryTabs";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { cn } from "@/lib/cn";
+import {
+  PARTNER_AUDIENCE_FILTER_OPTIONS,
+  type PartnerAudienceFilter,
+} from "@/lib/partner-audience";
 
 export type PartnerSortOption = "recent" | "endingSoon";
 
@@ -19,6 +23,8 @@ export default function PartnerFilters({
   onCategoryChange,
   searchValue,
   onSearchChange,
+  appliesToFilter,
+  onAppliesToFilterChange,
   sortValue,
   onSortChange,
   className,
@@ -28,6 +34,8 @@ export default function PartnerFilters({
   onCategoryChange: (key: CategoryKey | "all") => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  appliesToFilter?: PartnerAudienceFilter;
+  onAppliesToFilterChange?: (value: PartnerAudienceFilter) => void;
   sortValue: PartnerSortOption;
   onSortChange: (value: PartnerSortOption) => void;
   className?: string;
@@ -56,9 +64,28 @@ export default function PartnerFilters({
           <Input
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="업체명, 위치, 혜택, 태그로 검색"
+            placeholder="업체명, 위치, 혜택, 태그, 적용 대상으로 검색"
           />
         </div>
+        {appliesToFilter && onAppliesToFilterChange ? (
+          <div className="flex flex-col gap-1 md:w-44">
+            <span className="text-xs font-medium text-muted-foreground">
+              적용 대상
+            </span>
+            <Select
+              value={appliesToFilter}
+              onChange={(event) =>
+                onAppliesToFilterChange(event.target.value as PartnerAudienceFilter)
+              }
+            >
+              {PARTNER_AUDIENCE_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-1 md:w-56">
           <span className="text-xs font-medium text-muted-foreground">
             정렬 (현재 제휴 우선)

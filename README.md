@@ -49,6 +49,11 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 - 관리자 로그인
 - 카테고리 CRUD
 - 제휴 업체 CRUD
+- 기수 관리
+  - 기준 기수 / 기준 연도 / 기준 월 수정
+  - 조기 시작
+  - 자동 계산 복구
+  - 현재 학생 / 수료생 / 운영진 범위 확인
 - 회원 조회 / 수정 / 삭제
 - 회원 수동 추가
   - 기수 선택
@@ -106,6 +111,7 @@ supabase/
 
 tests/
   mm-profile-csv.test.mts Mattermost 닉네임 파서 테스트
+  ssafy-cycle-simulation.test.mts 기수 / 수료생 시뮬레이션 테스트
 
 docs/
   performance/            성능 측정 문서
@@ -189,6 +195,7 @@ http://localhost:3000
 2. [20260409.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260409.sql)
 3. [20260410_mm_user_directory.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260410_mm_user_directory.sql)
 4. [20260411_policy_documents.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260411_policy_documents.sql)
+5. [20260413000000_ssafy_cycle_settings.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260413000000_ssafy_cycle_settings.sql)
 
 주의:
 
@@ -208,8 +215,17 @@ http://localhost:3000
 - `14`: 14기 교육생
 - `15`: 15기 교육생
 - `0`: 운영진
+- 1월은 1학기 시작, 7월은 2학기 시작입니다.
+- 현재 기수는 `ssafy_cycle_settings`의 앵커 기준과 날짜를 함께 사용해 계산합니다.
+- `staff`, `student`, `graduate`는 저장값이 아니라 현재 날짜와 기수 기준으로 파생됩니다.
+- 2027년 7월 기준 예시
+  - `18기`: 1학기 교육생
+  - `17기`: 2학기 교육생
+  - `16기 이하`: 수료생
 
 운영진은 `members.staff_source_year`에 어느 기수 팀에서 확인된 계정인지 함께 저장합니다.
+
+기수 기준을 조정하거나 조기 시작을 적용하려면 관리자 화면의 `기수 관리`를 사용합니다.
 
 ### Mattermost 유저 디렉토리
 
@@ -246,6 +262,13 @@ http://localhost:3000
 4. 대상이 확인되면 운영용 계정이 DM으로 인증코드를 발송합니다.
 5. 사용자가 인증코드를 입력하면 회원가입을 완료합니다.
 6. 가입 시 최신 이용약관 / 개인정보 동의 버전도 함께 저장합니다.
+7. 기수별 허용 범위는 관리자 `기수 관리` 설정을 따른 뒤, 그 기준으로 signup / backfill / 디렉토리 조회가 동작합니다.
+
+시뮬레이션 검증은 다음 명령으로 실행할 수 있습니다.
+
+```bash
+npm run test:ssafy-cycle
+```
 
 ### 로그인
 

@@ -10,13 +10,7 @@ import MmUsernameInput from "@/components/auth/MmUsernameInput";
 import FormMessage from "@/components/ui/FormMessage";
 import { isValidPassword } from "@/lib/password";
 import PolicyAgreementField from "@/components/auth/PolicyAgreementField";
-import {
-  getCurrentSsafyYear,
-  getSelectableSsafyYears,
-  getSignupSsafyYearText,
-  parseSignupSsafyYearValue,
-  validateSignupSsafyYear,
-} from "@/lib/ssafy-year";
+import { parseSignupSsafyYearValue } from "@/lib/ssafy-year";
 import {
   normalizeMmUsername,
   PASSWORD_POLICY_MESSAGE,
@@ -28,20 +22,19 @@ type Step = "request" | "verify";
 
 export default function SignupForm({
   policies,
+  selectableYears,
+  signupYearsText,
+  defaultYear,
 }: {
   policies: RequiredPolicyMap;
+  selectableYears: number[];
+  signupYearsText: string;
+  defaultYear: number;
 }) {
   const [step, setStep] = useState<Step>("request");
   const [username, setUsername] = useState("");
-  const selectableYears = useMemo(
-    () => getSelectableSsafyYears().slice().sort((a, b) => a - b),
-    [],
-  );
   const signupYears = useMemo(() => [...selectableYears, 0], [selectableYears]);
-  const signupYearsText = useMemo(() => getSignupSsafyYearText(), []);
   const [year, setYear] = useState(() => {
-    const defaultYear =
-      selectableYears[selectableYears.length - 1] ?? getCurrentSsafyYear();
     return String(defaultYear);
   });
   const [password, setPassword] = useState("");
@@ -83,9 +76,8 @@ export default function SignupForm({
       setError(usernameError);
       return;
     }
-    const yearError = validateSignupSsafyYear(year);
     const parsedYear = parseSignupSsafyYearValue(year);
-    if (yearError || parsedYear === null) {
+    if (parsedYear === null || !signupYears.includes(parsedYear)) {
       setError(
         `회원가입은 현재 선택 가능한 ${signupYearsText}만 선택할 수 있습니다.`,
       );

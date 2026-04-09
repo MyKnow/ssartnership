@@ -1,3 +1,8 @@
+import type {
+  PartnerAudienceFilter,
+  PartnerAudienceKey,
+} from "@/lib/partner-audience";
+
 export type CategoryKey = string;
 export type PartnerVisibility = "public" | "confidential" | "private";
 
@@ -22,7 +27,9 @@ export type Partner = {
     end: string;
   };
   benefits: string[];
-  conditions?: string[];
+  appliesTo: PartnerAudienceKey[];
   images?: string[];
   tags?: string[];
 };
+
+export type { PartnerAudienceFilter, PartnerAudienceKey };

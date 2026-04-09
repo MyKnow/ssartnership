@@ -19,8 +19,11 @@ import {
   upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
 import {
+  getConfiguredSignupSsafyYearText,
+  getSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
+import {
   getPreferredStaffSourceYear,
-  getSignupSsafyYearText,
   parseSignupSsafyYearValue,
   validateSignupSsafyYear,
 } from "@/lib/ssafy-year";
@@ -52,9 +55,15 @@ export async function POST(request: Request) {
       username?: string;
       year?: string | number;
     };
+    const cycleSettings = await getSsafyCycleSettings();
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
-    const yearError = validateSignupSsafyYear(payload.year);
+    const yearError = validateSignupSsafyYear(
+      payload.year,
+      "기수",
+      new Date(),
+      cycleSettings,
+    );
     year = parseSignupSsafyYearValue(payload.year);
     if (!username) {
       await logAuthSecurity({
@@ -91,7 +100,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: "invalid_year",
-          message: `회원가입은 현재 선택 가능한 ${getSignupSsafyYearText()}만 선택할 수 있습니다.`,
+          message: `회원가입은 현재 선택 가능한 ${getConfiguredSignupSsafyYearText(cycleSettings)}만 선택할 수 있습니다.`,
         },
         { status: 400 },
       );

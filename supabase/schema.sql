@@ -23,7 +23,7 @@ create table if not exists partners (
   period_start date,
   period_end date,
   benefits text[] not null default '{}',
-  conditions text[] not null default '{}',
+  applies_to text[] not null default '{staff,student,graduate}',
   images text[] not null default '{}',
   tags text[] not null default '{}',
   created_at timestamp with time zone default now()
@@ -43,7 +43,21 @@ alter table partners drop constraint if exists partners_visibility_check;
 alter table partners add constraint partners_visibility_check
   check (visibility in ('public', 'confidential', 'private'));
 
-alter table partners add column if not exists conditions text[] not null default '{}';
+alter table partners add column if not exists applies_to text[] not null default '{staff,student,graduate}';
+update partners
+set applies_to = case
+  when coalesce(cardinality(applies_to), 0) = 0 then array['staff', 'student', 'graduate']
+  else applies_to
+end;
+alter table partners alter column applies_to set default '{staff,student,graduate}';
+alter table partners alter column applies_to set not null;
+alter table partners drop constraint if exists partners_applies_to_check;
+alter table partners add constraint partners_applies_to_check
+  check (
+    cardinality(applies_to) > 0
+    and applies_to <@ array['staff', 'student', 'graduate']::text[]
+  );
+alter table partners drop column if exists conditions;
 alter table partners add column if not exists images text[] not null default '{}';
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;
@@ -98,6 +112,52 @@ alter table members drop constraint if exists members_year_check;
 alter table members add constraint members_year_check check (year between 0 and 99);
 comment on column members.year is 'SSAFY year; 0 indicates staff';
 comment on column members.staff_source_year is 'Original staff lookup year when members.year is 0';
+
+create table if not exists ssafy_cycle_settings (
+  id integer primary key default 1,
+  anchor_year integer not null default 14,
+  anchor_calendar_year integer not null default 2025,
+  anchor_month integer not null default 7,
+  manual_current_year integer,
+  manual_reason text,
+  manual_applied_at timestamp with time zone,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint ssafy_cycle_settings_singleton_check check (id = 1)
+);
+
+alter table ssafy_cycle_settings add column if not exists anchor_year integer not null default 14;
+alter table ssafy_cycle_settings add column if not exists anchor_calendar_year integer not null default 2025;
+alter table ssafy_cycle_settings add column if not exists anchor_month integer not null default 7;
+alter table ssafy_cycle_settings add column if not exists manual_current_year integer;
+alter table ssafy_cycle_settings add column if not exists manual_reason text;
+alter table ssafy_cycle_settings add column if not exists manual_applied_at timestamp with time zone;
+alter table ssafy_cycle_settings add column if not exists created_at timestamp with time zone default now();
+alter table ssafy_cycle_settings add column if not exists updated_at timestamp with time zone default now();
+alter table ssafy_cycle_settings drop constraint if exists ssafy_cycle_settings_singleton_check;
+alter table ssafy_cycle_settings add constraint ssafy_cycle_settings_singleton_check check (id = 1);
+alter table ssafy_cycle_settings drop constraint if exists ssafy_cycle_settings_anchor_year_check;
+alter table ssafy_cycle_settings add constraint ssafy_cycle_settings_anchor_year_check check (anchor_year between 1 and 99);
+alter table ssafy_cycle_settings drop constraint if exists ssafy_cycle_settings_anchor_calendar_year_check;
+alter table ssafy_cycle_settings add constraint ssafy_cycle_settings_anchor_calendar_year_check check (anchor_calendar_year between 2000 and 3000);
+alter table ssafy_cycle_settings drop constraint if exists ssafy_cycle_settings_anchor_month_check;
+alter table ssafy_cycle_settings add constraint ssafy_cycle_settings_anchor_month_check check (anchor_month between 1 and 12);
+alter table ssafy_cycle_settings drop constraint if exists ssafy_cycle_settings_manual_current_year_check;
+alter table ssafy_cycle_settings add constraint ssafy_cycle_settings_manual_current_year_check
+  check (manual_current_year is null or manual_current_year between 0 and 99);
+
+insert into ssafy_cycle_settings (
+  id,
+  anchor_year,
+  anchor_calendar_year,
+  anchor_month
+)
+values (1, 14, 2025, 7)
+on conflict (id) do update set
+  anchor_year = excluded.anchor_year,
+  anchor_calendar_year = excluded.anchor_calendar_year,
+  anchor_month = excluded.anchor_month,
+  updated_at = now();
 
 create table if not exists policy_documents (
   id uuid primary key default uuid_generate_v4(),

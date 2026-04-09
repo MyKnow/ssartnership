@@ -11,6 +11,11 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
+import {
+  DEFAULT_PARTNER_AUDIENCE,
+  PARTNER_AUDIENCE_OPTIONS,
+  normalizePartnerAudience,
+} from "@/lib/partner-audience";
 
 export type PartnerCardCategoryOption = {
   id: string;
@@ -30,7 +35,7 @@ export type PartnerCardFormValues = {
     end?: string;
   };
   benefits?: string[];
-  conditions?: string[];
+  appliesTo?: string[];
   images?: string[];
   tags?: string[];
 };
@@ -57,10 +62,12 @@ export default function PartnerCardForm({
   className?: string;
 }) {
   const benefitsValue = (partner.benefits ?? []).join(", ");
-  const conditionsValue = (partner.conditions ?? []).join(", ");
   const tagsValue = (partner.tags ?? []).join(", ");
   const periodStart = partner.period?.start ?? "";
   const periodEnd = partner.period?.end ?? "";
+  const selectedAppliesTo = normalizePartnerAudience(
+    partner.appliesTo ?? DEFAULT_PARTNER_AUDIENCE,
+  );
 
   return (
     <article
@@ -198,13 +205,25 @@ export default function PartnerCardForm({
 
         <div className="grid gap-1">
           <span className="text-xs font-medium text-muted-foreground">
-            이용 조건
+            적용 대상
           </span>
-          <Input
-            name="conditions"
-            defaultValue={conditionsValue}
-            placeholder="조건1, 조건2"
-          />
+          <div className="grid gap-2 sm:grid-cols-3">
+            {PARTNER_AUDIENCE_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground"
+              >
+                <input
+                  type="checkbox"
+                  name="appliesTo"
+                  value={option.value}
+                  defaultChecked={selectedAppliesTo.includes(option.value)}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
         </div>
 
         <div className="grid gap-1">

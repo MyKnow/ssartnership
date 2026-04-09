@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
-import { SSAFY_STAFF_YEAR, getSelectableSsafyYears } from "@/lib/ssafy-year";
+import { SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
+import { getConfiguredSelectableSsafyYears } from "@/lib/ssafy-cycle-settings";
 import {
   getChannelByName,
   getSenderCredentials,
@@ -93,7 +94,10 @@ async function listAllChannelMemberIds(token: string, channelId: string) {
 }
 
 async function getAllSelectableUserSnapshots() {
-  const years = getSelectableSsafyYears().slice().sort((a, b) => b - a);
+  const configuredSelectableYears = await getConfiguredSelectableSsafyYears();
+  const years = Array.from(
+    new Set([...configuredSelectableYears, 15, 14]),
+  ).sort((a, b) => b - a);
   const snapshots = new Map<string, MmUserDirectorySnapshot>();
   const failures: MmUserDirectorySyncResult["failures"] = [];
   let checked = 0;

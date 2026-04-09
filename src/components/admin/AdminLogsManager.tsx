@@ -88,6 +88,9 @@ const auditLabels: Record<string, string> = {
   member_sync: '회원 정보 동기화',
   member_manual_add: '회원 수동 추가',
   member_delete: '회원 삭제',
+  cycle_settings_update: '기수 기준 수정',
+  cycle_settings_early_start: '기수 조기 시작',
+  cycle_settings_restore: '기수 기준 복구',
   push_send: '푸시 발송',
   push_log_delete: '푸시 로그 삭제',
 };

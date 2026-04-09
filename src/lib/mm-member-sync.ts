@@ -1,9 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
-import {
-  getBackfillableSsafyYears,
-  getSelectableSsafyYears,
-} from "@/lib/ssafy-year";
+import { getConfiguredBackfillableSsafyYears } from "@/lib/ssafy-cycle-settings";
 import {
   type MMUser,
   getSenderCredentials,
@@ -94,7 +91,7 @@ function buildMemberSyncSummary(result: MemberSyncResult) {
 
 function getMemberSyncCandidateYears(year: number) {
   if (year === 0) {
-    return getSelectableSsafyYears().slice().sort((a, b) => b - a);
+    return [15, 14];
   }
   return [year];
 }
@@ -310,7 +307,7 @@ export async function syncMemberById(
 
 export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchResult> {
   const supabase = getSupabaseAdminClient();
-  const years = getBackfillableSsafyYears();
+  const years = await getConfiguredBackfillableSsafyYears();
   const { data: members, error } = await supabase
     .from("members")
     .select(

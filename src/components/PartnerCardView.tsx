@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Chip from "@/components/ui/Chip";
+import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import { cn } from "@/lib/cn";
 import { getBlurDataURL } from "@/lib/image-blur";
 import { getCachedImageUrl } from "@/lib/image-cache";
@@ -344,21 +345,14 @@ export default function PartnerCardView({
             ))}
           </div>
         </div>
-        {partner.conditions && partner.conditions.length > 0 ? (
-          <div className="text-sm text-foreground">
-            <p className="font-medium text-foreground">이용 조건</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {partner.conditions.map((condition) => (
-                <Badge
-                  key={condition}
-                  className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-                >
-                  {condition}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <div className="text-sm text-foreground">
+          <p className="font-medium text-foreground">적용 대상</p>
+          <PartnerAudienceChips
+            appliesTo={partner.appliesTo}
+            className="mt-2"
+            chipClassName="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+          />
+        </div>
         {partner.tags && partner.tags.length > 0 ? (
           <div className="text-sm text-foreground">
             <p className="font-medium text-foreground">태그</p>

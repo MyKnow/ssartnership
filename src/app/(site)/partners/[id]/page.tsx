@@ -11,6 +11,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
 import Card from "@/components/ui/Card";
+import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import {
   getContactDisplay,
   getMapLink,
@@ -312,56 +313,49 @@ export default async function PartnerDetailPage({
                     ) : null}
                   </div>
 
-                  <div className="mt-6 grid gap-5">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                        혜택
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {viewPartner.benefits.map((benefit) => (
-                          <Badge
-                            key={benefit}
-                            className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-                          >
-                            {benefit}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
+          <div className="mt-6 grid gap-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                혜택
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {viewPartner.benefits.map((benefit) => (
+                  <Badge
+                    key={benefit}
+                    className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {benefit}
+                  </Badge>
+                ))}
+              </div>
+            </div>
 
-                    {viewPartner.conditions && viewPartner.conditions.length > 0 ? (
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                          이용 조건
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {viewPartner.conditions.map((condition) => (
-                            <Badge
-                              key={condition}
-                              className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-                            >
-                              {condition}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                적용 대상
+              </p>
+              <PartnerAudienceChips
+                appliesTo={viewPartner.appliesTo}
+                className="mt-3"
+                chipClassName="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
 
-                    {viewPartner.tags && viewPartner.tags.length > 0 ? (
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                          태그
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {viewPartner.tags.map((tag) => (
-                            <Chip key={tag} style={chipStyle}>
-                              #{tag}
-                            </Chip>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
+            {viewPartner.tags && viewPartner.tags.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                  태그
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {viewPartner.tags.map((tag) => (
+                    <Chip key={tag} style={chipStyle}>
+                      #{tag}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
                 </div>
               </Card>
 

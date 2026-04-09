@@ -2,6 +2,10 @@ import Link from "next/link";
 import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  getSsafyCycleOverview,
+  getSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +74,8 @@ export default async function AdminPage() {
   }
 
   const supabase = getSupabaseAdminClient();
+  const cycleSettings = await getSsafyCycleSettings();
+  const cycleOverview = getSsafyCycleOverview(cycleSettings);
 
   const [
     memberResult,
@@ -104,10 +110,13 @@ export default async function AdminPage() {
   const auditLogCount = auditLogResult.error ? 0 : auditLogResult.count ?? 0;
   const securityLogCount = securityLogResult.error ? 0 : securityLogResult.count ?? 0;
   const totalLogCount = productLogCount + auditLogCount + securityLogCount;
+  const cycleMeta = cycleSettings.manualCurrentYear
+    ? `${cycleOverview.currentYear}기 · 조기 시작`
+    : `${cycleOverview.currentYear}기 · ${cycleOverview.currentSemester}학기`;
 
   return (
     <AdminShell title="Admin 관리 홈">
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           href="/admin/members"
           title="회원 관리"
@@ -131,6 +140,12 @@ export default async function AdminPage() {
           title="로그 조회"
           description="집계 뷰와 대시보드, 검색·정렬·필터가 가능한 로그 탐색 화면으로 이동합니다."
           meta={`전체 ${totalLogCount.toLocaleString()}건 로그`}
+        />
+        <SummaryCard
+          href="/admin/cycle"
+          title="기수 관리"
+          description="현재 기수 계산 기준과 조기 시작 상태를 확인하고 복구할 수 있습니다."
+          meta={cycleMeta}
         />
       </div>
     </AdminShell>

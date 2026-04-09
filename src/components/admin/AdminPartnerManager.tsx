@@ -12,6 +12,11 @@ import Select from "@/components/ui/Select";
 import { ADMIN_COPY } from "@/lib/content";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import AdminPartnerEditorCard from "@/components/admin/AdminPartnerEditorCard";
+import {
+  DEFAULT_PARTNER_AUDIENCE,
+  getPartnerAudienceLabel,
+  normalizePartnerAudience,
+} from "@/lib/partner-audience";
 
 type AdminCategory = {
   id: string;
@@ -33,7 +38,7 @@ type AdminPartner = {
   period_start?: string | null;
   period_end?: string | null;
   benefits?: string[] | null;
-  conditions?: string[] | null;
+  applies_to?: string[] | null;
   images?: string[] | null;
   tags?: string[] | null;
 };
@@ -83,7 +88,7 @@ export default function AdminPartnerManager({
     const normalized = partners.map((partner, index) => {
       const categoryKey = categoryKeyById.get(partner.category_id) ?? "unknown";
       const benefits = partner.benefits ?? [];
-      const conditions = partner.conditions ?? [];
+      const appliesTo = normalizePartnerAudience(partner.applies_to);
       const tags = partner.tags ?? [];
 
       return {
@@ -99,7 +104,7 @@ export default function AdminPartnerManager({
           partner.reservation_link,
           partner.inquiry_link,
           benefits.join(" "),
-          conditions.join(" "),
+          appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
           tags.join(" "),
         ]
           .join(" ")
@@ -199,7 +204,7 @@ export default function AdminPartnerManager({
             inquiryLink: "",
             period: { start: "", end: "" },
             benefits: [],
-            conditions: [],
+            appliesTo: DEFAULT_PARTNER_AUDIENCE,
             images: [],
             tags: [],
           }}

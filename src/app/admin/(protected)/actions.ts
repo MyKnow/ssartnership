@@ -22,6 +22,14 @@ import {
   isPartnerVisibility,
   normalizePartnerVisibility,
 } from "@/lib/partner-visibility";
+import { parsePartnerAudienceSelection } from "@/lib/partner-audience";
+import {
+  clearSsafyCycleOverride,
+  getConfiguredCurrentSsafyYear,
+  getSsafyCycleSettings,
+  setSsafyCycleEarlyStart,
+  upsertSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 import {
   sanitizeHexColor,
   sanitizeHttpUrl,
@@ -42,7 +50,7 @@ type PartnerInput = {
   periodStart: string | null;
   periodEnd: string | null;
   benefits: string[];
-  conditions: string[];
+  appliesTo: string[];
   images: string[];
   tags: string[];
   visibility: PartnerVisibility;
@@ -117,8 +125,18 @@ function revalidateMemberPaths() {
   revalidatePath("/admin");
   revalidatePath("/admin/members");
   revalidatePath("/admin/partners");
+  revalidatePath("/admin/cycle");
   revalidatePath("/certification");
   revalidatePath("/auth/change-password");
+}
+
+function revalidateCyclePaths() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/cycle");
+  revalidatePath("/admin/members");
+  revalidatePath("/admin/push");
+  revalidatePath("/auth/signup");
+  revalidatePath("/certification");
 }
 
 function parseCategoryPayload(formData: FormData) {
@@ -151,6 +169,35 @@ function parseCategoryPayload(formData: FormData) {
   };
 }
 
+function parseSsafyCycleNumber(value: string, label: string, min: number, max: number) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${label}는 ${min}~${max} 사이의 숫자로 입력해 주세요.`);
+  }
+  return parsed;
+}
+
+function parseSsafyCycleSettingsPayload(formData: FormData) {
+  const anchorYearRaw = String(formData.get("anchorYear") || "").trim();
+  const anchorCalendarYearRaw = String(formData.get("anchorCalendarYear") || "").trim();
+  const anchorMonthRaw = String(formData.get("anchorMonth") || "").trim();
+
+  if (!anchorYearRaw || !anchorCalendarYearRaw || !anchorMonthRaw) {
+    throw new Error("기준 기수, 기준 연도, 기준 월을 모두 입력해 주세요.");
+  }
+
+  return {
+    anchorYear: parseSsafyCycleNumber(anchorYearRaw, "기준 기수", 1, 99),
+    anchorCalendarYear: parseSsafyCycleNumber(
+      anchorCalendarYearRaw,
+      "기준 연도",
+      2000,
+      3000,
+    ),
+    anchorMonth: parseSsafyCycleNumber(anchorMonthRaw, "기준 월", 1, 12),
+  };
+}
+
 function parsePartnerPayload(formData: FormData): PartnerInput {
   const name = String(formData.get("name") || "").trim();
   const categoryId = String(formData.get("categoryId") || "").trim();
@@ -162,9 +209,9 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
   const periodStart = String(formData.get("periodStart") || "").trim();
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
-  const conditions = String(formData.get("conditions") || "").trim();
   const images = String(formData.get("images") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
+  const appliesTo = formData.getAll("appliesTo").map((item) => String(item).trim());
 
   if (!name || !categoryId || !location) {
     throw new Error("업체명, 카테고리, 위치를 입력해 주세요.");
@@ -203,6 +250,11 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
     throw new Error("이미지 URL 형식을 확인해 주세요.");
   }
 
+  const parsedAppliesTo = parsePartnerAudienceSelection(appliesTo);
+  if (!parsedAppliesTo) {
+    throw new Error("적용 대상을 하나 이상 선택해 주세요.");
+  }
+
   return {
     name,
     categoryId,
@@ -213,7 +265,7 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
     periodStart: periodStart || null,
     periodEnd: periodEnd || null,
     benefits: parseList(benefits),
-    conditions: parseList(conditions),
+    appliesTo: parsedAppliesTo,
     images: sanitizedImages,
     tags: parseList(tags),
     visibility,
@@ -312,7 +364,7 @@ export async function createPartner(formData: FormData) {
       period_start: payload.periodStart,
       period_end: payload.periodEnd,
       benefits: payload.benefits,
-      conditions: payload.conditions,
+      applies_to: payload.appliesTo,
       images: payload.images,
       tags: payload.tags,
       visibility: payload.visibility,
@@ -338,7 +390,7 @@ export async function createPartner(formData: FormData) {
       periodEnd: payload.periodEnd,
       visibility: payload.visibility,
       benefitCount: payload.benefits.length,
-      conditionCount: payload.conditions.length,
+      appliesTo: payload.appliesTo,
       imageCount: payload.images.length,
       tagCount: payload.tags.length,
     },
@@ -396,7 +448,7 @@ export async function updatePartner(formData: FormData) {
       period_start: payload.periodStart,
       period_end: payload.periodEnd,
       benefits: payload.benefits,
-      conditions: payload.conditions,
+      applies_to: payload.appliesTo,
       images: payload.images,
       tags: payload.tags,
       visibility: payload.visibility,
@@ -421,7 +473,7 @@ export async function updatePartner(formData: FormData) {
       periodEnd: payload.periodEnd,
       visibility: payload.visibility,
       benefitCount: payload.benefits.length,
-      conditionCount: payload.conditions.length,
+      appliesTo: payload.appliesTo,
       imageCount: payload.images.length,
       tagCount: payload.tags.length,
     },
@@ -634,6 +686,58 @@ export async function manualAddMembers(
         : "추가할 수 있는 유저가 없습니다.",
     ...result,
   };
+}
+
+export async function updateSsafyCycleSettings(formData: FormData) {
+  await requireAdmin();
+  const payload = parseSsafyCycleSettingsPayload(formData);
+  await upsertSsafyCycleSettings(payload);
+  await logAdminAction("cycle_settings_update", {
+    targetType: "cycle_settings",
+    targetId: "singleton",
+    properties: payload,
+  });
+  revalidateCyclePaths();
+  redirect("/admin/cycle?status=updated");
+}
+
+export async function earlyStartSsafyCycle() {
+  await requireAdmin();
+  const settings = await getSsafyCycleSettings();
+  const currentYear = getConfiguredCurrentSsafyYear(settings);
+  const targetYear = currentYear + 1;
+  await setSsafyCycleEarlyStart(targetYear);
+  await logAdminAction("cycle_settings_early_start", {
+    targetType: "cycle_settings",
+    targetId: "singleton",
+    properties: {
+      currentYear,
+      targetYear,
+      anchorYear: settings.anchorYear,
+      anchorCalendarYear: settings.anchorCalendarYear,
+      anchorMonth: settings.anchorMonth,
+    },
+  });
+  revalidateCyclePaths();
+  redirect("/admin/cycle?status=early-started");
+}
+
+export async function restoreSsafyCycleSettings() {
+  await requireAdmin();
+  const settings = await getSsafyCycleSettings();
+  await clearSsafyCycleOverride();
+  await logAdminAction("cycle_settings_restore", {
+    targetType: "cycle_settings",
+    targetId: "singleton",
+    properties: {
+      currentYear: getConfiguredCurrentSsafyYear(settings),
+      anchorYear: settings.anchorYear,
+      anchorCalendarYear: settings.anchorCalendarYear,
+      anchorMonth: settings.anchorMonth,
+    },
+  });
+  revalidateCyclePaths();
+  redirect("/admin/cycle?status=restored");
 }
 
 export async function deleteMember(formData: FormData) {

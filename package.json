@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:mm-profile": "node --test tests/mm-profile-csv.test.mts",
+    "test:ssafy-cycle": "node --test tests/ssafy-cycle-simulation.test.mts",
     "release": "bash scripts/release.sh"
   },
   "dependencies": {

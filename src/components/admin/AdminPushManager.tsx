@@ -10,7 +10,11 @@ import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
 import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
-import { formatOptionalSsafyYearLabel, formatSsafyYearLabel } from "@/lib/ssafy-year";
+import {
+  formatOptionalSsafyYearLabel,
+  formatSsafyMemberLifecycleLabel,
+  formatSsafyYearLabel,
+} from "@/lib/ssafy-year";
 
 type PartnerOption = {
   id: string;
@@ -129,7 +133,10 @@ function extractPartnerIdFromUrl(url: string | null | undefined) {
 
 function getMemberLabel(member: MemberOption) {
   const name = member.display_name?.trim() || member.mm_username;
-  const yearLabel = formatOptionalSsafyYearLabel(member.year);
+  const yearLabel =
+    typeof member.year === "number"
+      ? formatSsafyMemberLifecycleLabel(member.year)
+      : formatOptionalSsafyYearLabel(member.year);
   const campusLabel = member.campus ?? "캠퍼스 미지정";
   return `${name} (@${member.mm_username}) · ${yearLabel} · ${campusLabel}`;
 }
