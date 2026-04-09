@@ -328,8 +328,17 @@ export async function POST(request: Request) {
     await sendPost(
       senderLogin.token,
       dmChannel.id,
-      `SSARTNERSHIP 인증코드입니다.\n\n인증코드: ${code}\n유효시간: ${CODE_TTL_MINUTES}분`,
+      [
+        "SSARTNERSHIP 인증코드입니다.",
+        "",
+        "인증코드",
+        "```plaintext",
+        code,
+        "```",
+        `유효시간: ${CODE_TTL_MINUTES}분`,
+      ].join("\n"),
     );
+
 
     await logAuthSecurity({
       ...context,

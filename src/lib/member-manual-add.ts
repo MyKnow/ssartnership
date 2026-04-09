@@ -392,7 +392,15 @@ export async function provisionManualMembers(
         await sendPost(
           resolution.senderToken,
           dmChannel.id,
-          `SSARTNERSHIP 임시 비밀번호입니다.\n\n임시 비밀번호: ${tempPassword}\n보안을 위해 로그인 후 반드시 변경해 주세요.`,
+          [
+            "SSARTNERSHIP 임시 비밀번호입니다.",
+            "",
+            "임시 비밀번호",
+            "```plaintext",
+            tempPassword,
+            "```",
+            "보안을 위해 로그인 후 반드시 변경해 주세요.",
+          ].join("\n"),
         );
 
         items.push({

@@ -47,7 +47,7 @@ export default async function AdminPartnersPage() {
       .order("created_at", { ascending: true }),
     supabase
       .from("partners")
-      .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,applies_to,images,tags,visibility")
+      .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility")
       .order("created_at", { ascending: false }),
   ]);
 
@@ -187,7 +187,7 @@ export default async function AdminPartnersPage() {
         <Card>
           <SectionHeading
             title="제휴 업체 관리"
-            description="혜택/태그는 콤마(,)로 구분해 입력하고, 적용 대상은 체크박스로 선택합니다."
+            description="이용 조건/혜택/태그는 콤마(,)로 구분해 입력하고, 적용 대상은 체크박스로 선택합니다."
           />
           <AdminPartnerManager
             categories={safeCategories}

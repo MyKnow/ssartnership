@@ -316,6 +316,22 @@ export default async function PartnerDetailPage({
           <div className="mt-6 grid gap-5">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                이용 조건
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {viewPartner.conditions.map((condition) => (
+                  <Badge
+                    key={condition}
+                    className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {condition}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 혜택
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -334,11 +350,7 @@ export default async function PartnerDetailPage({
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 적용 대상
               </p>
-              <PartnerAudienceChips
-                appliesTo={viewPartner.appliesTo}
-                className="mt-3"
-                chipClassName="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-              />
+              <PartnerAudienceChips appliesTo={viewPartner.appliesTo} className="mt-3" />
             </div>
 
             {viewPartner.tags && viewPartner.tags.length > 0 ? (

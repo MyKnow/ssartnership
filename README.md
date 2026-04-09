@@ -185,7 +185,7 @@ http://localhost:3000
 2. SQL Editor에서 [supabase/schema.sql](/Users/myknow/coding/ssartnership/supabase/schema.sql) 실행
 3. `.env` 또는 Vercel 환경 변수에 Supabase 값 등록
 
-`schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마가 포함되어 있습니다.
+`schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마, 제휴 업체 `이용 조건` 스키마가 포함되어 있습니다.
 
 ### 기존 프로젝트 업데이트
 
@@ -196,6 +196,7 @@ http://localhost:3000
 3. [20260410_mm_user_directory.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260410_mm_user_directory.sql)
 4. [20260411_policy_documents.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260411_policy_documents.sql)
 5. [20260413000000_ssafy_cycle_settings.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260413000000_ssafy_cycle_settings.sql)
+6. [20260414000000_partner_conditions.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260414000000_partner_conditions.sql)
 
 주의:
 

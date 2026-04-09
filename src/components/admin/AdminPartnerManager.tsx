@@ -37,6 +37,7 @@ type AdminPartner = {
   inquiry_link?: string | null;
   period_start?: string | null;
   period_end?: string | null;
+  conditions?: string[] | null;
   benefits?: string[] | null;
   applies_to?: string[] | null;
   images?: string[] | null;
@@ -87,6 +88,7 @@ export default function AdminPartnerManager({
 
     const normalized = partners.map((partner, index) => {
       const categoryKey = categoryKeyById.get(partner.category_id) ?? "unknown";
+      const conditions = partner.conditions ?? [];
       const benefits = partner.benefits ?? [];
       const appliesTo = normalizePartnerAudience(partner.applies_to);
       const tags = partner.tags ?? [];
@@ -101,6 +103,7 @@ export default function AdminPartnerManager({
           partner.location,
           partner.reservation_link ?? "",
           partner.inquiry_link ?? "",
+          conditions.join(" "),
           partner.reservation_link,
           partner.inquiry_link,
           benefits.join(" "),
@@ -203,6 +206,7 @@ export default function AdminPartnerManager({
             reservationLink: "",
             inquiryLink: "",
             period: { start: "", end: "" },
+            conditions: [],
             benefits: [],
             appliesTo: DEFAULT_PARTNER_AUDIENCE,
             images: [],

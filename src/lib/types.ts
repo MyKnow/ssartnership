@@ -26,6 +26,7 @@ export type Partner = {
     start: string;
     end: string;
   };
+  conditions: string[];
   benefits: string[];
   appliesTo: PartnerAudienceKey[];
   images?: string[];

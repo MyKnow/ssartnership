@@ -34,6 +34,7 @@ export type PartnerCardFormValues = {
     start?: string;
     end?: string;
   };
+  conditions?: string[];
   benefits?: string[];
   appliesTo?: string[];
   images?: string[];
@@ -62,6 +63,7 @@ export default function PartnerCardForm({
   className?: string;
 }) {
   const benefitsValue = (partner.benefits ?? []).join(", ");
+  const conditionsValue = (partner.conditions ?? []).join(", ");
   const tagsValue = (partner.tags ?? []).join(", ");
   const periodStart = partner.period?.start ?? "";
   const periodEnd = partner.period?.end ?? "";
@@ -200,6 +202,17 @@ export default function PartnerCardForm({
             name="benefits"
             defaultValue={benefitsValue}
             placeholder="혜택1, 혜택2"
+          />
+        </div>
+
+        <div className="grid gap-1">
+          <span className="text-xs font-medium text-muted-foreground">
+            이용 조건
+          </span>
+          <Input
+            name="conditions"
+            defaultValue={conditionsValue}
+            placeholder="조건1, 조건2"
           />
         </div>
 

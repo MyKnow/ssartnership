@@ -22,6 +22,7 @@ create table if not exists partners (
   inquiry_link text,
   period_start date,
   period_end date,
+  conditions text[] not null default '{}',
   benefits text[] not null default '{}',
   applies_to text[] not null default '{staff,student,graduate}',
   images text[] not null default '{}',
@@ -57,7 +58,7 @@ alter table partners add constraint partners_applies_to_check
     cardinality(applies_to) > 0
     and applies_to <@ array['staff', 'student', 'graduate']::text[]
   );
-alter table partners drop column if exists conditions;
+alter table partners add column if not exists conditions text[] not null default '{}';
 alter table partners add column if not exists images text[] not null default '{}';
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;

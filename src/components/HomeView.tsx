@@ -99,6 +99,7 @@ export default function HomeView({
           partner.location,
           partner.reservationLink ?? "",
           partner.inquiryLink ?? "",
+          partner.conditions.join(" "),
           partner.benefits.join(" "),
           partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
           (partner.tags ?? []).join(" "),

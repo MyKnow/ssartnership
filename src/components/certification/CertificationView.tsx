@@ -6,8 +6,8 @@ import { cn } from "@/lib/cn";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { trackProductEvent } from "@/lib/product-events";
 import {
-  formatSsafyMemberLifecycleLabel,
   getCurrentSsafyYear,
+  formatSsafyYearLabel,
 } from "@/lib/ssafy-year";
 import {
   getCertificationRoleLabel,
@@ -43,7 +43,7 @@ export default function CertificationView({
   const roleLabel = getCertificationRoleLabel(year);
   const scheme = getCertificationScheme(year);
   const campusLabel = member.campus ?? profile.campus ?? null;
-  const yearLabel = year > 0 ? formatSsafyMemberLifecycleLabel(year) : null;
+  const yearLabel = year > 0 ? formatSsafyYearLabel(year) : null;
   const hasCustomAvatar = Boolean(member.avatar_base64 && member.avatar_content_type);
   const avatarSrc = hasCustomAvatar
     ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`

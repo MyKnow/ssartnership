@@ -49,6 +49,7 @@ type PartnerInput = {
   inquiryLink: string | null;
   periodStart: string | null;
   periodEnd: string | null;
+  conditions: string[];
   benefits: string[];
   appliesTo: string[];
   images: string[];
@@ -208,6 +209,7 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
   const rawVisibility = String(formData.get("visibility") || "").trim();
   const periodStart = String(formData.get("periodStart") || "").trim();
   const periodEnd = String(formData.get("periodEnd") || "").trim();
+  const conditions = String(formData.get("conditions") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
   const images = String(formData.get("images") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
@@ -264,6 +266,7 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
     inquiryLink,
     periodStart: periodStart || null,
     periodEnd: periodEnd || null,
+    conditions: parseList(conditions),
     benefits: parseList(benefits),
     appliesTo: parsedAppliesTo,
     images: sanitizedImages,
@@ -363,6 +366,7 @@ export async function createPartner(formData: FormData) {
       inquiry_link: payload.inquiryLink,
       period_start: payload.periodStart,
       period_end: payload.periodEnd,
+      conditions: payload.conditions,
       benefits: payload.benefits,
       applies_to: payload.appliesTo,
       images: payload.images,
@@ -388,6 +392,7 @@ export async function createPartner(formData: FormData) {
       hasInquiryLink: Boolean(payload.inquiryLink),
       periodStart: payload.periodStart,
       periodEnd: payload.periodEnd,
+      conditionCount: payload.conditions.length,
       visibility: payload.visibility,
       benefitCount: payload.benefits.length,
       appliesTo: payload.appliesTo,
@@ -447,6 +452,7 @@ export async function updatePartner(formData: FormData) {
       inquiry_link: payload.inquiryLink,
       period_start: payload.periodStart,
       period_end: payload.periodEnd,
+      conditions: payload.conditions,
       benefits: payload.benefits,
       applies_to: payload.appliesTo,
       images: payload.images,
@@ -471,6 +477,7 @@ export async function updatePartner(formData: FormData) {
       hasInquiryLink: Boolean(payload.inquiryLink),
       periodStart: payload.periodStart,
       periodEnd: payload.periodEnd,
+      conditionCount: payload.conditions.length,
       visibility: payload.visibility,
       benefitCount: payload.benefits.length,
       appliesTo: payload.appliesTo,

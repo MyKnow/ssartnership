@@ -333,6 +333,19 @@ export default function PartnerCardView({
           </div>
         </div>
         <div className="text-sm text-foreground">
+          <p className="font-medium text-foreground">이용 조건</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {partner.conditions.map((condition) => (
+              <Badge
+                key={condition}
+                className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+              >
+                {condition}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        <div className="text-sm text-foreground">
           <p className="font-medium text-foreground">혜택</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {partner.benefits.map((benefit) => (
@@ -347,11 +360,7 @@ export default function PartnerCardView({
         </div>
         <div className="text-sm text-foreground">
           <p className="font-medium text-foreground">적용 대상</p>
-          <PartnerAudienceChips
-            appliesTo={partner.appliesTo}
-            className="mt-2"
-            chipClassName="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-          />
+          <PartnerAudienceChips appliesTo={partner.appliesTo} className="mt-2" />
         </div>
         {partner.tags && partner.tags.length > 0 ? (
           <div className="text-sm text-foreground">

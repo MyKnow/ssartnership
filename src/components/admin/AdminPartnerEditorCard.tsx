@@ -29,6 +29,7 @@ type PartnerValue = {
   inquiry_link?: string | null;
   period_start?: string | null;
   period_end?: string | null;
+  conditions?: string[] | null;
   benefits?: string[] | null;
   applies_to?: string[] | null;
   images?: string[] | null;
@@ -75,7 +76,6 @@ export default function AdminPartnerEditorCard({
           <PartnerAudienceChips
             appliesTo={partner.applies_to ?? []}
             className="mt-2"
-            chipClassName="bg-surface-muted text-foreground"
           />
         </div>
         <div className="inline-flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
@@ -102,6 +102,7 @@ export default function AdminPartnerEditorCard({
                 start: partner.period_start ?? "",
                 end: partner.period_end ?? "",
               },
+              conditions: partner.conditions ?? [],
               benefits: partner.benefits ?? [],
               appliesTo: partner.applies_to ?? [],
               images: partner.images ?? [],

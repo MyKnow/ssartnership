@@ -23,6 +23,7 @@ type PartnerRow = {
   inquiry_link?: string | null;
   period_start?: string | null;
   period_end?: string | null;
+  conditions?: string[] | null;
   benefits?: string[] | null;
   applies_to?: string[] | null;
   images?: string[] | null;
@@ -82,7 +83,7 @@ const getCachedPartnerRows = unstable_cache(
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,applies_to,images,tags,visibility,categories(key)",
+        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
       )
       .order("created_at", { ascending: false });
 
@@ -109,7 +110,7 @@ const getCachedPartnerRowById = unstable_cache(
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,benefits,applies_to,images,tags,visibility,categories(key)",
+        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -144,6 +145,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
       start: normalizeDate(row.period_start),
       end: normalizeDate(row.period_end),
     },
+    conditions: row.conditions ?? [],
     benefits: row.benefits ?? [],
     appliesTo: normalizePartnerAudience(row.applies_to),
     images: row.images ?? [],
@@ -162,6 +164,7 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
       start: "",
       end: "",
     },
+    conditions: [],
     benefits: [],
     appliesTo: normalizePartnerAudience(row.applies_to),
     images: [],
