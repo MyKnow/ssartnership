@@ -7,14 +7,13 @@ import {
   isFullPartnerAudience,
   normalizePartnerAudience,
 } from "@/lib/partner-audience";
-import type { PartnerAudienceKey } from "@/lib/types";
 
 export default function PartnerAudienceChips({
   appliesTo,
   className,
   chipClassName,
 }: {
-  appliesTo: PartnerAudienceKey[];
+  appliesTo: Array<string | null | undefined>;
   className?: string;
   chipClassName?: string;
 }) {
@@ -33,4 +32,3 @@ export default function PartnerAudienceChips({
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
-import { getConfiguredSelectableSsafyYears } from "@/lib/ssafy-cycle-settings";
+import { getConfiguredSelectableSsafyYears, getSsafyCycleSettings } from "@/lib/ssafy-cycle-settings";
 
 export type MMUser = {
   id: string;
@@ -296,7 +296,8 @@ export async function resolveSelectableMemberByUsername(
   username: string,
 ): Promise<SelectableStudentMatch | null> {
   const safeUsername = username.replace(/^@/, "").trim().toLowerCase();
-  const studentYears = (await getConfiguredSelectableSsafyYears()).sort(
+  const cycleSettings = await getSsafyCycleSettings();
+  const studentYears = getConfiguredSelectableSsafyYears(cycleSettings).sort(
     (a, b) => b - a,
   );
   const searchPlans = [

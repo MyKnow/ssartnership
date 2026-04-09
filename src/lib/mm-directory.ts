@@ -1,7 +1,10 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
 import { SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
-import { getConfiguredSelectableSsafyYears } from "@/lib/ssafy-cycle-settings";
+import {
+  getConfiguredSelectableSsafyYears,
+  getSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 import {
   getChannelByName,
   getSenderCredentials,
@@ -94,7 +97,10 @@ async function listAllChannelMemberIds(token: string, channelId: string) {
 }
 
 async function getAllSelectableUserSnapshots() {
-  const configuredSelectableYears = await getConfiguredSelectableSsafyYears();
+  const cycleSettings = await getSsafyCycleSettings();
+  const configuredSelectableYears = getConfiguredSelectableSsafyYears(
+    cycleSettings,
+  );
   const years = Array.from(
     new Set([...configuredSelectableYears, 15, 14]),
   ).sort((a, b) => b - a);
