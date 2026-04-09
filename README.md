@@ -1,49 +1,65 @@
 # SSARTNERSHIP
 
-SSAFY 서울 캠퍼스 교육생을 위한 제휴 혜택 플랫폼입니다.  
-카테고리별 제휴 업체를 조회하고, 상세 페이지에서 혜택, 이용 조건, 예약/문의 링크, 이미지까지 확인할 수 있습니다.  
-운영진은 Admin 페이지에서 카테고리와 제휴 업체를 관리하고, 교육생은 Mattermost 기반 인증으로 로그인 및 교육생 인증 카드를 사용할 수 있습니다.
+SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.  
+서울 지역 제휴 업체 정보를 빠르게 확인하고, Mattermost 기반 인증으로 교육생/운영진 신원을 확인할 수 있습니다.
+
+핵심 목표는 다음 두 가지입니다.
+
+- 제휴 정보를 공개 페이지에서 빠르게 탐색할 수 있게 하기
+- SSAFY 구성원만 접근해야 하는 기능은 Mattermost 인증과 관리자 도구로 안전하게 운영하기
 
 ## 핵심 기능
+
+### 공개 사용자 기능
 
 - 카테고리별 제휴 업체 조회
 - 검색 및 정렬
   - 현재 제휴 우선
   - 등록순
-  - 종료일 마감순
-- 파트너 상세 페이지
+  - 종료일 임박순
+- 제휴 업체 상세 페이지
   - 혜택
   - 이용 조건
   - 태그
   - 이미지 캐러셀
-  - 예약/문의 링크
+  - 지도 / 예약 / 문의 정보
   - 공유 링크 복사
-- 제휴 기간 외 카드 비활성화 오버레이
-- 반응형 UI 및 다크 모드
-- 제휴 제안 폼
-  - 이메일 발송
-  - 제출 확인 모달
-  - 홈 리다이렉트 + 토스트
-- Admin 기능
-  - 로그인
-  - 관리 홈 분기
-  - 카테고리 CRUD
-  - 제휴 업체 CRUD
-  - 회원 조회/수정/삭제
-  - 이미지 URL 추가/정렬/삭제
-- 교육생 인증 기능
-  - MM 아이디 기반 회원가입/로그인
-  - Mattermost DM 인증코드 발송
-  - 임시 비밀번호 재발급
-  - 비밀번호 변경 강제 플로우
-  - 교육생 인증 카드 표시
-  - 공개 QR 검증 페이지
-- PWA / 알림 기능
-  - 홈 화면 설치 지원
-  - 로그인 회원 대상 Web Push 구독 설정
-  - 전체 공지 수동 발송
-  - 신규 제휴 등록 시 자동 알림
-  - 제휴 종료 7일 전 자동 알림
+- 공개 / 대외비 / 비공개 제휴 상태 지원
+- 제휴 기간 외 상세 조회 허용, 예약/문의 링크 비노출
+- 반응형 UI, 다크 모드, PWA 설치 지원
+- RSS, sitemap, robots, SEO 메타데이터 제공
+
+### 회원 기능
+
+- Mattermost 기반 회원가입 / 로그인
+- 가입 대상
+  - 14기 교육생
+  - 15기 교육생
+  - 운영진
+- Mattermost DM 인증코드 발송
+- 임시 비밀번호 재설정
+- 비밀번호 강제 변경 플로우
+- 약관 / 개인정보 수집·이용 동의 버전 관리
+- 교육생 / 운영진 인증 카드
+- 공개 QR 검증 페이지
+- Web Push 구독 및 알림 설정
+
+### 관리자 기능
+
+- 관리자 로그인
+- 카테고리 CRUD
+- 제휴 업체 CRUD
+- 회원 조회 / 수정 / 삭제
+- 회원 수동 추가
+  - 기수 선택
+  - MM ID 리스트 입력
+  - 임시 비밀번호 발송
+  - 강제 비밀번호 변경 상태 저장
+- 회원 백필 실행
+- 로그 조회 및 상세 확인
+- Mock 미리보기
+- 공지 Push 발송
+- 신규 제휴 / 종료 예정 제휴 자동 알림
 
 ## 기술 스택
 
@@ -62,27 +78,38 @@ SSAFY 서울 캠퍼스 교육생을 위한 제휴 혜택 플랫폼입니다.
 ```text
 src/
   app/
-    (site)/                사용자 화면
+    (site)/                공개 사용자 화면
     admin/                 관리자 화면
-    api/                   인증, 제안, 이미지 프록시 API
-    auth/                  로그인/회원가입/비밀번호 변경
+    api/                   인증, 제휴, 로그, cron, 알림 API
+    auth/                  로그인, 회원가입, 약관 동의, 비밀번호 변경
+    legal/                 공개 약관 / 개인정보 문서
   components/
     admin/                 관리자 전용 컴포넌트
-    auth/                  인증 관련 컴포넌트
-    certification/         교육생 인증 카드
+    analytics/             분석 이벤트 컴포넌트
+    auth/                  인증 / 약관 동의 UI
+    certification/         인증 카드 및 QR
+    legal/                 정책 문서 렌더링
     ui/                    공용 UI 컴포넌트
   lib/
     repositories/          Repository 패턴
-    mattermost.ts          MM 연동
+    mattermost.ts          Mattermost 연동
+    mm-directory.ts        MM 유저 디렉토리 조회 / 동기화
+    mm-member-sync.ts      회원 프로필 동기화
+    member-manual-add.ts   관리자 수동 회원 추가
+    policy-documents.ts    약관 버전 / 동의 상태 계산
     user-auth.ts           사용자 세션
     auth.ts                관리자 세션
-    validation.ts          공통 검증 유틸
 
 supabase/
-  schema.sql              기본 스키마
+  schema.sql              기준 스키마
+  migrations/             운영 DB용 migration
+
+tests/
+  mm-profile-csv.test.mts Mattermost 닉네임 파서 테스트
 
 docs/
-  maintenance-audit.md    유지보수/리팩터링 로그
+  performance/            성능 측정 문서
+  security/               보안 정리 문서
 ```
 
 ## 로컬 실행
@@ -92,108 +119,242 @@ npm install
 npm run dev
 ```
 
-기본 개발 서버:
+개발 서버:
 
-```bash
+```text
 http://localhost:3000
 ```
 
 ## 환경 변수
 
-`.env.example`을 기준으로 `.env`를 구성합니다.
+`.env.example`를 기준으로 `.env`를 구성합니다.
 
-```env
-# Admin credentials
-ADMIN_ID=admin
-ADMIN_PASSWORD=change-me
-ADMIN_SESSION_SECRET=replace-with-long-random-string
-# Optional: restrict admin paths to fixed client IPs
-# ADMIN_ALLOWED_IPS=127.0.0.1,203.0.113.10
-# Optional: add HTTP Basic Auth in front of /admin and admin APIs
-# ADMIN_BASIC_AUTH_USERNAME=admin-gateway
-# ADMIN_BASIC_AUTH_PASSWORD=change-me-too
+주요 그룹은 다음과 같습니다.
 
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+- 관리자 인증
+  - `ADMIN_ID`
+  - `ADMIN_PASSWORD`
+  - `ADMIN_SESSION_SECRET`
+  - `ADMIN_ALLOWED_IPS` (선택)
+  - `ADMIN_BASIC_AUTH_USERNAME` / `ADMIN_BASIC_AUTH_PASSWORD` (선택)
+- Supabase
+  - `SUPABASE_URL`
+  - `SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- Mattermost
+  - `MM_BASE_URL`
+  - `MM_STUDENT_CHANNEL`
+  - `MM_SENDER_LOGIN_ID_14`
+  - `MM_SENDER_PASSWORD_14`
+  - `MM_TEAM_NAME_14`
+  - `MM_STUDENT_CHANNEL_14`
+  - `MM_SENDER_LOGIN_ID_15`
+  - `MM_SENDER_PASSWORD_15`
+  - `MM_TEAM_NAME_15`
+  - `MM_STUDENT_CHANNEL_15`
+- 사용자 세션 / QR
+  - `USER_SESSION_SECRET`
+  - `CERTIFICATION_QR_SECRET`
+- 제휴 제안 메일
+  - `NAVER_SMTP_USER`
+  - `NAVER_SMTP_PASS`
+  - `SUGGEST_NOTIFY_EMAIL`
+- Web Push / Cron
+  - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+  - `VAPID_PRIVATE_KEY`
+  - `VAPID_SUBJECT`
+  - `CRON_SECRET`
+- 사이트 URL / SEO
+  - `NEXT_PUBLIC_SITE_URL`
+- 목업 스위치
+  - `NEXT_PUBLIC_DATA_SOURCE=mock` (선택)
 
-# Data source
-# NEXT_PUBLIC_DATA_SOURCE=mock
-
-# Suggest mail
-NAVER_SMTP_USER=your-naver-id@naver.com
-NAVER_SMTP_PASS=your-naver-smtp-password
-SUGGEST_NOTIFY_EMAIL=your-naver-id@naver.com
-
-# Mattermost
-MM_BASE_URL=https://meeting.ssafy.com
-MM_SENDER_LOGIN_ID=myknow
-MM_SENDER_PASSWORD=change-me
-MM_SENDER_LOGIN_ID_14=myknow14
-MM_SENDER_PASSWORD_14=change-me-14
-MM_SENDER_LOGIN_ID_15=myknow15
-MM_SENDER_PASSWORD_15=change-me-15
-MM_TEAM_NAME=s15public
-MM_STUDENT_CHANNEL=off-topic
-# 기수별 팀명이 다르면 아래처럼 덮어쓸 수 있습니다.
-# MM_TEAM_NAME_14=s14public
-# MM_TEAM_NAME_15=s15public
-# 채널명이 기수별로 다르면 MM_STUDENT_CHANNEL_14 / MM_STUDENT_CHANNEL_15도 함께 둘 수 있습니다.
-
-# User session
-USER_SESSION_SECRET=replace-with-long-random-string
-CERTIFICATION_QR_SECRET=replace-with-long-random-string
-
-# Web Push
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=replace-with-vapid-public-key
-VAPID_PRIVATE_KEY=replace-with-vapid-private-key
-VAPID_SUBJECT=mailto:myknow00@naver.com
-CRON_SECRET=replace-with-long-random-string
-
-# Site URL
-NEXT_PUBLIC_SITE_URL=https://ssartnership.myknow.xyz
-```
+환경 변수 예시는 [.env.example](/Users/myknow/coding/ssartnership/.env.example)에 있습니다.
 
 ## Supabase 설정
 
+### 새 프로젝트
+
 1. Supabase 프로젝트 생성
 2. SQL Editor에서 [supabase/schema.sql](/Users/myknow/coding/ssartnership/supabase/schema.sql) 실행
-3. 이미 운영 중인 DB라면 [supabase/migrations/20260328_push_notifications_mvp1.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260328_push_notifications_mvp1.sql)도 추가 적용
-4. 서비스 롤 키와 URL을 `.env` 또는 Vercel 환경 변수에 등록
+3. `.env` 또는 Vercel 환경 변수에 Supabase 값 등록
+
+`schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마가 포함되어 있습니다.
+
+### 기존 프로젝트 업데이트
+
+운영 중인 DB라면 다음 migration을 순서대로 적용합니다.
+
+1. [20260401000000_partner_visibility.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260401000000_partner_visibility.sql)
+2. [20260409.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260409.sql)
+3. [20260410_mm_user_directory.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260410_mm_user_directory.sql)
+4. [20260411_policy_documents.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260411_policy_documents.sql)
 
 주의:
 
 - `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용입니다.
-- `members`, `mm_verification_codes`, `password_reset_attempts` 등 민감 테이블은 서비스 롤로만 접근합니다.
+- `members`, `mm_verification_codes`, `member_policy_consents`, `mm_user_directory`, `push_*` 테이블은 서비스 롤 기준으로만 다룹니다.
+
+## 회원 / 인증 모델
+
+### 식별 기준
+
+- 최종 식별자는 `mm_user_id`입니다.
+- `mm_username`은 변경 가능한 스냅샷 값으로만 취급합니다.
+- 회원가입 이후 주요 API는 `mm_user_id` 기준으로 동작합니다.
+
+### 기수 체계
+
+- `14`: 14기 교육생
+- `15`: 15기 교육생
+- `0`: 운영진
+
+운영진은 `members.staff_source_year`에 어느 기수 팀에서 확인된 계정인지 함께 저장합니다.
+
+### Mattermost 유저 디렉토리
+
+- `mm_user_directory` 테이블에 유저 스냅샷을 저장합니다.
+- 보관 값
+  - `mm_user_id`
+  - `mm_username`
+  - `display_name`
+  - `campus`
+  - `is_staff`
+  - `source_years`
+  - `synced_at`
+- 회원가입 / 로그인 / 재설정은 이 디렉토리를 먼저 조회하고, 없으면 Mattermost live API로 fallback 합니다.
+
+### 닉네임 파싱
+
+- 반 / 팀코드는 더 이상 저장하지 않습니다.
+- 중요 값은 다음만 유지합니다.
+  - 이름
+  - 캠퍼스
+  - 운영진 여부
+- 운영진 추정 역할명, 창업 캠퍼스, 14기/15기 다양한 닉네임 패턴을 지원합니다.
 
 ## Mattermost 인증 플로우
 
-1. 사용자가 MM 아이디와 사이트 비밀번호를 입력합니다.
-2. 서버가 Mattermost에서 설정된 팀과 교육생 채널을 읽을 수 있는지와, 해당 사용자가 그 팀/채널의 대상인지 확인합니다.
-3. 운영용 MM 계정이 해당 사용자에게 DM으로 인증코드를 보냅니다.
-4. 사용자가 인증코드를 입력하면 회원가입이 완료됩니다.
-5. 이후 로그인은 `MM 아이디 + 사이트 비밀번호` 조합으로 동작합니다.
+### 회원가입
+
+1. 사용자가 기수 또는 운영진을 선택합니다.
+2. 입력한 MM ID(username)를 `mm_user_directory`에서 먼저 찾습니다.
+3. 못 찾으면 선택한 조건으로 Mattermost API fallback 조회를 수행합니다.
+   - 14기: 14기 교육생만
+   - 15기: 15기 교육생만
+   - 운영진: 14기 / 15기 전체 중 운영진만
+4. 대상이 확인되면 운영용 계정이 DM으로 인증코드를 발송합니다.
+5. 사용자가 인증코드를 입력하면 회원가입을 완료합니다.
+6. 가입 시 최신 이용약관 / 개인정보 동의 버전도 함께 저장합니다.
+
+### 로그인
+
+1. `mm_username`으로 디렉토리 조회
+2. 필요 시 live fallback
+3. DB에서 `mm_user_id`로 회원 조회
+4. 비밀번호 검증
+5. 최신 약관 미동의 시 `/auth/consent`로 리다이렉트
+
+### 비밀번호 재설정
+
+- 가입된 회원만 가능
+- 운영진은 `staff_source_year`를 기준으로 적절한 팀 / 발신 계정을 선택합니다.
 
 주의:
 
 - 운영용 MM 계정은 대상 팀의 `view_team` 권한과 대상 채널의 `read_channel` 권한이 있어야 합니다.
-- private/invite-only 팀이거나 계정이 팀 멤버가 아니면 `GET /api/v4/teams/name/{team_name}` 단계에서 403이 날 수 있습니다.
-- 팀 이름은 `MM_TEAM_NAME`, `MM_TEAM_NAME_14`처럼 기수별로 분리해서 관리하는 편이 안전합니다.
-- 운영용 계정도 `MM_SENDER_LOGIN_ID_14`/`MM_SENDER_PASSWORD_14`처럼 기수별로 분리하면 14기 대상 API에 14기 대표 계정을 쓸 수 있습니다.
+- private / invite-only 팀이거나 운영 계정이 팀 멤버가 아니면 팀 조회 단계에서 403이 날 수 있습니다.
+- 14기 / 15기 발신 계정은 분리하는 편이 안전합니다.
+
+## 약관 / 개인정보 동의
+
+- 필수 동의
+  - 서비스 이용약관
+  - 개인정보 수집·이용 동의
+- 마케팅 / 수신 동의는 회원가입 단계에서 받지 않고, 별도 알림 설정 단계에서 처리합니다.
+- 정책 문서는 `policy_documents`에서 버전 관리합니다.
+- 회원 동의 이력은 `member_policy_consents`에 저장합니다.
+- 회원의 동의 버전이 없거나 오래되면 로그인 이후 동의 화면으로 보냅니다.
+
+공개 문서:
+
+- [/legal/service](/Users/myknow/coding/ssartnership/src/app/legal/[kind]/page.tsx)
+- [/legal/privacy](/Users/myknow/coding/ssartnership/src/app/legal/[kind]/page.tsx)
+
+## 관리자 운영 포인트
+
+- 회원 관리는 기수 / 캠퍼스 중심입니다.
+- 반 단위 관리 / 반 단위 Push는 제거되었습니다.
+- 관리자 페이지에서 다음 작업을 할 수 있습니다.
+  - 회원 수동 추가
+  - 백필 실행
+  - 로그 상세 조회
+  - 제휴 공개 상태 수정
+  - Push 발송
+  - Mock 미리보기
+
+회원 수동 추가는 다음 흐름으로 동작합니다.
+
+1. 기수 선택
+2. MM ID 리스트 입력
+3. 대상 사용자 조회
+4. 임시 비밀번호 발송
+5. `must_change_password=true` 저장
+6. 성공 / 실패 수 요약 표시
+
+DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
+
+## 제휴 상태와 노출 정책
+
+- `공개`
+  - 누구나 카드 / 상세 조회 가능
+- `대외비`
+  - 로그인하지 않은 사용자는 강한 블러, 클릭 차단, 상세 직접 접근 시 홈 리다이렉트
+  - 로그인한 인증 회원은 일반 공개 카드처럼 조회 가능
+- `비공개`
+  - 모든 사용자에게 블러
+  - 상세 직접 접근 차단
+
+또한 제휴 기간이 아니면:
+
+- 상세 페이지 조회는 가능
+- 지도는 조회 가능
+- 예약 / 문의 링크는 UI와 서버 payload 모두에서 숨김
+
+## 성능 / 캐시 / Cron
+
+- 공개 제휴 목록은 캐시를 사용합니다.
+- 관리자 변경 후 관련 캐시를 무효화합니다.
+- MM 유저 디렉토리는 Vercel cron으로 하루 1회 동기화합니다.
+- 제휴 종료 예정 알림도 하루 1회 실행합니다.
+
+[vercel.json](/Users/myknow/coding/ssartnership/vercel.json)
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/push-expiring-partners",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/member-sync",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
+```
 
 ## 주요 보안 포인트
 
-- 관리자 세션과 사용자 세션은 HMAC 서명 + 만료 시각을 사용합니다.
-- 관리자 로그인 시도는 rate limit 테이블로 제한합니다.
-- 인증코드와 비밀번호 재설정 요청도 횟수 제한이 적용됩니다.
+- 관리자 세션과 사용자 세션은 서명 + 만료 시각을 사용합니다.
+- 관리자 로그인은 입력 검증, suspicious parameter 탐지, IP/계정 기준 rate limit을 적용합니다.
+- 관리자 경로는 필요 시 IP allowlist 또는 Basic Auth로 한 번 더 제한할 수 있습니다.
+- 인증코드 / 비밀번호 재설정 요청은 횟수 제한이 적용됩니다.
 - 교육생 인증 QR은 짧은 만료시간의 서명 토큰으로 발급됩니다.
-- Web Push 구독 정보는 서버 전용 테이블에 저장하고, 실패한 endpoint는 자동 비활성화합니다.
-- Vercel cron이 종료 7일 전 알림을 하루 1회 실행합니다.
-- 이미지 프록시는 내부망/사설 IP/비정상 프로토콜을 차단합니다.
-- 관리자 액션은 카테고리 키, 색상값, 링크, 제휴 기간을 서버에서 다시 검증합니다.
-- 외부 새 탭 링크는 `noopener noreferrer`를 강제합니다.
-- 파트너 URL은 저장 전 정규화 및 필터링됩니다.
+- 이미지 프록시는 내부망 / 사설 IP / 비정상 프로토콜을 차단합니다.
+- 외부 링크는 `noopener noreferrer`를 강제합니다.
+- Web Push 구독 정보는 서버 전용 테이블에 저장하고 실패한 endpoint는 비활성화합니다.
 
 ## 스크립트
 
@@ -202,8 +363,11 @@ npm run dev
 npm run lint
 npm run build
 npm run start
+npm run test:mm-profile
 npm run release -- patch
 ```
+
+### release 스크립트
 
 `release` 스크립트는 다음을 수행합니다.
 
@@ -212,23 +376,21 @@ npm run release -- patch
 - commit + tag 생성
 - `git push`
 - `git push --tags`
-- 커밋 메시지는 여러 줄 붙여넣기를 지원하며, 입력 종료는 빈 줄 1회로 처리합니다.
-- `patch` 뒤에 오는 나머지 인자는 모두 커밋 메시지로 합쳐 한 줄 메시지로 바로 사용할 수 있습니다.
 
-예시:
+한 줄 메시지:
 
 ```bash
 npm run release -- patch "feat: 운영진 지원과 MM 닉네임 파싱 확장"
 ```
 
-여러 줄 메시지는 heredoc으로 한 번에 넣을 수 있습니다.
+여러 줄 메시지:
 
 ```bash
 npm run release -- patch <<'EOF'
 feat: 운영진 지원과 MM 닉네임 파싱 확장
 
-- MM 닉네임 파서를 확장해 운영진 역할 표식을 인식하도록 개선
-- 운영진 year=0 표시와 mock UI 미리보기를 추가
+- 운영진 year=0 지원
+- MM 닉네임 파싱 보강
 EOF
 ```
 
@@ -240,23 +402,22 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 
 1. GitHub 저장소 연결
 2. Vercel 프로젝트 생성
-3. `.env` 값을 Vercel Environment Variables에 동일하게 등록
-4. 배포 후 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 갱신
+3. `.env` 값을 Vercel Environment Variables에 등록
+4. Supabase migration / schema 적용
+5. 배포 후 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 갱신
 
 권장:
 
-- Production 환경에서 `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`는 최소 32자 이상 난수 사용
-- `ADMIN_ID`, `ADMIN_PASSWORD`, `MM_SENDER_PASSWORD`, SMTP 계정 정보는 절대 클라이언트에 노출되지 않도록 관리
-- 필요하면 `ADMIN_ALLOWED_IPS`로 `/admin` 접근 IP를 제한하고, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`로 2차 게이트를 추가
+- `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `CRON_SECRET`는 충분히 긴 난수 사용
+- `SUPABASE_SERVICE_ROLE_KEY`, `MM_SENDER_PASSWORD_*`, SMTP 계정, VAPID private key는 절대 클라이언트에 노출되지 않도록 관리
+- 운영 환경에서는 `ADMIN_ALLOWED_IPS` 또는 Basic Auth 중 최소 하나를 같이 두는 편이 안전
 
 ## 현재 상태
 
 - `npm run lint` 통과
-- `npx tsc --noEmit` 통과
-- 내부 버튼 링크는 공통 `Button` 컴포넌트에서 클라이언트 라우팅을 사용합니다.
-- 교육생 인증 카드는 공개 QR 검증 흐름과 Web Push 설정을 포함합니다.
-- 관리자 데이터 수정은 상세 페이지 캐시까지 함께 무효화합니다.
-- 신규 제휴 등록 시 자동 Web Push 알림을 발송합니다.
+- `npm run test:mm-profile` 통과
+- 회원가입 / 로그인 / 재설정 / 약관 동의 / 운영진 가입 흐름은 `mm_user_id` 중심으로 정리되어 있습니다.
+- 공개 제휴 페이지는 SEO, sitemap, RSS, robots를 포함합니다.
 
 ## 라이선스
 
