@@ -14,16 +14,24 @@ import {
   loginWithPassword,
   createDirectChannel,
   sendPost,
-  resolveSelectableStudentByUsername,
+  resolveSelectableMemberByUsername,
   getUserImage,
 } from "@/lib/mattermost";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
+import {
+  findMmUserDirectoryEntryByUsername,
+  upsertMmUserDirectorySnapshot,
+} from "@/lib/mm-directory";
+import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
 import {
   buildMemberSyncLogProperties,
   type MemberRow,
   syncMemberSnapshot,
 } from "@/lib/mm-member-sync";
-import { parseSsafyProfile } from "@/lib/mm-profile";
+import {
+    getEffectiveSsafyYear,
+    getPreferredStaffSourceYear,
+  } from "@/lib/ssafy-year";
 
 export const runtime = "nodejs";
 
@@ -60,18 +68,33 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdminClient();
     const memberSelect =
-      "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at";
-    const { data: memberByUsername } = await supabase
-      .from("members")
-      .select(memberSelect)
-      .eq("mm_username", username)
-      .maybeSingle();
+      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at";
+    const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
+    let resolvedStudentYear: number | null = null;
 
-    let member: MemberRow | null = memberByUsername ?? null;
-    if (!member) {
+    let member: MemberRow | null = null;
+    if (directoryEntry?.mm_user_id) {
+      const { data: memberById } = await supabase
+        .from("members")
+        .select(memberSelect)
+        .eq("mm_user_id", directoryEntry.mm_user_id)
+        .maybeSingle();
+      member = (memberById as MemberRow | null) ?? null;
+    } else {
       try {
-        const resolved = await resolveSelectableStudentByUsername(username);
+        const resolved = await resolveSelectableMemberByUsername(username);
         if (resolved) {
+          resolvedStudentYear = resolved.year;
+          const profile = parseSsafyProfileFromUser(resolved.user);
+          await upsertMmUserDirectorySnapshot({
+            mmUserId: resolved.user.id,
+            mmUsername: resolved.user.username,
+            displayName:
+              profile.displayName ?? resolved.user.nickname ?? resolved.user.username,
+            campus: profile.campus ?? null,
+            isStaff: Boolean(profile.isStaff),
+            sourceYears: [resolved.year],
+          });
           const { data: memberById } = await supabase
             .from("members")
             .select(memberSelect)
@@ -117,12 +140,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "not_registered" }, { status: 404 });
     }
 
-    const senderCredentials = getSenderCredentials(member.year);
+    const preferredStaffSourceYear = getPreferredStaffSourceYear(
+      directoryEntry?.source_years ?? [],
+    );
+    const effectiveYear = getEffectiveSsafyYear(
+      member.year,
+      member.staff_source_year,
+      [
+        resolvedStudentYear,
+        preferredStaffSourceYear,
+      ],
+    );
+    if (effectiveYear === null) {
+      throw new Error("운영진 회원은 staff_source_year가 필요합니다.");
+    }
+
+    const senderCredentials = getSenderCredentials(effectiveYear);
     const senderLogin = await loginWithPassword(
       senderCredentials.loginId,
       senderCredentials.password,
     );
-    const channelConfig = getStudentChannelConfig(member.year);
+    const channelConfig = getStudentChannelConfig(effectiveYear);
     let mmUser;
     try {
       mmUser = await findUserInChannelByUserId(
@@ -208,14 +246,13 @@ export async function POST(request: Request) {
     }
 
     const avatarPromise = getUserImage(senderLogin.token, member.mm_user_id);
-    const profile = parseSsafyProfile(mmUser.nickname || mmUser.username);
+    const profile = parseSsafyProfileFromUser(mmUser);
     const avatar = await avatarPromise;
     const syncResult = await syncMemberSnapshot(member, {
       mmUserId: member.mm_user_id,
       mmUsername: mmUser.username,
       displayName: profile.displayName ?? mmUser.nickname ?? mmUser.username,
       campus: profile.campus ?? null,
-      classNumber: profile.classNumber ?? null,
       avatarFetched: Boolean(avatar),
       avatarContentType: avatar?.contentType ?? null,
       avatarBase64: avatar?.base64 ?? null,

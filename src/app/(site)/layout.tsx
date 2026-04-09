@@ -11,6 +11,9 @@ export default async function SiteLayout({
   children: React.ReactNode;
 }) {
   const session = await getUserSession();
+  if (session?.requiresConsent) {
+    redirect("/auth/consent");
+  }
   if (session?.mustChangePassword) {
     redirect("/auth/change-password");
   }

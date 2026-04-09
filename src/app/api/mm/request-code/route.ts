@@ -12,12 +12,20 @@ import {
   loginWithPassword,
   sendPost,
 } from "@/lib/mattermost";
-import { parseSsafyProfile } from "@/lib/mm-profile";
-import { getSelectableSsafyYearText, isSelectableSsafyYear } from "@/lib/ssafy-year";
+import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
+import {
+  findMmUserDirectoryStaffEntryByUsername,
+  findMmUserDirectoryStudentEntryByUsernameAndYear,
+  upsertMmUserDirectorySnapshot,
+} from "@/lib/mm-directory";
+import {
+  getPreferredStaffSourceYear,
+  getSignupSsafyYearText,
+  parseSignupSsafyYearValue,
+  validateSignupSsafyYear,
+} from "@/lib/ssafy-year";
 import {
   normalizeMmUsername,
-  parseSsafyYearValue,
-  validateSsafyYear,
   validateMmUsername,
 } from "@/lib/validation";
 
@@ -46,8 +54,8 @@ export async function POST(request: Request) {
     };
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
-    const yearError = validateSsafyYear(payload.year);
-    year = parseSsafyYearValue(payload.year);
+    const yearError = validateSignupSsafyYear(payload.year);
+    year = parseSignupSsafyYearValue(payload.year);
     if (!username) {
       await logAuthSecurity({
         ...context,
@@ -80,77 +88,151 @@ export async function POST(request: Request) {
         identifier: username || null,
         properties: getRequestCodeLogProperties(year, { reason: "invalid_year" }),
       });
-      return NextResponse.json({ error: "invalid_year" }, { status: 400 });
-    }
-    if (!isSelectableSsafyYear(year)) {
-      await logAuthSecurity({
-        ...context,
-        eventName: "member_signup_code_request",
-        status: "failure",
-        actorType: "guest",
-        identifier: username || null,
-        properties: getRequestCodeLogProperties(year, {
-          reason: "inactive_year",
-        }),
-      });
       return NextResponse.json(
         {
           error: "invalid_year",
-          message: `회원가입은 현재 운영 중인 기수인 ${getSelectableSsafyYearText()}만 선택할 수 있습니다.`,
+          message: `회원가입은 현재 선택 가능한 ${getSignupSsafyYearText()}만 선택할 수 있습니다.`,
         },
         { status: 400 },
       );
     }
-
     const supabase = getSupabaseAdminClient();
-    const senderCredentials = getSenderCredentials(year);
-    const senderLogin = await loginWithPassword(
-      senderCredentials.loginId,
-      senderCredentials.password,
-    );
-    const channelConfig = getStudentChannelConfig(year);
-    let targetUser;
-    try {
-      targetUser = await findUserInChannelByUsername(
-        senderLogin.token,
-        username,
-        channelConfig,
-      );
-    } catch (error) {
-      if (error instanceof MattermostApiError) {
+    const directoryEntry =
+      year === 0
+        ? await findMmUserDirectoryStaffEntryByUsername(username)
+        : await findMmUserDirectoryStudentEntryByUsernameAndYear(username, year);
+    let targetUser:
+      | {
+          id: string;
+          username: string;
+          nickname?: string;
+          first_name?: string;
+          last_name?: string;
+          is_bot?: boolean;
+        }
+      | null = null;
+    let targetDisplayName = directoryEntry?.display_name ?? null;
+    let targetCampus = directoryEntry?.campus ?? null;
+    let resolvedFromDirectory = Boolean(directoryEntry);
+    let resolvedYearFromLive: number | null = null;
+    let lastInaccessibleError: MattermostApiError | null = null;
+    let attemptedLiveSearches = 0;
+    let inaccessibleLiveSearches = 0;
+
+    if (directoryEntry) {
+      targetUser = {
+        id: directoryEntry.mm_user_id,
+        username: directoryEntry.mm_username,
+        nickname: directoryEntry.display_name,
+      };
+    } else {
+      const searchYears = year === 0 ? [15, 14] : [year];
+
+      for (const searchYear of searchYears) {
+        try {
+          const senderCredentials = getSenderCredentials(searchYear);
+          const senderLogin = await loginWithPassword(
+            senderCredentials.loginId,
+            senderCredentials.password,
+          );
+          attemptedLiveSearches += 1;
+          const channelConfig = getStudentChannelConfig(searchYear);
+          const candidate = await findUserInChannelByUsername(
+            senderLogin.token,
+            username,
+            channelConfig,
+          );
+          if (!candidate) {
+            continue;
+          }
+
+          const profile = parseSsafyProfileFromUser(candidate);
+          const isExpectedMatch = year === 0
+            ? Boolean(profile.isStaff)
+            : !profile.isStaff;
+          if (!isExpectedMatch) {
+            continue;
+          }
+
+          targetUser = candidate;
+          targetDisplayName =
+            profile.displayName ?? candidate.nickname ?? candidate.username;
+          targetCampus = profile.campus ?? null;
+          resolvedFromDirectory = false;
+          resolvedYearFromLive = searchYear;
+          await upsertMmUserDirectorySnapshot({
+            mmUserId: candidate.id,
+            mmUsername: candidate.username,
+            displayName: targetDisplayName,
+            campus: targetCampus,
+            isStaff: Boolean(profile.isStaff),
+            sourceYears: [searchYear],
+          });
+          break;
+        } catch (error) {
+          if (error instanceof MattermostApiError) {
+            lastInaccessibleError = error;
+            inaccessibleLiveSearches += 1;
+            attemptedLiveSearches += 1;
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      if (!targetUser) {
+        if (
+          lastInaccessibleError &&
+          attemptedLiveSearches > 0 &&
+          inaccessibleLiveSearches === attemptedLiveSearches
+        ) {
+          await logAuthSecurity({
+            ...context,
+            eventName: "member_signup_code_request",
+            status: "failure",
+            actorType: "guest",
+            identifier: username,
+            properties: getRequestCodeLogProperties(year, {
+              reason: "team_or_channel_inaccessible",
+              status: lastInaccessibleError.status,
+            }),
+          });
+          return NextResponse.json(
+            {
+              error: "team_or_channel_inaccessible",
+              message:
+                "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
+            },
+            { status: 403 },
+          );
+        }
+
         await logAuthSecurity({
           ...context,
           eventName: "member_signup_code_request",
           status: "failure",
           actorType: "guest",
           identifier: username,
-          properties: getRequestCodeLogProperties(year, {
-            reason: "team_or_channel_inaccessible",
-            status: error.status,
-          }),
+          properties: getRequestCodeLogProperties(year, { reason: "not_found" }),
         });
         return NextResponse.json(
-          {
-            error: "team_or_channel_inaccessible",
-            message:
-              "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
-          },
-          { status: 403 },
+          { error: "not_found", message: "해당 MM 계정을 찾을 수 없습니다." },
+          { status: 404 },
         );
       }
-      throw error;
     }
-    if (!targetUser) {
-      await logAuthSecurity({
-        ...context,
-        eventName: "member_signup_code_request",
-        status: "failure",
-        actorType: "guest",
-        identifier: username,
-        properties: getRequestCodeLogProperties(year, { reason: "not_student" }),
-      });
-      return NextResponse.json({ error: "not_student" }, { status: 404 });
-    }
+
+    const senderYear =
+      year === 0
+        ? resolvedYearFromLive ??
+          getPreferredStaffSourceYear(directoryEntry?.source_years ?? []) ??
+          15
+        : year;
+    const senderCredentials = getSenderCredentials(senderYear);
+    const senderLogin = await loginWithPassword(
+      senderCredentials.loginId,
+      senderCredentials.password,
+    );
 
     const { data: existing } = await supabase
       .from("mm_verification_codes")
@@ -189,7 +271,7 @@ export async function POST(request: Request) {
     const { data: existingMember } = await supabase
       .from("members")
       .select(
-        "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at",
+        "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,updated_at",
       )
       .eq("mm_user_id", targetUser.id)
       .maybeSingle();
@@ -212,9 +294,6 @@ export async function POST(request: Request) {
     }
 
     const avatarPromise = getUserImage(senderLogin.token, targetUser.id);
-    const profile = parseSsafyProfile(
-      targetUser.nickname || targetUser.username,
-    );
     const avatar = await avatarPromise;
     const code = generateCode();
     const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
@@ -225,10 +304,9 @@ export async function POST(request: Request) {
       mm_user_id: targetUser.id,
       mm_username: targetUser.username,
       display_name:
-        profile.displayName ?? targetUser.nickname ?? targetUser.username,
+        targetDisplayName ?? targetUser.nickname ?? targetUser.username,
       year,
-      campus: profile.campus ?? null,
-      class_number: profile.classNumber ?? null,
+      campus: targetCampus,
       avatar_content_type: avatar?.contentType ?? null,
       avatar_base64: avatar?.base64 ?? null,
     });
@@ -253,8 +331,9 @@ export async function POST(request: Request) {
       properties: getRequestCodeLogProperties(year, {
         mmUserId: targetUser.id,
         mmUsername: targetUser.username,
-        campus: profile.campus ?? null,
-        classNumber: profile.classNumber ?? null,
+        campus: targetCampus,
+        resolvedFromDirectory,
+        resolvedYearFromLive,
       }),
     });
 

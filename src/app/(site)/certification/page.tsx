@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
-import Card from "@/components/ui/Card";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import {
   buildMemberSyncLogProperties,
@@ -15,7 +14,7 @@ import CertificationFooterActions from "@/components/certification/Certification
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `교육생 인증 | ${SITE_NAME}`,
+  title: `SSAFY 인증 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: true,
@@ -29,7 +28,6 @@ type CertificationMember = {
   display_name?: string | null;
   year?: number | null;
   campus?: string | null;
-  class_number?: number | null;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
 };
@@ -47,7 +45,7 @@ export default async function CertificationPage() {
   const { data: member } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64",
+      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64",
     )
     .eq("id", session.userId)
     .maybeSingle();
@@ -84,18 +82,18 @@ export default async function CertificationPage() {
       <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10">
-          <Card className="mx-auto max-w-2xl p-6">
+          <div className="mx-auto max-w-2xl">
             <h1 className="text-2xl font-semibold text-foreground">
-              교육생 인증
+              SSAFY 인증
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Mattermost 인증 정보를 기반으로 SSAFY 교육생임을 확인합니다.
+              현재 계정의 인증 상태와 표시 정보를 확인합니다.
             </p>
             <CertificationView
               member={currentMember}
               initialTimestamp={initialTimestamp}
             />
-          </Card>
+          </div>
           <CertificationFooterActions />
         </Container>
       </main>

@@ -14,8 +14,8 @@ type AdminMember = {
   mm_username: string;
   display_name?: string | null;
   year?: number | null;
+  staff_source_year?: number | null;
   campus?: string | null;
-  class_number?: number | null;
   must_change_password: boolean;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
@@ -56,12 +56,12 @@ export default function AdminMemberCard({
   const displayName =
     profile.displayName ?? member.display_name ?? member.mm_username;
   const year = member.year ?? getCurrentSsafyYear();
+  const staffSourceYear = member.staff_source_year ?? null;
   const campus = member.campus ?? profile.campus ?? "";
-  const classNumber = member.class_number ?? profile.classNumber ?? "";
   const avatarSrc =
     member.avatar_base64 && member.avatar_content_type
       ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
-      : null;
+      : "/avatar-default.svg";
   const topPanelSizeClass = "md:h-[196px]";
   const updateFormId = `member-update-${member.id}`;
 
@@ -80,20 +80,14 @@ export default function AdminMemberCard({
         <div
           className={`relative aspect-square w-full max-w-[196px] overflow-hidden rounded-[28px] border border-border bg-surface-muted md:max-w-none ${topPanelSizeClass}`}
         >
-          {avatarSrc ? (
-            <Image
-              src={avatarSrc}
-              alt={`${displayName} 프로필 이미지`}
-              fill
-              sizes="196px"
-              unoptimized
-              className="object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-muted-foreground">
-              {displayName.slice(0, 1)}
-            </div>
-          )}
+          <Image
+            src={avatarSrc}
+            alt={`${displayName} 프로필 이미지`}
+            fill
+            sizes="196px"
+            unoptimized
+            className="object-cover"
+          />
         </div>
 
         <div className={`grid gap-5 ${topPanelSizeClass}`}>
@@ -109,16 +103,18 @@ export default function AdminMemberCard({
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="font-medium text-foreground">기수/캠퍼스/반</span>
-              <span>
-                {[
-                  formatSsafyYearLabel(year),
-                  campus,
-                  classNumber ? `${classNumber}반` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || "-"}
-              </span>
+              <span className="font-medium text-foreground">기수</span>
+              <span>{formatSsafyYearLabel(year)}</span>
+            </div>
+            {year === 0 && staffSourceYear !== null ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="font-medium text-foreground">찾은 기수</span>
+                <span>{formatSsafyYearLabel(staffSourceYear)}</span>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="font-medium text-foreground">캠퍼스</span>
+              <span>{campus || "-"}</span>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-medium text-foreground">가입일</span>
@@ -149,7 +145,7 @@ export default function AdminMemberCard({
           <Input name="campus" defaultValue={campus} placeholder="서울" />
         </label>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-2 text-sm font-medium text-foreground">
             기수
             <Input
@@ -159,17 +155,6 @@ export default function AdminMemberCard({
               name="year"
               defaultValue={year}
               placeholder={String(getCurrentSsafyYear())}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            반
-            <Input
-              type="number"
-              min={1}
-              max={30}
-              name="classNumber"
-              defaultValue={classNumber}
-              placeholder="11"
             />
           </label>
 

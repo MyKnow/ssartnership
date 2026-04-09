@@ -62,13 +62,12 @@ export default async function AdminPushPage() {
 
   const { data: members, error: membersError } = targetableMemberIds.length
       ? await supabase
-        .from("members")
-        .select("id,display_name,mm_username,year,campus,class_number")
-        .in("id", targetableMemberIds)
-        .order("year", { ascending: true })
-        .order("campus", { ascending: true })
-        .order("class_number", { ascending: true })
-        .order("display_name", { ascending: true })
+      .from("members")
+      .select("id,display_name,mm_username,year,campus")
+      .in("id", targetableMemberIds)
+      .order("year", { ascending: true })
+      .order("campus", { ascending: true })
+      .order("display_name", { ascending: true })
     : { data: [], error: null };
 
   return (

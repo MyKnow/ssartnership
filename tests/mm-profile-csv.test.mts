@@ -20,8 +20,7 @@ const skipReason =
     ? `CSV fixture not found. Set MM_PROFILE_TEST_CSVS or place the files at: ${csvPaths.join(", ")}`
     : false;
 
-const SINGLE_CLASS_PROFILE_REGEX =
-  /(?:\[|\()(서울|광주|구미|부울경|대전|창업)_?(\d{1,2})반(?:\([^)]*\))?(?:_[^,\/\]\)]*)?(?:\]|\))/u;
+const CAMPUS_NAMES = ["서울", "광주", "구미", "부울경", "대전", "창업"] as const;
 
 const profileModulePromise = import(
   new URL("../src/lib/mm-profile.ts", import.meta.url).href
@@ -30,6 +29,23 @@ const profileModulePromise = import(
 async function parseProfile(value: string) {
   const { parseSsafyProfile } = await profileModulePromise;
   return parseSsafyProfile(value);
+}
+
+async function parseProfileFromUser(
+  user: Partial<Record<"nickname" | "first_name" | "last_name" | "username", string>>,
+) {
+  const { parseSsafyProfileFromUser } = await profileModulePromise;
+  return parseSsafyProfileFromUser(user);
+}
+
+function assertProfileFields(
+  actual: unknown,
+  expected: Record<string, unknown>,
+) {
+  const profile = actual as Record<string, unknown>;
+  for (const [key, value] of Object.entries(expected)) {
+    assert.deepStrictEqual(profile[key], value, key);
+  }
 }
 
 function parseCsv(text: string) {
@@ -101,107 +117,115 @@ const matchedNames = availableCsvPaths.length > 0
 
 const exactExamples = [
   {
-    raw: "강하준[서울_5반(S1)_S109]팀원",
+    raw: "강하준[서울(S1)_S109]팀원",
     expected: {
       displayName: "강하준",
       campus: "서울",
-      classNumber: 5,
     },
   },
   {
-    raw: "윤서하[창업_2반_F201]팀원",
+    raw: "윤서하[창업_F201]팀원",
     expected: {
       displayName: "윤서하",
       campus: "창업",
-      classNumber: 2,
     },
   },
   {
-    raw: "한도윤강사(서울13반)",
+    raw: "한도윤강사(서울)",
     expected: {
       displayName: "한도윤",
       campus: "서울",
-      classNumber: 13,
       isStaff: true,
       suggestedYear: 0,
     },
   },
   {
-    raw: "서지안(서울_17반)",
+    raw: "서지안(서울)",
     expected: {
       displayName: "서지안",
       campus: "서울",
-      classNumber: 17,
     },
   },
   {
-    raw: "박시온강사[서울_2반]",
+    raw: "박시온강사[서울]",
     expected: {
       displayName: "박시온",
       campus: "서울",
-      classNumber: 2,
       isStaff: true,
       suggestedYear: 0,
     },
   },
   {
-    raw: "이도현[부울경_1반_E102]팀원",
+    raw: "이도현[부울경_E102]팀원",
     expected: {
       displayName: "이도현",
       campus: "부울경",
-      classNumber: 1,
     },
   },
   {
-    raw: "최하린[구미_2반_S209]팀원",
+    raw: "최하린[구미_S209]팀원",
     expected: {
       displayName: "최하린",
       campus: "구미",
-      classNumber: 2,
     },
   },
   {
-    raw: "김서율[서울2반]",
+    raw: "김서율[서울]",
     expected: {
       displayName: "김서율",
       campus: "서울",
-      classNumber: 2,
     },
   },
   {
-    raw: "정유찬[구미_2반(S2)_S204]팀원",
+    raw: "정유찬[구미(S2)_S204]팀원",
     expected: {
       displayName: "정유찬",
       campus: "구미",
-      classNumber: 2,
     },
   },
   {
-    raw: "오가온[서울_2반_AI]실습코치",
+    raw: "오가온[서울_AI]실습코치",
     expected: {
       displayName: "오가온",
       campus: "서울",
-      classNumber: 2,
       isStaff: true,
       suggestedYear: 0,
     },
   },
 ] as const;
 
-const ambiguousExamples = [
-  "민하준프로[취업]",
-  "강수린[대전_PJT]실습코치",
-  "윤예찬[창업_1반/서울_1반]실습코치",
-  "서하윤[광주3반,4반]교육프로",
+const candidatePriorityExamples = [
+  {
+    user: {
+      nickname: "장나현(교육프로)",
+      first_name: "하준",
+      last_name: "김",
+      username: "jang-na-hyun",
+    },
+    expectedDisplayName: "장나현",
+  },
+  {
+    user: {
+      first_name: "민수",
+      last_name: "김",
+      username: "kim-minsu",
+    },
+    expectedDisplayName: "김민수",
+  },
+  {
+    user: {
+      username: "서지안",
+    },
+    expectedDisplayName: "서지안",
+  },
 ] as const;
 
 const staffExamples = [
   {
-    raw: "윤도하강사(서울13반)",
+    raw: "윤도하강사(서울)",
     expected: {
       displayName: "윤도하",
       campus: "서울",
-      classNumber: 13,
       isStaff: true,
       suggestedYear: 0,
     },
@@ -247,15 +271,54 @@ const staffExamples = [
       suggestedYear: 0,
     },
   },
+  {
+    raw: "AI조교1",
+    expected: {
+      displayName: "AI조교1",
+      isStaff: true,
+      suggestedYear: 0,
+    },
+  },
+  {
+    raw: "SuperApp운영자2",
+    expected: {
+      displayName: "SuperApp운영자2",
+      isStaff: true,
+      suggestedYear: 0,
+    },
+  },
+  {
+    raw: "SSAFY사무국",
+    expected: {
+      displayName: "SSAFY사무국",
+      isStaff: true,
+      suggestedYear: 0,
+    },
+  },
+] as const;
+
+const exclusionExamples = [
+  {
+    raw: "박준호팀원",
+    expectedReason: "student_signal_without_affiliation",
+  },
+  {
+    raw: "김민수[ABC]팀원",
+    expectedReason: "student_signal_without_affiliation",
+  },
+  {
+    raw: "최도윤[서울/대전]팀원",
+    expectedReason: "campus_ambiguous",
+  },
+  {
+    raw: "박성래",
+    expectedReason: "display_only",
+  },
 ] as const;
 
 const nonHumanOrUncertainStaffExamples = [
   "playbooks",
   "[시스템운영]",
-  "AI조교1",
-  "SuperApp운영자2",
-  "SSAFY사무국",
-  "박성래",
   "황준식",
 ] as const;
 
@@ -268,23 +331,41 @@ test(
 );
 
 test(
-  "synthetic representative examples are parsed as expected",
+  "MM user candidate priority follows nickname, last_name+first_name, first_name+last_name, and username",
   { skip: skipReason },
   async () => {
-    for (const example of exactExamples) {
-      assert.deepStrictEqual(await parseProfile(example.raw), example.expected);
+    for (const example of candidatePriorityExamples) {
+      const parsed = await parseProfileFromUser(example.user);
+      assert.equal(parsed.displayName, example.expectedDisplayName);
     }
   },
 );
 
 test(
-  "synthetic ambiguous or non-student patterns do not force a single-class parse",
+  "synthetic representative examples are parsed as expected",
   { skip: skipReason },
   async () => {
-    for (const raw of ambiguousExamples) {
+    for (const example of exactExamples) {
+      const parsed = await parseProfile(example.raw);
+      assertProfileFields(parsed, example.expected);
+      assert.equal(parsed.parseModeCandidateMatch, true, example.raw);
+      assert.equal(parsed.parsedExclusionReason, undefined, example.raw);
+    }
+  },
+);
+
+test(
+  "synthetic ambiguous campus patterns do not force a single-campus parse",
+  { skip: skipReason },
+  async () => {
+    for (const raw of [
+      "민하준프로[ABC]",
+      "강수린[대전/서울]실습코치",
+      "윤예찬[창업/서울]실습코치",
+      "서하윤[광주,구미]교육프로",
+    ] as const) {
       const parsed = await parseProfile(raw);
       assert.equal(parsed.campus, undefined, raw);
-      assert.equal(parsed.classNumber, undefined, raw);
     }
   },
 );
@@ -294,7 +375,22 @@ test(
   { skip: skipReason },
   async () => {
     for (const example of staffExamples) {
-      assert.deepStrictEqual(await parseProfile(example.raw), example.expected);
+      const parsed = await parseProfile(example.raw);
+      assertProfileFields(parsed, example.expected);
+      assert.equal(parsed.parseModeCandidateMatch, true, example.raw);
+      assert.equal(parsed.parsedExclusionReason, undefined, example.raw);
+    }
+  },
+);
+
+test(
+  "documented exclusion reasons are surfaced",
+  { skip: skipReason },
+  async () => {
+    for (const example of exclusionExamples) {
+      const parsed = await parseProfile(example.raw);
+      assert.equal(parsed.parsedExclusionReason, example.expectedReason, example.raw);
+      assert.equal(parsed.parseModeCandidateMatch, false, example.raw);
     }
   },
 );
@@ -312,28 +408,22 @@ test(
 );
 
 test(
-  "single-class campus rows from the CSV always parse to campus, class, and cleaned display name",
+  "single-campus rows from the CSV always parse to campus and cleaned display name",
   { skip: skipReason },
   async () => {
     const failures: string[] = [];
 
     for (const raw of matchedNames) {
-      const expected = raw.match(SINGLE_CLASS_PROFILE_REGEX);
-      if (!expected) {
+      const campusMatches = CAMPUS_NAMES.filter((campus) => raw.includes(campus));
+      if (campusMatches.length !== 1) {
         continue;
       }
 
       const parsed = await parseProfile(raw);
-      const expectedCampus = expected[1];
-      const expectedClassNumber = Number(expected[2]);
+      const expectedCampus = campusMatches[0];
 
       if (parsed.campus !== expectedCampus) {
         failures.push(`${raw} -> campus ${parsed.campus ?? "-"} !== ${expectedCampus}`);
-      }
-      if (parsed.classNumber !== expectedClassNumber) {
-        failures.push(
-          `${raw} -> class ${String(parsed.classNumber)} !== ${String(expectedClassNumber)}`,
-        );
       }
       if (!parsed.displayName || /[\[\]()]/u.test(parsed.displayName)) {
         failures.push(`${raw} -> invalid displayName ${parsed.displayName ?? "-"}`);

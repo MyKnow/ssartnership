@@ -29,9 +29,13 @@ const placeholder = (
 export default function PartnerImageCarousel({
   images,
   name,
+  className,
+  matchHeightSelector,
 }: {
   images: string[];
   name: string;
+  className?: string;
+  matchHeightSelector?: string;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isOpen, setOpen] = useState(false);
@@ -54,6 +58,8 @@ export default function PartnerImageCarousel({
   const cachedActiveImage = activeImage ? getCachedImageUrl(activeImage) : "";
   const blurDataURL = getBlurDataURL(32, 32);
   const canNavigate = safeImages.length > 1;
+  const activeThumbRef = useRef<HTMLButtonElement | null>(null);
+  const [desktopHeight, setDesktopHeight] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -71,6 +77,68 @@ export default function PartnerImageCarousel({
     }
     return;
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!hasImages || isOpen || safeImages.length <= 1) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % safeImages.length);
+      setZoom(1);
+      setOffset({ x: 0, y: 0 });
+    }, 3000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [hasImages, isOpen, safeImages.length]);
+
+  useEffect(() => {
+    activeThumbRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activeIndex]);
+
+  useEffect(() => {
+    if (!matchHeightSelector || typeof window === "undefined") {
+      return;
+    }
+
+    const media = window.matchMedia("(min-width: 1280px)");
+    let observer: ResizeObserver | null = null;
+
+    const syncHeight = () => {
+      if (!media.matches) {
+        setDesktopHeight(null);
+        return;
+      }
+      const target = document.querySelector(matchHeightSelector);
+      if (!(target instanceof HTMLElement)) {
+        setDesktopHeight(null);
+        return;
+      }
+      setDesktopHeight(target.getBoundingClientRect().height);
+    };
+
+    const target = document.querySelector(matchHeightSelector);
+    if (target instanceof HTMLElement) {
+      observer = new ResizeObserver(() => {
+        syncHeight();
+      });
+      observer.observe(target);
+    }
+
+    syncHeight();
+    media.addEventListener("change", syncHeight);
+    window.addEventListener("resize", syncHeight);
+
+    return () => {
+      observer?.disconnect();
+      media.removeEventListener("change", syncHeight);
+      window.removeEventListener("resize", syncHeight);
+    };
+  }, [matchHeightSelector]);
 
   const goNext = () => {
     if (!canNavigate) {
@@ -131,10 +199,16 @@ export default function PartnerImageCarousel({
   };
 
   return (
-    <div className="grid gap-3">
+    <div
+      className={cn(
+        "grid gap-3 xl:grid-cols-[minmax(0,1fr)_7.5rem] xl:items-stretch",
+        className,
+      )}
+      style={desktopHeight ? { height: `${desktopHeight}px` } : undefined}
+    >
       <button
         type="button"
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted"
+        className="relative aspect-[16/9] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted xl:h-full xl:min-h-0 xl:aspect-auto"
         onClick={() => {
           if (hasImages) {
             setOpen(true);
@@ -147,7 +221,7 @@ export default function PartnerImageCarousel({
             src={cachedActiveImage}
             alt={name}
             fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 720px"
+            sizes="(max-width: 1279px) 100vw, 50vw"
             className="object-cover"
             priority={false}
             placeholder="blur"
@@ -159,16 +233,20 @@ export default function PartnerImageCarousel({
       </button>
 
       {hasImages ? (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto px-3 pb-6 pt-2 xl:h-full xl:min-h-0 xl:flex-col xl:items-center xl:gap-3 xl:overflow-y-auto xl:overflow-x-visible xl:px-3 xl:py-2">
           {safeImages.map((image, index) => (
             <button
+              ref={index === activeIndex ? activeThumbRef : null}
               key={`${image}-${index}`}
               type="button"
               className={cn(
-                "h-16 w-20 flex-shrink-0 overflow-hidden rounded-2xl border",
-                index === activeIndex ? "border-strong" : "border-border",
+                "relative h-16 w-20 flex-shrink-0 overflow-hidden rounded-2xl border transition-all duration-300 ease-out xl:h-20 xl:w-20",
+                index === activeIndex
+                  ? "z-10 scale-[1.12] border-strong ring-2 ring-inset ring-strong/80 shadow-[0_4px_10px_rgba(0,0,0,0.48)] dark:shadow-[0_4px_10px_rgba(255,255,255,0.24)]"
+                  : "border-border hover:border-strong/70",
               )}
               onClick={() => setActiveIndex(index)}
+              aria-pressed={index === activeIndex}
               aria-label={`이미지 ${index + 1}`}
             >
               <Image

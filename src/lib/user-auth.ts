@@ -1,5 +1,9 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import {
+  evaluateRequiredPolicyStatus,
+  getActiveRequiredPolicies,
+} from "@/lib/policy-documents";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const COOKIE_NAME = "user_session";
@@ -107,7 +111,9 @@ export async function getUserSession() {
   const supabase = getSupabaseAdminClient();
   const { data: member } = await supabase
     .from("members")
-    .select("id,must_change_password")
+    .select(
+      "id,must_change_password,service_policy_version,privacy_policy_version",
+    )
     .eq("id", session.userId)
     .maybeSingle();
 
@@ -115,8 +121,12 @@ export async function getUserSession() {
     return null;
   }
 
+  const activePolicies = await getActiveRequiredPolicies();
+  const policyStatus = evaluateRequiredPolicyStatus(member, activePolicies);
+
   return {
     ...session,
     mustChangePassword: Boolean(member.must_change_password),
+    requiresConsent: policyStatus.requiresConsent,
   };
 }

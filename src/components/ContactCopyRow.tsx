@@ -5,6 +5,21 @@ import type { ProductEventName } from "@/lib/event-catalog";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 
+function getCompactContactLabel(label: string) {
+  if (!label.startsWith("http")) {
+    return label;
+  }
+
+  try {
+    const url = new URL(label);
+    const pathname = url.pathname === "/" ? "" : url.pathname;
+    const summary = `${url.hostname}${pathname}${url.search}`;
+    return summary.length > 40 ? `${summary.slice(0, 37)}…` : summary;
+  } catch {
+    return label.length > 40 ? `${label.slice(0, 37)}…` : label;
+  }
+}
+
 export default function ContactCopyRow({
   href,
   label,
@@ -21,14 +36,16 @@ export default function ContactCopyRow({
   targetId?: string | null;
 }) {
   const { notify } = useToast();
+  const compactLabel = getCompactContactLabel(label);
 
   return (
-    <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-muted px-4 py-3">
+    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface-muted px-4 py-3">
       <a
         href={href}
-        className="text-sm font-medium text-foreground hover:opacity-80"
+        className="min-w-0 flex-1 truncate text-sm font-medium text-foreground hover:opacity-80"
         target={href.startsWith("http") ? "_blank" : undefined}
         rel={href.startsWith("http") ? "noreferrer" : undefined}
+        title={label}
         onClick={() => {
           if (!eventName) {
             return;
@@ -39,11 +56,11 @@ export default function ContactCopyRow({
             targetId: targetId ?? null,
             properties: {
               source: "detail",
-            },
-          });
-        }}
+          },
+        });
+      }}
       >
-        {label}
+        {compactLabel}
       </a>
       <Button
         size="icon"

@@ -84,7 +84,9 @@ const auditLabels: Record<string, string> = {
   partner_update: '업체 수정',
   partner_delete: '업체 삭제',
   member_update: '회원 수정',
+  member_directory_sync: '회원 디렉토리 동기화',
   member_sync: '회원 정보 동기화',
+  member_manual_add: '회원 수동 추가',
   member_delete: '회원 삭제',
   push_send: '푸시 발송',
   push_log_delete: '푸시 로그 삭제',
@@ -95,6 +97,7 @@ const securityLabels: Record<string, string> = {
   member_logout: '회원 로그아웃',
   member_signup_code_request: '회원가입 인증코드 요청',
   member_signup_complete: '회원가입 완료',
+  member_policy_consent: '약관 동의',
   member_password_reset: '임시 비밀번호 발급',
   member_password_change: '비밀번호 변경',
   member_delete: '회원 탈퇴',
@@ -1337,6 +1340,70 @@ export default function AdminLogsManager({
                         ))}
                       </div>
                     ) : null}
+
+                    <details className="mt-4 rounded-2xl border border-border bg-surface px-4 py-3">
+                      <summary className="cursor-pointer select-none text-sm font-semibold text-foreground">
+                        상세 보기
+                      </summary>
+                      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+                        <div className="grid gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>그룹</span>
+                            <span className="font-medium text-foreground">{log.group}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>이벤트</span>
+                            <span className="max-w-full break-all font-medium text-foreground">
+                              {log.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>주체</span>
+                            <span className="max-w-full break-all font-medium text-foreground">
+                              {log.actorSearchLabel}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>상태</span>
+                            <span className="font-medium text-foreground">
+                              {log.status ?? '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>경로</span>
+                            <span className="max-w-full break-all font-medium text-foreground">
+                              {log.path ?? '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>대상</span>
+                            <span className="max-w-full break-all font-medium text-foreground">
+                              {log.targetType ?? '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>대상 ID</span>
+                            <span className="max-w-full break-all font-medium text-foreground">
+                              {log.targetId ?? '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span>생성 시각</span>
+                            <span className="font-medium text-foreground">
+                              {formatDateTime(log.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-surface-muted p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            properties
+                          </p>
+                          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground">
+                            {JSON.stringify(log.properties ?? {}, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </details>
                   </Card>
                 );
               })

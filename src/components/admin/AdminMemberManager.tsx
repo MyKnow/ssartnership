@@ -14,8 +14,8 @@ type AdminMember = {
   mm_username: string;
   display_name?: string | null;
   year?: number | null;
+  staff_source_year?: number | null;
   campus?: string | null;
-  class_number?: number | null;
   must_change_password: boolean;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
@@ -23,17 +23,15 @@ type AdminMember = {
   updated_at?: string | null;
 };
 
-type MemberSortOption = "recent" | "updated" | "name" | "classNumber";
+type MemberSortOption = "recent" | "updated" | "name";
 type MemberFilterOption = "all" | "normal" | "mustChangePassword";
 type YearFilterOption = "all" | `${number}`;
-type ClassFilterOption = "all" | `${number}`;
 
 type NormalizedMember = AdminMember & {
   _displayName: string;
   _search: string;
   _campus: string;
   _year: number | null;
-  _classNumber: number | null;
 };
 
 export default function AdminMemberManager({
@@ -49,7 +47,6 @@ export default function AdminMemberManager({
   const [sortValue, setSortValue] = useState<MemberSortOption>("recent");
   const [filterValue, setFilterValue] = useState<MemberFilterOption>("all");
   const [yearFilter, setYearFilter] = useState<YearFilterOption>("all");
-  const [classFilter, setClassFilter] = useState<ClassFilterOption>("all");
   const [campusFilter, setCampusFilter] = useState("all");
 
   const normalizedMembers = useMemo<NormalizedMember[]>(
@@ -59,7 +56,6 @@ export default function AdminMemberManager({
         const displayName =
           profile.displayName ?? member.display_name ?? member.mm_username;
         const campus = member.campus ?? profile.campus ?? "";
-        const classNumber = member.class_number ?? profile.classNumber ?? null;
 
         return {
           ...member,
@@ -74,7 +70,6 @@ export default function AdminMemberManager({
             .toLowerCase(),
           _campus: campus,
           _year: member.year ?? null,
-          _classNumber: classNumber,
         };
       }),
     [members],
@@ -104,26 +99,6 @@ export default function AdminMemberManager({
     [normalizedMembers],
   );
 
-  const classOptions = useMemo(
-    () => {
-      const scopedMembers =
-        yearFilter === "all"
-          ? normalizedMembers
-          : normalizedMembers.filter(
-              (member) => String(member._year ?? "") === yearFilter,
-            );
-
-      return Array.from(
-        new Set(
-          scopedMembers
-            .map((member) => member._classNumber)
-            .filter((classNumber): classNumber is number => classNumber !== null),
-        ),
-      ).sort((a, b) => a - b);
-    },
-    [normalizedMembers, yearFilter],
-  );
-
   const filteredMembers = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
 
@@ -147,17 +122,10 @@ export default function AdminMemberManager({
             (member) => String(member._year ?? "") === yearFilter,
           );
 
-    const classFiltered =
-      classFilter === "all"
-        ? yearFiltered
-        : yearFiltered.filter(
-            (member) => String(member._classNumber ?? "") === classFilter,
-          );
-
     const campusFiltered =
       campusFilter === "all"
-        ? classFiltered
-        : classFiltered.filter((member) => member._campus === campusFilter);
+        ? yearFiltered
+        : yearFiltered.filter((member) => member._campus === campusFilter);
 
     return [...campusFiltered].sort((a, b) => {
       if (a.must_change_password !== b.must_change_password) {
@@ -177,14 +145,6 @@ export default function AdminMemberManager({
         }
       }
 
-      if (sortValue === "classNumber") {
-        const classA = a._classNumber ?? Number.MAX_SAFE_INTEGER;
-        const classB = b._classNumber ?? Number.MAX_SAFE_INTEGER;
-        if (classA !== classB) {
-          return classA - classB;
-        }
-      }
-
       return (
         new Date(b.created_at ?? 0).getTime() -
         new Date(a.created_at ?? 0).getTime()
@@ -192,7 +152,6 @@ export default function AdminMemberManager({
     });
   }, [
     campusFilter,
-    classFilter,
     filterValue,
     normalizedMembers,
     searchValue,
@@ -202,7 +161,7 @@ export default function AdminMemberManager({
 
   return (
     <div className="mt-6 grid min-w-0 gap-6">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_160px_160px_180px_180px_180px]">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_160px_180px_180px_180px]">
         <Input
           className="sm:col-span-2 xl:col-span-1"
           value={searchValue}
@@ -211,26 +170,12 @@ export default function AdminMemberManager({
         />
         <Select
           value={yearFilter}
-          onChange={(event) => {
-            setYearFilter(event.target.value as YearFilterOption);
-            setClassFilter("all");
-          }}
+          onChange={(event) => setYearFilter(event.target.value as YearFilterOption)}
         >
           <option value="all">전체 기수</option>
           {yearOptions.map((year) => (
             <option key={year} value={String(year)}>
               {formatSsafyYearLabel(year)}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={classFilter}
-          onChange={(event) => setClassFilter(event.target.value as ClassFilterOption)}
-        >
-          <option value="all">전체 반</option>
-          {classOptions.map((classNumber) => (
-            <option key={classNumber} value={String(classNumber)}>
-              {classNumber}반
             </option>
           ))}
         </Select>
@@ -241,7 +186,6 @@ export default function AdminMemberManager({
           <option value="recent">등록순</option>
           <option value="updated">최근 수정순</option>
           <option value="name">이름순</option>
-          <option value="classNumber">반순</option>
         </Select>
         <Select
           value={filterValue}
@@ -266,7 +210,9 @@ export default function AdminMemberManager({
         </Select>
       </div>
 
-      <p className="text-sm text-muted-foreground">총 {members.length}명 회원</p>
+      <p className="text-sm text-muted-foreground">
+        총 {members.length}명 중 {filteredMembers.length}명 표시
+      </p>
 
       {filteredMembers.length === 0 ? (
         <EmptyState

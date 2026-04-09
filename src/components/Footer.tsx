@@ -42,6 +42,12 @@ export default function Footer() {
             <Button variant="ghost" href={SUGGESTION_URL}>
               제휴 제안
             </Button>
+            <Button variant="ghost" href="/legal/service">
+              이용약관
+            </Button>
+            <Button variant="ghost" href="/legal/privacy">
+              개인정보 처리방침
+            </Button>
             <Button variant="ghost" href="/rss.xml">
               RSS
             </Button>

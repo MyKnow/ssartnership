@@ -1,4 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
+import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -8,6 +9,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import {
   backfillMemberProfiles,
   deleteMember,
+  manualAddMembers,
   updateMember,
 } from "@/app/admin/(protected)/actions";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -30,7 +32,7 @@ export default async function AdminMembersPage({
   const { data: members } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,class_number,must_change_password,avatar_content_type,avatar_base64,created_at,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,must_change_password,avatar_content_type,avatar_base64,created_at,updated_at",
     )
     .order("created_at", { ascending: false });
 
@@ -42,15 +44,16 @@ export default async function AdminMembersPage({
       backHref="/admin"
       backLabel="관리 홈"
     >
+    <div className="grid gap-6">
       <Card>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <SectionHeading
             title="회원 관리"
-            description="교육생 계정의 표시 정보, 반, 비밀번호 변경 강제 여부를 관리할 수 있습니다."
+            description="회원의 표시 정보와 비밀번호 변경 강제 여부를 관리할 수 있습니다."
           />
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <Button variant="ghost" href="/admin/members/mock">
-              운영진 Mock 미리보기
+              Mock 미리보기
             </Button>
             <form action={backfillMemberProfiles}>
               <SubmitButton pendingText="백필 중">
@@ -85,22 +88,35 @@ export default async function AdminMembersPage({
             </p>
           </div>
         ) : null}
+      </Card>
 
-        {safeMembers.length === 0 ? (
-          <div className="mt-6">
-            <EmptyState
-              title="등록된 회원이 없습니다."
-              description="회원가입이 완료된 교육생이 생기면 이곳에서 관리할 수 있습니다."
-            />
-          </div>
-        ) : (
+      <Card>
+        <SectionHeading
+          title="유저 수동 추가"
+          description="MM 아이디를 입력하면 해당 기수에서 찾아 임시 비밀번호를 전송하고, 비밀번호 변경이 필요하도록 저장합니다. 운영진은 15기에서 먼저 찾고 없으면 14기에서 찾습니다."
+        />
+        <div className="mt-6">
+          <AdminMemberManualAddPanel action={manualAddMembers} />
+        </div>
+      </Card>
+
+      {safeMembers.length === 0 ? (
+        <Card>
+          <EmptyState
+            title="등록된 회원이 없습니다."
+            description="회원가입이 완료된 교육생이 생기면 이곳에서 관리할 수 있습니다."
+          />
+        </Card>
+      ) : (
+        <Card>
           <AdminMemberManager
             members={safeMembers}
             updateMember={updateMember}
             deleteMember={deleteMember}
           />
-        )}
-      </Card>
-    </AdminShell>
+        </Card>
+      )}
+    </div>
+  </AdminShell>
   );
 }

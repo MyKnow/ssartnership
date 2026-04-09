@@ -8,7 +8,12 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { hashCode } from "@/lib/mm-verification";
 import { setUserSession } from "@/lib/user-auth";
 import { hashPassword, isValidPassword } from "@/lib/password";
-import { parseSsafyProfile } from "@/lib/mm-profile";
+import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
+import {
+  getActiveRequiredPolicies,
+  getSelectedPolicyValidationError,
+  recordRequiredPolicyConsent,
+} from "@/lib/policy-documents";
 import {
   buildMemberSyncLogProperties,
   type MemberRow,
@@ -16,14 +21,24 @@ import {
 } from "@/lib/mm-member-sync";
 import {
   MattermostApiError,
+  getSenderCredentials,
   getUserImage,
-  resolveSelectableStudentByUsername,
+  loginWithPassword,
+  resolveSelectableMemberByUsername,
 } from "@/lib/mattermost";
 import {
   normalizeMmUsername,
   PASSWORD_POLICY_MESSAGE,
   validateMmUsername,
 } from "@/lib/validation";
+import {
+  findMmUserDirectoryEntryByUsername,
+  upsertMmUserDirectorySnapshot,
+} from "@/lib/mm-directory";
+import {
+  getEffectiveSsafyYear,
+  getPreferredStaffSourceYear,
+} from "@/lib/ssafy-year";
 
 export const runtime = "nodejs";
 
@@ -37,6 +52,8 @@ export async function POST(request: Request) {
       username?: string;
       code?: string;
       password?: string;
+      servicePolicyId?: string;
+      privacyPolicyId?: string;
     };
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
@@ -79,36 +96,122 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!payload.servicePolicyId || !payload.privacyPolicyId) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "policy_required" },
+      });
+      return NextResponse.json({ error: "policy_required" }, { status: 400 });
+    }
+
+    const activePolicies = await getActiveRequiredPolicies();
+    const policyValidationError = getSelectedPolicyValidationError(
+      {
+        servicePolicyId: payload.servicePolicyId,
+        privacyPolicyId: payload.privacyPolicyId,
+      },
+      activePolicies,
+    );
+    if (policyValidationError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: username,
+        properties: { reason: "policy_outdated" },
+      });
+      return NextResponse.json(
+        {
+          error: "policy_outdated",
+          message: policyValidationError,
+        },
+        { status: 409 },
+      );
+    }
+
     const supabase = getSupabaseAdminClient();
-    let resolvedStudent;
-    try {
-      resolvedStudent = await resolveSelectableStudentByUsername(username);
-    } catch (error) {
-      if (error instanceof MattermostApiError) {
+    let resolvedStudent:
+      | {
+          year: number;
+          senderToken: string;
+          user: {
+            id: string;
+            username: string;
+            nickname?: string;
+            first_name?: string;
+            last_name?: string;
+            is_bot?: boolean;
+          };
+        }
+      | null = null;
+    const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
+    let mmUserId = directoryEntry?.mm_user_id ?? null;
+    let resolvedDisplayName = directoryEntry?.display_name ?? null;
+    let resolvedCampus = directoryEntry?.campus ?? null;
+
+    if (!mmUserId) {
+      try {
+        resolvedStudent = await resolveSelectableMemberByUsername(username);
+      } catch (error) {
+        if (error instanceof MattermostApiError) {
+          await logAuthSecurity({
+            ...context,
+            eventName: "member_signup_complete",
+            status: "failure",
+            actorType: "guest",
+            identifier: username,
+            properties: {
+              reason: "team_or_channel_inaccessible",
+              status: error.status,
+            },
+          });
+          return NextResponse.json(
+            {
+              error: "team_or_channel_inaccessible",
+              message:
+                "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
+            },
+            { status: 403 },
+          );
+        }
+        throw error;
+      }
+
+      if (!resolvedStudent) {
         await logAuthSecurity({
           ...context,
           eventName: "member_signup_complete",
           status: "failure",
           actorType: "guest",
           identifier: username,
-          properties: {
-            reason: "team_or_channel_inaccessible",
-            status: error.status,
-          },
+          properties: { reason: "not_mm" },
         });
-        return NextResponse.json(
-          {
-            error: "team_or_channel_inaccessible",
-            message:
-              "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
-          },
-          { status: 403 },
-        );
+        return NextResponse.json({ error: "not_mm" }, { status: 404 });
       }
-      throw error;
+
+      const profile = parseSsafyProfileFromUser(resolvedStudent.user);
+      resolvedDisplayName =
+        profile.displayName ??
+        resolvedStudent.user.nickname ??
+        resolvedStudent.user.username;
+      resolvedCampus = profile.campus ?? null;
+      await upsertMmUserDirectorySnapshot({
+        mmUserId: resolvedStudent.user.id,
+        mmUsername: resolvedStudent.user.username,
+        displayName: resolvedDisplayName,
+        campus: resolvedCampus,
+        isStaff: Boolean(profile.isStaff),
+        sourceYears: [resolvedStudent.year],
+      });
+      mmUserId = resolvedStudent.user.id;
     }
 
-    if (!resolvedStudent) {
+    if (!mmUserId) {
       await logAuthSecurity({
         ...context,
         eventName: "member_signup_complete",
@@ -120,7 +223,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "not_mm" }, { status: 404 });
     }
 
-    const mmUserId = resolvedStudent.user.id;
     const { data: attempt } = await supabase
       .from("mm_verification_attempts")
       .select("id,count,blocked_until,first_attempt_at")
@@ -217,33 +319,49 @@ export async function POST(request: Request) {
     const memberPromise = supabase
       .from("members")
       .select(
-        "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at",
+        "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at",
       )
       .eq("mm_user_id", mmUserId)
       .maybeSingle();
-    const avatarPromise = getUserImage(resolvedStudent.senderToken, mmUserId);
     const passwordRecord = hashPassword(password);
     const { data: memberData } = await memberPromise;
     const member = (memberData as MemberRow | null) ?? null;
-    const avatar = await avatarPromise;
-    const profile = parseSsafyProfile(
-      resolvedStudent.user.nickname || resolvedStudent.user.username,
+    const preferredStaffSourceYear = getPreferredStaffSourceYear(
+      directoryEntry?.source_years ?? [],
     );
+    const senderYear = codeRow.year === 0
+      ? getEffectiveSsafyYear(
+          member?.year ?? 0,
+          member?.staff_source_year,
+          [
+            resolvedStudent?.year,
+            preferredStaffSourceYear,
+          ],
+        )
+      : codeRow.year;
+    if (senderYear === null) {
+      throw new Error("운영진 회원은 staff_source_year가 필요합니다.");
+    }
+    const senderCredentials = getSenderCredentials(senderYear);
+    const senderLogin = await loginWithPassword(
+      senderCredentials.loginId,
+      senderCredentials.password,
+    );
+    const avatar = await getUserImage(senderLogin.token, mmUserId);
     const snapshot = {
       mmUserId,
-      mmUsername: resolvedStudent.user.username,
+      mmUsername: directoryEntry?.mm_username ?? resolvedStudent?.user.username ?? mmUserId,
       displayName:
-        profile.displayName ??
-        resolvedStudent.user.nickname ??
-        resolvedStudent.user.username,
-      campus: profile.campus ?? null,
-      classNumber: profile.classNumber ?? null,
+        resolvedDisplayName ?? member?.display_name ?? mmUserId,
+      campus: resolvedCampus ?? member?.campus ?? null,
       avatarFetched: Boolean(avatar),
       avatarContentType: avatar?.contentType ?? null,
       avatarBase64: avatar?.base64 ?? null,
     };
 
-    const year = codeRow.year ?? member?.year ?? null;
+    const nextYear = codeRow.year ?? member?.year ?? null;
+    const nextStaffSourceYear =
+      nextYear === 0 ? member?.staff_source_year ?? senderYear : null;
 
     let authenticatedMemberId = member?.id ?? null;
     let nextMember: MemberRow | null = member ?? null;
@@ -270,9 +388,9 @@ export async function POST(request: Request) {
           mm_user_id: mmUserId,
           mm_username: snapshot.mmUsername,
           display_name: snapshot.displayName,
-          year: year ?? codeRow.year,
+          year: nextYear ?? codeRow.year,
+          staff_source_year: nextStaffSourceYear,
           campus: nextMember.campus ?? null,
-          class_number: nextMember.class_number ?? null,
           avatar_content_type: snapshot.avatarFetched
             ? snapshot.avatarContentType
             : nextMember.avatar_content_type ?? null,
@@ -285,7 +403,6 @@ export async function POST(request: Request) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", member.id);
-      await setUserSession(member.id, false);
     } else {
       const { data: inserted } = await supabase
         .from("members")
@@ -293,9 +410,9 @@ export async function POST(request: Request) {
           mm_user_id: mmUserId,
           mm_username: snapshot.mmUsername,
           display_name: snapshot.displayName,
-          year: year ?? codeRow.year,
+          year: nextYear ?? codeRow.year,
+          staff_source_year: nextStaffSourceYear,
           campus: snapshot.campus,
-          class_number: snapshot.classNumber,
           avatar_content_type: snapshot.avatarContentType,
           avatar_base64: snapshot.avatarBase64,
           password_hash: passwordRecord.hash,
@@ -307,9 +424,20 @@ export async function POST(request: Request) {
         .single();
       if (inserted?.id) {
         authenticatedMemberId = inserted.id;
-        await setUserSession(inserted.id, false);
       }
     }
+
+    if (!authenticatedMemberId) {
+      throw new Error("회원 생성에 실패했습니다.");
+    }
+
+    await recordRequiredPolicyConsent({
+      memberId: authenticatedMemberId,
+      activePolicies,
+      ipAddress: context.ipAddress ?? null,
+      userAgent: context.userAgent ?? null,
+    });
+    await setUserSession(authenticatedMemberId, false);
 
     await supabase
       .from("mm_verification_attempts")
@@ -328,9 +456,9 @@ export async function POST(request: Request) {
       actorId: authenticatedMemberId,
       identifier: mmUserId,
       properties: {
-        year: year ?? codeRow.year ?? null,
+        year: nextYear ?? codeRow.year ?? null,
+        staffSourceYear: nextStaffSourceYear,
         campus: nextMember?.campus ?? snapshot.campus,
-        classNumber: nextMember?.class_number ?? snapshot.classNumber,
         existingMember: Boolean(member?.id),
         mmUsername: snapshot.mmUsername,
         mmUserId,

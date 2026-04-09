@@ -5,9 +5,17 @@ import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 import {
+  getMemberRequiredPolicyStatus,
+} from "@/lib/policy-documents";
+import {
   MattermostApiError,
-  resolveSelectableStudentByUsername,
+  resolveSelectableMemberByUsername,
 } from "@/lib/mattermost";
+import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
+import {
+  findMmUserDirectoryEntryByUsername,
+  upsertMmUserDirectorySnapshot,
+} from "@/lib/mm-directory";
 
 export const runtime = "nodejs";
 
@@ -45,24 +53,35 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdminClient();
-    const { data: memberByUsername } = await supabase
-      .from("members")
-      .select(
-        "id,mm_user_id,mm_username,password_hash,password_salt,must_change_password,year",
-      )
-      .eq("mm_username", username)
-      .maybeSingle();
+    const memberSelect =
+      "id,mm_user_id,mm_username,password_hash,password_salt,must_change_password,year";
 
-    let member = memberByUsername;
-    if (!member) {
+    let member = null;
+    const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
+    if (directoryEntry?.mm_user_id) {
+      const { data: memberById } = await supabase
+        .from("members")
+        .select(memberSelect)
+        .eq("mm_user_id", directoryEntry.mm_user_id)
+        .maybeSingle();
+      member = memberById ?? null;
+    } else {
       try {
-        const resolved = await resolveSelectableStudentByUsername(username);
+        const resolved = await resolveSelectableMemberByUsername(username);
         if (resolved) {
+          const profile = parseSsafyProfileFromUser(resolved.user);
+          await upsertMmUserDirectorySnapshot({
+            mmUserId: resolved.user.id,
+            mmUsername: resolved.user.username,
+            displayName:
+              profile.displayName ?? resolved.user.nickname ?? resolved.user.username,
+            campus: profile.campus ?? null,
+            isStaff: Boolean(profile.isStaff),
+            sourceYears: [resolved.year],
+          });
           const { data: memberById } = await supabase
             .from("members")
-            .select(
-              "id,mm_user_id,mm_username,password_hash,password_salt,must_change_password,year",
-            )
+            .select(memberSelect)
             .eq("mm_user_id", resolved.user.id)
             .maybeSingle();
           member = memberById ?? null;
@@ -119,6 +138,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
     }
 
+    const policyStatus = await getMemberRequiredPolicyStatus(member.id);
     await setUserSession(member.id, Boolean(member.must_change_password));
 
     await logAuthSecurity({
@@ -130,9 +150,13 @@ export async function POST(request: Request) {
       identifier: username,
       properties: {
         mustChangePassword: Boolean(member.must_change_password),
+        requiresConsent: policyStatus.requiresConsent,
       },
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      requiresConsent: policyStatus.requiresConsent,
+    });
   } catch (error) {
     await logAuthSecurity({
       ...context,

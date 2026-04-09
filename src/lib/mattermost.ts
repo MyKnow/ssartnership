@@ -7,6 +7,7 @@ export type MMUser = {
   first_name?: string;
   last_name?: string;
   position?: string;
+  is_bot?: boolean;
 };
 
 export class MattermostApiError extends Error {
@@ -222,6 +223,24 @@ export async function getChannelMember(
   throw toMattermostApiError(response, "MM 채널 멤버 조회 실패");
 }
 
+export async function listChannelMembers(
+  token: string,
+  channelId: string,
+  page = 0,
+  perPage = 200,
+) {
+  const response = await mmFetch(
+    `/api/v4/channels/${channelId}/members?page=${page}&per_page=${perPage}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  if (!response.ok) {
+    throw toMattermostApiError(response, "MM 채널 멤버 목록 조회 실패");
+  }
+  return response.json() as Promise<Array<{ user_id?: string; userId?: string }>>;
+}
+
 export async function findUserInChannelByUserId(
   token: string,
   userId: string,
@@ -272,7 +291,7 @@ export type SelectableStudentMatch = {
   channelConfig: StudentChannelConfig;
 };
 
-export async function resolveSelectableStudentByUsername(
+export async function resolveSelectableMemberByUsername(
   username: string,
 ): Promise<SelectableStudentMatch | null> {
   const safeUsername = username.replace(/^@/, "").trim().toLowerCase();
@@ -313,6 +332,12 @@ export async function resolveSelectableStudentByUsername(
   }
 
   return null;
+}
+
+export async function resolveSelectableStudentByUsername(
+  username: string,
+): Promise<SelectableStudentMatch | null> {
+  return resolveSelectableMemberByUsername(username);
 }
 
 export function getSenderCredentials(year?: number) {

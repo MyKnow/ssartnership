@@ -101,3 +101,103 @@ body {
     transform: translateX(300%);
   }
 }
+
+@keyframes cert-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes cert-shape-float-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-14deg) scale(1);
+  }
+  50% {
+    transform: translate3d(24px, -16px, 0) rotate(-4deg) scale(1.07);
+  }
+}
+
+@keyframes cert-shape-float-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-28px, 18px, 0) scale(1.14);
+  }
+}
+
+@keyframes cert-shape-float-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(8deg) scale(1);
+  }
+  50% {
+    transform: translate3d(18px, -20px, 0) rotate(0deg) scale(1.06);
+  }
+}
+
+.cert-shape-a {
+  animation: cert-shape-float-a 18s ease-in-out infinite;
+}
+
+.cert-shape-b {
+  animation: cert-shape-float-b 24s ease-in-out infinite;
+}
+
+.cert-shape-c {
+  animation: cert-shape-float-c 20s ease-in-out infinite;
+}
+
+@keyframes cert-glow-drift-a {
+  0%,
+  100% {
+    background-position: 10% 16%;
+    transform: scale(1);
+  }
+  24% {
+    background-position: 78% 12%;
+    transform: scale(1.08);
+  }
+  52% {
+    background-position: 72% 76%;
+    transform: scale(0.96);
+  }
+  78% {
+    background-position: 14% 70%;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes cert-glow-drift-b {
+  0%,
+  100% {
+    background-position: 82% 72%;
+    transform: scale(0.94);
+  }
+  26% {
+    background-position: 18% 68%;
+    transform: scale(1.06);
+  }
+  58% {
+    background-position: 12% 14%;
+    transform: scale(1);
+  }
+  82% {
+    background-position: 76% 20%;
+    transform: scale(1.08);
+  }
+}
+
+.cert-glow-a {
+  animation: cert-glow-drift-a 10s ease-in-out infinite;
+}
+
+.cert-glow-b {
+  animation: cert-glow-drift-b 13s ease-in-out infinite;
+}

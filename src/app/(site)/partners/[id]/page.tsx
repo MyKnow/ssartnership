@@ -186,6 +186,7 @@ export default async function PartnerDetailPage({
   const inquiryDisplay = isActive
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
+  const contactCount = [reservationDisplay, inquiryDisplay].filter(Boolean).length;
   const partnerUrl = `${SITE_URL}/partners/${encodeURIComponent(partner.id)}`;
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -251,147 +252,174 @@ export default async function PartnerDetailPage({
               <ShareLinkButton targetType="partner" targetId={partner.id} />
             </div>
 
-            <Card className="p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <Badge
-                  className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
-                  style={badgeStyle}
-                >
-                  {categoryLabel}
-                </Badge>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {viewPartner.period.start} ~ {viewPartner.period.end}
-                </span>
-              </div>
-
-              <h1 className="mt-4 text-3xl font-semibold text-foreground">
-                {viewPartner.name}
-              </h1>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>{viewPartner.location}</span>
-                {mapLink ? (
-                  <TrackedAnchor
-                    className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
-                    href={mapLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    eventName="partner_map_click"
-                    targetType="partner"
-                    targetId={partner.id}
-                    properties={{ source: "detail" }}
-                    aria-label="지도 보기"
-                    title="지도 보기"
-                  >
-                    <svg
-                      width={16}
-                      height={16}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
-                      <path d="M9 3v15" />
-                      <path d="M15 6v15" />
-                    </svg>
-                  </TrackedAnchor>
-                ) : null}
-              </div>
-
-            </Card>
-
-            <PartnerImageCarousel
-              images={viewPartner.images ?? []}
-              name={viewPartner.name}
-            />
-
-            <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-              <Card className="p-6">
-                <SectionHeading title="혜택" />
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {viewPartner.benefits.map((benefit) => (
+            <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+              <Card
+                className="order-2 relative overflow-hidden p-6 xl:order-1"
+                data-partner-detail-summary
+              >
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.08),_transparent_45%),radial-gradient(circle_at_bottom_left,_rgba(14,165,233,0.08),_transparent_42%)]"
+                />
+                <div className="relative flex flex-col">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <Badge
-                      key={benefit}
-                      className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+                      className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
+                      style={badgeStyle}
                     >
-                      {benefit}
+                      {categoryLabel}
                     </Badge>
-                  ))}
-                </div>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {viewPartner.period.start} ~ {viewPartner.period.end}
+                    </span>
+                  </div>
 
-                {viewPartner.conditions && viewPartner.conditions.length > 0 ? (
-                  <div className="mt-6">
-                    <SectionHeading title="이용 조건" />
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {viewPartner.conditions.map((condition) => (
-                        <Badge
-                          key={condition}
-                          className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+                  <h1 className="mt-4 text-3xl font-semibold text-foreground">
+                    {viewPartner.name}
+                  </h1>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    <span>{viewPartner.location}</span>
+                    {mapLink ? (
+                      <TrackedAnchor
+                        className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
+                        href={mapLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        eventName="partner_map_click"
+                        targetType="partner"
+                        targetId={partner.id}
+                        properties={{ source: "detail" }}
+                        aria-label="지도 보기"
+                        title="지도 보기"
+                      >
+                        <svg
+                          width={16}
+                          height={16}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
                         >
-                          {condition}
-                        </Badge>
-                      ))}
-                    </div>
+                          <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+                          <path d="M9 3v15" />
+                          <path d="M15 6v15" />
+                        </svg>
+                      </TrackedAnchor>
+                    ) : null}
                   </div>
-                ) : null}
 
-                {viewPartner.tags && viewPartner.tags.length > 0 ? (
-                  <div className="mt-6">
-                    <SectionHeading title="태그" />
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {viewPartner.tags.map((tag) => (
-                        <Chip key={tag} style={chipStyle}>
-                          #{tag}
-                        </Chip>
-                      ))}
+                  <div className="mt-6 grid gap-5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                        혜택
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {viewPartner.benefits.map((benefit) => (
+                          <Badge
+                            key={benefit}
+                            className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+                          >
+                            {benefit}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
+
+                    {viewPartner.conditions && viewPartner.conditions.length > 0 ? (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                          이용 조건
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {viewPartner.conditions.map((condition) => (
+                            <Badge
+                              key={condition}
+                              className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
+                            >
+                              {condition}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {viewPartner.tags && viewPartner.tags.length > 0 ? (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                          태그
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {viewPartner.tags.map((tag) => (
+                            <Chip key={tag} style={chipStyle}>
+                              #{tag}
+                            </Chip>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                </div>
               </Card>
 
-              {isActive ? (
-                <>
-                  {reservationDisplay ? (
-                    <Card className="p-6">
-                      <SectionHeading title="예약" />
-                      <ContactCopyRow
-                        href={reservationDisplay.href}
-                        label={reservationDisplay.label}
-                        rawValue={normalizedLinks.reservationLink ?? ""}
-                        eventName="reservation_click"
-                        targetType="partner"
-                        targetId={partner.id}
-                      />
-                    </Card>
-                  ) : null}
-
-                  {inquiryDisplay ? (
-                    <Card className="p-6">
-                      <SectionHeading title="문의" />
-                      <ContactCopyRow
-                        href={inquiryDisplay.href}
-                        label={inquiryDisplay.label}
-                        rawValue={normalizedLinks.inquiryLink ?? ""}
-                        eventName="inquiry_click"
-                        targetType="partner"
-                        targetId={partner.id}
-                      />
-                    </Card>
-                  ) : null}
-                </>
-              ) : (
-                <Card className="p-6 lg:col-span-2">
-                  <SectionHeading title="예약/문의" />
-                  <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
-                    현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.
-                  </div>
-                </Card>
-              )}
+              <PartnerImageCarousel
+                className="order-1 xl:order-2"
+                images={viewPartner.images ?? []}
+                name={viewPartner.name}
+                matchHeightSelector="[data-partner-detail-summary]"
+              />
             </div>
+
+            {isActive ? (
+              <div className={`grid gap-4 ${contactCount > 1 ? "lg:grid-cols-2" : ""}`}>
+                {reservationDisplay ? (
+                  <Card className="p-5">
+                    <SectionHeading title="예약" />
+                    <ContactCopyRow
+                      href={reservationDisplay.href}
+                      label={reservationDisplay.label}
+                      rawValue={normalizedLinks.reservationLink ?? ""}
+                      eventName="reservation_click"
+                      targetType="partner"
+                      targetId={partner.id}
+                    />
+                  </Card>
+                ) : null}
+
+                {inquiryDisplay ? (
+                  <Card className="p-5">
+                    <SectionHeading title="문의" />
+                    <ContactCopyRow
+                      href={inquiryDisplay.href}
+                      label={inquiryDisplay.label}
+                      rawValue={normalizedLinks.inquiryLink ?? ""}
+                      eventName="inquiry_click"
+                      targetType="partner"
+                      targetId={partner.id}
+                    />
+                  </Card>
+                ) : null}
+
+                {contactCount === 0 ? (
+                  <Card className="p-5">
+                    <SectionHeading title="예약/문의" />
+                    <div className="mt-4 rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
+                      현재 등록된 예약/문의 정보가 없습니다.
+                    </div>
+                  </Card>
+                ) : null}
+              </div>
+            ) : (
+              <Card className="p-5">
+                <SectionHeading title="예약/문의" />
+                <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
+                  현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.
+                </div>
+              </Card>
+            )}
           </div>
         </Container>
       </main>

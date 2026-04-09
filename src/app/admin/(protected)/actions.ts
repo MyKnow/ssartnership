@@ -13,6 +13,12 @@ import {
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
 import {
+  parseManualMemberAddInputList,
+  provisionManualMembers,
+  type ManualMemberAddFormState,
+  type ManualMemberAddYear,
+} from "@/lib/member-manual-add";
+import {
   isPartnerVisibility,
   normalizePartnerVisibility,
 } from "@/lib/partner-visibility";
@@ -503,7 +509,6 @@ export async function updateMember(formData: FormData) {
   const displayName = String(formData.get("displayName") || "").trim();
   const yearRaw = String(formData.get("year") || "").trim();
   const campus = String(formData.get("campus") || "").trim();
-  const classNumberRaw = String(formData.get("classNumber") || "").trim();
   const mustChangePassword =
     String(formData.get("mustChangePassword") || "false").trim() === "true";
 
@@ -517,14 +522,6 @@ export async function updateMember(formData: FormData) {
     throw new Error("기수는 0~99 사이의 숫자로 입력해 주세요.");
   }
 
-  let classNumber: number | null = null;
-  if (classNumberRaw) {
-    classNumber = Number.parseInt(classNumberRaw, 10);
-    if (!Number.isInteger(classNumber) || classNumber < 1 || classNumber > 30) {
-      throw new Error("반 정보는 1~30 사이의 숫자로 입력해 주세요.");
-    }
-  }
-
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase
     .from("members")
@@ -532,7 +529,6 @@ export async function updateMember(formData: FormData) {
       display_name: displayName || null,
       year,
       campus: campus || null,
-      class_number: classNumber,
       must_change_password: mustChangePassword,
       updated_at: new Date().toISOString(),
     })
@@ -549,12 +545,95 @@ export async function updateMember(formData: FormData) {
       displayName,
       year,
       campus,
-      classNumber,
       mustChangePassword,
     },
   });
   revalidateMemberPaths();
   redirect("/admin/members");
+}
+
+export async function manualAddMembers(
+  _prevState: ManualMemberAddFormState,
+  formData: FormData,
+): Promise<ManualMemberAddFormState> {
+  await requireAdmin();
+
+  const requestedYearRaw = String(formData.get("requestedYear") || "").trim();
+  const requestedYear = Number.parseInt(requestedYearRaw, 10) as ManualMemberAddYear;
+  const mmIdsRaw = String(formData.get("mmIds") || "").trim();
+
+  if (![0, 14, 15].includes(requestedYear)) {
+    return {
+      status: "error",
+      message: "기수는 운영진, 14기, 15기 중 하나여야 합니다.",
+      requestedYear: 15,
+      total: 0,
+      success: 0,
+      failed: 0,
+      items: [],
+    };
+  }
+
+  const inputs = parseManualMemberAddInputList(mmIdsRaw);
+  if (inputs.length === 0) {
+    return {
+      status: "error",
+      message: "추가할 MM 아이디를 콤마로 구분해 입력해 주세요.",
+      requestedYear,
+      total: 0,
+      success: 0,
+      failed: 0,
+      items: [],
+    };
+  }
+
+  const context = await getServerActionLogContext("/admin/members");
+  const actorId = process.env.ADMIN_ID ?? "admin";
+  const result = await provisionManualMembers(requestedYear, inputs);
+
+  for (const item of result.items) {
+    try {
+      await logAdminAudit({
+        ...context,
+        action: "member_manual_add",
+        actorId,
+        targetType: "member",
+        targetId: item.memberId ?? item.mmUserId ?? item.username,
+        properties: {
+          requestedYear: result.requestedYear,
+          batchTotal: result.total,
+          batchSuccess: result.success,
+          batchFailed: result.failed,
+          input: item.raw,
+          normalizedUsername: item.username,
+          status: item.status,
+          action: item.action,
+          reason: item.reason,
+          resolvedYear: item.resolvedYear,
+          staffSourceYear: item.staffSourceYear,
+          memberId: item.memberId,
+          mmUserId: item.mmUserId,
+          mmUsername: item.mmUsername,
+          displayName: item.displayName,
+          campus: item.campus,
+        },
+      });
+    } catch (error) {
+      console.error("manual member add log failed", error);
+    }
+  }
+
+  revalidateMemberPaths();
+  revalidatePath("/admin/logs");
+
+  return {
+    status: result.failed > 0 ? (result.success > 0 ? "partial" : "error") : "success",
+    message:
+      result.success > 0
+        ? `${result.success}명의 유저를 추가했습니다.`
+        : "추가할 수 있는 유저가 없습니다.",
+    ...result,
+  };
 }
 
 export async function deleteMember(formData: FormData) {

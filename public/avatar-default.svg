@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="기본 프로필 이미지">
+  <rect width="512" height="512" rx="128" fill="#EAF6FF"/>
+  <circle cx="256" cy="192" r="92" fill="#C8EFFF"/>
+  <path d="M144 408c0-62.2 50.4-112.5 112.5-112.5h0c62.1 0 112.5 50.3 112.5 112.5v12H144v-12Z" fill="#5CBDE8"/>
+  <circle cx="256" cy="192" r="62" fill="#FFFFFF"/>
+  <circle cx="256" cy="192" r="56" fill="#16C2F4"/>
+  <circle cx="234" cy="184" r="6.5" fill="#FFFFFF"/>
+  <circle cx="278" cy="184" r="6.5" fill="#FFFFFF"/>
+  <path d="M233 209c6.7 8.7 38.3 8.7 46 0" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+</svg>

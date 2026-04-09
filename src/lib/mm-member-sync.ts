@@ -1,6 +1,9 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { parseSsafyProfile } from "@/lib/mm-profile";
-import { getBackfillableSsafyYears } from "@/lib/ssafy-year";
+import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
+import {
+  getBackfillableSsafyYears,
+  getEffectiveSsafyYear,
+} from "@/lib/ssafy-year";
 import {
   type MMUser,
   getSenderCredentials,
@@ -15,21 +18,20 @@ export type MemberRow = {
   mm_username: string;
   display_name?: string | null;
   year: number;
+  staff_source_year?: number | null;
   campus?: string | null;
-  class_number?: number | null;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
   updated_at?: string | null;
 };
 
-type MemberSyncField = "mmUsername" | "displayName" | "campus" | "classNumber" | "avatar";
+type MemberSyncField = "mmUsername" | "displayName" | "campus" | "avatar";
 
 export type MemberSyncSnapshot = {
   mmUserId: string;
   mmUsername: string;
   displayName: string;
   campus: string | null;
-  classNumber: number | null;
   avatarFetched: boolean;
   avatarContentType: string | null;
   avatarBase64: string | null;
@@ -52,7 +54,7 @@ export type MemberSyncBatchResult = {
 };
 
 function makeSnapshot(user: MMUser, avatar: { contentType: string; base64: string } | null): MemberSyncSnapshot {
-  const profile = parseSsafyProfile(user.nickname ?? user.username);
+  const profile = parseSsafyProfileFromUser(user);
   const displayName = profile.displayName ?? user.nickname ?? user.username;
 
   return {
@@ -60,7 +62,6 @@ function makeSnapshot(user: MMUser, avatar: { contentType: string; base64: strin
     mmUsername: user.username,
     displayName,
     campus: profile.campus ?? null,
-    classNumber: profile.classNumber ?? null,
     avatarFetched: Boolean(avatar),
     avatarContentType: avatar?.contentType ?? null,
     avatarBase64: avatar?.base64 ?? null,
@@ -78,9 +79,6 @@ function buildMemberSyncSummary(result: MemberSyncResult) {
   }
   if (result.changes.campus) {
     summaryParts.push(`캠퍼스 ${result.changes.campus}`);
-  }
-  if (result.changes.classNumber) {
-    summaryParts.push(`반 ${result.changes.classNumber}`);
   }
   if (result.changes.avatar) {
     summaryParts.push("프로필 사진 업데이트");
@@ -121,7 +119,6 @@ export async function syncMemberSnapshot(
   snapshot: MemberSyncSnapshot,
 ) {
   const nextCampus = snapshot.campus ?? member.campus ?? null;
-  const nextClassNumber = snapshot.classNumber ?? member.class_number ?? null;
   const nextAvatarContentType = snapshot.avatarFetched
     ? snapshot.avatarContentType
     : member.avatar_content_type ?? null;
@@ -143,10 +140,6 @@ export async function syncMemberSnapshot(
   if ((member.campus ?? null) !== nextCampus) {
     changedFields.push("campus");
     changes.campus = `${member.campus ?? "-"} → ${nextCampus ?? "-"}`;
-  }
-  if ((member.class_number ?? null) !== nextClassNumber) {
-    changedFields.push("classNumber");
-    changes.classNumber = `${member.class_number ?? "-"} → ${nextClassNumber ?? "-"}`;
   }
 
   const avatarChanged =
@@ -174,7 +167,6 @@ export async function syncMemberSnapshot(
     mm_username: snapshot.mmUsername,
     display_name: snapshot.displayName,
     campus: nextCampus,
-    class_number: nextClassNumber,
     avatar_content_type: nextAvatarContentType,
     avatar_base64: nextAvatarBase64,
     updated_at: updatedAt,
@@ -187,7 +179,6 @@ export async function syncMemberSnapshot(
       mm_username: nextMember.mm_username,
       display_name: nextMember.display_name,
       campus: nextMember.campus,
-      class_number: nextMember.class_number,
       avatar_content_type: nextMember.avatar_content_type,
       avatar_base64: nextMember.avatar_base64,
       updated_at: updatedAt,
@@ -214,7 +205,7 @@ export async function syncMemberById(
   const { data: member, error } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at",
     )
     .eq("id", memberId)
     .maybeSingle();
@@ -226,7 +217,15 @@ export async function syncMemberById(
     return null;
   }
 
-  const senderCredentials = getSenderCredentials(member.year);
+  const effectiveYear = getEffectiveSsafyYear(
+    member.year,
+    member.staff_source_year,
+  );
+  if (effectiveYear === null) {
+    throw new Error("운영진 회원은 staff_source_year가 필요합니다.");
+  }
+
+  const senderCredentials = getSenderCredentials(effectiveYear);
   const senderLogin = await loginWithPassword(
     senderCredentials.loginId,
     senderCredentials.password,
@@ -248,7 +247,7 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
   const { data: members, error } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,class_number,avatar_content_type,avatar_base64,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at",
     )
     .in("year", years)
     .order("year", { ascending: false })
@@ -258,16 +257,23 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
     throw new Error(error.message);
   }
 
+  const results: MemberSyncResult[] = [];
+  const failures: Array<{ memberId: string; mmUserId: string; reason: string }> = [];
   const groupedMembers = new Map<number, MemberRow[]>();
   (members ?? []).forEach((member) => {
-    const year = Number(member.year);
+    const year = getEffectiveSsafyYear(member.year, member.staff_source_year);
+    if (year === null) {
+      failures.push({
+        memberId: member.id,
+        mmUserId: member.mm_user_id,
+        reason: "staff_source_year_missing",
+      });
+      return;
+    }
     const list = groupedMembers.get(year) ?? [];
     list.push(member as MemberRow);
     groupedMembers.set(year, list);
   });
-
-  const results: MemberSyncResult[] = [];
-  const failures: Array<{ memberId: string; mmUserId: string; reason: string }> = [];
 
   for (const year of years.sort((a, b) => b - a)) {
     const yearMembers = groupedMembers.get(year) ?? [];

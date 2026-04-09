@@ -19,5 +19,6 @@ export async function GET() {
     userId: session.userId,
     mmUsername: member?.mm_username ?? null,
     mustChangePassword: session.mustChangePassword ?? false,
+    requiresConsent: session.requiresConsent ?? false,
   });
 }

@@ -5,6 +5,7 @@ import {
   buildMemberSyncLogProperties,
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
+import { syncMmUserDirectoryBySelectableYears } from "@/lib/mm-directory";
 
 export const runtime = "nodejs";
 
@@ -24,8 +25,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await syncMembersBySelectableYears();
     const actorId = process.env.ADMIN_ID ?? "admin";
+    const directoryResult = await syncMmUserDirectoryBySelectableYears();
+    await logAdminAudit({
+      ...context,
+      action: "member_directory_sync",
+      actorId,
+      targetType: "directory",
+      targetId: null,
+      properties: {
+        checked: directoryResult.checked,
+        uniqueUsers: directoryResult.uniqueUsers,
+        upserted: directoryResult.upserted,
+        deleted: directoryResult.deleted,
+        failures: directoryResult.failures.length,
+      },
+    });
+
+    const result = await syncMembersBySelectableYears();
 
     for (const syncResult of result.results) {
       await logAdminAudit({
@@ -42,6 +59,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      directory: {
+        checked: directoryResult.checked,
+        uniqueUsers: directoryResult.uniqueUsers,
+        upserted: directoryResult.upserted,
+        deleted: directoryResult.deleted,
+        failures: directoryResult.failures.length,
+      },
       summary: {
         checked: result.checked,
         updated: result.updated,

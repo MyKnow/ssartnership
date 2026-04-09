@@ -5,11 +5,6 @@ import { CERTIFICATION_QR_TTL_SECONDS } from "@/lib/certification-constants";
 export type CertificationQrPayload = {
   version: 1;
   userId: string;
-  mmUsername: string;
-  displayName?: string | null;
-  year?: number | null;
-  campus?: string | null;
-  classNumber?: number | null;
   issuedAt: number;
   expiresAt: number;
   nonce: string;
@@ -47,21 +42,11 @@ function sign(value: string) {
 
 export function issueCertificationQrToken(input: {
   userId: string;
-  mmUsername: string;
-  displayName?: string | null;
-  year?: number | null;
-  campus?: string | null;
-  classNumber?: number | null;
 }) {
   const now = Date.now();
   const payload: CertificationQrPayload = {
     version: 1,
     userId: input.userId,
-    mmUsername: input.mmUsername,
-    displayName: input.displayName ?? null,
-    year: input.year ?? null,
-    campus: input.campus ?? null,
-    classNumber: input.classNumber ?? null,
     issuedAt: now,
     expiresAt: now + CERTIFICATION_QR_TTL_SECONDS * 1000,
     nonce: crypto.randomBytes(12).toString("base64url"),
@@ -101,7 +86,6 @@ export function verifyCertificationQrToken(
     if (
       payload.version !== 1 ||
       typeof payload.userId !== "string" ||
-      typeof payload.mmUsername !== "string" ||
       typeof payload.issuedAt !== "number" ||
       typeof payload.expiresAt !== "number" ||
       typeof payload.nonce !== "string"

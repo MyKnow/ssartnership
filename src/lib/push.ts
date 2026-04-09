@@ -37,13 +37,12 @@ export type PushPayload = {
   tag?: string | null;
 };
 
-export type PushAudienceScope = "all" | "year" | "campus" | "class" | "member";
+export type PushAudienceScope = "all" | "year" | "campus" | "member";
 
 export type PushAudience =
   | { scope: "all" }
   | { scope: "year"; year: number }
   | { scope: "campus"; campus: string }
-  | { scope: "class"; campus: string; classNumber: number }
   | { scope: "member"; memberId: string };
 
 export type PushMessageLog = {
@@ -54,7 +53,6 @@ export type PushMessageLog = {
   target_label: string;
   target_year: number | null;
   target_campus: string | null;
-  target_class_number: number | null;
   target_member_id: string | null;
   title: string;
   body: string;
@@ -77,7 +75,6 @@ type ResolvedPushAudience = {
   label: string;
   year: number | null;
   campus: string | null;
-  classNumber: number | null;
   memberId: string | null;
   memberIds: string[] | null;
 };
@@ -172,21 +169,6 @@ export function parsePushAudience(input: unknown): PushAudience {
     return { scope: "campus", campus };
   }
 
-  if (scope === "class") {
-    const campus = String((input as { campus?: unknown }).campus ?? "").trim();
-    const classNumberValue = String(
-      (input as { classNumber?: unknown }).classNumber ?? "",
-    ).trim();
-    const classNumber = Number.parseInt(classNumberValue, 10);
-    if (!campus) {
-      throw new Error("캠퍼스를 선택해 주세요.");
-    }
-    if (!Number.isInteger(classNumber) || classNumber <= 0) {
-      throw new Error("반을 선택해 주세요.");
-    }
-    return { scope: "class", campus, classNumber };
-  }
-
   if (scope === "member") {
     const memberId = String((input as { memberId?: unknown }).memberId ?? "").trim();
     if (!memberId) {
@@ -207,7 +189,6 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
       label: "전체",
       year: null,
       campus: null,
-      classNumber: null,
       memberId: null,
       memberIds: null,
     };
@@ -228,7 +209,6 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
       label: formatSsafyYearLabel(audience.year),
       year: audience.year,
       campus: null,
-      classNumber: null,
       memberId: null,
       memberIds: (data ?? []).map((item) => item.id),
     };
@@ -249,29 +229,6 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
       label: `${audience.campus} 캠퍼스`,
       year: null,
       campus: audience.campus,
-      classNumber: null,
-      memberId: null,
-      memberIds: (data ?? []).map((item) => item.id),
-    };
-  }
-
-  if (audience.scope === "class") {
-    const { data, error } = await supabase
-      .from("members")
-      .select("id")
-      .eq("campus", audience.campus)
-      .eq("class_number", audience.classNumber);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return {
-      scope: "class",
-      label: `${audience.campus} ${audience.classNumber}반`,
-      year: null,
-      campus: audience.campus,
-      classNumber: audience.classNumber,
       memberId: null,
       memberIds: (data ?? []).map((item) => item.id),
     };
@@ -296,7 +253,6 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
     label: `${memberName} (@${data.mm_username})`,
     year: null,
     campus: null,
-    classNumber: null,
     memberId: data.id,
     memberIds: [data.id],
   };
@@ -595,7 +551,6 @@ async function createPushMessageLog(params: {
       target_label: params.audience.label,
       target_year: params.audience.year,
       target_campus: params.audience.campus,
-      target_class_number: params.audience.classNumber,
       target_member_id: params.audience.memberId,
       title: params.payload.title,
       body: params.payload.body,
@@ -603,7 +558,7 @@ async function createPushMessageLog(params: {
       status: "pending",
     })
     .select(
-      "id,type,source,target_scope,target_label,target_year,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
+      "id,type,source,target_scope,target_label,target_year,target_campus,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
     )
     .single();
 
@@ -647,7 +602,7 @@ export async function getRecentPushMessageLogs(limit = 200) {
   const { data, error } = await supabase
     .from("push_message_logs")
     .select(
-      "id,type,source,target_scope,target_label,target_year,target_campus,target_class_number,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
+      "id,type,source,target_scope,target_label,target_year,target_campus,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);

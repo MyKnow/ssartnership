@@ -23,7 +23,6 @@ type MemberOption = {
   mm_username: string;
   year: number | null;
   campus: string | null;
-  class_number: number | null;
 };
 
 type Props = {
@@ -41,7 +40,6 @@ const audienceLabels: Record<PushAudienceScope, string> = {
   all: "전체",
   year: "기수",
   campus: "캠퍼스",
-  class: "반",
   member: "개인",
 };
 
@@ -133,8 +131,7 @@ function getMemberLabel(member: MemberOption) {
   const name = member.display_name?.trim() || member.mm_username;
   const yearLabel = formatOptionalSsafyYearLabel(member.year);
   const campusLabel = member.campus ?? "캠퍼스 미지정";
-  const classLabel = member.class_number ? `${member.class_number}반` : "반 미지정";
-  return `${name} (@${member.mm_username}) · ${yearLabel} · ${campusLabel} ${classLabel}`;
+  return `${name} (@${member.mm_username}) · ${yearLabel} · ${campusLabel}`;
 }
 
 export default function AdminPushManager({
@@ -155,7 +152,6 @@ export default function AdminPushManager({
   const [audienceScope, setAudienceScope] = useState<PushAudienceScope>("all");
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedCampus, setSelectedCampus] = useState("");
-  const [selectedClassNumber, setSelectedClassNumber] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<PushMessageLog["type"] | "all">("all");
@@ -185,20 +181,6 @@ export default function AdminPushManager({
       ).sort((a, b) => a.localeCompare(b, "ko-KR")),
     [members],
   );
-
-  const classOptions = useMemo(() => {
-    if (!selectedCampus) {
-      return [];
-    }
-    return Array.from(
-      new Set(
-        members
-          .filter((member) => member.campus === selectedCampus)
-          .map((member) => member.class_number)
-          .filter((value): value is number => typeof value === "number"),
-      ),
-    ).sort((a, b) => a - b);
-  }, [members, selectedCampus]);
 
   const yearOptions = useMemo(
     () =>
@@ -231,12 +213,6 @@ export default function AdminPushManager({
         ).length;
       case "campus":
         return members.filter((member) => member.campus === selectedCampus).length;
-      case "class":
-        return members.filter(
-          (member) =>
-            member.campus === selectedCampus &&
-            String(member.class_number ?? "") === selectedClassNumber,
-        ).length;
       case "member":
         return members.some((member) => member.id === selectedMemberId) ? 1 : 0;
       default:
@@ -246,7 +222,6 @@ export default function AdminPushManager({
     audienceScope,
     members,
     selectedCampus,
-    selectedClassNumber,
     selectedMemberId,
     selectedYear,
   ]);
@@ -325,7 +300,6 @@ export default function AdminPushManager({
             scope: audienceScope,
             year: selectedYear || undefined,
             campus: selectedCampus || undefined,
-            classNumber: selectedClassNumber || undefined,
             memberId: selectedMemberId || undefined,
           },
         }),
@@ -351,7 +325,6 @@ export default function AdminPushManager({
       setAudienceScope("all");
       setSelectedYear("");
       setSelectedCampus("");
-      setSelectedClassNumber("");
       setSelectedMemberId("");
       router.refresh();
       notify(
@@ -387,30 +360,21 @@ export default function AdminPushManager({
     if (scope === "all") {
       setSelectedYear("");
       setSelectedCampus("");
-      setSelectedClassNumber("");
       setSelectedMemberId("");
       return;
     }
     if (scope === "year") {
       setSelectedCampus("");
-      setSelectedClassNumber("");
       setSelectedMemberId("");
       return;
     }
     if (scope === "campus") {
-      setSelectedYear("");
-      setSelectedClassNumber("");
-      setSelectedMemberId("");
-      return;
-    }
-    if (scope === "class") {
       setSelectedYear("");
       setSelectedMemberId("");
       return;
     }
     setSelectedYear("");
     setSelectedCampus("");
-    setSelectedClassNumber("");
   }
 
   function loadLog(log: PushMessageLog) {
@@ -428,11 +392,6 @@ export default function AdminPushManager({
       typeof log.target_year === "number" ? String(log.target_year) : "",
     );
     setSelectedCampus(log.target_campus ?? "");
-    setSelectedClassNumber(
-      typeof log.target_class_number === "number"
-        ? String(log.target_class_number)
-        : "",
-    );
     setSelectedMemberId(log.target_member_id ?? "");
     window.scrollTo({ top: 0, behavior: "smooth" });
     notify("기존 푸시 메시지를 입력 폼으로 불러왔습니다.");
@@ -503,11 +462,11 @@ export default function AdminPushManager({
           <div className="grid min-w-0 gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
             <SectionHeading
               title="발송 대상"
-              description="전체, 캠퍼스, 반, 개인 단위로 메시지 도달 범위를 지정할 수 있습니다."
+              description="전체, 기수, 캠퍼스, 개인 단위로 메시지 도달 범위를 지정할 수 있습니다."
               className="gap-1"
             />
 
-            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_repeat(4,minmax(0,1fr))]">
+            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_repeat(3,minmax(0,1fr))]">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 대상 범위
                 <Select
@@ -517,11 +476,10 @@ export default function AdminPushManager({
                       event.target.value as PushAudienceScope,
                     )
                   }
-                >
+                  >
                   <option value="all">전체</option>
                   <option value="year">기수</option>
                   <option value="campus">캠퍼스</option>
-                  <option value="class">반</option>
                   <option value="member">개인</option>
                 </Select>
               </label>
@@ -553,29 +511,12 @@ export default function AdminPushManager({
                   }
                   onChange={(event) => {
                     setSelectedCampus(event.target.value);
-                    setSelectedClassNumber("");
                   }}
                 >
                   <option value="">캠퍼스 선택</option>
                   {campusOptions.map((campus) => (
                     <option key={campus} value={campus}>
                       {campus}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                반
-                <Select
-                  value={selectedClassNumber}
-                  disabled={audienceScope !== "class" || !selectedCampus}
-                  onChange={(event) => setSelectedClassNumber(event.target.value)}
-                >
-                  <option value="">반 선택</option>
-                  {classOptions.map((classNumber) => (
-                    <option key={classNumber} value={classNumber}>
-                      {classNumber}반
                     </option>
                   ))}
                 </Select>
@@ -717,7 +658,6 @@ export default function AdminPushManager({
             <option value="all">전체</option>
             <option value="year">기수</option>
             <option value="campus">캠퍼스</option>
-            <option value="class">반</option>
             <option value="member">개인</option>
           </Select>
           <Select

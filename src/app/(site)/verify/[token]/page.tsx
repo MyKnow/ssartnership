@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
+import Badge from "@/components/ui/Badge";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
-import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyCertificationQrToken } from "@/lib/certification-qr";
 import { parseSsafyProfile } from "@/lib/mm-profile";
-import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
 import { SITE_NAME } from "@/lib/site";
+import {
+  getCertificationRoleLabel,
+  getCertificationScheme,
+} from "@/lib/certification-scheme";
+import CertificationCardFrame from "@/components/certification/CertificationCardFrame";
+import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: `교육생 QR 검증 | ${SITE_NAME}`,
+  title: `SSAFY 인증 QR 검증 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: true,
@@ -49,11 +53,12 @@ export default async function CertificationVerifyPage({
 
   let member:
     | {
-        mm_username: string;
+        id?: string | null;
         display_name?: string | null;
         year?: number | null;
         campus?: string | null;
-        class_number?: number | null;
+        avatar_content_type?: string | null;
+        avatar_base64?: string | null;
         must_change_password?: boolean | null;
       }
     | null = null;
@@ -62,7 +67,9 @@ export default async function CertificationVerifyPage({
     const supabase = getSupabaseAdminClient();
     const { data } = await supabase
       .from("members")
-      .select("id,mm_username,display_name,year,campus,class_number,must_change_password")
+      .select(
+        "id,display_name,year,campus,avatar_content_type,avatar_base64,must_change_password",
+      )
       .eq("id", verification.payload.userId)
       .maybeSingle();
 
@@ -72,13 +79,16 @@ export default async function CertificationVerifyPage({
   }
 
   const isValid = verification.ok && Boolean(member);
-  const profile = member
-    ? parseSsafyProfile(member.display_name ?? member.mm_username)
-    : null;
-  const verifiedYear =
-    member?.year ??
-    (verification.ok ? verification.payload.year : null) ??
-    getCurrentSsafyYear();
+  const profile = member ? parseSsafyProfile(member.display_name ?? "") : null;
+  const roleLabel = member ? getCertificationRoleLabel(member.year) : null;
+  const scheme = member ? getCertificationScheme(member.year) : null;
+  const campusLabel = member?.campus ?? profile?.campus ?? null;
+  const yearLabel = member?.year && member.year > 0 ? `${member.year}기` : null;
+  const avatarSrc =
+    member?.avatar_base64 && member.avatar_content_type
+      ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
+      : "/avatar-default.svg";
+  const name = profile?.displayName ?? member?.display_name ?? "이름 미지정";
 
   return (
     <div className="min-h-screen bg-background">
@@ -93,15 +103,16 @@ export default async function CertificationVerifyPage({
               reason: verification.ok ? "ok" : verification.reason,
               year: member?.year ?? null,
               campus: member?.campus ?? null,
-              classNumber: member?.class_number ?? null,
+              role: roleLabel,
             }}
             dedupeKey={`certification-verify:${rawToken}`}
           />
-          <Card className="mx-auto max-w-xl p-6">
+
+          <div className="mx-auto max-w-2xl">
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
                 <h1 className="text-2xl font-semibold text-foreground">
-                  교육생 QR 검증
+                  SSAFY QR 검증
                 </h1>
                 <Badge
                   className={
@@ -110,54 +121,60 @@ export default async function CertificationVerifyPage({
                       : "border border-danger/30 bg-danger/10 text-danger"
                   }
                 >
-                  {isValid ? "유효한 교육생" : "검증 실패"}
+                  {isValid ? `유효한 ${roleLabel ?? "인증"}` : "검증 실패"}
                 </Badge>
               </div>
 
               <p className="text-sm text-muted-foreground">
-                QR 토큰의 서명과 만료시간을 확인한 뒤 현재 저장된 교육생 정보를
+                QR 토큰의 서명과 만료시간을 확인한 뒤 현재 저장된 인증 정보를
                 대조합니다.
               </p>
 
-              {isValid && verification.ok && member ? (
-                <div className="rounded-3xl border border-border bg-surface-muted p-5">
-                  <div className="grid gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        SSAFY Trainee Verified
-                      </p>
-                      <h2 className="mt-2 text-2xl font-semibold text-foreground">
-                        {profile?.displayName ?? member.display_name ?? member.mm_username}
-                      </h2>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {`${formatSsafyYearLabel(verifiedYear)} · `}
-                        {member.campus ?? profile?.campus ?? "캠퍼스"}{" "}
-                        {member.class_number ? `${member.class_number}반` : ""}
-                      </p>
+              {isValid && verification.ok && member && scheme ? (
+                <CertificationCardFrame
+                  scheme={scheme}
+                  eyebrow="SSAFY 인증 검증"
+                  name={name}
+                  roleLabel={roleLabel}
+                  yearLabel={yearLabel}
+                  campusLabel={campusLabel}
+                  description=""
+                  footer={
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span
+                          className={cn(
+                            "inline-flex h-2 w-2 rounded-full",
+                            scheme.accentClassName,
+                          )}
+                        />
+                        <span className={scheme.subduedTextClassName}>
+                          QR 토큰이 유효합니다.
+                        </span>
+                      </div>
+                      <div className="grid gap-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className={cn("text-xs font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
+                            발급 시각
+                          </span>
+                          <span className="whitespace-nowrap font-semibold">
+                            {formatDate(verification.payload.issuedAt)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className={cn("text-xs font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
+                            만료 시각
+                          </span>
+                          <span className="whitespace-nowrap font-semibold">
+                            {formatDate(verification.payload.expiresAt)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-
-                    <div className="grid gap-3 rounded-2xl border border-border bg-surface p-4 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">MM 아이디</span>
-                        <span className="font-semibold text-foreground">
-                          @{member.mm_username}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">발급 시각</span>
-                        <span className="font-semibold text-foreground">
-                          {formatDate(verification.payload.issuedAt)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">만료 시각</span>
-                        <span className="font-semibold text-foreground">
-                          {formatDate(verification.payload.expiresAt)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  }
+                  avatarSrc={avatarSrc}
+                  avatarAlt="프로필 이미지"
+                />
               ) : (
                 <div className="rounded-3xl border border-danger/30 bg-danger/10 p-5">
                   <p className="text-base font-semibold text-danger">
@@ -182,7 +199,7 @@ export default async function CertificationVerifyPage({
                 </Link>
               </div>
             </div>
-          </Card>
+          </div>
         </Container>
       </main>
     </div>
