@@ -135,7 +135,7 @@ export default async function CertificationVerifyPage({
                   scheme={scheme}
                   eyebrow="SSAFY 인증 검증"
                   name={name}
-                  roleLabel={roleLabel}
+                  roleLabel={roleLabel ?? "인증"}
                   yearLabel={yearLabel}
                   campusLabel={campusLabel}
                   description=""
