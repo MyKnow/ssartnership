@@ -32,7 +32,7 @@ export default async function AdminMembersPage({
   const { data: members } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,must_change_password,avatar_content_type,avatar_base64,created_at,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,avatar_content_type,avatar_base64,created_at,updated_at",
     )
     .order("created_at", { ascending: false });
 

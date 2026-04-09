@@ -2,7 +2,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
 import {
   getBackfillableSsafyYears,
-  getEffectiveSsafyYear,
+  getSelectableSsafyYears,
 } from "@/lib/ssafy-year";
 import {
   type MMUser,
@@ -26,6 +26,11 @@ export type MemberRow = {
 };
 
 type MemberSyncField = "mmUsername" | "displayName" | "campus" | "avatar";
+
+type SenderSession = {
+  year: number;
+  token: string;
+};
 
 export type MemberSyncSnapshot = {
   mmUserId: string;
@@ -85,6 +90,79 @@ function buildMemberSyncSummary(result: MemberSyncResult) {
   }
 
   return summaryParts.join(" / ");
+}
+
+function getMemberSyncCandidateYears(year: number) {
+  if (year === 0) {
+    return getSelectableSsafyYears().slice().sort((a, b) => b - a);
+  }
+  return [year];
+}
+
+async function getSenderSessionForYear(
+  year: number,
+  cache: Map<number, Promise<SenderSession>>,
+) {
+  const cached = cache.get(year);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async () => {
+    const credentials = getSenderCredentials(year);
+    const senderLogin = await loginWithPassword(
+      credentials.loginId,
+      credentials.password,
+    );
+    return {
+      year,
+      token: senderLogin.token,
+    } satisfies SenderSession;
+  })();
+
+  cache.set(year, promise);
+
+  try {
+    return await promise;
+  } catch (error) {
+    cache.delete(year);
+    throw error;
+  }
+}
+
+async function resolveMemberSnapshotForYears(
+  member: MemberRow,
+  candidateYears: number[],
+  cache: Map<number, Promise<SenderSession>>,
+) {
+  let lastError: Error | null = null;
+
+  for (const senderYear of candidateYears) {
+    try {
+      const sender = await getSenderSessionForYear(senderYear, cache);
+      const snapshot = await fetchMemberSnapshotByUserId(
+        sender.token,
+        member.mm_user_id,
+      );
+      if (!snapshot) {
+        continue;
+      }
+      return {
+        senderYear,
+        senderToken: sender.token,
+        snapshot,
+      };
+    } catch (error) {
+      lastError =
+        error instanceof Error ? error : new Error("MM 사용자 조회 실패");
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  return null;
 }
 
 export function buildMemberSyncLogProperties(
@@ -205,7 +283,7 @@ export async function syncMemberById(
   const { data: member, error } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,updated_at",
     )
     .eq("id", memberId)
     .maybeSingle();
@@ -217,28 +295,17 @@ export async function syncMemberById(
     return null;
   }
 
-  const effectiveYear = getEffectiveSsafyYear(
-    member.year,
-    member.staff_source_year,
+  const senderSessionCache = new Map<number, Promise<SenderSession>>();
+  const resolved = await resolveMemberSnapshotForYears(
+    member as MemberRow,
+    getMemberSyncCandidateYears(member.year),
+    senderSessionCache,
   );
-  if (effectiveYear === null) {
-    throw new Error("운영진 회원은 staff_source_year가 필요합니다.");
-  }
-
-  const senderCredentials = getSenderCredentials(effectiveYear);
-  const senderLogin = await loginWithPassword(
-    senderCredentials.loginId,
-    senderCredentials.password,
-  );
-  const snapshot = await fetchMemberSnapshotByUserId(
-    senderLogin.token,
-    member.mm_user_id,
-  );
-  if (!snapshot) {
+  if (!resolved) {
     return null;
   }
 
-  return syncMemberSnapshot(member as MemberRow, snapshot);
+  return syncMemberSnapshot(member as MemberRow, resolved.snapshot);
 }
 
 export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchResult> {
@@ -247,7 +314,7 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
   const { data: members, error } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,updated_at",
     )
     .in("year", years)
     .order("year", { ascending: false })
@@ -261,12 +328,12 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
   const failures: Array<{ memberId: string; mmUserId: string; reason: string }> = [];
   const groupedMembers = new Map<number, MemberRow[]>();
   (members ?? []).forEach((member) => {
-    const year = getEffectiveSsafyYear(member.year, member.staff_source_year);
-    if (year === null) {
+    const year = member.year ?? null;
+    if (year === null || !years.includes(year)) {
       failures.push({
         memberId: member.id,
         mmUserId: member.mm_user_id,
-        reason: "staff_source_year_missing",
+        reason: "year_missing",
       });
       return;
     }
@@ -275,39 +342,21 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
     groupedMembers.set(year, list);
   });
 
+  const senderSessionCache = new Map<number, Promise<SenderSession>>();
   for (const year of years.sort((a, b) => b - a)) {
     const yearMembers = groupedMembers.get(year) ?? [];
     if (yearMembers.length === 0) {
       continue;
     }
 
-    let senderToken: string;
-    try {
-      const senderCredentials = getSenderCredentials(year);
-      const senderLogin = await loginWithPassword(
-        senderCredentials.loginId,
-        senderCredentials.password,
-      );
-      senderToken = senderLogin.token;
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "MM 로그인 실패";
-      yearMembers.forEach((member) => {
-        failures.push({
-          memberId: member.id,
-          mmUserId: member.mm_user_id,
-          reason,
-        });
-      });
-      continue;
-    }
-
     for (const member of yearMembers) {
       try {
-        const snapshot = await fetchMemberSnapshotByUserId(
-          senderToken,
-          member.mm_user_id,
+        const resolved = await resolveMemberSnapshotForYears(
+          member,
+          getMemberSyncCandidateYears(member.year),
+          senderSessionCache,
         );
-        if (!snapshot) {
+        if (!resolved) {
           failures.push({
             memberId: member.id,
             mmUserId: member.mm_user_id,
@@ -315,24 +364,28 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
           });
           continue;
         }
-        const result = await syncMemberSnapshot(member, snapshot);
+        const result = await syncMemberSnapshot(
+          member,
+          resolved.snapshot,
+        );
         if (result.updated) {
           results.push(result);
         }
       } catch (error) {
+        const reason = error instanceof Error ? error.message : "MM 동기화 실패";
         failures.push({
           memberId: member.id,
           mmUserId: member.mm_user_id,
-          reason: error instanceof Error ? error.message : "동기화 실패",
+          reason,
         });
       }
     }
   }
 
   return {
-    checked: (members ?? []).length,
+    checked: members?.length ?? 0,
     updated: results.length,
-    skipped: Math.max((members ?? []).length - results.length - failures.length, 0),
+    skipped: (members?.length ?? 0) - results.length - failures.length,
     results,
     failures,
   };

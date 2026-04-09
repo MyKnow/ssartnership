@@ -59,6 +59,7 @@ export default function PartnerImageCarousel({
   const blurDataURL = getBlurDataURL(32, 32);
   const canNavigate = safeImages.length > 1;
   const activeThumbRef = useRef<HTMLButtonElement | null>(null);
+  const thumbStripRef = useRef<HTMLDivElement | null>(null);
   const [desktopHeight, setDesktopHeight] = useState<number | null>(null);
 
   useEffect(() => {
@@ -82,6 +83,9 @@ export default function PartnerImageCarousel({
     if (!hasImages || isOpen || safeImages.length <= 1) {
       return;
     }
+    if (!window.matchMedia("(min-width: 1280px) and (pointer: fine)").matches) {
+      return;
+    }
     const interval = window.setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % safeImages.length);
       setZoom(1);
@@ -93,11 +97,26 @@ export default function PartnerImageCarousel({
   }, [hasImages, isOpen, safeImages.length]);
 
   useEffect(() => {
-    activeThumbRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
+    const thumb = activeThumbRef.current;
+    const strip = thumbStripRef.current;
+    if (!thumb || !strip) {
+      return;
+    }
+
+    const isDesktop = window.matchMedia(
+      "(min-width: 1280px) and (pointer: fine)",
+    ).matches;
+    if (isDesktop) {
+      const targetTop =
+        thumb.offsetTop - strip.clientHeight / 2 + thumb.offsetHeight / 2;
+      const nextTop = Math.max(
+        0,
+        Math.min(targetTop, strip.scrollHeight - strip.clientHeight),
+      );
+      strip.scrollTo({ top: nextTop, behavior: "smooth" });
+      return;
+    }
+
   }, [activeIndex]);
 
   useEffect(() => {
@@ -233,7 +252,10 @@ export default function PartnerImageCarousel({
       </button>
 
       {hasImages ? (
-        <div className="flex gap-2 overflow-x-auto px-3 pb-6 pt-2 xl:h-full xl:min-h-0 xl:flex-col xl:items-center xl:gap-3 xl:overflow-y-auto xl:overflow-x-visible xl:px-3 xl:py-2">
+        <div
+          ref={thumbStripRef}
+          className="flex gap-2 overflow-x-auto overscroll-contain px-3 pb-6 pt-2 xl:h-full xl:min-h-0 xl:flex-col xl:items-center xl:gap-3 xl:overflow-y-auto xl:overflow-x-visible xl:px-3 xl:py-2"
+        >
           {safeImages.map((image, index) => (
             <button
               ref={index === activeIndex ? activeThumbRef : null}
@@ -242,7 +264,7 @@ export default function PartnerImageCarousel({
               className={cn(
                 "relative h-16 w-20 flex-shrink-0 overflow-hidden rounded-2xl border transition-all duration-300 ease-out xl:h-20 xl:w-20",
                 index === activeIndex
-                  ? "z-10 scale-[1.12] border-strong ring-2 ring-inset ring-strong/80 shadow-[0_4px_10px_rgba(0,0,0,0.48)] dark:shadow-[0_4px_10px_rgba(255,255,255,0.24)]"
+                  ? "z-10 scale-[1.04] border-strong ring-2 ring-inset ring-strong/80 shadow-[0_4px_10px_rgba(0,0,0,0.48)] dark:shadow-[0_4px_10px_rgba(255,255,255,0.24)] xl:scale-[1.08]"
                   : "border-border hover:border-strong/70",
               )}
               onClick={() => setActiveIndex(index)}

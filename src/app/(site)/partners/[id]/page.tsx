@@ -374,9 +374,9 @@ export default async function PartnerDetailPage({
             </div>
 
             {isActive ? (
-              <div className={`grid gap-4 ${contactCount > 1 ? "lg:grid-cols-2" : ""}`}>
+              <div className={`grid gap-4 ${contactCount > 1 ? "xl:grid-cols-2" : ""}`}>
                 {reservationDisplay ? (
-                  <Card className="p-5">
+                  <Card className="w-full p-4 sm:p-5">
                     <SectionHeading title="예약" />
                     <ContactCopyRow
                       href={reservationDisplay.href}
@@ -390,7 +390,7 @@ export default async function PartnerDetailPage({
                 ) : null}
 
                 {inquiryDisplay ? (
-                  <Card className="p-5">
+                  <Card className="w-full p-4 sm:p-5">
                     <SectionHeading title="문의" />
                     <ContactCopyRow
                       href={inquiryDisplay.href}
@@ -404,7 +404,7 @@ export default async function PartnerDetailPage({
                 ) : null}
 
                 {contactCount === 0 ? (
-                  <Card className="p-5">
+                  <Card className="w-full p-4 sm:p-5">
                     <SectionHeading title="예약/문의" />
                     <div className="mt-4 rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
                       현재 등록된 예약/문의 정보가 없습니다.
@@ -413,7 +413,7 @@ export default async function PartnerDetailPage({
                 ) : null}
               </div>
             ) : (
-              <Card className="p-5">
+              <Card className="w-full p-4 sm:p-5">
                 <SectionHeading title="예약/문의" />
                 <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
                   현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.

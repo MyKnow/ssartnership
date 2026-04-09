@@ -29,9 +29,9 @@ import {
   syncMemberSnapshot,
 } from "@/lib/mm-member-sync";
 import {
-    getEffectiveSsafyYear,
-    getPreferredStaffSourceYear,
-  } from "@/lib/ssafy-year";
+  getEffectiveSsafyYear,
+  getPreferredStaffSourceYear,
+} from "@/lib/ssafy-year";
 
 export const runtime = "nodejs";
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdminClient();
     const memberSelect =
-      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at";
+      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,updated_at";
     const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
     let resolvedStudentYear: number | null = null;
 
@@ -145,14 +145,16 @@ export async function POST(request: Request) {
     );
     const effectiveYear = getEffectiveSsafyYear(
       member.year,
-      member.staff_source_year,
+      null,
       [
         resolvedStudentYear,
         preferredStaffSourceYear,
+        15,
+        14,
       ],
     );
     if (effectiveYear === null) {
-      throw new Error("운영진 회원은 staff_source_year가 필요합니다.");
+      throw new Error("운영진 회원을 조회할 수 없습니다.");
     }
 
     const senderCredentials = getSenderCredentials(effectiveYear);

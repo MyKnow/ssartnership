@@ -39,10 +39,10 @@ export default function ContactCopyRow({
   const compactLabel = getCompactContactLabel(label);
 
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface-muted px-4 py-3">
+    <div className="mt-4 flex items-center gap-2 overflow-hidden rounded-2xl border border-border bg-surface-muted px-3 py-2 sm:px-4 sm:py-2.5">
       <a
         href={href}
-        className="min-w-0 flex-1 truncate text-sm font-medium text-foreground hover:opacity-80"
+        className="min-w-0 flex-1 truncate text-xs font-medium leading-5 text-foreground hover:opacity-80 sm:text-sm"
         target={href.startsWith("http") ? "_blank" : undefined}
         rel={href.startsWith("http") ? "noreferrer" : undefined}
         title={label}
@@ -65,6 +65,7 @@ export default function ContactCopyRow({
       <Button
         size="icon"
         variant="ghost"
+        className="!h-10 !w-10 !min-h-10 !min-w-10 shrink-0 sm:!h-12 sm:!w-12 sm:!min-h-12 sm:!min-w-12"
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(rawValue);

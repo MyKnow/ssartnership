@@ -64,7 +64,7 @@ export const MANUAL_MEMBER_ADD_INITIAL_STATE: ManualMemberAddFormState = {
 
 const MANUAL_MEMBER_ADD_YEAR_FALLBACKS: ManualMemberAddYear[] = [15, 14];
 const MEMBER_SELECT =
-  "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,password_hash,password_salt,must_change_password,avatar_content_type,avatar_base64,updated_at";
+  "id,mm_user_id,mm_username,display_name,year,campus,password_hash,password_salt,must_change_password,avatar_content_type,avatar_base64,updated_at";
 
 type SenderSession = {
   token: string;
@@ -216,7 +216,6 @@ async function rollbackManualMemberProvision(input: {
       mm_username: input.existingMember.mm_username,
       display_name: input.existingMember.display_name ?? null,
       year: input.existingMember.year,
-      staff_source_year: input.existingMember.staff_source_year ?? null,
       campus: input.existingMember.campus ?? null,
       password_hash: input.existingMember.password_hash ?? null,
       password_salt: input.existingMember.password_salt ?? null,
@@ -238,7 +237,6 @@ function buildMemberPayload(input: {
   displayName: string;
   campus: string | null;
   year: ManualMemberAddYear;
-  staffSourceYear: number | null;
   avatarContentType: string | null;
   avatarBase64: string | null;
   passwordHash: string;
@@ -251,7 +249,6 @@ function buildMemberPayload(input: {
     display_name: input.displayName,
     year: input.year,
     campus: input.campus,
-    staff_source_year: input.staffSourceYear,
     password_hash: input.passwordHash,
     password_salt: input.passwordSalt,
     must_change_password: true,
@@ -331,12 +328,6 @@ export async function provisionManualMembers(
       const existingMember = await findExistingMemberByMmUser(resolution.user.id);
       const tempPassword = generateTempPassword(12);
       const { hash, salt } = hashPassword(tempPassword);
-      const staffSourceYear =
-        requestedYear === 0
-          ? resolution.resolvedYear
-          : existingMember?.year === 0
-            ? existingMember.staff_source_year ?? null
-            : null;
       const now = new Date().toISOString();
       const nextCampus = campus ?? existingMember?.campus ?? null;
       const payload = buildMemberPayload({
@@ -345,7 +336,6 @@ export async function provisionManualMembers(
         displayName,
         campus: nextCampus,
         year: requestedYear,
-        staffSourceYear,
         avatarContentType: avatar?.contentType ?? null,
         avatarBase64: avatar?.base64 ?? null,
         passwordHash: hash,
@@ -389,7 +379,7 @@ export async function provisionManualMembers(
         mmUsername: resolution.user.username,
         displayName,
         campus: nextCampus,
-        staffSourceYear,
+        staffSourceYear: requestedYear === 0 ? resolution.resolvedYear : null,
         action,
       } as const;
 

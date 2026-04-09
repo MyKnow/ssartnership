@@ -319,7 +319,7 @@ export async function POST(request: Request) {
     const memberPromise = supabase
       .from("members")
       .select(
-        "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at",
+        "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,updated_at",
       )
       .eq("mm_user_id", mmUserId)
       .maybeSingle();
@@ -332,15 +332,17 @@ export async function POST(request: Request) {
     const senderYear = codeRow.year === 0
       ? getEffectiveSsafyYear(
           member?.year ?? 0,
-          member?.staff_source_year,
+          null,
           [
             resolvedStudent?.year,
             preferredStaffSourceYear,
+            15,
+            14,
           ],
         )
       : codeRow.year;
     if (senderYear === null) {
-      throw new Error("운영진 회원은 staff_source_year가 필요합니다.");
+      throw new Error("운영진 회원을 조회할 수 없습니다.");
     }
     const senderCredentials = getSenderCredentials(senderYear);
     const senderLogin = await loginWithPassword(
@@ -360,9 +362,6 @@ export async function POST(request: Request) {
     };
 
     const nextYear = codeRow.year ?? member?.year ?? null;
-    const nextStaffSourceYear =
-      nextYear === 0 ? member?.staff_source_year ?? senderYear : null;
-
     let authenticatedMemberId = member?.id ?? null;
     let nextMember: MemberRow | null = member ?? null;
 
@@ -389,7 +388,6 @@ export async function POST(request: Request) {
           mm_username: snapshot.mmUsername,
           display_name: snapshot.displayName,
           year: nextYear ?? codeRow.year,
-          staff_source_year: nextStaffSourceYear,
           campus: nextMember.campus ?? null,
           avatar_content_type: snapshot.avatarFetched
             ? snapshot.avatarContentType
@@ -411,7 +409,6 @@ export async function POST(request: Request) {
           mm_username: snapshot.mmUsername,
           display_name: snapshot.displayName,
           year: nextYear ?? codeRow.year,
-          staff_source_year: nextStaffSourceYear,
           campus: snapshot.campus,
           avatar_content_type: snapshot.avatarContentType,
           avatar_base64: snapshot.avatarBase64,
@@ -455,12 +452,11 @@ export async function POST(request: Request) {
       actorType: "member",
       actorId: authenticatedMemberId,
       identifier: mmUserId,
-      properties: {
-        year: nextYear ?? codeRow.year ?? null,
-        staffSourceYear: nextStaffSourceYear,
-        campus: nextMember?.campus ?? snapshot.campus,
-        existingMember: Boolean(member?.id),
-        mmUsername: snapshot.mmUsername,
+        properties: {
+          year: nextYear ?? codeRow.year ?? null,
+          campus: nextMember?.campus ?? snapshot.campus,
+          existingMember: Boolean(member?.id),
+          mmUsername: snapshot.mmUsername,
         mmUserId,
       },
     });
