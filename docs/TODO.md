@@ -62,6 +62,14 @@
    대상: `src/lib/mm-directory.ts`, `src/lib/mm-member-sync.ts`
    완료: year 단위 작업을 병렬화하고, 결과 병합은 기존 우선순위를 유지하도록 정리했다.
 
+13. [ ] 제휴 업체 전용 포털 분리
+   대상: `src/app/partner/**`, `src/lib/partner-*.ts`, `src/lib/activity-logs.ts`, `src/app/admin/(protected)/actions.ts`
+   이유: 제휴 업체가 자기 업체에 관련된 로그와 기능만 볼 수 있는 전용 페이지를 두면, admin과 권한을 분리하면서 외부 파트너용 UX를 따로 설계할 수 있다.
+
+14. [ ] 제휴 업체 정적 이미지 저장
+   대상: `src/lib/repositories/*`, `src/components/PartnerImageCarousel.tsx`, `src/components/PartnerCardForm.tsx`, `src/app/api/image/route.ts`, storage 관련 레이어
+   이유: 제휴 업체 이미지를 정적 저장/서빙하면 외부 링크 의존과 로딩 변동성을 줄이고, 캐시 효율과 안정성을 높일 수 있다.
+
 ## 유지 규칙
 
 - 완료한 항목은 `[ ]`를 `[x]`로 바꾼다.
