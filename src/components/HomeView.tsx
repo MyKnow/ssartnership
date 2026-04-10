@@ -13,17 +13,12 @@ import PartnerFilters, {
   PartnerSortOption,
 } from "@/components/PartnerFilters";
 import PartnerCardView from "@/components/PartnerCardView";
-import HeroSection from "@/components/HeroSection";
-import SiteHeader from "@/components/SiteHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
-import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
 import { HOME_COPY } from "@/lib/content";
-import type { HeaderSession } from "@/lib/header-session";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
-import PushOptInBanner from "@/components/PushOptInBanner";
 import { getPartnerLockKind } from "@/lib/partner-visibility";
 import {
   getPartnerAudienceLabel,
@@ -40,15 +35,11 @@ const LOCK_ORDER = {
 export default function HomeView({
   categories,
   partners,
-  initialSession,
   viewerAuthenticated,
-  showPushOptInBanner = false,
 }: {
   categories: Category[];
   partners: Partner[];
-  initialSession?: HeaderSession | null;
   viewerAuthenticated: boolean;
-  showPushOptInBanner?: boolean;
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
     "all",
@@ -164,16 +155,6 @@ export default function HomeView({
 
   const visibleResultCount = filteredPartners.visible.length;
 
-  const renderLines = (value: string) => {
-    const lines = value.split("\n");
-    return lines.map((line, index) => (
-      <span key={`${line}-${index}`}>
-        {line}
-        {index < lines.length - 1 ? <br /> : null}
-      </span>
-    ));
-  };
-
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -268,70 +249,56 @@ export default function HomeView({
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader initialSession={initialSession} />
+    <>
+      <section className="mt-10 flex flex-col gap-6" data-nosnippet>
+        <SectionHeading
+          title={HOME_COPY.categoryTitle}
+          description={HOME_COPY.categoryDescription}
+        />
+        <PartnerFilters
+          categories={categories}
+          activeCategory={activeCategory}
+          onCategoryChange={handleCategoryChange}
+          searchValue={searchValue}
+          onSearchChange={handleSearchChange}
+          appliesToFilter={appliesToFilter}
+          onAppliesToFilterChange={setAppliesToFilter}
+          sortValue={sortValue}
+          onSortChange={handleSortChange}
+        />
+      </section>
 
-      <main>
-        <Container className="pb-16 pt-10">
-          <HeroSection
-            eyebrow={HOME_COPY.heroEyebrow}
-            title={HOME_COPY.heroTitle}
-            description={renderLines(HOME_COPY.heroDescription)}
+      <section className="mt-10">
+        {displayPartners.length === 0 ? (
+          <EmptyState
+            title={
+              partners.length === 0
+                ? HOME_COPY.emptyTitle
+                : HOME_COPY.noResultsTitle
+            }
+            description={
+              partners.length === 0
+                ? HOME_COPY.emptyDescription
+                : HOME_COPY.noResultsDescription
+            }
           />
-
-          <PushOptInBanner visible={showPushOptInBanner} />
-
-          <section className="mt-10 flex flex-col gap-6" data-nosnippet>
-            <SectionHeading
-              title={HOME_COPY.categoryTitle}
-              description={HOME_COPY.categoryDescription}
-            />
-            <PartnerFilters
-              categories={categories}
-              activeCategory={activeCategory}
-              onCategoryChange={handleCategoryChange}
-              searchValue={searchValue}
-              onSearchChange={handleSearchChange}
-              appliesToFilter={appliesToFilter}
-              onAppliesToFilterChange={setAppliesToFilter}
-              sortValue={sortValue}
-              onSortChange={handleSortChange}
-            />
-          </section>
-
-          <section className="mt-10">
-            {displayPartners.length === 0 ? (
-              <EmptyState
-                title={
-                  partners.length === 0
-                    ? HOME_COPY.emptyTitle
-                    : HOME_COPY.noResultsTitle
+        ) : (
+          <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-6">
+            {displayPartners.map((partner) => (
+              <PartnerCardView
+                key={partner.id}
+                partner={partner}
+                categoryLabel={
+                  categoryMap.get(partner.category)?.label ?? "알 수 없음"
                 }
-                description={
-                  partners.length === 0
-                    ? HOME_COPY.emptyDescription
-                    : HOME_COPY.noResultsDescription
-                }
+                categoryColor={categoryMap.get(partner.category)?.color}
+                viewerAuthenticated={viewerAuthenticated}
+                onCategoryClick={handleCategoryChange}
               />
-            ) : (
-              <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-6">
-                {displayPartners.map((partner) => (
-                  <PartnerCardView
-                    key={partner.id}
-                    partner={partner}
-                    categoryLabel={
-                      categoryMap.get(partner.category)?.label ?? "알 수 없음"
-                    }
-                    categoryColor={categoryMap.get(partner.category)?.color}
-                    viewerAuthenticated={viewerAuthenticated}
-                    onCategoryClick={handleCategoryChange}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        </Container>
-      </main>
-    </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
   );
 }

@@ -39,6 +39,7 @@ import {
   validateMemberYear,
   validateDateRange,
 } from "@/lib/validation";
+import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 
 type PartnerInput = {
   name: string;
@@ -796,6 +797,17 @@ export async function deleteMember(formData: FormData) {
       .from("password_reset_attempts")
       .delete()
       .eq("identifier", member.mm_username);
+  }
+  const memberAuthCleanupKeys = getMemberAuthCleanupKeys([
+    member.mm_user_id,
+    member.mm_username,
+    id,
+  ]);
+  if (memberAuthCleanupKeys.length > 0) {
+    await supabase
+      .from("member_auth_attempts")
+      .delete()
+      .in("identifier", memberAuthCleanupKeys);
   }
 
   const { error } = await supabase.from("members").delete().eq("id", id);

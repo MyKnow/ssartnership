@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { SITE_URL } from "@/lib/site";
 import { CERTIFICATION_QR_TTL_SECONDS } from "@/lib/certification-constants";
+import { createHmacDigest, verifyHmacDigest } from "./hmac.js";
 
 export type CertificationQrPayload = {
   version: 1;
@@ -37,7 +38,7 @@ function decodeBase64Url(value: string) {
 }
 
 function sign(value: string) {
-  return crypto.createHmac("sha256", getSecret()).update(value).digest("base64url");
+  return createHmacDigest(value, getSecret(), "base64url");
 }
 
 export function issueCertificationQrToken(input: {
@@ -67,15 +68,7 @@ export function verifyCertificationQrToken(
     return { ok: false, reason: "invalid" };
   }
 
-  const expected = sign(encodedPayload);
-  if (expected.length !== signature.length) {
-    return { ok: false, reason: "invalid" };
-  }
-  const isValidSignature = crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected),
-  );
-  if (!isValidSignature) {
+  if (!verifyHmacDigest(encodedPayload, signature, getSecret(), "base64url")) {
     return { ok: false, reason: "invalid" };
   }
 

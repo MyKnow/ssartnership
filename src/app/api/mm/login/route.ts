@@ -16,6 +16,12 @@ import {
   findMmUserDirectoryEntryByUsername,
   upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
+import {
+  delayMemberAuthAttempt,
+  getMemberAuthAttemptScope,
+  getMemberAuthBlockingState,
+  recordMemberAuthAttempt,
+} from "@/lib/member-auth-security";
 
 export const runtime = "nodejs";
 
@@ -29,6 +35,31 @@ export async function POST(request: Request) {
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
     const password = String(payload.password ?? "").trim();
+    const throttleContext = {
+      ipAddress: context.ipAddress ?? null,
+      accountIdentifier: username || null,
+    };
+    const blockedState = await getMemberAuthBlockingState(
+      "login",
+      throttleContext,
+    );
+    if (blockedState) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_login",
+        status: "blocked",
+        actorType: "guest",
+        identifier: username || null,
+        properties: {
+          reason: "rate_limit",
+          scope: getMemberAuthAttemptScope(blockedState.identifier),
+          blockedUntil: blockedState.blockedUntil,
+        },
+      });
+      await delayMemberAuthAttempt("login", true);
+      return NextResponse.json({ error: "blocked" }, { status: 429 });
+    }
+
     if (!username || !password) {
       await logAuthSecurity({
         ...context,
@@ -38,7 +69,9 @@ export async function POST(request: Request) {
         identifier: username || null,
         properties: { reason: "missing_fields" },
       });
-      return NextResponse.json({ error: "missing_fields" }, { status: 400 });
+      await recordMemberAuthAttempt("login", throttleContext, false);
+      await delayMemberAuthAttempt("login");
+      return NextResponse.json({ error: "login_failed" }, { status: 400 });
     }
     if (validateMmUsername(username)) {
       await logAuthSecurity({
@@ -49,7 +82,9 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "invalid_username" },
       });
-      return NextResponse.json({ error: "invalid_username" }, { status: 400 });
+      await recordMemberAuthAttempt("login", throttleContext, false);
+      await delayMemberAuthAttempt("login");
+      return NextResponse.json({ error: "login_failed" }, { status: 400 });
     }
 
     const supabase = getSupabaseAdminClient();
@@ -99,14 +134,9 @@ export async function POST(request: Request) {
               status: error.status,
             },
           });
-          return NextResponse.json(
-            {
-              error: "team_or_channel_inaccessible",
-              message:
-                "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
-            },
-            { status: 403 },
-          );
+          await recordMemberAuthAttempt("login", throttleContext, false);
+          await delayMemberAuthAttempt("login");
+          return NextResponse.json({ error: "login_failed" }, { status: 403 });
         }
         throw error;
       }
@@ -121,7 +151,9 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "not_registered" },
       });
-      return NextResponse.json({ error: "not_registered" }, { status: 401 });
+      await recordMemberAuthAttempt("login", throttleContext, false);
+      await delayMemberAuthAttempt("login");
+      return NextResponse.json({ error: "login_failed" }, { status: 401 });
     }
 
     const ok = verifyPassword(password, member.password_salt, member.password_hash);
@@ -135,11 +167,14 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "invalid_credentials" },
       });
-      return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
+      await recordMemberAuthAttempt("login", throttleContext, false);
+      await delayMemberAuthAttempt("login");
+      return NextResponse.json({ error: "login_failed" }, { status: 401 });
     }
 
     const policyStatus = await getMemberRequiredPolicyStatus(member.id);
     await setUserSession(member.id, Boolean(member.must_change_password));
+    await recordMemberAuthAttempt("login", throttleContext, true);
 
     await logAuthSecurity({
       ...context,
@@ -168,9 +203,7 @@ export async function POST(request: Request) {
         message: (error as Error).message,
       },
     });
-    return NextResponse.json(
-      { error: "login_failed", message: (error as Error).message },
-      { status: 500 },
-    );
+    await delayMemberAuthAttempt("login", true);
+    return NextResponse.json({ error: "login_failed" }, { status: 500 });
   }
 }

@@ -82,6 +82,15 @@ create table if not exists suggestion_attempts (
   created_at timestamp with time zone default now()
 );
 
+create table if not exists member_auth_attempts (
+  id uuid primary key default uuid_generate_v4(),
+  identifier text not null unique,
+  count integer not null default 0,
+  first_attempt_at timestamp with time zone not null default now(),
+  blocked_until timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
 create table if not exists members (
   id uuid primary key default uuid_generate_v4(),
   mm_user_id text not null unique,
@@ -487,6 +496,7 @@ create table if not exists auth_security_logs (
 create index if not exists partners_category_id_idx on partners(category_id);
 create index if not exists admin_login_attempts_identifier_idx on admin_login_attempts(identifier);
 create index if not exists suggestion_attempts_identifier_idx on suggestion_attempts(identifier);
+create index if not exists member_auth_attempts_identifier_idx on member_auth_attempts(identifier);
 create index if not exists mm_verification_attempts_identifier_idx on mm_verification_attempts(identifier);
 create index if not exists password_reset_attempts_identifier_idx on password_reset_attempts(identifier);
 create index if not exists push_subscriptions_member_id_idx on push_subscriptions(member_id);
@@ -520,6 +530,7 @@ alter table categories enable row level security;
 alter table partners enable row level security;
 alter table admin_login_attempts enable row level security;
 alter table suggestion_attempts enable row level security;
+alter table member_auth_attempts enable row level security;
 alter table members enable row level security;
 alter table policy_documents enable row level security;
 alter table member_policy_consents enable row level security;
@@ -548,6 +559,8 @@ revoke all on table admin_login_attempts from anon;
 revoke all on table admin_login_attempts from authenticated;
 revoke all on table suggestion_attempts from anon;
 revoke all on table suggestion_attempts from authenticated;
+revoke all on table member_auth_attempts from anon;
+revoke all on table member_auth_attempts from authenticated;
 revoke all on table members from anon;
 revoke all on table members from authenticated;
 revoke all on table policy_documents from anon;

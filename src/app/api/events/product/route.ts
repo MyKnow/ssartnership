@@ -5,6 +5,7 @@ import {
   logProductEvent,
   resolveCurrentActor,
 } from '@/lib/activity-logs';
+import { normalizeProductEventLocation } from '@/lib/product-event-path';
 
 export const runtime = 'nodejs';
 
@@ -41,8 +42,8 @@ export async function POST(request: NextRequest) {
       actorType: actor.actorType,
       actorId: actor.actorId,
       sessionId: body.sessionId ?? null,
-      path: body.path ?? context.path,
-      referrer: body.referrer ?? context.referrer,
+      path: normalizeProductEventLocation(body.path ?? context.path),
+      referrer: normalizeProductEventLocation(body.referrer ?? context.referrer),
       targetType: body.targetType ?? null,
       targetId: body.targetId ?? null,
       properties: body.properties ?? {},

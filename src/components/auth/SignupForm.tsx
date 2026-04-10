@@ -108,19 +108,19 @@ export default function SignupForm({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (data.error === "blocked") {
+          setError("요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.");
+          notify("요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.");
+          return;
+        }
         if (data.error === "cooldown") {
           setError("인증코드 요청이 너무 잦습니다. 60초 후 다시 시도해 주세요.");
           notify("잠시 후 다시 요청해 주세요.");
           return;
         }
-        if (data.error === "already_registered") {
-          setError("이미 가입된 계정입니다. 로그인해 주세요.");
-          notify("이미 가입된 계정입니다.");
-          return;
-        }
-        if (data.error === "not_found" || data.error === "not_student") {
-          setError("해당 MM 계정을 찾을 수 없습니다.");
-          notify("해당 MM 계정을 찾을 수 없습니다.");
+        if (data.error === "request_failed") {
+          setError("MM 계정을 확인할 수 없습니다.");
+          notify("MM 계정을 확인할 수 없습니다.");
           return;
         }
         if (data.error === "invalid_username") {
@@ -134,11 +134,6 @@ export default function SignupForm({
               `회원가입은 현재 선택 가능한 ${signupYearsText}만 선택할 수 있습니다.`,
           );
           notify("회원가입 가능한 기수를 확인해 주세요.");
-          return;
-        }
-        if (data.error === "request_failed") {
-          setError(data.message ?? "요청에 실패했습니다.");
-          notify(data.message ?? "요청에 실패했습니다.");
           return;
         }
         setError("MM 계정을 확인할 수 없습니다.");

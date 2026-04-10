@@ -51,29 +51,13 @@ export default function LoginForm() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        if (data.error === "not_registered") {
-          setError("회원가입이 필요합니다.");
-          notify("회원가입이 필요합니다.");
-          router.push("/auth/signup");
+        if (data.error === "blocked") {
+          setError("로그인이 너무 자주 시도되었습니다. 잠시 후 다시 시도해 주세요.");
+          notify("로그인이 너무 자주 시도되었습니다. 잠시 후 다시 시도해 주세요.");
           return;
         }
-        if (data.error === "invalid_username") {
-          setError("MM 아이디 형식을 확인해 주세요.");
-          notify("MM 아이디 형식을 확인해 주세요.");
-          return;
-        }
-        if (data.error === "invalid_credentials") {
-          setError("아이디 또는 비밀번호가 올바르지 않습니다.");
-          notify("아이디 또는 비밀번호가 올바르지 않습니다.");
-          return;
-        }
-        if (data.error === "login_failed") {
-          setError(data.message ?? "로그인에 실패했습니다.");
-          notify(data.message ?? "로그인에 실패했습니다.");
-          return;
-        }
-        setError("로그인에 실패했습니다.");
-        notify("로그인에 실패했습니다.");
+        setError("아이디 또는 비밀번호가 올바르지 않습니다.");
+        notify("아이디 또는 비밀번호가 올바르지 않습니다.");
         return;
       }
       setError(null);

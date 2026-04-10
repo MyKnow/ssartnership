@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/cn";
-import { getCachedImageUrl } from "@/lib/image-cache";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { getBlurDataURL } from "@/lib/image-blur";
+import { cn } from "@/lib/cn";
+import {
+  getCachedImageUrl,
+  isCachedImageUrlPreloaded,
+  preloadCachedImageUrls,
+} from "@/lib/image-cache";
+import Skeleton from "@/components/ui/Skeleton";
 
 const placeholder = (
   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -25,6 +29,40 @@ const placeholder = (
     </svg>
   </div>
 );
+
+function CarouselLoadingSkeleton({
+  className,
+  imageCount,
+  style,
+}: {
+  className?: string;
+  imageCount: number;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid gap-3 xl:grid-cols-[minmax(0,1fr)_7.5rem] xl:items-stretch",
+        className,
+      )}
+      style={style}
+      aria-hidden="true"
+    >
+      <div className="aspect-[16/9] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted">
+        <Skeleton className="h-full w-full rounded-none" />
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto overscroll-contain px-3 pb-6 pt-2 xl:h-full xl:min-h-0 xl:flex-col xl:items-center xl:gap-3 xl:overflow-y-auto xl:overflow-x-visible xl:px-3 xl:py-2">
+        {Array.from({ length: Math.max(1, imageCount) }).map((_, index) => (
+          <Skeleton
+            key={index}
+            className="h-16 w-20 flex-shrink-0 rounded-2xl xl:h-20 xl:w-20"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function PartnerImageCarousel({
   images,
@@ -52,15 +90,24 @@ export default function PartnerImageCarousel({
   });
   const lastTapRef = useRef(0);
 
-  const safeImages = images.filter(Boolean);
-  const hasImages = safeImages.length > 0;
-  const activeImage = hasImages ? safeImages[activeIndex] : "";
-  const cachedActiveImage = activeImage ? getCachedImageUrl(activeImage) : "";
-  const blurDataURL = getBlurDataURL(32, 32);
-  const canNavigate = safeImages.length > 1;
+  const safeImages = useMemo(() => images.filter(Boolean), [images]);
+  const cachedImages = useMemo(
+    () => safeImages.map((image) => getCachedImageUrl(image)),
+    [safeImages],
+  );
+  const hasImages = cachedImages.length > 0;
+  const imageCount = cachedImages.length;
+  const activeImage = hasImages ? cachedImages[activeIndex] : "";
+  const cachedActiveImage = activeImage ?? "";
+  const canNavigate = imageCount > 1;
   const activeThumbRef = useRef<HTMLButtonElement | null>(null);
   const thumbStripRef = useRef<HTMLDivElement | null>(null);
   const [desktopHeight, setDesktopHeight] = useState<number | null>(null);
+  const [isPreloaded, setIsPreloaded] = useState(
+    () =>
+      cachedImages.length === 0 ||
+      cachedImages.every((url) => isCachedImageUrlPreloaded(url)),
+  );
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -80,21 +127,42 @@ export default function PartnerImageCarousel({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!hasImages || isOpen || safeImages.length <= 1) {
+    if (!hasImages) {
+      return;
+    }
+    if (cachedImages.every((url) => isCachedImageUrlPreloaded(url))) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void preloadCachedImageUrls(cachedImages).then(() => {
+      if (!cancelled) {
+        setIsPreloaded(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cachedImages, hasImages]);
+
+  useEffect(() => {
+    if (!hasImages || !isPreloaded || isOpen || imageCount <= 1) {
       return;
     }
     if (!window.matchMedia("(min-width: 1280px) and (pointer: fine)").matches) {
       return;
     }
-    const interval = window.setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % safeImages.length);
+    const timeout = window.setTimeout(() => {
+      setActiveIndex((prev) => (prev + 1) % imageCount);
       setZoom(1);
       setOffset({ x: 0, y: 0 });
     }, 3000);
     return () => {
-      window.clearInterval(interval);
+      window.clearTimeout(timeout);
     };
-  }, [hasImages, isOpen, safeImages.length]);
+  }, [activeIndex, hasImages, imageCount, isOpen, isPreloaded]);
 
   useEffect(() => {
     const thumb = activeThumbRef.current;
@@ -116,7 +184,11 @@ export default function PartnerImageCarousel({
       strip.scrollTo({ top: nextTop, behavior: "smooth" });
       return;
     }
-
+    thumb.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
   }, [activeIndex]);
 
   useEffect(() => {
@@ -159,22 +231,22 @@ export default function PartnerImageCarousel({
     };
   }, [matchHeightSelector]);
 
-  const goNext = () => {
+  const activateImage = (nextIndex: number) => {
     if (!canNavigate) {
       return;
     }
-    setActiveIndex((prev) => (prev + 1) % safeImages.length);
+    const normalizedIndex = (nextIndex + imageCount) % imageCount;
+    setActiveIndex(normalizedIndex);
     setZoom(1);
     setOffset({ x: 0, y: 0 });
   };
 
+  const goNext = () => {
+    activateImage(activeIndex + 1);
+  };
+
   const goPrev = () => {
-    if (!canNavigate) {
-      return;
-    }
-    setActiveIndex((prev) => (prev - 1 + safeImages.length) % safeImages.length);
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
+    activateImage(activeIndex - 1);
   };
 
   const handleZoom = (delta: number) => {
@@ -217,6 +289,16 @@ export default function PartnerImageCarousel({
     return Math.hypot(dx, dy);
   };
 
+  if (hasImages && !isPreloaded) {
+    return (
+      <CarouselLoadingSkeleton
+        className={className}
+        imageCount={imageCount}
+        style={desktopHeight ? { height: `${desktopHeight}px` } : undefined}
+      />
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -242,9 +324,8 @@ export default function PartnerImageCarousel({
             fill
             sizes="(max-width: 1279px) 100vw, 50vw"
             className="object-cover"
-            priority={false}
-            placeholder="blur"
-            blurDataURL={blurDataURL}
+            unoptimized
+            loading="eager"
           />
         ) : (
           placeholder
@@ -267,19 +348,19 @@ export default function PartnerImageCarousel({
                   ? "z-10 scale-[1.04] border-strong ring-2 ring-inset ring-strong/80 shadow-[0_4px_10px_rgba(0,0,0,0.48)] dark:shadow-[0_4px_10px_rgba(255,255,255,0.24)] xl:scale-[1.08]"
                   : "border-border hover:border-strong/70",
               )}
-              onClick={() => setActiveIndex(index)}
+              onClick={() => activateImage(index)}
               aria-pressed={index === activeIndex}
               aria-label={`이미지 ${index + 1}`}
             >
               <Image
-                src={getCachedImageUrl(image)}
+                src={cachedImages[index]}
                 alt=""
                 width={80}
                 height={64}
                 className="h-full w-full object-cover"
                 sizes="80px"
-                placeholder="blur"
-                blurDataURL={blurDataURL}
+                unoptimized
+                loading="eager"
               />
             </button>
           ))}
@@ -436,7 +517,8 @@ export default function PartnerImageCarousel({
                     fill
                     sizes="100vw"
                     className="object-contain"
-                    priority={false}
+                    unoptimized
+                    loading="eager"
                   />
                 </div>
               ) : (

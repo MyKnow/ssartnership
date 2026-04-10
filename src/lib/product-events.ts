@@ -1,10 +1,11 @@
 'use client';
 
 import type { ProductEventName } from '@/lib/event-catalog';
+import { normalizeProductEventLocation } from '@/lib/product-event-path';
 
 type ProductEventClientPayload = {
   eventName: ProductEventName;
-  path?: string;
+  path?: string | null;
   referrer?: string | null;
   targetType?: string | null;
   targetId?: string | null;
@@ -42,10 +43,17 @@ export function trackProductEvent(payload: ProductEventClientPayload) {
     return;
   }
 
+  const path = normalizeProductEventLocation(
+    payload.path ?? `${window.location.pathname}${window.location.search}`,
+  );
+  const referrer = normalizeProductEventLocation(
+    payload.referrer ?? document.referrer ?? null,
+  );
+
   const body = JSON.stringify({
     sessionId: getProductSessionId(),
-    path: payload.path ?? `${window.location.pathname}${window.location.search}`,
-    referrer: payload.referrer ?? document.referrer ?? null,
+    path,
+    referrer,
     targetType: payload.targetType ?? null,
     targetId: payload.targetId ?? null,
     properties: payload.properties ?? {},

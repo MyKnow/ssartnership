@@ -1,17 +1,7 @@
-"use client";
-
 import { BellAlertIcon } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 
-export default function PushOptInBanner({
-  visible,
-}: {
-  visible: boolean;
-}) {
-  if (!visible) {
-    return null;
-  }
-
+export default function PushOptInBanner() {
   return (
     <section className="mt-6 rounded-[28px] border border-border bg-surface-elevated p-5 shadow-md">
       <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">

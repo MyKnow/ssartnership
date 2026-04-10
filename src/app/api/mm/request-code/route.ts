@@ -31,6 +31,12 @@ import {
   normalizeMmUsername,
   validateMmUsername,
 } from "@/lib/validation";
+import {
+  delayMemberAuthAttempt,
+  getMemberAuthAttemptScope,
+  getMemberAuthBlockingState,
+  recordMemberAuthAttempt,
+} from "@/lib/member-auth-security";
 
 export const runtime = "nodejs";
 
@@ -65,6 +71,10 @@ export async function POST(request: Request) {
       cycleSettings,
     );
     year = parseSignupSsafyYearValue(payload.year);
+    const throttleContext = {
+      ipAddress: context.ipAddress ?? null,
+      accountIdentifier: username || null,
+    };
     if (!username) {
       await logAuthSecurity({
         ...context,
@@ -73,6 +83,8 @@ export async function POST(request: Request) {
         actorType: "guest",
         properties: getRequestCodeLogProperties(year, { reason: "missing_fields" }),
       });
+      await recordMemberAuthAttempt("request-code", throttleContext, false);
+      await delayMemberAuthAttempt("request-code");
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (validateMmUsername(username)) {
@@ -86,6 +98,8 @@ export async function POST(request: Request) {
           reason: "invalid_username",
         }),
       });
+      await recordMemberAuthAttempt("request-code", throttleContext, false);
+      await delayMemberAuthAttempt("request-code");
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
     if (yearError || year === null) {
@@ -97,6 +111,8 @@ export async function POST(request: Request) {
         identifier: username || null,
         properties: getRequestCodeLogProperties(year, { reason: "invalid_year" }),
       });
+      await recordMemberAuthAttempt("request-code", throttleContext, false);
+      await delayMemberAuthAttempt("request-code");
       return NextResponse.json(
         {
           error: "invalid_year",
@@ -104,6 +120,26 @@ export async function POST(request: Request) {
         },
         { status: 400 },
       );
+    }
+    const blockedState = await getMemberAuthBlockingState(
+      "request-code",
+      throttleContext,
+    );
+    if (blockedState) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_code_request",
+        status: "blocked",
+        actorType: "guest",
+        identifier: username || null,
+        properties: getRequestCodeLogProperties(year, {
+          reason: "rate_limit",
+          scope: getMemberAuthAttemptScope(blockedState.identifier),
+          blockedUntil: blockedState.blockedUntil,
+        }),
+      });
+      await delayMemberAuthAttempt("request-code", true);
+      return NextResponse.json({ error: "blocked" }, { status: 429 });
     }
     const supabase = getSupabaseAdminClient();
     const directoryEntry =
@@ -206,14 +242,9 @@ export async function POST(request: Request) {
               status: lastInaccessibleError.status,
             }),
           });
-          return NextResponse.json(
-            {
-              error: "team_or_channel_inaccessible",
-              message:
-                "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
-            },
-            { status: 403 },
-          );
+          await recordMemberAuthAttempt("request-code", throttleContext, false);
+          await delayMemberAuthAttempt("request-code");
+          return NextResponse.json({ error: "request_failed" }, { status: 400 });
         }
 
         await logAuthSecurity({
@@ -224,10 +255,9 @@ export async function POST(request: Request) {
           identifier: username,
           properties: getRequestCodeLogProperties(year, { reason: "not_found" }),
         });
-        return NextResponse.json(
-          { error: "not_found", message: "해당 MM 계정을 찾을 수 없습니다." },
-          { status: 404 },
-        );
+        await recordMemberAuthAttempt("request-code", throttleContext, false);
+        await delayMemberAuthAttempt("request-code");
+        return NextResponse.json({ error: "request_failed" }, { status: 400 });
       }
     }
 
@@ -264,6 +294,8 @@ export async function POST(request: Request) {
           identifier: username,
           properties: getRequestCodeLogProperties(year, { reason: "cooldown" }),
         });
+        await recordMemberAuthAttempt("request-code", throttleContext, false);
+        await delayMemberAuthAttempt("request-code");
         return NextResponse.json({ error: "cooldown" }, { status: 429 });
       }
     }
@@ -299,7 +331,9 @@ export async function POST(request: Request) {
           mmUsername: targetUser.username,
         }),
       });
-      return NextResponse.json({ error: "already_registered" }, { status: 409 });
+      await recordMemberAuthAttempt("request-code", throttleContext, false);
+      await delayMemberAuthAttempt("request-code");
+      return NextResponse.json({ error: "request_failed" }, { status: 400 });
     }
 
     const avatarPromise = getUserImage(senderLogin.token, targetUser.id);
@@ -354,6 +388,7 @@ export async function POST(request: Request) {
         resolvedYearFromLive,
       }),
     });
+    await recordMemberAuthAttempt("request-code", throttleContext, true);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -367,9 +402,7 @@ export async function POST(request: Request) {
         message: (error as Error).message,
       }),
     });
-    return NextResponse.json(
-      { error: "request_failed", message: (error as Error).message },
-      { status: 500 },
-    );
+    await delayMemberAuthAttempt("request-code", true);
+    return NextResponse.json({ error: "request_failed" }, { status: 500 });
   }
 }

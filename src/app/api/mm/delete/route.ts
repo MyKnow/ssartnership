@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, clearUserSession } from "@/lib/user-auth";
+import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 
 export const runtime = "nodejs";
 
@@ -53,6 +54,17 @@ export async function POST(request: Request) {
       .from("password_reset_attempts")
       .delete()
       .eq("identifier", member.mm_username);
+  }
+  const memberAuthCleanupKeys = getMemberAuthCleanupKeys([
+    member?.mm_user_id,
+    member?.mm_username,
+    session.userId,
+  ]);
+  if (memberAuthCleanupKeys.length > 0) {
+    await supabase
+      .from("member_auth_attempts")
+      .delete()
+      .in("identifier", memberAuthCleanupKeys);
   }
 
   await supabase.from("members").delete().eq("id", session.userId);

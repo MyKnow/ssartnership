@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { ensureAdminApiAccess } from '@/lib/admin-access';
 import { exportAdminLogsCsv, type LogGroup } from '@/lib/log-insights';
 
@@ -27,14 +27,14 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const { filename, csv } = await exportAdminLogsCsv({
+  const { filename, stream } = await exportAdminLogsCsv({
     preset: searchParams.get('preset'),
     start: searchParams.get('start'),
     end: searchParams.get('end'),
     groups: parseGroups(searchParams.get('groups')),
   });
 
-  return new NextResponse(csv, {
+  return new Response(stream, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,

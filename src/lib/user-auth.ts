@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
-import crypto from "crypto";
 import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
 } from "@/lib/policy-documents";
+import { createHmacDigest, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const COOKIE_NAME = "user_session";
@@ -23,10 +23,7 @@ function getSecret() {
 
 function signPayload(payload: string) {
   const secret = getSecret();
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
+  const signature = createHmacDigest(payload, secret, "hex");
   return `${payload}.${signature}`;
 }
 
@@ -35,15 +32,7 @@ function verifyToken(token: string) {
   if (!payload || !signature) {
     return null;
   }
-  const expected = crypto
-    .createHmac("sha256", getSecret())
-    .update(payload)
-    .digest("hex");
-  const ok = crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected),
-  );
-  if (!ok) {
+  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
     return null;
   }
   try {
@@ -109,19 +98,24 @@ export async function getUserSession() {
   }
 
   const supabase = getSupabaseAdminClient();
-  const { data: member } = await supabase
+  const memberPromise = supabase
     .from("members")
     .select(
       "id,must_change_password,service_policy_version,privacy_policy_version",
     )
     .eq("id", session.userId)
     .maybeSingle();
+  const activePoliciesPromise = getActiveRequiredPolicies();
+
+  const [{ data: member }, activePolicies] = await Promise.all([
+    memberPromise,
+    activePoliciesPromise,
+  ]);
 
   if (!member?.id) {
     return null;
   }
 
-  const activePolicies = await getActiveRequiredPolicies();
   const policyStatus = evaluateRequiredPolicyStatus(member, activePolicies);
 
   return {

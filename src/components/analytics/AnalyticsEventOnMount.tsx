@@ -12,19 +12,27 @@ export default function AnalyticsEventOnMount({
   targetType,
   targetId,
   properties,
+  path,
   dedupeKey,
 }: {
   eventName: ProductEventName;
   targetType?: string | null;
   targetId?: string | null;
   properties?: Record<string, unknown> | null;
+  path?: string | null;
   dedupeKey?: string;
 }) {
   const key = useMemo(
     () =>
       dedupeKey ??
-      JSON.stringify({ eventName, targetType, targetId, properties: properties ?? {} }),
-    [dedupeKey, eventName, properties, targetId, targetType],
+      JSON.stringify({
+        eventName,
+        targetType,
+        targetId,
+        path,
+        properties: properties ?? {},
+      }),
+    [dedupeKey, eventName, path, properties, targetId, targetType],
   );
 
   useEffect(() => {
@@ -38,9 +46,10 @@ export default function AnalyticsEventOnMount({
       eventName,
       targetType,
       targetId,
+      path,
       properties: properties ?? {},
     });
-  }, [eventName, key, properties, targetId, targetType]);
+  }, [eventName, key, path, properties, targetId, targetType]);
 
   return null;
 }

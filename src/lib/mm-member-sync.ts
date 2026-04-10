@@ -165,6 +165,54 @@ async function resolveMemberSnapshotForYears(
   return null;
 }
 
+type MemberSyncYearBatchResult = {
+  results: MemberSyncResult[];
+  failures: Array<{ memberId: string; mmUserId: string; reason: string }>;
+};
+
+async function syncMembersForYear(
+  yearMembers: MemberRow[],
+  senderSessionCache: Map<number, Promise<SenderSession>>,
+): Promise<MemberSyncYearBatchResult> {
+  const results: MemberSyncResult[] = [];
+  const failures: Array<{ memberId: string; mmUserId: string; reason: string }> = [];
+
+  for (const member of yearMembers) {
+    try {
+      const resolved = await resolveMemberSnapshotForYears(
+        member,
+        getMemberSyncCandidateYears(member.year),
+        senderSessionCache,
+      );
+      if (!resolved) {
+        failures.push({
+          memberId: member.id,
+          mmUserId: member.mm_user_id,
+          reason: "MM 사용자 조회 실패",
+        });
+        continue;
+      }
+
+      const result = await syncMemberSnapshot(member, resolved.snapshot);
+      if (result.updated) {
+        results.push(result);
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "MM 동기화 실패";
+      failures.push({
+        memberId: member.id,
+        mmUserId: member.mm_user_id,
+        reason,
+      });
+    }
+  }
+
+  return {
+    results,
+    failures,
+  };
+}
+
 export function buildMemberSyncLogProperties(
   result: MemberSyncResult,
   extra: Record<string, unknown> = {},
@@ -344,43 +392,16 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
   });
 
   const senderSessionCache = new Map<number, Promise<SenderSession>>();
-  for (const year of years.sort((a, b) => b - a)) {
-    const yearMembers = groupedMembers.get(year) ?? [];
-    if (yearMembers.length === 0) {
-      continue;
-    }
+  const orderedYears = [...years].sort((a, b) => b - a);
+  const yearResults = await Promise.all(
+    orderedYears.map((year) =>
+      syncMembersForYear(groupedMembers.get(year) ?? [], senderSessionCache),
+    ),
+  );
 
-    for (const member of yearMembers) {
-      try {
-        const resolved = await resolveMemberSnapshotForYears(
-          member,
-          getMemberSyncCandidateYears(member.year),
-          senderSessionCache,
-        );
-        if (!resolved) {
-          failures.push({
-            memberId: member.id,
-            mmUserId: member.mm_user_id,
-            reason: "MM 사용자 조회 실패",
-          });
-          continue;
-        }
-        const result = await syncMemberSnapshot(
-          member,
-          resolved.snapshot,
-        );
-        if (result.updated) {
-          results.push(result);
-        }
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : "MM 동기화 실패";
-        failures.push({
-          memberId: member.id,
-          mmUserId: member.mm_user_id,
-          reason,
-        });
-      }
-    }
+  for (const yearResult of yearResults) {
+    results.push(...yearResult.results);
+    failures.push(...yearResult.failures);
   }
 
   return {

@@ -2,15 +2,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
-import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
-import {
-  buildMemberSyncLogProperties,
-  syncMemberById,
-} from "@/lib/mm-member-sync";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
+import CertificationProfileSync from "@/components/certification/CertificationProfileSync";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -54,29 +50,6 @@ export default async function CertificationPage() {
     redirect("/auth/login");
   }
 
-  let currentMember: CertificationMember = member as CertificationMember;
-  try {
-    const syncResult = await syncMemberById(member.id);
-    if (syncResult?.member) {
-      currentMember = syncResult.member;
-    }
-    if (syncResult?.updated) {
-      const context = await getServerActionLogContext("/certification");
-      await logAdminAudit({
-        ...context,
-        action: "member_sync",
-        actorId: process.env.ADMIN_ID ?? "admin",
-        targetType: "member",
-        targetId: member.id,
-        properties: buildMemberSyncLogProperties(syncResult, {
-          source: "profile_view",
-        }),
-      });
-    }
-  } catch (error) {
-    console.error("member profile sync failed", error);
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
@@ -90,11 +63,12 @@ export default async function CertificationPage() {
               현재 계정의 인증 상태와 표시 정보를 확인합니다.
             </p>
             <CertificationView
-              member={currentMember}
+              member={member as CertificationMember}
               initialTimestamp={initialTimestamp}
             />
           </div>
           <CertificationFooterActions />
+          <CertificationProfileSync />
         </Container>
       </main>
     </div>

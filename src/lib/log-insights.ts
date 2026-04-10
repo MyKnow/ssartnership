@@ -136,6 +136,18 @@ type UnifiedCsvRow = {
   properties: Record<string, unknown> | null;
 };
 
+type TimedLogRow = {
+  created_at: string;
+};
+
+export type AdminLogsLoadedData = {
+  range: ResolvedLogRange;
+  productRows: ProductLogRow[];
+  auditRows: AdminAuditLogRow[];
+  securityRows: AuthSecurityLogRow[];
+  memberLookup: Map<string, MemberLookupRecord>;
+};
+
 const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> = {
   '1h': 60 * 60 * 1000,
   '12h': 12 * 60 * 60 * 1000,
@@ -146,6 +158,23 @@ const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> = {
 
 const DEFAULT_PRESET: LogRangePreset = '24h';
 const QUERY_PAGE_SIZE = 1000;
+const ADMIN_LOGS_CSV_HEADER = [
+  'group',
+  'action',
+  'status',
+  'actor_type',
+  'actor_name',
+  'actor_mm_username',
+  'actor_id',
+  'identifier',
+  'ip_address',
+  'path',
+  'referrer',
+  'target_type',
+  'target_id',
+  'created_at',
+  'properties',
+] as const;
 
 function isRangePreset(value: string | null | undefined): value is LogRangePreset {
   return (
@@ -388,9 +417,9 @@ function resolveActorMeta(
 
 function buildChartBuckets(
   range: ResolvedLogRange,
-  productLogs: ProductLogRecord[],
-  auditLogs: AdminAuditLogRecord[],
-  securityLogs: AuthSecurityLogRecord[],
+  productLogs: TimedLogRow[],
+  auditLogs: TimedLogRow[],
+  securityLogs: TimedLogRow[],
 ) {
   const startTime = new Date(range.start).getTime();
   const endTime = new Date(range.end).getTime();
@@ -449,138 +478,304 @@ function toCsvCell(value: unknown) {
   return escapeCsvValue(JSON.stringify(value));
 }
 
-function toUnifiedCsvRows(data: AdminLogsPageData, groups: LogGroup[]) {
-  const rows: UnifiedCsvRow[] = [];
+function toCsvLine(row: UnifiedCsvRow) {
+  return [
+    row.group,
+    row.action,
+    row.status,
+    row.actorType,
+    row.actorName,
+    row.actorMmUsername,
+    row.actorId,
+    row.identifier,
+    row.ipAddress,
+    row.path,
+    row.referrer,
+    row.targetType,
+    row.targetId,
+    row.createdAt,
+    row.properties,
+  ]
+    .map(toCsvCell)
+    .join(',');
+}
 
-  if (groups.includes('product')) {
-    data.productLogs.forEach((log) => {
-      rows.push({
-        group: 'product',
-        action: String(log.event_name),
-        status: null,
-        actorType: log.actor_type,
-        actorName: log.actor_name,
-        actorMmUsername: log.actor_mm_username,
-        actorId: log.actor_id,
-        identifier: null,
-        ipAddress: log.ip_address,
-        path: log.path,
-        referrer: log.referrer,
-        targetType: log.target_type,
-        targetId: log.target_id,
-        createdAt: log.created_at,
-        properties: log.properties,
+function uniqueLogGroups(groups: LogGroup[]) {
+  return Array.from(new Set(groups));
+}
+
+function buildProductCsvRow(
+  log: ProductLogRow,
+  memberLookup: Map<string, MemberLookupRecord>,
+): UnifiedCsvRow {
+  const actorMeta = resolveActorMeta(log.actor_type, log.actor_id, memberLookup);
+  return {
+    group: 'product',
+    action: String(log.event_name),
+    status: null,
+    actorType: log.actor_type,
+    actorName: actorMeta.actor_name,
+    actorMmUsername: actorMeta.actor_mm_username,
+    actorId: log.actor_id,
+    identifier: null,
+    ipAddress: log.ip_address,
+    path: log.path,
+    referrer: log.referrer,
+    targetType: log.target_type,
+    targetId: log.target_id,
+    createdAt: log.created_at,
+    properties: log.properties,
+  };
+}
+
+function buildAuditCsvRow(log: AdminAuditLogRow): UnifiedCsvRow {
+  return {
+    group: 'audit',
+    action: String(log.action),
+    status: null,
+    actorType: 'admin',
+    actorName: null,
+    actorMmUsername: null,
+    actorId: log.actor_id,
+    identifier: null,
+    ipAddress: log.ip_address,
+    path: log.path,
+    referrer: null,
+    targetType: log.target_type,
+    targetId: log.target_id,
+    createdAt: log.created_at,
+    properties: log.properties,
+  };
+}
+
+function buildSecurityCsvRow(
+  log: AuthSecurityLogRow,
+  memberLookup: Map<string, MemberLookupRecord>,
+): UnifiedCsvRow {
+  const actorMeta = resolveActorMeta(log.actor_type, log.actor_id, memberLookup);
+  return {
+    group: 'security',
+    action: String(log.event_name),
+    status: log.status,
+    actorType: log.actor_type,
+    actorName: actorMeta.actor_name,
+    actorMmUsername: actorMeta.actor_mm_username,
+    actorId: log.actor_id,
+    identifier: log.identifier,
+    ipAddress: log.ip_address,
+    path: log.path,
+    referrer: null,
+    targetType: null,
+    targetId: null,
+    createdAt: log.created_at,
+    properties: log.properties,
+  };
+}
+
+function createCsvRowSources(
+  data: AdminLogsLoadedData,
+  groups: LogGroup[],
+) {
+  const sources: Array<{
+    rows: readonly TimedLogRow[];
+    index: number;
+    toCsvRow: (row: TimedLogRow) => UnifiedCsvRow;
+  }> = [];
+
+  for (const group of uniqueLogGroups(groups)) {
+    if (group === 'product') {
+      sources.push({
+        rows: data.productRows,
+        index: 0,
+        toCsvRow: (row) => buildProductCsvRow(row as ProductLogRow, data.memberLookup),
       });
-    });
+      continue;
+    }
+
+    if (group === 'audit') {
+      sources.push({
+        rows: data.auditRows,
+        index: 0,
+        toCsvRow: (row) => buildAuditCsvRow(row as AdminAuditLogRow),
+      });
+      continue;
+    }
+
+    if (group === 'security') {
+      sources.push({
+        rows: data.securityRows,
+        index: 0,
+        toCsvRow: (row) =>
+          buildSecurityCsvRow(row as AuthSecurityLogRow, data.memberLookup),
+      });
+    }
   }
 
-  if (groups.includes('audit')) {
-    data.auditLogs.forEach((log) => {
-      rows.push({
-        group: 'audit',
-        action: String(log.action),
-        status: null,
-        actorType: 'admin',
-        actorName: null,
-        actorMmUsername: null,
-        actorId: log.actor_id,
-        identifier: null,
-        ipAddress: log.ip_address,
-        path: log.path,
-        referrer: null,
-        targetType: log.target_type,
-        targetId: log.target_id,
-        createdAt: log.created_at,
-        properties: log.properties,
-      });
-    });
-  }
+  return sources;
+}
 
-  if (groups.includes('security')) {
-    data.securityLogs.forEach((log) => {
-      rows.push({
-        group: 'security',
-        action: String(log.event_name),
-        status: log.status,
-        actorType: log.actor_type,
-        actorName: log.actor_name,
-        actorMmUsername: log.actor_mm_username,
-        actorId: log.actor_id,
-        identifier: log.identifier,
-        ipAddress: log.ip_address,
-        path: log.path,
-        referrer: null,
-        targetType: null,
-        targetId: null,
-        createdAt: log.created_at,
-        properties: log.properties,
-      });
-    });
-  }
+export function* iterateAdminLogsCsvRows(
+  data: AdminLogsLoadedData,
+  groups: LogGroup[],
+): Generator<UnifiedCsvRow> {
+  const sources = createCsvRowSources(data, groups);
 
-  return rows.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  while (true) {
+    let nextIndex = -1;
+    let nextTimestamp = -1;
+
+    for (let index = 0; index < sources.length; index += 1) {
+      const source = sources[index];
+      const row = source.rows[source.index];
+      if (!row) {
+        continue;
+      }
+
+      const timestamp = new Date(row.created_at).getTime();
+      if (
+        nextIndex === -1 ||
+        timestamp > nextTimestamp ||
+        (timestamp === nextTimestamp && index < nextIndex)
+      ) {
+        nextIndex = index;
+        nextTimestamp = timestamp;
+      }
+    }
+
+    if (nextIndex === -1) {
+      return;
+    }
+
+    const source = sources[nextIndex];
+    const row = source.rows[source.index];
+    if (!row) {
+      return;
+    }
+
+    yield source.toCsvRow(row);
+    source.index += 1;
+  }
+}
+
+function createAdminLogsCsvStream(
+  data: AdminLogsLoadedData,
+  groups: LogGroup[],
+) {
+  const encoder = new TextEncoder();
+  const csvRows = iterateAdminLogsCsvRows(data, groups);
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      try {
+        controller.enqueue(encoder.encode(`${ADMIN_LOGS_CSV_HEADER.join(',')}\n`));
+
+        const buffer: string[] = [];
+        for (const row of csvRows) {
+          buffer.push(toCsvLine(row));
+          if (buffer.length >= 100) {
+            controller.enqueue(encoder.encode(`${buffer.join('\n')}\n`));
+            buffer.length = 0;
+          }
+        }
+
+        if (buffer.length > 0) {
+          controller.enqueue(encoder.encode(`${buffer.join('\n')}\n`));
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
+}
+
+async function loadAdminLogRows(
+  options: GetAdminLogsPageDataOptions = {},
+  groups: LogGroup[] = ['product', 'audit', 'security'],
+): Promise<AdminLogsLoadedData> {
+  const supabase = getSupabaseAdminClient();
+  const range = resolveLogRange(options);
+  const selectedGroups = uniqueLogGroups(groups);
+
+  const [productRows, auditRows, securityRows] = await Promise.all([
+    selectedGroups.includes('product')
+      ? queryAllRows<ProductLogRow>(
+          supabase,
+          'event_logs',
+          'id,session_id,actor_type,actor_id,event_name,path,referrer,target_type,target_id,properties,user_agent,ip_address,created_at',
+          range.start,
+          range.end,
+        )
+      : Promise.resolve([] as ProductLogRow[]),
+    selectedGroups.includes('audit')
+      ? queryAllRows<AdminAuditLogRow>(
+          supabase,
+          'admin_audit_logs',
+          'id,actor_id,action,path,target_type,target_id,properties,user_agent,ip_address,created_at',
+          range.start,
+          range.end,
+        )
+      : Promise.resolve([] as AdminAuditLogRow[]),
+    selectedGroups.includes('security')
+      ? queryAllRows<AuthSecurityLogRow>(
+          supabase,
+          'auth_security_logs',
+          'id,event_name,status,actor_type,actor_id,identifier,path,properties,user_agent,ip_address,created_at',
+          range.start,
+          range.end,
+        )
+      : Promise.resolve([] as AuthSecurityLogRow[]),
+  ]);
+
+  const memberIds = Array.from(
+    new Set([
+      ...productRows
+        .filter((row) => row.actor_type === 'member' && row.actor_id)
+        .map((row) => row.actor_id as string),
+      ...securityRows
+        .filter((row) => row.actor_type === 'member' && row.actor_id)
+        .map((row) => row.actor_id as string),
+    ]),
   );
+  const memberLookup = await fetchMemberLookup(supabase, memberIds);
+
+  return {
+    range,
+    productRows,
+    auditRows,
+    securityRows,
+    memberLookup,
+  };
 }
 
 export async function getAdminLogsPageData(
   options: GetAdminLogsPageDataOptions = {},
 ): Promise<AdminLogsPageData> {
-  const supabase = getSupabaseAdminClient();
-  const range = resolveLogRange(options);
+  const data = await loadAdminLogRows(options);
 
-  const [productRows, auditRows, securityRows] = await Promise.all([
-    queryAllRows<ProductLogRow>(
-      supabase,
-      'event_logs',
-      'id,session_id,actor_type,actor_id,event_name,path,referrer,target_type,target_id,properties,user_agent,ip_address,created_at',
-      range.start,
-      range.end,
-    ),
-    queryAllRows<AdminAuditLogRow>(
-      supabase,
-      'admin_audit_logs',
-      'id,actor_id,action,path,target_type,target_id,properties,user_agent,ip_address,created_at',
-      range.start,
-      range.end,
-    ),
-    queryAllRows<AuthSecurityLogRow>(
-      supabase,
-      'auth_security_logs',
-      'id,event_name,status,actor_type,actor_id,identifier,path,properties,user_agent,ip_address,created_at',
-      range.start,
-      range.end,
-    ),
-  ]);
-
-  const memberIds = [
-    ...productRows
-      .filter((row) => row.actor_type === 'member' && row.actor_id)
-      .map((row) => row.actor_id as string),
-    ...securityRows
-      .filter((row) => row.actor_type === 'member' && row.actor_id)
-      .map((row) => row.actor_id as string),
-  ];
-  const memberLookup = await fetchMemberLookup(supabase, memberIds);
-
-  const productLogs: ProductLogRecord[] = productRows.map((row) => ({
+  const productLogs: ProductLogRecord[] = data.productRows.map((row) => ({
     ...row,
-    ...resolveActorMeta(row.actor_type, row.actor_id, memberLookup),
+    ...resolveActorMeta(row.actor_type, row.actor_id, data.memberLookup),
   }));
-  const auditLogs: AdminAuditLogRecord[] = auditRows;
-  const securityLogs: AuthSecurityLogRecord[] = securityRows.map((row) => ({
+  const auditLogs: AdminAuditLogRow[] = data.auditRows;
+  const securityLogs: AuthSecurityLogRecord[] = data.securityRows.map((row) => ({
     ...row,
-    ...resolveActorMeta(row.actor_type, row.actor_id, memberLookup),
+    ...resolveActorMeta(row.actor_type, row.actor_id, data.memberLookup),
   }));
 
   return {
-    range,
+    range: data.range,
     counts: {
       product: productLogs.length,
       audit: auditLogs.length,
       security: securityLogs.length,
     },
-    chartBuckets: buildChartBuckets(range, productLogs, auditLogs, securityLogs),
+    chartBuckets: buildChartBuckets(
+      data.range,
+      productLogs,
+      auditLogs,
+      securityLogs,
+    ),
     productLogs,
     auditLogs,
     securityLogs,
@@ -591,54 +786,12 @@ export async function exportAdminLogsCsv(options: CsvExportOptions = {}) {
   const groups = (options.groups?.length
     ? options.groups
     : ['product', 'audit', 'security']) as LogGroup[];
-  const data = await getAdminLogsPageData(options);
-  const rows = toUnifiedCsvRows(data, groups);
-
-  const header = [
-    'group',
-    'action',
-    'status',
-    'actor_type',
-    'actor_name',
-    'actor_mm_username',
-    'actor_id',
-    'identifier',
-    'ip_address',
-    'path',
-    'referrer',
-    'target_type',
-    'target_id',
-    'created_at',
-    'properties',
-  ];
-
-  const body = rows.map((row) =>
-    [
-      row.group,
-      row.action,
-      row.status,
-      row.actorType,
-      row.actorName,
-      row.actorMmUsername,
-      row.actorId,
-      row.identifier,
-      row.ipAddress,
-      row.path,
-      row.referrer,
-      row.targetType,
-      row.targetId,
-      row.createdAt,
-      row.properties,
-    ]
-      .map(toCsvCell)
-      .join(','),
-  );
+  const data = await loadAdminLogRows(options, groups);
 
   return {
-    filename: `admin-logs-${new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[T:]/g, '-')}.csv`,
-    csv: [header.join(','), ...body].join('\n'),
+    filename: 'admin-logs-' +
+      new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-') +
+      '.csv',
+    stream: createAdminLogsCsvStream(data, groups),
   };
 }

@@ -46,12 +46,8 @@ export default function ResetPasswordForm() {
           setError("재설정 요청이 제한되었습니다. 잠시 후 다시 시도해 주세요.");
           return;
         }
-        if (data.error === "not_registered") {
-          setError("등록된 계정을 찾을 수 없습니다.");
-          return;
-        }
-        if (data.error === "not_mm") {
-          setError("해당 아이디는 교육생 채널에 존재하지 않습니다.");
+        if (data.error === "reset_failed") {
+          setError("비밀번호 재설정에 실패했습니다.");
           return;
         }
         if (data.error === "invalid_username") {

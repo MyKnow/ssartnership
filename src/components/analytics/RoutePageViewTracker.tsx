@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { trackProductEvent } from '@/lib/product-events';
+import { normalizeProductEventLocation } from '@/lib/product-event-path';
 
 let previousTrackedPath: string | null = null;
 
@@ -15,7 +16,7 @@ export default function RoutePageViewTracker({
   const lastTrackedRef = useRef<string>('');
 
   useEffect(() => {
-    const path = pathname;
+    const path = normalizeProductEventLocation(pathname);
     if (!path || lastTrackedRef.current === path) {
       return;
     }

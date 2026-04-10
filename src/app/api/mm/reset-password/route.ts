@@ -32,6 +32,12 @@ import {
   getEffectiveSsafyYear,
   getPreferredStaffSourceYear,
 } from "@/lib/ssafy-year";
+import {
+  delayMemberAuthAttempt,
+  getMemberAuthAttemptScope,
+  getMemberAuthBlockingState,
+  recordMemberAuthAttempt,
+} from "@/lib/member-auth-security";
 
 export const runtime = "nodejs";
 
@@ -44,6 +50,30 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as { username?: string };
     const username = normalizeMmUsername(String(payload.username ?? ""));
+    const throttleContext = {
+      ipAddress: context.ipAddress ?? null,
+      accountIdentifier: username || null,
+    };
+    const blockedState = await getMemberAuthBlockingState(
+      "reset-password",
+      throttleContext,
+    );
+    if (blockedState) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_reset",
+        status: "blocked",
+        actorType: "guest",
+        identifier: username || null,
+        properties: {
+          reason: "rate_limit",
+          scope: getMemberAuthAttemptScope(blockedState.identifier),
+          blockedUntil: blockedState.blockedUntil,
+        },
+      });
+      await delayMemberAuthAttempt("reset-password", true);
+      return NextResponse.json({ error: "blocked" }, { status: 429 });
+    }
     if (!username) {
       await logAuthSecurity({
         ...context,
@@ -52,6 +82,8 @@ export async function POST(request: Request) {
         actorType: "guest",
         properties: { reason: "missing_fields" },
       });
+      await recordMemberAuthAttempt("reset-password", throttleContext, false);
+      await delayMemberAuthAttempt("reset-password");
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (validateMmUsername(username)) {
@@ -63,6 +95,8 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "invalid_username" },
       });
+      await recordMemberAuthAttempt("reset-password", throttleContext, false);
+      await delayMemberAuthAttempt("reset-password");
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
 
@@ -115,14 +149,9 @@ export async function POST(request: Request) {
               status: error.status,
             },
           });
-          return NextResponse.json(
-            {
-              error: "team_or_channel_inaccessible",
-              message:
-                "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
-            },
-            { status: 403 },
-          );
+          await recordMemberAuthAttempt("reset-password", throttleContext, false);
+          await delayMemberAuthAttempt("reset-password");
+          return NextResponse.json({ error: "reset_failed" }, { status: 400 });
         }
         throw error;
       }
@@ -137,7 +166,9 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "not_registered" },
       });
-      return NextResponse.json({ error: "not_registered" }, { status: 404 });
+      await recordMemberAuthAttempt("reset-password", throttleContext, false);
+      await delayMemberAuthAttempt("reset-password");
+      return NextResponse.json({ error: "reset_failed" }, { status: 400 });
     }
 
     const preferredStaffSourceYear = getPreferredStaffSourceYear(
@@ -183,14 +214,9 @@ export async function POST(request: Request) {
             status: error.status,
           },
         });
-        return NextResponse.json(
-          {
-            error: "team_or_channel_inaccessible",
-            message:
-              "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
-          },
-          { status: 403 },
-        );
+        await recordMemberAuthAttempt("reset-password", throttleContext, false);
+        await delayMemberAuthAttempt("reset-password");
+        return NextResponse.json({ error: "reset_failed" }, { status: 400 });
       }
       throw error;
     }
@@ -205,7 +231,9 @@ export async function POST(request: Request) {
         identifier: member.mm_user_id,
         properties: { reason: "not_mm" },
       });
-      return NextResponse.json({ error: "not_mm" }, { status: 404 });
+      await recordMemberAuthAttempt("reset-password", throttleContext, false);
+      await delayMemberAuthAttempt("reset-password");
+      return NextResponse.json({ error: "reset_failed" }, { status: 400 });
     }
 
     const { data: attempt } = await supabase
@@ -226,6 +254,8 @@ export async function POST(request: Request) {
           identifier: member.mm_user_id,
           properties: { reason: "rate_limit" },
         });
+        await recordMemberAuthAttempt("reset-password", throttleContext, false);
+        await delayMemberAuthAttempt("reset-password", true);
         return NextResponse.json({ error: "blocked" }, { status: 429 });
       }
     }
@@ -243,6 +273,8 @@ export async function POST(request: Request) {
           identifier: member.mm_user_id,
           properties: { reason: "cooldown" },
         });
+        await recordMemberAuthAttempt("reset-password", throttleContext, false);
+        await delayMemberAuthAttempt("reset-password");
         return NextResponse.json({ error: "cooldown" }, { status: 429 });
       }
     }
@@ -347,6 +379,7 @@ export async function POST(request: Request) {
         year: member.year,
       },
     });
+    await recordMemberAuthAttempt("reset-password", throttleContext, true);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -360,9 +393,7 @@ export async function POST(request: Request) {
         message: (error as Error).message,
       },
     });
-    return NextResponse.json(
-      { error: "reset_failed", message: (error as Error).message },
-      { status: 500 },
-    );
+    await delayMemberAuthAttempt("reset-password", true);
+    return NextResponse.json({ error: "reset_failed" }, { status: 500 });
   }
 }

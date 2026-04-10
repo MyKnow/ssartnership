@@ -33,6 +33,10 @@ export default function ChangePasswordForm() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (data.error === "blocked") {
+          setError("변경 시도가 너무 잦습니다. 잠시 후 다시 시도해 주세요.");
+          return;
+        }
         if (data.error === "invalid_password") {
           setError(PASSWORD_POLICY_MESSAGE);
           return;

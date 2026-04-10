@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const REQUIRED_POLICY_KINDS = ["service", "privacy"] as const;
@@ -25,6 +26,9 @@ export type MemberPolicyVersionFields = {
 };
 
 export type RequiredPolicyMap = Record<PolicyKind, PolicyDocument>;
+
+const POLICY_DOCUMENTS_CACHE_KEY = "policy-documents";
+const REQUIRED_POLICY_CACHE_REVALIDATE_SECONDS = 300;
 
 export function isPolicyKind(value: string): value is PolicyKind {
   return REQUIRED_POLICY_KINDS.includes(value as PolicyKind);
@@ -54,7 +58,7 @@ export function getPolicyHref(kind: PolicyKind, version?: number) {
 const POLICY_SELECT =
   "id,kind,version,title,summary,content,is_active,effective_at,created_at,updated_at";
 
-export async function getActiveRequiredPolicies() {
+async function queryActiveRequiredPolicies(): Promise<RequiredPolicyMap> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("policy_documents")
@@ -86,7 +90,20 @@ export async function getActiveRequiredPolicies() {
   return policyMap as RequiredPolicyMap;
 }
 
-export async function getPolicyDocumentByKind(
+const getCachedActiveRequiredPolicies = unstable_cache(
+  queryActiveRequiredPolicies,
+  [POLICY_DOCUMENTS_CACHE_KEY, "active-required"],
+  {
+    revalidate: REQUIRED_POLICY_CACHE_REVALIDATE_SECONDS,
+    tags: [POLICY_DOCUMENTS_CACHE_KEY],
+  },
+);
+
+export async function getActiveRequiredPolicies() {
+  return getCachedActiveRequiredPolicies();
+}
+
+async function queryPolicyDocumentByKind(
   kind: PolicyKind,
   version?: number | null,
 ) {
@@ -110,6 +127,22 @@ export async function getPolicyDocumentByKind(
   }
 
   return data as PolicyDocument;
+}
+
+const getCachedPolicyDocumentByKind = unstable_cache(
+  queryPolicyDocumentByKind,
+  [POLICY_DOCUMENTS_CACHE_KEY, "by-kind"],
+  {
+    revalidate: REQUIRED_POLICY_CACHE_REVALIDATE_SECONDS,
+    tags: [POLICY_DOCUMENTS_CACHE_KEY],
+  },
+);
+
+export async function getPolicyDocumentByKind(
+  kind: PolicyKind,
+  version?: number | null,
+) {
+  return getCachedPolicyDocumentByKind(kind, version);
 }
 
 export function evaluateRequiredPolicyStatus(

@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
-import { partnerRepository } from "@/lib/repositories";
-import HomeView from "@/components/HomeView";
-import { isWithinPeriod } from "@/lib/partner-utils";
+import { Suspense } from "react";
+import HeroSection from "@/components/HeroSection";
+import HomeContent from "@/components/HomeContent";
+import HomePushOptInBannerGate from "@/components/HomePushOptInBannerGate";
+import SiteHeader from "@/components/SiteHeader";
+import Container from "@/components/ui/Container";
+import { HOME_COPY } from "@/lib/content";
 import {
   SITE_ALTERNATE_NAMES,
   SITE_DESCRIPTION,
@@ -12,9 +16,18 @@ import {
   SITE_URL,
 } from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
-import { getMemberPushPreferences, isPushConfigured } from "@/lib/push";
 
 export const revalidate = 300;
+
+function renderLines(value: string) {
+  const lines = value.split("\n");
+  return lines.map((line, index) => (
+    <span key={`${line}-${index}`}>
+      {line}
+      {index < lines.length - 1 ? <br /> : null}
+    </span>
+  ));
+}
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
@@ -55,39 +68,8 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  const sessionPromise = getSignedUserSession();
-  const [categories, session] = await Promise.all([
-    partnerRepository.getCategories(),
-    sessionPromise,
-  ]);
-  const partnersPromise = partnerRepository.getPartners({
-    authenticated: Boolean(session?.userId),
-  });
+  const session = await getSignedUserSession();
   const headerSession = session?.userId ? { userId: session.userId } : null;
-  const pushPreferencesPromise =
-    session?.userId && isPushConfigured()
-      ? getMemberPushPreferences(session.userId)
-      : Promise.resolve(null);
-  const [partners, pushPreferences] = await Promise.all([
-    partnersPromise,
-    pushPreferencesPromise,
-  ]);
-  const viewPartners = partners.map((partner) => {
-    if (isWithinPeriod(partner.period.start, partner.period.end)) {
-      return partner;
-    }
-    return {
-      ...partner,
-      reservationLink: undefined,
-      inquiryLink: undefined,
-    };
-  });
-  const showPushOptInBanner = Boolean(
-    session?.userId &&
-      isPushConfigured() &&
-      pushPreferences &&
-      !pushPreferences.enabled,
-  );
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -110,18 +92,27 @@ export default async function Home() {
   };
 
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <HomeView
-        categories={categories}
-        partners={viewPartners}
-        initialSession={headerSession}
-        viewerAuthenticated={Boolean(session?.userId)}
-        showPushOptInBanner={showPushOptInBanner}
-      />
-    </>
+    <div className="min-h-screen bg-background">
+      <SiteHeader initialSession={headerSession} />
+      <main>
+        <Container className="pb-16 pt-10">
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+          <HeroSection
+            eyebrow={HOME_COPY.heroEyebrow}
+            title={HOME_COPY.heroTitle}
+            description={renderLines(HOME_COPY.heroDescription)}
+          />
+          <Suspense fallback={null}>
+            <HomePushOptInBannerGate memberId={session?.userId ?? null} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <HomeContent viewerAuthenticated={Boolean(session?.userId)} />
+          </Suspense>
+        </Container>
+      </main>
+    </div>
   );
 }

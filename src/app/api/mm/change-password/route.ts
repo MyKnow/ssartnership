@@ -3,6 +3,12 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
 import { hashPassword, isValidPassword, verifyPassword } from "@/lib/password";
+import {
+  delayMemberAuthAttempt,
+  getMemberAuthAttemptScope,
+  getMemberAuthBlockingState,
+  recordMemberAuthAttempt,
+} from "@/lib/member-auth-security";
 
 export const runtime = "nodejs";
 
@@ -20,6 +26,30 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+    const throttleContext = {
+      ipAddress: context.ipAddress ?? null,
+      accountIdentifier: session.userId,
+    };
+    const blockedState = await getMemberAuthBlockingState(
+      "change-password",
+      throttleContext,
+    );
+    if (blockedState) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "blocked",
+        actorType: "member",
+        actorId: session.userId,
+        properties: {
+          reason: "rate_limit",
+          scope: getMemberAuthAttemptScope(blockedState.identifier),
+          blockedUntil: blockedState.blockedUntil,
+        },
+      });
+      await delayMemberAuthAttempt("change-password", true);
+      return NextResponse.json({ error: "blocked" }, { status: 429 });
+    }
     const payload = (await request.json()) as {
       currentPassword?: string;
       nextPassword?: string;
@@ -35,6 +65,8 @@ export async function POST(request: Request) {
         actorId: session.userId,
         properties: { reason: "missing_fields" },
       });
+      await recordMemberAuthAttempt("change-password", throttleContext, false);
+      await delayMemberAuthAttempt("change-password");
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (!isValidPassword(nextPassword)) {
@@ -46,6 +78,8 @@ export async function POST(request: Request) {
         actorId: session.userId,
         properties: { reason: "invalid_password" },
       });
+      await recordMemberAuthAttempt("change-password", throttleContext, false);
+      await delayMemberAuthAttempt("change-password");
       return NextResponse.json({ error: "invalid_password" }, { status: 400 });
     }
 
@@ -65,6 +99,8 @@ export async function POST(request: Request) {
         actorId: session.userId,
         properties: { reason: "wrong_password" },
       });
+      await recordMemberAuthAttempt("change-password", throttleContext, false);
+      await delayMemberAuthAttempt("change-password");
       return NextResponse.json({ error: "wrong_password" }, { status: 400 });
     }
 
@@ -82,6 +118,8 @@ export async function POST(request: Request) {
         actorId: session.userId,
         properties: { reason: "wrong_password" },
       });
+      await recordMemberAuthAttempt("change-password", throttleContext, false);
+      await delayMemberAuthAttempt("change-password");
       return NextResponse.json({ error: "wrong_password" }, { status: 400 });
     }
 
@@ -97,6 +135,7 @@ export async function POST(request: Request) {
       .eq("id", session.userId);
 
     await setUserSession(session.userId, false);
+    await recordMemberAuthAttempt("change-password", throttleContext, true);
     await logAuthSecurity({
       ...context,
       eventName: "member_password_change",
@@ -116,9 +155,7 @@ export async function POST(request: Request) {
         message: (error as Error).message,
       },
     });
-    return NextResponse.json(
-      { error: "change_failed", message: (error as Error).message },
-      { status: 500 },
-    );
+    await delayMemberAuthAttempt("change-password", true);
+    return NextResponse.json({ error: "change_failed" }, { status: 500 });
   }
 }

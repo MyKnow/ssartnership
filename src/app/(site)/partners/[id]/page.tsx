@@ -372,6 +372,7 @@ export default async function PartnerDetailPage({
               </Card>
 
               <PartnerImageCarousel
+                key={`${partner.id}:${(viewPartner.images ?? []).join("|")}`}
                 className="order-1 xl:order-2"
                 images={viewPartner.images ?? []}
                 name={viewPartner.name}

@@ -72,6 +72,27 @@ function buildSnapshotFromUser(user: MMUser, sourceYear: number): MmUserDirector
   };
 }
 
+function mergeDirectorySnapshot(
+  existing: MmUserDirectorySnapshot | undefined,
+  next: MmUserDirectorySnapshot,
+) {
+  if (!existing) {
+    return { ...next };
+  }
+
+  return {
+    ...existing,
+    mmUsername: next.mmUsername,
+    displayName: next.displayName,
+    campus: next.campus ?? existing.campus ?? null,
+    isStaff: existing.isStaff || next.isStaff,
+    sourceYears: uniqueSortedYears([
+      ...existing.sourceYears,
+      ...next.sourceYears,
+    ]),
+  };
+}
+
 async function listAllChannelMemberIds(token: string, channelId: string) {
   const memberIds: string[] = [];
   let page = 0;
@@ -96,76 +117,94 @@ async function listAllChannelMemberIds(token: string, channelId: string) {
   return memberIds;
 }
 
-async function getAllSelectableUserSnapshots() {
-  const cycleSettings = await getSsafyCycleSettings();
-  const configuredSelectableYears = getConfiguredSelectableSsafyYears(
-    cycleSettings,
-  );
-  const years = Array.from(
-    new Set([...configuredSelectableYears, 15, 14]),
-  ).sort((a, b) => b - a);
+type SelectableYearSnapshotBatch = {
+  sourceYear: number;
+  checked: number;
+  snapshots: Map<string, MmUserDirectorySnapshot>;
+  failures: MmUserDirectorySyncResult["failures"];
+};
+
+async function getSelectableYearUserSnapshots(
+  sourceYear: number,
+): Promise<SelectableYearSnapshotBatch> {
   const snapshots = new Map<string, MmUserDirectorySnapshot>();
   const failures: MmUserDirectorySyncResult["failures"] = [];
   let checked = 0;
 
-  for (const sourceYear of years) {
-    try {
-      const credentials = getSenderCredentials(sourceYear);
-      const senderLogin = await loginWithPassword(
-        credentials.loginId,
-        credentials.password,
-      );
-      const channelConfig = getStudentChannelConfig(sourceYear);
-      const team = await getTeamByName(senderLogin.token, channelConfig.teamName);
-      const channel = await getChannelByName(
-        senderLogin.token,
-        team.id,
-        channelConfig.channelName,
-      );
-      const memberIds = await listAllChannelMemberIds(senderLogin.token, channel.id);
-      checked += memberIds.length;
+  try {
+    const credentials = getSenderCredentials(sourceYear);
+    const senderLogin = await loginWithPassword(
+      credentials.loginId,
+      credentials.password,
+    );
+    const channelConfig = getStudentChannelConfig(sourceYear);
+    const team = await getTeamByName(senderLogin.token, channelConfig.teamName);
+    const channel = await getChannelByName(
+      senderLogin.token,
+      team.id,
+      channelConfig.channelName,
+    );
+    const memberIds = await listAllChannelMemberIds(senderLogin.token, channel.id);
+    checked += memberIds.length;
 
-      const users = await Promise.all(
-        memberIds.map(async (userId) => {
-          try {
-            return await getUserById(senderLogin.token, userId);
-          } catch (error) {
-            failures.push({
-              sourceYear,
-              userId,
-              reason: error instanceof Error ? error.message : "MM 사용자 조회 실패",
-            });
-            return null;
-          }
-        }),
-      );
-
-      for (const user of users) {
-        if (!user || user.is_bot) {
-          continue;
+    const users = await Promise.all(
+      memberIds.map(async (userId) => {
+        try {
+          return await getUserById(senderLogin.token, userId);
+        } catch (error) {
+          failures.push({
+            sourceYear,
+            userId,
+            reason: error instanceof Error ? error.message : "MM 사용자 조회 실패",
+          });
+          return null;
         }
+      }),
+    );
 
-        const snapshot = buildSnapshotFromUser(user, sourceYear);
-        const existing = snapshots.get(snapshot.mmUserId);
-        if (!existing) {
-          snapshots.set(snapshot.mmUserId, snapshot);
-          continue;
-        }
-
-        existing.mmUsername = snapshot.mmUsername;
-        existing.displayName = snapshot.displayName;
-        existing.campus = snapshot.campus ?? existing.campus ?? null;
-        existing.isStaff = existing.isStaff || snapshot.isStaff;
-        existing.sourceYears = uniqueSortedYears([
-          ...existing.sourceYears,
-          ...snapshot.sourceYears,
-        ]);
+    for (const user of users) {
+      if (!user || user.is_bot) {
+        continue;
       }
-    } catch (error) {
-      failures.push({
-        sourceYear,
-        reason: error instanceof Error ? error.message : "MM 디렉토리 동기화 실패",
-      });
+
+      const snapshot = buildSnapshotFromUser(user, sourceYear);
+      const existing = snapshots.get(snapshot.mmUserId);
+      snapshots.set(
+        snapshot.mmUserId,
+        mergeDirectorySnapshot(existing, snapshot),
+      );
+    }
+  } catch (error) {
+    failures.push({
+      sourceYear,
+      reason: error instanceof Error ? error.message : "MM 디렉토리 동기화 실패",
+    });
+  }
+
+  return {
+    sourceYear,
+    checked,
+    snapshots,
+    failures,
+  };
+}
+
+export function mergeSelectableYearSnapshotBatches(
+  batches: SelectableYearSnapshotBatch[],
+) {
+  const snapshots = new Map<string, MmUserDirectorySnapshot>();
+  const failures: MmUserDirectorySyncResult["failures"] = [];
+  let checked = 0;
+
+  for (const batch of batches) {
+    checked += batch.checked;
+    failures.push(...batch.failures);
+    for (const snapshot of batch.snapshots.values()) {
+      const existing = snapshots.get(snapshot.mmUserId);
+      snapshots.set(
+        snapshot.mmUserId,
+        mergeDirectorySnapshot(existing, snapshot),
+      );
     }
   }
 
@@ -174,6 +213,22 @@ async function getAllSelectableUserSnapshots() {
     snapshots,
     failures,
   };
+}
+
+async function getAllSelectableUserSnapshots() {
+  const cycleSettings = await getSsafyCycleSettings();
+  const configuredSelectableYears = getConfiguredSelectableSsafyYears(
+    cycleSettings,
+  );
+  const years = Array.from(
+    new Set([...configuredSelectableYears, 15, 14]),
+  ).sort((a, b) => b - a);
+
+  const batches = await Promise.all(
+    years.map((sourceYear) => getSelectableYearUserSnapshots(sourceYear)),
+  );
+
+  return mergeSelectableYearSnapshotBatches(batches);
 }
 
 export async function findMmUserDirectoryEntryByUsername(username: string) {

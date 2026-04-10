@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
+import { createHmacDigest, verifyHmacDigest } from "./hmac.js";
 
 const COOKIE_NAME = "admin_session";
 const SESSION_TTL_DAYS = 7;
@@ -21,10 +22,7 @@ function getSecret() {
 
 function signPayload(payload: string) {
   const secret = getSecret();
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
+  const signature = createHmacDigest(payload, secret, "hex");
   return `${payload}.${signature}`;
 }
 
@@ -33,15 +31,7 @@ function verifyToken(token: string) {
   if (!payload || !signature) {
     return false;
   }
-  const expected = crypto
-    .createHmac("sha256", getSecret())
-    .update(payload)
-    .digest("hex");
-  const validSignature = crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected),
-  );
-  if (!validSignature) {
+  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
     return false;
   }
   try {

@@ -98,6 +98,7 @@ export default async function CertificationVerifyPage({
           <AnalyticsEventOnMount
             eventName="certification_qr_verify"
             targetType="certification_qr"
+            path="/verify/[token]"
             properties={{
               valid: isValid,
               reason: verification.ok ? "ok" : verification.reason,

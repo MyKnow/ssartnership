@@ -39,6 +39,12 @@ import {
   getEffectiveSsafyYear,
   getPreferredStaffSourceYear,
 } from "@/lib/ssafy-year";
+import {
+  delayMemberAuthAttempt,
+  getMemberAuthAttemptScope,
+  getMemberAuthBlockingState,
+  recordMemberAuthAttempt,
+} from "@/lib/member-auth-security";
 
 export const runtime = "nodejs";
 
@@ -59,6 +65,30 @@ export async function POST(request: Request) {
     const username = normalizeMmUsername(String(payload.username ?? ""));
     const code = String(payload.code ?? "").trim().toUpperCase();
     const password = String(payload.password ?? "").trim();
+    const throttleContext = {
+      ipAddress: context.ipAddress ?? null,
+      accountIdentifier: username || null,
+    };
+    const blockedState = await getMemberAuthBlockingState(
+      "verify-code",
+      throttleContext,
+    );
+    if (blockedState) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "blocked",
+        actorType: "guest",
+        identifier: username || null,
+        properties: {
+          reason: "rate_limit",
+          scope: getMemberAuthAttemptScope(blockedState.identifier),
+          blockedUntil: blockedState.blockedUntil,
+        },
+      });
+      await delayMemberAuthAttempt("verify-code", true);
+      return NextResponse.json({ error: "blocked" }, { status: 429 });
+    }
     if (!username || !code || !password) {
       await logAuthSecurity({
         ...context,
@@ -68,6 +98,8 @@ export async function POST(request: Request) {
         identifier: username || null,
         properties: { reason: "missing_fields" },
       });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
     if (validateMmUsername(username)) {
@@ -79,6 +111,8 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "invalid_username" },
       });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
       return NextResponse.json({ error: "invalid_username" }, { status: 400 });
     }
     if (!isValidPassword(password)) {
@@ -90,6 +124,8 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "invalid_password" },
       });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
       return NextResponse.json(
         { error: "invalid_password", message: PASSWORD_POLICY_MESSAGE },
         { status: 400 },
@@ -105,6 +141,8 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "policy_required" },
       });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
       return NextResponse.json({ error: "policy_required" }, { status: 400 });
     }
 
@@ -170,14 +208,9 @@ export async function POST(request: Request) {
               status: error.status,
             },
           });
-          return NextResponse.json(
-            {
-              error: "team_or_channel_inaccessible",
-              message:
-                "운영용 MM 계정이 대상 팀/채널을 읽을 수 없습니다. MM_TEAM_NAME 설정과 팀 권한을 확인해 주세요.",
-            },
-            { status: 403 },
-          );
+          await recordMemberAuthAttempt("verify-code", throttleContext, false);
+          await delayMemberAuthAttempt("verify-code");
+          return NextResponse.json({ error: "invalid_code" }, { status: 400 });
         }
         throw error;
       }
@@ -191,7 +224,9 @@ export async function POST(request: Request) {
           identifier: username,
           properties: { reason: "not_mm" },
         });
-        return NextResponse.json({ error: "not_mm" }, { status: 404 });
+        await recordMemberAuthAttempt("verify-code", throttleContext, false);
+        await delayMemberAuthAttempt("verify-code");
+        return NextResponse.json({ error: "invalid_code" }, { status: 400 });
       }
 
       const profile = parseSsafyProfileFromUser(resolvedStudent.user);
@@ -220,7 +255,9 @@ export async function POST(request: Request) {
         identifier: username,
         properties: { reason: "not_mm" },
       });
-      return NextResponse.json({ error: "not_mm" }, { status: 404 });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
+      return NextResponse.json({ error: "invalid_code" }, { status: 400 });
     }
 
     const { data: attempt } = await supabase
@@ -240,6 +277,8 @@ export async function POST(request: Request) {
           identifier: mmUserId,
           properties: { reason: "verification_blocked" },
         });
+        await recordMemberAuthAttempt("verify-code", throttleContext, false);
+        await delayMemberAuthAttempt("verify-code", true);
         return NextResponse.json({ error: "blocked" }, { status: 429 });
       }
     }
@@ -261,6 +300,8 @@ export async function POST(request: Request) {
         identifier: mmUserId,
         properties: { reason: "missing_code" },
       });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
       return NextResponse.json({ error: "invalid_code" }, { status: 400 });
     }
 
@@ -273,6 +314,8 @@ export async function POST(request: Request) {
         identifier: mmUserId,
         properties: { reason: "expired" },
       });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
       return NextResponse.json({ error: "expired" }, { status: 400 });
     }
 
@@ -313,6 +356,8 @@ export async function POST(request: Request) {
           attemptCount: nextCount,
         },
       });
+      await recordMemberAuthAttempt("verify-code", throttleContext, false);
+      await delayMemberAuthAttempt("verify-code");
       return NextResponse.json({ error: "invalid_code" }, { status: 400 });
     }
 
@@ -444,6 +489,7 @@ export async function POST(request: Request) {
       .from("mm_verification_codes")
       .delete()
       .eq("mm_user_id", mmUserId);
+    await recordMemberAuthAttempt("verify-code", throttleContext, true);
 
     await logAuthSecurity({
       ...context,
@@ -452,11 +498,11 @@ export async function POST(request: Request) {
       actorType: "member",
       actorId: authenticatedMemberId,
       identifier: mmUserId,
-        properties: {
-          year: nextYear ?? codeRow.year ?? null,
-          campus: nextMember?.campus ?? snapshot.campus,
-          existingMember: Boolean(member?.id),
-          mmUsername: snapshot.mmUsername,
+      properties: {
+        year: nextYear ?? codeRow.year ?? null,
+        campus: nextMember?.campus ?? snapshot.campus,
+        existingMember: Boolean(member?.id),
+        mmUsername: snapshot.mmUsername,
         mmUserId,
       },
     });
@@ -473,9 +519,7 @@ export async function POST(request: Request) {
         message: (error as Error).message,
       },
     });
-    return NextResponse.json(
-      { error: "verify_failed", message: (error as Error).message },
-      { status: 500 },
-    );
+    await delayMemberAuthAttempt("verify-code", true);
+    return NextResponse.json({ error: "verify_failed" }, { status: 500 });
   }
 }

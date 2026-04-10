@@ -8,6 +8,7 @@ import {
   type ProductEventName,
 } from '@/lib/event-catalog';
 import { SITE_URL } from '@/lib/site';
+import { normalizeProductEventLocation } from '@/lib/product-event-path';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { getSignedUserSession } from '@/lib/user-auth';
 
@@ -217,8 +218,8 @@ export async function logProductEvent(input: ProductLogInput) {
     actor_type: input.actorType,
     actor_id: input.actorId ?? null,
     event_name: input.eventName,
-    path: input.path ?? null,
-    referrer: input.referrer ?? null,
+    path: normalizeProductEventLocation(input.path ?? null),
+    referrer: normalizeProductEventLocation(input.referrer ?? null),
     target_type: input.targetType ?? null,
     target_id: input.targetId ?? null,
     properties: sanitizeProperties(input.properties),

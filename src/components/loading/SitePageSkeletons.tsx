@@ -1,29 +1,51 @@
-import SiteHeader from "@/components/SiteHeader";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import Skeleton from "@/components/ui/Skeleton";
+
+function StaticSkeleton({ className }: { className?: string }) {
+  return <Skeleton animated={false} className={className} />;
+}
+
+function LoadingHeader() {
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="min-h-[calc(5rem+env(safe-area-inset-top))]"
+      />
+      <header className="fixed inset-x-0 top-0 z-40">
+        <div className="border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+          <Container className="flex items-center justify-between gap-3 py-4">
+            <StaticSkeleton className="h-7 w-32 rounded-lg" />
+            <div className="flex items-center gap-2">
+              <StaticSkeleton className="h-10 w-10 rounded-full" />
+              <StaticSkeleton className="h-10 w-10 rounded-full" />
+              <StaticSkeleton className="h-10 w-10 rounded-full" />
+            </div>
+          </Container>
+        </div>
+      </header>
+    </>
+  );
+}
 
 function HomePartnerCardSkeleton() {
   return (
     <article className="flex h-full w-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <div className="flex gap-4">
-        <Skeleton className="aspect-square w-28 shrink-0 rounded-2xl" />
+        <StaticSkeleton className="aspect-square w-24 shrink-0 rounded-2xl" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
-            <Skeleton className="h-6 w-36 max-w-[70%]" />
-            <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-          </div>
-          <Skeleton className="mt-3 h-4 w-full max-w-[85%]" />
-          <Skeleton className="mt-2 h-4 w-40 max-w-[60%]" />
+          <StaticSkeleton className="h-6 w-36 max-w-[70%]" />
+          <StaticSkeleton className="mt-3 h-4 w-full max-w-[85%]" />
+          <StaticSkeleton className="mt-2 h-4 w-40 max-w-[60%]" />
           <div className="mt-4 flex flex-wrap gap-2">
-            <Skeleton className="h-8 w-16 rounded-full" />
-            <Skeleton className="h-8 w-20 rounded-full" />
-            <Skeleton className="h-8 w-14 rounded-full" />
+            <StaticSkeleton className="h-8 w-16 rounded-full" />
+            <StaticSkeleton className="h-8 w-20 rounded-full" />
           </div>
         </div>
       </div>
       <div className="flex justify-end">
-        <Skeleton className="h-12 w-28 rounded-full" />
+        <StaticSkeleton className="h-12 w-28 rounded-full" />
       </div>
     </article>
   );
@@ -61,63 +83,65 @@ function AuthCardFrame({
 export function HomePageSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <LoadingHeader />
       <main>
         <Container className="pb-16 pt-10">
-          <section className="hero-surface rounded-3xl px-8 py-10 shadow-lg">
-            <Skeleton className="h-4 w-40 rounded-lg bg-white/15 dark:bg-white/10" />
-            <Skeleton className="mt-4 h-10 w-full max-w-xl rounded-xl bg-white/15 dark:bg-white/10" />
-            <Skeleton className="mt-4 h-4 w-full max-w-2xl rounded-lg bg-white/15 dark:bg-white/10" />
-            <Skeleton className="mt-2 h-4 w-full max-w-xl rounded-lg bg-white/15 dark:bg-white/10" />
+          <section className="hero-surface animate-pulse motion-reduce:animate-none rounded-3xl px-8 py-10 shadow-lg">
+            <StaticSkeleton className="h-4 w-40 rounded-lg bg-white/15 dark:bg-white/10" />
+            <StaticSkeleton className="mt-4 h-10 w-full max-w-xl rounded-xl bg-white/15 dark:bg-white/10" />
+            <StaticSkeleton className="mt-4 h-4 w-full max-w-2xl rounded-lg bg-white/15 dark:bg-white/10" />
+            <StaticSkeleton className="mt-2 h-4 w-full max-w-xl rounded-lg bg-white/15 dark:bg-white/10" />
           </section>
 
-          <section className="mt-6 rounded-[28px] border border-border bg-surface-elevated p-5 shadow-md">
+          <section className="mt-6 animate-pulse motion-reduce:animate-none rounded-[28px] border border-border bg-surface-elevated p-5 shadow-md">
             <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
               <div className="flex items-start gap-3">
-                <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
+                <StaticSkeleton className="h-12 w-12 shrink-0 rounded-2xl" />
                 <div className="min-w-0 flex-1">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="mt-2 h-4 w-full max-w-lg" />
+                  <StaticSkeleton className="h-6 w-48" />
+                  <StaticSkeleton className="mt-2 h-4 w-full max-w-lg" />
                 </div>
               </div>
               <div className="flex justify-end">
-                <Skeleton className="h-12 w-32 rounded-full" />
+                <StaticSkeleton className="h-12 w-32 rounded-full" />
               </div>
             </div>
           </section>
 
           <section className="mt-10 flex flex-col gap-6">
-            <div>
-              <Skeleton className="h-8 w-36" />
-              <Skeleton className="mt-2 h-4 w-full max-w-md" />
+            <div className="animate-pulse motion-reduce:animate-none">
+              <StaticSkeleton className="h-8 w-36" />
+              <StaticSkeleton className="mt-2 h-4 w-full max-w-md" />
             </div>
             <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-2">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Skeleton
+              <div className="animate-pulse motion-reduce:animate-none flex flex-wrap gap-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <StaticSkeleton
                     key={index}
-                    className="h-12 w-24 rounded-full"
+                    className="h-11 w-24 rounded-full"
                   />
                 ))}
               </div>
-              <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-muted p-4 md:flex-row md:items-center md:justify-between">
+              <div className="animate-pulse motion-reduce:animate-none flex flex-col gap-3 rounded-2xl border border-border bg-surface-muted p-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex-1">
-                  <Skeleton className="h-4 w-10 rounded-lg" />
-                  <Skeleton className="mt-2 h-12 w-full rounded-2xl" />
+                  <StaticSkeleton className="h-4 w-10 rounded-lg" />
+                  <StaticSkeleton className="mt-2 h-12 w-full rounded-2xl" />
                 </div>
                 <div className="md:w-56">
-                  <Skeleton className="h-4 w-36 rounded-lg" />
-                  <Skeleton className="mt-2 h-12 w-full rounded-2xl" />
+                  <StaticSkeleton className="h-4 w-36 rounded-lg" />
+                  <StaticSkeleton className="mt-2 h-12 w-full rounded-2xl" />
                 </div>
               </div>
             </div>
           </section>
 
           <section className="mt-10">
-            <div className="grid justify-items-center gap-x-4 gap-y-6 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <HomePartnerCardSkeleton key={index} />
-              ))}
+            <div className="animate-pulse motion-reduce:animate-none">
+              <div className="grid justify-items-center gap-x-4 gap-y-6 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <HomePartnerCardSkeleton key={index} />
+                ))}
+              </div>
             </div>
           </section>
         </Container>
@@ -129,7 +153,7 @@ export function HomePageSkeleton() {
 export function AuthPageSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <LoadingHeader />
       <main>
         <Container className="pb-16 pt-10">
           <AuthCardFrame />
@@ -142,7 +166,7 @@ export function AuthPageSkeleton() {
 export function NotificationsPageSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <LoadingHeader />
       <main>
         <Container className="pb-16 pt-10">
           <div className="mx-auto max-w-2xl">
@@ -200,7 +224,7 @@ export function NotificationsPageSkeleton() {
 export function CertificationPageSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <LoadingHeader />
       <main>
         <Container className="pb-16 pt-10">
           <Card className="mx-auto max-w-2xl p-6">
@@ -239,20 +263,20 @@ export function CertificationPageSkeleton() {
                 <Skeleton className="h-14 w-36 rounded-full bg-white/10" />
               </div>
             </div>
-          </Card>
 
-          <div className="mx-auto mt-4 w-full max-w-2xl rounded-3xl border border-border bg-surface p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <Skeleton className="h-5 w-24" />
-                <Skeleton className="mt-2 h-4 w-full max-w-sm" />
-              </div>
-              <div className="ml-auto flex w-full flex-wrap justify-end gap-2 sm:w-auto">
-                <Skeleton className="h-12 w-36 rounded-full" />
-                <Skeleton className="h-12 w-28 rounded-full" />
+            <div className="mx-auto mt-4 w-full max-w-2xl rounded-3xl border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="mt-2 h-4 w-full max-w-sm" />
+                </div>
+                <div className="ml-auto flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+                  <Skeleton className="h-12 w-36 rounded-full" />
+                  <Skeleton className="h-12 w-28 rounded-full" />
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
         </Container>
       </main>
     </div>
@@ -262,7 +286,7 @@ export function CertificationPageSkeleton() {
 export function SuggestPageSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <LoadingHeader />
       <main>
         <Container className="pb-16 pt-10">
           <Skeleton className="h-8 w-40" />
