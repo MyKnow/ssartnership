@@ -1,6 +1,6 @@
 {
   "name": "ssartnership",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "perf:lighthouse": "npm run build && node scripts/lighthouse-check.mjs",
     "test:mm-profile": "node --test tests/mm-profile-csv.test.mts",
     "test:ssafy-cycle": "node --test tests/ssafy-cycle-simulation.test.mts",
     "release": "bash scripts/release.sh"
@@ -38,6 +39,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "lighthouse": "^12.6.1",
     "png-to-ico": "^3.0.1",
     "sharp": "^0.34.5",
     "tailwindcss": "^4",
