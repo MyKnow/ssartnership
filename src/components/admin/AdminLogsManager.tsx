@@ -95,6 +95,8 @@ const auditLabels: Record<string, string> = {
   cycle_settings_restore: '기수 기준 복구',
   push_send: '푸시 발송',
   push_log_delete: '푸시 로그 삭제',
+  partner_account_update: '제휴 포털 계정 수정',
+  partner_account_company_update: '제휴 포털 권한 수정',
 };
 
 const securityLabels: Record<string, string> = {

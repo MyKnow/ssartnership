@@ -92,9 +92,10 @@
       대상: `src/app/api/partner/**`, `src/lib/partner-mail.ts`, `src/lib/partner-auth-*.ts`
       목표: 비밀번호를 잊었을 때 초기 비밀번호가 포함된 재설정 메일을 보낼 수 있게 한다.
       완료: 로그인 페이지와 공통 Header/Footer에 재설정/변경 진입점을 추가하고, 이메일 인증 기반 임시 비밀번호 발급 후 임시 비밀번호 로그인 시 강제 변경되도록 `/partner` 경로를 차단했다.
-   13-8. [ ] 관리자 페이지에서 업체 아이디 및 권한 관리
+   13-8. [x] 관리자 페이지에서 업체 아이디 및 권한 관리
       대상: `src/app/admin/(protected)/**`, `src/components/admin/**`, `src/lib/partner-*.ts`
       목표: 내가 업체 계정 상태, 권한, 연결된 회사와 서비스를 한 곳에서 관리할 수 있어야 한다.
+      완료: `admin/partners`에 업체 계정 관리 섹션을 추가해 로그인 아이디, 표시명, 활성 상태, 강제 비밀번호 변경 여부와 회사별 권한을 수정할 수 있게 했다.
 
 14. [x] 제휴 업체 정적 이미지 저장
    대상: `src/lib/repositories/*`, `src/components/PartnerImageCarousel.tsx`, `src/components/PartnerCardForm.tsx`, `src/app/api/image/route.ts`, storage 관련 레이어

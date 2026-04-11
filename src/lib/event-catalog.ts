@@ -44,6 +44,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'cycle_settings_restore',
   'push_send',
   'push_log_delete',
+  'partner_account_update',
+  'partner_account_company_update',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

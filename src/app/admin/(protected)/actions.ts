@@ -5,7 +5,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { isWithinPeriod } from "@/lib/partner-utils";
+import { isWithinPeriod, normalizePartnerLoginId } from "@/lib/partner-utils";
 import { createNewPartnerPayload, isPushConfigured, sendPushToAudience } from "@/lib/push";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
 import { generateTempPassword, hashPassword } from "@/lib/password";
@@ -108,7 +108,12 @@ type PartnerAccountRow = {
   is_active?: boolean | null;
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
+  last_login_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
+
+type PartnerAccountCompanyRole = "owner" | "admin" | "manager" | "viewer";
 
 function parseList(value: string) {
   return Array.from(
@@ -148,6 +153,57 @@ function parsePartnerCompanyPayload(formData: FormData): PartnerCompanyInput {
     contactName: contactName || null,
     contactEmail: contactEmail || null,
     contactPhone: contactPhone || null,
+  };
+}
+
+function parsePartnerAccountPayload(formData: FormData) {
+  const id = String(formData.get("id") || "").trim();
+  const loginId = normalizePartnerLoginId(String(formData.get("loginId") || "").trim());
+  const displayName = String(formData.get("displayName") || "").trim();
+  const isActive = String(formData.get("isActive") || "false").trim() === "true";
+  const mustChangePassword =
+    String(formData.get("mustChangePassword") || "false").trim() === "true";
+
+  if (!id) {
+    throw new Error("수정할 업체 계정을 찾을 수 없습니다.");
+  }
+  if (!loginId) {
+    throw new Error("로그인 아이디를 입력해 주세요.");
+  }
+  if (!isValidEmail(loginId)) {
+    throw new Error("로그인 아이디는 올바른 이메일이어야 합니다.");
+  }
+  if (!displayName) {
+    throw new Error("표시명을 입력해 주세요.");
+  }
+
+  return {
+    id,
+    loginId,
+    displayName,
+    isActive,
+    mustChangePassword,
+  };
+}
+
+function parsePartnerAccountCompanyPayload(formData: FormData) {
+  const accountId = String(formData.get("accountId") || "").trim();
+  const companyId = String(formData.get("companyId") || "").trim();
+  const role = String(formData.get("role") || "").trim();
+  const isActive = String(formData.get("isActive") || "false").trim() === "true";
+
+  if (!accountId || !companyId) {
+    throw new Error("권한을 변경할 계정과 회사를 찾을 수 없습니다.");
+  }
+  if (!["owner", "admin", "manager", "viewer"].includes(role)) {
+    throw new Error("권한은 owner, admin, manager, viewer 중 하나여야 합니다.");
+  }
+
+  return {
+    accountId,
+    companyId,
+    role: role as PartnerAccountCompanyRole,
+    isActive,
   };
 }
 
@@ -194,6 +250,30 @@ function normalizePartnerCompanyRow(row: PartnerCompanyRow | null | undefined) {
     contact_phone: row.contact_phone ?? null,
     is_active: row.is_active ?? true,
   } satisfies PartnerCompanyRow;
+}
+
+function normalizePartnerAccountRow(
+  row: PartnerAccountRow | null | undefined,
+) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    login_id: row.login_id,
+    display_name: row.display_name,
+    email: row.email ?? null,
+    password_hash: row.password_hash ?? null,
+    password_salt: row.password_salt ?? null,
+    must_change_password: row.must_change_password ?? true,
+    is_active: row.is_active ?? true,
+    email_verified_at: row.email_verified_at ?? null,
+    initial_setup_completed_at: row.initial_setup_completed_at ?? null,
+    last_login_at: row.last_login_at ?? null,
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
+  } satisfies PartnerAccountRow;
 }
 
 async function ensurePartnerCompanyRow(
@@ -572,6 +652,11 @@ function revalidatePartnerData() {
   revalidateTag("partners", "max");
 }
 
+function revalidatePartnerAccountData() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/partners");
+}
+
 function revalidateMemberPaths() {
   revalidatePath("/admin");
   revalidatePath("/admin/members");
@@ -588,6 +673,134 @@ function revalidateCyclePaths() {
   revalidatePath("/admin/push");
   revalidatePath("/auth/signup");
   revalidatePath("/certification");
+}
+
+export async function updatePartnerAccount(formData: FormData) {
+  await requireAdmin();
+  const payload = parsePartnerAccountPayload(formData);
+
+  const supabase = getSupabaseAdminClient();
+  const { data: existingAccount, error: accountError } = await supabase
+    .from("partner_accounts")
+    .select(
+      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,last_login_at,created_at,updated_at",
+    )
+    .eq("id", payload.id)
+    .maybeSingle();
+
+  if (accountError) {
+    throw new Error(accountError.message);
+  }
+  if (!existingAccount) {
+    throw new Error("수정할 업체 계정을 찾을 수 없습니다.");
+  }
+
+  const currentAccount = normalizePartnerAccountRow(existingAccount as PartnerAccountRow);
+  if (!currentAccount) {
+    throw new Error("업체 계정 정보를 처리하지 못했습니다.");
+  }
+
+  const nextAccount = {
+    login_id: payload.loginId,
+    display_name: payload.displayName,
+    email: payload.loginId,
+    is_active: payload.isActive,
+    must_change_password: payload.mustChangePassword,
+    updated_at: new Date().toISOString(),
+  };
+
+  const hasChanges =
+    currentAccount.login_id !== nextAccount.login_id ||
+    currentAccount.display_name !== nextAccount.display_name ||
+    (currentAccount.email ?? currentAccount.login_id) !== nextAccount.email ||
+    Boolean(currentAccount.is_active) !== nextAccount.is_active ||
+    Boolean(currentAccount.must_change_password) !== nextAccount.must_change_password;
+
+  if (hasChanges) {
+    const { error } = await supabase
+      .from("partner_accounts")
+      .update(nextAccount)
+      .eq("id", payload.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  const linkedCompanyCount = await supabase
+    .from("partner_account_companies")
+    .select("id", { count: "exact", head: true })
+    .eq("account_id", payload.id)
+    .eq("is_active", true);
+
+  await logAdminAction("partner_account_update", {
+    targetType: "partner_account",
+    targetId: payload.id,
+    properties: {
+      loginId: payload.loginId,
+      displayName: payload.displayName,
+      isActive: payload.isActive,
+      mustChangePassword: payload.mustChangePassword,
+      companyCount: linkedCompanyCount.count ?? 0,
+    },
+  });
+
+  revalidatePartnerAccountData();
+  redirect("/admin/partners");
+}
+
+export async function updatePartnerAccountCompanyPermission(formData: FormData) {
+  await requireAdmin();
+  const payload = parsePartnerAccountCompanyPayload(formData);
+
+  const supabase = getSupabaseAdminClient();
+  const { data: existingLink, error: linkError } = await supabase
+    .from("partner_account_companies")
+    .select("id,account_id,company_id,role,is_active,created_at")
+    .eq("account_id", payload.accountId)
+    .eq("company_id", payload.companyId)
+    .maybeSingle();
+
+  if (linkError) {
+    throw new Error(linkError.message);
+  }
+  if (!existingLink) {
+    throw new Error("수정할 권한 연결을 찾을 수 없습니다.");
+  }
+
+  const nextLink = {
+    role: payload.role,
+    is_active: payload.isActive,
+  };
+
+  const hasChanges =
+    existingLink.role !== nextLink.role ||
+    Boolean(existingLink.is_active) !== nextLink.is_active;
+
+  if (hasChanges) {
+    const { error } = await supabase
+      .from("partner_account_companies")
+      .update(nextLink)
+      .eq("id", existingLink.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  await logAdminAction("partner_account_company_update", {
+    targetType: "partner_account_company",
+    targetId: existingLink.id,
+    properties: {
+      accountId: payload.accountId,
+      companyId: payload.companyId,
+      role: payload.role,
+      isActive: payload.isActive,
+    },
+  });
+
+  revalidatePartnerAccountData();
+  redirect("/admin/partners");
 }
 
 function parseCategoryPayload(formData: FormData) {
