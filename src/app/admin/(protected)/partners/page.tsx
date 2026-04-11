@@ -1,5 +1,4 @@
 import AdminShell from "@/components/admin/AdminShell";
-import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
 import PartnerChangeRequestQueue from "@/components/admin/PartnerChangeRequestQueue";
 import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
 import Card from "@/components/ui/Card";
@@ -32,44 +31,8 @@ type PartnerCompanyRow = {
   contact_email?: string | null;
   contact_phone?: string | null;
   is_active?: boolean | null;
-};
-
-type PartnerAccountCompanyLinkRow = {
-  id: string;
-  role?: "owner" | "admin" | "manager" | "viewer" | null;
-  is_active?: boolean | null;
-  created_at?: string | null;
-  company?: PartnerCompanyRow | null;
-};
-
-type PartnerAccountRowRecord = {
-  id: string;
-  login_id: string;
-  display_name: string;
-  email?: string | null;
-  must_change_password?: boolean | null;
-  is_active?: boolean | null;
-  email_verified_at?: string | null;
-  initial_setup_completed_at?: string | null;
-  last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
-  links?: PartnerAccountCompanyLinkRow[] | PartnerAccountCompanyLinkRow | null;
-};
-
-type PartnerAccountRow = {
-  id: string;
-  login_id: string;
-  display_name: string;
-  email?: string | null;
-  must_change_password?: boolean | null;
-  is_active?: boolean | null;
-  email_verified_at?: string | null;
-  initial_setup_completed_at?: string | null;
-  last_login_at?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  links: PartnerAccountCompanyLinkRow[];
 };
 
 function normalizePartnerCompany(
@@ -86,42 +49,6 @@ function normalizePartnerCompany(
     return value as PartnerCompanyRow;
   }
   return null;
-}
-
-function normalizePartnerAccount(
-  value: unknown,
-): PartnerAccountRow | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const row = value as PartnerAccountRowRecord;
-  const links = Array.isArray(row.links)
-    ? row.links
-    : row.links
-      ? [row.links]
-      : [];
-
-  return {
-    id: row.id,
-    login_id: row.login_id,
-    display_name: row.display_name,
-    email: row.email ?? null,
-    must_change_password: row.must_change_password ?? null,
-    is_active: row.is_active ?? null,
-    email_verified_at: row.email_verified_at ?? null,
-    initial_setup_completed_at: row.initial_setup_completed_at ?? null,
-    last_login_at: row.last_login_at ?? null,
-    created_at: row.created_at ?? null,
-    updated_at: row.updated_at ?? null,
-    links: links.map((link) => ({
-      id: link.id,
-      role: link.role ?? null,
-      is_active: link.is_active ?? null,
-      created_at: link.created_at ?? null,
-      company: normalizePartnerCompany(link.company),
-    })),
-  };
 }
 
 function FieldGroup({
@@ -150,7 +77,6 @@ export default async function AdminPartnersPage() {
     categoriesResult,
     partnersResult,
     companiesResult,
-    accountsResult,
     changeRequests,
   ] = await Promise.all([
     supabase
@@ -163,12 +89,8 @@ export default async function AdminPartnersPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("partner_companies")
-      .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+      .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active,created_at,updated_at")
       .order("name", { ascending: true }),
-    supabase
-      .from("partner_accounts")
-      .select("id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,last_login_at,created_at,updated_at,links:partner_account_companies(id,role,is_active,created_at,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active))")
-      .order("created_at", { ascending: false }),
     listPartnerChangeRequests(),
   ]);
 
@@ -178,13 +100,10 @@ export default async function AdminPartnersPage() {
     company: normalizePartnerCompany((partner as { company?: unknown }).company),
   }));
   const safeCompanies = companiesResult.data ?? [];
-  const safeAccounts = (accountsResult.data ?? [])
-    .map((account) => normalizePartnerAccount(account))
-    .filter((account): account is PartnerAccountRow => Boolean(account));
 
   return (
     <AdminShell
-      title="협력사 관리"
+      title="브랜드 관리"
       backHref="/admin"
       backLabel="관리 홈"
     >
@@ -331,14 +250,6 @@ export default async function AdminPartnersPage() {
             updatePartner={updatePartner}
             deletePartner={deletePartner}
           />
-        </Card>
-
-        <Card>
-          <SectionHeading
-            title="협력사 계정 및 권한 관리"
-            description="로그인 아이디, 활성 상태, 비밀번호 변경 필요 여부와 협력사별 권한을 관리합니다."
-          />
-          <AdminPartnerAccountManager accounts={safeAccounts} />
         </Card>
 
       </section>

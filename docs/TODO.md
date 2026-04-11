@@ -96,10 +96,9 @@
       대상: `src/app/admin/(protected)/**`, `src/components/admin/**`, `src/lib/partner-*.ts`
       목표: 내가 협력사 계정 상태, 권한, 연결된 협력사와 브랜드를 한 곳에서 관리할 수 있어야 한다.
       완료: `admin/partners`에 협력사 계정 관리 섹션을 추가해 로그인 아이디, 표시명, 활성 상태, 강제 비밀번호 변경 여부와 협력사별 권한을 수정할 수 있게 했다.
-   13-9. [ ] 협력사 리스트 CRUD
-      대상: `src/app/admin/(protected)/partners/**`, `src/components/admin/AdminCompanyManager.tsx`, `src/app/admin/(protected)/actions.ts`
-      목표: admin의 협력사 관리 페이지에서 협력사 목록을 직접 생성/수정/삭제할 수 있어야 한다.
-      이유: 협력사와 브랜드를 분리한 정책에 맞추려면, 브랜드 목록과 별개로 협력사 본체를 따로 CRUD할 수 있어야 한다.
+   13-9. [x] 협력사 리스트 CRUD
+      대상: `src/app/admin/(protected)/companies/**`, `src/components/admin/AdminCompanyManager.tsx`, `src/app/admin/(protected)/actions.ts`
+      완료: 관리자 홈에서 협력사 관리 카드와 브랜드 관리 카드를 분리하고, 협력사 전용 페이지에서 협력사 목록 생성/수정/삭제와 담당자 계정 연결 현황을 관리할 수 있게 했다.
 
 14. [x] 제휴 업체 정적 이미지 저장
    대상: `src/lib/repositories/*`, `src/components/PartnerImageCarousel.tsx`, `src/components/PartnerCardForm.tsx`, `src/app/api/image/route.ts`, storage 관련 레이어

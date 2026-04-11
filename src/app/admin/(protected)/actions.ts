@@ -86,6 +86,16 @@ type PartnerCompanyInput = {
   contactPhone: string | null;
 };
 
+type PartnerCompanyCrudInput = {
+  companyId: string | null;
+  name: string;
+  description: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  isActive: boolean;
+};
+
 type PartnerCompanyRow = {
   id: string;
   name: string;
@@ -153,6 +163,35 @@ function parsePartnerCompanyPayload(formData: FormData): PartnerCompanyInput {
     contactName: contactName || null,
     contactEmail: contactEmail || null,
     contactPhone: contactPhone || null,
+  };
+}
+
+function parsePartnerCompanyCrudPayload(
+  formData: FormData,
+): PartnerCompanyCrudInput {
+  const companyId = String(formData.get("companyId") || "").trim();
+  const name = String(formData.get("companyName") || "").trim();
+  const description = String(formData.get("companyDescription") || "").trim();
+  const contactName = String(formData.get("companyContactName") || "").trim();
+  const contactEmail = String(formData.get("companyContactEmail") || "").trim();
+  const contactPhone = String(formData.get("companyContactPhone") || "").trim();
+  const isActive = formData.getAll("companyIsActive").includes("true");
+
+  if (!name) {
+    throw new Error("협력사명을 입력해 주세요.");
+  }
+  if (contactEmail && !isValidEmail(contactEmail)) {
+    throw new Error("담당자 이메일 형식이 올바르지 않습니다.");
+  }
+
+  return {
+    companyId: companyId || null,
+    name,
+    description: description || null,
+    contactName: contactName || null,
+    contactEmail: contactEmail || null,
+    contactPhone: contactPhone || null,
+    isActive,
   };
 }
 
@@ -654,7 +693,20 @@ function revalidatePartnerData() {
 
 function revalidatePartnerAccountData() {
   revalidatePath("/admin");
+  revalidatePath("/admin/companies");
   revalidatePath("/admin/partners");
+}
+
+function revalidatePartnerCompanyData() {
+  revalidateTag("partners", "max");
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/companies");
+  revalidatePath("/admin/partners");
+  revalidatePath("/partner");
+  revalidatePath("/partners/[id]", "page");
+  revalidatePath("/partner/services/[partnerId]", "page");
+  revalidatePath("/partner/services/[partnerId]/request", "page");
 }
 
 function revalidateMemberPaths() {
@@ -1096,6 +1148,185 @@ export async function deleteCategory(formData: FormData) {
   });
   revalidateCategoryData();
   revalidateAdminAndPublicPaths();
+}
+
+export async function createPartnerCompany(formData: FormData) {
+  await requireAdmin();
+  const payload = parsePartnerCompanyCrudPayload(formData);
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("partner_companies")
+    .insert({
+      name: payload.name,
+      slug: buildPartnerCompanySlug(payload.name),
+      description: payload.description,
+      contact_name: payload.contactName,
+      contact_email: payload.contactEmail?.toLowerCase() ?? null,
+      contact_phone: payload.contactPhone,
+      is_active: payload.isActive,
+    })
+    .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const company = normalizePartnerCompanyRow(data as PartnerCompanyRow);
+  if (!company) {
+    throw new Error("협력사 정보를 처리하지 못했습니다.");
+  }
+
+  await logAdminAction("partner_company_create", {
+    targetType: "partner_company",
+    targetId: company.id,
+    properties: {
+      name: company.name,
+      slug: company.slug,
+      description: company.description ?? null,
+      contactName: company.contact_name ?? null,
+      contactEmail: company.contact_email ?? null,
+      contactPhone: company.contact_phone ?? null,
+      isActive: company.is_active ?? true,
+    },
+  });
+
+  revalidatePartnerCompanyData();
+  redirect("/admin/partners");
+}
+
+export async function updatePartnerCompany(formData: FormData) {
+  await requireAdmin();
+  const payload = parsePartnerCompanyCrudPayload(formData);
+  const companyId = payload.companyId;
+
+  if (!companyId) {
+    throw new Error("수정할 협력사를 찾을 수 없습니다.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: existingCompany, error: companyError } = await supabase
+    .from("partner_companies")
+    .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active,created_at,updated_at")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (companyError) {
+    throw new Error(companyError.message);
+  }
+  if (!existingCompany) {
+    throw new Error("수정할 협력사를 찾을 수 없습니다.");
+  }
+
+  const nextCompany = {
+    name: payload.name,
+    slug: existingCompany.slug,
+    description: payload.description,
+    contact_name: payload.contactName,
+    contact_email: payload.contactEmail?.toLowerCase() ?? null,
+    contact_phone: payload.contactPhone,
+    is_active: payload.isActive,
+    updated_at: new Date().toISOString(),
+  };
+
+  const hasChanges =
+    nextCompany.name !== existingCompany.name ||
+    nextCompany.slug !== existingCompany.slug ||
+    nextCompany.description !== existingCompany.description ||
+    nextCompany.contact_name !== existingCompany.contact_name ||
+    nextCompany.contact_email !== existingCompany.contact_email ||
+    nextCompany.contact_phone !== existingCompany.contact_phone ||
+    Boolean(existingCompany.is_active) !== nextCompany.is_active;
+
+  if (hasChanges) {
+    const { error: updateError } = await supabase
+      .from("partner_companies")
+      .update(nextCompany)
+      .eq("id", companyId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+  }
+
+  await logAdminAction("partner_company_update", {
+    targetType: "partner_company",
+    targetId: companyId,
+    properties: {
+      name: nextCompany.name,
+      slug: nextCompany.slug,
+      description: nextCompany.description,
+      contactName: nextCompany.contact_name,
+      contactEmail: nextCompany.contact_email,
+      contactPhone: nextCompany.contact_phone,
+      isActive: nextCompany.is_active,
+    },
+  });
+
+  revalidatePartnerCompanyData();
+  redirect("/admin/partners");
+}
+
+export async function deletePartnerCompany(formData: FormData) {
+  await requireAdmin();
+  const companyId = String(formData.get("companyId") || "").trim();
+  if (!companyId) {
+    throw new Error("삭제할 협력사를 찾을 수 없습니다.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: existingCompany, error: companyError } = await supabase
+    .from("partner_companies")
+    .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (companyError) {
+    throw new Error(companyError.message);
+  }
+  if (!existingCompany) {
+    throw new Error("삭제할 협력사를 찾을 수 없습니다.");
+  }
+
+  const [brandCountResult, accountLinkCountResult] = await Promise.all([
+    supabase
+      .from("partners")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId),
+    supabase
+      .from("partner_account_companies")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId),
+  ]);
+
+  const brandCount = brandCountResult.error ? 0 : brandCountResult.count ?? 0;
+  const accountLinkCount = accountLinkCountResult.error
+    ? 0
+    : accountLinkCountResult.count ?? 0;
+
+  const { error: deleteError } = await supabase
+    .from("partner_companies")
+    .delete()
+    .eq("id", companyId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  await logAdminAction("partner_company_delete", {
+    targetType: "partner_company",
+    targetId: companyId,
+    properties: {
+      name: existingCompany.name,
+      slug: existingCompany.slug,
+      brandCount,
+      accountLinkCount,
+    },
+  });
+
+  revalidatePartnerCompanyData();
+  redirect("/admin/partners");
 }
 
 export async function createPartner(formData: FormData) {

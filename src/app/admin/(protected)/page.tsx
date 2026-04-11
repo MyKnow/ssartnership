@@ -79,16 +79,20 @@ export default async function AdminPage() {
 
   const [
     memberResult,
+    companyResult,
     partnerResult,
     categoryResult,
+    accountResult,
     pushResult,
     productLogResult,
     auditLogResult,
     securityLogResult,
   ] = await Promise.all([
     supabase.from("members").select("*", { count: "exact", head: true }),
+    supabase.from("partner_companies").select("id", { count: "exact", head: true }),
     supabase.from("partners").select("*", { count: "exact", head: true }),
     supabase.from("categories").select("*", { count: "exact", head: true }),
+    supabase.from("partner_accounts").select("id", { count: "exact", head: true }),
     supabase
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
@@ -103,8 +107,10 @@ export default async function AdminPage() {
   ]);
 
   const memberCount = memberResult.error ? 0 : memberResult.count ?? 0;
+  const companyCount = companyResult.error ? 0 : companyResult.count ?? 0;
   const partnerCount = partnerResult.error ? 0 : partnerResult.count ?? 0;
   const categoryCount = categoryResult.error ? 0 : categoryResult.count ?? 0;
+  const accountCount = accountResult.error ? 0 : accountResult.count ?? 0;
   const pushSubscriptionCount = pushResult.error ? 0 : pushResult.count ?? 0;
   const productLogCount = productLogResult.error ? 0 : productLogResult.count ?? 0;
   const auditLogCount = auditLogResult.error ? 0 : auditLogResult.count ?? 0;
@@ -116,7 +122,7 @@ export default async function AdminPage() {
 
   return (
     <AdminShell title="Admin 관리 홈">
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <SummaryCard
           href="/admin/members"
           title="회원 관리"
@@ -124,10 +130,16 @@ export default async function AdminPage() {
           meta={`총 ${memberCount}명 회원`}
         />
         <SummaryCard
+          href="/admin/companies"
+          title="협력사 관리"
+          description="협력사 자체와 담당자 계정, 연결 권한을 관리합니다."
+          meta={`협력사 ${companyCount}개 · 계정 ${accountCount}개`}
+        />
+        <SummaryCard
           href="/admin/partners"
-          title="업체 관리"
-          description="카테고리와 제휴 업체를 관리하고, 등록된 혜택 정보를 수정할 수 있습니다."
-          meta={`제휴 ${partnerCount}개 · 카테고리 ${categoryCount}개`}
+          title="브랜드 관리"
+          description="브랜드별 혜택, 조건, 태그, 변경 요청을 관리합니다."
+          meta={`브랜드 ${partnerCount}개 · 카테고리 ${categoryCount}개`}
         />
         <SummaryCard
           href="/admin/push"
