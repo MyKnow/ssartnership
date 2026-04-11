@@ -1,15 +1,14 @@
 import Link from "next/link";
-import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import BrandWordmark from "@/components/BrandWordmark";
 import ThemeToggle from "@/components/ThemeToggle";
 import { BUG_REPORT_EMAIL } from "@/lib/site";
 import { getPartnerSession } from "@/lib/partner-session";
+import { isPartnerPortalMock } from "@/lib/partner-portal";
+import PartnerPortalActionLinks from "@/components/partner/PartnerPortalActionLinks";
 
 export default async function PartnerPortalFooter() {
   const session = await getPartnerSession();
-  const authHref = session ? "/partner/logout" : "/partner/login";
-  const authLabel = session ? "로그아웃" : "로그인";
 
   return (
     <footer className="border-t border-border bg-surface/90 py-6 backdrop-blur">
@@ -25,21 +24,7 @@ export default async function PartnerPortalFooter() {
 
           <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />
-            <Button variant="ghost" href="/partner">
-              대시보드
-            </Button>
-            <Button variant="ghost" href="/partner/setup">
-              초기 설정
-            </Button>
-            <Button variant="ghost" href="/partner/change-password">
-              비밀번호 변경
-            </Button>
-            <Button variant="ghost" href={authHref}>
-              {authLabel}
-            </Button>
-            <Button variant="ghost" href="/" className="hidden sm:inline-flex">
-              공개 홈
-            </Button>
+            <PartnerPortalActionLinks session={session} isMock={isPartnerPortalMock} />
           </div>
         </div>
 
