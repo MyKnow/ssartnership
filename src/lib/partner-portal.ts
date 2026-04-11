@@ -51,6 +51,7 @@ export type PartnerPortalSetupContext = {
   token: string;
   account: PartnerPortalAccountSummary;
   company: PartnerPortalCompanySummary;
+  setupVerificationCode?: string;
   demoVerificationCode?: string;
   isSetupComplete: boolean;
   isMock: boolean;
@@ -69,6 +70,13 @@ export type PartnerPortalSetupResult = {
   companyId: string;
   loginId: string;
   completedAt: string;
+};
+
+export type PartnerPortalSetupLinkResult = {
+  account: PartnerPortalAccountSummary;
+  setupUrl: string;
+  emailSentTo: string;
+  setupVerificationCode?: string;
 };
 
 export type PartnerPortalDemoSetupSummary = {

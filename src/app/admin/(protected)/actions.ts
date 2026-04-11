@@ -9,6 +9,8 @@ import { isWithinPeriod, normalizePartnerLoginId } from "@/lib/partner-utils";
 import { createNewPartnerPayload, isPushConfigured, sendPushToAudience } from "@/lib/push";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
 import { generateTempPassword, hashPassword } from "@/lib/password";
+import { generateCode, hashCode } from "@/lib/mm-verification";
+import { sendPartnerPortalInitialSetupEmail } from "@/lib/partner-email";
 import type { PartnerVisibility } from "@/lib/types";
 import {
   buildMemberSyncLogProperties,
@@ -49,6 +51,7 @@ import {
   validateMemberYear,
   validateDateRange,
 } from "@/lib/validation";
+import { SITE_URL } from "@/lib/site";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 import {
   approvePartnerChangeRequest as approvePartnerChangeRequestRecord,
@@ -118,6 +121,7 @@ type PartnerAccountRow = {
   is_active?: boolean | null;
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
+  initial_setup_link_sent_at?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -199,9 +203,8 @@ function parsePartnerAccountPayload(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
   const loginId = normalizePartnerLoginId(String(formData.get("loginId") || "").trim());
   const displayName = String(formData.get("displayName") || "").trim();
-  const isActive = String(formData.get("isActive") || "false").trim() === "true";
-  const mustChangePassword =
-    String(formData.get("mustChangePassword") || "false").trim() === "true";
+  const isActive = formData.getAll("isActive").includes("true");
+  const mustChangePassword = formData.getAll("mustChangePassword").includes("true");
 
   if (!id) {
     throw new Error("수정할 업체 계정을 찾을 수 없습니다.");
@@ -229,7 +232,7 @@ function parsePartnerAccountCompanyPayload(formData: FormData) {
   const accountId = String(formData.get("accountId") || "").trim();
   const companyId = String(formData.get("companyId") || "").trim();
   const role = String(formData.get("role") || "").trim();
-  const isActive = String(formData.get("isActive") || "false").trim() === "true";
+  const isActive = formData.getAll("isActive").includes("true");
 
   if (!accountId || !companyId) {
     throw new Error("권한을 변경할 계정과 회사를 찾을 수 없습니다.");
@@ -309,10 +312,72 @@ function normalizePartnerAccountRow(
     is_active: row.is_active ?? true,
     email_verified_at: row.email_verified_at ?? null,
     initial_setup_completed_at: row.initial_setup_completed_at ?? null,
+    initial_setup_link_sent_at: row.initial_setup_link_sent_at ?? null,
     last_login_at: row.last_login_at ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
   } satisfies PartnerAccountRow;
+}
+
+async function issuePartnerAccountInitialSetupLink(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  accountId: string,
+) {
+  const { data: account, error: accountError } = await supabase
+    .from("partner_accounts")
+    .select(
+      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at",
+    )
+    .eq("id", accountId)
+    .maybeSingle();
+
+  if (accountError) {
+    throw new Error(accountError.message);
+  }
+  if (!account) {
+    throw new Error("초기설정 URL을 전송할 계정을 찾을 수 없습니다.");
+  }
+  if (!account.is_active) {
+    throw new Error("비활성화된 계정입니다. 먼저 활성화해 주세요.");
+  }
+  if (account.initial_setup_completed_at) {
+    throw new Error("이미 초기 설정이 완료된 계정입니다.");
+  }
+
+  const emailSentTo = normalizePartnerLoginId(account.email ?? account.login_id);
+  if (!isValidEmail(emailSentTo)) {
+    throw new Error("담당자 이메일 형식이 올바르지 않습니다.");
+  }
+
+  const setupToken = randomUUID();
+  const verificationCode = generateCode();
+  const verificationCodeHash = hashCode(verificationCode);
+  const now = new Date().toISOString();
+
+  const { error: updateError } = await supabase
+    .from("partner_accounts")
+    .update({
+      initial_setup_token: setupToken,
+      initial_setup_verification_code_hash: verificationCodeHash,
+      initial_setup_link_sent_at: null,
+      must_change_password: true,
+      email_verified_at: null,
+      updated_at: now,
+    })
+    .eq("id", account.id);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return {
+    account,
+    emailSentTo,
+    setupToken,
+    setupUrl: new URL(`/partner/setup/${setupToken}`, SITE_URL).toString(),
+    verificationCode,
+    now,
+  };
 }
 
 async function ensurePartnerCompanyRow(
@@ -798,7 +863,85 @@ export async function updatePartnerAccount(formData: FormData) {
   });
 
   revalidatePartnerAccountData();
-  redirect("/admin/partners");
+  redirect("/admin/companies");
+}
+
+export async function createPartnerAccountInitialSetupUrl(formData: FormData) {
+  await requireAdmin();
+  const accountId = String(formData.get("id") || "").trim();
+  if (!accountId) {
+    throw new Error("초기설정 URL을 생성할 계정을 찾을 수 없습니다.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
+
+  await logAdminAction("partner_account_initial_setup_link_generate", {
+    targetType: "partner_account",
+    targetId: issued.account.id,
+    properties: {
+      loginId: issued.account.login_id,
+      displayName: issued.account.display_name,
+      emailSentTo: issued.emailSentTo,
+      setupLinkGeneratedAt: issued.now,
+    },
+  });
+
+  revalidatePartnerAccountData();
+  redirect("/admin/companies");
+}
+
+export async function sendPartnerAccountInitialSetupUrl(formData: FormData) {
+  await requireAdmin();
+  const accountId = String(formData.get("id") || "").trim();
+  if (!accountId) {
+    throw new Error("초기설정 URL을 전송할 계정을 찾을 수 없습니다.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
+
+  try {
+    await sendPartnerPortalInitialSetupEmail({
+      to: issued.emailSentTo,
+      displayName: issued.account.display_name,
+      loginId: issued.account.login_id,
+      setupUrl: issued.setupUrl,
+      verificationCode: issued.verificationCode,
+    });
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "초기설정 URL 전송에 실패했습니다.",
+    );
+  }
+
+  const { error: sentAtError } = await supabase
+    .from("partner_accounts")
+    .update({
+      initial_setup_link_sent_at: issued.now,
+      updated_at: issued.now,
+    })
+    .eq("id", issued.account.id);
+
+  if (sentAtError) {
+    throw new Error(sentAtError.message);
+  }
+
+  await logAdminAction("partner_account_initial_setup_link_send", {
+    targetType: "partner_account",
+    targetId: issued.account.id,
+    properties: {
+      loginId: issued.account.login_id,
+      displayName: issued.account.display_name,
+      emailSentTo: issued.emailSentTo,
+      setupLinkSentAt: issued.now,
+    },
+  });
+
+  revalidatePartnerAccountData();
+  redirect("/admin/companies");
 }
 
 export async function updatePartnerAccountCompanyPermission(formData: FormData) {
@@ -852,7 +995,7 @@ export async function updatePartnerAccountCompanyPermission(formData: FormData) 
   });
 
   revalidatePartnerAccountData();
-  redirect("/admin/partners");
+  redirect("/admin/companies");
 }
 
 function parseCategoryPayload(formData: FormData) {
@@ -1125,7 +1268,7 @@ export async function updateCategory(formData: FormData) {
   });
   revalidateCategoryData();
   revalidateAdminAndPublicPaths();
-  redirect("/admin/partners");
+  redirect("/admin/companies");
 }
 
 export async function deleteCategory(formData: FormData) {
@@ -1193,7 +1336,7 @@ export async function createPartnerCompany(formData: FormData) {
   });
 
   revalidatePartnerCompanyData();
-  redirect("/admin/partners");
+  redirect("/admin/companies");
 }
 
 export async function updatePartnerCompany(formData: FormData) {
@@ -1265,7 +1408,7 @@ export async function updatePartnerCompany(formData: FormData) {
   });
 
   revalidatePartnerCompanyData();
-  redirect("/admin/partners");
+  redirect("/admin/companies");
 }
 
 export async function deletePartnerCompany(formData: FormData) {

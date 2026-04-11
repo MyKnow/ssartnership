@@ -90,12 +90,18 @@ create table if not exists partner_accounts (
   email text,
   email_verified_at timestamp with time zone,
   initial_setup_completed_at timestamp with time zone,
+  initial_setup_token text,
+  initial_setup_verification_code_hash text,
+  initial_setup_link_sent_at timestamp with time zone,
   must_change_password boolean not null default true,
   is_active boolean not null default true,
   last_login_at timestamp with time zone,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
+
+create unique index if not exists partner_accounts_initial_setup_token_key
+  on partner_accounts(initial_setup_token);
 
 create table if not exists partner_account_companies (
   id uuid primary key default uuid_generate_v4(),

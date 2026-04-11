@@ -3,8 +3,11 @@ import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
+import PartnerInitialSetupUrlCopyButton from "@/components/admin/PartnerInitialSetupUrlCopyButton";
 import {
   updatePartnerAccount,
+  createPartnerAccountInitialSetupUrl,
+  sendPartnerAccountInitialSetupUrl,
   updatePartnerAccountCompanyPermission,
 } from "@/app/admin/(protected)/actions";
 
@@ -36,6 +39,8 @@ type AdminPartnerAccount = {
   is_active?: boolean | null;
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
+  initial_setup_link_sent_at?: string | null;
+  initial_setup_token?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -152,6 +157,23 @@ export default function AdminPartnerAccountManager({
                   <Badge className="bg-surface text-muted-foreground">
                     협력사 연결 {account.links.length}개
                   </Badge>
+                  <Badge
+                    className={
+                      account.initial_setup_completed_at
+                        ? "bg-emerald-500/10 text-emerald-700"
+                        : account.initial_setup_token
+                          ? "bg-sky-500/10 text-sky-700"
+                          : "bg-surface text-muted-foreground"
+                    }
+                  >
+                    {account.initial_setup_completed_at
+                      ? "초기 설정 완료"
+                      : account.initial_setup_token
+                        ? account.initial_setup_link_sent_at
+                          ? "초기설정 URL 전송됨"
+                          : "초기설정 URL 준비됨"
+                        : "초기설정 URL 미생성"}
+                  </Badge>
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">
@@ -172,6 +194,45 @@ export default function AdminPartnerAccountManager({
                 <p className="mt-1 break-all font-mono text-foreground">
                   {account.id}
                 </p>
+                <div className="mt-4 flex flex-col gap-2 sm:items-end">
+                  {!account.initial_setup_completed_at &&
+                  account.is_active !== false ? (
+                    <form action={createPartnerAccountInitialSetupUrl}>
+                      <input type="hidden" name="id" value={account.id} />
+                      <SubmitButton
+                        pendingText="생성 중"
+                        variant="ghost"
+                        className="w-full sm:w-auto"
+                      >
+                        {account.initial_setup_token
+                          ? "초기설정 URL 재생성"
+                          : "초기설정 URL 생성"}
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                  {account.initial_setup_token ? (
+                    <PartnerInitialSetupUrlCopyButton
+                      setupUrl={new URL(
+                        `/partner/setup/${account.initial_setup_token}`,
+                        process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app",
+                      ).toString()}
+                    />
+                  ) : null}
+                  {!account.initial_setup_completed_at &&
+                  account.is_active !== false ? (
+                    <form action={sendPartnerAccountInitialSetupUrl}>
+                      <input type="hidden" name="id" value={account.id} />
+                      <SubmitButton
+                        pendingText="전송 중"
+                        className="w-full sm:w-auto"
+                      >
+                        {account.initial_setup_link_sent_at
+                          ? "초기설정 URL 재전송"
+                          : "초기설정 URL 메일 전송"}
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </div>
               </div>
             </div>
 

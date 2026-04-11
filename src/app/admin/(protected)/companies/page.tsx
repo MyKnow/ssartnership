@@ -37,6 +37,8 @@ type PartnerAccountRowRecord = {
   is_active?: boolean | null;
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
+  initial_setup_link_sent_at?: string | null;
+  initial_setup_token?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -52,6 +54,8 @@ type PartnerAccountRow = {
   is_active?: boolean | null;
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
+  initial_setup_link_sent_at?: string | null;
+  initial_setup_token?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -97,6 +101,8 @@ function normalizePartnerAccount(
     is_active: row.is_active ?? null,
     email_verified_at: row.email_verified_at ?? null,
     initial_setup_completed_at: row.initial_setup_completed_at ?? null,
+    initial_setup_link_sent_at: row.initial_setup_link_sent_at ?? null,
+    initial_setup_token: row.initial_setup_token ?? null,
     last_login_at: row.last_login_at ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
@@ -129,7 +135,7 @@ export default async function AdminCompaniesPage() {
     supabase
       .from("partner_accounts")
       .select(
-        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,last_login_at,created_at,updated_at,links:partner_account_companies(id,role,is_active,created_at,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active))",
+        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_token,last_login_at,created_at,updated_at,links:partner_account_companies(id,role,is_active,created_at,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active))",
       )
       .order("created_at", { ascending: false }),
   ]);

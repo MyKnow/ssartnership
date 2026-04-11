@@ -49,6 +49,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'push_log_delete',
   'partner_account_update',
   'partner_account_company_update',
+  'partner_account_initial_setup_link_generate',
+  'partner_account_initial_setup_link_send',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

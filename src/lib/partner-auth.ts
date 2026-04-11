@@ -5,6 +5,7 @@ import {
   type PartnerPortalLoginResult,
   type PartnerPortalPasswordChangeResult,
   type PartnerPortalPasswordResetResult,
+  type PartnerPortalCompanySummary,
   type PartnerPortalSetupContext,
   type PartnerPortalSetupInput,
   type PartnerPortalSetupResult,
@@ -22,7 +23,9 @@ import {
   verifyPassword,
 } from "./password.ts";
 import { normalizePartnerLoginId } from "./partner-utils.ts";
+import { normalizePartnerVisibility } from "./partner-visibility.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
+import { hashCode } from "./mm-verification.ts";
 import {
   PartnerPortalLoginError,
   PartnerPortalSetupError,
@@ -43,18 +46,6 @@ export async function listPartnerPortalDemoSetups(): Promise<
   return activePartnerPortalRepository.listDemoSetups();
 }
 
-export async function getPartnerPortalSetupContext(
-  token: string,
-): Promise<PartnerPortalSetupContext | null> {
-  return activePartnerPortalRepository.getSetupContext(token);
-}
-
-export async function completePartnerPortalInitialSetup(
-  input: PartnerPortalSetupInput,
-): Promise<PartnerPortalSetupResult> {
-  return activePartnerPortalRepository.completeInitialSetup(input);
-}
-
 type PartnerPortalAccountRow = {
   id: string;
   login_id: string;
@@ -66,6 +57,31 @@ type PartnerPortalAccountRow = {
   is_active?: boolean | null;
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
+  initial_setup_token?: string | null;
+  initial_setup_verification_code_hash?: string | null;
+  initial_setup_link_sent_at?: string | null;
+};
+
+type PartnerPortalSetupCompanyRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  is_active?: boolean | null;
+};
+
+type PartnerPortalSetupServiceRow = {
+  id: string;
+  name: string;
+  location: string;
+  visibility?: string | null;
+  categories?:
+    | { label?: string | null }
+    | Array<{ label?: string | null }>
+    | null;
 };
 
 function toPartnerPortalAccountSummary(
@@ -82,6 +98,40 @@ function toPartnerPortalAccountSummary(
     initialSetupCompletedAt: account.initial_setup_completed_at ?? null,
     isActive: Boolean(account.is_active),
     ...overrides,
+  };
+}
+
+function extractPartnerPortalCategoryLabel(
+  categories: PartnerPortalSetupServiceRow["categories"],
+) {
+  if (!categories) {
+    return "제휴";
+  }
+  if (Array.isArray(categories)) {
+    return categories[0]?.label ?? "제휴";
+  }
+  return categories.label ?? "제휴";
+}
+
+function toPartnerPortalSetupCompanySummary(
+  company: PartnerPortalSetupCompanyRow,
+  services: PartnerPortalSetupServiceRow[],
+): PartnerPortalCompanySummary {
+  return {
+    id: company.id,
+    name: company.name,
+    slug: company.slug,
+    description: company.description ?? null,
+    contactName: company.contact_name ?? null,
+    contactEmail: company.contact_email ?? null,
+    contactPhone: company.contact_phone ?? null,
+    services: services.map((service) => ({
+      id: service.id,
+      name: service.name,
+      location: service.location,
+      categoryLabel: extractPartnerPortalCategoryLabel(service.categories),
+      visibility: normalizePartnerVisibility(service.visibility),
+    })),
   };
 }
 
@@ -102,6 +152,49 @@ async function getSupabasePartnerPortalCompanyIds(
   return (companyLinks ?? [])
     .map((item) => item.company_id)
     .filter((companyId): companyId is string => Boolean(companyId));
+}
+
+async function getSupabasePartnerPortalSetupCompany(
+  accountId: string,
+): Promise<PartnerPortalCompanySummary | null> {
+  const supabase = getSupabaseAdminClient();
+  const { data: companyLink, error: companyLinkError } = await supabase
+    .from("partner_account_companies")
+    .select(
+      "company_id,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active)",
+    )
+    .eq("account_id", accountId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (companyLinkError) {
+    throw companyLinkError;
+  }
+
+  const company = Array.isArray(companyLink?.company)
+    ? (companyLink.company[0] as PartnerPortalSetupCompanyRow | undefined) ?? null
+    : (companyLink?.company as PartnerPortalSetupCompanyRow | null | undefined) ??
+      null;
+  if (!company || company.is_active === false) {
+    return null;
+  }
+
+  const { data: services, error: servicesError } = await supabase
+    .from("partners")
+    .select("id,name,location,visibility,categories(label)")
+    .eq("company_id", company.id)
+    .order("created_at", { ascending: true });
+
+  if (servicesError) {
+    throw servicesError;
+  }
+
+  return toPartnerPortalSetupCompanySummary(
+    company,
+    (services ?? []) as PartnerPortalSetupServiceRow[],
+  );
 }
 
 async function findSupabasePartnerPortalAccount(
@@ -135,6 +228,23 @@ async function findSupabasePartnerPortalAccount(
   }
 
   return (byEmail as PartnerPortalAccountRow | null) ?? null;
+}
+
+async function findSupabasePartnerPortalSetupAccount(token: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data: account, error } = await supabase
+    .from("partner_accounts")
+    .select(
+      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_token,initial_setup_verification_code_hash,initial_setup_link_sent_at",
+    )
+    .eq("initial_setup_token", token)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (account as PartnerPortalAccountRow | null) ?? null;
 }
 
 async function authenticateSupabasePartnerPortalLogin(
@@ -302,6 +412,124 @@ export async function requestPartnerPortalPasswordReset(
   };
 }
 
+async function getSupabasePartnerPortalSetupContext(
+  token: string,
+): Promise<PartnerPortalSetupContext | null> {
+  const account = await findSupabasePartnerPortalSetupAccount(token);
+  if (
+    !account ||
+    !account.is_active ||
+    !account.initial_setup_token ||
+    account.initial_setup_completed_at
+  ) {
+    return null;
+  }
+
+  const company = await getSupabasePartnerPortalSetupCompany(account.id);
+  if (!company) {
+    return null;
+  }
+
+  return {
+    token,
+    account: {
+      id: account.id,
+      loginId: account.login_id,
+      displayName: account.display_name,
+      email: account.email ?? account.login_id,
+      mustChangePassword: Boolean(account.must_change_password),
+      emailVerifiedAt: account.email_verified_at ?? null,
+      initialSetupCompletedAt: account.initial_setup_completed_at ?? null,
+      isActive: Boolean(account.is_active),
+    },
+    company,
+    isSetupComplete: false,
+    isMock: false,
+  };
+}
+
+async function completeSupabasePartnerPortalInitialSetup(
+  input: PartnerPortalSetupInput,
+): Promise<PartnerPortalSetupResult> {
+  const account = await findSupabasePartnerPortalSetupAccount(input.token);
+
+  if (!account || !account.initial_setup_token) {
+    throw new PartnerPortalSetupError(
+      "not_found",
+      "초기 설정 링크를 찾을 수 없습니다.",
+    );
+  }
+  if (account.initial_setup_completed_at) {
+    throw new PartnerPortalSetupError(
+      "already_completed",
+      "이미 초기 설정이 완료되었습니다.",
+    );
+  }
+  if (!account.initial_setup_verification_code_hash) {
+    throw new PartnerPortalSetupError(
+      "not_found",
+      "초기 설정 링크를 찾을 수 없습니다.",
+    );
+  }
+  if (hashCode(input.verificationCode.trim()) !== account.initial_setup_verification_code_hash) {
+    throw new PartnerPortalSetupError(
+      "invalid_code",
+      "이메일 인증 코드가 올바르지 않습니다.",
+    );
+  }
+
+  if (input.password !== input.confirmPassword) {
+    throw new PartnerPortalSetupError(
+      "password_mismatch",
+      "비밀번호 확인이 일치하지 않습니다.",
+    );
+  }
+
+  if (!isValidPassword(input.password)) {
+    throw new PartnerPortalSetupError(
+      "invalid_password",
+      "비밀번호는 8자 이상이며 영문, 숫자, 특수문자를 모두 포함해야 합니다.",
+    );
+  }
+
+  const passwordRecord = hashPassword(input.password);
+  const completedAt = new Date().toISOString();
+  const supabase = getSupabaseAdminClient();
+  const companyIds = await getSupabasePartnerPortalCompanyIds(account.id);
+  if (companyIds.length === 0) {
+    throw new PartnerPortalSetupError(
+      "not_found",
+      "연결된 협력사를 찾을 수 없습니다.",
+    );
+  }
+  const { error } = await supabase
+    .from("partner_accounts")
+    .update({
+      password_hash: passwordRecord.hash,
+      password_salt: passwordRecord.salt,
+      must_change_password: false,
+      is_active: true,
+      email_verified_at: completedAt,
+      initial_setup_completed_at: completedAt,
+      initial_setup_token: null,
+      initial_setup_verification_code_hash: null,
+      updated_at: completedAt,
+    })
+    .eq("id", account.id);
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    token: input.token,
+    accountId: account.id,
+    companyId: companyIds[0],
+    loginId: account.login_id,
+    completedAt,
+  };
+}
+
 export async function changePartnerPortalPassword(input: {
   accountId: string;
   currentPassword: string;
@@ -405,6 +633,24 @@ export function isPartnerPortalSetupError(
   error: unknown,
 ): error is PartnerPortalSetupError {
   return error instanceof PartnerPortalSetupError;
+}
+
+export async function getPartnerPortalSetupContext(
+  token: string,
+): Promise<PartnerPortalSetupContext | null> {
+  if (isPartnerPortalMock) {
+    return activePartnerPortalRepository.getSetupContext(token);
+  }
+  return getSupabasePartnerPortalSetupContext(token);
+}
+
+export async function completePartnerPortalInitialSetup(
+  input: PartnerPortalSetupInput,
+): Promise<PartnerPortalSetupResult> {
+  if (isPartnerPortalMock) {
+    return activePartnerPortalRepository.completeInitialSetup(input);
+  }
+  return completeSupabasePartnerPortalInitialSetup(input);
 }
 
 export function getPartnerPortalSetupErrorStatus(
