@@ -47,11 +47,11 @@ export async function sendPartnerPortalTemporaryPasswordEmail(input: {
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpUser}>`,
     to: input.to,
-    subject: `[${SITE_NAME}] 제휴 포털 임시 비밀번호 안내`,
+    subject: `[${SITE_NAME}] 협력사 포털 임시 비밀번호 안내`,
     text: [
       `${input.displayName || "담당자"}님,`,
       "",
-      `요청하신 제휴 포털 임시 비밀번호입니다.`,
+      `요청하신 협력사 포털 임시 비밀번호입니다.`,
       `로그인 아이디: ${input.loginId}`,
       `임시 비밀번호: ${input.temporaryPassword}`,
       "",
@@ -59,7 +59,7 @@ export async function sendPartnerPortalTemporaryPasswordEmail(input: {
     ].join("\n"),
     html: `
       <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
-        <h2 style="margin: 0 0 12px;">제휴 포털 임시 비밀번호 안내</h2>
+        <h2 style="margin: 0 0 12px;">협력사 포털 임시 비밀번호 안내</h2>
         <p style="margin: 0 0 16px; color: #334155;">
           안녕하세요 ${safeDisplayName}님, 요청하신 임시 비밀번호를 전달드립니다.
           로그인 후 반드시 새 비밀번호로 변경해 주세요.
@@ -69,7 +69,7 @@ export async function sendPartnerPortalTemporaryPasswordEmail(input: {
           <p style="margin: 0;"><strong>임시 비밀번호</strong><br />${safeTemporaryPassword}</p>
         </div>
         <p style="margin: 16px 0 0; color: #334155;">
-          ${SITE_NAME} 제휴 포털에서 로그인 후, 비밀번호 변경 화면에서 새 비밀번호를 설정해 주세요.
+          ${SITE_NAME} 협력사 포털에서 로그인 후, 비밀번호 변경 화면에서 새 비밀번호를 설정해 주세요.
         </p>
       </div>
     `,

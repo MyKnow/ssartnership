@@ -40,7 +40,7 @@ function isPartnerChangeRequestErrorCode(
 }
 
 export const metadata: Metadata = {
-  title: `제휴 서비스 상세 | ${SITE_NAME}`,
+  title: `브랜드 상세 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,

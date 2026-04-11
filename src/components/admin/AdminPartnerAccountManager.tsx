@@ -111,8 +111,8 @@ export default function AdminPartnerAccountManager({
     return (
       <div className="mt-6">
         <EmptyState
-          title="업체 계정이 없습니다."
-          description="제휴 업체를 추가하면 담당자 계정이 함께 나타납니다."
+          title="협력사 계정이 없습니다."
+          description="협력사를 추가하면 담당자 계정이 함께 나타납니다."
         />
       </div>
     );
@@ -150,7 +150,7 @@ export default function AdminPartnerAccountManager({
                     {account.must_change_password ? "비밀번호 변경 필요" : "일반"}
                   </Badge>
                   <Badge className="bg-surface text-muted-foreground">
-                    연결 {account.links.length}개
+                    협력사 연결 {account.links.length}개
                   </Badge>
                 </div>
                 <div>
@@ -269,10 +269,10 @@ export default function AdminPartnerAccountManager({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-semibold text-foreground">
-                      회사별 권한
+                      협력사별 권한
                     </h4>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      연결된 회사마다 권한과 활성 상태를 조정할 수 있습니다.
+                      연결된 협력사마다 권한과 활성 상태를 조정할 수 있습니다.
                     </p>
                   </div>
                 </div>
@@ -280,8 +280,8 @@ export default function AdminPartnerAccountManager({
                 <div className="mt-4 space-y-3">
                   {account.links.length === 0 ? (
                     <EmptyState
-                      title="연결된 회사가 없습니다."
-                      description="이 계정에 접근 권한을 줄 회사를 추가해 주세요."
+                      title="연결된 협력사가 없습니다."
+                      description="이 계정에 접근 권한을 줄 협력사를 추가해 주세요."
                     />
                   ) : null}
                   {account.links.map((link) => {
@@ -294,7 +294,7 @@ export default function AdminPartnerAccountManager({
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="font-semibold text-foreground">
-                              {link.company?.name ?? "회사 정보 없음"}
+                              {link.company?.name ?? "협력사 정보 없음"}
                             </p>
                             <p className="mt-1 break-all text-xs text-muted-foreground">
                               {link.company?.slug ?? link.company?.id ?? link.id}

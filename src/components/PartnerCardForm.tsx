@@ -114,7 +114,7 @@ export default function PartnerCardForm({
     partner.appliesTo ?? DEFAULT_PARTNER_AUDIENCE,
   );
   const heroTitle =
-    mode === "create" ? "상세 페이지처럼 새 제휴를 추가합니다" : "상세 페이지처럼 제휴를 수정합니다";
+    mode === "create" ? "상세 페이지처럼 새 브랜드를 추가합니다" : "상세 페이지처럼 브랜드를 수정합니다";
   const heroDescription =
     mode === "create"
       ? "기본 정보, 썸네일, 갤러리, 조건과 혜택을 카드 단위로 나눠 입력하세요."
@@ -135,7 +135,7 @@ export default function PartnerCardForm({
         <div className="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="grid gap-2">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-              {mode === "create" ? "새 제휴 추가" : "제휴 정보 수정"}
+              {mode === "create" ? "새 브랜드 추가" : "브랜드 정보 수정"}
             </p>
             <h2 className="text-3xl font-semibold tracking-tight text-foreground">
               {heroTitle}
@@ -179,7 +179,7 @@ export default function PartnerCardForm({
                 className="w-full"
               />
 
-              <FieldGroup label="업체명">
+              <FieldGroup label="브랜드명">
                 <Input name="name" defaultValue={nameValue} required />
               </FieldGroup>
 
@@ -240,17 +240,17 @@ export default function PartnerCardForm({
 
         <Card className="overflow-hidden">
           <SectionHeading
-            title="제휴 회사 / 담당자"
-            description="한 회사가 여러 서비스를 가질 수 있으니, 회사와 담당자 이메일을 함께 묶어 관리합니다."
+            title="협력사 / 담당자"
+            description="한 협력사가 여러 브랜드를 가질 수 있으니, 협력사와 담당자 이메일을 함께 묶어 관리합니다."
           />
 
           <div className="mt-6 grid gap-5">
-            <FieldGroup label="기존 회사 연결">
+            <FieldGroup label="기존 협력사 연결">
               <Select
                 name="companyId"
                 defaultValue={companyValue?.id ?? ""}
               >
-                <option value="">새 회사 생성</option>
+                <option value="">새 협력사 생성</option>
                 {(companyOptions ?? []).map((company) => (
                   <option key={company.id} value={company.id}>
                     {company.name}
@@ -261,11 +261,11 @@ export default function PartnerCardForm({
             </FieldGroup>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <FieldGroup label="회사명">
+              <FieldGroup label="협력사명">
                 <Input
                   name="companyName"
                   defaultValue={companyValue?.name ?? ""}
-                  placeholder="회사명"
+                  placeholder="협력사명"
                 />
               </FieldGroup>
               <FieldGroup label="담당자 이름">
@@ -295,18 +295,18 @@ export default function PartnerCardForm({
               </FieldGroup>
             </div>
 
-            <FieldGroup label="회사 설명">
+            <FieldGroup label="협력사 설명">
               <Textarea
                 name="companyDescription"
                 defaultValue={companyValue?.description ?? ""}
                 rows={3}
-                placeholder="포털에서 함께 보일 회사 소개를 입력합니다."
+                placeholder="포털에서 함께 보일 협력사 소개를 입력합니다."
               />
             </FieldGroup>
 
             <p className="text-xs leading-5 text-muted-foreground">
               담당자 이메일은 이후 포털 로그인 아이디와 초기 설정 안내에
-              사용됩니다. 기존 회사를 연결할 때는 비워 두고 저장해도 됩니다.
+              사용됩니다. 기존 협력사를 연결할 때는 비워 두고 저장해도 됩니다.
             </p>
           </div>
         </Card>
@@ -396,7 +396,7 @@ export default function PartnerCardForm({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">
-            {submitLabel ?? (mode === "create" ? "제휴 추가" : "수정")}
+            {submitLabel ?? (mode === "create" ? "브랜드 추가" : "수정")}
           </SubmitButton>
         </div>
       </form>

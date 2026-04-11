@@ -97,7 +97,7 @@ export default function AdminMobileNav({
     },
     {
       href: "/admin/partners",
-      label: "업체 관리",
+      label: "협력사 관리",
       active: pathname === "/admin/partners",
     },
     {

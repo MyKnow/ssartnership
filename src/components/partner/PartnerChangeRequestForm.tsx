@@ -109,7 +109,7 @@ export default function PartnerChangeRequestForm({
           <Card className="overflow-hidden">
             <SectionHeading
               title="이미지 / 링크 / 기간"
-              description="썸네일, 기타 이미지, 예약/문의 링크, 제휴 기간은 관리자 승인 후 반영됩니다."
+              description="썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간은 관리자 승인 후 반영됩니다."
             />
 
             <div className="mt-6 grid gap-6">
@@ -146,7 +146,7 @@ export default function PartnerChangeRequestForm({
                   />
                 </FieldGroup>
                 <FieldGroup
-                  label="제휴 시작일"
+                  label="브랜드 시작일"
                   note="기간 변경은 관리자 승인이 필요합니다."
                 >
                   <Input
@@ -156,7 +156,7 @@ export default function PartnerChangeRequestForm({
                   />
                 </FieldGroup>
                 <FieldGroup
-                  label="제휴 종료일"
+                  label="브랜드 종료일"
                   note="기간 변경은 관리자 승인이 필요합니다."
                 >
                   <Input
@@ -245,7 +245,7 @@ export default function PartnerChangeRequestForm({
             <p className="text-sm font-semibold text-foreground">안내</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               혜택, 이용 조건, 태그, 적용 대상, 썸네일, 기타 이미지, 예약/문의
-              링크, 제휴 기간은 관리자 승인 후 반영됩니다. 승인 전에는 현재 값이
+              링크, 브랜드 제휴 기간은 관리자 승인 후 반영됩니다. 승인 전에는 현재 값이
               그대로 유지됩니다.
             </p>
           </div>

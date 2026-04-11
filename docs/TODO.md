@@ -62,40 +62,44 @@
    대상: `src/lib/mm-directory.ts`, `src/lib/mm-member-sync.ts`
    완료: year 단위 작업을 병렬화하고, 결과 병합은 기존 우선순위를 유지하도록 정리했다.
 
-13. [ ] 제휴 업체 전용 포털 분리
+13. [ ] 협력사 전용 포털 분리
    대상: `supabase/schema.sql`, `supabase/migrations/*`, `src/app/partner/**`, `src/lib/partner-*.ts`, `src/lib/activity-logs.ts`, `src/app/admin/(protected)/actions.ts`
-   이유: 제휴 업체가 회사 단위로 로그인하고, 그 아래 여러 서비스를 함께 관리할 수 있어야 한다. company / service / account 구조를 먼저 깔고, 그 위에 전용 포털과 승인 흐름을 얹으면 admin과 권한을 분리하면서 외부 파트너용 UX를 단계적으로 만들 수 있다.
+   이유: 협력사가 여러 브랜드를 소유하고, 그 아래 여러 관리 계정을 가질 수 있어야 한다. 협력사 / 브랜드 / account 구조를 먼저 깔고, 그 위에 전용 포털과 승인 흐름을 얹으면 admin과 권한을 분리하면서 외부 협력사용 UX를 단계적으로 만들 수 있다.
    세부 단계:
-   13-1. [x] company / service / account 스키마 초안 확정
+   13-1. [x] 협력사 / 브랜드 / account 스키마 초안 확정
       완료: `partner_companies`, `partners.company_id`, `partner_accounts`, `partner_account_companies`, `partner_auth_attempts`와 관련 migration을 먼저 추가했다.
-   13-2. [x] 관리자에서 제휴 담당자 이메일 발급 및 업체 연결
+   13-2. [x] 관리자에서 협력사 담당자 이메일 발급 및 협력사 연결
       대상: `src/app/admin/(protected)/actions.ts`, `src/app/admin/(protected)/partners/**`, `src/lib/partner-*.ts`
-      목표: 제휴 업체를 생성할 때 담당자 이메일과 회사-계정 연결을 함께 만들 수 있어야 한다.
-      완료: 관리자 제휴 폼에서 회사 선택/생성, 담당자 이메일 입력, 포털 계정 생성 및 회사-계정 연결까지 저장되도록 묶었다.
+      목표: 협력사를 생성할 때 담당자 이메일과 협력사-계정 연결을 함께 만들 수 있어야 한다.
+      완료: 관리자 제휴 폼에서 협력사 선택/생성, 담당자 이메일 입력, 포털 계정 생성 및 협력사-계정 연결까지 저장되도록 묶었다.
    13-3. [x] 초기 설정 페이지에서 이메일 인증 및 비밀번호 설정
       대상: `src/app/partner/setup/**`, `src/app/api/partner/**`, `src/lib/partner-auth-*.ts`
       목표: 담당자가 링크로 들어와 이메일 소유를 확인하고 초기 비밀번호를 직접 설정하게 한다.
       완료: mock 데모 목록과 토큰별 설정 페이지/API를 붙여 이메일 코드 확인과 초기 비밀번호 설정을 바로 테스트할 수 있게 했다.
-   13-4. [x] 업체 포털 로그인 및 세션 분리
+   13-4. [x] 협력사 포털 로그인 및 세션 분리
       대상: `src/app/partner/login/**`, `src/app/partner/layout.tsx`, `middleware.ts`, `src/lib/partner-session.ts`
-      목표: 제휴 업체 계정은 관리자/일반 사용자 세션과 분리된 경계에서만 접근하게 한다.
+      목표: 협력사 계정은 관리자/일반 사용자 세션과 분리된 경계에서만 접근하게 한다.
       완료: `/partner` 진입 시 세션이 없으면 로그인으로 보내고, 별도 `partner_session` 쿠키와 로그인 서버 액션, rate limit, 보안 로그를 붙였다.
-   13-5. [x] 소속 서비스 조회와 수치형 로그만 노출
+   13-5. [x] 소속 브랜드 조회와 수치형 로그만 노출
       대상: `src/app/partner/**`, `src/lib/activity-logs.ts`, `src/lib/partner-dashboard.ts`
-      목표: 업체는 자신이 소유한 여러 서비스의 정보와 조회수/클릭수 같은 집계 수치만 볼 수 있게 한다.
-      완료: `/partner` 대시보드를 회사별 서비스 카드로 바꾸고, raw 로그 대신 조회수/카드 클릭/지도 클릭/예약/문의 집계만 보여주게 했다.
-   13-6. [x] 제휴 정보 수정 시 승인/취소 흐름 추가
+      목표: 협력사는 자신이 소유한 여러 브랜드의 정보와 조회수/클릭수 같은 집계 수치만 볼 수 있게 한다.
+      완료: `/partner` 대시보드를 협력사별 브랜드 카드로 바꾸고, raw 로그 대신 조회수/카드 클릭/지도 클릭/예약/문의 집계만 보여주게 했다.
+   13-6. [x] 브랜드 정보 수정 시 승인/취소 흐름 추가
       대상: `src/app/partner/**`, `src/app/admin/(protected)/actions.ts`, `src/lib/partner-change-requests.ts`
       목표: 혜택, 이용 조건, 적용 대상 같은 민감한 항목은 변경 요청으로 저장하고, 나의 승인 후에만 반영되게 한다.
-      완료: 서비스 상세 페이지에서 편집 모드로 변경 요청을 만들고, 관리자 대기열에서 승인/거절/취소를 처리하게 바꿨다.
+      완료: 브랜드 상세 페이지에서 편집 모드로 변경 요청을 만들고, 관리자 대기열에서 승인/거절/취소를 처리하게 바꿨다.
    13-7. [x] 비밀번호 재설정 메일과 초기 비밀번호 재발급
       대상: `src/app/api/partner/**`, `src/lib/partner-mail.ts`, `src/lib/partner-auth-*.ts`
       목표: 비밀번호를 잊었을 때 초기 비밀번호가 포함된 재설정 메일을 보낼 수 있게 한다.
       완료: 로그인 페이지와 공통 Header/Footer에 재설정/변경 진입점을 추가하고, 이메일 인증 기반 임시 비밀번호 발급 후 임시 비밀번호 로그인 시 강제 변경되도록 `/partner` 경로를 차단했다.
-   13-8. [x] 관리자 페이지에서 업체 아이디 및 권한 관리
+   13-8. [x] 관리자 페이지에서 협력사 계정 및 권한 관리
       대상: `src/app/admin/(protected)/**`, `src/components/admin/**`, `src/lib/partner-*.ts`
-      목표: 내가 업체 계정 상태, 권한, 연결된 회사와 서비스를 한 곳에서 관리할 수 있어야 한다.
-      완료: `admin/partners`에 업체 계정 관리 섹션을 추가해 로그인 아이디, 표시명, 활성 상태, 강제 비밀번호 변경 여부와 회사별 권한을 수정할 수 있게 했다.
+      목표: 내가 협력사 계정 상태, 권한, 연결된 협력사와 브랜드를 한 곳에서 관리할 수 있어야 한다.
+      완료: `admin/partners`에 협력사 계정 관리 섹션을 추가해 로그인 아이디, 표시명, 활성 상태, 강제 비밀번호 변경 여부와 협력사별 권한을 수정할 수 있게 했다.
+   13-9. [ ] 협력사 리스트 CRUD
+      대상: `src/app/admin/(protected)/partners/**`, `src/components/admin/AdminCompanyManager.tsx`, `src/app/admin/(protected)/actions.ts`
+      목표: admin의 협력사 관리 페이지에서 협력사 목록을 직접 생성/수정/삭제할 수 있어야 한다.
+      이유: 협력사와 브랜드를 분리한 정책에 맞추려면, 브랜드 목록과 별개로 협력사 본체를 따로 CRUD할 수 있어야 한다.
 
 14. [x] 제휴 업체 정적 이미지 저장
    대상: `src/lib/repositories/*`, `src/components/PartnerImageCarousel.tsx`, `src/components/PartnerCardForm.tsx`, `src/app/api/image/route.ts`, storage 관련 레이어

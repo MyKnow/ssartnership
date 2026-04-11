@@ -16,7 +16,7 @@ export default async function PartnerPortalFooter() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Link
             href="/partner"
-            aria-label="업체 포털 홈"
+            aria-label="협력사 포털 홈"
             className="inline-flex items-center text-foreground hover:opacity-80"
           >
             <BrandWordmark className="text-base sm:text-lg" />
@@ -42,7 +42,7 @@ export default async function PartnerPortalFooter() {
         </div>
 
         <div className="flex flex-col gap-2 text-xs leading-6 sm:flex-row sm:items-center sm:justify-between">
-          <p>제휴 담당자 전용 공간입니다. 정보 변경은 승인 절차를 거칩니다.</p>
+          <p>협력사 담당자 전용 공간입니다. 정보 변경은 승인 절차를 거칩니다.</p>
           <a
             href={`mailto:${BUG_REPORT_EMAIL}`}
             className="font-medium text-foreground hover:opacity-80"

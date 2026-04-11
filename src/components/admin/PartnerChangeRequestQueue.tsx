@@ -85,13 +85,13 @@ export default function PartnerChangeRequestQueue({
     <Card className="space-y-6">
       <SectionHeading
         title="승인 대기 요청"
-        description="혜택, 이용 조건, 태그, 적용 대상, 썸네일, 기타 이미지, 예약/문의 링크, 제휴 기간 변경 요청을 이곳에서 승인하거나 거절합니다."
+        description="혜택, 이용 조건, 태그, 적용 대상, 썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간 변경 요청을 이곳에서 승인하거나 거절합니다."
       />
 
       {requests.length === 0 ? (
         <EmptyState
           title="승인 대기 요청이 없습니다."
-          description="제휴 담당자가 민감 정보 변경 요청을 보내면 이곳에 표시됩니다."
+          description="협력사 담당자가 민감 정보 변경 요청을 보내면 이곳에 표시됩니다."
         />
       ) : (
         <div className="grid gap-4">

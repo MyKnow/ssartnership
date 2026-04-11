@@ -6,7 +6,7 @@ import { SITE_NAME } from "@/lib/site";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: `업체 포털 | ${SITE_NAME}`,
+  title: `협력사 포털 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,

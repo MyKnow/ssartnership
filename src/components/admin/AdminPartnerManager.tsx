@@ -224,14 +224,14 @@ export default function AdminPartnerManager({
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            총 {partners.length}개 제휴
+            총 {partners.length}개 브랜드
           </p>
           <Button
             variant="ghost"
             onClick={() => setCreateOpen((prev) => !prev)}
             disabled={!canCreate}
           >
-            {isCreateOpen ? "추가 폼 닫기" : "제휴 업체 추가"}
+            {isCreateOpen ? "추가 폼 닫기" : "브랜드 추가"}
           </Button>
         </div>
       </div>
@@ -259,7 +259,7 @@ export default function AdminPartnerManager({
           companyOptions={companyOptions}
           categoryId={defaultCategoryId}
           formAction={createPartner}
-          submitLabel="제휴 추가"
+          submitLabel="브랜드 추가"
           className="bg-surface"
         />
       ) : null}

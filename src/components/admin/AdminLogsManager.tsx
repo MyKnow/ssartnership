@@ -67,7 +67,7 @@ const productLabels: Record<string, string> = {
   push_unsubscribe_device: '현재 기기 알림 해제',
   push_unsubscribe_all: '모든 기기 알림 해제',
   push_preference_change: '푸시 설정 변경',
-  suggest_submit: '제휴 제안 제출',
+  suggest_submit: '협력사 제안 제출',
   pwa_install_click: 'PWA 설치 클릭',
   certification_view: '내 프로필 조회',
   certification_qr_open: '교육생 QR 열기',
@@ -80,11 +80,11 @@ const auditLabels: Record<string, string> = {
   category_create: '카테고리 생성',
   category_update: '카테고리 수정',
   category_delete: '카테고리 삭제',
-  partner_create: '업체 생성',
-  partner_update: '업체 수정',
-  partner_delete: '업체 삭제',
-  partner_change_request_approve: '제휴 변경 요청 승인',
-  partner_change_request_reject: '제휴 변경 요청 거절',
+  partner_create: '브랜드 생성',
+  partner_update: '브랜드 수정',
+  partner_delete: '브랜드 삭제',
+  partner_change_request_approve: '브랜드 변경 요청 승인',
+  partner_change_request_reject: '브랜드 변경 요청 거절',
   member_update: '회원 수정',
   member_directory_sync: '회원 디렉토리 동기화',
   member_sync: '회원 정보 동기화',
@@ -95,8 +95,8 @@ const auditLabels: Record<string, string> = {
   cycle_settings_restore: '기수 기준 복구',
   push_send: '푸시 발송',
   push_log_delete: '푸시 로그 삭제',
-  partner_account_update: '제휴 포털 계정 수정',
-  partner_account_company_update: '제휴 포털 권한 수정',
+  partner_account_update: '협력사 포털 계정 수정',
+  partner_account_company_update: '협력사 포털 권한 수정',
 };
 
 const securityLabels: Record<string, string> = {
@@ -110,10 +110,10 @@ const securityLabels: Record<string, string> = {
   member_delete: '회원 탈퇴',
   admin_login: '관리자 로그인',
   admin_access: '관리자 접근 제어',
-  partner_login: '제휴 포털 로그인',
-  partner_logout: '제휴 포털 로그아웃',
-  partner_password_reset: '제휴 포털 비밀번호 재설정',
-  partner_password_change: '제휴 포털 비밀번호 변경',
+  partner_login: '협력사 포털 로그인',
+  partner_logout: '협력사 포털 로그아웃',
+  partner_password_reset: '협력사 포털 비밀번호 재설정',
+  partner_password_change: '협력사 포털 비밀번호 변경',
 };
 
 function formatDateTime(value: string) {

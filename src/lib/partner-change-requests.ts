@@ -306,7 +306,7 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
 
 function extractCategoryLabel(categories: PartnerRow["categories"]) {
   const category = normalizeRelation(categories);
-  return category?.label ?? "제휴";
+  return category?.label ?? "브랜드";
 }
 
 function extractCategoryColor(categories: PartnerRow["categories"]) {
@@ -530,7 +530,7 @@ async function createSupabaseRequest(
   if (!context) {
     throw new PartnerChangeRequestError(
       "forbidden",
-      "해당 서비스의 변경 요청을 만들 수 없습니다.",
+      "해당 브랜드의 변경 요청을 만들 수 없습니다.",
     );
   }
   if (context.pendingRequest) {
@@ -752,7 +752,7 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
   if (!previousPartner) {
     throw new PartnerChangeRequestError(
       "not_found",
-      "대상 업체를 찾을 수 없습니다.",
+      "대상 협력사를 찾을 수 없습니다.",
     );
   }
 

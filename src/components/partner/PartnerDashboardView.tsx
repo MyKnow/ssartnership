@@ -130,9 +130,9 @@ function CompanySection({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-primary/10 text-primary">제휴 회사</Badge>
+            <Badge className="bg-primary/10 text-primary">협력사</Badge>
             <Badge className="bg-surface text-muted-foreground">
-              서비스 {company.services.length}개
+              브랜드 {company.services.length}개
             </Badge>
           </div>
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -146,21 +146,21 @@ function CompanySection({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <MetricCard
-            label="조회수"
-            value={company.totals.detailViews}
-            hint="해당 회사 서비스들의 상세 페이지 조회 합계"
-          />
+        <MetricCard
+          label="조회수"
+          value={company.totals.detailViews}
+          hint="해당 협력사 브랜드들의 상세 페이지 조회 합계"
+        />
           <MetricCard
             label="총 클릭"
             value={company.totals.totalClicks}
             hint="카드, 지도, 예약, 문의 클릭 합계"
           />
-          <MetricCard
-            label="서비스 수"
-            value={company.services.length}
-            hint="포털에서 관리 가능한 연결 서비스"
-          />
+        <MetricCard
+          label="브랜드 수"
+          value={company.services.length}
+          hint="포털에서 관리 가능한 연결 브랜드"
+        />
         </div>
       </div>
 
@@ -193,8 +193,8 @@ function CompanySection({
 
       {company.services.length === 0 ? (
         <EmptyState
-          title="연결된 서비스가 없습니다."
-          description="관리자에서 업체 서비스를 연결하면 여기에서 조회할 수 있습니다."
+          title="연결된 브랜드가 없습니다."
+          description="관리자에서 협력사 브랜드를 연결하면 여기에서 조회할 수 있습니다."
         />
       ) : (
         <div className="space-y-3">
@@ -220,7 +220,7 @@ export default function PartnerDashboardView({
         <div className="mx-auto max-w-6xl space-y-6">
           <Card className="space-y-6 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="bg-primary/10 text-primary">제휴 포털</Badge>
+              <Badge className="bg-primary/10 text-primary">협력사 포털</Badge>
               <Badge className="bg-surface text-muted-foreground">
                 집계 수치만 제공
               </Badge>
@@ -228,30 +228,30 @@ export default function PartnerDashboardView({
 
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-                회사별 서비스 현황
+                협력사별 브랜드 현황
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
                 {session.displayName}님 계정으로 로그인되었습니다. 이 화면에서는
-                회사별 서비스 정보와 조회수, 클릭수 같은 집계 값만 확인할 수
+                협력사별 브랜드 정보와 조회수, 클릭수 같은 집계 값만 확인할 수
                 있습니다.
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
-                label="연결 회사"
+                label="연결 협력사"
                 value={dashboard.totals.companyCount}
-                hint="이 계정이 관리하는 회사 수"
+                hint="이 계정이 관리하는 협력사 수"
               />
               <MetricCard
-                label="서비스 수"
+                label="브랜드 수"
                 value={dashboard.totals.serviceCount}
-                hint="연결된 회사의 전체 서비스 수"
+                hint="연결된 협력사의 전체 브랜드 수"
               />
               <MetricCard
                 label="조회수"
                 value={dashboard.totals.detailViews}
-                hint="전체 서비스 상세 페이지 조회 합계"
+                hint="전체 브랜드 상세 페이지 조회 합계"
               />
               <MetricCard
                 label="총 클릭"
@@ -262,16 +262,16 @@ export default function PartnerDashboardView({
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>로그인 아이디: {session.loginId}</span>
-              <span>연결 회사: {session.companyIds.length}개</span>
+              <span>연결 협력사: {session.companyIds.length}개</span>
               <span>세션 상태: 분리 세션 활성화</span>
             </div>
           </Card>
 
           {dashboard.companies.length === 0 ? (
-            <EmptyState
-              title="연결된 회사가 없습니다."
-              description="관리자에서 업체와 연결된 회사 정보를 먼저 생성해야 합니다."
-            />
+          <EmptyState
+            title="연결된 협력사가 없습니다."
+            description="관리자에서 이 협력사에 연결된 브랜드 정보를 먼저 생성해야 합니다."
+          />
           ) : (
             dashboard.companies.map((company) => (
               <CompanySection key={company.id} company={company} />

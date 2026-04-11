@@ -208,7 +208,7 @@ export default function PartnerServiceDetailView({
                 {context.partnerName}
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                썸네일, 기타 이미지, 예약/문의 링크, 제휴 기간, 혜택, 이용 조건,
+                썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간, 혜택, 이용 조건,
                 태그, 적용 대상을 요청할 수 있습니다. 승인되기 전까지는 현재 값이
                 유지됩니다.
               </p>
@@ -217,7 +217,7 @@ export default function PartnerServiceDetailView({
             <>
               <Card className="space-y-4 p-6 sm:p-8">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-primary/10 text-primary">제휴 서비스</Badge>
+                  <Badge className="bg-primary/10 text-primary">브랜드</Badge>
                   <Badge className="bg-surface text-muted-foreground">
                     {context.companyName}
                   </Badge>
@@ -238,7 +238,7 @@ export default function PartnerServiceDetailView({
                     {context.companyName} - {context.partnerName}
                   </h1>
                   <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                    서비스 상세 정보를 확인할 수 있습니다. 연필 버튼을 누르면 같은
+                    브랜드 상세 정보를 확인할 수 있습니다. 연필 버튼을 누르면 같은
                     화면에서 수정 요청을 보낼 수 있습니다.
                   </p>
                 </div>
@@ -246,7 +246,7 @@ export default function PartnerServiceDetailView({
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-border bg-background/60 p-4">
                     <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                      서비스명
+                      브랜드명
                     </p>
                     <p className="mt-2 text-sm font-semibold text-foreground">
                       {context.partnerName}
@@ -590,7 +590,7 @@ export default function PartnerServiceDetailView({
                 <Card className="w-full p-4 sm:p-5">
                   <SectionHeading title="예약/문의" />
                   <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
-                    현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.
+                    현재 브랜드 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.
                   </div>
                 </Card>
               )}

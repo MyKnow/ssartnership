@@ -15,13 +15,13 @@ export default async function PartnerPortalHeader() {
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/partner"
-            aria-label="업체 포털 홈"
+            aria-label="협력사 포털 홈"
             className="inline-flex items-center text-foreground hover:opacity-80"
           >
             <BrandWordmark className="text-lg sm:text-xl" />
           </Link>
           <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground">
-            업체 포털
+            협력사 포털
           </span>
         </div>
 

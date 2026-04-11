@@ -184,7 +184,7 @@ export default async function AdminPartnersPage() {
 
   return (
     <AdminShell
-      title="업체 관리"
+      title="협력사 관리"
       backHref="/admin"
       backLabel="관리 홈"
     >
@@ -320,8 +320,8 @@ export default async function AdminPartnersPage() {
 
         <Card>
           <SectionHeading
-            title="제휴 업체 관리"
-            description="회사와 담당자 이메일을 함께 관리하고, 이용 조건/혜택/태그는 칩으로 다룹니다."
+            title="브랜드 관리"
+            description="협력사와 담당자 이메일을 함께 관리하고, 이용 조건/혜택/태그는 칩으로 다룹니다."
           />
           <AdminPartnerManager
             categories={safeCategories}
@@ -335,8 +335,8 @@ export default async function AdminPartnersPage() {
 
         <Card>
           <SectionHeading
-            title="업체 아이디 및 권한 관리"
-            description="로그인 아이디, 활성 상태, 비밀번호 변경 필요 여부와 회사별 권한을 관리합니다."
+            title="협력사 계정 및 권한 관리"
+            description="로그인 아이디, 활성 상태, 비밀번호 변경 필요 여부와 협력사별 권한을 관리합니다."
           />
           <AdminPartnerAccountManager accounts={safeAccounts} />
         </Card>
