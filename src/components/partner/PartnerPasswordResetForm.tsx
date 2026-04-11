@@ -92,7 +92,7 @@ export default function PartnerPasswordResetForm() {
           {success.temporaryPassword ? (
             <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                mock 임시 비밀번호
+                임시 비밀번호
               </p>
               <p className="mt-2 font-mono text-sm text-foreground">
                 {success.temporaryPassword}

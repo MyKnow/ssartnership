@@ -4,8 +4,9 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { notFound } from "next/navigation";
 import { listPartnerPortalDemoSetups } from "@/lib/partner-auth";
+import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -17,6 +18,10 @@ export const metadata: Metadata = {
 };
 
 export default async function PartnerSetupIndexPage() {
+  if (!isPartnerPortalMock) {
+    notFound();
+  }
+
   const setups = await listPartnerPortalDemoSetups();
 
   return (
@@ -27,9 +32,6 @@ export default async function PartnerSetupIndexPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">
                 제휴 포털 초기 설정
-              </Badge>
-              <Badge className="bg-surface text-muted-foreground">
-                {isPartnerPortalMock ? "Mock 데이터" : "실데이터"}
               </Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
@@ -95,7 +97,7 @@ export default async function PartnerSetupIndexPage() {
                     </div>
                     <div className="rounded-2xl border border-border bg-background/60 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                        데모 코드
+                        설정 코드
                       </p>
                       <p className="mt-2 break-all text-lg font-semibold text-foreground">
                         {setup.demoVerificationCode ?? "미공개"}

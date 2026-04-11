@@ -109,21 +109,36 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
             완료 시각: {new Date(success.completedAt).toLocaleString("ko-KR")}
           </p>
         </div>
-        <Button href="/partner/setup" variant="ghost">
-          다른 데모 보기
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button href="/partner/login">로그인 페이지</Button>
+          {context.isMock ? (
+            <Button href="/partner/setup" variant="ghost">
+              다른 데모 보기
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-border bg-background/70 p-4">
+        <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
+          초기 설정
+        </p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          이메일 인증 코드와 새 비밀번호를 입력하면, 이 계정의 포털 접근이
+          완료됩니다.
+        </p>
+      </div>
+
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         이메일 인증 코드
         <Input
           value={verificationCode}
           onChange={(event) => setVerificationCode(event.target.value)}
-          placeholder={context.isMock ? "mock 코드가 자동 입력됩니다." : "인증 코드"}
+          placeholder="인증 코드"
           autoComplete="one-time-code"
           disabled={pending}
         />
@@ -150,12 +165,6 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
         </label>
       </div>
 
-      {context.isMock ? (
-        <FormMessage>
-          mock 데이터에서는 인증 코드가 안내 카드에 노출되어 바로 테스트할 수
-          있습니다.
-        </FormMessage>
-      ) : null}
       <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
 

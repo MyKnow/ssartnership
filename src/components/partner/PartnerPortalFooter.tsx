@@ -2,6 +2,7 @@ import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import BrandWordmark from "@/components/BrandWordmark";
+import ThemeToggle from "@/components/ThemeToggle";
 import { BUG_REPORT_EMAIL } from "@/lib/site";
 import { getPartnerSession } from "@/lib/partner-session";
 
@@ -23,6 +24,7 @@ export default async function PartnerPortalFooter() {
           </Link>
 
           <div className="flex flex-wrap items-center gap-2">
+            <ThemeToggle />
             <Button variant="ghost" href="/partner">
               대시보드
             </Button>

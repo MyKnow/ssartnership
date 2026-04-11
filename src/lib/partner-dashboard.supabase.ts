@@ -31,6 +31,13 @@ type PartnerServiceRow = {
     | null;
 };
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string) {
+  return UUID_PATTERN.test(value.trim());
+}
+
 function extractCategoryLabel(
   categories: PartnerServiceRow["categories"],
 ) {
@@ -52,6 +59,16 @@ function createEmptyMetrics(): PartnerPortalServiceMetrics {
     inquiryClicks: 0,
     totalClicks: 0,
   };
+}
+
+function normalizeSupabaseCompanyIds(companyIds: string[]) {
+  return [
+    ...new Set(
+      companyIds
+        .map((id) => id.trim())
+        .filter((id): id is string => Boolean(id) && isUuid(id)),
+    ),
+  ];
 }
 
 async function countPartnerEvent(
@@ -131,7 +148,7 @@ function toCompanyDashboard(
 export async function getSupabasePartnerPortalDashboard(
   companyIds: string[],
 ): Promise<PartnerPortalDashboard> {
-  const uniqueCompanyIds = [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
+  const uniqueCompanyIds = normalizeSupabaseCompanyIds(companyIds);
   if (uniqueCompanyIds.length === 0) {
     return {
       companies: [],

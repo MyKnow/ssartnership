@@ -2,6 +2,7 @@ import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import BrandWordmark from "@/components/BrandWordmark";
+import ThemeToggle from "@/components/ThemeToggle";
 import { getPartnerSession } from "@/lib/partner-session";
 
 export default async function PartnerPortalHeader() {
@@ -26,6 +27,7 @@ export default async function PartnerPortalHeader() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" href="/partner">
             대시보드
           </Button>

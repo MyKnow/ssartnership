@@ -24,6 +24,13 @@ import {
   rejectMockPartnerChangeRequest,
 } from "./mock/partner-change-requests.ts";
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string) {
+  return UUID_PATTERN.test(value.trim());
+}
+
 export type PartnerChangeRequestStatus =
   | "pending"
   | "approved"
@@ -247,6 +254,16 @@ function normalizeCompanyIds(companyIds: string[]) {
   return [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
 }
 
+function normalizeSupabaseCompanyIds(companyIds: string[]) {
+  return [
+    ...new Set(
+      companyIds
+        .map((id) => id.trim())
+        .filter((id): id is string => Boolean(id) && isUuid(id)),
+    ),
+  ];
+}
+
 function normalizeTextList(values?: string[] | null) {
   const seen = new Set<string>();
   const next: string[] = [];
@@ -432,7 +449,7 @@ async function getSupabaseRequestContext(
   companyIds: string[],
   partnerId: string,
 ): Promise<PartnerChangeRequestContext | null> {
-  const uniqueCompanyIds = normalizeCompanyIds(companyIds);
+  const uniqueCompanyIds = normalizeSupabaseCompanyIds(companyIds);
   if (uniqueCompanyIds.length === 0) {
     return null;
   }
@@ -509,7 +526,7 @@ async function getSupabasePendingRequests(companyIds?: string[]) {
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
-  const uniqueCompanyIds = normalizeCompanyIds(companyIds ?? []);
+  const uniqueCompanyIds = normalizeSupabaseCompanyIds(companyIds ?? []);
   if (uniqueCompanyIds.length > 0) {
     query = query.in("company_id", uniqueCompanyIds);
   }
