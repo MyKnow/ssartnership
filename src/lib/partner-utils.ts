@@ -58,3 +58,7 @@ export function compareEndDate(
   }
   return dateA.getTime() - dateB.getTime();
 }
+
+export function normalizePartnerLoginId(value: string) {
+  return value.trim().toLowerCase();
+}

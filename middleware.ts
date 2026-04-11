@@ -8,9 +8,14 @@ import {
 } from "@/lib/admin-security";
 
 const COOKIE_NAME = "user_session";
+const PARTNER_COOKIE_NAME = "partner_session";
 
 function getSecret() {
   return process.env.USER_SESSION_SECRET ?? "";
+}
+
+function getPartnerSecret() {
+  return process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET ?? "";
 }
 
 async function hmacSha256Hex(payload: string, secret: string) {
@@ -49,6 +54,53 @@ async function verifyToken(token: string) {
       typeof parsed.issuedAt !== "number" ||
       typeof parsed.expiresAt !== "number"
     ) {
+      return null;
+    }
+    if (parsed.issuedAt > Date.now() || parsed.expiresAt <= Date.now()) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function verifyPartnerToken(token: string) {
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) {
+    return null;
+  }
+  try {
+    const expected = await hmacSha256Hex(payload, getPartnerSecret());
+    if (expected !== signature) {
+      return null;
+    }
+    const parsed = JSON.parse(payload) as {
+      accountId?: string;
+      loginId?: string;
+      displayName?: string;
+      companyIds?: string[];
+      issuedAt?: number;
+      expiresAt?: number;
+    };
+    if (
+      typeof parsed.accountId !== "string" ||
+      typeof parsed.loginId !== "string" ||
+      typeof parsed.displayName !== "string" ||
+      !Array.isArray(parsed.companyIds) ||
+      typeof parsed.issuedAt !== "number" ||
+      typeof parsed.expiresAt !== "number"
+    ) {
+      return null;
+    }
+    if (
+      parsed.companyIds.some(
+        (companyId) => typeof companyId !== "string" || !companyId,
+      )
+    ) {
+      return null;
+    }
+    if (parsed.companyIds.length === 0) {
       return null;
     }
     if (parsed.issuedAt > Date.now() || parsed.expiresAt <= Date.now()) {
@@ -102,19 +154,49 @@ export async function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  if (!token) {
-    return NextResponse.next();
-  }
-  const payload = await verifyToken(token);
-  if (payload?.mustChangePassword && pathname !== "/auth/change-password") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/change-password";
-    return NextResponse.redirect(url);
+  if (token) {
+    const payload = await verifyToken(token);
+    if (payload?.mustChangePassword && pathname !== "/auth/change-password") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/change-password";
+      return NextResponse.redirect(url);
+    }
   }
 
   if (pathname.startsWith("/auth")) {
     return NextResponse.next();
   }
+
+  const isPartnerSetupPath =
+    pathname === "/partner/setup" || pathname.startsWith("/partner/setup/");
+  const isPartnerLoginPath = pathname === "/partner/login";
+  const isPartnerPath = pathname === "/partner" || pathname.startsWith("/partner/");
+
+  if (isPartnerPath) {
+    const partnerToken = request.cookies.get(PARTNER_COOKIE_NAME)?.value;
+    const partnerPayload = partnerToken
+      ? await verifyPartnerToken(partnerToken)
+      : null;
+
+    if (isPartnerLoginPath) {
+      if (partnerPayload) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/partner";
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.next();
+    }
+
+    if (isPartnerSetupPath) {
+      return NextResponse.next();
+    }
+    if (!partnerPayload) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/partner/login";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return NextResponse.next();
 }
 

@@ -72,12 +72,14 @@
       대상: `src/app/admin/(protected)/actions.ts`, `src/app/admin/(protected)/partners/**`, `src/lib/partner-*.ts`
       목표: 제휴 업체를 생성할 때 담당자 이메일과 회사-계정 연결을 함께 만들 수 있어야 한다.
       완료: 관리자 제휴 폼에서 회사 선택/생성, 담당자 이메일 입력, 포털 계정 생성 및 회사-계정 연결까지 저장되도록 묶었다.
-   13-3. [ ] 초기 설정 페이지에서 이메일 인증 및 비밀번호 설정
+   13-3. [x] 초기 설정 페이지에서 이메일 인증 및 비밀번호 설정
       대상: `src/app/partner/setup/**`, `src/app/api/partner/**`, `src/lib/partner-auth-*.ts`
       목표: 담당자가 링크로 들어와 이메일 소유를 확인하고 초기 비밀번호를 직접 설정하게 한다.
-   13-4. [ ] 업체 포털 로그인 및 세션 분리
+      완료: mock 데모 목록과 토큰별 설정 페이지/API를 붙여 이메일 코드 확인과 초기 비밀번호 설정을 바로 테스트할 수 있게 했다.
+   13-4. [x] 업체 포털 로그인 및 세션 분리
       대상: `src/app/partner/login/**`, `src/app/partner/layout.tsx`, `middleware.ts`, `src/lib/partner-session.ts`
       목표: 제휴 업체 계정은 관리자/일반 사용자 세션과 분리된 경계에서만 접근하게 한다.
+      완료: `/partner` 진입 시 세션이 없으면 로그인으로 보내고, 별도 `partner_session` 쿠키와 로그인 서버 액션, rate limit, 보안 로그를 붙였다.
    13-5. [ ] 소속 서비스 조회와 수치형 로그만 노출
       대상: `src/app/partner/**`, `src/lib/activity-logs.ts`, `src/lib/partner-dashboard.ts`
       목표: 업체는 자신이 소유한 여러 서비스의 정보와 조회수/클릭수 같은 집계 수치만 볼 수 있게 한다.

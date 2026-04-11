@@ -10,7 +10,7 @@ let previousTrackedPath: string | null = null;
 export default function RoutePageViewTracker({
   area,
 }: {
-  area: 'site' | 'admin' | 'auth';
+  area: 'site' | 'admin' | 'auth' | 'partner';
 }) {
   const pathname = usePathname();
   const lastTrackedRef = useRef<string>('');

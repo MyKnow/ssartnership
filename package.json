@@ -10,6 +10,7 @@
     "lint": "eslint",
     "perf:lighthouse": "npm run build && node scripts/lighthouse-check.mjs",
     "test:mm-profile": "node --test tests/mm-profile-csv.test.mts",
+    "test:partner-portal": "node --test tests/partner-portal.mock.test.mts",
     "test:ssafy-cycle": "node --test tests/ssafy-cycle-simulation.test.mts",
     "release": "bash scripts/release.sh"
   },

@@ -106,6 +106,7 @@ const securityLabels: Record<string, string> = {
   member_delete: '회원 탈퇴',
   admin_login: '관리자 로그인',
   admin_access: '관리자 접근 제어',
+  partner_login: '제휴 포털 로그인',
 };
 
 function formatDateTime(value: string) {
