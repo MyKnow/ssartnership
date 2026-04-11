@@ -22,6 +22,7 @@ type PartnerValue = {
   id: string;
   name: string;
   category_id: string;
+  company_id?: string | null;
   visibility: "public" | "confidential" | "private";
   location: string;
   map_url?: string | null;
@@ -35,16 +36,36 @@ type PartnerValue = {
   thumbnail?: string | null;
   images?: string[] | null;
   tags?: string[] | null;
+  company?:
+    | {
+        id: string;
+        name: string;
+        slug: string;
+        description?: string | null;
+        contact_name?: string | null;
+        contact_email?: string | null;
+        contact_phone?: string | null;
+        is_active?: boolean | null;
+      }
+    | null;
 };
 
 export default function AdminPartnerEditorCard({
   partner,
   categoryOptions,
+  companyOptions,
   formAction,
   deleteAction,
 }: {
   partner: PartnerValue;
   categoryOptions: CategoryOption[];
+  companyOptions: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    contactName?: string | null;
+    contactEmail?: string | null;
+  }>;
   formAction: (formData: FormData) => void | Promise<void>;
   deleteAction: (formData: FormData) => void | Promise<void>;
 }) {
@@ -55,6 +76,7 @@ export default function AdminPartnerEditorCard({
       categoryOptions.find((item) => item.id === partner.category_id) ?? null,
     [categoryOptions, partner.category_id],
   );
+  const company = partner.company ?? null;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
   const galleryImages = partner.thumbnail
     ? partner.images ?? []
@@ -76,6 +98,9 @@ export default function AdminPartnerEditorCard({
             </Badge>
             <Badge className="bg-surface text-foreground">
               {category?.label ?? "미분류"}
+            </Badge>
+            <Badge className="bg-surface text-foreground">
+              {company?.name ?? "회사 미연결"}
             </Badge>
           </div>
           <PartnerAudienceChips
@@ -113,8 +138,19 @@ export default function AdminPartnerEditorCard({
               thumbnail,
               images: galleryImages,
               tags: partner.tags ?? [],
+              company: company
+                ? {
+                    id: company.id,
+                    name: company.name,
+                    description: company.description ?? "",
+                    contactName: company.contact_name ?? "",
+                    contactEmail: company.contact_email ?? "",
+                    contactPhone: company.contact_phone ?? "",
+                  }
+                : null,
             }}
             categoryOptions={categoryOptions}
+            companyOptions={companyOptions}
             categoryId={partner.category_id}
             formAction={formAction}
             deleteAction={deleteAction}

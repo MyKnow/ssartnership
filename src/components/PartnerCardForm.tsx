@@ -6,6 +6,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
+import Textarea from "@/components/ui/Textarea";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { cn } from "@/lib/cn";
@@ -14,7 +15,6 @@ import {
   PartnerThumbnailField,
 } from "@/components/admin/PartnerMediaEditor";
 import TokenChipField from "@/components/admin/TokenChipField";
-import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
@@ -28,6 +28,23 @@ import {
 export type PartnerCardCategoryOption = {
   id: string;
   label: string;
+};
+
+export type PartnerCardCompanyOption = {
+  id: string;
+  name: string;
+  slug: string;
+  contactName?: string | null;
+  contactEmail?: string | null;
+};
+
+export type PartnerCardCompanyValues = {
+  id?: string;
+  name?: string;
+  description?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 };
 
 export type PartnerCardFormValues = {
@@ -48,6 +65,7 @@ export type PartnerCardFormValues = {
   thumbnail?: string | null;
   images?: string[];
   tags?: string[];
+  company?: PartnerCardCompanyValues | null;
 };
 
 export type PartnerCardFormMode = "edit" | "create";
@@ -73,6 +91,7 @@ export default function PartnerCardForm({
   partner,
   mode = "edit",
   categoryOptions,
+  companyOptions,
   categoryId,
   formAction,
   deleteAction,
@@ -82,6 +101,7 @@ export default function PartnerCardForm({
   partner: PartnerCardFormValues;
   mode?: PartnerCardFormMode;
   categoryOptions?: PartnerCardCategoryOption[];
+  companyOptions?: PartnerCardCompanyOption[];
   categoryId?: string;
   formAction?: (formData: FormData) => void | Promise<void>;
   deleteAction?: (formData: FormData) => void | Promise<void>;
@@ -103,6 +123,7 @@ export default function PartnerCardForm({
     periodStart || periodEnd ? `${periodStart} ~ ${periodEnd}` : "기간 미설정";
   const visibilityValue = partner.visibility ?? "public";
   const nameValue = partner.name ?? "";
+  const companyValue = partner.company ?? null;
 
   return (
     <article className={cn("grid gap-6", className)}>
@@ -217,6 +238,79 @@ export default function PartnerCardForm({
           </Card>
         </div>
 
+        <Card className="overflow-hidden">
+          <SectionHeading
+            title="제휴 회사 / 담당자"
+            description="한 회사가 여러 서비스를 가질 수 있으니, 회사와 담당자 이메일을 함께 묶어 관리합니다."
+          />
+
+          <div className="mt-6 grid gap-5">
+            <FieldGroup label="기존 회사 연결">
+              <Select
+                name="companyId"
+                defaultValue={companyValue?.id ?? ""}
+              >
+                <option value="">새 회사 생성</option>
+                {(companyOptions ?? []).map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                    {company.contactEmail ? ` · ${company.contactEmail}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </FieldGroup>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldGroup label="회사명">
+                <Input
+                  name="companyName"
+                  defaultValue={companyValue?.name ?? ""}
+                  placeholder="회사명"
+                />
+              </FieldGroup>
+              <FieldGroup label="담당자 이름">
+                <Input
+                  name="companyContactName"
+                  defaultValue={companyValue?.contactName ?? ""}
+                  placeholder="담당자 이름"
+                />
+              </FieldGroup>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldGroup label="담당자 이메일">
+                <Input
+                  name="companyContactEmail"
+                  type="email"
+                  defaultValue={companyValue?.contactEmail ?? ""}
+                  placeholder="partner@example.com"
+                />
+              </FieldGroup>
+              <FieldGroup label="담당자 전화번호">
+                <Input
+                  name="companyContactPhone"
+                  defaultValue={companyValue?.contactPhone ?? ""}
+                  placeholder="010-1234-5678"
+                />
+              </FieldGroup>
+            </div>
+
+            <FieldGroup label="회사 설명">
+              <Textarea
+                name="companyDescription"
+                defaultValue={companyValue?.description ?? ""}
+                rows={3}
+                placeholder="포털에서 함께 보일 회사 소개를 입력합니다."
+              />
+            </FieldGroup>
+
+            <p className="text-xs leading-5 text-muted-foreground">
+              담당자 이메일은 이후 포털 로그인 아이디와 초기 설정 안내에
+              사용됩니다. 기존 회사를 연결할 때는 비워 두고 저장해도 됩니다.
+            </p>
+          </div>
+        </Card>
+
         <PartnerGalleryField
           initial={partner.images ?? []}
           className="w-full"
@@ -295,9 +389,6 @@ export default function PartnerCardForm({
                     <span>{option.label}</span>
                   </label>
                 ))}
-              </div>
-              <div className="rounded-2xl border border-border bg-surface-muted px-4 py-3">
-                <PartnerAudienceChips appliesTo={selectedAppliesTo} />
               </div>
             </div>
           </Card>

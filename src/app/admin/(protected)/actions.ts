@@ -8,6 +8,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { createNewPartnerPayload, isPushConfigured, sendPushToAudience } from "@/lib/push";
 import { clearAdminSession, requireAdmin } from "@/lib/auth";
+import { generateTempPassword, hashPassword } from "@/lib/password";
 import type { PartnerVisibility } from "@/lib/types";
 import {
   buildMemberSyncLogProperties,
@@ -42,6 +43,7 @@ import {
   sanitizeHexColor,
   sanitizeHttpUrl,
   sanitizePartnerLinkValue,
+  isValidEmail,
   parseMemberYearValue,
   validateCategoryKey,
   validateMemberYear,
@@ -71,6 +73,37 @@ type PartnerMediaInput = {
   uploadedUrls: string[];
 };
 
+type PartnerCompanyInput = {
+  companyId: string | null;
+  name: string;
+  description: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+};
+
+type PartnerCompanyRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  is_active?: boolean | null;
+};
+
+type PartnerAccountRow = {
+  id: string;
+  login_id: string;
+  display_name: string;
+  email?: string | null;
+  password_hash?: string | null;
+  password_salt?: string | null;
+  must_change_password?: boolean | null;
+  is_active?: boolean | null;
+};
+
 function parseList(value: string) {
   return Array.from(
     new Set(
@@ -88,6 +121,403 @@ function parseOptionalUrl(value: string) {
 
 function parsePartnerLink(value: string) {
   return sanitizePartnerLinkValue(value) ?? null;
+}
+
+function parsePartnerCompanyPayload(formData: FormData): PartnerCompanyInput {
+  const companyId = String(formData.get("companyId") || "").trim();
+  const name = String(formData.get("companyName") || "").trim();
+  const description = String(formData.get("companyDescription") || "").trim();
+  const contactName = String(formData.get("companyContactName") || "").trim();
+  const contactEmail = String(formData.get("companyContactEmail") || "").trim();
+  const contactPhone = String(formData.get("companyContactPhone") || "").trim();
+
+  if (contactEmail && !isValidEmail(contactEmail)) {
+    throw new Error("담당자 이메일 형식이 올바르지 않습니다.");
+  }
+
+  return {
+    companyId: companyId || null,
+    name,
+    description: description || null,
+    contactName: contactName || null,
+    contactEmail: contactEmail || null,
+    contactPhone: contactPhone || null,
+  };
+}
+
+function buildPartnerCompanySlug(name: string) {
+  const normalized = name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 48);
+
+  const base = normalized || "partner-company";
+  return `${base}-${randomUUID().slice(0, 8)}`;
+}
+
+function toPartnerAccountDisplayName(company: PartnerCompanyInput, companyRow?: PartnerCompanyRow | null) {
+  return (
+    company.contactName ||
+    companyRow?.contact_name ||
+    company.name ||
+    companyRow?.name ||
+    "제휴 담당자"
+  );
+}
+
+function toPartnerAccountLoginId(company: PartnerCompanyInput, companyRow?: PartnerCompanyRow | null) {
+  const email = company.contactEmail || companyRow?.contact_email || "";
+  return email.trim().toLowerCase();
+}
+
+function normalizePartnerCompanyRow(row: PartnerCompanyRow | null | undefined) {
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description ?? null,
+    contact_name: row.contact_name ?? null,
+    contact_email: row.contact_email ?? null,
+    contact_phone: row.contact_phone ?? null,
+    is_active: row.is_active ?? true,
+  } satisfies PartnerCompanyRow;
+}
+
+async function ensurePartnerCompanyRow(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  companyInput: PartnerCompanyInput,
+  requireCompany: boolean,
+) {
+  const hasCompanySelection = Boolean(companyInput.companyId);
+  const hasCompanyFields = Boolean(
+    companyInput.name ||
+      companyInput.description ||
+      companyInput.contactName ||
+      companyInput.contactEmail ||
+      companyInput.contactPhone,
+  );
+
+  if (!hasCompanySelection && !hasCompanyFields) {
+    if (requireCompany) {
+      throw new Error("회사명과 담당자 이메일을 입력해 주세요.");
+    }
+    return {
+      company: null,
+      account: null,
+      createdCompany: false,
+      createdAccount: false,
+      createdLink: false,
+    };
+  }
+
+  const cleanupTasks: Array<() => Promise<void>> = [];
+  let company: PartnerCompanyRow | null = null;
+  let account: PartnerAccountRow | null = null;
+  let createdCompany = false;
+  let createdAccount = false;
+  let createdLink = false;
+
+  try {
+    if (hasCompanySelection) {
+      const { data, error } = await supabase
+        .from("partner_companies")
+        .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+        .eq("id", companyInput.companyId)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (!data) {
+        throw new Error("연결할 회사를 찾을 수 없습니다.");
+      }
+
+      company = normalizePartnerCompanyRow(data as PartnerCompanyRow);
+      if (!company) {
+        throw new Error("회사 정보를 처리하지 못했습니다.");
+      }
+      const currentCompany = company;
+
+      const nextCompany = {
+        name: companyInput.name || currentCompany.name,
+        slug: currentCompany.slug,
+        description:
+          companyInput.description !== null && companyInput.description !== undefined
+            ? companyInput.description
+            : currentCompany.description ?? null,
+        contact_name:
+          companyInput.contactName !== null && companyInput.contactName !== undefined
+            ? companyInput.contactName
+            : currentCompany.contact_name ?? null,
+        contact_email:
+          companyInput.contactEmail !== null && companyInput.contactEmail !== undefined
+            ? companyInput.contactEmail.toLowerCase()
+            : currentCompany.contact_email ?? null,
+        contact_phone:
+          companyInput.contactPhone !== null && companyInput.contactPhone !== undefined
+            ? companyInput.contactPhone
+            : currentCompany.contact_phone ?? null,
+        is_active: currentCompany.is_active ?? true,
+      };
+
+      const hasChanges =
+        nextCompany.name !== currentCompany.name ||
+        nextCompany.description !== currentCompany.description ||
+        nextCompany.contact_name !== currentCompany.contact_name ||
+        nextCompany.contact_email !== currentCompany.contact_email ||
+        nextCompany.contact_phone !== currentCompany.contact_phone;
+
+      if (hasChanges) {
+        const { data: updatedCompany, error: updateError } = await supabase
+          .from("partner_companies")
+          .update(nextCompany)
+          .eq("id", currentCompany.id)
+          .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+          .single();
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+
+        company = normalizePartnerCompanyRow(updatedCompany as PartnerCompanyRow);
+      }
+    } else {
+      if (!companyInput.name) {
+        throw new Error("회사명을 입력해 주세요.");
+      }
+      if (!companyInput.contactEmail) {
+        throw new Error("담당자 이메일을 입력해 주세요.");
+      }
+
+      const { data: created, error } = await supabase
+        .from("partner_companies")
+        .insert({
+          name: companyInput.name,
+          slug: buildPartnerCompanySlug(companyInput.name),
+          description: companyInput.description,
+          contact_name: companyInput.contactName,
+          contact_email: companyInput.contactEmail.toLowerCase(),
+          contact_phone: companyInput.contactPhone,
+          is_active: true,
+        })
+        .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      company = normalizePartnerCompanyRow(created as PartnerCompanyRow);
+      createdCompany = true;
+      cleanupTasks.push(async () => {
+        await supabase.from("partner_companies").delete().eq("id", company?.id ?? "");
+      });
+    }
+
+    if (!company) {
+      throw new Error("회사 정보를 처리하지 못했습니다.");
+    }
+
+    const resolvedCompany = company;
+    const loginId = toPartnerAccountLoginId(companyInput, resolvedCompany);
+    if (!loginId) {
+      throw new Error("담당자 이메일을 입력해 주세요.");
+    }
+    const displayName = toPartnerAccountDisplayName(companyInput, resolvedCompany);
+
+    const { data: existingLink, error: linkError } = await supabase
+      .from("partner_account_companies")
+      .select("account_id,is_active")
+      .eq("company_id", resolvedCompany.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (linkError) {
+      throw new Error(linkError.message);
+    }
+
+  if (existingLink?.account_id) {
+    if (existingLink.is_active === false) {
+      const { error: activateLinkError } = await supabase
+        .from("partner_account_companies")
+        .update({ is_active: true })
+        .eq("account_id", existingLink.account_id)
+        .eq("company_id", resolvedCompany.id);
+
+      if (activateLinkError) {
+        throw new Error(activateLinkError.message);
+      }
+    }
+
+    const { data: existingAccount, error: accountError } = await supabase
+      .from("partner_accounts")
+      .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+      .eq("id", existingLink.account_id)
+      .maybeSingle();
+
+      if (accountError) {
+        throw new Error(accountError.message);
+      }
+      if (!existingAccount) {
+        throw new Error("연결된 업체 계정을 찾을 수 없습니다.");
+      }
+
+      const nextAccount = {
+        login_id: loginId,
+        display_name: displayName,
+        email: loginId,
+        is_active: true,
+      };
+
+      const hasAccountChanges =
+        nextAccount.login_id !== existingAccount.login_id ||
+        nextAccount.display_name !== existingAccount.display_name ||
+        nextAccount.email !== existingAccount.email ||
+        Boolean(existingAccount.is_active) !== true;
+
+      if (hasAccountChanges) {
+        const { data: updatedAccount, error: updateError } = await supabase
+          .from("partner_accounts")
+          .update(nextAccount)
+          .eq("id", existingAccount.id)
+          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+          .single();
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+        account = updatedAccount as PartnerAccountRow;
+      } else {
+        account = existingAccount as PartnerAccountRow;
+      }
+    } else {
+      const { data: existingAccount, error: accountLookupError } = await supabase
+        .from("partner_accounts")
+        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+        .eq("login_id", loginId)
+        .maybeSingle();
+
+      if (accountLookupError) {
+        throw new Error(accountLookupError.message);
+      }
+
+      if (existingAccount) {
+        const { data: updatedAccount, error: updateError } = await supabase
+          .from("partner_accounts")
+          .update({
+            display_name: displayName,
+            email: loginId,
+            is_active: true,
+          })
+          .eq("id", existingAccount.id)
+          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+          .single();
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+        account = updatedAccount as PartnerAccountRow;
+      } else {
+        const passwordRecord = hashPassword(generateTempPassword(12));
+        const { data: createdAccountRow, error: createAccountError } = await supabase
+          .from("partner_accounts")
+          .insert({
+            login_id: loginId,
+            display_name: displayName,
+            email: loginId,
+            password_hash: passwordRecord.hash,
+            password_salt: passwordRecord.salt,
+            must_change_password: true,
+            is_active: true,
+          })
+          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+          .single();
+
+        if (createAccountError) {
+          throw new Error(createAccountError.message);
+        }
+
+        account = createdAccountRow as PartnerAccountRow;
+        createdAccount = true;
+        cleanupTasks.push(async () => {
+          await supabase.from("partner_accounts").delete().eq("id", account?.id ?? "");
+        });
+      }
+
+      const { error: createLinkError } = await supabase
+        .from("partner_account_companies")
+        .insert({
+          account_id: account.id,
+          company_id: resolvedCompany.id,
+          role: "owner",
+          is_active: true,
+        });
+
+      if (createLinkError) {
+        throw new Error(createLinkError.message);
+      }
+      createdLink = true;
+      cleanupTasks.push(async () => {
+        await supabase
+          .from("partner_account_companies")
+          .delete()
+          .eq("account_id", account?.id ?? "")
+          .eq("company_id", resolvedCompany.id);
+      });
+    }
+
+    return {
+      company: resolvedCompany,
+      account,
+      createdCompany,
+      createdAccount,
+      createdLink,
+    };
+  } catch (error) {
+    for (const cleanup of cleanupTasks.reverse()) {
+      await cleanup().catch(() => undefined);
+    }
+    throw error;
+  }
+}
+
+async function cleanupPartnerCompanyProvision(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  provision: Awaited<ReturnType<typeof ensurePartnerCompanyRow>> | null,
+) {
+  if (!provision?.company) {
+    return;
+  }
+
+  if (provision.createdLink && provision.account) {
+    await supabase
+      .from("partner_account_companies")
+      .delete()
+      .eq("account_id", provision.account.id)
+      .eq("company_id", provision.company.id);
+  }
+
+  if (provision.createdAccount && provision.account) {
+    await supabase
+      .from("partner_accounts")
+      .delete()
+      .eq("id", provision.account.id);
+  }
+
+  if (provision.createdCompany) {
+    await supabase
+      .from("partner_companies")
+      .delete()
+      .eq("id", provision.company.id);
+  }
 }
 
 async function logAdminAction(
@@ -442,31 +872,42 @@ export async function createPartner(formData: FormData) {
   await requireAdmin();
   const payload = parsePartnerPayload(formData);
   const partnerId = randomUUID();
+  const companyPayload = parsePartnerCompanyPayload(formData);
   const media = await resolvePartnerMediaPayload(formData, partnerId);
 
   const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.from("partners").insert({
-    id: partnerId,
-    name: payload.name,
-    category_id: payload.categoryId,
-    location: payload.location,
-    map_url: payload.mapUrl,
-    reservation_link: payload.reservationLink,
-    inquiry_link: payload.inquiryLink,
-    period_start: payload.periodStart,
-    period_end: payload.periodEnd,
-    conditions: payload.conditions,
-    benefits: payload.benefits,
-    applies_to: payload.appliesTo,
-    thumbnail: media.thumbnail,
-    images: media.images,
-    tags: payload.tags,
-    visibility: payload.visibility,
-  });
+  let companyProvision: Awaited<ReturnType<typeof ensurePartnerCompanyRow>> | null = null;
 
-  if (error) {
+  try {
+    companyProvision = await ensurePartnerCompanyRow(supabase, companyPayload, true);
+
+    const { error } = await supabase.from("partners").insert({
+      id: partnerId,
+      company_id: companyProvision.company?.id ?? null,
+      name: payload.name,
+      category_id: payload.categoryId,
+      location: payload.location,
+      map_url: payload.mapUrl,
+      reservation_link: payload.reservationLink,
+      inquiry_link: payload.inquiryLink,
+      period_start: payload.periodStart,
+      period_end: payload.periodEnd,
+      conditions: payload.conditions,
+      benefits: payload.benefits,
+      applies_to: payload.appliesTo,
+      thumbnail: media.thumbnail,
+      images: media.images,
+      tags: payload.tags,
+      visibility: payload.visibility,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    throw new Error(error.message);
+    await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    throw error;
   }
 
   await logAdminAction("partner_create", {
@@ -474,6 +915,9 @@ export async function createPartner(formData: FormData) {
     targetId: partnerId,
     properties: {
       name: payload.name,
+      companyId: companyProvision?.company?.id ?? null,
+      companyName: companyProvision?.company?.name ?? null,
+      companyContactEmail: companyProvision?.company?.contact_email ?? null,
       categoryId: payload.categoryId,
       location: payload.location,
       hasMapUrl: Boolean(payload.mapUrl),
@@ -531,7 +975,7 @@ export async function updatePartner(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
-    .select("thumbnail,images")
+    .select("company_id,thumbnail,images")
     .eq("id", id)
     .maybeSingle();
 
@@ -542,32 +986,60 @@ export async function updatePartner(formData: FormData) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
   }
 
+  const companyPayload = parsePartnerCompanyPayload(formData);
   const media = await resolvePartnerMediaPayload(formData, id);
+  const hasCompanyPayload = Boolean(
+    companyPayload.companyId ||
+      companyPayload.name ||
+      companyPayload.description ||
+      companyPayload.contactName ||
+      companyPayload.contactEmail ||
+      companyPayload.contactPhone,
+  );
+  let companyProvision: Awaited<ReturnType<typeof ensurePartnerCompanyRow>> | null = null;
+  let nextCompanyId = previousPartner.company_id ?? null;
 
-  const { error } = await supabase
-    .from("partners")
-    .update({
-      name: payload.name,
-      category_id: payload.categoryId,
-      location: payload.location,
-      map_url: payload.mapUrl,
-      reservation_link: payload.reservationLink,
-      inquiry_link: payload.inquiryLink,
-      period_start: payload.periodStart,
-      period_end: payload.periodEnd,
-      conditions: payload.conditions,
-      benefits: payload.benefits,
-      applies_to: payload.appliesTo,
-      thumbnail: media.thumbnail,
-      images: media.images,
-      tags: payload.tags,
-      visibility: payload.visibility,
-    })
-    .eq("id", id);
+  if (hasCompanyPayload) {
+    companyProvision = await ensurePartnerCompanyRow(
+      supabase,
+      companyPayload,
+      Boolean(previousPartner.company_id || hasCompanyPayload),
+    );
+    if (companyProvision.company) {
+      nextCompanyId = companyProvision.company.id;
+    }
+  }
 
-  if (error) {
+  try {
+    const { error } = await supabase
+      .from("partners")
+      .update({
+        company_id: nextCompanyId,
+        name: payload.name,
+        category_id: payload.categoryId,
+        location: payload.location,
+        map_url: payload.mapUrl,
+        reservation_link: payload.reservationLink,
+        inquiry_link: payload.inquiryLink,
+        period_start: payload.periodStart,
+        period_end: payload.periodEnd,
+        conditions: payload.conditions,
+        benefits: payload.benefits,
+        applies_to: payload.appliesTo,
+        thumbnail: media.thumbnail,
+        images: media.images,
+        tags: payload.tags,
+        visibility: payload.visibility,
+      })
+      .eq("id", id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    throw new Error(error.message);
+    await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    throw error;
   }
 
   const previousUrls = collectPartnerMediaUrls(previousPartner);
@@ -583,6 +1055,9 @@ export async function updatePartner(formData: FormData) {
     targetId: id,
     properties: {
       name: payload.name,
+      companyId: nextCompanyId,
+      companyName: companyProvision?.company?.name ?? null,
+      companyContactEmail: companyProvision?.company?.contact_email ?? null,
       categoryId: payload.categoryId,
       location: payload.location,
       hasMapUrl: Boolean(payload.mapUrl),

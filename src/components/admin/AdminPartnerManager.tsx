@@ -30,6 +30,7 @@ type AdminPartner = {
   id: string;
   name: string;
   category_id: string;
+  company_id?: string | null;
   visibility: "public" | "confidential" | "private";
   location: string;
   map_url?: string | null;
@@ -43,6 +44,29 @@ type AdminPartner = {
   thumbnail?: string | null;
   images?: string[] | null;
   tags?: string[] | null;
+  company?:
+    | {
+        id: string;
+        name: string;
+        slug: string;
+        description?: string | null;
+        contact_name?: string | null;
+        contact_email?: string | null;
+        contact_phone?: string | null;
+        is_active?: boolean | null;
+      }
+    | null;
+};
+
+type AdminCompany = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  is_active?: boolean | null;
 };
 
 type VisibilityFilter = "all" | "public" | "confidential" | "private";
@@ -50,12 +74,14 @@ type VisibilityFilter = "all" | "public" | "confidential" | "private";
 export default function AdminPartnerManager({
   categories,
   partners,
+  companies,
   createPartner,
   updatePartner,
   deletePartner,
 }: {
   categories: AdminCategory[];
   partners: AdminPartner[];
+  companies: AdminCompany[];
   createPartner: (formData: FormData) => void | Promise<void>;
   updatePartner: (formData: FormData) => void | Promise<void>;
   deletePartner: (formData: FormData) => void | Promise<void>;
@@ -80,6 +106,18 @@ export default function AdminPartnerManager({
     [categories],
   );
 
+  const companyOptions = useMemo(
+    () =>
+      companies.map((company) => ({
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+        contactName: company.contact_name ?? "",
+        contactEmail: company.contact_email ?? "",
+      })),
+    [companies],
+  );
+
   const categoryKeyById = useMemo(() => {
     return new Map(categories.map((category) => [category.id, category.key]));
   }, [categories]);
@@ -101,6 +139,8 @@ export default function AdminPartnerManager({
         _isActive: isWithinPeriod(partner.period_start, partner.period_end),
         _search: [
           partner.name,
+          partner.company?.name ?? "",
+          partner.company?.contact_email ?? "",
           partner.location,
           partner.reservation_link ?? "",
           partner.inquiry_link ?? "",
@@ -213,8 +253,10 @@ export default function AdminPartnerManager({
             thumbnail: null,
             images: [],
             tags: [],
+            company: null,
           }}
           categoryOptions={categoryOptions}
+          companyOptions={companyOptions}
           categoryId={defaultCategoryId}
           formAction={createPartner}
           submitLabel="제휴 추가"
@@ -238,10 +280,11 @@ export default function AdminPartnerManager({
       ) : (
         <div className="grid gap-6">
           {filteredPartners.map((partner) => (
-            <AdminPartnerEditorCard
+              <AdminPartnerEditorCard
               key={partner.id}
               partner={partner}
               categoryOptions={categoryOptions}
+              companyOptions={companyOptions}
               formAction={updatePartner}
               deleteAction={deletePartner}
             />

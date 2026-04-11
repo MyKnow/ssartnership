@@ -18,6 +18,33 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+type PartnerCompanyRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  is_active?: boolean | null;
+};
+
+function normalizePartnerCompany(
+  value: unknown,
+): PartnerCompanyRow | null {
+  if (!value) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    const first = value[0] as PartnerCompanyRow | undefined;
+    return first ?? null;
+  }
+  if (typeof value === "object") {
+    return value as PartnerCompanyRow;
+  }
+  return null;
+}
+
 function FieldGroup({
   label,
   children,
@@ -40,19 +67,27 @@ function FieldGroup({
 export default async function AdminPartnersPage() {
   const supabase = getSupabaseAdminClient();
 
-  const [categoriesResult, partnersResult] = await Promise.all([
+  const [categoriesResult, partnersResult, companiesResult] = await Promise.all([
     supabase
       .from("categories")
       .select("id,key,label,description,color")
       .order("created_at", { ascending: true }),
     supabase
       .from("partners")
-      .select("id,name,category_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility")
+      .select("id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active)")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("partner_companies")
+      .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+      .order("name", { ascending: true }),
   ]);
 
   const safeCategories = categoriesResult.data ?? [];
-  const safePartners = partnersResult.data ?? [];
+  const safePartners = (partnersResult.data ?? []).map((partner) => ({
+    ...partner,
+    company: normalizePartnerCompany((partner as { company?: unknown }).company),
+  }));
+  const safeCompanies = companiesResult.data ?? [];
 
   return (
     <AdminShell
@@ -187,11 +222,12 @@ export default async function AdminPartnersPage() {
         <Card>
           <SectionHeading
             title="제휴 업체 관리"
-            description="이용 조건/혜택/태그는 콤마(,)로 구분해 입력하고, 적용 대상은 체크박스로 선택합니다."
+            description="회사와 담당자 이메일을 함께 관리하고, 이용 조건/혜택/태그는 칩으로 다룹니다."
           />
           <AdminPartnerManager
             categories={safeCategories}
             partners={safePartners}
+            companies={safeCompanies}
             createPartner={createPartner}
             updatePartner={updatePartner}
             deletePartner={deletePartner}
