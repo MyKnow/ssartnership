@@ -1,11 +1,13 @@
+import { forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
-export default function Input({
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+const Input = forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(function Input({ className, ...props }, ref) {
   return (
     <input
+      ref={ref}
       {...props}
       className={cn(
         "w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted",
@@ -14,4 +16,6 @@ export default function Input({
       )}
     />
   );
-}
+});
+
+export default Input;

@@ -8,12 +8,12 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
-import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
 import {
   PartnerGalleryField,
   PartnerThumbnailField,
 } from "@/components/admin/PartnerMediaEditor";
+import TokenChipField from "@/components/admin/TokenChipField";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import {
   getPartnerVisibilityBadgeClass,
@@ -88,9 +88,6 @@ export default function PartnerCardForm({
   submitLabel?: string;
   className?: string;
 }) {
-  const benefitsValue = (partner.benefits ?? []).join("\n");
-  const conditionsValue = (partner.conditions ?? []).join("\n");
-  const tagsValue = (partner.tags ?? []).join(", ");
   const periodStart = partner.period?.start ?? "";
   const periodEnd = partner.period?.end ?? "";
   const selectedAppliesTo = normalizePartnerAudience(
@@ -147,7 +144,7 @@ export default function PartnerCardForm({
           <input type="hidden" name="id" value={partner.id} />
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+        <div className="grid gap-6">
           <Card className="overflow-hidden">
             <SectionHeading
               title="기본 정보"
@@ -155,15 +152,15 @@ export default function PartnerCardForm({
             />
 
             <div className="mt-6 grid gap-5">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:items-start">
-                <FieldGroup label="업체명">
-                  <Input name="name" defaultValue={nameValue} required />
-                </FieldGroup>
-                <PartnerThumbnailField
-                  initial={partner.thumbnail ?? null}
-                  className="lg:self-start"
-                />
-              </div>
+
+              <PartnerThumbnailField
+                initial={partner.thumbnail ?? null}
+                className="w-full"
+              />
+
+              <FieldGroup label="업체명">
+                <Input name="name" defaultValue={nameValue} required />
+              </FieldGroup>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <FieldGroup label="노출 상태">
@@ -218,55 +215,70 @@ export default function PartnerCardForm({
               </FieldGroup>
             </div>
           </Card>
-
-          <PartnerGalleryField
-            initial={partner.images ?? []}
-            className="self-start"
-          />
         </div>
+
+        <PartnerGalleryField
+          initial={partner.images ?? []}
+          className="w-full"
+        />
 
         <div className="grid gap-6 xl:grid-cols-2">
           <Card className="overflow-hidden">
             <SectionHeading
               title="이용 조건"
-              description="쉼표 또는 줄바꿈으로 구분하면 상세 페이지에서 개별 조건으로 표시됩니다."
+              description="칩으로 분리된 조건을 입력하고, 순서와 내용을 직접 다듬습니다."
             />
-            <FieldGroup label="조건 목록" className="mt-6">
-              <Textarea
+            <div className="mt-6">
+              <TokenChipField
                 name="conditions"
-                defaultValue={conditionsValue}
-                placeholder={"예: 전 직원 SSAFY 구성원 인증\n예: 예약 후 이용"}
-                rows={6}
-                className="min-h-40 resize-y"
+                initialValues={partner.conditions ?? []}
+                placeholder="조건을 입력하고 Enter"
+                helpText="Enter로 칩을 추가하고 버튼을 눌러 순서를 바꿀 수 있습니다."
+                emptyText="아직 등록된 이용 조건이 없습니다."
               />
-            </FieldGroup>
+            </div>
           </Card>
 
           <Card className="overflow-hidden">
             <SectionHeading
               title="혜택"
-              description="혜택도 줄바꿈 기반으로 입력하면 카드 목록처럼 읽기 좋습니다."
+              description="칩 단위로 혜택을 저장하고, 필요한 문구를 언제든 수정합니다."
             />
-            <FieldGroup label="혜택 목록" className="mt-6">
-              <Textarea
+            <div className="mt-6">
+              <TokenChipField
                 name="benefits"
-                defaultValue={benefitsValue}
-                placeholder={"예: 월 이용권 20% 할인\n예: PT 5회 패키지 10% 할인"}
-                rows={6}
-                className="min-h-40 resize-y"
+                initialValues={partner.benefits ?? []}
+                placeholder="혜택을 입력하고 Enter"
+                helpText="Enter로 칩을 추가하고 버튼을 눌러 순서를 바꿀 수 있습니다."
+                emptyText="아직 등록된 혜택이 없습니다."
               />
-            </FieldGroup>
+            </div>
           </Card>
         </div>
 
-        <Card className="overflow-hidden">
-          <SectionHeading
-            title="적용 대상과 태그"
-            description="상세 페이지의 적용 대상 칩과 태그 영역을 한 번에 정리합니다."
-          />
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="overflow-hidden">
+            <SectionHeading
+              title="태그"
+              description="짧은 키워드를 칩으로 저장하고, 노출 분류를 빠르게 찾을 수 있게 합니다."
+            />
+            <div className="mt-6">
+              <TokenChipField
+                name="tags"
+                initialValues={partner.tags ?? []}
+                placeholder="태그를 입력하고 Enter"
+                helpText="짧은 키워드를 칩으로 저장합니다. 줄바꿈으로 여러 개를 한 번에 넣고 위/아래 화살표로 정리할 수 있습니다."
+                emptyText="아직 등록된 태그가 없습니다."
+              />
+            </div>
+          </Card>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
-            <div className="grid gap-4">
+          <Card className="overflow-hidden">
+            <SectionHeading
+              title="적용 대상"
+              description="상세 페이지에서 보이는 적용 대상 칩을 기준으로 노출 범위를 관리합니다."
+            />
+            <div className="mt-6 grid gap-4">
               <div className="grid gap-2 sm:grid-cols-3">
                 {PARTNER_AUDIENCE_OPTIONS.map((option) => (
                   <label
@@ -288,16 +300,8 @@ export default function PartnerCardForm({
                 <PartnerAudienceChips appliesTo={selectedAppliesTo} />
               </div>
             </div>
-
-            <FieldGroup label="태그">
-              <Input
-                name="tags"
-                defaultValue={tagsValue}
-                placeholder="태그1, 태그2"
-              />
-            </FieldGroup>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">

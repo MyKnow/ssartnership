@@ -236,7 +236,7 @@ export default function AdminPartnerManager({
           }
         />
       ) : (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6">
           {filteredPartners.map((partner) => (
             <AdminPartnerEditorCard
               key={partner.id}

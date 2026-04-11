@@ -260,7 +260,7 @@ export default async function PartnerDetailPage({
 
             <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
               <Card
-                className="order-2 relative overflow-hidden p-6 xl:order-1"
+                className="order-1 relative overflow-hidden p-6 xl:order-1"
                 data-partner-detail-summary
               >
                 <div
@@ -393,7 +393,7 @@ export default async function PartnerDetailPage({
 
               <PartnerImageCarousel
                 key={`${partner.id}:${(viewPartner.images ?? []).join("|")}`}
-                className="order-1 xl:order-2"
+                className="order-2 xl:order-2"
                 images={viewPartner.images ?? []}
                 name={viewPartner.name}
               />

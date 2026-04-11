@@ -241,6 +241,7 @@ export default function PartnerCardView({
                 className="object-cover"
                 placeholder="blur"
                 blurDataURL={blurDataURL}
+                unoptimized
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">

@@ -723,7 +723,7 @@ function MediaField({
               <div
                 key={item.id}
                 className={cn(
-                  "grid gap-2 rounded-2xl border border-border bg-surface p-2",
+                  "grid min-w-0 gap-2 rounded-2xl border border-border bg-surface p-2",
                   !multiple ? "max-w-[18rem]" : null,
                 )}
               >
@@ -742,11 +742,11 @@ function MediaField({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2">
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <span className="truncate text-xs font-medium text-muted-foreground">
                     {item.kind === "existing" ? "기존 이미지" : "새 이미지"}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1 sm:justify-end">
                     {multiple ? (
                       <>
                         <Button
@@ -756,6 +756,7 @@ function MediaField({
                           onClick={() => moveItem(index, -1)}
                           ariaLabel="위로"
                           title="위로"
+                          className="h-10 w-10 min-h-10 min-w-10"
                         >
                           <ArrowUpIcon className="h-4 w-4" />
                         </Button>
@@ -766,6 +767,7 @@ function MediaField({
                           onClick={() => moveItem(index, 1)}
                           ariaLabel="아래로"
                           title="아래로"
+                          className="h-10 w-10 min-h-10 min-w-10"
                         >
                           <ArrowDownIcon className="h-4 w-4" />
                         </Button>
@@ -778,6 +780,7 @@ function MediaField({
                       onClick={() => replaceItemAt(index)}
                       ariaLabel="수정"
                       title="수정"
+                      className="h-10 w-10 min-h-10 min-w-10"
                     >
                       <PencilIcon className="h-4 w-4" />
                     </Button>
@@ -788,6 +791,7 @@ function MediaField({
                       onClick={() => removeItem(index)}
                       ariaLabel="삭제"
                       title="삭제"
+                      className="h-10 w-10 min-h-10 min-w-10"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </Button>
