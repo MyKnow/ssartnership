@@ -6,6 +6,10 @@ type MockPartnerChangeRequestModule = typeof import("../src/lib/mock/partner-cha
 type PartnerPortalModule = typeof import("../src/lib/partner-portal");
 type PartnerAuthModule = typeof import("../src/lib/partner-auth");
 
+process.env.NEXT_PUBLIC_DATA_SOURCE = process.env.NEXT_PUBLIC_DATA_SOURCE ?? "mock";
+process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE =
+  process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ?? "mock";
+
 const mockPartnerPortalModulePromise = import(
   new URL("../src/lib/mock/partner-portal.ts", import.meta.url).href
 ) as Promise<MockPartnerPortalModule>;

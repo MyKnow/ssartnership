@@ -105,7 +105,10 @@ class UnconfiguredPartnerPortalRepository implements PartnerPortalRepository {
   }
 }
 
-const dataSource = process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ?? "mock";
+const dataSource =
+  process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??
+  process.env.NEXT_PUBLIC_DATA_SOURCE ??
+  "supabase";
 
 export const isPartnerPortalMock = dataSource !== "supabase";
 
