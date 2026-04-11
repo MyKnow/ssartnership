@@ -80,9 +80,10 @@
       대상: `src/app/partner/login/**`, `src/app/partner/layout.tsx`, `middleware.ts`, `src/lib/partner-session.ts`
       목표: 제휴 업체 계정은 관리자/일반 사용자 세션과 분리된 경계에서만 접근하게 한다.
       완료: `/partner` 진입 시 세션이 없으면 로그인으로 보내고, 별도 `partner_session` 쿠키와 로그인 서버 액션, rate limit, 보안 로그를 붙였다.
-   13-5. [ ] 소속 서비스 조회와 수치형 로그만 노출
+   13-5. [x] 소속 서비스 조회와 수치형 로그만 노출
       대상: `src/app/partner/**`, `src/lib/activity-logs.ts`, `src/lib/partner-dashboard.ts`
       목표: 업체는 자신이 소유한 여러 서비스의 정보와 조회수/클릭수 같은 집계 수치만 볼 수 있게 한다.
+      완료: `/partner` 대시보드를 회사별 서비스 카드로 바꾸고, raw 로그 대신 조회수/카드 클릭/지도 클릭/예약/문의 집계만 보여주게 했다.
    13-6. [ ] 제휴 정보 수정 시 승인/취소 흐름 추가
       대상: `src/app/partner/**`, `src/app/admin/(protected)/actions.ts`, `src/lib/partner-change-requests.ts`
       목표: 혜택, 이용 조건, 적용 대상 같은 민감한 항목은 변경 요청으로 저장하고, 나의 승인 후에만 반영되게 한다.

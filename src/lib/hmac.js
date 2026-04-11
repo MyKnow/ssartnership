@@ -40,3 +40,17 @@ export function verifyHmacDigest(
   return crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
 }
 
+/**
+ * @param {string} token
+ * @returns {[string, string] | null}
+ */
+export function splitSignedToken(token) {
+  const separatorIndex = token.lastIndexOf(".");
+  if (separatorIndex <= 0 || separatorIndex >= token.length - 1) {
+    return null;
+  }
+  return [
+    token.slice(0, separatorIndex),
+    token.slice(separatorIndex + 1),
+  ];
+}

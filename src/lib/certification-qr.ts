@@ -1,7 +1,11 @@
 import crypto from "crypto";
 import { SITE_URL } from "@/lib/site";
 import { CERTIFICATION_QR_TTL_SECONDS } from "@/lib/certification-constants";
-import { createHmacDigest, verifyHmacDigest } from "./hmac.js";
+import {
+  createHmacDigest,
+  splitSignedToken,
+  verifyHmacDigest,
+} from "./hmac.js";
 
 export type CertificationQrPayload = {
   version: 1;
@@ -63,7 +67,11 @@ export function issueCertificationQrToken(input: {
 export function verifyCertificationQrToken(
   token: string,
 ): CertificationQrVerificationResult {
-  const [encodedPayload, signature] = token.split(".");
+  const signedToken = splitSignedToken(token);
+  if (!signedToken) {
+    return { ok: false, reason: "invalid" };
+  }
+  const [encodedPayload, signature] = signedToken;
   if (!encodedPayload || !signature) {
     return { ok: false, reason: "invalid" };
   }

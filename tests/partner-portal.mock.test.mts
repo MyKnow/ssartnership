@@ -161,3 +161,31 @@ test("authenticates a completed partner setup", async () => {
   assert.equal(result.companyIds.length, 1);
   assert.equal(result.companyIds[0], "mock-partner-company-cafe-haeon");
 });
+
+test("builds a company dashboard with aggregate metrics only", async () => {
+  const { getMockPartnerPortalDashboard } = await mockPartnerPortalModulePromise;
+  const dashboard = await getMockPartnerPortalDashboard([
+    "mock-partner-company-cafe-haeon",
+    "mock-partner-company-urban-gym",
+  ]);
+
+  assert.equal(dashboard.totals.companyCount, 2);
+  assert.equal(dashboard.totals.serviceCount, 5);
+  assert.equal(dashboard.totals.detailViews, 3750);
+  assert.equal(dashboard.totals.totalClicks, 1460);
+  assert.equal(dashboard.companies[0]?.services.length, 3);
+  assert.equal(dashboard.companies[1]?.services.length, 2);
+  assert.equal(dashboard.companies[0]?.totals.detailViews, 1950);
+  assert.equal(dashboard.companies[1]?.totals.totalClicks, 718);
+});
+
+test("splits signed tokens from the last dot", async () => {
+  const { splitSignedToken } = await import("../src/lib/hmac.js");
+  const token = `{"loginId":"partner@cafehaeon.example"}.abcdef123456`;
+  const parts = splitSignedToken(token);
+
+  assert.deepStrictEqual(parts, [
+    '{"loginId":"partner@cafehaeon.example"}',
+    "abcdef123456",
+  ]);
+});

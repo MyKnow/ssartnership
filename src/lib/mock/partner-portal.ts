@@ -5,6 +5,12 @@ import {
   verifyPassword,
 } from "../password.ts";
 import { normalizePartnerLoginId } from "../partner-utils.ts";
+import type {
+  PartnerPortalCompanyDashboard,
+  PartnerPortalDashboard,
+  PartnerPortalServiceDashboard,
+  PartnerPortalServiceMetrics,
+} from "../partner-dashboard.ts";
 import {
   type PartnerPortalAccountSummary,
   type PartnerPortalCompanySummary,
@@ -28,7 +34,11 @@ type MockPortalAccountRecord = PartnerPortalAccountSummary & {
   lastLoginAt: string | null;
 };
 
-type MockPortalCompanyRecord = PartnerPortalCompanySummary;
+type MockPortalServiceRecord = PartnerPortalServiceDashboard;
+
+type MockPortalCompanyRecord = Omit<PartnerPortalCompanySummary, "services"> & {
+  services: MockPortalServiceRecord[];
+};
 
 type MockPortalSetupRecord = {
   token: string;
@@ -101,6 +111,14 @@ const seededSetups: MockPortalSetupRecord[] = [
           location: "서울 강남구 역삼로 123",
           categoryLabel: "카페",
           visibility: "public",
+          metrics: {
+            detailViews: 1240,
+            cardClicks: 360,
+            mapClicks: 58,
+            reservationClicks: 81,
+            inquiryClicks: 26,
+            totalClicks: 525,
+          },
         },
         {
           id: "mock-partner-service-cafe-haeon-station",
@@ -108,6 +126,14 @@ const seededSetups: MockPortalSetupRecord[] = [
           location: "서울 강남구 테헤란로 222",
           categoryLabel: "공간제휴",
           visibility: "public",
+          metrics: {
+            detailViews: 520,
+            cardClicks: 120,
+            mapClicks: 22,
+            reservationClicks: 14,
+            inquiryClicks: 6,
+            totalClicks: 162,
+          },
         },
         {
           id: "mock-partner-service-cafe-haeon-dessert",
@@ -115,6 +141,14 @@ const seededSetups: MockPortalSetupRecord[] = [
           location: "서울 강남구 논현로 45",
           categoryLabel: "카페",
           visibility: "confidential",
+          metrics: {
+            detailViews: 190,
+            cardClicks: 44,
+            mapClicks: 7,
+            reservationClicks: 3,
+            inquiryClicks: 1,
+            totalClicks: 55,
+          },
         },
       ],
     },
@@ -144,6 +178,14 @@ const seededSetups: MockPortalSetupRecord[] = [
           location: "서울 강남구 봉은사로 11",
           categoryLabel: "헬스",
           visibility: "public",
+          metrics: {
+            detailViews: 1560,
+            cardClicks: 410,
+            mapClicks: 74,
+            reservationClicks: 126,
+            inquiryClicks: 31,
+            totalClicks: 641,
+          },
         },
         {
           id: "mock-partner-service-urban-gym-sauna",
@@ -151,6 +193,14 @@ const seededSetups: MockPortalSetupRecord[] = [
           location: "서울 강남구 봉은사로 11, B1",
           categoryLabel: "헬스",
           visibility: "confidential",
+          metrics: {
+            detailViews: 240,
+            cardClicks: 56,
+            mapClicks: 10,
+            reservationClicks: 8,
+            inquiryClicks: 3,
+            totalClicks: 77,
+          },
         },
       ],
     },
@@ -169,7 +219,10 @@ function getStore() {
         account: { ...setup.account },
         company: {
           ...setup.company,
-          services: setup.company.services.map((service) => ({ ...service })),
+          services: setup.company.services.map((service) => ({
+            ...service,
+            metrics: { ...service.metrics },
+          })),
         },
       })),
     };
@@ -203,7 +256,13 @@ function toContext(record: MockPortalSetupRecord): PartnerPortalSetupContext {
       contactName: record.company.contactName ?? null,
       contactEmail: record.company.contactEmail ?? null,
       contactPhone: record.company.contactPhone ?? null,
-      services: record.company.services.map((service) => ({ ...service })),
+      services: record.company.services.map((service) => ({
+        id: service.id,
+        name: service.name,
+        location: service.location,
+        categoryLabel: service.categoryLabel,
+        visibility: service.visibility,
+      })),
     },
     demoVerificationCode: record.account.setupVerificationCode,
     isSetupComplete: Boolean(record.account.initialSetupCompletedAt),
@@ -353,6 +412,99 @@ export async function authenticateMockPartnerPortalLogin(
       isActive: setup.account.isActive,
     },
     companyIds: [setup.company.id],
+  };
+}
+
+function cloneMetrics(metrics: PartnerPortalServiceMetrics) {
+  return {
+    detailViews: metrics.detailViews,
+    cardClicks: metrics.cardClicks,
+    mapClicks: metrics.mapClicks,
+    reservationClicks: metrics.reservationClicks,
+    inquiryClicks: metrics.inquiryClicks,
+    totalClicks: metrics.totalClicks,
+  };
+}
+
+function normalizeMetrics(
+  metrics?: Partial<PartnerPortalServiceMetrics> | null,
+): PartnerPortalServiceMetrics {
+  return {
+    detailViews: metrics?.detailViews ?? 0,
+    cardClicks: metrics?.cardClicks ?? 0,
+    mapClicks: metrics?.mapClicks ?? 0,
+    reservationClicks: metrics?.reservationClicks ?? 0,
+    inquiryClicks: metrics?.inquiryClicks ?? 0,
+    totalClicks: metrics?.totalClicks ?? 0,
+  };
+}
+
+function sumMetrics(records: PartnerPortalServiceMetrics[]) {
+  return records.reduce<PartnerPortalServiceMetrics>(
+    (accumulator, metrics) => ({
+      detailViews: accumulator.detailViews + metrics.detailViews,
+      cardClicks: accumulator.cardClicks + metrics.cardClicks,
+      mapClicks: accumulator.mapClicks + metrics.mapClicks,
+      reservationClicks:
+        accumulator.reservationClicks + metrics.reservationClicks,
+      inquiryClicks: accumulator.inquiryClicks + metrics.inquiryClicks,
+      totalClicks: accumulator.totalClicks + metrics.totalClicks,
+    }),
+    {
+      detailViews: 0,
+      cardClicks: 0,
+      mapClicks: 0,
+      reservationClicks: 0,
+      inquiryClicks: 0,
+      totalClicks: 0,
+    },
+  );
+}
+
+function toDashboardCompany(
+  record: MockPortalSetupRecord,
+): PartnerPortalCompanyDashboard {
+  return {
+    id: record.company.id,
+    name: record.company.name,
+    slug: record.company.slug,
+    description: record.company.description ?? null,
+    contactName: record.company.contactName ?? null,
+    contactEmail: record.company.contactEmail ?? null,
+    contactPhone: record.company.contactPhone ?? null,
+    services: record.company.services.map((service) => ({
+      id: service.id,
+      name: service.name,
+      location: service.location,
+      categoryLabel: service.categoryLabel,
+      visibility: service.visibility,
+      metrics: cloneMetrics(normalizeMetrics(service.metrics)),
+    })),
+    totals: sumMetrics(
+      record.company.services.map((service) => normalizeMetrics(service.metrics)),
+    ),
+  };
+}
+
+export async function getMockPartnerPortalDashboard(
+  companyIds: string[],
+): Promise<PartnerPortalDashboard> {
+  const uniqueCompanyIds = [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
+  const companies = getStore()
+    .setups.filter((setup) => uniqueCompanyIds.includes(setup.company.id))
+    .map((setup) => toDashboardCompany(setup));
+
+  const totals = sumMetrics(companies.map((company) => company.totals));
+  return {
+    companies,
+    totals: {
+      ...totals,
+      companyCount: companies.length,
+      serviceCount: companies.reduce(
+        (count, company) => count + company.services.length,
+        0,
+      ),
+    },
   };
 }
 

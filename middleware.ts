@@ -18,6 +18,17 @@ function getPartnerSecret() {
   return process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET ?? "";
 }
 
+function splitSignedToken(token: string) {
+  const separatorIndex = token.lastIndexOf(".");
+  if (separatorIndex <= 0 || separatorIndex >= token.length - 1) {
+    return null;
+  }
+  return [
+    token.slice(0, separatorIndex),
+    token.slice(separatorIndex + 1),
+  ] as const;
+}
+
 async function hmacSha256Hex(payload: string, secret: string) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -34,7 +45,11 @@ async function hmacSha256Hex(payload: string, secret: string) {
 }
 
 async function verifyToken(token: string) {
-  const [payload, signature] = token.split(".");
+  const signedToken = splitSignedToken(token);
+  if (!signedToken) {
+    return null;
+  }
+  const [payload, signature] = signedToken;
   if (!payload || !signature) {
     return null;
   }
@@ -66,7 +81,11 @@ async function verifyToken(token: string) {
 }
 
 async function verifyPartnerToken(token: string) {
-  const [payload, signature] = token.split(".");
+  const signedToken = splitSignedToken(token);
+  if (!signedToken) {
+    return null;
+  }
+  const [payload, signature] = signedToken;
   if (!payload || !signature) {
     return null;
   }

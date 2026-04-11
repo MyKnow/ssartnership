@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
-import { createHmacDigest, verifyHmacDigest } from "./hmac.js";
+import {
+  createHmacDigest,
+  splitSignedToken,
+  verifyHmacDigest,
+} from "./hmac.js";
 
 const COOKIE_NAME = "admin_session";
 const SESSION_TTL_DAYS = 7;
@@ -27,7 +31,11 @@ function signPayload(payload: string) {
 }
 
 function verifyToken(token: string) {
-  const [payload, signature] = token.split(".");
+  const signedToken = splitSignedToken(token);
+  if (!signedToken) {
+    return false;
+  }
+  const [payload, signature] = signedToken;
   if (!payload || !signature) {
     return false;
   }

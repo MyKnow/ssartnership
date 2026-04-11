@@ -3,7 +3,7 @@ import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
 } from "@/lib/policy-documents";
-import { createHmacDigest, verifyHmacDigest } from "./hmac.js";
+import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const COOKIE_NAME = "user_session";
@@ -28,7 +28,11 @@ function signPayload(payload: string) {
 }
 
 function verifyToken(token: string) {
-  const [payload, signature] = token.split(".");
+  const signedToken = splitSignedToken(token);
+  if (!signedToken) {
+    return null;
+  }
+  const [payload, signature] = signedToken;
   if (!payload || !signature) {
     return null;
   }
