@@ -10,6 +10,8 @@ type PartnerAuthRateLimitContext = {
   accountIdentifier?: string | null;
 };
 
+export type PartnerAuthRoute = "login" | "reset-password" | "change-password";
+
 export const PARTNER_AUTH_RATE_LIMIT = {
   table: "partner_auth_attempts",
   windowMs: 10 * 60 * 1000,
@@ -22,19 +24,23 @@ function sleep(ms: number) {
 }
 
 export function buildPartnerAuthAttemptKey(
+  route: PartnerAuthRoute,
   scope: "ip" | "account",
   value: string,
 ) {
-  return `login:${scope}:${normalizePartnerLoginId(value)}`;
+  return `${route}:${scope}:${normalizePartnerLoginId(value)}`;
 }
 
 export function getPartnerAuthAttemptKeys(
+  route: PartnerAuthRoute,
   context: PartnerAuthRateLimitContext,
 ) {
   const keys = [
-    context.ipAddress ? buildPartnerAuthAttemptKey("ip", context.ipAddress) : null,
+    context.ipAddress
+      ? buildPartnerAuthAttemptKey(route, "ip", context.ipAddress)
+      : null,
     context.accountIdentifier
-      ? buildPartnerAuthAttemptKey("account", context.accountIdentifier)
+      ? buildPartnerAuthAttemptKey(route, "account", context.accountIdentifier)
       : null,
   ];
 
@@ -46,9 +52,10 @@ export function getPartnerAuthAttemptScope(identifier: string) {
 }
 
 export async function getPartnerAuthBlockingState(
+  route: PartnerAuthRoute,
   context: PartnerAuthRateLimitContext,
 ) {
-  const keys = getPartnerAuthAttemptKeys(context);
+  const keys = getPartnerAuthAttemptKeys(route, context);
   if (keys.length === 0) {
     return null;
   }
@@ -58,10 +65,11 @@ export async function getPartnerAuthBlockingState(
 }
 
 export async function recordPartnerAuthAttempt(
+  route: PartnerAuthRoute,
   context: PartnerAuthRateLimitContext,
   success: boolean,
 ) {
-  const keys = getPartnerAuthAttemptKeys(context);
+  const keys = getPartnerAuthAttemptKeys(route, context);
   if (keys.length === 0) {
     return;
   }
@@ -69,7 +77,17 @@ export async function recordPartnerAuthAttempt(
   await recordAttemptBatch(keys, success, PARTNER_AUTH_RATE_LIMIT);
 }
 
-export async function delayPartnerAuthAttempt(blocked = false) {
-  const delayMs = blocked ? 1_200 : randomInt(500, 901);
+export async function delayPartnerAuthAttempt(
+  route: PartnerAuthRoute,
+  blocked = false,
+) {
+  const delayMs =
+    route === "login"
+      ? blocked
+        ? 1_200
+        : randomInt(500, 901)
+      : blocked
+        ? 900
+        : randomInt(350, 701);
   await sleep(delayMs);
 }

@@ -84,12 +84,14 @@
       대상: `src/app/partner/**`, `src/lib/activity-logs.ts`, `src/lib/partner-dashboard.ts`
       목표: 업체는 자신이 소유한 여러 서비스의 정보와 조회수/클릭수 같은 집계 수치만 볼 수 있게 한다.
       완료: `/partner` 대시보드를 회사별 서비스 카드로 바꾸고, raw 로그 대신 조회수/카드 클릭/지도 클릭/예약/문의 집계만 보여주게 했다.
-   13-6. [ ] 제휴 정보 수정 시 승인/취소 흐름 추가
+   13-6. [x] 제휴 정보 수정 시 승인/취소 흐름 추가
       대상: `src/app/partner/**`, `src/app/admin/(protected)/actions.ts`, `src/lib/partner-change-requests.ts`
       목표: 혜택, 이용 조건, 적용 대상 같은 민감한 항목은 변경 요청으로 저장하고, 나의 승인 후에만 반영되게 한다.
-   13-7. [ ] 비밀번호 재설정 메일과 초기 비밀번호 재발급
+      완료: 서비스 상세 페이지에서 편집 모드로 변경 요청을 만들고, 관리자 대기열에서 승인/거절/취소를 처리하게 바꿨다.
+   13-7. [x] 비밀번호 재설정 메일과 초기 비밀번호 재발급
       대상: `src/app/api/partner/**`, `src/lib/partner-mail.ts`, `src/lib/partner-auth-*.ts`
       목표: 비밀번호를 잊었을 때 초기 비밀번호가 포함된 재설정 메일을 보낼 수 있게 한다.
+      완료: 로그인 페이지와 공통 Header/Footer에 재설정/변경 진입점을 추가하고, 이메일 인증 기반 임시 비밀번호 발급 후 임시 비밀번호 로그인 시 강제 변경되도록 `/partner` 경로를 차단했다.
    13-8. [ ] 관리자 페이지에서 업체 아이디 및 권한 관리
       대상: `src/app/admin/(protected)/**`, `src/components/admin/**`, `src/lib/partner-*.ts`
       목표: 내가 업체 계정 상태, 권한, 연결된 회사와 서비스를 한 곳에서 관리할 수 있어야 한다.

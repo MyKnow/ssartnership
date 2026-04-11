@@ -81,8 +81,9 @@ async function loginAction(formData: FormData) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: loginId || null,
   };
+  let redirectTo = "/partner";
 
-  const blockedState = await getPartnerAuthBlockingState(throttleContext);
+  const blockedState = await getPartnerAuthBlockingState("login", throttleContext);
   if (blockedState) {
     await logAuthSecurity({
       ...context,
@@ -96,7 +97,7 @@ async function loginAction(formData: FormData) {
         blockedUntil: blockedState.blockedUntil,
       },
     });
-    await delayPartnerAuthAttempt(true);
+    await delayPartnerAuthAttempt("login", true);
     redirect(
       `/partner/login?error=blocked${
         loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
@@ -113,8 +114,10 @@ async function loginAction(formData: FormData) {
       identifier: loginId || null,
       properties: { reason: "missing_fields" },
     });
-    await recordPartnerAuthAttempt(throttleContext, false).catch(() => undefined);
-    await delayPartnerAuthAttempt();
+    await recordPartnerAuthAttempt("login", throttleContext, false).catch(
+      () => undefined,
+    );
+    await delayPartnerAuthAttempt("login");
     redirect(
       `/partner/login?error=invalid_request${
         loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
@@ -131,8 +134,10 @@ async function loginAction(formData: FormData) {
       identifier: loginId || null,
       properties: { reason: "invalid_email" },
     });
-    await recordPartnerAuthAttempt(throttleContext, false).catch(() => undefined);
-    await delayPartnerAuthAttempt();
+    await recordPartnerAuthAttempt("login", throttleContext, false).catch(
+      () => undefined,
+    );
+    await delayPartnerAuthAttempt("login");
     redirect(
       `/partner/login?error=invalid_email${
         loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
@@ -142,13 +147,19 @@ async function loginAction(formData: FormData) {
 
   try {
     const result = await authenticatePartnerPortalLogin(loginId, password);
+    redirectTo = result.account.mustChangePassword
+      ? "/partner/change-password"
+      : "/partner";
     await setPartnerSession({
       accountId: result.account.id,
       loginId: result.account.loginId,
       displayName: result.account.displayName,
       companyIds: result.companyIds,
+      mustChangePassword: result.account.mustChangePassword,
     });
-    await recordPartnerAuthAttempt(throttleContext, true).catch(() => undefined);
+    await recordPartnerAuthAttempt("login", throttleContext, true).catch(
+      () => undefined,
+    );
 
     await logAuthSecurity({
       ...context,
@@ -173,8 +184,10 @@ async function loginAction(formData: FormData) {
           reason: error.code,
         },
       });
-      await recordPartnerAuthAttempt(throttleContext, false).catch(() => undefined);
-      await delayPartnerAuthAttempt();
+      await recordPartnerAuthAttempt("login", throttleContext, false).catch(
+        () => undefined,
+      );
+      await delayPartnerAuthAttempt("login");
       redirect(
         `/partner/login?error=${encodeURIComponent(error.code)}${
           loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
@@ -193,8 +206,10 @@ async function loginAction(formData: FormData) {
         message: (error as Error).message,
       },
     });
-    await recordPartnerAuthAttempt(throttleContext, false).catch(() => undefined);
-    await delayPartnerAuthAttempt(true);
+    await recordPartnerAuthAttempt("login", throttleContext, false).catch(
+      () => undefined,
+    );
+    await delayPartnerAuthAttempt("login", true);
     redirect(
       `/partner/login?error=server_error${
         loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
@@ -202,7 +217,7 @@ async function loginAction(formData: FormData) {
     );
   }
 
-  redirect("/partner");
+  redirect(redirectTo);
 }
 
 export default async function PartnerLoginPage({
@@ -212,7 +227,7 @@ export default async function PartnerLoginPage({
 }) {
   const session = await getPartnerSession();
   if (session) {
-    redirect("/partner");
+    redirect(session.mustChangePassword ? "/partner/change-password" : "/partner");
   }
 
   const params = (await searchParams) ?? {};
@@ -221,7 +236,7 @@ export default async function PartnerLoginPage({
   const errorMessage = getLoginErrorMessage(errorCode);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-2xl">
           <Card className="space-y-6 p-6 sm:p-8">
@@ -275,6 +290,9 @@ export default async function PartnerLoginPage({
 
               <div className="flex flex-wrap items-center gap-3">
                 <SubmitButton pendingText="로그인 중">로그인</SubmitButton>
+                <Button variant="ghost" href="/partner/reset">
+                  비밀번호 재설정
+                </Button>
                 <Button variant="ghost" href="/partner/setup">
                   초기 설정 페이지
                 </Button>

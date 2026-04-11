@@ -20,7 +20,7 @@ export default async function PartnerSetupIndexPage() {
   const setups = await listPartnerPortalDemoSetups();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-5xl">
           <div className="mb-8 flex flex-col gap-4 rounded-[2rem] border border-border bg-surface px-6 py-8 shadow-sm sm:px-8">

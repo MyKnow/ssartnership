@@ -20,6 +20,9 @@ export default async function PartnerHomePage() {
   if (!session) {
     redirect("/partner/login");
   }
+  if (session.mustChangePassword) {
+    redirect("/partner/change-password");
+  }
 
   const dashboard = await getPartnerPortalDashboard(session.companyIds);
 

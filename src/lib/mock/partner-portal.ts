@@ -17,6 +17,8 @@ import {
   type PartnerPortalDemoSetupSummary,
   type PartnerPortalRepository,
   type PartnerPortalLoginResult,
+  type PartnerPortalPasswordChangeResult,
+  type PartnerPortalPasswordResetResult,
   type PartnerPortalSetupContext,
   type PartnerPortalSetupInput,
   type PartnerPortalSetupResult,
@@ -25,6 +27,10 @@ import {
   PartnerPortalSetupError,
   PartnerPortalLoginError,
 } from "../partner-portal-errors.ts";
+import {
+  PartnerPortalPasswordChangeError,
+  PartnerPortalPasswordResetError,
+} from "../partner-password-errors.ts";
 
 type MockPortalAccountRecord = PartnerPortalAccountSummary & {
   passwordHash: string;
@@ -32,6 +38,8 @@ type MockPortalAccountRecord = PartnerPortalAccountSummary & {
   setupToken: string;
   setupVerificationCode: string;
   lastLoginAt: string | null;
+  emailVerifiedAt: string | null;
+  initialSetupCompletedAt: string | null;
 };
 
 type MockPortalServiceRecord = PartnerPortalServiceDashboard;
@@ -378,7 +386,7 @@ export async function authenticateMockPartnerPortalLogin(
     );
   }
 
-  if (setup.account.mustChangePassword) {
+  if (setup.account.mustChangePassword && !setup.account.initialSetupCompletedAt) {
     throw new PartnerPortalLoginError(
       "setup_required",
       "초기 설정이 필요합니다. 받은 링크로 먼저 비밀번호를 설정해 주세요.",
@@ -407,6 +415,120 @@ export async function authenticateMockPartnerPortalLogin(
       displayName: setup.account.displayName,
       email: setup.account.email,
       mustChangePassword: setup.account.mustChangePassword,
+      emailVerifiedAt: setup.account.emailVerifiedAt,
+      initialSetupCompletedAt: setup.account.initialSetupCompletedAt,
+      isActive: setup.account.isActive,
+    },
+    companyIds: [setup.company.id],
+  };
+}
+
+function findAccountByEmail(email: string) {
+  const normalized = normalizePartnerLoginId(email);
+  return (
+    getStore().setups.find(
+      (item) =>
+        normalizePartnerLoginId(item.account.loginId) === normalized ||
+        normalizePartnerLoginId(item.account.email) === normalized,
+    ) ?? null
+  );
+}
+
+export async function requestMockPartnerPortalPasswordReset(
+  email: string,
+): Promise<PartnerPortalPasswordResetResult> {
+  const setup = findAccountByEmail(email);
+  if (!setup) {
+    throw new PartnerPortalPasswordResetError(
+      "not_found",
+      "해당 이메일로 등록된 계정을 찾을 수 없습니다.",
+    );
+  }
+  if (!setup.account.isActive) {
+    throw new PartnerPortalPasswordResetError(
+      "inactive_account",
+      "비활성화된 계정입니다. 관리자에게 문의해 주세요.",
+    );
+  }
+  if (!setup.account.initialSetupCompletedAt) {
+    throw new PartnerPortalPasswordResetError(
+      "setup_required",
+      "아직 초기 설정이 완료되지 않았습니다. 초기 설정 링크를 먼저 사용해 주세요.",
+    );
+  }
+
+  const temporaryPassword = generateTempPassword(12);
+  const passwordRecord = hashPassword(temporaryPassword);
+  const emailVerifiedAt = new Date().toISOString();
+
+  setup.account.passwordHash = passwordRecord.hash;
+  setup.account.passwordSalt = passwordRecord.salt;
+  setup.account.mustChangePassword = true;
+  setup.account.emailVerifiedAt = emailVerifiedAt;
+
+  return {
+    account: {
+      id: setup.account.id,
+      loginId: setup.account.loginId,
+      displayName: setup.account.displayName,
+      email: setup.account.email,
+      mustChangePassword: true,
+      emailVerifiedAt: emailVerifiedAt,
+      initialSetupCompletedAt: setup.account.initialSetupCompletedAt,
+      isActive: setup.account.isActive,
+    },
+    temporaryPassword,
+    emailSentTo: setup.account.email,
+  };
+}
+
+export async function changeMockPartnerPortalPassword(input: {
+  accountId: string;
+  currentPassword: string;
+  nextPassword: string;
+}): Promise<PartnerPortalPasswordChangeResult> {
+  const setup = getStore().setups.find(
+    (item) => item.account.id === input.accountId,
+  );
+
+  if (!setup || !setup.account.isActive) {
+    throw new PartnerPortalPasswordChangeError(
+      "unauthorized",
+      "로그인 후 다시 시도해 주세요.",
+    );
+  }
+
+  const ok = verifyPassword(
+    input.currentPassword,
+    setup.account.passwordSalt,
+    setup.account.passwordHash,
+  );
+  if (!ok) {
+    throw new PartnerPortalPasswordChangeError(
+      "wrong_password",
+      "현재 비밀번호가 올바르지 않습니다.",
+    );
+  }
+
+  if (!isValidPassword(input.nextPassword)) {
+    throw new PartnerPortalPasswordChangeError(
+      "invalid_password",
+      "비밀번호는 8자 이상이며 영문, 숫자, 특수문자를 모두 포함해야 합니다.",
+    );
+  }
+
+  const passwordRecord = hashPassword(input.nextPassword);
+  setup.account.passwordHash = passwordRecord.hash;
+  setup.account.passwordSalt = passwordRecord.salt;
+  setup.account.mustChangePassword = false;
+
+  return {
+    account: {
+      id: setup.account.id,
+      loginId: setup.account.loginId,
+      displayName: setup.account.displayName,
+      email: setup.account.email,
+      mustChangePassword: false,
       emailVerifiedAt: setup.account.emailVerifiedAt,
       initialSetupCompletedAt: setup.account.initialSetupCompletedAt,
       isActive: setup.account.isActive,

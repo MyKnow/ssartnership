@@ -88,6 +88,8 @@ create table if not exists partner_accounts (
   password_hash text not null,
   password_salt text not null,
   email text,
+  email_verified_at timestamp with time zone,
+  initial_setup_completed_at timestamp with time zone,
   must_change_password boolean not null default true,
   is_active boolean not null default true,
   last_login_at timestamp with time zone,
@@ -116,6 +118,45 @@ create table if not exists partner_auth_attempts (
   blocked_until timestamp with time zone,
   created_at timestamp with time zone default now()
 );
+
+create table if not exists partner_change_requests (
+  id uuid primary key default uuid_generate_v4(),
+  company_id uuid not null references partner_companies(id) on delete cascade,
+  partner_id uuid not null references partners(id) on delete cascade,
+  requested_by_account_id uuid references partner_accounts(id) on delete set null,
+  status text not null default 'pending',
+  current_conditions text[] not null default '{}',
+  current_benefits text[] not null default '{}',
+  current_applies_to text[] not null default '{staff,student,graduate}',
+  current_tags text[] not null default '{}',
+  current_thumbnail text,
+  current_images text[] not null default '{}',
+  current_reservation_link text,
+  current_inquiry_link text,
+  current_period_start date,
+  current_period_end date,
+  requested_conditions text[] not null default '{}',
+  requested_benefits text[] not null default '{}',
+  requested_applies_to text[] not null default '{staff,student,graduate}',
+  requested_tags text[] not null default '{}',
+  requested_thumbnail text,
+  requested_images text[] not null default '{}',
+  requested_reservation_link text,
+  requested_inquiry_link text,
+  requested_period_start date,
+  requested_period_end date,
+  reviewed_by_admin_id text,
+  reviewed_at timestamp with time zone,
+  cancelled_by_account_id uuid references partner_accounts(id) on delete set null,
+  cancelled_at timestamp with time zone,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_change_requests_status_check
+    check (status in ('pending', 'approved', 'rejected', 'cancelled'))
+);
+
+alter table partner_change_requests add column if not exists current_tags text[] not null default '{}';
+alter table partner_change_requests add column if not exists requested_tags text[] not null default '{}';
 
 create table if not exists admin_login_attempts (
   id uuid primary key default uuid_generate_v4(),
@@ -556,6 +597,13 @@ create index if not exists partner_accounts_login_id_idx on partner_accounts(log
 create index if not exists partner_account_companies_account_id_idx on partner_account_companies(account_id);
 create index if not exists partner_account_companies_company_id_idx on partner_account_companies(company_id);
 create index if not exists partner_auth_attempts_identifier_idx on partner_auth_attempts(identifier);
+create index if not exists partner_change_requests_company_id_idx on partner_change_requests(company_id);
+create index if not exists partner_change_requests_partner_id_idx on partner_change_requests(partner_id);
+create index if not exists partner_change_requests_status_idx on partner_change_requests(status);
+create index if not exists partner_change_requests_created_at_idx on partner_change_requests(created_at desc);
+create unique index if not exists partner_change_requests_pending_partner_idx
+  on partner_change_requests(partner_id)
+  where status = 'pending';
 create index if not exists mm_verification_attempts_identifier_idx on mm_verification_attempts(identifier);
 create index if not exists password_reset_attempts_identifier_idx on password_reset_attempts(identifier);
 create index if not exists push_subscriptions_member_id_idx on push_subscriptions(member_id);
@@ -601,6 +649,7 @@ alter table mm_user_directory enable row level security;
 alter table mm_verification_codes enable row level security;
 alter table mm_verification_attempts enable row level security;
 alter table password_reset_attempts enable row level security;
+alter table partner_change_requests enable row level security;
 alter table push_preferences enable row level security;
 alter table push_subscriptions enable row level security;
 alter table push_message_logs enable row level security;
@@ -634,6 +683,8 @@ revoke all on table partner_account_companies from anon;
 revoke all on table partner_account_companies from authenticated;
 revoke all on table partner_auth_attempts from anon;
 revoke all on table partner_auth_attempts from authenticated;
+revoke all on table partner_change_requests from anon;
+revoke all on table partner_change_requests from authenticated;
 revoke all on table members from anon;
 revoke all on table members from authenticated;
 revoke all on table policy_documents from anon;

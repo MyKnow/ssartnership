@@ -10,6 +10,7 @@ export type PartnerSession = {
   loginId: string;
   displayName: string;
   companyIds: string[];
+  mustChangePassword: boolean;
   issuedAt: number;
   expiresAt: number;
 };
@@ -50,6 +51,8 @@ function verifyToken(token: string) {
       typeof parsed.loginId !== "string" ||
       typeof parsed.displayName !== "string" ||
       !Array.isArray(parsed.companyIds) ||
+      (parsed.mustChangePassword !== undefined &&
+        typeof parsed.mustChangePassword !== "boolean") ||
       typeof parsed.issuedAt !== "number" ||
       typeof parsed.expiresAt !== "number"
     ) {
@@ -69,6 +72,7 @@ function verifyToken(token: string) {
       loginId: parsed.loginId,
       displayName: parsed.displayName,
       companyIds: parsed.companyIds,
+      mustChangePassword: Boolean(parsed.mustChangePassword),
       issuedAt: parsed.issuedAt,
       expiresAt: parsed.expiresAt,
     };
@@ -91,6 +95,7 @@ export async function setPartnerSession(session: {
   loginId: string;
   displayName: string;
   companyIds: string[];
+  mustChangePassword?: boolean;
 }) {
   const now = Date.now();
   const payload = JSON.stringify({
@@ -98,6 +103,7 @@ export async function setPartnerSession(session: {
     loginId: session.loginId,
     displayName: session.displayName,
     companyIds: session.companyIds,
+    mustChangePassword: Boolean(session.mustChangePassword),
     issuedAt: now,
     expiresAt: now + SESSION_TTL_MS,
   });

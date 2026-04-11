@@ -50,6 +50,10 @@ import {
   validateDateRange,
 } from "@/lib/validation";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
+import {
+  approvePartnerChangeRequest as approvePartnerChangeRequestRecord,
+  rejectPartnerChangeRequest as rejectPartnerChangeRequestRecord,
+} from "@/lib/partner-change-requests";
 
 type PartnerCoreInput = {
   name: string;
@@ -102,6 +106,8 @@ type PartnerAccountRow = {
   password_salt?: string | null;
   must_change_password?: boolean | null;
   is_active?: boolean | null;
+  email_verified_at?: string | null;
+  initial_setup_completed_at?: string | null;
 };
 
 function parseList(value: string) {
@@ -359,7 +365,7 @@ async function ensurePartnerCompanyRow(
 
     const { data: existingAccount, error: accountError } = await supabase
       .from("partner_accounts")
-      .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+      .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
       .eq("id", existingLink.account_id)
       .maybeSingle();
 
@@ -388,7 +394,7 @@ async function ensurePartnerCompanyRow(
           .from("partner_accounts")
           .update(nextAccount)
           .eq("id", existingAccount.id)
-          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+      .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
           .single();
 
         if (updateError) {
@@ -401,7 +407,7 @@ async function ensurePartnerCompanyRow(
     } else {
       const { data: existingAccount, error: accountLookupError } = await supabase
         .from("partner_accounts")
-        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
         .eq("login_id", loginId)
         .maybeSingle();
 
@@ -418,7 +424,7 @@ async function ensurePartnerCompanyRow(
             is_active: true,
           })
           .eq("id", existingAccount.id)
-          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
           .single();
 
         if (updateError) {
@@ -437,8 +443,10 @@ async function ensurePartnerCompanyRow(
             password_salt: passwordRecord.salt,
             must_change_password: true,
             is_active: true,
+            email_verified_at: null,
+            initial_setup_completed_at: null,
           })
-          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active")
+          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
           .single();
 
         if (createAccountError) {
@@ -544,6 +552,15 @@ function revalidateAdminAndPublicPaths(partnerId?: string) {
   revalidatePath("/partners/[id]", "page");
   if (partnerId) {
     revalidatePath(`/partners/${partnerId}`);
+  }
+}
+
+function revalidatePartnerPortalPaths(partnerId?: string) {
+  revalidatePath("/partner");
+  revalidatePath("/admin/partners");
+  if (partnerId) {
+    revalidatePath(`/partner/services/${partnerId}`);
+    revalidatePath(`/partner/services/${partnerId}/request`);
   }
 }
 
@@ -1076,6 +1093,81 @@ export async function updatePartner(formData: FormData) {
   });
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
+  redirect("/admin/partners");
+}
+
+export async function approvePartnerChangeRequest(formData: FormData) {
+  await requireAdmin();
+  const requestId = String(formData.get("requestId") || "").trim();
+  if (!requestId) {
+    throw new Error("승인할 요청을 찾을 수 없습니다.");
+  }
+
+  const request = await approvePartnerChangeRequestRecord({
+    requestId,
+    adminId: process.env.ADMIN_ID ?? "admin",
+  });
+
+  await logAdminAction("partner_change_request_approve", {
+    targetType: "partner_change_request",
+    targetId: request.id,
+      properties: {
+        partnerId: request.partnerId,
+        partnerName: request.partnerName,
+        companyId: request.companyId,
+        companyName: request.companyName,
+        requestedConditionsCount: request.requestedConditions.length,
+        requestedBenefitsCount: request.requestedBenefits.length,
+        requestedTagsCount: request.requestedTags.length,
+        requestedAppliesTo: request.requestedAppliesTo,
+        requestedThumbnail: Boolean(request.requestedThumbnail),
+        requestedImagesCount: request.requestedImages.length,
+        requestedReservationLink: Boolean(request.requestedReservationLink),
+        requestedInquiryLink: Boolean(request.requestedInquiryLink),
+      requestedPeriodStart: request.requestedPeriodStart,
+      requestedPeriodEnd: request.requestedPeriodEnd,
+    },
+  });
+
+  revalidatePartnerData();
+  revalidateAdminAndPublicPaths(request.partnerId);
+  revalidatePartnerPortalPaths(request.partnerId);
+  redirect("/admin/partners");
+}
+
+export async function rejectPartnerChangeRequest(formData: FormData) {
+  await requireAdmin();
+  const requestId = String(formData.get("requestId") || "").trim();
+  if (!requestId) {
+    throw new Error("거절할 요청을 찾을 수 없습니다.");
+  }
+
+  const request = await rejectPartnerChangeRequestRecord({
+    requestId,
+    adminId: process.env.ADMIN_ID ?? "admin",
+  });
+
+  await logAdminAction("partner_change_request_reject", {
+    targetType: "partner_change_request",
+    targetId: request.id,
+      properties: {
+        partnerId: request.partnerId,
+        partnerName: request.partnerName,
+        companyId: request.companyId,
+        companyName: request.companyName,
+        requestedTagsCount: request.requestedTags.length,
+        requestedThumbnail: Boolean(request.requestedThumbnail),
+        requestedImagesCount: request.requestedImages.length,
+        requestedReservationLink: Boolean(request.requestedReservationLink),
+        requestedInquiryLink: Boolean(request.requestedInquiryLink),
+        requestedPeriodStart: request.requestedPeriodStart,
+      requestedPeriodEnd: request.requestedPeriodEnd,
+    },
+  });
+
+  revalidatePartnerData();
+  revalidateAdminAndPublicPaths(request.partnerId);
+  revalidatePartnerPortalPaths(request.partnerId);
   redirect("/admin/partners");
 }
 

@@ -39,6 +39,14 @@ export type PartnerPortalLoginResult = {
   companyIds: string[];
 };
 
+export type PartnerPortalPasswordResetResult = {
+  account: PartnerPortalAccountSummary;
+  temporaryPassword: string;
+  emailSentTo: string;
+};
+
+export type PartnerPortalPasswordChangeResult = PartnerPortalLoginResult;
+
 export type PartnerPortalSetupContext = {
   token: string;
   account: PartnerPortalAccountSummary;

@@ -47,7 +47,7 @@ export default async function PartnerSetupTokenPage({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-6xl">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

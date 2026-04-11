@@ -99,6 +99,7 @@ async function verifyPartnerToken(token: string) {
       loginId?: string;
       displayName?: string;
       companyIds?: string[];
+      mustChangePassword?: boolean;
       issuedAt?: number;
       expiresAt?: number;
     };
@@ -107,6 +108,8 @@ async function verifyPartnerToken(token: string) {
       typeof parsed.loginId !== "string" ||
       typeof parsed.displayName !== "string" ||
       !Array.isArray(parsed.companyIds) ||
+      (parsed.mustChangePassword !== undefined &&
+        typeof parsed.mustChangePassword !== "boolean") ||
       typeof parsed.issuedAt !== "number" ||
       typeof parsed.expiresAt !== "number"
     ) {
@@ -189,6 +192,7 @@ export async function middleware(request: NextRequest) {
   const isPartnerSetupPath =
     pathname === "/partner/setup" || pathname.startsWith("/partner/setup/");
   const isPartnerLoginPath = pathname === "/partner/login";
+  const isPartnerLogoutPath = pathname === "/partner/logout";
   const isPartnerPath = pathname === "/partner" || pathname.startsWith("/partner/");
 
   if (isPartnerPath) {
@@ -197,7 +201,27 @@ export async function middleware(request: NextRequest) {
       ? await verifyPartnerToken(partnerToken)
       : null;
 
+    if (
+      partnerPayload?.mustChangePassword &&
+      pathname !== "/partner/change-password" &&
+      pathname !== "/partner/logout"
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/partner/change-password";
+      return NextResponse.redirect(url);
+    }
+
     if (isPartnerLoginPath) {
+      if (partnerPayload) {
+        const url = request.nextUrl.clone();
+        url.pathname =
+          partnerPayload.mustChangePassword ? "/partner/change-password" : "/partner";
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.next();
+    }
+
+    if (pathname === "/partner/reset") {
       if (partnerPayload) {
         const url = request.nextUrl.clone();
         url.pathname = "/partner";
@@ -207,9 +231,14 @@ export async function middleware(request: NextRequest) {
     }
 
     if (isPartnerSetupPath) {
+      if (partnerPayload) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/partner";
+        return NextResponse.redirect(url);
+      }
       return NextResponse.next();
     }
-    if (!partnerPayload) {
+    if (!partnerPayload && !isPartnerLogoutPath) {
       const url = request.nextUrl.clone();
       url.pathname = "/partner/login";
       return NextResponse.redirect(url);

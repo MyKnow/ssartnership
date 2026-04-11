@@ -83,6 +83,8 @@ const auditLabels: Record<string, string> = {
   partner_create: '업체 생성',
   partner_update: '업체 수정',
   partner_delete: '업체 삭제',
+  partner_change_request_approve: '제휴 변경 요청 승인',
+  partner_change_request_reject: '제휴 변경 요청 거절',
   member_update: '회원 수정',
   member_directory_sync: '회원 디렉토리 동기화',
   member_sync: '회원 정보 동기화',
@@ -107,6 +109,9 @@ const securityLabels: Record<string, string> = {
   admin_login: '관리자 로그인',
   admin_access: '관리자 접근 제어',
   partner_login: '제휴 포털 로그인',
+  partner_logout: '제휴 포털 로그아웃',
+  partner_password_reset: '제휴 포털 비밀번호 재설정',
+  partner_password_change: '제휴 포털 비밀번호 변경',
 };
 
 function formatDateTime(value: string) {

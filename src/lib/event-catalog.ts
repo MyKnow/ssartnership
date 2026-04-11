@@ -32,6 +32,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_create',
   'partner_update',
   'partner_delete',
+  'partner_change_request_approve',
+  'partner_change_request_reject',
   'member_update',
   'member_directory_sync',
   'member_sync',
@@ -58,6 +60,9 @@ export const AUTH_SECURITY_EVENT_NAMES = [
   'admin_login',
   'admin_access',
   'partner_login',
+  'partner_logout',
+  'partner_password_reset',
+  'partner_password_change',
 ] as const;
 
 export type AuthSecurityEventName = (typeof AUTH_SECURITY_EVENT_NAMES)[number];

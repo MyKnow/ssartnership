@@ -3,6 +3,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
+import Link from "next/link";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
@@ -71,7 +72,11 @@ function ServiceCard({
   service: PartnerPortalDashboard["companies"][number]["services"][number];
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-background/60 p-4">
+    <Link
+      href={`/partner/services/${encodeURIComponent(service.id)}`}
+      aria-label={`${service.name} 상세 보기`}
+      className="group block rounded-2xl border border-border bg-background/60 p-4 transition-colors hover:border-primary/30 hover:bg-background/80"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -90,7 +95,7 @@ function ServiceCard({
           </p>
         </div>
         <div className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted-foreground">
-          집계 수치만 제공
+          상세 보기
         </div>
       </div>
 
@@ -105,7 +110,13 @@ function ServiceCard({
         />
         <ServiceMetric label="문의 클릭" value={service.metrics.inquiryClicks} />
       </div>
-    </div>
+
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground">
+          클릭하여 상세를 확인하고 연필로 수정 요청을 시작하세요.
+        </span>
+      </div>
+    </Link>
   );
 }
 
@@ -204,7 +215,7 @@ export default function PartnerDashboardView({
   dashboard: PartnerPortalDashboard;
 }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-6xl space-y-6">
           <Card className="space-y-6 p-6 sm:p-8">

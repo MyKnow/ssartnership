@@ -1,4 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
+import PartnerChangeRequestQueue from "@/components/admin/PartnerChangeRequestQueue";
 import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
@@ -7,13 +8,16 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import {
   createCategory,
+  approvePartnerChangeRequest,
   createPartner,
   deleteCategory,
   deletePartner,
+  rejectPartnerChangeRequest,
   updateCategory,
   updatePartner,
 } from "@/app/admin/(protected)/actions";
 import { ADMIN_COPY } from "@/lib/content";
+import { listPartnerChangeRequests } from "@/lib/partner-change-requests";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +71,12 @@ function FieldGroup({
 export default async function AdminPartnersPage() {
   const supabase = getSupabaseAdminClient();
 
-  const [categoriesResult, partnersResult, companiesResult] = await Promise.all([
+  const [
+    categoriesResult,
+    partnersResult,
+    companiesResult,
+    changeRequests,
+  ] = await Promise.all([
     supabase
       .from("categories")
       .select("id,key,label,description,color")
@@ -80,6 +89,7 @@ export default async function AdminPartnersPage() {
       .from("partner_companies")
       .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
       .order("name", { ascending: true }),
+    listPartnerChangeRequests(),
   ]);
 
   const safeCategories = categoriesResult.data ?? [];
@@ -96,6 +106,12 @@ export default async function AdminPartnersPage() {
       backLabel="관리 홈"
     >
       <section className="grid gap-6">
+        <PartnerChangeRequestQueue
+          requests={changeRequests}
+          approveAction={approvePartnerChangeRequest}
+          rejectAction={rejectPartnerChangeRequest}
+        />
+
         <Card>
           <SectionHeading
             title="카테고리 관리"
