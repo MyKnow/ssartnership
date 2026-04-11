@@ -18,6 +18,7 @@ type PartnerRow = {
   name: string;
   category_id: string;
   location: string;
+  thumbnail?: string | null;
   map_url?: string | null;
   reservation_link?: string | null;
   inquiry_link?: string | null;
@@ -83,7 +84,7 @@ const getCachedPartnerRows = unstable_cache(
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
+        "id,name,category_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
       )
       .order("created_at", { ascending: false });
 
@@ -110,7 +111,7 @@ const getCachedPartnerRowById = unstable_cache(
     const { data, error } = await supabase
       .from("partners")
       .select(
-        "id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
+        "id,name,category_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -132,12 +133,15 @@ const getCachedPartnerRowById = unstable_cache(
 );
 
 function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
+  const galleryImages = row.thumbnail ? row.images ?? [] : (row.images ?? []).slice(1);
+  const thumbnail = row.thumbnail ?? row.images?.[0] ?? null;
   return {
     id: row.id,
     name: row.name,
     category: categoryKey,
     visibility: normalizePartnerVisibility(row.visibility),
     location: row.location,
+    thumbnail,
     mapUrl: row.map_url ?? undefined,
     reservationLink: row.reservation_link ?? undefined,
     inquiryLink: row.inquiry_link ?? undefined,
@@ -148,7 +152,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
     conditions: row.conditions ?? [],
     benefits: row.benefits ?? [],
     appliesTo: normalizePartnerAudience(row.applies_to),
-    images: row.images ?? [],
+    images: galleryImages,
     tags: row.tags ?? [],
   };
 }
@@ -167,6 +171,7 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
     conditions: [],
     benefits: [],
     appliesTo: normalizePartnerAudience(row.applies_to),
+    thumbnail: null,
     images: [],
     tags: [],
   };

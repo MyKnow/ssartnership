@@ -47,7 +47,7 @@ export default async function AdminPartnersPage() {
       .order("created_at", { ascending: true }),
     supabase
       .from("partners")
-      .select("id,name,category_id,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility")
+      .select("id,name,category_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility")
       .order("created_at", { ascending: false }),
   ]);
 

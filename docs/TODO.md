@@ -66,9 +66,10 @@
    대상: `src/app/partner/**`, `src/lib/partner-*.ts`, `src/lib/activity-logs.ts`, `src/app/admin/(protected)/actions.ts`
    이유: 제휴 업체가 자기 업체에 관련된 로그와 기능만 볼 수 있는 전용 페이지를 두면, admin과 권한을 분리하면서 외부 파트너용 UX를 따로 설계할 수 있다.
 
-14. [ ] 제휴 업체 정적 이미지 저장
+14. [x] 제휴 업체 정적 이미지 저장
    대상: `src/lib/repositories/*`, `src/components/PartnerImageCarousel.tsx`, `src/components/PartnerCardForm.tsx`, `src/app/api/image/route.ts`, storage 관련 레이어
    이유: 제휴 업체 이미지를 정적 저장/서빙하면 외부 링크 의존과 로딩 변동성을 줄이고, 캐시 효율과 안정성을 높일 수 있다.
+   완료: 썸네일과 갤러리를 분리하고, 로컬 업로드/드래그앤드롭/URL 입력 후 크롭한 `webp` 파일을 `partner-media` storage로 일괄 저장하도록 바꿨다.
 
 ## 유지 규칙
 

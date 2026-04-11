@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
@@ -17,6 +18,7 @@ import {
   getMapLink,
   normalizeReservationInquiry,
 } from "@/lib/partner-links";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import ContactCopyRow from "@/components/ContactCopyRow";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
@@ -173,6 +175,9 @@ export default async function PartnerDetailPage({
         color: category.color,
     }
     : undefined;
+  const thumbnailUrl = viewPartner.thumbnail
+    ? getCachedImageUrl(viewPartner.thumbnail)
+    : "";
 
   const mapLink = getMapLink(viewPartner.mapUrl, viewPartner.location, viewPartner.name);
   const normalizedLinks = isActive
@@ -275,6 +280,21 @@ export default async function PartnerDetailPage({
                     </span>
                   </div>
 
+                  {thumbnailUrl ? (
+                    <div className="mt-4 w-full max-w-40 overflow-hidden rounded-3xl border border-border bg-surface-muted sm:max-w-48">
+                      <div className="relative aspect-square w-full">
+                        <Image
+                          src={thumbnailUrl}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 40vw, 192px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
                   <h1 className="mt-4 text-3xl font-semibold text-foreground">
                     {viewPartner.name}
                   </h1>
@@ -376,7 +396,6 @@ export default async function PartnerDetailPage({
                 className="order-1 xl:order-2"
                 images={viewPartner.images ?? []}
                 name={viewPartner.name}
-                matchHeightSelector="[data-partner-detail-summary]"
               />
             </div>
 

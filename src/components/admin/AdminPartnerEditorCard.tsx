@@ -32,6 +32,7 @@ type PartnerValue = {
   conditions?: string[] | null;
   benefits?: string[] | null;
   applies_to?: string[] | null;
+  thumbnail?: string | null;
   images?: string[] | null;
   tags?: string[] | null;
 };
@@ -54,6 +55,10 @@ export default function AdminPartnerEditorCard({
       categoryOptions.find((item) => item.id === partner.category_id) ?? null,
     [categoryOptions, partner.category_id],
   );
+  const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
+  const galleryImages = partner.thumbnail
+    ? partner.images ?? []
+    : (partner.images ?? []).slice(1);
 
   return (
     <article className="rounded-3xl border border-border bg-surface-elevated p-4 shadow-sm">
@@ -105,7 +110,8 @@ export default function AdminPartnerEditorCard({
               conditions: partner.conditions ?? [],
               benefits: partner.benefits ?? [],
               appliesTo: partner.applies_to ?? [],
-              images: partner.images ?? [],
+              thumbnail,
+              images: galleryImages,
               tags: partner.tags ?? [],
             }}
             categoryOptions={categoryOptions}

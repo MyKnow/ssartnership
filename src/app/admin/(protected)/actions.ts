@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
@@ -24,6 +25,13 @@ import {
 } from "@/lib/partner-visibility";
 import { parsePartnerAudienceSelection } from "@/lib/partner-audience";
 import {
+  parsePartnerMediaManifest,
+} from "@/lib/partner-media";
+import {
+  deletePartnerMediaUrls,
+  uploadPartnerMediaFile,
+} from "@/lib/partner-media-storage";
+import {
   clearSsafyCycleOverride,
   getConfiguredCurrentSsafyYear,
   getSsafyCycleSettings,
@@ -41,7 +49,7 @@ import {
 } from "@/lib/validation";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 
-type PartnerInput = {
+type PartnerCoreInput = {
   name: string;
   categoryId: string;
   location: string;
@@ -53,23 +61,17 @@ type PartnerInput = {
   conditions: string[];
   benefits: string[];
   appliesTo: string[];
-  images: string[];
   tags: string[];
   visibility: PartnerVisibility;
 };
 
-function parseList(value: string) {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  );
-}
+type PartnerMediaInput = {
+  thumbnail: string | null;
+  images: string[];
+  uploadedUrls: string[];
+};
 
-function parseMultiLine(value: string) {
+function parseList(value: string) {
   return Array.from(
     new Set(
       value
@@ -200,7 +202,7 @@ function parseSsafyCycleSettingsPayload(formData: FormData) {
   };
 }
 
-function parsePartnerPayload(formData: FormData): PartnerInput {
+function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const name = String(formData.get("name") || "").trim();
   const categoryId = String(formData.get("categoryId") || "").trim();
   const location = String(formData.get("location") || "").trim();
@@ -212,7 +214,6 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const conditions = String(formData.get("conditions") || "").trim();
   const benefits = String(formData.get("benefits") || "").trim();
-  const images = String(formData.get("images") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
   const appliesTo = formData.getAll("appliesTo").map((item) => String(item).trim());
 
@@ -245,14 +246,6 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
   }
   const visibility = normalizePartnerVisibility(rawVisibility || "public");
 
-  const rawImageUrls = parseMultiLine(images);
-  const sanitizedImages = rawImageUrls
-    .map((item) => sanitizeHttpUrl(item))
-    .filter((item): item is string => Boolean(item));
-  if (rawImageUrls.length !== sanitizedImages.length) {
-    throw new Error("이미지 URL 형식을 확인해 주세요.");
-  }
-
   const parsedAppliesTo = parsePartnerAudienceSelection(appliesTo);
   if (!parsedAppliesTo) {
     throw new Error("적용 대상을 하나 이상 선택해 주세요.");
@@ -270,10 +263,104 @@ function parsePartnerPayload(formData: FormData): PartnerInput {
     conditions: parseList(conditions),
     benefits: parseList(benefits),
     appliesTo: parsedAppliesTo,
-    images: sanitizedImages,
     tags: parseList(tags),
     visibility,
   };
+}
+
+function getFormDataFile(formData: FormData, name: string) {
+  const value = formData.get(name);
+  return value instanceof File && value.size > 0 ? value : null;
+}
+
+async function resolvePartnerMediaPayload(
+  formData: FormData,
+  partnerId: string,
+): Promise<PartnerMediaInput> {
+  const thumbnailManifestRaw = String(formData.get("thumbnailManifest") || "");
+  const galleryManifestRaw = String(formData.get("galleryManifest") || "");
+  const thumbnailManifest = parsePartnerMediaManifest(thumbnailManifestRaw);
+  const galleryManifest = parsePartnerMediaManifest(galleryManifestRaw);
+
+  if (thumbnailManifestRaw.trim() && !thumbnailManifest) {
+    throw new Error("썸네일 이미지 형식을 확인해 주세요.");
+  }
+  if (galleryManifestRaw.trim() && !galleryManifest) {
+    throw new Error("이미지 목록 형식을 확인해 주세요.");
+  }
+
+  const thumbnailFile = getFormDataFile(formData, "thumbnailFile");
+  const galleryFiles = formData
+    .getAll("galleryFiles")
+    .filter((item): item is File => item instanceof File && item.size > 0);
+
+  let thumbnail: string | null = null;
+  const uploadedUrls: string[] = [];
+  if (thumbnailManifest?.thumbnail) {
+    if (thumbnailManifest.thumbnail.kind === "existing") {
+      thumbnail = thumbnailManifest.thumbnail.url;
+    } else {
+      if (!thumbnailFile) {
+        throw new Error("썸네일 이미지를 찾을 수 없습니다.");
+      }
+      thumbnail = await uploadPartnerMediaFile(
+        partnerId,
+        "thumbnail",
+        thumbnailFile,
+        0,
+      );
+      uploadedUrls.push(thumbnail);
+    }
+  }
+
+  const images: string[] = [];
+  let galleryFileIndex = 0;
+  const galleryEntries = galleryManifest?.gallery ?? [];
+  for (const [index, entry] of galleryEntries.entries()) {
+    if (entry.kind === "existing") {
+      images.push(entry.url);
+      continue;
+    }
+
+    const nextFile = galleryFiles[galleryFileIndex++];
+    if (!nextFile) {
+      throw new Error("추가 이미지 파일을 찾을 수 없습니다.");
+    }
+    if (!nextFile.type.startsWith("image/")) {
+      throw new Error("이미지 파일만 저장할 수 있습니다.");
+    }
+
+    const uploadedUrl = await uploadPartnerMediaFile(
+      partnerId,
+      "gallery",
+      nextFile,
+      index,
+    );
+    images.push(uploadedUrl);
+    uploadedUrls.push(uploadedUrl);
+  }
+
+  return {
+    thumbnail,
+    images,
+    uploadedUrls,
+  };
+}
+
+function collectPartnerMediaUrls(row?: {
+  thumbnail?: string | null;
+  images?: string[] | null;
+} | null) {
+  if (!row) {
+    return [];
+  }
+
+  const urls = [
+    row.thumbnail ?? null,
+    ...(row.images ?? []),
+  ].filter((item): item is string => Boolean(item));
+
+  return Array.from(new Set(urls));
 }
 
 export async function createCategory(formData: FormData) {
@@ -354,36 +441,37 @@ export async function deleteCategory(formData: FormData) {
 export async function createPartner(formData: FormData) {
   await requireAdmin();
   const payload = parsePartnerPayload(formData);
+  const partnerId = randomUUID();
+  const media = await resolvePartnerMediaPayload(formData, partnerId);
 
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("partners")
-    .insert({
-      name: payload.name,
-      category_id: payload.categoryId,
-      location: payload.location,
-      map_url: payload.mapUrl,
-      reservation_link: payload.reservationLink,
-      inquiry_link: payload.inquiryLink,
-      period_start: payload.periodStart,
-      period_end: payload.periodEnd,
-      conditions: payload.conditions,
-      benefits: payload.benefits,
-      applies_to: payload.appliesTo,
-      images: payload.images,
-      tags: payload.tags,
-      visibility: payload.visibility,
-    })
-    .select("id")
-    .single();
+  const { error } = await supabase.from("partners").insert({
+    id: partnerId,
+    name: payload.name,
+    category_id: payload.categoryId,
+    location: payload.location,
+    map_url: payload.mapUrl,
+    reservation_link: payload.reservationLink,
+    inquiry_link: payload.inquiryLink,
+    period_start: payload.periodStart,
+    period_end: payload.periodEnd,
+    conditions: payload.conditions,
+    benefits: payload.benefits,
+    applies_to: payload.appliesTo,
+    thumbnail: media.thumbnail,
+    images: media.images,
+    tags: payload.tags,
+    visibility: payload.visibility,
+  });
 
   if (error) {
+    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     throw new Error(error.message);
   }
 
   await logAdminAction("partner_create", {
     targetType: "partner",
-    targetId: data?.id ?? null,
+    targetId: partnerId,
     properties: {
       name: payload.name,
       categoryId: payload.categoryId,
@@ -397,13 +485,13 @@ export async function createPartner(formData: FormData) {
       visibility: payload.visibility,
       benefitCount: payload.benefits.length,
       appliesTo: payload.appliesTo,
-      imageCount: payload.images.length,
+      hasThumbnail: Boolean(media.thumbnail),
+      imageCount: media.images.length,
       tagCount: payload.tags.length,
     },
   });
 
   if (
-    data?.id &&
     payload.visibility !== "private" &&
     isPushConfigured() &&
     isWithinPeriod(payload.periodStart, payload.periodEnd)
@@ -417,7 +505,7 @@ export async function createPartner(formData: FormData) {
     try {
       await sendPushToAudience(
         createNewPartnerPayload({
-          partnerId: data.id,
+          partnerId,
           name: payload.name,
           location: payload.location,
           categoryLabel: category?.label ?? null,
@@ -429,19 +517,33 @@ export async function createPartner(formData: FormData) {
   }
 
   revalidatePartnerData();
-  revalidateAdminAndPublicPaths(data?.id);
+  revalidateAdminAndPublicPaths(partnerId);
 }
 
 export async function updatePartner(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
-  const payload = parsePartnerPayload(formData);
-
   if (!id) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
   }
+  const payload = parsePartnerPayload(formData);
 
   const supabase = getSupabaseAdminClient();
+  const { data: previousPartner, error: previousPartnerError } = await supabase
+    .from("partners")
+    .select("thumbnail,images")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (previousPartnerError) {
+    throw new Error(previousPartnerError.message);
+  }
+  if (!previousPartner) {
+    throw new Error("수정할 업체를 찾을 수 없습니다.");
+  }
+
+  const media = await resolvePartnerMediaPayload(formData, id);
+
   const { error } = await supabase
     .from("partners")
     .update({
@@ -456,15 +558,25 @@ export async function updatePartner(formData: FormData) {
       conditions: payload.conditions,
       benefits: payload.benefits,
       applies_to: payload.appliesTo,
-      images: payload.images,
+      thumbnail: media.thumbnail,
+      images: media.images,
       tags: payload.tags,
       visibility: payload.visibility,
     })
     .eq("id", id);
 
   if (error) {
+    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     throw new Error(error.message);
   }
+
+  const previousUrls = collectPartnerMediaUrls(previousPartner);
+  const nextUrls = collectPartnerMediaUrls({
+    thumbnail: media.thumbnail,
+    images: media.images,
+  });
+  const removedUrls = previousUrls.filter((url) => !nextUrls.includes(url));
+  await deletePartnerMediaUrls(removedUrls).catch(() => undefined);
 
   await logAdminAction("partner_update", {
     targetType: "partner",
@@ -482,7 +594,8 @@ export async function updatePartner(formData: FormData) {
       visibility: payload.visibility,
       benefitCount: payload.benefits.length,
       appliesTo: payload.appliesTo,
-      imageCount: payload.images.length,
+      hasThumbnail: Boolean(media.thumbnail),
+      imageCount: media.images.length,
       tagCount: payload.tags.length,
     },
   });
@@ -499,11 +612,25 @@ export async function deletePartner(formData: FormData) {
   }
 
   const supabase = getSupabaseAdminClient();
+  const { data: previousPartner, error: previousPartnerError } = await supabase
+    .from("partners")
+    .select("thumbnail,images")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (previousPartnerError) {
+    throw new Error(previousPartnerError.message);
+  }
+
   const { error } = await supabase.from("partners").delete().eq("id", id);
 
   if (error) {
     throw new Error(error.message);
   }
+
+  await deletePartnerMediaUrls(collectPartnerMediaUrls(previousPartner)).catch(
+    () => undefined,
+  );
 
   await logAdminAction("partner_delete", {
     targetType: "partner",

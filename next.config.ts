@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import type { RemotePattern } from "next/dist/shared/lib/image-config";
 
 const securityHeaders = [
   {
@@ -23,6 +24,26 @@ const securityHeaders = [
   },
 ];
 
+function buildSupabaseRemotePattern(): RemotePattern | null {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  if (!rawUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(rawUrl);
+    return {
+      protocol: parsed.protocol.replace(":", "") as "http" | "https",
+      hostname: parsed.hostname,
+      pathname: "/storage/v1/object/public/**",
+    };
+  } catch {
+    return null;
+  }
+}
+
+const supabaseRemotePattern = buildSupabaseRemotePattern();
+
 if (process.env.NODE_ENV === "production") {
   securityHeaders.push({
     key: "Strict-Transport-Security",
@@ -34,6 +55,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   images: {
     formats: ["image/avif", "image/webp"],
+    remotePatterns: supabaseRemotePattern ? [supabaseRemotePattern] : undefined,
     localPatterns: [
       {
         pathname: "/api/image",

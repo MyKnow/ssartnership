@@ -61,9 +61,8 @@ export default function PartnerCardView({
 
   const lockKind = getPartnerLockKind(partner.visibility, viewerAuthenticated);
   const thumbnailUrl =
-    partner.images && partner.images.length > 0
-      ? getCachedImageUrl(partner.images[0])
-      : "";
+    partner.thumbnail ?? (partner.images && partner.images.length > 0 ? partner.images[0] : "");
+  const cachedThumbnailUrl = getCachedImageUrl(thumbnailUrl);
   const blurDataURL = getBlurDataURL(32, 32);
   const isActive = isWithinPeriod(partner.period.start, partner.period.end);
   const normalizedLinks = isActive
@@ -233,9 +232,9 @@ export default function PartnerCardView({
         </div>
         <div className="flex items-start gap-4">
           <div className="relative aspect-square w-28 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
-            {thumbnailUrl ? (
+            {cachedThumbnailUrl ? (
               <Image
-                src={thumbnailUrl}
+                src={cachedThumbnailUrl}
                 alt=""
                 fill
                 sizes="112px"

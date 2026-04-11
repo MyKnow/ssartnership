@@ -107,7 +107,7 @@ src/
 
 supabase/
   schema.sql              기준 스키마
-  migrations/             운영 DB용 migration
+  migrations/             기준 migration
 
 tests/
   mm-profile-csv.test.mts Mattermost 닉네임 파서 테스트
@@ -179,24 +179,10 @@ http://localhost:3000
 
 ## Supabase 설정
 
-### 새 프로젝트
-
-1. Supabase 프로젝트 생성
-2. SQL Editor에서 [supabase/schema.sql](/Users/myknow/coding/ssartnership/supabase/schema.sql) 실행
-3. `.env` 또는 Vercel 환경 변수에 Supabase 값 등록
+- 스키마 변경은 항상 `supabase/migrations`에 먼저 기록합니다.
+- `main`으로 merge하기 전에 migration이 누락되지 않았는지 확인합니다.
 
 `schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마, 제휴 업체 `이용 조건` 스키마가 포함되어 있습니다.
-
-### 기존 프로젝트 업데이트
-
-운영 중인 DB라면 다음 migration을 순서대로 적용합니다.
-
-1. [20260401000000_partner_visibility.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260401000000_partner_visibility.sql)
-2. [20260409.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260409.sql)
-3. [20260410_mm_user_directory.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260410_mm_user_directory.sql)
-4. [20260411_policy_documents.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260411_policy_documents.sql)
-5. [20260413000000_ssafy_cycle_settings.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260413000000_ssafy_cycle_settings.sql)
-6. [20260414000000_partner_conditions.sql](/Users/myknow/coding/ssartnership/supabase/migrations/20260414000000_partner_conditions.sql)
 
 주의:
 

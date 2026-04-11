@@ -25,6 +25,7 @@ create table if not exists partners (
   conditions text[] not null default '{}',
   benefits text[] not null default '{}',
   applies_to text[] not null default '{staff,student,graduate}',
+  thumbnail text,
   images text[] not null default '{}',
   tags text[] not null default '{}',
   created_at timestamp with time zone default now()
@@ -58,6 +59,7 @@ alter table partners add constraint partners_applies_to_check
     cardinality(applies_to) > 0
     and applies_to <@ array['staff', 'student', 'graduate']::text[]
   );
+alter table partners add column if not exists thumbnail text;
 alter table partners add column if not exists conditions text[] not null default '{}';
 alter table partners add column if not exists images text[] not null default '{}';
 alter table partners add column if not exists reservation_link text;

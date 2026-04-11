@@ -48,7 +48,7 @@ function CarouselLoadingSkeleton({
       style={style}
       aria-hidden="true"
     >
-      <div className="aspect-[16/9] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted">
+      <div className="aspect-[4/3] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted">
         <Skeleton className="h-full w-full rounded-none" />
       </div>
 
@@ -309,7 +309,7 @@ export default function PartnerImageCarousel({
     >
       <button
         type="button"
-        className="relative aspect-[16/9] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted xl:h-full xl:min-h-0 xl:aspect-auto"
+        className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted"
         onClick={() => {
           if (hasImages) {
             setOpen(true);

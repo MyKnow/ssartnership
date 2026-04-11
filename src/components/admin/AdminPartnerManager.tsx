@@ -40,6 +40,7 @@ type AdminPartner = {
   conditions?: string[] | null;
   benefits?: string[] | null;
   applies_to?: string[] | null;
+  thumbnail?: string | null;
   images?: string[] | null;
   tags?: string[] | null;
 };
@@ -209,6 +210,7 @@ export default function AdminPartnerManager({
             conditions: [],
             benefits: [],
             appliesTo: DEFAULT_PARTNER_AUDIENCE,
+            thumbnail: null,
             images: [],
             tags: [],
           }}

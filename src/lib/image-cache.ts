@@ -1,12 +1,30 @@
 const PROXY_PREFIX = "/api/image?url=";
+const PARTNER_MEDIA_STORAGE_MARKER = "/storage/v1/object/public/partner-media/";
 const warmedImageUrls = new Set<string>();
 const pendingImagePreloads = new Map<string, Promise<void>>();
+
+function shouldBypassProxy(src: string) {
+  if (
+    src.startsWith("/") ||
+    src.startsWith("data:") ||
+    src.startsWith("blob:")
+  ) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(src);
+    return parsed.pathname.includes(PARTNER_MEDIA_STORAGE_MARKER);
+  } catch {
+    return false;
+  }
+}
 
 export function getCachedImageUrl(src?: string | null) {
   if (!src) {
     return "";
   }
-  if (src.startsWith(PROXY_PREFIX) || src.startsWith("data:")) {
+  if (src.startsWith(PROXY_PREFIX) || shouldBypassProxy(src)) {
     return src;
   }
   return `${PROXY_PREFIX}${encodeURIComponent(src)}`;
