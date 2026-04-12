@@ -156,7 +156,7 @@ function parsePartnerCompanyPayload(formData: FormData): PartnerCompanyInput {
   const contactEmail = String(formData.get("companyContactEmail") || "").trim();
   const contactPhone = String(formData.get("companyContactPhone") || "").trim();
 
-  if (contactEmail && !isValidEmail(contactEmail)) {
+  if (!companyId && contactEmail && !isValidEmail(contactEmail)) {
     throw new Error("담당자 이메일 형식이 올바르지 않습니다.");
   }
 
@@ -433,51 +433,13 @@ async function ensurePartnerCompanyRow(
       if (!company) {
         throw new Error("회사 정보를 처리하지 못했습니다.");
       }
-      const currentCompany = company;
-
-      const nextCompany = {
-        name: companyInput.name || currentCompany.name,
-        slug: currentCompany.slug,
-        description:
-          companyInput.description !== null && companyInput.description !== undefined
-            ? companyInput.description
-            : currentCompany.description ?? null,
-        contact_name:
-          companyInput.contactName !== null && companyInput.contactName !== undefined
-            ? companyInput.contactName
-            : currentCompany.contact_name ?? null,
-        contact_email:
-          companyInput.contactEmail !== null && companyInput.contactEmail !== undefined
-            ? companyInput.contactEmail.toLowerCase()
-            : currentCompany.contact_email ?? null,
-        contact_phone:
-          companyInput.contactPhone !== null && companyInput.contactPhone !== undefined
-            ? companyInput.contactPhone
-            : currentCompany.contact_phone ?? null,
-        is_active: currentCompany.is_active ?? true,
+      return {
+        company,
+        account: null,
+        createdCompany: false,
+        createdAccount: false,
+        createdLink: false,
       };
-
-      const hasChanges =
-        nextCompany.name !== currentCompany.name ||
-        nextCompany.description !== currentCompany.description ||
-        nextCompany.contact_name !== currentCompany.contact_name ||
-        nextCompany.contact_email !== currentCompany.contact_email ||
-        nextCompany.contact_phone !== currentCompany.contact_phone;
-
-      if (hasChanges) {
-        const { data: updatedCompany, error: updateError } = await supabase
-          .from("partner_companies")
-          .update(nextCompany)
-          .eq("id", currentCompany.id)
-          .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
-          .single();
-
-        if (updateError) {
-          throw new Error(updateError.message);
-        }
-
-        company = normalizePartnerCompanyRow(updatedCompany as PartnerCompanyRow);
-      }
     } else {
       if (!companyInput.name) {
         throw new Error("회사명을 입력해 주세요.");
