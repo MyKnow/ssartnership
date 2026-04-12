@@ -99,7 +99,7 @@ const auditLabels: Record<string, string> = {
   push_send: '푸시 발송',
   push_log_delete: '푸시 로그 삭제',
   partner_account_update: '협력사 포털 계정 수정',
-  partner_account_company_update: '협력사 포털 권한 수정',
+  partner_account_company_update: '협력사 포털 연결 수정',
   partner_account_initial_setup_link_generate: '협력사 포털 초기설정 URL 생성',
   partner_account_initial_setup_link_send: '협력사 포털 초기설정 URL 전송',
 };

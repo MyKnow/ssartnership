@@ -22,7 +22,6 @@ type PartnerCompanyRow = {
 
 type PartnerAccountCompanyLinkRow = {
   id: string;
-  role?: "owner" | "admin" | "manager" | "viewer" | null;
   is_active?: boolean | null;
   created_at?: string | null;
   company?: PartnerCompanyRow | null;
@@ -108,7 +107,6 @@ function normalizePartnerAccount(
     updated_at: row.updated_at ?? null,
     links: links.map((link) => ({
       id: link.id,
-      role: link.role ?? null,
       is_active: link.is_active ?? null,
       created_at: link.created_at ?? null,
       company: normalizePartnerCompany(link.company),
@@ -135,7 +133,7 @@ export default async function AdminCompaniesPage() {
     supabase
       .from("partner_accounts")
       .select(
-        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_token,last_login_at,created_at,updated_at,links:partner_account_companies(id,role,is_active,created_at,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active))",
+        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_token,last_login_at,created_at,updated_at,links:partner_account_companies(id,is_active,created_at,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active))",
       )
       .order("created_at", { ascending: false }),
   ]);
@@ -184,8 +182,8 @@ export default async function AdminCompaniesPage() {
 
         <Card>
           <SectionHeading
-            title="협력사 계정 및 권한 관리"
-            description="로그인 아이디, 활성 상태, 비밀번호 변경 필요 여부와 협력사별 권한을 관리합니다."
+            title="협력사 계정 및 연결 관리"
+            description="로그인 아이디, 활성 상태, 비밀번호 변경 필요 여부와 협력사별 연결 활성 상태를 관리합니다."
           />
           <AdminPartnerAccountManager accounts={safeAccounts} />
         </Card>

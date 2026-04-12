@@ -132,7 +132,7 @@ export default async function AdminPage() {
         <SummaryCard
           href="/admin/companies"
           title="협력사 관리"
-          description="협력사 자체와 담당자 계정, 연결 권한을 관리합니다."
+          description="협력사 자체와 담당자 계정, 연결 상태를 관리합니다."
           meta={`협력사 ${companyCount}개 · 계정 ${accountCount}개`}
         />
         <SummaryCard

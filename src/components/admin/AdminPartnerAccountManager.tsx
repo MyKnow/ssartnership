@@ -1,19 +1,17 @@
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import PartnerInitialSetupUrlCopyButton from "@/components/admin/PartnerInitialSetupUrlCopyButton";
 import {
   updatePartnerAccount,
   createPartnerAccountInitialSetupUrl,
   sendPartnerAccountInitialSetupUrl,
-  updatePartnerAccountCompanyPermission,
+  updatePartnerAccountCompanyConnection,
 } from "@/app/admin/(protected)/actions";
 
 type AdminPartnerAccountCompany = {
   id: string;
-  role?: "owner" | "admin" | "manager" | "viewer" | null;
   is_active?: boolean | null;
   created_at?: string | null;
   company?:
@@ -46,37 +44,6 @@ type AdminPartnerAccount = {
   updated_at?: string | null;
   links: AdminPartnerAccountCompany[];
 };
-
-const ROLE_OPTIONS: Array<{
-  value: "owner" | "admin" | "manager" | "viewer";
-  label: string;
-}> = [
-  { value: "owner", label: "소유자" },
-  { value: "admin", label: "관리자" },
-  { value: "manager", label: "담당자" },
-  { value: "viewer", label: "조회자" },
-];
-
-function getRoleLabel(
-  role?: "owner" | "admin" | "manager" | "viewer" | null,
-) {
-  return ROLE_OPTIONS.find((item) => item.value === role)?.label ?? "미지정";
-}
-
-function getRoleBadgeClass(role?: "owner" | "admin" | "manager" | "viewer" | null) {
-  switch (role) {
-    case "owner":
-      return "bg-violet-500/10 text-violet-700";
-    case "admin":
-      return "bg-sky-500/10 text-sky-700";
-    case "manager":
-      return "bg-emerald-500/10 text-emerald-700";
-    case "viewer":
-      return "bg-surface text-muted-foreground";
-    default:
-      return "bg-surface text-muted-foreground";
-  }
-}
 
 function FieldGroup({
   label,
@@ -330,20 +297,20 @@ export default function AdminPartnerAccountManager({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-semibold text-foreground">
-                      협력사별 권한
+                      협력사 연결
                     </h4>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      연결된 협력사마다 권한과 활성 상태를 조정할 수 있습니다.
+                      연결된 협력사마다 활성 상태를 조정할 수 있습니다.
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-4 space-y-3">
                   {account.links.length === 0 ? (
-                    <EmptyState
-                      title="연결된 협력사가 없습니다."
-                      description="이 계정에 접근 권한을 줄 협력사를 추가해 주세요."
-                    />
+                  <EmptyState
+                    title="연결된 협력사가 없습니다."
+                    description="이 계정에 연결할 협력사를 추가해 주세요."
+                  />
                   ) : null}
                   {account.links.map((link) => {
                     const linkFormId = `partner-account-link-${account.id}-${link.id}`;
@@ -362,9 +329,6 @@ export default function AdminPartnerAccountManager({
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={getRoleBadgeClass(link.role)}>
-                              {getRoleLabel(link.role)}
-                            </Badge>
                             <Badge
                               className={
                                 link.is_active !== false
@@ -379,8 +343,8 @@ export default function AdminPartnerAccountManager({
 
                         <form
                           id={linkFormId}
-                          action={updatePartnerAccountCompanyPermission}
-                          className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_160px_auto]"
+                          action={updatePartnerAccountCompanyConnection}
+                          className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]"
                         >
                           <input type="hidden" name="accountId" value={account.id} />
                           <input
@@ -388,37 +352,30 @@ export default function AdminPartnerAccountManager({
                             name="companyId"
                             value={link.company?.id ?? ""}
                           />
-                          <FieldGroup label="권한">
-                            <Select name="role" defaultValue={link.role ?? "viewer"}>
-                              {ROLE_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </Select>
+                          <FieldGroup label="연결 상태">
+                            <div className="flex items-center gap-3 text-sm font-medium text-foreground">
+                              <input
+                                type="hidden"
+                                name="isActive"
+                                value="false"
+                              />
+                              <input
+                                type="checkbox"
+                                name="isActive"
+                                value="true"
+                                defaultChecked={link.is_active !== false}
+                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                              />
+                              연결 활성
+                            </div>
                           </FieldGroup>
-                          <label className="flex items-center gap-3 text-sm font-medium text-foreground">
-                            <input
-                              type="hidden"
-                              name="isActive"
-                              value="false"
-                            />
-                            <input
-                              type="checkbox"
-                              name="isActive"
-                              value="true"
-                              defaultChecked={link.is_active !== false}
-                              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                            />
-                            연결 활성
-                          </label>
                           <div className="flex items-end justify-end">
                             <SubmitButton
                               pendingText="저장 중"
                               form={linkFormId}
                               className="w-full sm:w-auto"
                             >
-                              권한 저장
+                              연결 저장
                             </SubmitButton>
                           </div>
                         </form>

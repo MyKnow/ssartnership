@@ -127,8 +127,6 @@ type PartnerAccountRow = {
   updated_at?: string | null;
 };
 
-type PartnerAccountCompanyRole = "owner" | "admin" | "manager" | "viewer";
-
 function parseList(value: string) {
   return Array.from(
     new Set(
@@ -231,20 +229,15 @@ function parsePartnerAccountPayload(formData: FormData) {
 function parsePartnerAccountCompanyPayload(formData: FormData) {
   const accountId = String(formData.get("accountId") || "").trim();
   const companyId = String(formData.get("companyId") || "").trim();
-  const role = String(formData.get("role") || "").trim();
   const isActive = formData.getAll("isActive").includes("true");
 
   if (!accountId || !companyId) {
-    throw new Error("권한을 변경할 계정과 회사를 찾을 수 없습니다.");
-  }
-  if (!["owner", "admin", "manager", "viewer"].includes(role)) {
-    throw new Error("권한은 owner, admin, manager, viewer 중 하나여야 합니다.");
+    throw new Error("연결 상태를 변경할 계정과 회사를 찾을 수 없습니다.");
   }
 
   return {
     accountId,
     companyId,
-    role: role as PartnerAccountCompanyRole,
     isActive,
   };
 }
@@ -611,7 +604,6 @@ async function ensurePartnerCompanyRow(
         .insert({
           account_id: account.id,
           company_id: resolvedCompany.id,
-          role: "owner",
           is_active: true,
         });
 
@@ -906,14 +898,14 @@ export async function sendPartnerAccountInitialSetupUrl(formData: FormData) {
   redirect("/admin/companies");
 }
 
-export async function updatePartnerAccountCompanyPermission(formData: FormData) {
+export async function updatePartnerAccountCompanyConnection(formData: FormData) {
   await requireAdmin();
   const payload = parsePartnerAccountCompanyPayload(formData);
 
   const supabase = getSupabaseAdminClient();
   const { data: existingLink, error: linkError } = await supabase
     .from("partner_account_companies")
-    .select("id,account_id,company_id,role,is_active,created_at")
+    .select("id,account_id,company_id,is_active,created_at")
     .eq("account_id", payload.accountId)
     .eq("company_id", payload.companyId)
     .maybeSingle();
@@ -922,16 +914,14 @@ export async function updatePartnerAccountCompanyPermission(formData: FormData) 
     throw new Error(linkError.message);
   }
   if (!existingLink) {
-    throw new Error("수정할 권한 연결을 찾을 수 없습니다.");
+    throw new Error("수정할 연결을 찾을 수 없습니다.");
   }
 
   const nextLink = {
-    role: payload.role,
     is_active: payload.isActive,
   };
 
   const hasChanges =
-    existingLink.role !== nextLink.role ||
     Boolean(existingLink.is_active) !== nextLink.is_active;
 
   if (hasChanges) {
@@ -951,7 +941,6 @@ export async function updatePartnerAccountCompanyPermission(formData: FormData) 
     properties: {
       accountId: payload.accountId,
       companyId: payload.companyId,
-      role: payload.role,
       isActive: payload.isActive,
     },
   });

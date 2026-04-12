@@ -107,11 +107,8 @@ create table if not exists partner_account_companies (
   id uuid primary key default uuid_generate_v4(),
   account_id uuid not null references partner_accounts(id) on delete cascade,
   company_id uuid not null references partner_companies(id) on delete cascade,
-  role text not null default 'owner',
   is_active boolean not null default true,
   created_at timestamp with time zone default now(),
-  constraint partner_account_companies_role_check
-    check (role in ('owner', 'admin', 'manager', 'viewer')),
   constraint partner_account_companies_account_company_key
     unique (account_id, company_id)
 );
