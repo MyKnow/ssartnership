@@ -1,0 +1,57 @@
+name: Sync Preview Supabase
+
+on:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: preview-sync-non-main
+  cancel-in-progress: true
+
+jobs:
+  sync-preview:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+      SUPABASE_PRODUCTION_URL: ${{ secrets.SUPABASE_PRODUCTION_URL }}
+      SUPABASE_PRODUCTION_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PRODUCTION_SERVICE_ROLE_KEY }}
+      SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
+      SUPABASE_PREVIEW_URL: ${{ secrets.SUPABASE_PREVIEW_URL }}
+      SUPABASE_PREVIEW_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_PREVIEW_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_PREVIEW_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_PREVIEW_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase@latest
+
+      - name: Sync production data and storage to preview
+        run: npm run sync:preview
+
+      - name: Apply preview migrations
+        run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes
+
+      - name: Run optimization policy
+        run: npm run perf:lighthouse

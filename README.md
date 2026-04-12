@@ -181,6 +181,17 @@ http://localhost:3000
 
 - 스키마 변경은 항상 `supabase/migrations`에 먼저 기록합니다.
 - `main`으로 merge하기 전에 migration이 누락되지 않았는지 확인합니다.
+- `main`을 제외한 브랜치 push 시 GitHub Actions가 production 데이터를 preview로 미러링한 뒤 migration을 적용하고, Lighthouse 성능 체크까지 실행합니다.
+- 이 워크플로를 위해 GitHub Secrets에 다음 값을 넣습니다.
+  - `SUPABASE_PRODUCTION_DB_URL`
+  - `SUPABASE_PRODUCTION_URL`
+  - `SUPABASE_PRODUCTION_SERVICE_ROLE_KEY`
+  - `SUPABASE_PREVIEW_DB_URL`
+  - `SUPABASE_PREVIEW_URL`
+- `SUPABASE_PREVIEW_SERVICE_ROLE_KEY`
+- `SUPABASE_PREVIEW_ANON_KEY`
+- `*_DB_URL` 값은 Supabase 대시보드에서 복사한 percent-encoded PostgreSQL 연결 문자열을 사용합니다.
+- 로컬 또는 CI에서 동일한 동기화 로직을 재사용하려면 `npm run sync:preview`를 실행합니다.
 
 `schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마, 제휴 업체 `이용 조건` 스키마가 포함되어 있습니다.
 

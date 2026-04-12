@@ -49,6 +49,11 @@ async function detectChromePath() {
     '/Applications/Chromium.app/Contents/MacOS/Chromium',
     '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/opt/google/chrome/chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
   ];
 
   for (const candidate of candidates) {
