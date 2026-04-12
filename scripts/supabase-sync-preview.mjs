@@ -216,7 +216,7 @@ async function collectBucketFilePaths(storageClient, bucketName, prefix = "", pa
   let offset = 0;
 
   while (true) {
-    const { data, error } = await storageClient.from(bucketName).list(prefix, {
+    const { data, error } = await storageClient.storage.from(bucketName).list(prefix, {
       limit,
       offset,
       sortBy: {
