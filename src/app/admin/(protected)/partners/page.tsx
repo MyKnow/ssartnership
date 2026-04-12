@@ -4,6 +4,7 @@ import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
+import ShellHeader from "@/components/ui/ShellHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import {
@@ -108,13 +109,18 @@ export default async function AdminPartnersPage() {
       backLabel="관리 홈"
     >
       <section className="grid gap-6">
+        <ShellHeader
+          eyebrow="Partners"
+          title="브랜드와 변경 요청 관리"
+          description="카테고리, 브랜드, 승인 대기 요청을 같은 디자인 규칙 아래에서 관리합니다."
+        />
         <PartnerChangeRequestQueue
           requests={changeRequests}
           approveAction={approvePartnerChangeRequest}
           rejectAction={rejectPartnerChangeRequest}
         />
 
-        <Card>
+        <Card tone="elevated">
           <SectionHeading
             title="카테고리 관리"
             description="카테고리 키는 소문자 영문/숫자 조합을 권장합니다."
@@ -237,7 +243,7 @@ export default async function AdminPartnersPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card tone="elevated">
           <SectionHeading
             title="브랜드 관리"
             description="협력사와 담당자 이메일을 함께 관리하고, 이용 조건/혜택/태그는 칩으로 다룹니다."

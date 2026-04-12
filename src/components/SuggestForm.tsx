@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
@@ -87,10 +88,12 @@ export default function SuggestForm() {
         }
       }}
     >
+      <InlineMessage
+        title="제안 접수 안내"
+        description="업체 정보와 담당자 연락처를 함께 보내 주시면 검토 속도가 빨라집니다."
+      />
       <div className="grid gap-1">
-        <span className="text-xs font-medium text-muted-foreground">
-          업체명
-        </span>
+        <span className="ui-caption">업체명</span>
         <Input
           name="companyName"
           value={formState.companyName}
@@ -100,9 +103,7 @@ export default function SuggestForm() {
       </div>
 
       <div className="grid gap-1">
-        <span className="text-xs font-medium text-muted-foreground">
-          업체분야 소개
-        </span>
+        <span className="ui-caption">업체분야 소개</span>
         <Textarea
           name="businessArea"
           value={formState.businessArea}
@@ -113,9 +114,7 @@ export default function SuggestForm() {
       </div>
 
       <div className="grid gap-1">
-        <span className="text-xs font-medium text-muted-foreground">
-          제안 제휴 조건
-        </span>
+        <span className="ui-caption">제안 제휴 조건</span>
         <Textarea
           name="partnershipConditions"
           value={formState.partnershipConditions}
@@ -127,9 +126,7 @@ export default function SuggestForm() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            담당자 이름
-          </span>
+          <span className="ui-caption">담당자 이름</span>
           <Input
             name="contactName"
             value={formState.contactName}
@@ -138,9 +135,7 @@ export default function SuggestForm() {
           />
         </div>
         <div className="grid gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            담당자 직위
-          </span>
+          <span className="ui-caption">담당자 직위</span>
           <Input
             name="contactRole"
             value={formState.contactRole}
@@ -152,9 +147,7 @@ export default function SuggestForm() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            담당자 이메일
-          </span>
+          <span className="ui-caption">담당자 이메일</span>
           <Input
             type="email"
             name="contactEmail"
@@ -166,9 +159,7 @@ export default function SuggestForm() {
           />
         </div>
         <div className="grid gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            회사 사이트 URL
-          </span>
+          <span className="ui-caption">회사 사이트 URL</span>
           <Input
             name="companyUrl"
             value={formState.companyUrl}
@@ -194,7 +185,7 @@ export default function SuggestForm() {
         description="제안을 제출할까요? 제출 후 홈 화면으로 이동합니다."
         onClose={() => setConfirmOpen(false)}
       >
-        <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={isSubmitting}>
+        <Button variant="secondary" onClick={() => setConfirmOpen(false)} disabled={isSubmitting}>
           취소
         </Button>
         <Button onClick={handleSubmit} loading={isSubmitting} loadingText="제출 중">

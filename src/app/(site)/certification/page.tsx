@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
+import ShellHeader from "@/components/ui/ShellHeader";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
@@ -54,14 +55,13 @@ export default async function CertificationPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
-        <Container className="pb-16 pt-10">
-          <div className="mx-auto max-w-2xl">
-            <h1 className="text-2xl font-semibold text-foreground">
-              SSAFY 인증
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              현재 계정의 인증 상태와 표시 정보를 확인합니다.
-            </p>
+        <Container className="pb-16 pt-10" size="wide">
+          <div className="mx-auto max-w-4xl space-y-6">
+            <ShellHeader
+              eyebrow="Certification"
+              title="SSAFY 인증"
+              description="현재 계정의 인증 상태와 표시 정보를 확인합니다."
+            />
             <CertificationView
               member={member as CertificationMember}
               initialTimestamp={initialTimestamp}

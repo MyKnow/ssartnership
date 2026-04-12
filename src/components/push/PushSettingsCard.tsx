@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import InlineMessage from "@/components/ui/InlineMessage";
+import StatsRow from "@/components/ui/StatsRow";
 import { useToast } from "@/components/ui/Toast";
 import { trackProductEvent } from "@/lib/product-events";
 import type { PushPreferenceState } from "@/lib/push";
@@ -20,23 +22,6 @@ const preferenceLabels: Record<PreferenceKey, string> = {
   newPartnerEnabled: "신규 제휴",
   expiringPartnerEnabled: "종료 7일 전",
 };
-
-function StatusMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-sm font-semibold text-foreground">{value}</p>
-    </div>
-  );
-}
 
 function InstallGuideStep({
   step,
@@ -445,7 +430,7 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
   }
 
   return (
-    <Card className="mx-auto mt-6 max-w-2xl min-w-0 overflow-hidden">
+    <Card tone="elevated" className="mx-auto mt-6 max-w-2xl min-w-0 overflow-hidden">
       <div className="border-b border-border pb-5">
         <div className="flex items-start justify-between gap-3">
           <h2 className="min-w-0 text-lg font-semibold text-foreground">
@@ -459,31 +444,47 @@ export default function PushSettingsCard({ initialPreferences, configured }: Pro
         </p>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <StatusMetric
-          label="권한 상태"
-          value={permission === "unsupported" ? "미지원" : permission}
-        />
-        <StatusMetric
-          label="기기 구독"
-          value={hasSubscription ? "구독됨" : "미구독"}
+      <div className="mt-5">
+        <StatsRow
+          minItemWidth="11rem"
+          items={[
+            {
+              label: "권한 상태",
+              value: permission === "unsupported" ? "미지원" : permission,
+              hint: "브라우저 알림 권한 상태",
+            },
+            {
+              label: "기기 구독",
+              value: hasSubscription ? "구독됨" : "미구독",
+              hint: "현재 기기의 Web Push 연결 상태",
+            },
+          ]}
         />
       </div>
 
       {!isReceivingOnThisDevice ? (
-        <div className="mt-5 rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
-          {!configured
-            ? "서버에 VAPID 키와 CRON 시크릿이 설정되면 알림 기능을 바로 사용할 수 있습니다."
-            : !supported
-              ? "이 브라우저는 Web Push를 지원하지 않습니다. 최신 Chrome, Edge 또는 iOS/iPadOS 설치형 앱에서 확인해 주세요."
-              : iosNeedsInstall
-                ? "iPhone/iPad에서는 브라우저의 공유 메뉴에서 홈 화면에 추가한 뒤, 설치된 앱 안에서 알림을 켤 수 있습니다."
-                : permission === "denied"
-                  ? "브라우저 설정에서 알림 권한을 다시 허용한 뒤 재시도해 주세요."
-                  : accountEnabled
-                    ? "이 계정은 다른 기기에서 알림을 받고 있습니다. 현재 기기에서도 필요하면 알림을 켜 주세요."
-                    : "기기 알림을 켜면 공지와 제휴 소식을 앱처럼 받을 수 있습니다."}
-        </div>
+        <InlineMessage
+          className="mt-5"
+          tone={
+            !configured || iosNeedsInstall || permission === "denied"
+              ? "warning"
+              : "info"
+          }
+          title="현재 기기에서는 아직 알림이 완전히 켜져 있지 않습니다."
+          description={
+            !configured
+              ? "서버에 VAPID 키와 CRON 시크릿이 설정되면 알림 기능을 바로 사용할 수 있습니다."
+              : !supported
+                ? "이 브라우저는 Web Push를 지원하지 않습니다. 최신 Chrome, Edge 또는 iOS/iPadOS 설치형 앱에서 확인해 주세요."
+                : iosNeedsInstall
+                  ? "iPhone/iPad에서는 브라우저의 공유 메뉴에서 홈 화면에 추가한 뒤, 설치된 앱 안에서 알림을 켤 수 있습니다."
+                  : permission === "denied"
+                    ? "브라우저 설정에서 알림 권한을 다시 허용한 뒤 재시도해 주세요."
+                    : accountEnabled
+                      ? "이 계정은 다른 기기에서 알림을 받고 있습니다. 현재 기기에서도 필요하면 알림을 켜 주세요."
+                      : "기기 알림을 켜면 공지와 제휴 소식을 앱처럼 받을 수 있습니다."
+          }
+        />
       ) : null}
 
       {iosNeedsInstall ? (

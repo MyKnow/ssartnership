@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import EmptyState from "@/components/ui/EmptyState";
+import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import AdminMemberCard from "@/components/admin/AdminMemberCard";
@@ -161,54 +162,71 @@ export default function AdminMemberManager({
 
   return (
     <div className="mt-6 grid min-w-0 gap-6">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_160px_180px_180px_180px]">
-        <Input
-          className="sm:col-span-2 xl:col-span-1"
-          value={searchValue}
-          onChange={(event) => setSearchValue(event.target.value)}
-          placeholder="이름, MM 아이디로 검색"
-        />
-        <Select
-          value={yearFilter}
-          onChange={(event) => setYearFilter(event.target.value as YearFilterOption)}
-        >
-          <option value="all">전체 기수</option>
-          {yearOptions.map((year) => (
-            <option key={year} value={String(year)}>
-              {formatSsafyYearLabel(year)}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={sortValue}
-          onChange={(event) => setSortValue(event.target.value as MemberSortOption)}
-        >
-          <option value="recent">등록순</option>
-          <option value="updated">최근 수정순</option>
-          <option value="name">이름순</option>
-        </Select>
-        <Select
-          value={filterValue}
-          onChange={(event) =>
-            setFilterValue(event.target.value as MemberFilterOption)
-          }
-        >
-          <option value="all">전체 상태</option>
-          <option value="mustChangePassword">비밀번호 변경 필요</option>
-          <option value="normal">정상</option>
-        </Select>
-        <Select
-          value={campusFilter}
-          onChange={(event) => setCampusFilter(event.target.value)}
-        >
-          <option value="all">전체 캠퍼스</option>
-          {campusOptions.map((campus) => (
-            <option key={campus} value={campus}>
-              {campus}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <FilterBar
+        title="회원 필터"
+        description="이름, 기수, 캠퍼스, 상태 기준으로 회원 목록을 빠르게 좁힙니다."
+      >
+        <div className="grid min-w-[14rem] flex-1 gap-1">
+          <span className="ui-caption">검색</span>
+          <Input
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="이름, MM 아이디로 검색"
+          />
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">기수</span>
+          <Select
+            value={yearFilter}
+            onChange={(event) => setYearFilter(event.target.value as YearFilterOption)}
+          >
+            <option value="all">전체 기수</option>
+            {yearOptions.map((year) => (
+              <option key={year} value={String(year)}>
+                {formatSsafyYearLabel(year)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">정렬</span>
+          <Select
+            value={sortValue}
+            onChange={(event) => setSortValue(event.target.value as MemberSortOption)}
+          >
+            <option value="recent">등록순</option>
+            <option value="updated">최근 수정순</option>
+            <option value="name">이름순</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">상태</span>
+          <Select
+            value={filterValue}
+            onChange={(event) =>
+              setFilterValue(event.target.value as MemberFilterOption)
+            }
+          >
+            <option value="all">전체 상태</option>
+            <option value="mustChangePassword">비밀번호 변경 필요</option>
+            <option value="normal">정상</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">캠퍼스</span>
+          <Select
+            value={campusFilter}
+            onChange={(event) => setCampusFilter(event.target.value)}
+          >
+            <option value="all">전체 캠퍼스</option>
+            {campusOptions.map((campus) => (
+              <option key={campus} value={campus}>
+                {campus}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </FilterBar>
 
       <p className="text-sm text-muted-foreground">
         총 {members.length}명 중 {filteredMembers.length}명 표시

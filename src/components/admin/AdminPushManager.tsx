@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
+import InlineMessage from "@/components/ui/InlineMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
+import StatsRow from "@/components/ui/StatsRow";
 import Textarea from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
 import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
@@ -65,26 +68,6 @@ const statusLabels: Record<PushMessageLog["status"], string> = {
   failed: "발송 실패",
   no_target: "대상 없음",
 };
-
-function MetricCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-border bg-surface-muted px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-3 text-2xl font-semibold text-foreground">{value}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-    </div>
-  );
-}
 
 function getStatusBadgeClass(status: PushMessageLog["status"]) {
   switch (status) {
@@ -441,23 +424,25 @@ export default function AdminPushManager({
 
   return (
     <div className="grid min-w-0 gap-8 overflow-x-hidden">
-      <section className="grid min-w-0 gap-3 md:grid-cols-3">
-        <MetricCard
-          label="활성 구독"
-          value={`${activeSubscriptions}개`}
-          hint="실제 전송 가능한 기기 구독 수입니다."
-        />
-        <MetricCard
-          label="공지 가능 회원"
-          value={`${enabledMembers}명`}
-          hint="현재 공지 푸시를 실제로 받을 수 있는 회원 수입니다."
-        />
-        <MetricCard
-          label="최근 메시지 로그"
-          value={`${logs.length}건`}
-          hint="최근 발송/자동 알림 메시지 이력입니다."
-        />
-      </section>
+      <StatsRow
+        items={[
+          {
+            label: "활성 구독",
+            value: `${activeSubscriptions}개`,
+            hint: "실제 전송 가능한 기기 구독 수",
+          },
+          {
+            label: "공지 가능 회원",
+            value: `${enabledMembers}명`,
+            hint: "공지 푸시를 받을 수 있는 회원 수",
+          },
+          {
+            label: "최근 메시지 로그",
+            value: `${logs.length}건`,
+            hint: "최근 발송 및 자동 알림 이력",
+          },
+        ]}
+      />
 
       <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface-muted/50 p-4 sm:p-5">
         <SectionHeading
@@ -465,136 +450,139 @@ export default function AdminPushManager({
           description="발송 대상을 먼저 정하고, 직접 URL 입력 또는 등록된 제휴 업체 선택으로 이동 경로를 구성합니다."
         />
 
+        {!configured ? (
+          <InlineMessage
+            tone="warning"
+            title="푸시 설정이 아직 완성되지 않았습니다."
+            description="VAPID 환경 변수와 CRON 시크릿이 준비되어야 수동 발송과 자동 발송을 모두 안정적으로 운영할 수 있습니다."
+          />
+        ) : null}
+
         <form className="grid gap-4" onSubmit={handleSubmit}>
+          <FilterBar
+            title="발송 대상"
+            description="전체, 기수, 캠퍼스, 개인 단위로 메시지 도달 범위를 지정합니다."
+          >
+            <label className="grid min-w-[10rem] gap-2 text-sm font-medium text-foreground">
+              대상 범위
+              <Select
+                value={audienceScope}
+                onChange={(event) =>
+                  handleAudienceScopeChange(event.target.value as PushAudienceScope)
+                }
+              >
+                <option value="all">전체</option>
+                <option value="year">기수</option>
+                <option value="campus">캠퍼스</option>
+                <option value="member">개인</option>
+              </Select>
+            </label>
+
+            <label className="grid min-w-[10rem] gap-2 text-sm font-medium text-foreground">
+              기수
+              <Select
+                value={selectedYear}
+                disabled={audienceScope !== "year"}
+                onChange={(event) => setSelectedYear(event.target.value)}
+              >
+                <option value="">기수 선택</option>
+                {audienceYearOptions.map((year) => (
+                  <option key={year} value={String(year)}>
+                    {formatSsafyYearLabel(year)}
+                  </option>
+                ))}
+              </Select>
+            </label>
+
+            <label className="grid min-w-[10rem] gap-2 text-sm font-medium text-foreground">
+              캠퍼스
+              <Select
+                value={selectedCampus}
+                disabled={
+                  audienceScope === "all" ||
+                  audienceScope === "year" ||
+                  audienceScope === "member"
+                }
+                onChange={(event) => {
+                  setSelectedCampus(event.target.value);
+                }}
+              >
+                <option value="">캠퍼스 선택</option>
+                {campusOptions.map((campus) => (
+                  <option key={campus} value={campus}>
+                    {campus}
+                  </option>
+                ))}
+              </Select>
+            </label>
+
+            <label className="grid min-w-[12rem] flex-1 gap-2 text-sm font-medium text-foreground">
+              개인
+              <Select
+                value={selectedMemberId}
+                disabled={audienceScope !== "member"}
+                onChange={(event) => setSelectedMemberId(event.target.value)}
+              >
+                <option value="">개인 선택</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {getMemberLabel(member)}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </FilterBar>
+
           <div className="grid min-w-0 gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
-            <SectionHeading
-              title="발송 대상"
-              description="전체, 기수, 캠퍼스, 개인 단위로 메시지 도달 범위를 지정할 수 있습니다."
-              className="gap-1"
-            />
-
-            <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_repeat(3,minmax(0,1fr))]">
+            <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
               <label className="grid gap-2 text-sm font-medium text-foreground">
-                대상 범위
-                <Select
-                  value={audienceScope}
-                  onChange={(event) =>
-                    handleAudienceScopeChange(
-                      event.target.value as PushAudienceScope,
-                    )
-                  }
-                  >
-                  <option value="all">전체</option>
-                  <option value="year">기수</option>
-                  <option value="campus">캠퍼스</option>
-                  <option value="member">개인</option>
-                </Select>
+                제목
+                <Input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="알림 제목"
+                  maxLength={60}
+                  required
+                />
               </label>
 
               <label className="grid gap-2 text-sm font-medium text-foreground">
-                기수
+                가게 상세 페이지 선택
                 <Select
-                  value={selectedYear}
-                  disabled={audienceScope !== "year"}
-                  onChange={(event) => setSelectedYear(event.target.value)}
+                  value={selectedPartnerId}
+                  onChange={(event) => handlePartnerChange(event.target.value)}
                 >
-                  <option value="">기수 선택</option>
-                  {audienceYearOptions.map((year) => (
-                    <option key={year} value={String(year)}>
-                      {formatSsafyYearLabel(year)}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                캠퍼스
-                <Select
-                  value={selectedCampus}
-                  disabled={
-                    audienceScope === "all" ||
-                    audienceScope === "year" ||
-                    audienceScope === "member"
-                  }
-                  onChange={(event) => {
-                    setSelectedCampus(event.target.value);
-                  }}
-                >
-                  <option value="">캠퍼스 선택</option>
-                  {campusOptions.map((campus) => (
-                    <option key={campus} value={campus}>
-                      {campus}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                개인
-                <Select
-                  value={selectedMemberId}
-                  disabled={audienceScope !== "member"}
-                  onChange={(event) => setSelectedMemberId(event.target.value)}
-                >
-                  <option value="">개인 선택</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {getMemberLabel(member)}
+                  <option value="">직접 URL 입력</option>
+                  {partners.map((partner) => (
+                    <option key={partner.id} value={partner.id}>
+                      {partner.name}
                     </option>
                   ))}
                 </Select>
               </label>
             </div>
-          </div>
 
-          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <label className="grid gap-2 text-sm font-medium text-foreground">
-              제목
-              <Input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="알림 제목"
-                maxLength={60}
+              내용
+              <Textarea
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                placeholder="알림 내용"
+                rows={4}
+                maxLength={160}
                 required
               />
             </label>
 
             <label className="grid gap-2 text-sm font-medium text-foreground">
-              가게 상세 페이지 선택
-              <Select
-                value={selectedPartnerId}
-                onChange={(event) => handlePartnerChange(event.target.value)}
-              >
-                <option value="">직접 URL 입력</option>
-                {partners.map((partner) => (
-                  <option key={partner.id} value={partner.id}>
-                    {partner.name}
-                  </option>
-                ))}
-              </Select>
+              이동 URL
+              <Input
+                value={url}
+                onChange={(event) => handleUrlChange(event.target.value)}
+                placeholder="예: /partners/uuid 또는 https://..."
+              />
             </label>
           </div>
-
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            내용
-            <Textarea
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              placeholder="알림 내용"
-              rows={4}
-              maxLength={160}
-              required
-            />
-          </label>
-
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            이동 URL
-            <Input
-              value={url}
-              onChange={(event) => handleUrlChange(event.target.value)}
-              placeholder="예: /partners/uuid 또는 https://..."
-            />
-          </label>
 
           <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid min-w-0 gap-1">
@@ -624,74 +612,85 @@ export default function AdminPushManager({
           description="과거 메시지를 검색, 정렬, 필터링하고 필요하면 입력 폼으로 다시 불러올 수 있습니다."
         />
 
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.35fr)_repeat(5,minmax(0,0.75fr))]">
-          <Input
-            className="sm:col-span-2 xl:col-span-1"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="제목, 내용, URL, 대상 검색"
-          />
-          <Select
-            value={typeFilter}
-            onChange={(event) =>
-              setTypeFilter(event.target.value as PushMessageLog["type"] | "all")
-            }
-          >
-            <option value="all">전체 유형</option>
-            <option value="announcement">운영 공지</option>
-            <option value="new_partner">신규 제휴</option>
-            <option value="expiring_partner">종료 임박</option>
-          </Select>
-          <Select
-            value={sourceFilter}
-            onChange={(event) =>
-              setSourceFilter(
-                event.target.value as PushMessageLog["source"] | "all",
-              )
-            }
-          >
-            <option value="all">전체 발송 방식</option>
-            <option value="manual">수동 발송</option>
-            <option value="automatic">자동 발송</option>
-          </Select>
-          <Select
-            value={audienceFilter}
-            onChange={(event) =>
-              setAudienceFilter(
-                event.target.value as PushAudienceScope | "all",
-              )
-            }
-          >
-            <option value="all">전체</option>
-            <option value="year">기수</option>
-            <option value="campus">캠퍼스</option>
-            <option value="member">개인</option>
-          </Select>
-          <Select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(
-                event.target.value as PushMessageLog["status"] | "all",
-              )
-            }
-          >
-            <option value="all">전체 상태</option>
-            <option value="sent">발송 완료</option>
-            <option value="partial_failed">일부 실패</option>
-            <option value="failed">발송 실패</option>
-            <option value="no_target">대상 없음</option>
-            <option value="pending">대기</option>
-          </Select>
-          <Select
-            value={sort}
-            onChange={(event) => setSort(event.target.value as SortOption)}
-          >
-            <option value="newest">최신순</option>
-            <option value="oldest">오래된순</option>
-            <option value="delivered">성공 수 많은순</option>
-            <option value="failed">실패 수 많은순</option>
-          </Select>
-        </div>
+        <FilterBar title="로그 필터" description="유형, 대상, 상태, 정렬 기준으로 이력을 압축해서 봅니다.">
+          <div className="grid min-w-[14rem] flex-1 gap-1">
+            <span className="ui-caption">검색</span>
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="제목, 내용, URL, 대상 검색"
+            />
+          </div>
+          <div className="grid min-w-[10rem] gap-1">
+            <span className="ui-caption">유형</span>
+            <Select
+              value={typeFilter}
+              onChange={(event) =>
+                setTypeFilter(event.target.value as PushMessageLog["type"] | "all")
+              }
+            >
+              <option value="all">전체 유형</option>
+              <option value="announcement">운영 공지</option>
+              <option value="new_partner">신규 제휴</option>
+              <option value="expiring_partner">종료 임박</option>
+            </Select>
+          </div>
+          <div className="grid min-w-[10rem] gap-1">
+            <span className="ui-caption">발송 방식</span>
+            <Select
+              value={sourceFilter}
+              onChange={(event) =>
+                setSourceFilter(event.target.value as PushMessageLog["source"] | "all")
+              }
+            >
+              <option value="all">전체 발송 방식</option>
+              <option value="manual">수동 발송</option>
+              <option value="automatic">자동 발송</option>
+            </Select>
+          </div>
+          <div className="grid min-w-[10rem] gap-1">
+            <span className="ui-caption">대상</span>
+            <Select
+              value={audienceFilter}
+              onChange={(event) =>
+                setAudienceFilter(event.target.value as PushAudienceScope | "all")
+              }
+            >
+              <option value="all">전체</option>
+              <option value="year">기수</option>
+              <option value="campus">캠퍼스</option>
+              <option value="member">개인</option>
+            </Select>
+          </div>
+          <div className="grid min-w-[10rem] gap-1">
+            <span className="ui-caption">상태</span>
+            <Select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as PushMessageLog["status"] | "all")
+              }
+            >
+              <option value="all">전체 상태</option>
+              <option value="sent">발송 완료</option>
+              <option value="partial_failed">일부 실패</option>
+              <option value="failed">발송 실패</option>
+              <option value="no_target">대상 없음</option>
+              <option value="pending">대기</option>
+            </Select>
+          </div>
+          <div className="grid min-w-[10rem] gap-1">
+            <span className="ui-caption">정렬</span>
+            <Select
+              value={sort}
+              onChange={(event) => setSort(event.target.value as SortOption)}
+            >
+              <option value="newest">최신순</option>
+              <option value="oldest">오래된순</option>
+              <option value="delivered">성공 수 많은순</option>
+              <option value="failed">실패 수 많은순</option>
+            </Select>
+          </div>
+        </FilterBar>
 
         <div className="grid min-w-0 gap-3">
           {filteredLogs.length === 0 ? (

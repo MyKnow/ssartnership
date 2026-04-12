@@ -58,12 +58,12 @@ export default function PolicyDocumentView({
   policy: PolicyDocument;
 }) {
   return (
-    <Card className="space-y-6 p-6 sm:p-8">
+    <Card tone="elevated" className="space-y-6">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="rounded-full bg-muted px-3 py-1">
+        <span className="rounded-full bg-surface-muted px-3 py-1">
           버전 v{policy.version}
         </span>
-        <span className="rounded-full bg-muted px-3 py-1">
+        <span className="rounded-full bg-surface-muted px-3 py-1">
           시행 {new Date(policy.effective_at).toLocaleDateString("ko-KR")}
         </span>
       </div>

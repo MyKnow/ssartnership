@@ -2,7 +2,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
 import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
 import Card from "@/components/ui/Card";
-import SectionHeading from "@/components/ui/SectionHeading";
+import ShellHeader from "@/components/ui/ShellHeader";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -172,19 +172,16 @@ export default async function AdminCompaniesPage() {
   return (
     <AdminShell title="협력사 관리" backHref="/admin" backLabel="관리 홈">
       <section className="grid gap-6">
-        <Card>
-          <SectionHeading
-            title="협력사 리스트 관리"
-            description="협력사 자체를 생성, 수정, 삭제하고 브랜드와 관리 계정 연결 현황을 함께 봅니다."
-          />
+        <ShellHeader
+          eyebrow="Companies"
+          title="협력사 리스트와 연결 관리"
+          description="협력사 자체, 담당자 계정, 브랜드 연결 상태를 같은 기준 레이아웃에서 관리합니다."
+        />
+        <Card tone="elevated">
           <AdminCompanyManager companies={companyCards} />
         </Card>
 
-        <Card>
-          <SectionHeading
-            title="협력사 계정 및 연결 관리"
-            description="로그인 아이디, 활성 상태, 비밀번호 변경 필요 여부와 협력사별 연결 활성 상태를 관리합니다."
-          />
+        <Card tone="elevated">
           <AdminPartnerAccountManager accounts={safeAccounts} />
         </Card>
       </section>

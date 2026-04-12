@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
+import ShellHeader from "@/components/ui/ShellHeader";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyCertificationQrToken } from "@/lib/certification-qr";
 import { parseSsafyProfile } from "@/lib/mm-profile";
@@ -94,7 +96,7 @@ export default async function CertificationVerifyPage({
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
-        <Container className="pb-16 pt-10">
+        <Container className="pb-16 pt-10" size="wide">
           <AnalyticsEventOnMount
             eventName="certification_qr_verify"
             targetType="certification_qr"
@@ -109,96 +111,92 @@ export default async function CertificationVerifyPage({
             dedupeKey={`certification-verify:${rawToken}`}
           />
 
-          <div className="mx-auto max-w-2xl">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-3">
-                <h1 className="text-2xl font-semibold text-foreground">
-                  SSAFY QR 검증
-                </h1>
-                <Badge
-                  className={
-                    isValid
-                      ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border border-danger/30 bg-danger/10 text-danger"
-                  }
-                >
+          <div className="mx-auto max-w-4xl space-y-6">
+            <ShellHeader
+              eyebrow="Verification"
+              title="SSAFY QR 검증"
+              description="QR 토큰의 서명과 만료시간을 확인한 뒤 현재 저장된 인증 정보를 대조합니다."
+              actions={
+                <Badge variant={isValid ? "success" : "danger"}>
                   {isValid ? `유효한 ${roleLabel ?? "인증"}` : "검증 실패"}
                 </Badge>
-              </div>
+              }
+            />
 
-              <p className="text-sm text-muted-foreground">
-                QR 토큰의 서명과 만료시간을 확인한 뒤 현재 저장된 인증 정보를
-                대조합니다.
-              </p>
-
-              {isValid && verification.ok && member && scheme ? (
-                <CertificationCardFrame
-                  scheme={scheme}
-                  eyebrow="SSAFY 인증 검증"
-                  name={name}
-                  roleLabel={roleLabel ?? "인증"}
-                  yearLabel={yearLabel}
-                  campusLabel={campusLabel}
-                  description=""
-                  footer={
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-xs">
+            {isValid && verification.ok && member && scheme ? (
+              <CertificationCardFrame
+                scheme={scheme}
+                eyebrow="SSAFY 인증 검증"
+                name={name}
+                roleLabel={roleLabel ?? "인증"}
+                yearLabel={yearLabel}
+                campusLabel={campusLabel}
+                description=""
+                footer={
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span
+                        className={cn(
+                          "inline-flex h-2 w-2 rounded-full",
+                          scheme.accentClassName,
+                        )}
+                      />
+                      <span className={scheme.subduedTextClassName}>
+                        QR 토큰이 유효합니다.
+                      </span>
+                    </div>
+                    <div className="grid gap-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
                         <span
                           className={cn(
-                            "inline-flex h-2 w-2 rounded-full",
-                            scheme.accentClassName,
+                            "text-xs font-medium uppercase tracking-[0.16em]",
+                            scheme.mutedTextClassName,
                           )}
-                        />
-                        <span className={scheme.subduedTextClassName}>
-                          QR 토큰이 유효합니다.
+                        >
+                          발급 시각
+                        </span>
+                        <span className="whitespace-nowrap font-semibold">
+                          {formatDate(verification.payload.issuedAt)}
                         </span>
                       </div>
-                      <div className="grid gap-2 text-sm">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className={cn("text-xs font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
-                            발급 시각
-                          </span>
-                          <span className="whitespace-nowrap font-semibold">
-                            {formatDate(verification.payload.issuedAt)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className={cn("text-xs font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
-                            만료 시각
-                          </span>
-                          <span className="whitespace-nowrap font-semibold">
-                            {formatDate(verification.payload.expiresAt)}
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span
+                          className={cn(
+                            "text-xs font-medium uppercase tracking-[0.16em]",
+                            scheme.mutedTextClassName,
+                          )}
+                        >
+                          만료 시각
+                        </span>
+                        <span className="whitespace-nowrap font-semibold">
+                          {formatDate(verification.payload.expiresAt)}
+                        </span>
                       </div>
                     </div>
-                  }
-                  avatarSrc={avatarSrc}
-                  avatarAlt="프로필 이미지"
-                />
-              ) : (
-                <div className="rounded-3xl border border-danger/30 bg-danger/10 p-5">
-                  <p className="text-base font-semibold text-danger">
-                    유효하지 않은 QR입니다.
-                  </p>
-                  <p className="mt-2 text-sm text-danger/90">
-                    {verification.ok
-                      ? "회원 정보가 일치하지 않거나 현재 인증 상태로 사용할 수 없습니다."
-                      : verification.reason === "expired"
-                        ? "QR 토큰이 만료되었습니다. 교육생증에서 새 QR을 다시 표시해 주세요."
-                        : "QR 토큰 서명이 유효하지 않습니다."}
-                  </p>
-                </div>
-              )}
+                  </div>
+                }
+                avatarSrc={avatarSrc}
+                avatarAlt="프로필 이미지"
+              />
+            ) : (
+              <Card className="space-y-2 border-danger/30 bg-danger/10">
+                <p className="text-base font-semibold text-danger">
+                  유효하지 않은 QR입니다.
+                </p>
+                <p className="mt-2 text-sm text-danger/90">
+                  {verification.ok
+                    ? "회원 정보가 일치하지 않거나 현재 인증 상태로 사용할 수 없습니다."
+                    : verification.reason === "expired"
+                      ? "QR 토큰이 만료되었습니다. 교육생증에서 새 QR을 다시 표시해 주세요."
+                      : "QR 토큰 서명이 유효하지 않습니다."}
+                </p>
+              </Card>
+            )}
 
-              <div className="flex justify-end">
-                <Link
-                  href="/"
-                  className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border bg-surface px-5 text-sm font-semibold text-foreground hover:border-strong"
-                >
-                  홈으로
-                </Link>
-              </div>
+            <div className="flex justify-end">
+              <Button href="/" variant="secondary">
+                홈으로
+              </Button>
             </div>
           </div>
         </Container>

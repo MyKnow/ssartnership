@@ -1,7 +1,7 @@
 import AdminPushManager from "@/components/admin/AdminPushManager";
 import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
-import SectionHeading from "@/components/ui/SectionHeading";
+import ShellHeader from "@/components/ui/ShellHeader";
 import {
   getActiveSubscriptionPushPreferences,
   getRecentPushMessageLogs,
@@ -71,27 +71,26 @@ export default async function AdminPushPage() {
     : { data: [], error: null };
 
   return (
-    <AdminShell
-      title="푸시 알림 관리"
-      backHref="/admin"
-      backLabel="관리 홈"
-    >
-      <Card>
-        <SectionHeading
-          title="푸시 알림 관리"
+    <AdminShell title="푸시 알림 관리" backHref="/admin" backLabel="관리 홈">
+      <div className="grid gap-6">
+        <ShellHeader
+          eyebrow="Push"
+          title="푸시 알림 운영"
           description="전체 공지는 수동 발송하고, 신규 제휴와 종료 7일 전 알림은 자동 발송됩니다."
         />
-        <div className="mt-6">
-          <AdminPushManager
-            configured={isPushConfigured()}
-            activeSubscriptions={activeSubscriptions}
-            enabledMembers={enabledMembers}
-            partners={partners}
-            members={membersError ? [] : members ?? []}
-            recentLogs={recentLogs}
-          />
-        </div>
-      </Card>
+        <Card tone="elevated">
+          <div className="mt-6">
+            <AdminPushManager
+              configured={isPushConfigured()}
+              activeSubscriptions={activeSubscriptions}
+              enabledMembers={enabledMembers}
+              partners={partners}
+              members={membersError ? [] : members ?? []}
+              recentLogs={recentLogs}
+            />
+          </div>
+        </Card>
+      </div>
     </AdminShell>
   );
 }

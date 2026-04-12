@@ -1,4 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
+import AdminStyleGuideTabsDemo from "@/components/admin/AdminStyleGuideTabsDemo";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -13,23 +14,9 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
-import Tabs from "@/components/ui/Tabs";
 import Textarea from "@/components/ui/Textarea";
 
 export const dynamic = "force-dynamic";
-
-const tabOptions = [
-  {
-    value: "immediate",
-    label: "즉시 반영",
-    description: "저장 즉시 서비스에 반영되는 정책",
-  },
-  {
-    value: "approval",
-    label: "승인 요청",
-    description: "관리자 승인 후 반영되는 정책",
-  },
-] as const;
 
 export default function AdminStyleGuidePage() {
   return (
@@ -86,7 +73,7 @@ export default function AdminStyleGuidePage() {
             <div className="space-y-6">
               <div className="space-y-3">
                 <p className="ui-kicker">Buttons</p>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   <Button>Primary</Button>
                   <Button variant="soft">Soft</Button>
                   <Button variant="secondary">Secondary</Button>
@@ -97,7 +84,7 @@ export default function AdminStyleGuidePage() {
 
               <div className="space-y-3">
                 <p className="ui-kicker">Inputs</p>
-                <ResponsiveGrid minItemWidth="16rem">
+                <ResponsiveGrid minItemWidth="14rem">
                   <Input placeholder="협력사명" />
                   <Select defaultValue="brand">
                     <option value="brand">브랜드</option>
@@ -109,7 +96,7 @@ export default function AdminStyleGuidePage() {
 
               <div className="space-y-3">
                 <p className="ui-kicker">Tabs</p>
-                <Tabs value="immediate" onChange={() => undefined} options={tabOptions} />
+                <AdminStyleGuideTabsDemo />
               </div>
 
               <div className="space-y-3">
@@ -151,18 +138,18 @@ export default function AdminStyleGuidePage() {
               description="검색, 정렬, 상태를 같은 밀도로 배치합니다."
               trailing={<Button variant="ghost">초기화</Button>}
             >
-              <div className="grid min-w-[15rem] gap-1">
+              <div className="grid min-w-[13rem] gap-1">
                 <span className="ui-caption">검색</span>
                 <Input placeholder="브랜드명, 위치, 태그" />
               </div>
-              <div className="grid min-w-[11rem] gap-1">
+              <div className="grid min-w-[10rem] gap-1">
                 <span className="ui-caption">정렬</span>
                 <Select defaultValue="recent">
                   <option value="recent">등록순</option>
                   <option value="endingSoon">마감순</option>
                 </Select>
               </div>
-              <div className="grid min-w-[11rem] gap-1">
+              <div className="grid min-w-[10rem] gap-1">
                 <span className="ui-caption">상태</span>
                 <Select defaultValue="all">
                   <option value="all">전체</option>
@@ -177,7 +164,7 @@ export default function AdminStyleGuidePage() {
               title="파트너 변경 요청 예시"
               description="폼은 의미 단위로 분리하고, 한 섹션에 너무 많은 필드를 몰지 않습니다."
             >
-              <ResponsiveGrid minItemWidth="16rem">
+              <ResponsiveGrid minItemWidth="14rem">
                 <div className="grid gap-1.5">
                   <span className="ui-caption">브랜드명</span>
                   <Input placeholder="브랜드명" />
