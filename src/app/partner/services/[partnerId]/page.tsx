@@ -10,6 +10,7 @@ import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import {
   cancelPartnerChangeRequestAction,
+  savePartnerImmediateChanges,
   submitPartnerChangeRequest,
 } from "./request/actions";
 
@@ -81,7 +82,9 @@ export default async function PartnerServiceDetailPage({
     ? getPartnerChangeRequestErrorMessage(errorCode)
     : null;
   const successMessage =
-    successCode === "submitted"
+    successCode === "saved"
+      ? "메인 썸네일, 추가 이미지, 예약/문의 링크, 태그가 즉시 반영되었습니다."
+      : successCode === "submitted"
       ? "변경 요청이 접수되었습니다. 관리자 승인 후 반영됩니다."
       : successCode === "cancelled"
         ? "변경 요청이 취소되었습니다."
@@ -94,6 +97,7 @@ export default async function PartnerServiceDetailPage({
       mode={mode}
       errorMessage={errorMessage}
       successMessage={successMessage}
+      saveImmediateAction={savePartnerImmediateChanges}
       createAction={submitPartnerChangeRequest}
       cancelAction={cancelPartnerChangeRequestAction}
     />

@@ -76,35 +76,6 @@ function getPathFromValue(value: string | null) {
   }
 }
 
-function isLocalHost(host?: string | null) {
-  if (!host) {
-    return false;
-  }
-
-  return (
-    host.includes('localhost') ||
-    host.startsWith('127.0.0.1') ||
-    host.startsWith('0.0.0.0') ||
-    host.startsWith('[::1]')
-  );
-}
-
-function isLocalIp(ipAddress?: string | null) {
-  if (!ipAddress) {
-    return false;
-  }
-
-  return (
-    ipAddress === '::1' ||
-    ipAddress === '127.0.0.1' ||
-    ipAddress === '::ffff:127.0.0.1'
-  );
-}
-
-function shouldSkipLogging(context: BaseLogContext) {
-  return process.env.NODE_ENV !== 'production' || isLocalHost(context.host) || isLocalIp(context.ipAddress);
-}
-
 function sanitizeJsonValue(value: unknown): JsonValue | undefined {
   if (value === null) {
     return null;
@@ -210,9 +181,6 @@ export async function resolveCurrentActor(): Promise<{
 }
 
 export async function logProductEvent(input: ProductLogInput) {
-  if (shouldSkipLogging(input)) {
-    return;
-  }
   await insertLog('event_logs', {
     session_id: input.sessionId ?? null,
     actor_type: input.actorType,
@@ -229,9 +197,6 @@ export async function logProductEvent(input: ProductLogInput) {
 }
 
 export async function logAdminAudit(input: AdminAuditInput) {
-  if (shouldSkipLogging(input)) {
-    return;
-  }
   await insertLog('admin_audit_logs', {
     actor_id: input.actorId ?? process.env.ADMIN_ID ?? 'admin',
     action: input.action,
@@ -245,9 +210,6 @@ export async function logAdminAudit(input: AdminAuditInput) {
 }
 
 export async function logAuthSecurity(input: AuthSecurityInput) {
-  if (shouldSkipLogging(input)) {
-    return;
-  }
   await insertLog('auth_security_logs', {
     event_name: input.eventName,
     status: input.status,

@@ -17,6 +17,7 @@ import {
   ArrowDownIcon,
 } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
@@ -86,6 +87,77 @@ function createPreviewEntryFromExisting(url: string): MediaItem {
     kind: "existing",
     url,
   };
+}
+
+function MediaCardToolbar({
+  multiple,
+  onAddUrl,
+  onAddFiles,
+}: {
+  multiple: boolean;
+  onAddUrl: (url: string) => boolean;
+  onAddFiles: (files: FileList | File[] | null) => boolean;
+}) {
+  const [draftUrl, setDraftUrl] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadLabel = multiple ? "파일/갤러리 업로드" : "파일 업로드";
+
+  const submitUrl = () => {
+    if (onAddUrl(draftUrl)) {
+      setDraftUrl("");
+    }
+  };
+
+  return (
+    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Input
+          value={draftUrl}
+          onChange={(event) => setDraftUrl(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              submitUrl();
+            }
+          }}
+          placeholder="이미지 링크를 붙여넣으세요"
+        />
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={submitUrl}
+            className="w-full sm:w-auto"
+          >
+            <LinkIcon className="h-4 w-4" />
+            추가
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full sm:w-auto"
+          >
+            <ArrowUpTrayIcon className="h-4 w-4" />
+            {uploadLabel}
+          </Button>
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple={multiple}
+        className="hidden"
+        onChange={(event) => {
+          if (onAddFiles(event.target.files)) {
+            event.target.value = "";
+          }
+        }}
+      />
+    </div>
+  );
 }
 
 function manifestEntryForItem(item: MediaItem): PartnerMediaManifestEntry {
@@ -488,7 +560,7 @@ function MediaField({
 
   const currentCrop = pendingCrops[0] ?? null;
 
-  const finishCurrentCrop = (file: File) => {
+  const finishCurrentCrop = (file: File, insertAt?: number) => {
     setItems((prev) => {
       const nextEntry = createPreviewEntryFromFile(file);
       if (!multiple && prev.length > 0) {
@@ -497,6 +569,13 @@ function MediaField({
           revokeIfBlobUrl(previous.url);
         }
         return [nextEntry];
+      }
+
+      if (typeof insertAt === "number") {
+        const copy = [...prev];
+        const safeIndex = Math.max(0, Math.min(insertAt, copy.length));
+        copy.splice(safeIndex, 0, nextEntry);
+        return copy;
       }
 
       return [...prev, nextEntry];
@@ -510,7 +589,7 @@ function MediaField({
     setPendingCrops((prev) => prev.slice(1));
   };
 
-  const queueFile = (file: File, index: number) => {
+  const queueFile = (file: File, index: number, insertAt?: number) => {
     const pendingId = crypto.randomUUID();
     const objectUrl = makeObjectUrl(file);
     const sourceUrl = objectUrl;
@@ -522,34 +601,44 @@ function MediaField({
       outputName: inferOutputName(role, index),
       onApply: (croppedFile) => {
         revokeIfBlobUrl(objectUrl);
-        finishCurrentCrop(croppedFile);
+        finishCurrentCrop(croppedFile, insertAt);
       },
     });
   };
 
-  const ingestFiles = (files: FileList | File[] | null) => {
+  const ingestFiles = (
+    files: FileList | File[] | null,
+    insertAt?: number,
+  ) => {
     if (!files || files.length === 0) {
-      return;
+      return false;
     }
 
     const picked = Array.from(files);
     if (picked.some((file) => !isImageFile(file))) {
       setError("이미지 파일만 추가할 수 있습니다.");
-      return;
+      return false;
     }
 
     setError(null);
-    picked.forEach((file, index) => queueFile(file, index));
+    picked.forEach((file, index) =>
+      queueFile(
+        file,
+        index,
+        typeof insertAt === "number" ? insertAt + index : undefined,
+      ),
+    );
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    return true;
   };
 
-  const handleAddUrl = () => {
-    const safe = sanitizeHttpUrl(draftUrl);
+  const handleAddUrl = (rawUrl?: string, insertAt?: number) => {
+    const safe = sanitizeHttpUrl(rawUrl ?? draftUrl);
     if (!safe) {
       setError("이미지 링크는 올바른 http(s) 주소여야 합니다.");
-      return;
+      return false;
     }
 
     setError(null);
@@ -559,12 +648,18 @@ function MediaField({
       id: pendingId,
       sourceUrl,
       aspectRatio,
-      outputName: inferOutputName(role, items.length),
+      outputName: inferOutputName(
+        role,
+        typeof insertAt === "number" ? insertAt : items.length,
+      ),
       onApply: (croppedFile) => {
-        finishCurrentCrop(croppedFile);
+        finishCurrentCrop(croppedFile, insertAt);
       },
     });
-    setDraftUrl("");
+    if (!rawUrl) {
+      setDraftUrl("");
+    }
+    return true;
   };
 
   const replaceItemAt = (index: number) => {
@@ -573,7 +668,8 @@ function MediaField({
       return;
     }
 
-    const sourceUrl = item.kind === "existing" ? getCachedImageUrl(item.url) : item.url;
+    const sourceUrl =
+      item.kind === "existing" ? getCachedImageUrl(item.url) : item.url;
 
     enqueueCrop({
       id: item.id,
@@ -674,112 +770,122 @@ function MediaField({
             </div>
           </div>
 
-          <div
-            className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-3"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              ingestFiles(event.dataTransfer.files);
-            }}
-          >
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input
-                value={draftUrl}
-                onChange={(event) => setDraftUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleAddUrl();
-                  }
-                }}
-                placeholder="이미지 링크를 붙여넣으세요"
-              />
-              <div className="flex shrink-0 items-center gap-2">
-                <Button type="button" variant="ghost" onClick={handleAddUrl} className="w-full sm:w-auto">
-                  <LinkIcon className="h-4 w-4" />
-                  추가
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full sm:w-auto"
-                >
-                  <ArrowUpTrayIcon className="h-4 w-4" />
-                  파일
-                </Button>
+          {!hasItems ? (
+            <div
+              className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-3"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                ingestFiles(event.dataTransfer.files);
+              }}
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  value={draftUrl}
+                  onChange={(event) => setDraftUrl(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddUrl();
+                    }
+                  }}
+                  placeholder="이미지 링크를 붙여넣으세요"
+                />
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleAddUrl}
+                    className="w-full sm:w-auto"
+                  >
+                    <LinkIcon className="h-4 w-4" />
+                    추가
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full sm:w-auto"
+                  >
+                    <ArrowUpTrayIcon className="h-4 w-4" />
+                    파일
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-background/60 px-4 py-3 text-xs leading-6 text-muted-foreground">
+                {emptyMessage}
               </div>
             </div>
-
-            <div className="rounded-2xl border border-border bg-background/60 px-4 py-3 text-xs leading-6 text-muted-foreground">
-              {emptyMessage}
-            </div>
-          </div>
+          ) : null}
         </div>
 
         {hasItems ? (
-          <div className={cn("grid gap-3", multiple ? "sm:grid-cols-2 xl:grid-cols-3" : null)}>
-            {items.map((item, index) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "grid min-w-0 gap-2 rounded-2xl border border-border bg-surface p-2",
-                  !multiple ? "max-w-[18rem]" : null,
-                )}
-              >
+          <div className={cn("grid gap-3", multiple ? "sm:grid-cols-2" : null)}>
+            {items.map((item, index) =>
+              multiple ? (
                 <div
-                  className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
-                  style={{ aspectRatio: multiple ? PARTNER_GALLERY_ASPECT_RATIO : PARTNER_THUMBNAIL_ASPECT_RATIO }}
+                  key={item.id}
+                  className="grid min-w-0 gap-2 rounded-2xl border border-border bg-surface p-2"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- blob/object URL preview */}
-                  <img
-                    src={item.kind === "existing" ? getCachedImageUrl(item.url) : item.url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/50 px-2 py-1 text-[11px] font-semibold text-white">
-                    {item.kind === "existing" ? "저장됨" : "메모리"}
+                  <div
+                    className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
+                    style={{ aspectRatio: PARTNER_GALLERY_ASPECT_RATIO }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- blob/object URL preview */}
+                    <img
+                      src={item.kind === "existing" ? getCachedImageUrl(item.url) : item.url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    <Badge
+                      className={cn(
+                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-sm backdrop-blur-sm",
+                        item.kind === "existing"
+                          ? "border-border bg-background/95 text-foreground"
+                          : "border-primary/40 bg-primary/90 text-white dark:text-black",
+                      )}
+                    >
+                      {item.kind === "existing" ? "기존 이미지" : "새 이미지"}
+                    </Badge>
                   </div>
-                </div>
 
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <span className="truncate text-xs font-medium text-muted-foreground">
-                    {item.kind === "existing" ? "기존 이미지" : "새 이미지"}
-                  </span>
+                  <MediaCardToolbar
+                    multiple={multiple}
+                    onAddUrl={(url) => handleAddUrl(url, index + 1)}
+                    onAddFiles={(files) => ingestFiles(files, index + 1)}
+                  />
+
                   <div className="flex flex-wrap items-center gap-1 sm:justify-end">
-                    {multiple ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => moveItem(index, -1)}
-                          ariaLabel="위로"
-                          title="위로"
-                          className="h-10 w-10 min-h-10 min-w-10"
-                        >
-                          <ArrowUpIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => moveItem(index, 1)}
-                          ariaLabel="아래로"
-                          title="아래로"
-                          className="h-10 w-10 min-h-10 min-w-10"
-                        >
-                          <ArrowDownIcon className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => moveItem(index, -1)}
+                      ariaLabel="위로"
+                      title="위로"
+                      className="h-10 w-10 min-h-10 min-w-10"
+                    >
+                      <ArrowUpIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => moveItem(index, 1)}
+                      ariaLabel="아래로"
+                      title="아래로"
+                      className="h-10 w-10 min-h-10 min-w-10"
+                    >
+                      <ArrowDownIcon className="h-4 w-4" />
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       onClick={() => replaceItemAt(index)}
-                      ariaLabel="수정"
-                      title="수정"
+                      ariaLabel="구도 수정"
+                      title="구도 수정"
                       className="h-10 w-10 min-h-10 min-w-10"
                     >
                       <PencilIcon className="h-4 w-4" />
@@ -797,8 +903,68 @@ function MediaField({
                     </Button>
                   </div>
                 </div>
-              </div>
-            ))}
+              ) : (
+                <div
+                  key={item.id}
+                  className="grid min-w-0 gap-3 rounded-2xl border border-border bg-surface p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:items-start"
+                >
+                  <div
+                    className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
+                    style={{ aspectRatio: PARTNER_THUMBNAIL_ASPECT_RATIO }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- blob/object URL preview */}
+                    <img
+                      src={item.kind === "existing" ? getCachedImageUrl(item.url) : item.url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    <Badge
+                      className={cn(
+                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-sm backdrop-blur-sm",
+                        item.kind === "existing"
+                          ? "border-border bg-background/95 text-foreground"
+                          : "border-primary/40 bg-primary/90 text-white dark:text-black",
+                      )}
+                    >
+                      {item.kind === "existing" ? "기존 이미지" : "새 이미지"}
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <MediaCardToolbar
+                      multiple={multiple}
+                      onAddUrl={(url) => handleAddUrl(url, 0)}
+                      onAddFiles={(files) => ingestFiles(files, 0)}
+                    />
+
+                    <div className="flex flex-wrap items-center gap-1 sm:justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => replaceItemAt(index)}
+                        ariaLabel="구도 수정"
+                        title="구도 수정"
+                        className="h-10 w-10 min-h-10 min-w-10"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="icon"
+                        onClick={() => removeItem(index)}
+                        ariaLabel="삭제"
+                        title="삭제"
+                        className="h-10 w-10 min-h-10 min-w-10"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ),
+            )}
           </div>
         ) : null}
       </div>

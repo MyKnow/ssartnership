@@ -11,9 +11,11 @@ import {
 export default function PartnerAudienceChips({
   appliesTo,
   className,
+  badgeClassName = "bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100",
 }: {
   appliesTo: Array<string | null | undefined>;
   className?: string;
+  badgeClassName?: string;
 }) {
   const normalized = normalizePartnerAudience(appliesTo);
   const labels = isFullPartnerAudience(normalized)
@@ -26,10 +28,7 @@ export default function PartnerAudienceChips({
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
       {labels.map((item) => (
-        <Badge
-          key={item.key}
-          className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-        >
+        <Badge key={item.key} className={badgeClassName}>
           {item.label}
         </Badge>
       ))}

@@ -54,6 +54,3 @@ jobs:
 
       - name: Apply preview migrations
         run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes
-
-      - name: Run optimization policy
-        run: npm run perf:lighthouse

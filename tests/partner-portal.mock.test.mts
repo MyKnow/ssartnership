@@ -242,12 +242,64 @@ test("builds a company dashboard with aggregate metrics only", async () => {
   assert.equal(dashboard.companies[1]?.totals.totalClicks, 718);
 });
 
-test("creates and approves partner change requests with media and period changes", async () => {
+test("updates immediate partner fields without approval", async () => {
   const {
+    updateMockPartnerImmediateFields,
+    getMockPartnerChangeRequestContext,
+  } = await mockPartnerChangeRequestModulePromise;
+
+  const result = await updateMockPartnerImmediateFields({
+    companyIds: ["mock-partner-company-cafe-haeon"],
+    partnerId: "mock-partner-service-cafe-haeon-main",
+    thumbnail: "https://example.com/cafe-haeon-thumb.webp",
+    images: [
+      "https://example.com/cafe-haeon-1.webp",
+      "https://example.com/cafe-haeon-2.webp",
+    ],
+    tags: ["모임", "디저트"],
+    reservationLink: "https://booking.example.com/cafe-haeon",
+    inquiryLink: "02-999-1111",
+  });
+
+  assert.equal(result.partnerId, "mock-partner-service-cafe-haeon-main");
+  assert.equal(result.companyId, "mock-partner-company-cafe-haeon");
+  assert.equal(result.currentMediaUrls.length, 3);
+
+  const updatedContext = await getMockPartnerChangeRequestContext(
+    ["mock-partner-company-cafe-haeon"],
+    "mock-partner-service-cafe-haeon-main",
+  );
+
+  assert.equal(updatedContext?.thumbnail, "https://example.com/cafe-haeon-thumb.webp");
+  assert.deepStrictEqual(updatedContext?.images, [
+    "https://example.com/cafe-haeon-1.webp",
+    "https://example.com/cafe-haeon-2.webp",
+  ]);
+  assert.deepStrictEqual(updatedContext?.tags, ["모임", "디저트"]);
+  assert.equal(updatedContext?.reservationLink, "https://booking.example.com/cafe-haeon");
+  assert.equal(updatedContext?.inquiryLink, "02-999-1111");
+});
+
+test("creates and approves partner change requests for approval-required fields only", async () => {
+  const {
+    updateMockPartnerImmediateFields,
     createMockPartnerChangeRequest,
     approveMockPartnerChangeRequest,
     getMockPartnerChangeRequestContext,
   } = await mockPartnerChangeRequestModulePromise;
+
+  await updateMockPartnerImmediateFields({
+    companyIds: ["mock-partner-company-cafe-haeon"],
+    partnerId: "mock-partner-service-cafe-haeon-main",
+    thumbnail: "https://example.com/cafe-haeon-thumb.webp",
+    images: [
+      "https://example.com/cafe-haeon-1.webp",
+      "https://example.com/cafe-haeon-2.webp",
+    ],
+    tags: ["모임", "디저트"],
+    reservationLink: "https://booking.example.com/cafe-haeon",
+    inquiryLink: "02-999-1111",
+  });
 
   const currentContext = await getMockPartnerChangeRequestContext(
     ["mock-partner-company-cafe-haeon"],
@@ -265,29 +317,30 @@ test("creates and approves partner change requests with media and period changes
     requestedPartnerName: "카페 해온 본점 리뉴얼",
     requestedPartnerLocation: "서울 강남구 역삼로 125",
     requestedMapUrl: "https://map.example.com/cafe-haeon-renewal",
-    requestedConditions: currentContext?.currentConditions ?? [],
-    requestedBenefits: currentContext?.currentBenefits ?? [],
-    requestedAppliesTo: currentContext?.currentAppliesTo ?? [],
-    requestedTags: ["모임", "디저트"],
-    requestedThumbnail: "https://example.com/cafe-haeon-thumb.webp",
-    requestedImages: [
-      "https://example.com/cafe-haeon-1.webp",
-      "https://example.com/cafe-haeon-2.webp",
-    ],
-    requestedReservationLink: "https://booking.example.com/cafe-haeon",
-    requestedInquiryLink: "02-999-1111",
+    requestedConditions: [...(currentContext?.currentConditions ?? []), "평일만 사용"],
+    requestedBenefits: [...(currentContext?.currentBenefits ?? []), "추가 혜택"],
+    requestedAppliesTo: ["staff", "student", "graduate"],
+    requestedTags: currentContext?.tags ?? [],
+    requestedThumbnail: currentContext?.thumbnail ?? null,
+    requestedImages: currentContext?.images ?? [],
+    requestedReservationLink: currentContext?.reservationLink ?? null,
+    requestedInquiryLink: currentContext?.inquiryLink ?? null,
     requestedPeriodStart: "2026-04-01",
     requestedPeriodEnd: "2026-10-31",
   });
 
-  assert.equal(request.requestedThumbnail, "https://example.com/cafe-haeon-thumb.webp");
-  assert.equal(request.requestedImages.length, 2);
-  assert.deepStrictEqual(request.requestedTags, ["모임", "디저트"]);
   assert.equal(request.requestedPartnerName, "카페 해온 본점 리뉴얼");
   assert.equal(request.requestedPartnerLocation, "서울 강남구 역삼로 125");
   assert.equal(request.requestedMapUrl, "https://map.example.com/cafe-haeon-renewal");
-  assert.equal(request.requestedReservationLink, "https://booking.example.com/cafe-haeon");
-  assert.equal(request.requestedInquiryLink, "02-999-1111");
+  assert.deepStrictEqual(request.requestedConditions, [
+    ...(currentContext?.currentConditions ?? []),
+    "평일만 사용",
+  ]);
+  assert.deepStrictEqual(request.requestedBenefits, [
+    ...(currentContext?.currentBenefits ?? []),
+    "추가 혜택",
+  ]);
+  assert.deepStrictEqual(request.requestedAppliesTo, ["staff", "student", "graduate"]);
   assert.equal(request.requestedPeriodStart, "2026-04-01");
   assert.equal(request.requestedPeriodEnd, "2026-10-31");
 
@@ -301,19 +354,28 @@ test("creates and approves partner change requests with media and period changes
     "mock-partner-service-cafe-haeon-main",
   );
 
+  assert.equal(updatedContext?.partnerName, "카페 해온 본점 리뉴얼");
+  assert.equal(updatedContext?.partnerLocation, "서울 강남구 역삼로 125");
+  assert.equal(updatedContext?.mapUrl, "https://map.example.com/cafe-haeon-renewal");
+  assert.deepStrictEqual(updatedContext?.currentConditions, [
+    ...(currentContext?.currentConditions ?? []),
+    "평일만 사용",
+  ]);
+  assert.deepStrictEqual(updatedContext?.currentBenefits, [
+    ...(currentContext?.currentBenefits ?? []),
+    "추가 혜택",
+  ]);
+  assert.deepStrictEqual(updatedContext?.currentAppliesTo, ["staff", "student", "graduate"]);
+  assert.equal(updatedContext?.periodStart, "2026-04-01");
+  assert.equal(updatedContext?.periodEnd, "2026-10-31");
   assert.equal(updatedContext?.thumbnail, "https://example.com/cafe-haeon-thumb.webp");
   assert.deepStrictEqual(updatedContext?.images, [
     "https://example.com/cafe-haeon-1.webp",
     "https://example.com/cafe-haeon-2.webp",
   ]);
-  assert.equal(updatedContext?.partnerName, "카페 해온 본점 리뉴얼");
-  assert.equal(updatedContext?.partnerLocation, "서울 강남구 역삼로 125");
-  assert.equal(updatedContext?.mapUrl, "https://map.example.com/cafe-haeon-renewal");
   assert.deepStrictEqual(updatedContext?.tags, ["모임", "디저트"]);
   assert.equal(updatedContext?.reservationLink, "https://booking.example.com/cafe-haeon");
   assert.equal(updatedContext?.inquiryLink, "02-999-1111");
-  assert.equal(updatedContext?.periodStart, "2026-04-01");
-  assert.equal(updatedContext?.periodEnd, "2026-10-31");
 });
 
 test("splits signed tokens from the last dot", async () => {

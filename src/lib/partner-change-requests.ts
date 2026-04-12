@@ -22,6 +22,7 @@ import {
   getMockPartnerChangeRequestContext,
   listMockPartnerChangeRequests,
   rejectMockPartnerChangeRequest,
+  updateMockPartnerImmediateFields,
 } from "./mock/partner-change-requests.ts";
 
 const UUID_PATTERN =
@@ -42,6 +43,9 @@ export type PartnerChangeRequestSummary = {
   companyId: string;
   companyName: string;
   companySlug: string;
+  companyContactName: string | null;
+  companyContactEmail: string | null;
+  companyContactPhone: string | null;
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
@@ -147,6 +151,23 @@ export type PartnerChangeRequestReviewInput = {
   adminId: string;
 };
 
+export type PartnerImmediateUpdateInput = {
+  companyIds: string[];
+  partnerId: string;
+  thumbnail: string | null;
+  images: string[];
+  tags: string[];
+  reservationLink: string | null;
+  inquiryLink: string | null;
+};
+
+export type PartnerImmediateUpdateResult = {
+  partnerId: string;
+  companyId: string;
+  previousMediaUrls: string[];
+  currentMediaUrls: string[];
+};
+
 export interface PartnerChangeRequestRepository {
   getRequestContext(
     companyIds: string[],
@@ -171,6 +192,9 @@ type PartnerCompanyRow = {
   id: string;
   name: string;
   slug: string;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
 };
 
 type PartnerCategoryRow = {
@@ -263,7 +287,7 @@ type PartnerChangeRequestRow = {
 };
 
 const REQUEST_SELECT =
-  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_map_url,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_map_url,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
+  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_map_url,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_map_url,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug,contact_name,contact_email,contact_phone),partner:partners(id,name,location,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
 
 function normalizeCompanyIds(companyIds: string[]) {
   return [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
@@ -361,6 +385,17 @@ function collectPartnerMediaUrls(row?: {
   return normalizeHttpUrlList([row.thumbnail ?? null, ...(row.images ?? [])]);
 }
 
+function collectPartnerMediaUrlsFromInput(input?: {
+  thumbnail?: string | null;
+  images?: string[] | null;
+} | null) {
+  if (!input) {
+    return [];
+  }
+
+  return normalizeHttpUrlList([input.thumbnail ?? null, ...(input.images ?? [])]);
+}
+
 export function collectPartnerChangeRequestRequestedMediaUrls(
   request?: Pick<PartnerChangeRequestSummary, "requestedThumbnail" | "requestedImages"> | null,
 ) {
@@ -409,6 +444,9 @@ function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSummary {
     companyId: row.company_id,
     companyName: company?.name ?? "미지정",
     companySlug: company?.slug ?? "",
+    companyContactName: company?.contact_name ?? null,
+    companyContactEmail: company?.contact_email ?? null,
+    companyContactPhone: company?.contact_phone ?? null,
     partnerId: row.partner_id,
     partnerName: currentPartnerName || "미지정",
     partnerLocation: currentPartnerLocation || "",
@@ -586,6 +624,72 @@ async function getSupabasePendingRequests(companyIds?: string[]) {
   return (data ?? []).map((row) => toSummary(row as PartnerChangeRequestRow));
 }
 
+async function updateSupabasePartnerImmediateFields(
+  input: PartnerImmediateUpdateInput,
+): Promise<PartnerImmediateUpdateResult> {
+  const context = await getSupabaseRequestContext(input.companyIds, input.partnerId);
+  if (!context) {
+    throw new PartnerChangeRequestError(
+      "forbidden",
+      "해당 브랜드의 즉시 반영 항목을 수정할 수 없습니다.",
+    );
+  }
+
+  const previousMediaUrls = collectPartnerMediaUrls({
+    thumbnail: context.thumbnail,
+    images: context.images,
+  });
+  const currentMediaUrls = collectPartnerMediaUrlsFromInput({
+    thumbnail: input.thumbnail,
+    images: input.images,
+  });
+
+  if (
+    context.thumbnail === input.thumbnail &&
+    arraysEqual(context.images, input.images) &&
+    arraysEqual(context.tags, input.tags) &&
+    context.reservationLink === input.reservationLink &&
+    context.inquiryLink === input.inquiryLink
+  ) {
+    throw new PartnerChangeRequestError(
+      "no_changes",
+      "현재 값과 다른 변경이 없어 저장할 수 없습니다.",
+    );
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("partners")
+    .update({
+      thumbnail: input.thumbnail,
+      images: input.images,
+      tags: input.tags,
+      reservation_link: input.reservationLink,
+      inquiry_link: input.inquiryLink,
+    })
+    .eq("id", input.partnerId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return {
+    partnerId: input.partnerId,
+    companyId: context.companyId,
+    previousMediaUrls,
+    currentMediaUrls,
+  };
+}
+
+export async function updatePartnerImmediateFields(
+  input: PartnerImmediateUpdateInput,
+): Promise<PartnerImmediateUpdateResult> {
+  if (isPartnerPortalMock) {
+    return updateMockPartnerImmediateFields(input);
+  }
+  return updateSupabasePartnerImmediateFields(input);
+}
+
 async function createSupabaseRequest(
   input: PartnerChangeRequestCreateInput,
 ): Promise<PartnerChangeRequestSummary> {
@@ -644,11 +748,6 @@ async function createSupabaseRequest(
     requestedConditions.length === 0 &&
     requestedBenefits.length === 0 &&
     requestedAppliesTo.length === 0 &&
-    requestedTags.length === 0 &&
-    !requestedThumbnail &&
-    requestedImages.length === 0 &&
-    !requestedReservationLink &&
-    !requestedInquiryLink &&
     !requestedPeriodStart &&
     !requestedPeriodEnd
   ) {
@@ -665,11 +764,6 @@ async function createSupabaseRequest(
     arraysEqual(context.currentConditions, requestedConditions) &&
     arraysEqual(context.currentBenefits, requestedBenefits) &&
     arraysEqual(context.currentAppliesTo, requestedAppliesTo) &&
-    arraysEqual(context.currentTags, requestedTags) &&
-    context.thumbnail === requestedThumbnail &&
-    arraysEqual(context.images, requestedImages) &&
-    context.reservationLink === requestedReservationLink &&
-    context.inquiryLink === requestedInquiryLink &&
     context.periodStart === requestedPeriodStart &&
     context.periodEnd === requestedPeriodEnd
   ) {
@@ -766,6 +860,17 @@ async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInput) {
       "이미 처리된 요청입니다.",
     );
   }
+
+  const { data: currentPartner, error: currentPartnerError } = await supabase
+    .from("partners")
+    .select("thumbnail,images")
+    .eq("id", summary.partnerId)
+    .maybeSingle();
+
+  if (currentPartnerError) {
+    throw new Error(currentPartnerError.message);
+  }
+
   if (
     summary.requestedByAccountId !== input.accountId ||
     !normalizeCompanyIds(input.companyIds).includes(summary.companyId)
@@ -797,8 +902,14 @@ async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInput) {
       "취소된 요청을 확인하지 못했습니다.",
     );
   }
+  const currentMediaUrls = collectPartnerMediaUrls(currentPartner as {
+    thumbnail?: string | null;
+    images?: string[] | null;
+  } | null);
+  const requestedMediaUrls =
+    collectPartnerChangeRequestRequestedMediaUrls(cancelled);
   await deletePartnerMediaUrls(
-    collectPartnerChangeRequestRequestedMediaUrls(cancelled),
+    requestedMediaUrls.filter((url) => !currentMediaUrls.includes(url)),
   ).catch(() => undefined);
   return cancelled;
 }
@@ -826,16 +937,16 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     );
   }
 
-  const { data: previousPartner, error: previousPartnerError } = await supabase
+  const { data: currentPartner, error: currentPartnerError } = await supabase
     .from("partners")
     .select("thumbnail,images")
     .eq("id", summary.partnerId)
     .maybeSingle();
 
-  if (previousPartnerError) {
-    throw new Error(previousPartnerError.message);
+  if (currentPartnerError) {
+    throw new Error(currentPartnerError.message);
   }
-  if (!previousPartner) {
+  if (!currentPartner) {
     throw new PartnerChangeRequestError(
       "not_found",
       "대상 협력사를 찾을 수 없습니다.",
@@ -851,11 +962,6 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
       conditions: summary.requestedConditions,
       benefits: summary.requestedBenefits,
       applies_to: summary.requestedAppliesTo,
-      tags: summary.requestedTags,
-      thumbnail: summary.requestedThumbnail,
-      images: summary.requestedImages,
-      reservation_link: summary.requestedReservationLink,
-      inquiry_link: summary.requestedInquiryLink,
       period_start: summary.requestedPeriodStart,
       period_end: summary.requestedPeriodEnd,
     })
@@ -880,14 +986,13 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     throw new Error(error.message);
   }
 
-  const previousMediaUrls = collectPartnerMediaUrls(previousPartner as {
+  const currentMediaUrls = collectPartnerMediaUrls(currentPartner as {
     thumbnail?: string | null;
     images?: string[] | null;
   } | null);
-  const nextMediaUrls = collectPartnerChangeRequestRequestedMediaUrls(summary);
-  const removedMediaUrls = previousMediaUrls.filter(
-    (url) => !nextMediaUrls.includes(url),
-  );
+  const removedMediaUrls = collectPartnerChangeRequestRequestedMediaUrls(
+    summary,
+  ).filter((url) => !currentMediaUrls.includes(url));
   await deletePartnerMediaUrls(removedMediaUrls).catch(() => undefined);
 
   const approved = await fetchRequestSummary(supabase, input.requestId);
@@ -923,6 +1028,16 @@ async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     );
   }
 
+  const { data: currentPartner, error: currentPartnerError } = await supabase
+    .from("partners")
+    .select("thumbnail,images")
+    .eq("id", summary.partnerId)
+    .maybeSingle();
+
+  if (currentPartnerError) {
+    throw new Error(currentPartnerError.message);
+  }
+
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("partner_change_requests")
@@ -945,8 +1060,14 @@ async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInput) {
       "거절된 요청을 확인하지 못했습니다.",
     );
   }
+  const currentMediaUrls = collectPartnerMediaUrls(currentPartner as {
+    thumbnail?: string | null;
+    images?: string[] | null;
+  } | null);
+  const requestedMediaUrls =
+    collectPartnerChangeRequestRequestedMediaUrls(rejected);
   await deletePartnerMediaUrls(
-    collectPartnerChangeRequestRequestedMediaUrls(rejected),
+    requestedMediaUrls.filter((url) => !currentMediaUrls.includes(url)),
   ).catch(() => undefined);
   return rejected;
 }

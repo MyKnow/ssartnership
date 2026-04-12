@@ -91,6 +91,7 @@ function ServiceCard({
   return (
     <Link
       href={`/partner/services/${encodeURIComponent(service.id)}`}
+      prefetch={false}
       aria-label={`${service.name} 상세 보기`}
       className="group block rounded-2xl border border-border bg-background/60 p-4 transition-colors hover:border-primary/30 hover:bg-background/80"
     >

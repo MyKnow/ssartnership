@@ -8,6 +8,8 @@ import type {
   PartnerChangeRequestCancelInput,
   PartnerChangeRequestReviewInput,
   PartnerChangeRequestSummary,
+  PartnerImmediateUpdateInput,
+  PartnerImmediateUpdateResult,
 } from "../partner-change-requests.ts";
 import type { PartnerPortalCompanyStatus } from "../partner-dashboard.ts";
 import { normalizePartnerAudience } from "../partner-audience.ts";
@@ -18,6 +20,9 @@ type MockChangeRequestServiceRecord = {
   companyId: string;
   companyName: string;
   companySlug: string;
+  companyContactName: string | null;
+  companyContactEmail: string | null;
+  companyContactPhone: string | null;
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
@@ -92,11 +97,21 @@ function normalizeHttpUrlList(
   return next;
 }
 
+function collectServiceMediaUrls(service?: MockChangeRequestServiceRecord | null) {
+  if (!service) {
+    return [];
+  }
+  return normalizeHttpUrlList([service.thumbnail ?? null, ...(service.images ?? [])]);
+}
+
 function normalizeServiceRecord(
   service: Partial<MockChangeRequestServiceRecord> & {
     companyId: string;
     companyName: string;
     companySlug: string;
+    companyContactName?: string | null;
+    companyContactEmail?: string | null;
+    companyContactPhone?: string | null;
     partnerId: string;
     partnerName: string;
     partnerLocation: string;
@@ -107,6 +122,9 @@ function normalizeServiceRecord(
     companyId: service.companyId,
     companyName: service.companyName,
     companySlug: service.companySlug,
+    companyContactName: service.companyContactName ?? null,
+    companyContactEmail: service.companyContactEmail ?? null,
+    companyContactPhone: service.companyContactPhone ?? null,
     partnerId: service.partnerId,
     partnerName: service.partnerName,
     partnerLocation: service.partnerLocation,
@@ -132,6 +150,9 @@ const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-cafe-haeon",
     companyName: "카페 해온",
     companySlug: "cafe-haeon",
+    companyContactName: "김도연",
+    companyContactEmail: "partner@cafehaeon.example",
+    companyContactPhone: "02-555-8123",
     partnerId: "mock-partner-service-cafe-haeon-main",
     partnerName: "카페 해온 본점",
     partnerLocation: "서울 강남구 역삼로 123",
@@ -154,6 +175,9 @@ const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-cafe-haeon",
     companyName: "카페 해온",
     companySlug: "cafe-haeon",
+    companyContactName: "김도연",
+    companyContactEmail: "partner@cafehaeon.example",
+    companyContactPhone: "02-555-8123",
     partnerId: "mock-partner-service-cafe-haeon-dessert",
     partnerName: "카페 해온 디저트 바",
     partnerLocation: "서울 강남구 논현로 45",
@@ -176,6 +200,9 @@ const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-urban-gym",
     companyName: "어반짐 역삼",
     companySlug: "urban-gym",
+    companyContactName: "박지수",
+    companyContactEmail: "admin@urbangym.example",
+    companyContactPhone: "02-777-8811",
     partnerId: "mock-partner-service-urban-gym-pt",
     partnerName: "어반짐 PT 패키지",
     partnerLocation: "서울 강남구 봉은사로 11",
@@ -198,6 +225,9 @@ const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-urban-gym",
     companyName: "어반짐 역삼",
     companySlug: "urban-gym",
+    companyContactName: "박지수",
+    companyContactEmail: "admin@urbangym.example",
+    companyContactPhone: "02-777-8811",
     partnerId: "mock-partner-service-urban-gym-sauna",
     partnerName: "어반짐 사우나",
     partnerLocation: "서울 강남구 봉은사로 11, B1",
@@ -469,6 +499,9 @@ function normalizeRequestRecord(
         service?.partnerLocation ||
         request.partnerLocation,
     ),
+    companyContactName: service?.companyContactName ?? null,
+    companyContactEmail: service?.companyContactEmail ?? null,
+    companyContactPhone: service?.companyContactPhone ?? null,
     currentMapUrl: sanitizeHttpUrl(currentMapUrlSource ?? undefined),
     currentConditions: normalizeTextList(currentConditionsSource),
     currentBenefits: normalizeTextList(currentBenefitsSource),
@@ -646,6 +679,50 @@ export async function getMockPartnerChangeRequestContext(
   };
 }
 
+export async function updateMockPartnerImmediateFields(
+  input: PartnerImmediateUpdateInput,
+): Promise<PartnerImmediateUpdateResult> {
+  const service = findService(input.partnerId);
+  if (!service || !input.companyIds.includes(service.companyId)) {
+    throw new PartnerChangeRequestError(
+      "forbidden",
+      "해당 브랜드의 즉시 반영 항목을 수정할 수 없습니다.",
+    );
+  }
+
+  const previousMediaUrls = collectServiceMediaUrls(service);
+  const currentMediaUrls = normalizeHttpUrlList([
+    input.thumbnail ?? null,
+    ...(input.images ?? []),
+  ]);
+
+  if (
+    service.thumbnail === input.thumbnail &&
+    arraysEqual(service.images, input.images) &&
+    arraysEqual(service.tags, input.tags) &&
+    service.reservationLink === input.reservationLink &&
+    service.inquiryLink === input.inquiryLink
+  ) {
+    throw new PartnerChangeRequestError(
+      "no_changes",
+      "현재 값과 다른 변경이 없어 저장할 수 없습니다.",
+    );
+  }
+
+  service.thumbnail = input.thumbnail;
+  service.images = [...input.images];
+  service.tags = [...input.tags];
+  service.reservationLink = input.reservationLink;
+  service.inquiryLink = input.inquiryLink;
+
+  return {
+    partnerId: service.partnerId,
+    companyId: service.companyId,
+    previousMediaUrls,
+    currentMediaUrls,
+  };
+}
+
 export async function createMockPartnerChangeRequest(
   input: PartnerChangeRequestCreateInput,
 ): Promise<PartnerChangeRequestSummary> {
@@ -689,11 +766,6 @@ export async function createMockPartnerChangeRequest(
     arraysEqual(service.currentConditions, requestedConditions) &&
     arraysEqual(service.currentBenefits, requestedBenefits) &&
     arraysEqual(service.currentAppliesTo, requestedAppliesTo) &&
-    arraysEqual(service.tags, requestedTags) &&
-    service.thumbnail === requestedThumbnail &&
-    arraysEqual(service.images, requestedImages) &&
-    service.reservationLink === requestedReservationLink &&
-    service.inquiryLink === requestedInquiryLink &&
     service.periodStart === requestedPeriodStart &&
     service.periodEnd === requestedPeriodEnd
   ) {
@@ -709,6 +781,9 @@ export async function createMockPartnerChangeRequest(
     companyId: service.companyId,
     companyName: service.companyName,
     companySlug: service.companySlug,
+    companyContactName: service.companyContactName,
+    companyContactEmail: service.companyContactEmail,
+    companyContactPhone: service.companyContactPhone,
     partnerId: service.partnerId,
     partnerName: service.partnerName,
     partnerLocation: service.partnerLocation,
@@ -810,11 +885,6 @@ export async function approveMockPartnerChangeRequest(
     service.currentConditions = [...request.requestedConditions];
     service.currentBenefits = [...request.requestedBenefits];
     service.currentAppliesTo = [...request.requestedAppliesTo];
-    service.tags = [...request.requestedTags];
-    service.thumbnail = request.requestedThumbnail;
-    service.images = [...request.requestedImages];
-    service.reservationLink = request.requestedReservationLink;
-    service.inquiryLink = request.requestedInquiryLink;
     service.periodStart = request.requestedPeriodStart;
     service.periodEnd = request.requestedPeriodEnd;
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import Image from "next/image";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -19,6 +19,7 @@ import {
   getMapLink,
   normalizeReservationInquiry,
 } from "@/lib/partner-links";
+import { cn } from "@/lib/cn";
 import { getCachedImageUrl } from "@/lib/image-cache";
 import {
   getPartnerVisibilityBadgeClass,
@@ -35,29 +36,14 @@ function withAlpha(color: string, alphaHex: string) {
   return `${color}${alphaHex}`;
 }
 
-function SummaryCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-background/70 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-        {title}
-      </p>
-      <div className="mt-3">{children}</div>
-    </div>
-  );
-}
-
 function ListChips({
   values,
   emptyText,
+  badgeClassName = "bg-surface text-foreground",
 }: {
   values: string[];
   emptyText: string;
+  badgeClassName?: string;
 }) {
   if (values.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyText}</p>;
@@ -66,7 +52,7 @@ function ListChips({
   return (
     <div className="flex flex-wrap gap-2">
       {values.map((value) => (
-        <Badge key={value} className="bg-surface text-foreground">
+        <Badge key={value} className={badgeClassName}>
           {value}
         </Badge>
       ))}
@@ -74,26 +60,117 @@ function ListChips({
   );
 }
 
-function SummaryRows({
-  rows,
+function arraysEqual(a: string[], b: string[]) {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((value, index) => value === b[index]);
+}
+
+function formatRange(start: string | null, end: string | null) {
+  return `${start ?? "미정"} ~ ${end ?? "미정"}`;
+}
+
+function DiffText({
+  tone,
+  children,
 }: {
-  rows: Array<{ label: string; value: ReactNode }>;
+  tone: "current" | "requested";
+  children: ReactNode;
 }) {
   return (
-    <div className="grid gap-3">
-      {rows.map((row) => (
-        <div
-          key={row.label}
-          className="rounded-2xl border border-border bg-background/70 px-4 py-3"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            {row.label}
-          </p>
-          <div className="mt-2 break-all text-sm leading-6 text-foreground">
-            {row.value}
-          </div>
-        </div>
-      ))}
+    <div
+      className={cn(
+        "break-words text-sm font-medium leading-6",
+        tone === "current"
+          ? "text-rose-700 dark:text-rose-100"
+          : "text-emerald-700 dark:text-emerald-100",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DiffLink({
+  tone,
+  href,
+}: {
+  tone: "current" | "requested";
+  href: string | null;
+}) {
+  if (!href) {
+    return <DiffText tone={tone}>없음</DiffText>;
+  }
+
+  return (
+    <a
+      className={cn(
+        "break-all text-sm font-medium leading-6 underline decoration-1 underline-offset-4",
+        tone === "current"
+          ? "text-rose-700 decoration-rose-300 hover:text-rose-600 dark:text-rose-100 dark:decoration-rose-400"
+          : "text-emerald-700 decoration-emerald-300 hover:text-emerald-600 dark:text-emerald-100 dark:decoration-emerald-400",
+      )}
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {href}
+    </a>
+  );
+}
+
+function DiffPanel({
+  tone,
+  label,
+  children,
+}: {
+  tone: "current" | "requested";
+  label: string;
+  children: ReactNode;
+}) {
+  const toneClass =
+    tone === "current"
+      ? "border-rose-500/20 bg-rose-500/5"
+      : "border-emerald-500/20 bg-emerald-500/5";
+  const labelClass =
+    tone === "current"
+      ? "text-rose-700 dark:text-rose-200"
+      : "text-emerald-700 dark:text-emerald-200";
+
+  return (
+    <div className={cn("rounded-2xl border p-4", toneClass)}>
+      <p className={cn("text-xs font-semibold uppercase tracking-[0.18em]", labelClass)}>
+        {label}
+      </p>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function DiffCard({
+  label,
+  current,
+  requested,
+}: {
+  label: string;
+  current: ReactNode;
+  requested: ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-border bg-background/70 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <Badge className="bg-primary/10 text-primary">변경됨</Badge>
+      </div>
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <DiffPanel tone="current" label="현재">
+          {current}
+        </DiffPanel>
+        <DiffPanel tone="requested" label="요청">
+          {requested}
+        </DiffPanel>
+      </div>
     </div>
   );
 }
@@ -110,12 +187,148 @@ function SectionTitle({
   );
 }
 
+type PendingDiffItem = {
+  key: string;
+  label: string;
+  current: ReactElement;
+  requested: ReactElement;
+};
+
+function getPendingDiffItems(
+  pendingRequest: PartnerChangeRequestContext["pendingRequest"],
+): PendingDiffItem[] {
+  if (!pendingRequest) {
+    return [];
+  }
+
+  return [
+    pendingRequest.currentPartnerName !== pendingRequest.requestedPartnerName
+      ? {
+          key: "partnerName",
+          label: "브랜드명",
+          current: <DiffText tone="current">{pendingRequest.currentPartnerName}</DiffText>,
+          requested: (
+            <DiffText tone="requested">{pendingRequest.requestedPartnerName}</DiffText>
+          ),
+        }
+      : null,
+    pendingRequest.currentPartnerLocation !== pendingRequest.requestedPartnerLocation
+      ? {
+          key: "partnerLocation",
+          label: "위치",
+          current: (
+            <DiffText tone="current">{pendingRequest.currentPartnerLocation}</DiffText>
+          ),
+          requested: (
+            <DiffText tone="requested">
+              {pendingRequest.requestedPartnerLocation}
+            </DiffText>
+          ),
+        }
+      : null,
+    pendingRequest.currentMapUrl !== pendingRequest.requestedMapUrl
+      ? {
+          key: "mapUrl",
+          label: "지도 URL",
+          current: (
+            <DiffLink tone="current" href={pendingRequest.currentMapUrl} />
+          ),
+          requested: (
+            <DiffLink tone="requested" href={pendingRequest.requestedMapUrl} />
+          ),
+        }
+      : null,
+    !arraysEqual(pendingRequest.currentConditions, pendingRequest.requestedConditions)
+      ? {
+          key: "conditions",
+          label: "이용 조건",
+          current: (
+            <ListChips
+              values={pendingRequest.currentConditions}
+              emptyText="조건이 없습니다."
+              badgeClassName="border border-rose-500/15 bg-rose-500/10 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-100"
+            />
+          ),
+          requested: (
+            <ListChips
+              values={pendingRequest.requestedConditions}
+              emptyText="조건이 없습니다."
+              badgeClassName="border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-100"
+            />
+          ),
+        }
+      : null,
+    !arraysEqual(pendingRequest.currentBenefits, pendingRequest.requestedBenefits)
+      ? {
+          key: "benefits",
+          label: "혜택",
+          current: (
+            <ListChips
+              values={pendingRequest.currentBenefits}
+              emptyText="혜택이 없습니다."
+              badgeClassName="border border-rose-500/15 bg-rose-500/10 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-100"
+            />
+          ),
+          requested: (
+            <ListChips
+              values={pendingRequest.requestedBenefits}
+              emptyText="혜택이 없습니다."
+              badgeClassName="border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-100"
+            />
+          ),
+        }
+      : null,
+    !arraysEqual(pendingRequest.currentAppliesTo, pendingRequest.requestedAppliesTo)
+      ? {
+          key: "appliesTo",
+          label: "적용 대상",
+          current: (
+            <PartnerAudienceChips
+              appliesTo={pendingRequest.currentAppliesTo}
+              badgeClassName="border border-rose-500/15 bg-rose-500/10 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-100"
+            />
+          ),
+          requested: (
+            <PartnerAudienceChips
+              appliesTo={pendingRequest.requestedAppliesTo}
+              badgeClassName="border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-100"
+            />
+          ),
+        }
+      : null,
+    pendingRequest.currentPeriodStart !== pendingRequest.requestedPeriodStart ||
+    pendingRequest.currentPeriodEnd !== pendingRequest.requestedPeriodEnd
+      ? {
+          key: "period",
+          label: "기간",
+          current: (
+            <DiffText tone="current">
+              {formatRange(
+                pendingRequest.currentPeriodStart,
+                pendingRequest.currentPeriodEnd,
+              )}
+            </DiffText>
+          ),
+          requested: (
+            <DiffText tone="requested">
+              {formatRange(
+                pendingRequest.requestedPeriodStart,
+                pendingRequest.requestedPeriodEnd,
+              )}
+            </DiffText>
+          ),
+        }
+      : null,
+  ].filter((item): item is PendingDiffItem => Boolean(item));
+}
+
 export default function PartnerServiceDetailView({
   session,
   context,
   mode,
   errorMessage,
   successMessage,
+  saveImmediateAction,
   createAction,
   cancelAction,
 }: {
@@ -124,6 +337,7 @@ export default function PartnerServiceDetailView({
   mode: "view" | "edit";
   errorMessage?: string | null;
   successMessage?: string | null;
+  saveImmediateAction: (formData: FormData) => void | Promise<void>;
   createAction: (formData: FormData) => void | Promise<void>;
   cancelAction: (formData: FormData) => void | Promise<void>;
 }) {
@@ -163,8 +377,9 @@ export default function PartnerServiceDetailView({
   const viewHref = `/partner/services/${encodeURIComponent(context.partnerId)}`;
   const editHref = `${viewHref}?mode=edit`;
   const isEditMode = mode === "edit";
-  const canCancelPendingRequest =
-    context.pendingRequest?.requestedByAccountId === session.accountId;
+  const pendingRequest = context.pendingRequest;
+  const pendingDiffItems = getPendingDiffItems(pendingRequest);
+  const canCancelPendingRequest = pendingRequest?.requestedByAccountId === session.accountId;
 
   return (
     <div className="bg-background">
@@ -217,9 +432,9 @@ export default function PartnerServiceDetailView({
                 {context.partnerName}
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                브랜드 정보, 썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간,
-                혜택, 이용 조건, 태그, 적용 대상을 요청할 수 있습니다. 승인되기 전까지는
-                현재 값이 유지됩니다.
+                메인 썸네일, 추가 이미지, 예약/문의 링크, 태그는 즉시 반영되고,
+                브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자
+                승인 후 반영됩니다.
               </p>
             </Card>
           ) : (
@@ -241,220 +456,48 @@ export default function PartnerServiceDetailView({
                     </Badge>
                   ) : null}
                 </div>
-
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-                    {context.companyName} - {context.partnerName}
-                  </h1>
-                  <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                    브랜드 상세 정보를 확인할 수 있습니다. 연필 버튼을 누르면 같은
-                    화면에서 수정 요청을 보낼 수 있습니다.
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-border bg-background/60 p-4">
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                      브랜드명
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {context.partnerName}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-background/60 p-4">
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                      카테고리
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {context.categoryLabel}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-background/60 p-4">
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                      위치
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
-                      {context.partnerLocation}
-                    </p>
-                  </div>
-                </div>
               </Card>
 
-              {context.pendingRequest ? (
-                <Card className="space-y-4 p-6 sm:p-8">
+              {pendingRequest ? (
+                <Card className="space-y-5 p-6 sm:p-8">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
                       <Badge className="bg-amber-500/10 text-amber-700">
                         승인 대기 중
                       </Badge>
                       <p className="text-sm leading-6 text-muted-foreground">
-                        제출된 요청은 관리자 승인 전까지 반영되지 않습니다.
+                        변경된 항목만 현재값과 요청값으로 비교합니다.
                       </p>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      요청 시각{" "}
-                      {new Date(context.pendingRequest.createdAt).toLocaleString("ko-KR")}
+                      요청 시각 {new Date(pendingRequest.createdAt).toLocaleString("ko-KR")}
                     </div>
                   </div>
 
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <SummaryCard title="현재 브랜드 정보">
-                      <SummaryRows
-                        rows={[
-                          {
-                            label: "브랜드명",
-                            value: context.pendingRequest.currentPartnerName,
-                          },
-                          {
-                            label: "위치",
-                            value: context.pendingRequest.currentPartnerLocation,
-                          },
-                          {
-                            label: "지도 URL",
-                            value: context.pendingRequest.currentMapUrl ?? "없음",
-                          },
-                        ]}
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {pendingDiffItems.map((item) => (
+                      <DiffCard
+                        key={item.key}
+                        label={item.label}
+                        current={item.current}
+                        requested={item.requested}
                       />
-                    </SummaryCard>
-                    <SummaryCard title="요청 브랜드 정보">
-                      <SummaryRows
-                        rows={[
-                          {
-                            label: "브랜드명",
-                            value: context.pendingRequest.requestedPartnerName,
-                          },
-                          {
-                            label: "위치",
-                            value: context.pendingRequest.requestedPartnerLocation,
-                          },
-                          {
-                            label: "지도 URL",
-                            value: context.pendingRequest.requestedMapUrl ?? "없음",
-                          },
-                        ]}
-                      />
-                    </SummaryCard>
+                    ))}
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <SummaryCard title="현재 조건">
-                      <ListChips
-                        values={context.currentConditions}
-                        emptyText="조건이 없습니다."
-                      />
-                    </SummaryCard>
-                    <SummaryCard title="현재 혜택">
-                      <ListChips
-                        values={context.currentBenefits}
-                        emptyText="혜택이 없습니다."
-                      />
-                    </SummaryCard>
-                    <SummaryCard title="현재 적용 대상">
-                      <PartnerAudienceChips appliesTo={context.currentAppliesTo} />
-                    </SummaryCard>
-                  </div>
+                  {pendingDiffItems.length === 0 ? (
+                    <div className="rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
+                      변경된 항목이 없습니다.
+                    </div>
+                  ) : null}
 
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <SummaryCard title="요청 조건">
-                      <ListChips
-                        values={context.pendingRequest.requestedConditions}
-                        emptyText="조건이 없습니다."
-                      />
-                    </SummaryCard>
-                    <SummaryCard title="요청 혜택">
-                      <ListChips
-                        values={context.pendingRequest.requestedBenefits}
-                        emptyText="혜택이 없습니다."
-                      />
-                    </SummaryCard>
-                    <SummaryCard title="현재 태그">
-                      <ListChips values={context.tags} emptyText="태그가 없습니다." />
-                    </SummaryCard>
-                    <SummaryCard title="요청 태그">
-                      <ListChips
-                        values={context.pendingRequest.requestedTags}
-                        emptyText="태그가 없습니다."
-                      />
-                    </SummaryCard>
-                    <SummaryCard title="요청 적용 대상">
-                      <PartnerAudienceChips
-                        appliesTo={context.pendingRequest.requestedAppliesTo}
-                      />
-                    </SummaryCard>
-                    <SummaryCard title="요청자">
-                      <p className="text-sm text-foreground">
-                        {context.pendingRequest.requestedByDisplayName ??
-                          context.pendingRequest.requestedByLoginId ??
-                          "미지정"}
-                      </p>
-                    </SummaryCard>
-                  </div>
-
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <SummaryCard title="현재 이미지 / 링크 / 기간">
-                      <SummaryRows
-                        rows={[
-                          {
-                            label: "썸네일",
-                            value: context.pendingRequest.currentThumbnail
-                              ? "등록됨"
-                              : "없음",
-                          },
-                          {
-                            label: "기타 이미지",
-                            value:
-                              context.pendingRequest.currentImages.length > 0
-                                ? `${context.pendingRequest.currentImages.length}장`
-                                : "없음",
-                          },
-                          {
-                            label: "예약 링크",
-                            value: context.pendingRequest.currentReservationLink ?? "없음",
-                          },
-                          {
-                            label: "문의 링크",
-                            value: context.pendingRequest.currentInquiryLink ?? "없음",
-                          },
-                          {
-                            label: "기간",
-                            value: `${context.pendingRequest.currentPeriodStart ?? "미정"} ~ ${context.pendingRequest.currentPeriodEnd ?? "미정"}`,
-                          },
-                        ]}
-                      />
-                    </SummaryCard>
-                    <SummaryCard title="요청 이미지 / 링크 / 기간">
-                      <SummaryRows
-                        rows={[
-                          {
-                            label: "썸네일",
-                            value: context.pendingRequest.requestedThumbnail
-                              ? "등록됨"
-                              : "없음",
-                          },
-                          {
-                            label: "기타 이미지",
-                            value:
-                              context.pendingRequest.requestedImages.length > 0
-                                ? `${context.pendingRequest.requestedImages.length}장`
-                                : "없음",
-                          },
-                          {
-                            label: "예약 링크",
-                            value:
-                              context.pendingRequest.requestedReservationLink ?? "없음",
-                          },
-                          {
-                            label: "문의 링크",
-                            value:
-                              context.pendingRequest.requestedInquiryLink ?? "없음",
-                          },
-                          {
-                            label: "기간",
-                            value: `${context.pendingRequest.requestedPeriodStart ?? "미정"} ~ ${context.pendingRequest.requestedPeriodEnd ?? "미정"}`,
-                          },
-                        ]}
-                      />
-                    </SummaryCard>
+                  <div className="rounded-2xl border border-border bg-background/70 px-4 py-3 text-sm text-muted-foreground">
+                    요청자{" "}
+                    <span className="font-medium text-foreground">
+                      {pendingRequest.requestedByDisplayName ??
+                        pendingRequest.requestedByLoginId ??
+                        "미지정"}
+                    </span>
                   </div>
                 </Card>
               ) : null}
@@ -652,6 +695,7 @@ export default function PartnerServiceDetailView({
               canCancelPendingRequest={canCancelPendingRequest}
               errorMessage={errorMessage}
               successMessage={successMessage}
+              saveImmediateAction={saveImmediateAction}
               createAction={createAction}
               cancelAction={cancelAction}
             />

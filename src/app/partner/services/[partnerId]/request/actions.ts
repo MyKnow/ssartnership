@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   PartnerChangeRequestError,
@@ -8,6 +8,8 @@ import {
 import {
   cancelPartnerChangeRequest,
   createPartnerChangeRequest,
+  getPartnerChangeRequestContext,
+  updatePartnerImmediateFields,
 } from "@/lib/partner-change-requests";
 import { getPartnerSession } from "@/lib/partner-session";
 import { parsePartnerAudienceSelection } from "@/lib/partner-audience";
@@ -46,6 +48,17 @@ function getFormDataFile(formData: FormData, name: string) {
 
 function getReturnUrl(partnerId: string) {
   return `/partner/services/${encodeURIComponent(partnerId)}`;
+}
+
+function revalidatePartnerServicePaths(partnerId: string) {
+  revalidateTag("partners", "max");
+  revalidatePath("/partner");
+  revalidatePath("/admin");
+  revalidatePath("/admin/partners");
+  revalidatePath("/partners/[id]", "page");
+  revalidatePath(`/partners/${partnerId}`);
+  revalidatePath(`/partner/services/${encodeURIComponent(partnerId)}`);
+  revalidatePath(`/partner/services/${encodeURIComponent(partnerId)}/request`);
 }
 
 async function resolvePartnerMediaPayload(
@@ -132,7 +145,7 @@ async function resolvePartnerMediaPayload(
   }
 }
 
-export async function submitPartnerChangeRequest(formData: FormData) {
+export async function savePartnerImmediateChanges(formData: FormData) {
   const session = await getPartnerSession();
   if (!session) {
     redirect("/partner/login");
@@ -146,47 +159,17 @@ export async function submitPartnerChangeRequest(formData: FormData) {
     redirect("/partner?error=invalid_request");
   }
 
-  const partnerName = String(formData.get("partnerName") || "").trim();
-  const partnerLocation = String(formData.get("partnerLocation") || "").trim();
-  const rawMapUrl = String(formData.get("mapUrl") || "").trim();
-  const conditions = parseList(String(formData.get("conditions") || ""));
-  const benefits = parseList(String(formData.get("benefits") || ""));
-  const tags = parseList(String(formData.get("tags") || ""));
-  const appliesTo = parsePartnerAudienceSelection(
-    formData.getAll("appliesTo").map((item) => String(item).trim()),
-  );
-  const rawReservationLink = String(formData.get("reservationLink") || "").trim();
-  const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
-  const periodStart = String(formData.get("periodStart") || "").trim();
-  const periodEnd = String(formData.get("periodEnd") || "").trim();
-
-  if (!appliesTo) {
-    redirect(`${getReturnUrl(partnerId)}?mode=edit&error=invalid_request`);
+  const context = await getPartnerChangeRequestContext(session.companyIds, partnerId);
+  if (!context) {
+    redirect(`${getReturnUrl(partnerId)}?mode=edit&error=forbidden`);
   }
 
+  const tags = parseList(String(formData.get("tags") || ""));
+  const rawReservationLink = String(formData.get("reservationLink") || "").trim();
+  const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
   let media: PartnerRequestMediaPayload | null = null;
 
   try {
-    if (!partnerName || !partnerLocation) {
-      throw new PartnerChangeRequestError(
-        "invalid_request",
-        "브랜드명과 위치를 입력해 주세요.",
-      );
-    }
-
-    const dateRangeError = validateDateRange(periodStart, periodEnd);
-    if (dateRangeError) {
-      throw new PartnerChangeRequestError("invalid_request", dateRangeError);
-    }
-
-    const mapUrl = rawMapUrl ? sanitizeHttpUrl(rawMapUrl) : null;
-    if (rawMapUrl && !mapUrl) {
-      throw new PartnerChangeRequestError(
-        "invalid_request",
-        "지도 URL 형식을 확인해 주세요.",
-      );
-    }
-
     const reservationLink = rawReservationLink
       ? sanitizePartnerLinkValue(rawReservationLink)
       : null;
@@ -209,6 +192,90 @@ export async function submitPartnerChangeRequest(formData: FormData) {
 
     media = await resolvePartnerMediaPayload(formData, partnerId);
 
+    const result = await updatePartnerImmediateFields({
+      companyIds: session.companyIds,
+      partnerId,
+      thumbnail: media.thumbnail,
+      images: media.images,
+      tags,
+      reservationLink,
+      inquiryLink,
+    });
+
+    await deletePartnerMediaUrls(
+      result.previousMediaUrls.filter(
+        (url) => !result.currentMediaUrls.includes(url),
+      ),
+    ).catch(() => undefined);
+  } catch (error) {
+    if (media) {
+      await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+    }
+    if (error instanceof PartnerChangeRequestError) {
+      redirect(`${getReturnUrl(partnerId)}?mode=edit&error=${error.code}`);
+    }
+    throw error;
+  }
+
+  revalidatePartnerServicePaths(partnerId);
+  redirect(`${getReturnUrl(partnerId)}?mode=edit&success=saved`);
+}
+
+export async function submitPartnerChangeRequest(formData: FormData) {
+  const session = await getPartnerSession();
+  if (!session) {
+    redirect("/partner/login");
+  }
+  if (session.mustChangePassword) {
+    redirect("/partner/change-password");
+  }
+
+  const partnerId = String(formData.get("partnerId") || "").trim();
+  if (!partnerId) {
+    redirect("/partner?error=invalid_request");
+  }
+
+  const partnerName = String(formData.get("partnerName") || "").trim();
+  const partnerLocation = String(formData.get("partnerLocation") || "").trim();
+  const rawMapUrl = String(formData.get("mapUrl") || "").trim();
+  const conditions = parseList(String(formData.get("conditions") || ""));
+  const benefits = parseList(String(formData.get("benefits") || ""));
+  const appliesTo = parsePartnerAudienceSelection(
+    formData.getAll("appliesTo").map((item) => String(item).trim()),
+  );
+  const periodStart = String(formData.get("periodStart") || "").trim();
+  const periodEnd = String(formData.get("periodEnd") || "").trim();
+
+  if (!appliesTo) {
+    redirect(`${getReturnUrl(partnerId)}?mode=edit&error=invalid_request`);
+  }
+
+  try {
+    if (!partnerName || !partnerLocation) {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "브랜드명과 위치를 입력해 주세요.",
+      );
+    }
+
+    const dateRangeError = validateDateRange(periodStart, periodEnd);
+    if (dateRangeError) {
+      throw new PartnerChangeRequestError("invalid_request", dateRangeError);
+    }
+
+    const mapUrl = rawMapUrl ? sanitizeHttpUrl(rawMapUrl) : null;
+    if (rawMapUrl && !mapUrl) {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "지도 URL 형식을 확인해 주세요.",
+      );
+    }
+
+    const context = await getPartnerChangeRequestContext(session.companyIds, partnerId);
+    if (!context) {
+      redirect(`${getReturnUrl(partnerId)}?mode=edit&error=forbidden`);
+    }
+
     await createPartnerChangeRequest({
       companyIds: session.companyIds,
       partnerId,
@@ -220,28 +287,23 @@ export async function submitPartnerChangeRequest(formData: FormData) {
       requestedMapUrl: mapUrl,
       requestedConditions: conditions,
       requestedBenefits: benefits,
-      requestedTags: tags,
+      requestedTags: context.tags,
       requestedAppliesTo: appliesTo,
-      requestedThumbnail: media.thumbnail,
-      requestedImages: media.images,
-      requestedReservationLink: reservationLink,
-      requestedInquiryLink: inquiryLink,
+      requestedThumbnail: context.thumbnail,
+      requestedImages: context.images,
+      requestedReservationLink: context.reservationLink,
+      requestedInquiryLink: context.inquiryLink,
       requestedPeriodStart: periodStart || null,
       requestedPeriodEnd: periodEnd || null,
     });
   } catch (error) {
-    if (media) {
-      await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    }
     if (error instanceof PartnerChangeRequestError) {
       redirect(`${getReturnUrl(partnerId)}?mode=edit&error=${error.code}`);
     }
     throw error;
   }
 
-  revalidatePath("/partner");
-  revalidatePath("/admin/partners");
-  revalidatePath(`/partner/services/${encodeURIComponent(partnerId)}`);
+  revalidatePartnerServicePaths(partnerId);
   redirect(`${getReturnUrl(partnerId)}?mode=edit&success=submitted`);
 }
 
