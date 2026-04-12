@@ -83,11 +83,11 @@ export default function AdminPartnerEditorCard({
     : (partner.images ?? []).slice(1);
 
   return (
-    <article className="rounded-3xl border border-border bg-surface-elevated p-4 shadow-sm">
+    <article className="rounded-[var(--radius-panel)] border border-border/80 bg-surface-elevated/95 p-4 shadow-[var(--shadow-flat)] backdrop-blur-md">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-4 rounded-2xl text-left"
+        className="flex w-full items-center justify-between gap-4 rounded-[1.1rem] text-left"
         aria-expanded={open}
       >
         <div className="min-w-0">

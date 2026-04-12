@@ -2,8 +2,9 @@ import { cn } from "@/lib/cn";
 
 const variants = {
   error:
-    "rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs font-medium text-danger",
-  muted: "text-xs text-muted-foreground",
+    "rounded-[1rem] border border-danger/20 bg-danger/10 px-3.5 py-2.5 text-sm font-medium text-danger",
+  muted: "text-sm text-muted-foreground",
+  info: "rounded-[1rem] border border-primary/15 bg-primary-soft/80 px-3.5 py-2.5 text-sm font-medium text-primary",
 };
 
 export default function FormMessage({

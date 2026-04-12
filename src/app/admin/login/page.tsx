@@ -200,19 +200,19 @@ export default async function AdminLoginPage({
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
-      <Card className="w-full max-w-md">
+      <Card tone="elevated" className="w-full max-w-md">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="ui-kicker">
               Admin Login
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-foreground">
+            <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">
               관리자 로그인
             </h1>
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
+              variant="secondary"
               href="/"
               size="icon"
               ariaLabel="사용자 화면으로"

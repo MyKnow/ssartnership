@@ -3,6 +3,9 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
+import MotionReveal from "@/components/ui/MotionReveal";
+import ShellHeader from "@/components/ui/ShellHeader";
+import StatsRow from "@/components/ui/StatsRow";
 import Link from "next/link";
 import {
   getPartnerVisibilityBadgeClass,
@@ -20,30 +23,6 @@ function formatCount(value: number) {
   return value.toLocaleString("ko-KR");
 }
 
-function MetricCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: number;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-background/70 p-4">
-      <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-        {formatCount(value)}
-      </p>
-      {hint ? (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{hint}</p>
-      ) : null}
-    </div>
-  );
-}
-
 function ServiceMetric({
   label,
   value,
@@ -56,13 +35,11 @@ function ServiceMetric({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-surface p-4",
+        "rounded-[1.2rem] border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-flat)]",
         className,
       )}
     >
-      <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </p>
+      <p className="ui-kicker">{label}</p>
       <p className="mt-2 text-lg font-semibold text-foreground">
         {formatCount(value)}
       </p>
@@ -93,7 +70,7 @@ function ServiceCard({
       href={`/partner/services/${encodeURIComponent(service.id)}`}
       prefetch={false}
       aria-label={`${service.name} 상세 보기`}
-      className="group block rounded-2xl border border-border bg-background/60 p-4 transition-colors hover:border-primary/30 hover:bg-background/80"
+      className="group block rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-4 shadow-[var(--shadow-flat)] transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
@@ -138,59 +115,58 @@ function CompanySection({
   company: PartnerPortalDashboard["companies"][number];
 }) {
   return (
-    <Card className="space-y-6 p-6 sm:p-8">
+    <Card tone="elevated" className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
             {company.name}
           </h2>
           {company.description ? (
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+            <p className="max-w-3xl ui-body">
               {company.description}
             </p>
           ) : null}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <MetricCard
-            label="조회수"
-            value={company.totals.detailViews}
-            hint="해당 협력사 브랜드들의 상세 페이지 조회 합계"
-          />
-          <MetricCard
-            label="총 클릭"
-            value={company.totals.totalClicks}
-            hint="카드, 지도, 예약, 문의 클릭 합계"
-          />
-          <MetricCard
-            label="브랜드 수"
-            value={company.services.length}
-            hint="포털에서 관리 가능한 연결 브랜드"
+        <div className="w-full lg:max-w-3xl">
+          <StatsRow
+            minItemWidth="11rem"
+            items={[
+              {
+                label: "조회수",
+                value: formatCount(company.totals.detailViews),
+                hint: "상세 페이지 조회 합계",
+              },
+              {
+                label: "총 클릭",
+                value: formatCount(company.totals.totalClicks),
+                hint: "카드, 지도, 예약, 문의 클릭 합계",
+              },
+              {
+                label: "브랜드 수",
+                value: formatCount(company.services.length),
+                hint: "포털에서 관리 가능한 연결 브랜드",
+              },
+            ]}
           />
         </div>
       </div>
 
       <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-background/60 p-4">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            담당자
-          </p>
+        <div className="rounded-[1.2rem] border border-border/80 bg-surface-muted/90 p-4 shadow-[var(--shadow-flat)]">
+          <p className="ui-kicker">담당자</p>
           <p className="mt-2 text-sm font-semibold text-foreground">
             {company.contactName ?? "미지정"}
           </p>
         </div>
-        <div className="rounded-2xl border border-border bg-background/60 p-4">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            연락처
-          </p>
+        <div className="rounded-[1.2rem] border border-border/80 bg-surface-muted/90 p-4 shadow-[var(--shadow-flat)]">
+          <p className="ui-kicker">연락처</p>
           <p className="mt-2 break-all text-sm font-semibold text-foreground">
             {company.contactEmail ?? company.contactPhone ?? "미지정"}
           </p>
         </div>
-        <div className="rounded-2xl border border-border bg-background/60 p-4">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            상태
-          </p>
+        <div className="rounded-[1.2rem] border border-border/80 bg-surface-muted/90 p-4 shadow-[var(--shadow-flat)]">
+          <p className="ui-kicker">상태</p>
           <p
             className={cn(
               "mt-2 text-center text-sm font-semibold",
@@ -229,44 +205,41 @@ export default function PartnerDashboardView({
     <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-6xl space-y-6">
-          <Card className="space-y-6 p-6 sm:p-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="bg-primary/10 text-primary">협력사 포털</Badge>
-            </div>
+          <MotionReveal>
+            <Card tone="elevated" className="space-y-6">
+              <ShellHeader
+                eyebrow="Partner Portal"
+                title="협력사별 브랜드 현황"
+                description="협력사 단위로 연결된 브랜드와 조회·클릭 지표를 한 번에 확인합니다."
+                actions={<Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>}
+              />
 
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-                협력사별 브랜드 현황
-              </h1>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                label="연결 협력사"
-                value={dashboard.totals.companyCount}
-                hint="이 계정이 관리하는 협력사 수"
+              <StatsRow
+                items={[
+                  {
+                    label: "연결 협력사",
+                    value: formatCount(dashboard.totals.companyCount),
+                    hint: "이 계정이 관리하는 협력사 수",
+                  },
+                  {
+                    label: "브랜드 수",
+                    value: formatCount(dashboard.totals.serviceCount),
+                    hint: "연결된 협력사의 전체 브랜드 수",
+                  },
+                  {
+                    label: "조회수",
+                    value: formatCount(dashboard.totals.detailViews),
+                    hint: "전체 브랜드 상세 페이지 조회 합계",
+                  },
+                  {
+                    label: "총 클릭",
+                    value: formatCount(dashboard.totals.totalClicks),
+                    hint: "카드, 지도, 예약, 문의 클릭 합계",
+                  },
+                ]}
               />
-              <MetricCard
-                label="브랜드 수"
-                value={dashboard.totals.serviceCount}
-                hint="연결된 협력사의 전체 브랜드 수"
-              />
-              <MetricCard
-                label="조회수"
-                value={dashboard.totals.detailViews}
-                hint="전체 브랜드 상세 페이지 조회 합계"
-              />
-              <MetricCard
-                label="총 클릭"
-                value={dashboard.totals.totalClicks}
-                hint="카드, 지도, 예약, 문의 클릭 합계"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span>로그인 아이디: {session.loginId}</span>
-            </div>
-          </Card>
+            </Card>
+          </MotionReveal>
 
           {dashboard.companies.length === 0 ? (
             <EmptyState
@@ -274,14 +247,16 @@ export default function PartnerDashboardView({
               description="관리자에서 이 협력사에 연결된 브랜드 정보를 먼저 생성해야 합니다."
             />
           ) : (
-            dashboard.companies.map((company) => (
-              <CompanySection key={company.id} company={company} />
+            dashboard.companies.map((company, index) => (
+              <MotionReveal key={company.id} delay={0.04 + index * 0.03}>
+                <CompanySection company={company} />
+              </MotionReveal>
             ))
           )}
 
           <div className="flex flex-wrap items-center gap-3">
             {isPartnerPortalMock ? (
-              <Button href="/partner/setup" variant="ghost">
+              <Button href="/partner/setup" variant="secondary">
                 초기 설정 데모
               </Button>
             ) : null}

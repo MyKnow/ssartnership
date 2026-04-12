@@ -9,9 +9,9 @@ export default function Select({
       <select
         {...props}
         className={cn(
-          "w-full appearance-none rounded-2xl border border-border bg-surface px-3 py-2 pr-10 text-sm text-foreground",
-          "focus:border-strong focus:outline-none",
-          "disabled:cursor-not-allowed disabled:border-border/60 disabled:bg-muted/50 disabled:text-muted-foreground disabled:opacity-100",
+          "h-11 w-full appearance-none rounded-[1rem] border border-border bg-surface/90 px-3.5 pr-10 text-sm text-foreground shadow-[var(--shadow-flat)] transition-[border-color,background-color,box-shadow] duration-200 ease-out",
+          "focus:border-strong focus:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-primary/15",
+          "disabled:cursor-not-allowed disabled:border-border/60 disabled:bg-surface-muted disabled:text-muted-foreground disabled:opacity-100",
           className,
         )}
       />

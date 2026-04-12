@@ -10,7 +10,7 @@ export default async function PartnerPortalHeader() {
   const session = await getPartnerSession();
 
   return (
-    <header className="border-b border-border bg-surface/90 backdrop-blur">
+    <header className="border-b border-border/70 bg-surface-overlay/95 shadow-[var(--shadow-flat)] backdrop-blur-xl">
       <Container className="flex flex-wrap items-center justify-between gap-3 py-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Link
@@ -20,7 +20,7 @@ export default async function PartnerPortalHeader() {
           >
             <BrandWordmark className="text-lg sm:text-xl" />
           </Link>
-          <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground">
+          <span className="rounded-full border border-border bg-surface-muted/80 px-3 py-1 text-xs font-medium text-muted-foreground">
             협력사 포털
           </span>
         </div>

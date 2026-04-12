@@ -3,24 +3,33 @@ import { cn } from "@/lib/cn";
 import Spinner from "@/components/ui/Spinner";
 
 const base =
-  "inline-flex min-h-12 min-w-12 cursor-pointer items-center justify-center rounded-full font-semibold leading-none transition";
+  "group inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-[transform,background-color,border-color,color,box-shadow,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const sizes = {
-  sm: "h-12 px-4 text-xs",
-  md: "h-12 px-5 text-sm",
-  lg: "h-12 px-6 text-base",
-  icon: "h-12 w-12 p-0 text-sm",
+  sm: "h-10 rounded-[0.95rem] px-4 text-sm",
+  md: "h-11 rounded-[1rem] px-[1.125rem] text-sm",
+  lg: "h-12 rounded-[1.05rem] px-5 text-base",
+  icon: "h-11 w-11 rounded-[1rem] p-0 text-sm",
 };
 
 const variants = {
-  primary: "bg-primary text-primary-foreground hover:opacity-90",
-  ghost: "border border-border bg-surface text-foreground hover:border-strong",
-  danger: "border border-border bg-surface text-danger hover:border-strong",
+  primary:
+    "border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-raised)] hover:-translate-y-px hover:bg-primary-emphasis hover:shadow-[var(--shadow-floating)]",
+  ghost:
+    "border-border bg-surface/90 text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
+  danger:
+    "border-danger/20 bg-danger/10 text-danger shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-danger/35 hover:bg-danger/12",
+  soft:
+    "border-primary/10 bg-primary-soft text-primary shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-primary/20 hover:bg-primary-soft/90",
+  secondary:
+    "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface",
 };
+
+export type ButtonVariant = keyof typeof variants;
 
 type ButtonProps = {
   children: React.ReactNode;
-  variant?: keyof typeof variants;
+  variant?: ButtonVariant;
   size?: keyof typeof sizes;
   className?: string;
   type?: "button" | "submit" | "reset";
@@ -77,7 +86,7 @@ export default function Button({
     base,
     variants[variant],
     sizes[size],
-    isDisabled ? "cursor-not-allowed opacity-60" : null,
+    isDisabled ? "cursor-not-allowed opacity-60 shadow-none hover:translate-y-0" : null,
     className,
   );
   const content = (

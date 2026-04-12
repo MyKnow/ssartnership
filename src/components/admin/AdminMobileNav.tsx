@@ -120,6 +120,11 @@ export default function AdminMobileNav({
       label: "기수 관리",
       active: pathname === "/admin/cycle",
     },
+    {
+      href: "/admin/style-guide",
+      label: "UI 스타일 가이드",
+      active: pathname === "/admin/style-guide",
+    },
   ];
 
   return (

@@ -243,19 +243,19 @@ export default async function PartnerLoginPage({
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-2xl">
           <PartnerLoginSetupToast show={setupStatus === "completed"} />
-          <Card className="space-y-6 p-6 sm:p-8">
+          <Card tone="elevated" className="space-y-6">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="bg-primary/10 text-primary">제휴 포털</Badge>
-              <Badge className="bg-surface text-muted-foreground">
+              <Badge variant="primary">제휴 포털</Badge>
+              <Badge>
                 업체 세션 분리
               </Badge>
             </div>
 
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              <h1 className="ui-page-title">
                 업체 포털 로그인
               </h1>
-              <p className="text-sm leading-6 text-muted-foreground">
+              <p className="ui-body">
                 담당자 이메일과 비밀번호로 로그인하면, 연결된 회사의 서비스
                 정보를 확인할 수 있습니다.
               </p>
@@ -294,13 +294,13 @@ export default async function PartnerLoginPage({
 
               <div className="flex flex-wrap items-center gap-3">
                 <SubmitButton pendingText="로그인 중">로그인</SubmitButton>
-                <Button variant="ghost" href="/partner/reset">
+                <Button variant="secondary" href="/partner/reset">
                   비밀번호 재설정
                 </Button>
-                <Button variant="ghost" href="/partner/setup">
+                <Button variant="secondary" href="/partner/setup">
                   초기 설정 페이지
                 </Button>
-                <Button variant="ghost" href="/">
+                <Button variant="secondary" href="/">
                   홈으로
                 </Button>
               </div>

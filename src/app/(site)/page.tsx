@@ -95,7 +95,7 @@ export default async function Home() {
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
-        <Container className="pb-16 pt-10">
+        <Container className="pb-16 pt-10" size="wide">
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

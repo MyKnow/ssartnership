@@ -12,17 +12,17 @@ export default function ThemeToggle() {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="secondary"
       size="icon"
       onClick={() => setTheme(activeTheme === "dark" ? "light" : "dark")}
       ariaLabel="테마 변경"
       title="테마 변경"
     >
       <span className="block dark:hidden">
-        <MoonIcon className="h-5 w-5 text-indigo-500" />
+        <MoonIcon className="h-5 w-5 text-primary" />
       </span>
       <span className="hidden dark:block">
-        <SunIcon className="h-5 w-5 text-amber-400" />
+        <SunIcon className="h-5 w-5 text-warning" />
       </span>
     </Button>
   );

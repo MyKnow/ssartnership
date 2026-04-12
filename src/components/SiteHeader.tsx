@@ -33,21 +33,21 @@ export default function SiteHeader({
         <div
           ref={headerRef}
           className={cn(
-            "border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur transition-transform duration-300 ease-out will-change-transform",
+            "border-b border-border/70 bg-surface-overlay/95 pt-[env(safe-area-inset-top)] shadow-[var(--shadow-flat)] backdrop-blur-xl transition-transform duration-300 ease-out will-change-transform",
             hidden ? "-translate-y-full" : "translate-y-0",
           )}
         >
-          <Container className="flex items-center justify-between gap-3 py-4">
+          <Container className="flex items-center justify-between gap-3 py-4" size="wide">
             <Link
               href="/"
               aria-label={SITE_NAME}
-              className="inline-flex min-h-12 items-center text-foreground hover:opacity-80"
+              className="inline-flex min-h-11 items-center text-foreground transition-opacity hover:opacity-80"
             >
               <BrandWordmark className="text-lg sm:text-xl" />
             </Link>
             <div className="flex items-center gap-2">
               <div className="hidden items-center gap-2 sm:flex">
-                <Button variant="ghost" href={suggestHref}>
+                <Button variant="soft" href={suggestHref}>
                   제휴 제안하기
                 </Button>
               </div>
@@ -57,7 +57,7 @@ export default function SiteHeader({
               {initialSession ? (
                 <div className="hidden items-center sm:flex">
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     href="/notifications"
                     ariaLabel="알림 설정"

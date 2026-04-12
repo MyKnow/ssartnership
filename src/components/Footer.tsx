@@ -14,8 +14,8 @@ import BrandWordmark from "@/components/BrandWordmark";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border bg-surface/90 py-6 backdrop-blur">
-      <Container className="flex flex-col gap-4 text-sm text-muted-foreground">
+    <footer className="border-t border-border/70 bg-surface-overlay/90 py-6 backdrop-blur-xl">
+      <Container className="flex flex-col gap-4 text-sm text-muted-foreground" size="wide">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Link
             href="/"
@@ -26,7 +26,7 @@ export default function Footer() {
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              variant="ghost"
+              variant="secondary"
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
@@ -36,21 +36,21 @@ export default function Footer() {
             >
               <FaGithub className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" href={`mailto:${BUG_REPORT_EMAIL}`}>
+            <Button variant="secondary" href={`mailto:${BUG_REPORT_EMAIL}`}>
               버그 제보
             </Button>
-            <Button variant="ghost" href={SUGGESTION_URL}>
+            <Button variant="secondary" href={SUGGESTION_URL}>
               제휴 제안
             </Button>
-            <Button variant="ghost" href="/legal/service">
+            <Button variant="secondary" href="/legal/service">
               이용약관
             </Button>
-            <Button variant="ghost" href="/legal/privacy">
+            <Button variant="secondary" href="/legal/privacy">
               개인정보 처리방침
             </Button>
             <PwaInstallButton />
             <Button
-              variant="ghost"
+              variant="secondary"
               href="/admin"
               size="icon"
               ariaLabel="Admin"

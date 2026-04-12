@@ -2,6 +2,7 @@
 
 import type { Category, CategoryKey } from "@/lib/types";
 import CategoryTabs, { CategoryTabOption } from "@/components/CategoryTabs";
+import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { cn } from "@/lib/cn";
@@ -56,11 +57,9 @@ export default function PartnerFilters({
         activeKey={activeCategory}
         onChange={onCategoryChange}
       />
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-muted p-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-1 flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            검색
-          </span>
+      <FilterBar title="Filters" description="검색, 적용 대상, 정렬을 한 곳에서 조정합니다.">
+        <div className="flex flex-1 flex-col gap-1 lg:min-w-[20rem]">
+          <span className="ui-caption">검색</span>
           <Input
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
@@ -68,10 +67,8 @@ export default function PartnerFilters({
           />
         </div>
         {appliesToFilter && onAppliesToFilterChange ? (
-          <div className="flex flex-col gap-1 md:w-44">
-            <span className="text-xs font-medium text-muted-foreground">
-              적용 대상
-            </span>
+          <div className="flex flex-col gap-1 lg:w-44">
+            <span className="ui-caption">적용 대상</span>
             <Select
               value={appliesToFilter}
               onChange={(event) =>
@@ -86,10 +83,8 @@ export default function PartnerFilters({
             </Select>
           </div>
         ) : null}
-        <div className="flex flex-col gap-1 md:w-56">
-          <span className="text-xs font-medium text-muted-foreground">
-            정렬 (현재 제휴 우선)
-          </span>
+        <div className="flex flex-col gap-1 lg:w-56">
+          <span className="ui-caption">정렬 (현재 제휴 우선)</span>
           <Select
             value={sortValue}
             onChange={(event) =>
@@ -103,7 +98,7 @@ export default function PartnerFilters({
             ))}
           </Select>
         </div>
-      </div>
+      </FilterBar>
     </div>
   );
 }

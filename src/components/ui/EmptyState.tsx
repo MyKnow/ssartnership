@@ -14,13 +14,13 @@ export default function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-dashed border-border bg-surface p-10 text-center",
+        "rounded-[var(--radius-panel)] border border-dashed border-border bg-surface-muted/80 px-6 py-10 text-center shadow-[var(--shadow-flat)]",
         className,
       )}
     >
-      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="text-base font-semibold text-foreground">{title}</p>
       {description ? (
-        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+        <p className="mt-2 ui-body">{description}</p>
       ) : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>

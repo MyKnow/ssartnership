@@ -3,6 +3,7 @@
 import { useFormStatus } from "react-dom";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
+import type { ButtonVariant } from "@/components/ui/Button";
 
 export default function SubmitButton({
   children,
@@ -13,7 +14,7 @@ export default function SubmitButton({
 }: {
   children: React.ReactNode;
   pendingText?: string;
-  variant?: "primary" | "ghost" | "danger";
+  variant?: ButtonVariant;
   className?: string;
   form?: string;
 }) {

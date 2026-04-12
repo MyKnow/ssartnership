@@ -16,15 +16,15 @@ export default function PasswordInput({
         {...props}
         type={visible ? "text" : "password"}
         className={cn(
-          "w-full rounded-2xl border border-border bg-surface px-3 py-2 pr-11 text-sm text-foreground placeholder:text-muted",
-          "focus:border-strong focus:outline-none",
+          "h-11 w-full rounded-[1rem] border border-border bg-surface/90 px-3.5 pr-11 text-sm text-foreground shadow-[var(--shadow-flat)] transition-[border-color,background-color,box-shadow] duration-200 ease-out placeholder:text-muted-foreground",
+          "focus:border-strong focus:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-primary/15",
           className,
         )}
       />
       <button
         type="button"
         onClick={() => setVisible((prev) => !prev)}
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 text-muted-foreground hover:text-foreground"
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 text-muted-foreground transition-colors hover:text-foreground"
         aria-label={visible ? "비밀번호 숨기기" : "비밀번호 보기"}
       >
         {visible ? <EyeOff size={16} /> : <Eye size={16} />}

@@ -12,6 +12,7 @@ import type { Category, CategoryKey, Partner } from "@/lib/types";
 import PartnerFilters, {
   PartnerSortOption,
 } from "@/components/PartnerFilters";
+import MotionReveal from "@/components/ui/MotionReveal";
 import PartnerCardView from "@/components/PartnerCardView";
 import SectionHeading from "@/components/ui/SectionHeading";
 import EmptyState from "@/components/ui/EmptyState";
@@ -250,55 +251,60 @@ export default function HomeView({
 
   return (
     <>
-      <section className="mt-10 flex flex-col gap-6" data-nosnippet>
-        <SectionHeading
-          title={HOME_COPY.categoryTitle}
-          description={HOME_COPY.categoryDescription}
-        />
-        <PartnerFilters
-          categories={categories}
-          activeCategory={activeCategory}
-          onCategoryChange={handleCategoryChange}
-          searchValue={searchValue}
-          onSearchChange={handleSearchChange}
-          appliesToFilter={appliesToFilter}
-          onAppliesToFilterChange={setAppliesToFilter}
-          sortValue={sortValue}
-          onSortChange={handleSortChange}
-        />
-      </section>
-
-      <section className="mt-10">
-        {displayPartners.length === 0 ? (
-          <EmptyState
-            title={
-              partners.length === 0
-                ? HOME_COPY.emptyTitle
-                : HOME_COPY.noResultsTitle
-            }
-            description={
-              partners.length === 0
-                ? HOME_COPY.emptyDescription
-                : HOME_COPY.noResultsDescription
-            }
+      <MotionReveal delay={0.04}>
+        <section className="mt-10 flex flex-col gap-6" data-nosnippet>
+          <SectionHeading
+            eyebrow="Directory"
+            title={HOME_COPY.categoryTitle}
+            description={HOME_COPY.categoryDescription}
           />
-        ) : (
-          <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3 xl:gap-x-6">
-            {displayPartners.map((partner) => (
-              <PartnerCardView
-                key={partner.id}
-                partner={partner}
-                categoryLabel={
-                  categoryMap.get(partner.category)?.label ?? "알 수 없음"
-                }
-                categoryColor={categoryMap.get(partner.category)?.color}
-                viewerAuthenticated={viewerAuthenticated}
-                onCategoryClick={handleCategoryChange}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          <PartnerFilters
+            categories={categories}
+            activeCategory={activeCategory}
+            onCategoryChange={handleCategoryChange}
+            searchValue={searchValue}
+            onSearchChange={handleSearchChange}
+            appliesToFilter={appliesToFilter}
+            onAppliesToFilterChange={setAppliesToFilter}
+            sortValue={sortValue}
+            onSortChange={handleSortChange}
+          />
+        </section>
+      </MotionReveal>
+
+      <MotionReveal delay={0.08}>
+        <section className="mt-10">
+          {displayPartners.length === 0 ? (
+            <EmptyState
+              title={
+                partners.length === 0
+                  ? HOME_COPY.emptyTitle
+                  : HOME_COPY.noResultsTitle
+              }
+              description={
+                partners.length === 0
+                  ? HOME_COPY.emptyDescription
+                  : HOME_COPY.noResultsDescription
+              }
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
+              {displayPartners.map((partner) => (
+                <PartnerCardView
+                  key={partner.id}
+                  partner={partner}
+                  categoryLabel={
+                    categoryMap.get(partner.category)?.label ?? "알 수 없음"
+                  }
+                  categoryColor={categoryMap.get(partner.category)?.color}
+                  viewerAuthenticated={viewerAuthenticated}
+                  onCategoryClick={handleCategoryChange}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </MotionReveal>
     </>
   );
 }

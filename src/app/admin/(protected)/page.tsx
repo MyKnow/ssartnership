@@ -19,19 +19,19 @@ type SummaryCardProps = {
 function SummaryCard({ href, title, description, meta }: SummaryCardProps) {
   return (
     <Link href={href} className="group block">
-      <Card className="h-full transition hover:-translate-y-0.5 hover:border-strong hover:shadow-md">
+      <Card className="h-full transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)]">
         <div className="flex h-full flex-col justify-between gap-6">
           <div className="grid gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="ui-kicker">
               Admin
             </p>
-            <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
-            <p className="text-sm text-muted-foreground">{description}</p>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">{title}</h2>
+            <p className="ui-body">{description}</p>
           </div>
 
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-foreground">{meta}</span>
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-muted text-foreground transition group-hover:border-strong">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-border bg-surface-muted text-foreground transition group-hover:border-strong">
               <svg
                 width={18}
                 height={18}
@@ -158,6 +158,12 @@ export default async function AdminPage() {
           title="기수 관리"
           description="현재 기수 계산 기준과 조기 시작 상태를 확인하고 복구할 수 있습니다."
           meta={cycleMeta}
+        />
+        <SummaryCard
+          href="/admin/style-guide"
+          title="UI 스타일 가이드"
+          description="토큰, 프리미티브, 컴포넌트 조합을 light/dark와 반응형에서 검증합니다."
+          meta="디자인 시스템 기준 확인"
         />
       </div>
     </AdminShell>

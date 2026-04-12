@@ -37,26 +37,26 @@ export default function AdminShell({
         <div
           ref={headerRef}
           className={cn(
-            "border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur transition-transform duration-300 ease-out will-change-transform",
+            "border-b border-border/70 bg-surface-overlay/95 pt-[env(safe-area-inset-top)] shadow-[var(--shadow-flat)] backdrop-blur-xl transition-transform duration-300 ease-out will-change-transform",
             hidden ? "-translate-y-full" : "translate-y-0",
           )}
         >
-          <Container className="flex items-start justify-between gap-4 py-5 sm:items-center">
+          <Container className="flex items-start justify-between gap-4 py-5 sm:items-center" size="wide">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="ui-kicker">
                 {SITE_NAME}
               </p>
-              <h1 className="mt-2 text-xl font-semibold text-foreground sm:text-2xl">
+              <h1 className="mt-2 text-xl font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
                 {title}
               </h1>
             </div>
             <div className="hidden flex-wrap items-center justify-end gap-3 sm:flex">
               {backHref && backLabel ? (
-                <Button variant="ghost" href={backHref}>
+                <Button variant="secondary" href={backHref}>
                   {backLabel}
                 </Button>
               ) : null}
-              <Button variant="ghost" href="/">
+              <Button variant="secondary" href="/">
                 사용자 화면
               </Button>
               <ThemeToggle />
@@ -85,7 +85,7 @@ export default function AdminShell({
       </header>
 
       <main>
-        <Container className="pb-16 pt-10">{children}</Container>
+        <Container className="pb-16 pt-10" size="wide">{children}</Container>
       </main>
       <ScrollToTopFab />
     </div>

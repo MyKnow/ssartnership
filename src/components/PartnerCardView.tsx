@@ -100,7 +100,7 @@ export default function PartnerCardView({
     return (
       <article
         className={cn(
-          "relative flex h-full w-full overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-sm",
+          "relative flex h-full w-full overflow-hidden rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-5 shadow-[var(--shadow-flat)] backdrop-blur-md",
           className,
         )}
         aria-label={lockCopy.title}
@@ -156,7 +156,7 @@ export default function PartnerCardView({
   return (
     <article
       className={cn(
-        "relative flex h-full w-full flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+        "relative flex h-full w-full flex-col justify-between rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-5 shadow-[var(--shadow-flat)] backdrop-blur-md transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)]",
         canNavigate ? "cursor-pointer" : null,
         className,
       )}

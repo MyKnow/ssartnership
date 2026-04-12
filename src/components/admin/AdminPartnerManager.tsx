@@ -8,6 +8,7 @@ import PartnerFilters, {
 } from "@/components/PartnerFilters";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
+import FilterBar from "@/components/ui/FilterBar";
 import Select from "@/components/ui/Select";
 import { ADMIN_COPY } from "@/lib/content";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
@@ -205,11 +206,21 @@ export default function AdminPartnerManager({
         onSortChange={setSortValue}
       />
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-muted p-4 md:flex-row md:items-end md:justify-between">
-        <div className="grid gap-1 md:w-56">
-          <span className="text-xs font-medium text-muted-foreground">
-            노출 상태
-          </span>
+      <FilterBar
+        title="Partner Admin"
+        description={`총 ${partners.length}개 브랜드를 검색, 필터, 정렬합니다.`}
+        trailing={
+          <Button
+            variant="soft"
+            onClick={() => setCreateOpen((prev) => !prev)}
+            disabled={!canCreate}
+          >
+            {isCreateOpen ? "추가 폼 닫기" : "브랜드 추가"}
+          </Button>
+        }
+      >
+        <div className="grid gap-1 lg:w-56">
+          <span className="ui-caption">노출 상태</span>
           <Select
             value={visibilityFilter}
             onChange={(event) =>
@@ -222,19 +233,7 @@ export default function AdminPartnerManager({
             <option value="private">비공개</option>
           </Select>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            총 {partners.length}개 브랜드
-          </p>
-          <Button
-            variant="ghost"
-            onClick={() => setCreateOpen((prev) => !prev)}
-            disabled={!canCreate}
-          >
-            {isCreateOpen ? "추가 폼 닫기" : "브랜드 추가"}
-          </Button>
-        </div>
-      </div>
+      </FilterBar>
 
       {isCreateOpen ? (
         <PartnerCardForm
