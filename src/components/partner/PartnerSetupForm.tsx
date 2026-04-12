@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { useToast } from "@/components/ui/Toast";
+import { useRouter } from "next/navigation";
 import type { PartnerPortalSetupContext } from "@/lib/partner-portal";
 import {
   getPartnerPortalSetupErrorMessage,
@@ -17,12 +16,9 @@ type PartnerSetupFormProps = {
   context: PartnerPortalSetupContext;
 };
 
-type SuccessState = {
-  completedAt: string;
-};
-
 export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
   const { notify } = useToast();
+  const router = useRouter();
   const [verificationCode, setVerificationCode] = useState(
     context.demoVerificationCode ?? "",
   );
@@ -33,16 +29,9 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
       ? "이미 초기 설정이 완료된 계정입니다."
       : null,
   );
-  const [success, setSuccess] = useState<SuccessState | null>(
-    context.account.initialSetupCompletedAt
-      ? {
-          completedAt: context.account.initialSetupCompletedAt,
-        }
-      : null,
-  );
   const [pending, setPending] = useState(false);
 
-  const isLocked = Boolean(success);
+  const isLocked = Boolean(context.account.initialSetupCompletedAt);
 
   const handleSubmit = async () => {
     if (pending || isLocked) {
@@ -80,46 +69,12 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
         return;
       }
 
-      const completedAt =
-        typeof data.completedAt === "string"
-          ? data.completedAt
-          : new Date().toISOString();
       setError(null);
-      setSuccess({ completedAt });
-      notify("초기 설정이 완료되었습니다.");
+      router.replace("/partner/login?setup=completed");
     } finally {
       setPending(false);
     }
   };
-
-  if (success) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-          <div className="flex items-center gap-2">
-            <Badge className="bg-emerald-500 text-white">완료</Badge>
-            <p className="text-sm font-medium text-emerald-700">
-              초기 설정이 저장되었습니다.
-            </p>
-          </div>
-          <p className="mt-3 text-sm leading-6 text-emerald-700/90">
-            {context.company.name} 계정의 비밀번호와 이메일 인증이
-            완료되었습니다.
-            <br />
-            완료 시각: {new Date(success.completedAt).toLocaleString("ko-KR")}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button href="/partner/login">로그인 페이지</Button>
-          {context.isMock ? (
-            <Button href="/partner/setup" variant="ghost">
-              다른 데모 보기
-            </Button>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-5">
@@ -168,9 +123,14 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
       <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
 
-      <Button onClick={handleSubmit} loading={pending} loadingText="설정 중">
-        초기 설정 완료
-      </Button>
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={pending || isLocked}
+        className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-foreground px-5 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {pending ? "설정 중" : "초기 설정 완료"}
+      </button>
 
       {context.isSetupComplete ? (
         <FormMessage>

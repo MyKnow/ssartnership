@@ -47,6 +47,23 @@ function FieldGroup({
   );
 }
 
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="space-y-4 p-5">
+      <SectionHeading title={title} description={description} />
+      <div>{children}</div>
+    </Card>
+  );
+}
+
 export default function PartnerChangeRequestForm({
   context,
   pendingRequest,
@@ -106,13 +123,49 @@ export default function PartnerChangeRequestForm({
         <form action={createAction} className="space-y-6">
           <input type="hidden" name="partnerId" value={context.partnerId} />
 
-          <Card className="overflow-hidden">
-            <SectionHeading
-              title="이미지 / 링크 / 기간"
-              description="썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간은 관리자 승인 후 반영됩니다."
-            />
+          <div className="grid gap-4">
+            <SectionCard
+              title="브랜드 정보"
+              description="브랜드명, 위치, 지도 URL을 수정합니다."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <FieldGroup
+                  label="브랜드명"
+                  note="브랜드명 변경도 관리자 승인 후 반영됩니다."
+                >
+                  <Input
+                    name="partnerName"
+                    defaultValue={context.partnerName}
+                    placeholder="브랜드명"
+                  />
+                </FieldGroup>
+                <FieldGroup
+                  label="위치"
+                  note="지도 버튼과 상세 위치 표시에 사용됩니다."
+                >
+                  <Input
+                    name="partnerLocation"
+                    defaultValue={context.partnerLocation}
+                    placeholder="예: 서울 강남구 역삼로 123"
+                  />
+                </FieldGroup>
+                <FieldGroup
+                  label="지도 URL"
+                  note="비워두면 지도 버튼이 숨겨집니다."
+                >
+                  <Input
+                    name="mapUrl"
+                    defaultValue={context.mapUrl ?? ""}
+                    placeholder="https://map.naver.com/..."
+                  />
+                </FieldGroup>
+              </div>
+            </SectionCard>
 
-            <div className="mt-6 grid gap-6">
+            <SectionCard
+              title="이미지"
+              description="썸네일과 기타 이미지를 수정합니다."
+            >
               <div className="grid gap-6 xl:grid-cols-2">
                 <PartnerThumbnailField
                   initial={context.thumbnail}
@@ -123,7 +176,12 @@ export default function PartnerChangeRequestForm({
                   className="w-full"
                 />
               </div>
+            </SectionCard>
 
+            <SectionCard
+              title="링크"
+              description="예약 링크와 문의 링크를 수정합니다."
+            >
               <div className="grid gap-4 sm:grid-cols-2">
                 <FieldGroup
                   label="예약 링크"
@@ -145,6 +203,14 @@ export default function PartnerChangeRequestForm({
                     placeholder="문의 링크 또는 연락처"
                   />
                 </FieldGroup>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="기간"
+              description="브랜드 노출 시작일과 종료일을 수정합니다."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FieldGroup
                   label="브랜드 시작일"
                   note="기간 변경은 관리자 승인이 필요합니다."
@@ -166,40 +232,53 @@ export default function PartnerChangeRequestForm({
                   />
                 </FieldGroup>
               </div>
-            </div>
-          </Card>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <TokenChipField
-              name="conditions"
-              initialValues={context.currentConditions}
-              placeholder="줄바꿈으로 조건을 추가하세요."
-              helpText="조건은 줄바꿈으로 구분합니다."
-              emptyText="조건을 입력해 주세요."
-            />
-            <TokenChipField
-              name="benefits"
-              initialValues={context.currentBenefits}
-              placeholder="줄바꿈으로 혜택을 추가하세요."
-              helpText="혜택은 줄바꿈으로 구분합니다."
-              emptyText="혜택을 입력해 주세요."
-            />
-            <TokenChipField
-              name="tags"
-              initialValues={context.tags}
-              placeholder="줄바꿈으로 태그를 추가하세요."
-              helpText="태그는 줄바꿈으로 구분합니다."
-              emptyText="태그를 입력해 주세요."
-            />
+            </SectionCard>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium text-foreground">적용 대상</p>
-              <p className="text-xs text-muted-foreground">
-                하나 이상 선택해 주세요.
-              </p>
-            </div>
+          <div className="grid gap-4">
+            <SectionCard
+              title="이용 조건"
+              description="브랜드 이용 시 지켜야 할 조건을 추가합니다."
+            >
+              <TokenChipField
+                name="conditions"
+                initialValues={context.currentConditions}
+                placeholder="Enter를 눌러서 조건을 추가하세요."
+                helpText="조건은 줄바꿈으로 구분합니다."
+                emptyText="조건을 입력해 주세요."
+              />
+            </SectionCard>
+            <SectionCard
+              title="혜택"
+              description="협력사가 제공하는 할인이나 혜택을 추가합니다."
+            >
+              <TokenChipField
+                name="benefits"
+                initialValues={context.currentBenefits}
+                placeholder="Enter를 눌러서 혜택을 추가하세요."
+                helpText="혜택은 줄바꿈으로 구분합니다."
+                emptyText="혜택을 입력해 주세요."
+              />
+            </SectionCard>
+            <SectionCard
+              title="태그"
+              description="검색과 분류에 사용할 태그를 추가합니다."
+            >
+              <TokenChipField
+                name="tags"
+                initialValues={context.tags}
+                placeholder="Enter를 눌러서 태그를 추가하세요."
+                helpText="태그는 줄바꿈으로 구분합니다."
+                emptyText="태그를 입력해 주세요."
+              />
+            </SectionCard>
+          </div>
+
+          <Card className="space-y-4 p-5">
+            <SectionHeading
+              title="적용 대상"
+              description="혜택이 적용되는 대상을 선택합니다."
+            />
 
             <div className="grid gap-3 sm:grid-cols-3">
               {PARTNER_AUDIENCE_OPTIONS.map((option) => {
@@ -239,14 +318,14 @@ export default function PartnerChangeRequestForm({
                 );
               })}
             </div>
-          </div>
+          </Card>
 
           <div className="rounded-2xl border border-border bg-background/70 p-4">
             <p className="text-sm font-semibold text-foreground">안내</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              혜택, 이용 조건, 태그, 적용 대상, 썸네일, 기타 이미지, 예약/문의
-              링크, 브랜드 제휴 기간은 관리자 승인 후 반영됩니다. 승인 전에는 현재 값이
-              그대로 유지됩니다.
+              브랜드 정보, 혜택, 이용 조건, 태그, 적용 대상, 썸네일, 기타 이미지,
+              예약/문의 링크, 브랜드 제휴 기간은 관리자 승인 후 반영됩니다. 승인 전에는
+              현재 값이 그대로 유지됩니다.
             </p>
           </div>
 

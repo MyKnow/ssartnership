@@ -9,6 +9,7 @@ import type {
   PartnerChangeRequestReviewInput,
   PartnerChangeRequestSummary,
 } from "../partner-change-requests.ts";
+import type { PartnerPortalCompanyStatus } from "../partner-dashboard.ts";
 import { normalizePartnerAudience } from "../partner-audience.ts";
 import type { PartnerVisibility } from "../types.ts";
 import { sanitizeHttpUrl, sanitizePartnerLinkValue } from "../validation.ts";
@@ -63,6 +64,10 @@ type MockChangeRequestStore = {
 function normalizeOptionalText(value?: string | null) {
   const normalized = String(value ?? "").trim();
   return normalized || null;
+}
+
+function normalizeRequiredText(value?: string | null) {
+  return String(value ?? "").trim();
 }
 
 function normalizeOptionalLink(value?: string | null) {
@@ -322,6 +327,9 @@ function normalizeRequestRecord(
     requestedByAccountId: string;
     requestedByLoginId: string | null;
     requestedByDisplayName: string | null;
+    currentPartnerName?: string | null;
+    currentPartnerLocation?: string | null;
+    currentMapUrl?: string | null;
     currentConditions?: string[] | null;
     currentBenefits?: string[] | null;
     currentAppliesTo?: string[] | null;
@@ -332,6 +340,9 @@ function normalizeRequestRecord(
     currentInquiryLink?: string | null;
     currentPeriodStart?: string | null;
     currentPeriodEnd?: string | null;
+    requestedPartnerName?: string | null;
+    requestedPartnerLocation?: string | null;
+    requestedMapUrl?: string | null;
     requestedConditions?: string[] | null;
     requestedBenefits?: string[] | null;
     requestedAppliesTo?: string[] | null;
@@ -345,6 +356,16 @@ function normalizeRequestRecord(
   },
   service?: MockChangeRequestServiceRecord | null,
 ): MockChangeRequestRecord {
+  const currentPartnerNameSource =
+    request.currentPartnerName === undefined
+      ? service?.partnerName
+      : request.currentPartnerName;
+  const currentPartnerLocationSource =
+    request.currentPartnerLocation === undefined
+      ? service?.partnerLocation
+      : request.currentPartnerLocation;
+  const currentMapUrlSource =
+    request.currentMapUrl === undefined ? service?.mapUrl : request.currentMapUrl;
   const currentConditionsSource =
     request.currentConditions === undefined
       ? service?.currentConditions
@@ -411,6 +432,18 @@ function normalizeRequestRecord(
     request.requestedPeriodEnd === undefined
       ? service?.periodEnd
       : request.requestedPeriodEnd;
+  const requestedPartnerNameSource =
+    request.requestedPartnerName === undefined
+      ? currentPartnerNameSource
+      : request.requestedPartnerName;
+  const requestedPartnerLocationSource =
+    request.requestedPartnerLocation === undefined
+      ? currentPartnerLocationSource
+      : request.requestedPartnerLocation;
+  const requestedMapUrlSource =
+    request.requestedMapUrl === undefined
+      ? currentMapUrlSource
+      : request.requestedMapUrl;
   const reviewedByAdminId = request.reviewedByAdminId ?? null;
   const reviewedAt = request.reviewedAt ?? null;
   const cancelledByAccountId = request.cancelledByAccountId ?? null;
@@ -420,6 +453,23 @@ function normalizeRequestRecord(
 
   return {
     ...request,
+    partnerName: normalizeRequiredText(
+      currentPartnerNameSource || service?.partnerName || request.partnerName,
+    ),
+    partnerLocation: normalizeRequiredText(
+      currentPartnerLocationSource ||
+        service?.partnerLocation ||
+        request.partnerLocation,
+    ),
+    currentPartnerName: normalizeRequiredText(
+      currentPartnerNameSource || service?.partnerName || request.partnerName,
+    ),
+    currentPartnerLocation: normalizeRequiredText(
+      currentPartnerLocationSource ||
+        service?.partnerLocation ||
+        request.partnerLocation,
+    ),
+    currentMapUrl: sanitizeHttpUrl(currentMapUrlSource ?? undefined),
     currentConditions: normalizeTextList(currentConditionsSource),
     currentBenefits: normalizeTextList(currentBenefitsSource),
     currentAppliesTo: normalizeAudience(currentAppliesToSource),
@@ -430,6 +480,19 @@ function normalizeRequestRecord(
     currentInquiryLink: normalizeOptionalLink(currentInquiryLinkSource),
     currentPeriodStart: normalizeOptionalText(currentPeriodStartSource),
     currentPeriodEnd: normalizeOptionalText(currentPeriodEndSource),
+    requestedPartnerName: normalizeRequiredText(
+      requestedPartnerNameSource ||
+        currentPartnerNameSource ||
+        service?.partnerName ||
+        request.partnerName,
+    ),
+    requestedPartnerLocation: normalizeRequiredText(
+      requestedPartnerLocationSource ||
+        currentPartnerLocationSource ||
+        service?.partnerLocation ||
+        request.partnerLocation,
+    ),
+    requestedMapUrl: sanitizeHttpUrl(requestedMapUrlSource ?? undefined),
     requestedConditions: normalizeTextList(request.requestedConditions),
     requestedBenefits: normalizeTextList(request.requestedBenefits),
     requestedAppliesTo: normalizeAudience(request.requestedAppliesTo),
@@ -484,6 +547,46 @@ function findDisplayNameByAccountId(accountId: string) {
     (item) => item.requestedByAccountId === accountId,
   );
   return request?.requestedByDisplayName ?? request?.requestedByLoginId ?? null;
+}
+
+function normalizeCompanyStatus(
+  status: PartnerChangeRequestSummary["status"],
+): PartnerPortalCompanyStatus {
+  if (status === "pending" || status === "rejected") {
+    return status;
+  }
+
+  return "approved";
+}
+
+export function getMockPartnerChangeRequestCompanyStatuses(
+  companyIds?: string[],
+) {
+  const uniqueCompanyIds = [
+    ...new Set((companyIds ?? []).map((id) => id.trim()).filter(Boolean)),
+  ];
+  const statusByCompanyId = new Map<string, PartnerPortalCompanyStatus>();
+  const requests = [...getStore().requests]
+    .filter(
+      (request) =>
+        uniqueCompanyIds.length === 0 ||
+        uniqueCompanyIds.includes(request.companyId),
+    )
+    .sort(
+      (a, b) =>
+        b.updatedAt.localeCompare(a.updatedAt) ||
+        b.createdAt.localeCompare(a.createdAt),
+    );
+
+  for (const request of requests) {
+    if (statusByCompanyId.has(request.companyId)) {
+      continue;
+    }
+
+    statusByCompanyId.set(request.companyId, normalizeCompanyStatus(request.status));
+  }
+
+  return statusByCompanyId;
 }
 
 export async function listMockPartnerChangeRequests(
@@ -565,6 +668,11 @@ export async function createMockPartnerChangeRequest(
   const requestedBenefits = normalizeTextList(input.requestedBenefits);
   const requestedAppliesTo = normalizeAudience(input.requestedAppliesTo);
   const requestedTags = normalizeTextList(input.requestedTags);
+  const requestedPartnerName = normalizeRequiredText(input.requestedPartnerName);
+  const requestedPartnerLocation = normalizeRequiredText(
+    input.requestedPartnerLocation,
+  );
+  const requestedMapUrl = sanitizeHttpUrl(input.requestedMapUrl ?? undefined);
   const requestedThumbnail = sanitizeHttpUrl(input.requestedThumbnail ?? undefined);
   const requestedImages = normalizeHttpUrlList(input.requestedImages);
   const requestedReservationLink = normalizeOptionalLink(
@@ -575,6 +683,9 @@ export async function createMockPartnerChangeRequest(
   const requestedPeriodEnd = normalizeOptionalText(input.requestedPeriodEnd);
 
   if (
+    service.partnerName === requestedPartnerName &&
+    service.partnerLocation === requestedPartnerLocation &&
+    service.mapUrl === requestedMapUrl &&
     arraysEqual(service.currentConditions, requestedConditions) &&
     arraysEqual(service.currentBenefits, requestedBenefits) &&
     arraysEqual(service.currentAppliesTo, requestedAppliesTo) &&
@@ -601,6 +712,9 @@ export async function createMockPartnerChangeRequest(
     partnerId: service.partnerId,
     partnerName: service.partnerName,
     partnerLocation: service.partnerLocation,
+    currentPartnerName: service.partnerName,
+    currentPartnerLocation: service.partnerLocation,
+    currentMapUrl: service.mapUrl,
     categoryLabel: service.categoryLabel,
     status: "pending",
     requestedByAccountId: input.requestedByAccountId,
@@ -619,6 +733,9 @@ export async function createMockPartnerChangeRequest(
     currentInquiryLink: service.inquiryLink,
     currentPeriodStart: service.periodStart,
     currentPeriodEnd: service.periodEnd,
+    requestedPartnerName,
+    requestedPartnerLocation,
+    requestedMapUrl,
     requestedConditions,
     requestedBenefits,
     requestedAppliesTo,
@@ -687,6 +804,9 @@ export async function approveMockPartnerChangeRequest(
 
   const service = findService(request.partnerId);
   if (service) {
+    service.partnerName = request.requestedPartnerName;
+    service.partnerLocation = request.requestedPartnerLocation;
+    service.mapUrl = request.requestedMapUrl;
     service.currentConditions = [...request.requestedConditions];
     service.currentBenefits = [...request.requestedBenefits];
     service.currentAppliesTo = [...request.requestedAppliesTo];

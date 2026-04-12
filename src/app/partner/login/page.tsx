@@ -8,6 +8,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import SubmitButton from "@/components/ui/SubmitButton";
+import PartnerLoginSetupToast from "@/components/partner/PartnerLoginSetupToast";
 import { getServerActionLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import {
   authenticatePartnerPortalLogin,
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
 type PartnerLoginSearchParams = {
   error?: string | string[];
   loginId?: string | string[];
+  setup?: string | string[];
 };
 
 function readSearchParam(value?: string | string[]) {
@@ -233,12 +235,14 @@ export default async function PartnerLoginPage({
   const params = (await searchParams) ?? {};
   const errorCode = readSearchParam(params.error);
   const defaultLoginId = readSearchParam(params.loginId);
+  const setupStatus = readSearchParam(params.setup);
   const errorMessage = getLoginErrorMessage(errorCode);
 
   return (
     <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-2xl">
+          <PartnerLoginSetupToast show={setupStatus === "completed"} />
           <Card className="space-y-6 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">제휴 포털</Badge>

@@ -193,8 +193,17 @@ export default function PartnerServiceDetailView({
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M12 20h9" />
-                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  {mode === "edit" ? (
+                    <>
+                      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </>
+                  )}
                 </svg>
                 {mode === "edit" ? "보기로 전환" : "수정 요청"}
               </span>
@@ -208,9 +217,9 @@ export default function PartnerServiceDetailView({
                 {context.partnerName}
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간, 혜택, 이용 조건,
-                태그, 적용 대상을 요청할 수 있습니다. 승인되기 전까지는 현재 값이
-                유지됩니다.
+                브랜드 정보, 썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간,
+                혜택, 이용 조건, 태그, 적용 대상을 요청할 수 있습니다. 승인되기 전까지는
+                현재 값이 유지됩니다.
               </p>
             </Card>
           ) : (
@@ -286,6 +295,45 @@ export default function PartnerServiceDetailView({
                       요청 시각{" "}
                       {new Date(context.pendingRequest.createdAt).toLocaleString("ko-KR")}
                     </div>
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <SummaryCard title="현재 브랜드 정보">
+                      <SummaryRows
+                        rows={[
+                          {
+                            label: "브랜드명",
+                            value: context.pendingRequest.currentPartnerName,
+                          },
+                          {
+                            label: "위치",
+                            value: context.pendingRequest.currentPartnerLocation,
+                          },
+                          {
+                            label: "지도 URL",
+                            value: context.pendingRequest.currentMapUrl ?? "없음",
+                          },
+                        ]}
+                      />
+                    </SummaryCard>
+                    <SummaryCard title="요청 브랜드 정보">
+                      <SummaryRows
+                        rows={[
+                          {
+                            label: "브랜드명",
+                            value: context.pendingRequest.requestedPartnerName,
+                          },
+                          {
+                            label: "위치",
+                            value: context.pendingRequest.requestedPartnerLocation,
+                          },
+                          {
+                            label: "지도 URL",
+                            value: context.pendingRequest.requestedMapUrl ?? "없음",
+                          },
+                        ]}
+                      />
+                    </SummaryCard>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">

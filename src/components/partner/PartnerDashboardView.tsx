@@ -8,8 +8,12 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
+import { isPartnerPortalMock } from "@/lib/partner-portal";
 import type { PartnerSession } from "@/lib/partner-session";
-import type { PartnerPortalDashboard } from "@/lib/partner-dashboard";
+import {
+  getPartnerPortalCompanyStatusLabel,
+  type PartnerPortalDashboard,
+} from "@/lib/partner-dashboard";
 import { cn } from "@/lib/cn";
 
 function formatCount(value: number) {
@@ -66,6 +70,19 @@ function ServiceMetric({
   );
 }
 
+function getCompanyStatusTextClass(
+  status: PartnerPortalDashboard["companies"][number]["status"],
+) {
+  switch (status) {
+    case "pending":
+      return "text-amber-600 dark:text-amber-400";
+    case "rejected":
+      return "text-danger";
+    default:
+      return "text-emerald-600 dark:text-emerald-400";
+  }
+}
+
 function ServiceCard({
   service,
 }: {
@@ -110,12 +127,6 @@ function ServiceCard({
         />
         <ServiceMetric label="문의 클릭" value={service.metrics.inquiryClicks} />
       </div>
-
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground">
-          클릭하여 상세를 확인하고 연필로 수정 요청을 시작하세요.
-        </span>
-      </div>
     </Link>
   );
 }
@@ -129,12 +140,6 @@ function CompanySection({
     <Card className="space-y-6 p-6 sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-primary/10 text-primary">협력사</Badge>
-            <Badge className="bg-surface text-muted-foreground">
-              브랜드 {company.services.length}개
-            </Badge>
-          </div>
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">
             {company.name}
           </h2>
@@ -146,21 +151,21 @@ function CompanySection({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard
-          label="조회수"
-          value={company.totals.detailViews}
-          hint="해당 협력사 브랜드들의 상세 페이지 조회 합계"
-        />
+          <MetricCard
+            label="조회수"
+            value={company.totals.detailViews}
+            hint="해당 협력사 브랜드들의 상세 페이지 조회 합계"
+          />
           <MetricCard
             label="총 클릭"
             value={company.totals.totalClicks}
             hint="카드, 지도, 예약, 문의 클릭 합계"
           />
-        <MetricCard
-          label="브랜드 수"
-          value={company.services.length}
-          hint="포털에서 관리 가능한 연결 브랜드"
-        />
+          <MetricCard
+            label="브랜드 수"
+            value={company.services.length}
+            hint="포털에서 관리 가능한 연결 브랜드"
+          />
         </div>
       </div>
 
@@ -183,10 +188,15 @@ function CompanySection({
         </div>
         <div className="rounded-2xl border border-border bg-background/60 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            식별자
+            상태
           </p>
-          <p className="mt-2 break-all text-sm font-semibold text-foreground">
-            {company.slug}
+          <p
+            className={cn(
+              "mt-2 text-center text-sm font-semibold",
+              getCompanyStatusTextClass(company.status),
+            )}
+          >
+            {getPartnerPortalCompanyStatusLabel(company.status)}
           </p>
         </div>
       </div>
@@ -221,20 +231,12 @@ export default function PartnerDashboardView({
           <Card className="space-y-6 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">협력사 포털</Badge>
-              <Badge className="bg-surface text-muted-foreground">
-                집계 수치만 제공
-              </Badge>
             </div>
 
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">
                 협력사별 브랜드 현황
               </h1>
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                {session.displayName}님 계정으로 로그인되었습니다. 이 화면에서는
-                협력사별 브랜드 정보와 조회수, 클릭수 같은 집계 값만 확인할 수
-                있습니다.
-              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -262,16 +264,14 @@ export default function PartnerDashboardView({
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>로그인 아이디: {session.loginId}</span>
-              <span>연결 협력사: {session.companyIds.length}개</span>
-              <span>세션 상태: 분리 세션 활성화</span>
             </div>
           </Card>
 
           {dashboard.companies.length === 0 ? (
-          <EmptyState
-            title="연결된 협력사가 없습니다."
-            description="관리자에서 이 협력사에 연결된 브랜드 정보를 먼저 생성해야 합니다."
-          />
+            <EmptyState
+              title="연결된 협력사가 없습니다."
+              description="관리자에서 이 협력사에 연결된 브랜드 정보를 먼저 생성해야 합니다."
+            />
           ) : (
             dashboard.companies.map((company) => (
               <CompanySection key={company.id} company={company} />
@@ -279,12 +279,11 @@ export default function PartnerDashboardView({
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button href="/partner/setup" variant="ghost">
-              초기 설정 데모
-            </Button>
-            <Button href="/" variant="ghost">
-              홈으로
-            </Button>
+            {isPartnerPortalMock ? (
+              <Button href="/partner/setup" variant="ghost">
+                초기 설정 데모
+              </Button>
+            ) : null}
           </div>
         </div>
       </Container>

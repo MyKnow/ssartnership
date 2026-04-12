@@ -262,6 +262,9 @@ test("creates and approves partner change requests with media and period changes
     requestedByAccountId: "mock-partner-account-cafe-haeon",
     requestedByLoginId: "partner@cafehaeon.example",
     requestedByDisplayName: "김도연",
+    requestedPartnerName: "카페 해온 본점 리뉴얼",
+    requestedPartnerLocation: "서울 강남구 역삼로 125",
+    requestedMapUrl: "https://map.example.com/cafe-haeon-renewal",
     requestedConditions: currentContext?.currentConditions ?? [],
     requestedBenefits: currentContext?.currentBenefits ?? [],
     requestedAppliesTo: currentContext?.currentAppliesTo ?? [],
@@ -280,6 +283,9 @@ test("creates and approves partner change requests with media and period changes
   assert.equal(request.requestedThumbnail, "https://example.com/cafe-haeon-thumb.webp");
   assert.equal(request.requestedImages.length, 2);
   assert.deepStrictEqual(request.requestedTags, ["모임", "디저트"]);
+  assert.equal(request.requestedPartnerName, "카페 해온 본점 리뉴얼");
+  assert.equal(request.requestedPartnerLocation, "서울 강남구 역삼로 125");
+  assert.equal(request.requestedMapUrl, "https://map.example.com/cafe-haeon-renewal");
   assert.equal(request.requestedReservationLink, "https://booking.example.com/cafe-haeon");
   assert.equal(request.requestedInquiryLink, "02-999-1111");
   assert.equal(request.requestedPeriodStart, "2026-04-01");
@@ -300,6 +306,9 @@ test("creates and approves partner change requests with media and period changes
     "https://example.com/cafe-haeon-1.webp",
     "https://example.com/cafe-haeon-2.webp",
   ]);
+  assert.equal(updatedContext?.partnerName, "카페 해온 본점 리뉴얼");
+  assert.equal(updatedContext?.partnerLocation, "서울 강남구 역삼로 125");
+  assert.equal(updatedContext?.mapUrl, "https://map.example.com/cafe-haeon-renewal");
   assert.deepStrictEqual(updatedContext?.tags, ["모임", "디저트"]);
   assert.equal(updatedContext?.reservationLink, "https://booking.example.com/cafe-haeon");
   assert.equal(updatedContext?.inquiryLink, "02-999-1111");

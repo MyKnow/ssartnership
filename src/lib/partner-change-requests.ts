@@ -45,6 +45,9 @@ export type PartnerChangeRequestSummary = {
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
+  currentPartnerName: string;
+  currentPartnerLocation: string;
+  currentMapUrl: string | null;
   categoryLabel: string;
   status: PartnerChangeRequestStatus;
   requestedByAccountId: string | null;
@@ -70,6 +73,9 @@ export type PartnerChangeRequestSummary = {
   requestedInquiryLink: string | null;
   requestedPeriodStart: string | null;
   requestedPeriodEnd: string | null;
+  requestedPartnerName: string;
+  requestedPartnerLocation: string;
+  requestedMapUrl: string | null;
   reviewedByAdminId: string | null;
   reviewedAt: string | null;
   cancelledByAccountId: string | null;
@@ -115,6 +121,9 @@ export type PartnerChangeRequestCreateInput = {
   requestedByAccountId: string;
   requestedByLoginId: string;
   requestedByDisplayName: string;
+  requestedPartnerName: string;
+  requestedPartnerLocation: string;
+  requestedMapUrl: string | null;
   requestedConditions: string[];
   requestedBenefits: string[];
   requestedAppliesTo: PartnerAudienceKey[];
@@ -206,6 +215,9 @@ type PartnerChangeRequestRow = {
   company_id: string;
   partner_id: string;
   status: PartnerChangeRequestStatus;
+  current_partner_name?: string | null;
+  current_partner_location?: string | null;
+  current_map_url?: string | null;
   current_conditions?: string[] | null;
   current_benefits?: string[] | null;
   current_applies_to?: string[] | null;
@@ -216,6 +228,9 @@ type PartnerChangeRequestRow = {
   current_inquiry_link?: string | null;
   current_period_start?: string | null;
   current_period_end?: string | null;
+  requested_partner_name?: string | null;
+  requested_partner_location?: string | null;
+  requested_map_url?: string | null;
   requested_conditions?: string[] | null;
   requested_benefits?: string[] | null;
   requested_applies_to?: string[] | null;
@@ -248,7 +263,7 @@ type PartnerChangeRequestRow = {
 };
 
 const REQUEST_SELECT =
-  "id,company_id,partner_id,status,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
+  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_map_url,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_map_url,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
 
 function normalizeCompanyIds(companyIds: string[]) {
   return [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
@@ -283,6 +298,10 @@ function normalizeTextList(values?: string[] | null) {
 function normalizeOptionalText(value?: string | null) {
   const normalized = String(value ?? "").trim();
   return normalized || null;
+}
+
+function normalizeRequiredText(value?: string | null) {
+  return String(value ?? "").trim();
 }
 
 function normalizeHttpUrlList(
@@ -363,6 +382,27 @@ function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSummary {
   const company = normalizeRelation(row.company);
   const partner = normalizeRelation(row.partner);
   const requestedBy = normalizeRelation(row.requested_by);
+  const currentPartnerName = normalizeRequiredText(
+    row.current_partner_name || partner?.name || "",
+  );
+  const currentPartnerLocation = normalizeRequiredText(
+    row.current_partner_location || partner?.location || "",
+  );
+  const currentMapUrl = normalizeOptionalText(
+    sanitizeHttpUrl(row.current_map_url ?? partner?.map_url ?? undefined),
+  );
+  const requestedPartnerName = normalizeRequiredText(
+    row.requested_partner_name || currentPartnerName || partner?.name || "",
+  );
+  const requestedPartnerLocation = normalizeRequiredText(
+    row.requested_partner_location ||
+      currentPartnerLocation ||
+      partner?.location ||
+      "",
+  );
+  const requestedMapUrl = normalizeOptionalText(
+    sanitizeHttpUrl(row.requested_map_url ?? currentMapUrl ?? undefined),
+  );
 
   return {
     id: row.id,
@@ -370,8 +410,11 @@ function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSummary {
     companyName: company?.name ?? "미지정",
     companySlug: company?.slug ?? "",
     partnerId: row.partner_id,
-    partnerName: partner?.name ?? "미지정",
-    partnerLocation: partner?.location ?? "",
+    partnerName: currentPartnerName || "미지정",
+    partnerLocation: currentPartnerLocation || "",
+    currentPartnerName,
+    currentPartnerLocation,
+    currentMapUrl,
     categoryLabel: extractCategoryLabel(partner?.categories ?? null),
     status: row.status,
     requestedByAccountId: row.requested_by_account_id ?? null,
@@ -399,6 +442,9 @@ function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSummary {
     requestedInquiryLink: normalizeOptionalText(row.requested_inquiry_link),
     requestedPeriodStart: normalizeOptionalText(row.requested_period_start),
     requestedPeriodEnd: normalizeOptionalText(row.requested_period_end),
+    requestedPartnerName,
+    requestedPartnerLocation,
+    requestedMapUrl,
     reviewedByAdminId: row.reviewed_by_admin_id ?? null,
     reviewedAt: row.reviewed_at ?? null,
     cancelledByAccountId: row.cancelled_by_account_id ?? null,
@@ -561,6 +607,11 @@ async function createSupabaseRequest(
   const requestedBenefits = normalizeTextList(input.requestedBenefits);
   const requestedAppliesTo = normalizeAudience(input.requestedAppliesTo);
   const requestedTags = normalizeTextList(input.requestedTags);
+  const requestedPartnerName = normalizeRequiredText(input.requestedPartnerName);
+  const requestedPartnerLocation = normalizeRequiredText(
+    input.requestedPartnerLocation,
+  );
+  const requestedMapUrl = sanitizeHttpUrl(input.requestedMapUrl ?? undefined);
   const requestedThumbnail = normalizeOptionalText(input.requestedThumbnail);
   const requestedImages = normalizeHttpUrlList(input.requestedImages);
   const requestedReservationLink = sanitizePartnerLinkValue(
@@ -579,8 +630,17 @@ async function createSupabaseRequest(
   if (dateRangeError) {
     throw new PartnerChangeRequestError("invalid_request", dateRangeError);
   }
+  if (!requestedPartnerName || !requestedPartnerLocation) {
+    throw new PartnerChangeRequestError(
+      "invalid_request",
+      "브랜드명과 위치를 입력해 주세요.",
+    );
+  }
 
   if (
+    context.partnerName === requestedPartnerName &&
+    context.partnerLocation === requestedPartnerLocation &&
+    context.mapUrl === requestedMapUrl &&
     requestedConditions.length === 0 &&
     requestedBenefits.length === 0 &&
     requestedAppliesTo.length === 0 &&
@@ -599,6 +659,9 @@ async function createSupabaseRequest(
   }
 
   if (
+    context.partnerName === requestedPartnerName &&
+    context.partnerLocation === requestedPartnerLocation &&
+    context.mapUrl === requestedMapUrl &&
     arraysEqual(context.currentConditions, requestedConditions) &&
     arraysEqual(context.currentBenefits, requestedBenefits) &&
     arraysEqual(context.currentAppliesTo, requestedAppliesTo) &&
@@ -636,6 +699,9 @@ async function createSupabaseRequest(
       partner_id: input.partnerId,
       requested_by_account_id: input.requestedByAccountId,
       status: "pending",
+      current_partner_name: context.partnerName,
+      current_partner_location: context.partnerLocation,
+      current_map_url: context.mapUrl,
       current_conditions: context.currentConditions,
       current_benefits: context.currentBenefits,
       current_applies_to: context.currentAppliesTo,
@@ -646,6 +712,9 @@ async function createSupabaseRequest(
       current_inquiry_link: context.inquiryLink,
       current_period_start: context.periodStart,
       current_period_end: context.periodEnd,
+      requested_partner_name: requestedPartnerName,
+      requested_partner_location: requestedPartnerLocation,
+      requested_map_url: requestedMapUrl,
       requested_conditions: requestedConditions,
       requested_benefits: requestedBenefits,
       requested_applies_to: requestedAppliesTo,
@@ -776,6 +845,9 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
   const { error: updatePartnerError } = await supabase
     .from("partners")
     .update({
+      name: summary.requestedPartnerName,
+      location: summary.requestedPartnerLocation,
+      map_url: summary.requestedMapUrl,
       conditions: summary.requestedConditions,
       benefits: summary.requestedBenefits,
       applies_to: summary.requestedAppliesTo,

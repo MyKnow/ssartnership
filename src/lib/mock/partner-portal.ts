@@ -11,6 +11,7 @@ import type {
   PartnerPortalServiceDashboard,
   PartnerPortalServiceMetrics,
 } from "../partner-dashboard.ts";
+import { getMockPartnerChangeRequestCompanyStatuses } from "./partner-change-requests.ts";
 import {
   type PartnerPortalAccountSummary,
   type PartnerPortalCompanySummary,
@@ -585,6 +586,7 @@ function sumMetrics(records: PartnerPortalServiceMetrics[]) {
 
 function toDashboardCompany(
   record: MockPortalSetupRecord,
+  status: PartnerPortalCompanyDashboard["status"],
 ): PartnerPortalCompanyDashboard {
   return {
     id: record.company.id,
@@ -594,6 +596,7 @@ function toDashboardCompany(
     contactName: record.company.contactName ?? null,
     contactEmail: record.company.contactEmail ?? null,
     contactPhone: record.company.contactPhone ?? null,
+    status,
     services: record.company.services.map((service) => ({
       id: service.id,
       name: service.name,
@@ -612,9 +615,17 @@ export async function getMockPartnerPortalDashboard(
   companyIds: string[],
 ): Promise<PartnerPortalDashboard> {
   const uniqueCompanyIds = [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
+  const statusByCompanyId = getMockPartnerChangeRequestCompanyStatuses(
+    uniqueCompanyIds,
+  );
   const companies = getStore()
     .setups.filter((setup) => uniqueCompanyIds.includes(setup.company.id))
-    .map((setup) => toDashboardCompany(setup));
+    .map((setup) =>
+      toDashboardCompany(
+        setup,
+        statusByCompanyId.get(setup.company.id) ?? "approved",
+      ),
+    );
 
   const totals = sumMetrics(companies.map((company) => company.totals));
   return {

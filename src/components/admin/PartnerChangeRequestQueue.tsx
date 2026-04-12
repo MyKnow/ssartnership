@@ -85,7 +85,7 @@ export default function PartnerChangeRequestQueue({
     <Card className="space-y-6">
       <SectionHeading
         title="승인 대기 요청"
-        description="혜택, 이용 조건, 태그, 적용 대상, 썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간 변경 요청을 이곳에서 승인하거나 거절합니다."
+        description="브랜드 정보, 혜택, 이용 조건, 태그, 적용 대상, 썸네일, 기타 이미지, 예약/문의 링크, 브랜드 제휴 기간 변경 요청을 이곳에서 승인하거나 거절합니다."
       />
 
       {requests.length === 0 ? (
@@ -162,6 +162,45 @@ export default function PartnerChangeRequestQueue({
                     </p>
                     <PartnerAudienceChips appliesTo={request.requestedAppliesTo} />
                   </div>
+                </SummaryBlock>
+              </div>
+
+              <div className="grid gap-3 xl:grid-cols-2">
+                <SummaryBlock label="현재 브랜드 정보">
+                  <SummaryRows
+                    rows={[
+                      {
+                        label: "브랜드명",
+                        value: request.currentPartnerName,
+                      },
+                      {
+                        label: "위치",
+                        value: request.currentPartnerLocation,
+                      },
+                      {
+                        label: "지도 URL",
+                        value: request.currentMapUrl ?? "없음",
+                      },
+                    ]}
+                  />
+                </SummaryBlock>
+                <SummaryBlock label="요청 브랜드 정보">
+                  <SummaryRows
+                    rows={[
+                      {
+                        label: "브랜드명",
+                        value: request.requestedPartnerName,
+                      },
+                      {
+                        label: "위치",
+                        value: request.requestedPartnerLocation,
+                      },
+                      {
+                        label: "지도 URL",
+                        value: request.requestedMapUrl ?? "없음",
+                      },
+                    ]}
+                  />
                 </SummaryBlock>
               </div>
 

@@ -6,6 +6,11 @@ import { isPartnerPortalMock } from "./partner-portal.ts";
 import { getMockPartnerPortalDashboard } from "./mock/partner-portal.ts";
 import { getSupabasePartnerPortalDashboard } from "./partner-dashboard.supabase.ts";
 
+export type PartnerPortalCompanyStatus =
+  | "approved"
+  | "pending"
+  | "rejected";
+
 export type PartnerPortalServiceMetrics = {
   detailViews: number;
   cardClicks: number;
@@ -23,6 +28,7 @@ export type PartnerPortalCompanyDashboard = Omit<
   PartnerPortalCompanySummary,
   "services"
 > & {
+  status: PartnerPortalCompanyStatus;
   services: PartnerPortalServiceDashboard[];
   totals: PartnerPortalServiceMetrics;
 };
@@ -78,6 +84,29 @@ function createEmptyDashboard(): PartnerPortalDashboard {
       serviceCount: 0,
     },
   };
+}
+
+export function normalizePartnerPortalCompanyStatus(
+  value?: string | null,
+): PartnerPortalCompanyStatus {
+  if (value === "pending" || value === "rejected") {
+    return value;
+  }
+
+  return "approved";
+}
+
+export function getPartnerPortalCompanyStatusLabel(
+  status: PartnerPortalCompanyStatus,
+) {
+  switch (status) {
+    case "pending":
+      return "승인 대기 중";
+    case "rejected":
+      return "수정 반려됨";
+    default:
+      return "승인됨";
+  }
 }
 
 export const partnerDashboardRepository: PartnerPortalDashboardRepository = {

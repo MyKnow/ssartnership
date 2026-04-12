@@ -131,6 +131,9 @@ create table if not exists partner_change_requests (
   partner_id uuid not null references partners(id) on delete cascade,
   requested_by_account_id uuid references partner_accounts(id) on delete set null,
   status text not null default 'pending',
+  current_partner_name text not null default '',
+  current_partner_location text not null default '',
+  current_map_url text,
   current_conditions text[] not null default '{}',
   current_benefits text[] not null default '{}',
   current_applies_to text[] not null default '{staff,student,graduate}',
@@ -141,6 +144,9 @@ create table if not exists partner_change_requests (
   current_inquiry_link text,
   current_period_start date,
   current_period_end date,
+  requested_partner_name text not null default '',
+  requested_partner_location text not null default '',
+  requested_map_url text,
   requested_conditions text[] not null default '{}',
   requested_benefits text[] not null default '{}',
   requested_applies_to text[] not null default '{staff,student,graduate}',
@@ -161,7 +167,13 @@ create table if not exists partner_change_requests (
     check (status in ('pending', 'approved', 'rejected', 'cancelled'))
 );
 
+alter table partner_change_requests add column if not exists current_partner_name text not null default '';
+alter table partner_change_requests add column if not exists current_partner_location text not null default '';
+alter table partner_change_requests add column if not exists current_map_url text;
 alter table partner_change_requests add column if not exists current_tags text[] not null default '{}';
+alter table partner_change_requests add column if not exists requested_partner_name text not null default '';
+alter table partner_change_requests add column if not exists requested_partner_location text not null default '';
+alter table partner_change_requests add column if not exists requested_map_url text;
 alter table partner_change_requests add column if not exists requested_tags text[] not null default '{}';
 
 create table if not exists admin_login_attempts (

@@ -16,7 +16,11 @@ import {
   deletePartnerMediaUrls,
   uploadPartnerMediaFile,
 } from "@/lib/partner-media-storage";
-import { sanitizePartnerLinkValue, validateDateRange } from "@/lib/validation";
+import {
+  sanitizeHttpUrl,
+  sanitizePartnerLinkValue,
+  validateDateRange,
+} from "@/lib/validation";
 
 type PartnerRequestMediaPayload = {
   thumbnail: string | null;
@@ -142,6 +146,9 @@ export async function submitPartnerChangeRequest(formData: FormData) {
     redirect("/partner?error=invalid_request");
   }
 
+  const partnerName = String(formData.get("partnerName") || "").trim();
+  const partnerLocation = String(formData.get("partnerLocation") || "").trim();
+  const rawMapUrl = String(formData.get("mapUrl") || "").trim();
   const conditions = parseList(String(formData.get("conditions") || ""));
   const benefits = parseList(String(formData.get("benefits") || ""));
   const tags = parseList(String(formData.get("tags") || ""));
@@ -160,9 +167,24 @@ export async function submitPartnerChangeRequest(formData: FormData) {
   let media: PartnerRequestMediaPayload | null = null;
 
   try {
+    if (!partnerName || !partnerLocation) {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "브랜드명과 위치를 입력해 주세요.",
+      );
+    }
+
     const dateRangeError = validateDateRange(periodStart, periodEnd);
     if (dateRangeError) {
       throw new PartnerChangeRequestError("invalid_request", dateRangeError);
+    }
+
+    const mapUrl = rawMapUrl ? sanitizeHttpUrl(rawMapUrl) : null;
+    if (rawMapUrl && !mapUrl) {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "지도 URL 형식을 확인해 주세요.",
+      );
     }
 
     const reservationLink = rawReservationLink
@@ -193,6 +215,9 @@ export async function submitPartnerChangeRequest(formData: FormData) {
       requestedByAccountId: session.accountId,
       requestedByLoginId: session.loginId,
       requestedByDisplayName: session.displayName,
+      requestedPartnerName: partnerName,
+      requestedPartnerLocation: partnerLocation,
+      requestedMapUrl: mapUrl,
       requestedConditions: conditions,
       requestedBenefits: benefits,
       requestedTags: tags,

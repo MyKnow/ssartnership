@@ -4,6 +4,7 @@ import {
   type PartnerPortalDashboard,
   type PartnerPortalServiceDashboard,
   type PartnerPortalServiceMetrics,
+  normalizePartnerPortalCompanyStatus,
   sumPartnerPortalMetrics,
 } from "./partner-dashboard.ts";
 import { normalizePartnerVisibility } from "./partner-visibility.ts";
@@ -29,6 +30,12 @@ type PartnerServiceRow = {
     | { label?: string | null }
     | Array<{ label?: string | null }>
     | null;
+};
+
+type PartnerChangeRequestRow = {
+  company_id: string;
+  status?: string | null;
+  updated_at?: string | null;
 };
 
 const UUID_PATTERN =
@@ -131,6 +138,7 @@ function toServiceDashboard(
 function toCompanyDashboard(
   row: PartnerCompanyRow,
   services: PartnerPortalServiceDashboard[],
+  status: string | null | undefined,
 ): PartnerPortalCompanyDashboard {
   return {
     id: row.id,
@@ -140,6 +148,7 @@ function toCompanyDashboard(
     contactName: row.contact_name ?? null,
     contactEmail: row.contact_email ?? null,
     contactPhone: row.contact_phone ?? null,
+    status: normalizePartnerPortalCompanyStatus(status),
     services,
     totals: sumPartnerPortalMetrics(services.map((service) => service.metrics)),
   };
@@ -161,7 +170,7 @@ export async function getSupabasePartnerPortalDashboard(
   }
 
   const supabase = getSupabaseAdminClient();
-  const [companyResult, serviceResult] = await Promise.all([
+  const [companyResult, serviceResult, changeRequestResult] = await Promise.all([
     supabase
       .from("partner_companies")
       .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
@@ -173,6 +182,11 @@ export async function getSupabasePartnerPortalDashboard(
       .select("id,company_id,name,location,visibility,categories(label)")
       .in("company_id", uniqueCompanyIds)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("partner_change_requests")
+      .select("company_id,status,updated_at")
+      .in("company_id", uniqueCompanyIds)
+      .order("updated_at", { ascending: false }),
   ]);
 
   if (companyResult.error) {
@@ -181,9 +195,22 @@ export async function getSupabasePartnerPortalDashboard(
   if (serviceResult.error) {
     throw new Error(serviceResult.error.message);
   }
+  if (changeRequestResult.error) {
+    throw new Error(changeRequestResult.error.message);
+  }
 
   const companyRows = (companyResult.data ?? []) as PartnerCompanyRow[];
   const serviceRows = (serviceResult.data ?? []) as PartnerServiceRow[];
+  const requestRows = (changeRequestResult.data ?? []) as PartnerChangeRequestRow[];
+  const statusByCompanyId = new Map<string, string | null | undefined>();
+
+  for (const request of requestRows) {
+    if (statusByCompanyId.has(request.company_id)) {
+      continue;
+    }
+
+    statusByCompanyId.set(request.company_id, request.status ?? null);
+  }
 
   const serviceMetricsEntries = await Promise.all(
     serviceRows.map(async (row) => {
@@ -202,7 +229,7 @@ export async function getSupabasePartnerPortalDashboard(
           metricsByServiceId.get(serviceRow.id) ?? createEmptyMetrics(),
         ),
       );
-    return toCompanyDashboard(row, services);
+    return toCompanyDashboard(row, services, statusByCompanyId.get(row.id));
   });
 
   const totals = sumPartnerPortalMetrics(
