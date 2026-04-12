@@ -44,8 +44,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Supabase CLI
-        run: npm install -g supabase@latest
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Sync production data and storage to preview
         run: npm run sync:preview
