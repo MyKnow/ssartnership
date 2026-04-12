@@ -36,7 +36,11 @@ export default function PartnerPortalActionLinks({
       <Button variant="ghost" href="/partner/change-password">
         비밀번호 변경
       </Button>
-      <Button variant="ghost" href={authHref}>
+      <Button
+        variant="ghost"
+        href={authHref}
+        prefetch={session ? false : undefined}
+      >
         {authLabel}
       </Button>
       <Button variant="ghost" href="/" className="hidden sm:inline-flex">

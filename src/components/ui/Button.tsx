@@ -25,6 +25,7 @@ type ButtonProps = {
   className?: string;
   type?: "button" | "submit" | "reset";
   href?: string;
+  prefetch?: boolean;
   target?: string;
   rel?: string;
   onClick?: () => void;
@@ -58,6 +59,7 @@ export default function Button({
   className,
   type = "button",
   href,
+  prefetch,
   target,
   rel,
   onClick,
@@ -113,7 +115,7 @@ export default function Button({
 
     if (isInternalHref(href)) {
       return (
-        <Link href={href} {...sharedProps}>
+        <Link href={href} prefetch={prefetch} {...sharedProps}>
           {content}
         </Link>
       );
