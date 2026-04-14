@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import type { CategoryKey } from "@/lib/types";
-import PartnerCardForm from "@/components/PartnerCardForm";
 import PartnerFilters, {
   PartnerSortOption,
 } from "@/components/PartnerFilters";
@@ -14,7 +13,6 @@ import { ADMIN_COPY } from "@/lib/content";
 import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import AdminPartnerEditorCard from "@/components/admin/AdminPartnerEditorCard";
 import {
-  DEFAULT_PARTNER_AUDIENCE,
   getPartnerAudienceLabel,
   normalizePartnerAudience,
 } from "@/lib/partner-audience";
@@ -76,14 +74,12 @@ export default function AdminPartnerManager({
   categories,
   partners,
   companies,
-  createPartner,
   updatePartner,
   deletePartner,
 }: {
   categories: AdminCategory[];
   partners: AdminPartner[];
   companies: AdminCompany[];
-  createPartner: (formData: FormData) => void | Promise<void>;
   updatePartner: (formData: FormData) => void | Promise<void>;
   deletePartner: (formData: FormData) => void | Promise<void>;
 }) {
@@ -94,7 +90,6 @@ export default function AdminPartnerManager({
     useState<VisibilityFilter>("all");
   const [searchValue, setSearchValue] = useState("");
   const [sortValue, setSortValue] = useState<PartnerSortOption>("recent");
-  const [isCreateOpen, setCreateOpen] = useState(false);
 
   const categoryOptions = useMemo(
     () =>
@@ -187,9 +182,6 @@ export default function AdminPartnerManager({
     });
   }, [activeCategory, categoryKeyById, partners, searchValue, sortValue, visibilityFilter]);
 
-  const defaultCategoryId = categoryOptions[0]?.id ?? "";
-  const canCreate = categoryOptions.length > 0;
-
   return (
     <div className="mt-6 grid gap-6">
       <PartnerFilters
@@ -212,10 +204,9 @@ export default function AdminPartnerManager({
         trailing={
           <Button
             variant="soft"
-            onClick={() => setCreateOpen((prev) => !prev)}
-            disabled={!canCreate}
+            href="/admin/partners/new"
           >
-            {isCreateOpen ? "추가 폼 닫기" : "브랜드 추가"}
+            브랜드 추가
           </Button>
         }
       >
@@ -234,34 +225,6 @@ export default function AdminPartnerManager({
           </Select>
         </div>
       </FilterBar>
-
-      {isCreateOpen ? (
-        <PartnerCardForm
-          mode="create"
-          partner={{
-            name: "",
-            visibility: "public",
-            location: "",
-            mapUrl: "",
-            reservationLink: "",
-            inquiryLink: "",
-            period: { start: "", end: "" },
-            conditions: [],
-            benefits: [],
-            appliesTo: DEFAULT_PARTNER_AUDIENCE,
-            thumbnail: null,
-            images: [],
-            tags: [],
-            company: null,
-          }}
-          categoryOptions={categoryOptions}
-          companyOptions={companyOptions}
-          categoryId={defaultCategoryId}
-          formAction={createPartner}
-          submitLabel="브랜드 추가"
-          className="bg-surface"
-        />
-      ) : null}
 
       {filteredPartners.length === 0 ? (
         <EmptyState

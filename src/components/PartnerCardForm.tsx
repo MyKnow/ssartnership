@@ -70,20 +70,36 @@ export type PartnerCardFormValues = {
 };
 
 export type PartnerCardFormMode = "edit" | "create";
+export type PartnerCardFormField =
+  | "name"
+  | "categoryId"
+  | "location"
+  | "mapUrl"
+  | "reservationLink"
+  | "inquiryLink"
+  | "companyName"
+  | "companyId"
+  | "companyContactName"
+  | "companyContactEmail"
+  | "companyContactPhone"
+  | "companyDescription";
 
 function FieldGroup({
   label,
   children,
   className,
+  error,
 }: {
   label: string;
   children: ReactNode;
   className?: string;
+  error?: string | null;
 }) {
   return (
     <label className={cn("grid gap-1.5", className)}>
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {children}
+      {error ? <span className="text-xs font-medium text-danger">{error}</span> : null}
     </label>
   );
 }
@@ -98,6 +114,8 @@ export default function PartnerCardForm({
   deleteAction,
   submitLabel,
   className,
+  focusField,
+  fieldErrors,
 }: {
   partner: PartnerCardFormValues;
   mode?: PartnerCardFormMode;
@@ -108,6 +126,8 @@ export default function PartnerCardForm({
   deleteAction?: (formData: FormData) => void | Promise<void>;
   submitLabel?: string;
   className?: string;
+  focusField?: PartnerCardFormField;
+  fieldErrors?: Partial<Record<PartnerCardFormField, string>>;
 }) {
   const periodStart = partner.period?.start ?? "";
   const periodEnd = partner.period?.end ?? "";
@@ -128,6 +148,7 @@ export default function PartnerCardForm({
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyValue?.id ?? "");
 
   const companyFieldsLocked = Boolean(selectedCompanyId);
+  const invalidClass = "border-danger/40 ring-2 ring-danger/15";
 
   return (
     <article className={cn("grid gap-6", className)}>
@@ -184,7 +205,14 @@ export default function PartnerCardForm({
               />
 
               <FieldGroup label="브랜드명">
-                <Input name="name" defaultValue={nameValue} required />
+                <Input
+                  name="name"
+                  defaultValue={nameValue}
+                  required
+                  autoFocus={focusField === "name"}
+                  aria-invalid={Boolean(fieldErrors?.name) || undefined}
+                  className={fieldErrors?.name ? invalidClass : undefined}
+                />
               </FieldGroup>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -200,7 +228,14 @@ export default function PartnerCardForm({
                   </Select>
                 </FieldGroup>
                 <FieldGroup label="카테고리">
-                  <Select name="categoryId" defaultValue={categoryId} required>
+                  <Select
+                    name="categoryId"
+                    defaultValue={categoryId}
+                    required
+                    autoFocus={focusField === "categoryId"}
+                    aria-invalid={Boolean(fieldErrors?.categoryId) || undefined}
+                    className={fieldErrors?.categoryId ? invalidClass : undefined}
+                  >
                     {(categoryOptions ?? []).map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.label}
@@ -212,7 +247,11 @@ export default function PartnerCardForm({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <FieldGroup label="시작일">
-                  <Input type="date" name="periodStart" defaultValue={periodStart} />
+                  <Input
+                    type="date"
+                    name="periodStart"
+                    defaultValue={periodStart}
+                  />
                 </FieldGroup>
                 <FieldGroup label="종료일">
                   <Input type="date" name="periodEnd" defaultValue={periodEnd} />
@@ -220,23 +259,45 @@ export default function PartnerCardForm({
               </div>
 
               <FieldGroup label="위치">
-                <Input name="location" defaultValue={partner.location ?? ""} required />
+                <Input
+                  name="location"
+                  defaultValue={partner.location ?? ""}
+                  required
+                  autoFocus={focusField === "location"}
+                  aria-invalid={Boolean(fieldErrors?.location) || undefined}
+                  className={fieldErrors?.location ? invalidClass : undefined}
+                />
               </FieldGroup>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <FieldGroup label="지도 URL">
-                  <Input name="mapUrl" defaultValue={partner.mapUrl ?? ""} />
+                  <Input
+                    name="mapUrl"
+                    defaultValue={partner.mapUrl ?? ""}
+                    autoFocus={focusField === "mapUrl"}
+                    aria-invalid={Boolean(fieldErrors?.mapUrl) || undefined}
+                    className={fieldErrors?.mapUrl ? invalidClass : undefined}
+                  />
                 </FieldGroup>
                 <FieldGroup label="예약 링크">
                   <Input
                     name="reservationLink"
                     defaultValue={partner.reservationLink ?? ""}
+                    autoFocus={focusField === "reservationLink"}
+                    aria-invalid={Boolean(fieldErrors?.reservationLink) || undefined}
+                    className={fieldErrors?.reservationLink ? invalidClass : undefined}
                   />
                 </FieldGroup>
               </div>
 
               <FieldGroup label="문의 링크">
-                <Input name="inquiryLink" defaultValue={partner.inquiryLink ?? ""} />
+                <Input
+                  name="inquiryLink"
+                  defaultValue={partner.inquiryLink ?? ""}
+                  autoFocus={focusField === "inquiryLink"}
+                  aria-invalid={Boolean(fieldErrors?.inquiryLink) || undefined}
+                  className={fieldErrors?.inquiryLink ? invalidClass : undefined}
+                />
               </FieldGroup>
             </div>
           </Card>
@@ -254,6 +315,9 @@ export default function PartnerCardForm({
                 name="companyId"
                 defaultValue={companyValue?.id ?? ""}
                 onChange={(event) => setSelectedCompanyId(event.target.value)}
+                autoFocus={focusField === "companyId"}
+                aria-invalid={Boolean(fieldErrors?.companyId) || undefined}
+                className={fieldErrors?.companyId ? invalidClass : undefined}
               >
                 <option value="">새 협력사 생성</option>
                 {(companyOptions ?? []).map((company) => (
@@ -277,6 +341,9 @@ export default function PartnerCardForm({
                   defaultValue={companyValue?.name ?? ""}
                   placeholder="협력사명"
                   disabled={companyFieldsLocked}
+                  autoFocus={focusField === "companyName"}
+                  aria-invalid={Boolean(fieldErrors?.companyName) || undefined}
+                  className={fieldErrors?.companyName ? invalidClass : undefined}
                 />
               </FieldGroup>
               <FieldGroup label="담당자 이름">
@@ -285,6 +352,9 @@ export default function PartnerCardForm({
                   defaultValue={companyValue?.contactName ?? ""}
                   placeholder="담당자 이름"
                   disabled={companyFieldsLocked}
+                  autoFocus={focusField === "companyContactName"}
+                  aria-invalid={Boolean(fieldErrors?.companyContactName) || undefined}
+                  className={fieldErrors?.companyContactName ? invalidClass : undefined}
                 />
               </FieldGroup>
             </div>
@@ -297,6 +367,9 @@ export default function PartnerCardForm({
                   defaultValue={companyValue?.contactEmail ?? ""}
                   placeholder="partner@example.com"
                   disabled={companyFieldsLocked}
+                  autoFocus={focusField === "companyContactEmail"}
+                  aria-invalid={Boolean(fieldErrors?.companyContactEmail) || undefined}
+                  className={fieldErrors?.companyContactEmail ? invalidClass : undefined}
                 />
               </FieldGroup>
               <FieldGroup label="담당자 전화번호">
@@ -305,6 +378,9 @@ export default function PartnerCardForm({
                   defaultValue={companyValue?.contactPhone ?? ""}
                   placeholder="010-1234-5678"
                   disabled={companyFieldsLocked}
+                  autoFocus={focusField === "companyContactPhone"}
+                  aria-invalid={Boolean(fieldErrors?.companyContactPhone) || undefined}
+                  className={fieldErrors?.companyContactPhone ? invalidClass : undefined}
                 />
               </FieldGroup>
             </div>
@@ -316,6 +392,9 @@ export default function PartnerCardForm({
                 rows={3}
                 placeholder="포털에서 함께 보일 협력사 소개를 입력합니다."
                 disabled={companyFieldsLocked}
+                autoFocus={focusField === "companyDescription"}
+                aria-invalid={Boolean(fieldErrors?.companyDescription) || undefined}
+                className={fieldErrors?.companyDescription ? invalidClass : undefined}
               />
             </FieldGroup>
 

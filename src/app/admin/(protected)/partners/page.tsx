@@ -1,16 +1,18 @@
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPartnerCreateToast from "@/components/admin/AdminPartnerCreateToast";
 import PartnerChangeRequestQueue from "@/components/admin/PartnerChangeRequestQueue";
 import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
+import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import ShellHeader from "@/components/ui/ShellHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
+import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import {
   createCategory,
   approvePartnerChangeRequest,
-  createPartner,
   deleteCategory,
   deletePartner,
   rejectPartnerChangeRequest,
@@ -71,8 +73,14 @@ function FieldGroup({
   );
 }
 
-export default async function AdminPartnersPage() {
+export default async function AdminPartnersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string }>;
+}) {
   const supabase = getSupabaseAdminClient();
+  const params = (await searchParams) ?? {};
+  const partnerFormError = params.error ? partnerFormErrorMessages[params.error] : null;
 
   const [
     categoriesResult,
@@ -109,11 +117,15 @@ export default async function AdminPartnersPage() {
       backLabel="관리 홈"
     >
       <section className="grid gap-6">
+        <AdminPartnerCreateToast />
         <ShellHeader
           eyebrow="Partners"
           title="브랜드와 변경 요청 관리"
           description="카테고리, 브랜드, 승인 대기 요청을 같은 디자인 규칙 아래에서 관리합니다."
         />
+        {partnerFormError ? (
+          <FormMessage variant="error">{partnerFormError}</FormMessage>
+        ) : null}
         <PartnerChangeRequestQueue
           requests={changeRequests}
           approveAction={approvePartnerChangeRequest}
@@ -252,7 +264,6 @@ export default async function AdminPartnersPage() {
             categories={safeCategories}
             partners={safePartners}
             companies={safeCompanies}
-            createPartner={createPartner}
             updatePartner={updatePartner}
             deletePartner={deletePartner}
           />

@@ -155,7 +155,7 @@ function parsePartnerCompanyPayload(formData: FormData): PartnerCompanyInput {
   const contactPhone = String(formData.get("companyContactPhone") || "").trim();
 
   if (!companyId && contactEmail && !isValidEmail(contactEmail)) {
-    throw new Error("담당자 이메일 형식이 올바르지 않습니다.");
+    throw new Error("partner_company_invalid_email");
   }
 
   return {
@@ -180,10 +180,10 @@ function parsePartnerCompanyCrudPayload(
   const isActive = formData.getAll("companyIsActive").includes("true");
 
   if (!name) {
-    throw new Error("협력사명을 입력해 주세요.");
+    throw new Error("partner_company_missing_name");
   }
   if (contactEmail && !isValidEmail(contactEmail)) {
-    throw new Error("담당자 이메일 형식이 올바르지 않습니다.");
+    throw new Error("partner_company_invalid_email");
   }
 
   return {
@@ -1024,37 +1024,37 @@ function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const appliesTo = formData.getAll("appliesTo").map((item) => String(item).trim());
 
   if (!name || !categoryId || !location) {
-    throw new Error("업체명, 카테고리, 위치를 입력해 주세요.");
+    throw new Error("partner_form_missing_required");
   }
 
   const dateRangeError = validateDateRange(periodStart, periodEnd);
   if (dateRangeError) {
-    throw new Error(dateRangeError);
+    throw new Error("partner_form_invalid_period");
   }
 
   const mapUrl = parseOptionalUrl(rawMapUrl);
   if (rawMapUrl && !mapUrl) {
-    throw new Error("지도 링크는 올바른 http(s) 주소여야 합니다.");
+    throw new Error("partner_form_invalid_map_url");
   }
 
   const reservationLink = parsePartnerLink(rawReservationLink);
   if (rawReservationLink && !reservationLink) {
-    throw new Error("예약 링크 형식을 확인해 주세요.");
+    throw new Error("partner_form_invalid_reservation_url");
   }
 
   const inquiryLink = parsePartnerLink(rawInquiryLink);
   if (rawInquiryLink && !inquiryLink) {
-    throw new Error("문의 링크 형식을 확인해 주세요.");
+    throw new Error("partner_form_invalid_inquiry_url");
   }
 
   if (rawVisibility && !isPartnerVisibility(rawVisibility)) {
-    throw new Error("노출 상태는 공개, 대외비, 비공개 중 하나여야 합니다.");
+    throw new Error("partner_form_invalid_visibility");
   }
   const visibility = normalizePartnerVisibility(rawVisibility || "public");
 
   const parsedAppliesTo = parsePartnerAudienceSelection(appliesTo);
   if (!parsedAppliesTo) {
-    throw new Error("적용 대상을 하나 이상 선택해 주세요.");
+    throw new Error("partner_form_invalid_applies_to");
   }
 
   return {
@@ -1072,6 +1072,38 @@ function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     tags: parseList(tags),
     visibility,
   };
+}
+
+function redirectPartnerFormError(code: string, path = "/admin/partners"): never {
+  redirect(`${path}?error=${encodeURIComponent(code)}`);
+}
+
+function parsePartnerPayloadOrRedirect(
+  formData: FormData,
+  path: string,
+): PartnerCoreInput {
+  try {
+    return parsePartnerPayload(formData);
+  } catch (error) {
+    return redirectPartnerFormError(
+      error instanceof Error ? error.message : "partner_form_invalid_request",
+      path,
+    );
+  }
+}
+
+function parsePartnerCompanyPayloadOrRedirect(
+  formData: FormData,
+  path: string,
+): PartnerCompanyInput {
+  try {
+    return parsePartnerCompanyPayload(formData);
+  } catch (error) {
+    return redirectPartnerFormError(
+      error instanceof Error ? error.message : "partner_company_invalid_request",
+      path,
+    );
+  }
 }
 
 function getFormDataFile(formData: FormData, name: string) {
@@ -1425,9 +1457,9 @@ export async function deletePartnerCompany(formData: FormData) {
 
 export async function createPartner(formData: FormData) {
   await requireAdmin();
-  const payload = parsePartnerPayload(formData);
+  const payload = parsePartnerPayloadOrRedirect(formData, "/admin/partners/new");
   const partnerId = randomUUID();
-  const companyPayload = parsePartnerCompanyPayload(formData);
+  const companyPayload = parsePartnerCompanyPayloadOrRedirect(formData, "/admin/partners/new");
   const media = await resolvePartnerMediaPayload(formData, partnerId);
 
   const supabase = getSupabaseAdminClient();
@@ -1517,6 +1549,7 @@ export async function createPartner(formData: FormData) {
 
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(partnerId);
+  redirect("/admin/partners?created=partner_created");
 }
 
 export async function updatePartner(formData: FormData) {
@@ -1525,7 +1558,7 @@ export async function updatePartner(formData: FormData) {
   if (!id) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
   }
-  const payload = parsePartnerPayload(formData);
+  const payload = parsePartnerPayloadOrRedirect(formData, "/admin/partners");
 
   const supabase = getSupabaseAdminClient();
   const { data: previousPartner, error: previousPartnerError } = await supabase
@@ -1541,7 +1574,7 @@ export async function updatePartner(formData: FormData) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
   }
 
-  const companyPayload = parsePartnerCompanyPayload(formData);
+  const companyPayload = parsePartnerCompanyPayloadOrRedirect(formData, "/admin/partners");
   const media = await resolvePartnerMediaPayload(formData, id);
   const hasCompanyPayload = Boolean(
     companyPayload.companyId ||
