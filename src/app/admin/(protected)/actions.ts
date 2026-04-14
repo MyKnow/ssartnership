@@ -1434,7 +1434,7 @@ export async function createPartner(formData: FormData) {
   let companyProvision: Awaited<ReturnType<typeof ensurePartnerCompanyRow>> | null = null;
 
   try {
-    companyProvision = await ensurePartnerCompanyRow(supabase, companyPayload, true);
+    companyProvision = await ensurePartnerCompanyRow(supabase, companyPayload, false);
 
     const { error } = await supabase.from("partners").insert({
       id: partnerId,

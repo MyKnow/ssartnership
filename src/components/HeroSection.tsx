@@ -18,7 +18,7 @@ export default function HeroSection({
           <p className="hero-eyebrow text-sm font-semibold uppercase tracking-[0.28em]">
             {eyebrow}
           </p>
-          <h2 className="mt-4 text-[clamp(2.25rem,5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.05em]">
+          <h2 className="mt-4 text-[clamp(1.5rem,5vw,3.5rem)] font-semibold leading-[1.02] tracking-[-0.05em]">
             {title}
           </h2>
           <p className="hero-body mt-4 max-w-2xl text-sm leading-7 sm:text-base">

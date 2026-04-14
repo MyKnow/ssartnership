@@ -795,7 +795,7 @@ function MediaField({
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={handleAddUrl}
+                    onClick={() => handleAddUrl()}
                     className="w-full sm:w-auto"
                   >
                     <LinkIcon className="h-4 w-4" />
