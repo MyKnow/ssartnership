@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
-import { useToast } from "@/components/ui/Toast";
 import { sanitizeHttpUrl } from "@/lib/validation";
 
 const initialState = {
@@ -26,7 +26,7 @@ export default function SuggestForm() {
   const [formState, setFormState] = useState(initialState);
   const [isSubmitting, setSubmitting] = useState(false);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-  const { notify } = useToast();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const router = useRouter();
 
   const handleChange = (
@@ -34,6 +34,9 @@ export default function SuggestForm() {
   ) => {
     const { name, value } = event.target;
     setFormState((prev) => ({ ...prev, [name]: value }));
+    if (errorMessage) {
+      setErrorMessage(null);
+    }
   };
 
   const handleSubmit = async () => {
@@ -41,6 +44,7 @@ export default function SuggestForm() {
       return;
     }
     setSubmitting(true);
+    setErrorMessage(null);
     setConfirmOpen(false);
 
     try {
@@ -53,12 +57,17 @@ export default function SuggestForm() {
       });
 
       if (!response.ok) {
-        notify("메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        const data = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        setErrorMessage(
+          data?.message ?? "메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        );
         setSubmitting(false);
         return;
       }
     } catch {
-      notify("메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      setErrorMessage("메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
       setSubmitting(false);
       return;
     }
@@ -76,11 +85,11 @@ export default function SuggestForm() {
       onSubmit={(event) => {
         event.preventDefault();
         if (!emailRegex.test(formState.contactEmail)) {
-          notify("이메일 형식을 확인해 주세요.");
+          setErrorMessage("이메일 형식을 확인해 주세요.");
           return;
         }
         if (formState.companyUrl.trim() && !sanitizeHttpUrl(formState.companyUrl)) {
-          notify("회사 사이트 URL 형식을 확인해 주세요.");
+          setErrorMessage("회사 사이트 URL 형식을 확인해 주세요.");
           return;
         }
         if (event.currentTarget.reportValidity()) {
@@ -88,6 +97,7 @@ export default function SuggestForm() {
         }
       }}
     >
+      {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
       <InlineMessage
         title="제안 접수 안내"
         description="업체 정보와 담당자 연락처를 함께 보내 주시면 검토 속도가 빨라집니다."

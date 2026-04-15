@@ -65,6 +65,23 @@ export type PushMessageLog = {
   completed_at: string | null;
 };
 
+export type PushErrorCode =
+  | "config_missing"
+  | "invalid_request"
+  | "db_error"
+  | "not_found"
+  | "push_unavailable";
+
+export class PushError extends Error {
+  code: PushErrorCode;
+
+  constructor(code: PushErrorCode, message: string) {
+    super(message);
+    this.name = "PushError";
+    this.code = code;
+  }
+}
+
 type PushSendOptions = {
   source?: "manual" | "automatic";
   audience?: PushAudience;
@@ -106,13 +123,21 @@ type WebPushModule = typeof import("web-push");
 
 let webPushPromise: Promise<WebPushModule> | null = null;
 
+function wrapPushDbError(
+  error: { message?: string | null } | null | undefined,
+  message = "Push 데이터를 처리하지 못했습니다.",
+) {
+  return new PushError("db_error", error?.message?.trim() || message);
+}
+
 function getPushEnv() {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT;
 
   if (!publicKey || !privateKey || !subject) {
-    throw new Error(
+    throw new PushError(
+      "config_missing",
       "Web Push를 사용하려면 NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT가 필요합니다.",
     );
   }
@@ -156,7 +181,7 @@ export function parsePushAudience(input: unknown): PushAudience {
       (input as { year?: string | number | null }).year,
     );
     if (year === null) {
-      throw new Error("기수를 선택해 주세요.");
+      throw new PushError("invalid_request", "기수를 선택해 주세요.");
     }
     return { scope: "year", year };
   }
@@ -164,7 +189,7 @@ export function parsePushAudience(input: unknown): PushAudience {
   if (scope === "campus") {
     const campus = String((input as { campus?: unknown }).campus ?? "").trim();
     if (!campus) {
-      throw new Error("캠퍼스를 선택해 주세요.");
+      throw new PushError("invalid_request", "캠퍼스를 선택해 주세요.");
     }
     return { scope: "campus", campus };
   }
@@ -172,12 +197,12 @@ export function parsePushAudience(input: unknown): PushAudience {
   if (scope === "member") {
     const memberId = String((input as { memberId?: unknown }).memberId ?? "").trim();
     if (!memberId) {
-      throw new Error("개인 발송 대상을 선택해 주세요.");
+      throw new PushError("invalid_request", "개인 발송 대상을 선택해 주세요.");
     }
     return { scope: "member", memberId };
   }
 
-  throw new Error("알림 발송 대상을 확인해 주세요.");
+  throw new PushError("invalid_request", "알림 발송 대상을 확인해 주세요.");
 }
 
 async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPushAudience> {
@@ -201,7 +226,7 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
       .eq("year", audience.year);
 
     if (error) {
-      throw new Error(error.message);
+      throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
     }
 
     return {
@@ -221,7 +246,7 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
       .eq("campus", audience.campus);
 
     if (error) {
-      throw new Error(error.message);
+      throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
     }
 
     return {
@@ -241,10 +266,10 @@ async function resolvePushAudience(audience: PushAudience): Promise<ResolvedPush
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
   }
   if (!data) {
-    throw new Error("개인 발송 대상을 찾을 수 없습니다.");
+    throw new PushError("not_found", "개인 발송 대상을 찾을 수 없습니다.");
   }
 
   const memberName = data.display_name?.trim() || data.mm_username;
@@ -302,7 +327,7 @@ export async function getMemberPushPreferences(memberId: string) {
     if (isMissingPushTableError(error)) {
       return getPushPreferencesOrDefault();
     }
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 설정을 불러오지 못했습니다.");
   }
 
   return getPushPreferencesOrDefault(
@@ -361,7 +386,7 @@ export async function upsertMemberPushPreferences(
   );
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 설정을 저장하지 못했습니다.");
   }
 
   return next;
@@ -370,12 +395,12 @@ export async function upsertMemberPushPreferences(
 function validateSubscription(input: SubscriptionInput) {
   const endpoint = sanitizeHttpUrl(input.endpoint);
   if (!endpoint?.startsWith("https://")) {
-    throw new Error("유효한 Push 구독 정보를 찾을 수 없습니다.");
+    throw new PushError("invalid_request", "유효한 Push 구독 정보를 찾을 수 없습니다.");
   }
   const p256dh = input.keys?.p256dh?.trim();
   const auth = input.keys?.auth?.trim();
   if (!p256dh || !auth) {
-    throw new Error("Push 구독 키가 누락되었습니다.");
+    throw new PushError("invalid_request", "Push 구독 키가 누락되었습니다.");
   }
 
   return {
@@ -415,7 +440,7 @@ export async function upsertPushSubscription(params: {
   );
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 구독 정보를 저장하지 못했습니다.");
   }
 
   return upsertMemberPushPreferences(memberId, {
@@ -447,7 +472,7 @@ export async function deactivatePushSubscription(params: {
 
   const { error } = await query;
   if (error) {
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 구독을 비활성화하지 못했습니다.");
   }
 
   return getMemberPushPreferences(memberId);
@@ -464,7 +489,7 @@ export async function deactivateAllPushSubscriptions(memberId: string) {
     .eq("member_id", memberId);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 구독을 비활성화하지 못했습니다.");
   }
 
   return upsertMemberPushPreferences(memberId, { enabled: false });
@@ -563,7 +588,7 @@ async function createPushMessageLog(params: {
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 메시지 로그를 저장하지 못했습니다.");
   }
 
   return data as PushMessageLog;
@@ -611,7 +636,7 @@ export async function getRecentPushMessageLogs(limit = 200) {
     if (isMissingPushTableError(error)) {
       return [] as PushMessageLog[];
     }
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 메시지 로그를 불러오지 못했습니다.");
   }
 
   return (data ?? []) as PushMessageLog[];
@@ -620,14 +645,14 @@ export async function getRecentPushMessageLogs(limit = 200) {
 export async function deletePushMessageLog(logId: string) {
   const id = logId.trim();
   if (!id) {
-    throw new Error("삭제할 로그를 찾을 수 없습니다.");
+    throw new PushError("not_found", "삭제할 로그를 찾을 수 없습니다.");
   }
 
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("push_message_logs").delete().eq("id", id);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPushDbError(error, "Push 메시지 로그를 삭제하지 못했습니다.");
   }
 }
 
@@ -665,7 +690,7 @@ export async function sendPushToAudience(
   options: PushSendOptions = {},
 ) {
   if (!isPushConfigured()) {
-    throw new Error("Web Push 환경 변수가 설정되지 않았습니다.");
+    throw new PushError("config_missing", "Web Push 환경 변수가 설정되지 않았습니다.");
   }
 
   const resolvedAudience = await resolvePushAudience(
@@ -704,7 +729,7 @@ export async function sendPushToAudience(
   const { data: subscriptions, error: subscriptionError } = await subscriptionQuery;
 
   if (subscriptionError) {
-    throw new Error(subscriptionError.message);
+    throw wrapPushDbError(subscriptionError, "Push 구독을 불러오지 못했습니다.");
   }
 
   const safeSubscriptions = (subscriptions ?? []) as StoredSubscription[];
@@ -727,7 +752,7 @@ export async function sendPushToAudience(
     .in("member_id", memberIds);
 
   if (preferenceError) {
-    throw new Error(preferenceError.message);
+    throw wrapPushDbError(preferenceError, "Push 설정을 불러오지 못했습니다.");
   }
 
   const preferenceKey = getPreferenceKey(payload.type);
@@ -838,12 +863,12 @@ export function createAnnouncementPayload(params: {
   const title = params.title.trim();
   const body = params.body.trim();
   if (!title || !body) {
-    throw new Error("제목과 내용을 모두 입력해 주세요.");
+    throw new PushError("invalid_request", "제목과 내용을 모두 입력해 주세요.");
   }
 
   const safeUrl = sanitizeNotificationUrl(params.url);
   if (params.url?.trim() && !safeUrl) {
-    throw new Error("알림 이동 URL 형식을 확인해 주세요.");
+    throw new PushError("invalid_request", "알림 이동 URL 형식을 확인해 주세요.");
   }
 
   return {

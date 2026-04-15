@@ -155,7 +155,7 @@ function parsePartnerCompanyPayload(formData: FormData): PartnerCompanyInput {
   const contactPhone = String(formData.get("companyContactPhone") || "").trim();
 
   if (!companyId && contactEmail && !isValidEmail(contactEmail)) {
-    throw new Error("partner_company_invalid_email");
+    throw new Error("partner_account_invalid_email");
   }
 
   return {
@@ -205,16 +205,16 @@ function parsePartnerAccountPayload(formData: FormData) {
   const mustChangePassword = formData.getAll("mustChangePassword").includes("true");
 
   if (!id) {
-    throw new Error("수정할 업체 계정을 찾을 수 없습니다.");
+    throw new Error("partner_account_missing_id");
   }
   if (!loginId) {
-    throw new Error("로그인 아이디를 입력해 주세요.");
+    throw new Error("partner_account_invalid_request");
   }
   if (!isValidEmail(loginId)) {
-    throw new Error("로그인 아이디는 올바른 이메일이어야 합니다.");
+    throw new Error("partner_account_invalid_email");
   }
   if (!displayName) {
-    throw new Error("표시명을 입력해 주세요.");
+    throw new Error("partner_account_invalid_request");
   }
 
   return {
@@ -232,7 +232,7 @@ function parsePartnerAccountCompanyPayload(formData: FormData) {
   const isActive = formData.getAll("isActive").includes("true");
 
   if (!accountId || !companyId) {
-    throw new Error("연결 상태를 변경할 계정과 회사를 찾을 수 없습니다.");
+    throw new Error("partner_account_company_missing");
   }
 
   return {
@@ -748,7 +748,15 @@ function revalidateCyclePaths() {
 
 export async function updatePartnerAccount(formData: FormData) {
   await requireAdmin();
-  const payload = parsePartnerAccountPayload(formData);
+  let payload: ReturnType<typeof parsePartnerAccountPayload>;
+  try {
+    payload = parsePartnerAccountPayload(formData);
+  } catch (error) {
+    redirectAdminActionError(
+      "/admin/companies",
+      error instanceof Error ? error.message : "partner_account_invalid_request",
+    );
+  }
 
   const supabase = getSupabaseAdminClient();
   const { data: existingAccount, error: accountError } = await supabase
@@ -760,15 +768,15 @@ export async function updatePartnerAccount(formData: FormData) {
     .maybeSingle();
 
   if (accountError) {
-    throw new Error(accountError.message);
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
   }
   if (!existingAccount) {
-    throw new Error("수정할 업체 계정을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "partner_account_missing_id");
   }
 
   const currentAccount = normalizePartnerAccountRow(existingAccount as PartnerAccountRow);
   if (!currentAccount) {
-    throw new Error("업체 계정 정보를 처리하지 못했습니다.");
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
   }
 
   const nextAccount = {
@@ -794,7 +802,7 @@ export async function updatePartnerAccount(formData: FormData) {
       .eq("id", payload.id);
 
     if (error) {
-      throw new Error(error.message);
+      redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
     }
   }
 
@@ -824,11 +832,16 @@ export async function createPartnerAccountInitialSetupUrl(formData: FormData) {
   await requireAdmin();
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
-    throw new Error("초기설정 URL을 생성할 계정을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "partner_account_missing_id");
   }
 
   const supabase = getSupabaseAdminClient();
-  const issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
+  let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;
+  try {
+    issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
+  } catch {
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+  }
 
   await logAdminAction("partner_account_initial_setup_link_generate", {
     targetType: "partner_account",
@@ -849,11 +862,16 @@ export async function sendPartnerAccountInitialSetupUrl(formData: FormData) {
   await requireAdmin();
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
-    throw new Error("초기설정 URL을 전송할 계정을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "partner_account_missing_id");
   }
 
   const supabase = getSupabaseAdminClient();
-  const issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
+  let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;
+  try {
+    issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
+  } catch {
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+  }
 
   try {
     await sendPartnerPortalInitialSetupEmail({
@@ -863,12 +881,8 @@ export async function sendPartnerAccountInitialSetupUrl(formData: FormData) {
       setupUrl: issued.setupUrl,
       verificationCode: issued.verificationCode,
     });
-  } catch (error) {
-    throw new Error(
-      error instanceof Error
-        ? error.message
-        : "초기설정 URL 전송에 실패했습니다.",
-    );
+  } catch {
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
   }
 
   const { error: sentAtError } = await supabase
@@ -880,7 +894,7 @@ export async function sendPartnerAccountInitialSetupUrl(formData: FormData) {
     .eq("id", issued.account.id);
 
   if (sentAtError) {
-    throw new Error(sentAtError.message);
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
   }
 
   await logAdminAction("partner_account_initial_setup_link_send", {
@@ -900,7 +914,15 @@ export async function sendPartnerAccountInitialSetupUrl(formData: FormData) {
 
 export async function updatePartnerAccountCompanyConnection(formData: FormData) {
   await requireAdmin();
-  const payload = parsePartnerAccountCompanyPayload(formData);
+  let payload: ReturnType<typeof parsePartnerAccountCompanyPayload>;
+  try {
+    payload = parsePartnerAccountCompanyPayload(formData);
+  } catch (error) {
+    redirectAdminActionError(
+      "/admin/companies",
+      error instanceof Error ? error.message : "partner_account_company_invalid_request",
+    );
+  }
 
   const supabase = getSupabaseAdminClient();
   const { data: existingLink, error: linkError } = await supabase
@@ -911,10 +933,10 @@ export async function updatePartnerAccountCompanyConnection(formData: FormData) 
     .maybeSingle();
 
   if (linkError) {
-    throw new Error(linkError.message);
+    redirectAdminActionError("/admin/companies", "partner_account_company_invalid_request");
   }
   if (!existingLink) {
-    throw new Error("수정할 연결을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "partner_account_company_missing");
   }
 
   const nextLink = {
@@ -931,7 +953,7 @@ export async function updatePartnerAccountCompanyConnection(formData: FormData) 
       .eq("id", existingLink.id);
 
     if (error) {
-      throw new Error(error.message);
+      redirectAdminActionError("/admin/companies", "partner_account_company_invalid_request");
     }
   }
 
@@ -958,17 +980,17 @@ function parseCategoryPayload(formData: FormData) {
   const rawColor = String(formData.get("color") || "").trim();
 
   if (!key || !label) {
-    throw new Error("카테고리 키와 라벨을 입력해 주세요.");
+    throw new Error("category_missing_fields");
   }
 
   const keyError = validateCategoryKey(key);
   if (keyError) {
-    throw new Error(keyError);
+    throw new Error("category_invalid_key");
   }
 
   const color = rawColor ? sanitizeHexColor(rawColor) : null;
   if (rawColor && !color) {
-    throw new Error("카테고리 색상은 #RRGGBB 형식이어야 합니다.");
+    throw new Error("category_invalid_color");
   }
 
   return {
@@ -982,7 +1004,7 @@ function parseCategoryPayload(formData: FormData) {
 function parseSsafyCycleNumber(value: string, label: string, min: number, max: number) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(`${label}는 ${min}~${max} 사이의 숫자로 입력해 주세요.`);
+    throw new Error("cycle_invalid_number");
   }
   return parsed;
 }
@@ -993,7 +1015,7 @@ function parseSsafyCycleSettingsPayload(formData: FormData) {
   const anchorMonthRaw = String(formData.get("anchorMonth") || "").trim();
 
   if (!anchorYearRaw || !anchorCalendarYearRaw || !anchorMonthRaw) {
-    throw new Error("기준 기수, 기준 연도, 기준 월을 모두 입력해 주세요.");
+    throw new Error("cycle_missing_fields");
   }
 
   return {
@@ -1078,6 +1100,10 @@ function redirectPartnerFormError(code: string, path = "/admin/partners"): never
   redirect(`${path}?error=${encodeURIComponent(code)}`);
 }
 
+function redirectAdminActionError(path: string, code: string): never {
+  redirect(`${path}?error=${encodeURIComponent(code)}`);
+}
+
 function parsePartnerPayloadOrRedirect(
   formData: FormData,
   path: string,
@@ -1102,6 +1128,34 @@ function parsePartnerCompanyPayloadOrRedirect(
     return redirectPartnerFormError(
       error instanceof Error ? error.message : "partner_company_invalid_request",
       path,
+    );
+  }
+}
+
+function parseCategoryPayloadOrRedirect(
+  formData: FormData,
+  path: string,
+): ReturnType<typeof parseCategoryPayload> {
+  try {
+    return parseCategoryPayload(formData);
+  } catch (error) {
+    return redirectAdminActionError(
+      path,
+      error instanceof Error ? error.message : "category_invalid_request",
+    );
+  }
+}
+
+function parseSsafyCycleSettingsPayloadOrRedirect(
+  formData: FormData,
+  path: string,
+): ReturnType<typeof parseSsafyCycleSettingsPayload> {
+  try {
+    return parseSsafyCycleSettingsPayload(formData);
+  } catch (error) {
+    return redirectAdminActionError(
+      path,
+      error instanceof Error ? error.message : "cycle_invalid_request",
     );
   }
 }
@@ -1203,7 +1257,10 @@ function collectPartnerMediaUrls(row?: {
 
 export async function createCategory(formData: FormData) {
   await requireAdmin();
-  const { key, label, description, color } = parseCategoryPayload(formData);
+  const { key, label, description, color } = parseCategoryPayloadOrRedirect(
+    formData,
+    "/admin/partners",
+  );
 
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -1228,10 +1285,13 @@ export async function createCategory(formData: FormData) {
 export async function updateCategory(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
-  const { key, label, description, color } = parseCategoryPayload(formData);
+  const { key, label, description, color } = parseCategoryPayloadOrRedirect(
+    formData,
+    "/admin/partners",
+  );
 
   if (!id) {
-    throw new Error("수정할 카테고리를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/partners", "category_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -1241,7 +1301,7 @@ export async function updateCategory(formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    throw new Error(error.message);
+    redirectAdminActionError("/admin/partners", "category_invalid_request");
   }
 
   await logAdminAction("category_update", {
@@ -1258,14 +1318,14 @@ export async function deleteCategory(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
   if (!id) {
-    throw new Error("삭제할 카테고리를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/partners", "category_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("categories").delete().eq("id", id);
 
   if (error) {
-    throw new Error(error.message);
+    redirectAdminActionError("/admin/partners", "category_invalid_request");
   }
 
   await logAdminAction("category_delete", {
@@ -1278,7 +1338,15 @@ export async function deleteCategory(formData: FormData) {
 
 export async function createPartnerCompany(formData: FormData) {
   await requireAdmin();
-  const payload = parsePartnerCompanyCrudPayload(formData);
+  let payload: PartnerCompanyCrudInput;
+  try {
+    payload = parsePartnerCompanyCrudPayload(formData);
+  } catch (error) {
+    redirectAdminActionError(
+      "/admin/companies",
+      error instanceof Error ? error.message : "company_invalid_request",
+    );
+  }
 
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -1296,12 +1364,12 @@ export async function createPartnerCompany(formData: FormData) {
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
 
   const company = normalizePartnerCompanyRow(data as PartnerCompanyRow);
   if (!company) {
-    throw new Error("협력사 정보를 처리하지 못했습니다.");
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
 
   await logAdminAction("partner_company_create", {
@@ -1324,11 +1392,19 @@ export async function createPartnerCompany(formData: FormData) {
 
 export async function updatePartnerCompany(formData: FormData) {
   await requireAdmin();
-  const payload = parsePartnerCompanyCrudPayload(formData);
+  let payload: PartnerCompanyCrudInput;
+  try {
+    payload = parsePartnerCompanyCrudPayload(formData);
+  } catch (error) {
+    redirectAdminActionError(
+      "/admin/companies",
+      error instanceof Error ? error.message : "company_invalid_request",
+    );
+  }
   const companyId = payload.companyId;
 
   if (!companyId) {
-    throw new Error("수정할 협력사를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -1339,10 +1415,10 @@ export async function updatePartnerCompany(formData: FormData) {
     .maybeSingle();
 
   if (companyError) {
-    throw new Error(companyError.message);
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
   if (!existingCompany) {
-    throw new Error("수정할 협력사를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
 
   const nextCompany = {
@@ -1372,7 +1448,7 @@ export async function updatePartnerCompany(formData: FormData) {
       .eq("id", companyId);
 
     if (updateError) {
-      throw new Error(updateError.message);
+      redirectAdminActionError("/admin/companies", "company_invalid_request");
     }
   }
 
@@ -1398,7 +1474,7 @@ export async function deletePartnerCompany(formData: FormData) {
   await requireAdmin();
   const companyId = String(formData.get("companyId") || "").trim();
   if (!companyId) {
-    throw new Error("삭제할 협력사를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -1409,10 +1485,10 @@ export async function deletePartnerCompany(formData: FormData) {
     .maybeSingle();
 
   if (companyError) {
-    throw new Error(companyError.message);
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
   if (!existingCompany) {
-    throw new Error("삭제할 협력사를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
 
   const [brandCountResult, accountLinkCountResult] = await Promise.all([
@@ -1437,7 +1513,7 @@ export async function deletePartnerCompany(formData: FormData) {
     .eq("id", companyId);
 
   if (deleteError) {
-    throw new Error(deleteError.message);
+    redirectAdminActionError("/admin/companies", "company_invalid_request");
   }
 
   await logAdminAction("partner_company_delete", {
@@ -1671,7 +1747,7 @@ export async function approvePartnerChangeRequest(formData: FormData) {
   await requireAdmin();
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
-    throw new Error("승인할 요청을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
   }
 
   const request = await approvePartnerChangeRequestRecord({
@@ -1710,7 +1786,7 @@ export async function rejectPartnerChangeRequest(formData: FormData) {
   await requireAdmin();
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
-    throw new Error("거절할 요청을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
   }
 
   const request = await rejectPartnerChangeRequestRecord({
@@ -1746,7 +1822,7 @@ export async function deletePartner(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
   if (!id) {
-    throw new Error("삭제할 업체를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -1757,13 +1833,13 @@ export async function deletePartner(formData: FormData) {
     .maybeSingle();
 
   if (previousPartnerError) {
-    throw new Error(previousPartnerError.message);
+    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
   }
 
   const { error } = await supabase.from("partners").delete().eq("id", id);
 
   if (error) {
-    throw new Error(error.message);
+    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
   }
 
   await deletePartnerMediaUrls(collectPartnerMediaUrls(previousPartner)).catch(
@@ -1838,13 +1914,13 @@ export async function updateMember(formData: FormData) {
     String(formData.get("mustChangePassword") || "false").trim() === "true";
 
   if (!id) {
-    throw new Error("수정할 회원을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/members", "member_missing_id");
   }
 
   const yearError = validateMemberYear(yearRaw);
   const year = parseMemberYearValue(yearRaw);
   if (yearError || year === null) {
-    throw new Error("기수는 0~99 사이의 숫자로 입력해 주세요.");
+    redirectAdminActionError("/admin/members", "member_invalid_year");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -1860,7 +1936,7 @@ export async function updateMember(formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    throw new Error(error.message);
+    redirectAdminActionError("/admin/members", "member_invalid_request");
   }
 
   await logAdminAction("member_update", {
@@ -1963,7 +2039,10 @@ export async function manualAddMembers(
 
 export async function updateSsafyCycleSettings(formData: FormData) {
   await requireAdmin();
-  const payload = parseSsafyCycleSettingsPayload(formData);
+  const payload = parseSsafyCycleSettingsPayloadOrRedirect(
+    formData,
+    "/admin/cycle",
+  );
   await upsertSsafyCycleSettings(payload);
   await logAdminAction("cycle_settings_update", {
     targetType: "cycle_settings",
@@ -2018,7 +2097,7 @@ export async function deleteMember(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
 
   if (!id) {
-    throw new Error("삭제할 회원을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/members", "member_missing_id");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -2029,10 +2108,10 @@ export async function deleteMember(formData: FormData) {
     .maybeSingle();
 
   if (memberError) {
-    throw new Error(memberError.message);
+    redirectAdminActionError("/admin/members", "member_invalid_request");
   }
   if (!member?.mm_user_id && !member?.mm_username) {
-    throw new Error("삭제할 회원을 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/members", "member_missing_id");
   }
 
   if (member.mm_user_id) {
@@ -2078,7 +2157,7 @@ export async function deleteMember(formData: FormData) {
   const { error } = await supabase.from("members").delete().eq("id", id);
 
   if (error) {
-    throw new Error(error.message);
+    redirectAdminActionError("/admin/members", "member_invalid_request");
   }
 
   await logAdminAction("member_delete", {

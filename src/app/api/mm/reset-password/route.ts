@@ -185,7 +185,13 @@ export async function POST(request: Request) {
       ],
     );
     if (effectiveYear === null) {
-      throw new Error("운영진 회원을 조회할 수 없습니다.");
+      return NextResponse.json(
+        {
+          error: "reset_failed",
+          message: "운영진 회원 정보를 확인하지 못했습니다. 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
     }
 
     const senderCredentials = getSenderCredentials(effectiveYear);
@@ -394,6 +400,12 @@ export async function POST(request: Request) {
       },
     });
     await delayMemberAuthAttempt("reset-password", true);
-    return NextResponse.json({ error: "reset_failed" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "reset_failed",
+        message: "비밀번호 재설정에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
   }
 }

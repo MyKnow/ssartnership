@@ -58,6 +58,18 @@ export type MemberSyncBatchResult = {
   failures: Array<{ memberId: string; mmUserId: string; reason: string }>;
 };
 
+export type MmMemberSyncErrorCode = "db_error" | "lookup_failed" | "invalid_state";
+
+export class MmMemberSyncError extends Error {
+  code: MmMemberSyncErrorCode;
+
+  constructor(code: MmMemberSyncErrorCode, message: string) {
+    super(message);
+    this.name = "MmMemberSyncError";
+    this.code = code;
+  }
+}
+
 function makeSnapshot(user: MMUser, avatar: { contentType: string; base64: string } | null): MemberSyncSnapshot {
   const profile = parseSsafyProfileFromUser(user);
   const displayName = profile.displayName ?? user.nickname ?? user.username;
@@ -97,6 +109,13 @@ function getMemberSyncCandidateYears(year: number) {
     return [15, 14];
   }
   return [year];
+}
+
+function wrapMmMemberSyncDbError(
+  error: { message?: string | null } | null | undefined,
+  message = "회원 동기화를 처리하지 못했습니다.",
+) {
+  return new MmMemberSyncError("db_error", error?.message?.trim() || message);
 }
 
 async function getSenderSessionForYear(
@@ -159,7 +178,10 @@ async function resolveMemberSnapshotForYears(
   }
 
   if (lastError) {
-    throw lastError;
+    throw new MmMemberSyncError(
+      "lookup_failed",
+      lastError.message || "MM 사용자 조회 실패",
+    );
   }
 
   return null;
@@ -312,7 +334,7 @@ export async function syncMemberSnapshot(
     .eq("id", member.id);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapMmMemberSyncDbError(error, "회원 정보를 저장하지 못했습니다.");
   }
 
   return {
@@ -337,7 +359,7 @@ export async function syncMemberById(
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapMmMemberSyncDbError(error, "회원 정보를 불러오지 못했습니다.");
   }
   if (!member?.id) {
     return null;
@@ -370,7 +392,7 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapMmMemberSyncDbError(error, "회원 정보를 불러오지 못했습니다.");
   }
 
   const results: MemberSyncResult[] = [];

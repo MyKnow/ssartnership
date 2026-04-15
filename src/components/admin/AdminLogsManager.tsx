@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
+import FormMessage from '@/components/ui/FormMessage';
 import Input from '@/components/ui/Input';
 import SectionHeading from '@/components/ui/SectionHeading';
 import Select from '@/components/ui/Select';
@@ -606,6 +607,7 @@ export default function AdminLogsManager({
     security: true,
   });
   const [isExporting, setIsExporting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const unifiedLogs = useMemo<NormalizedLog[]>(() => {
     const normalizedProduct = data.productLogs.map((log) => {
@@ -889,6 +891,7 @@ export default function AdminLogsManager({
     end?: string;
   }) {
     setIsLoading(true);
+    setErrorMessage(null);
 
     try {
       const searchParams = new URLSearchParams();
@@ -908,7 +911,8 @@ export default function AdminLogsManager({
         const payload = (await response.json().catch(() => null)) as
           | { message?: string }
           | null;
-        throw new Error(payload?.message ?? '로그 조회에 실패했습니다.');
+        setErrorMessage(payload?.message ?? '로그 조회에 실패했습니다.');
+        return;
       }
 
       const nextData = (await response.json()) as AdminLogsPageData;
@@ -917,7 +921,7 @@ export default function AdminLogsManager({
       setCustomStartInput(toDateTimeLocalValue(nextData.range.start));
       setCustomEndInput(toDateTimeLocalValue(nextData.range.end));
     } catch (error) {
-      notify(error instanceof Error ? error.message : '로그 조회에 실패했습니다.');
+      setErrorMessage(error instanceof Error ? error.message : '로그 조회에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -997,6 +1001,7 @@ export default function AdminLogsManager({
     }
 
     setIsExporting(true);
+    setErrorMessage(null);
 
     try {
       const searchParams = new URLSearchParams({
@@ -1017,7 +1022,8 @@ export default function AdminLogsManager({
         const payload = (await response.json().catch(() => null)) as
           | { message?: string }
           | null;
-        throw new Error(payload?.message ?? 'CSV 다운로드에 실패했습니다.');
+        setErrorMessage(payload?.message ?? 'CSV 다운로드에 실패했습니다.');
+        return;
       }
 
       const blob = await response.blob();
@@ -1031,7 +1037,7 @@ export default function AdminLogsManager({
       URL.revokeObjectURL(downloadUrl);
       setExportOpen(false);
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'CSV 다운로드에 실패했습니다.');
+      setErrorMessage(error instanceof Error ? error.message : 'CSV 다운로드에 실패했습니다.');
     } finally {
       setIsExporting(false);
     }
@@ -1050,6 +1056,8 @@ export default function AdminLogsManager({
               CSV 다운로드
             </Button>
           </div>
+
+          {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
 
           <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
             {RANGE_PRESET_OPTIONS.map((option) => (

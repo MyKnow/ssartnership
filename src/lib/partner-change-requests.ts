@@ -32,6 +32,16 @@ function isUuid(value: string) {
   return UUID_PATTERN.test(value.trim());
 }
 
+function wrapPartnerChangeRequestDbError(
+  error: { message?: string | null } | null | undefined,
+  message = "변경 요청 정보를 처리하지 못했습니다.",
+) {
+  return new PartnerChangeRequestError(
+    "invalid_request",
+    error?.message?.trim() || message,
+  );
+}
+
 export type PartnerChangeRequestStatus =
   | "pending"
   | "approved"
@@ -503,7 +513,10 @@ async function fetchRequestSummary(
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 정보를 불러오지 못했습니다.",
+    );
   }
 
   return data ? toSummary(data as PartnerChangeRequestRow) : null;
@@ -523,7 +536,10 @@ async function fetchPendingRequestSummary(
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 정보를 불러오지 못했습니다.",
+    );
   }
 
   return data ? toSummary(data as PartnerChangeRequestRow) : null;
@@ -548,7 +564,10 @@ async function getSupabaseRequestContext(
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 정보를 불러오지 못했습니다.",
+    );
   }
   if (!partner) {
     return null;
@@ -618,7 +637,10 @@ async function getSupabasePendingRequests(companyIds?: string[]) {
   const { data, error } = await query;
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 정보를 불러오지 못했습니다.",
+    );
   }
 
   return (data ?? []).map((row) => toSummary(row as PartnerChangeRequestRow));
@@ -670,7 +692,10 @@ async function updateSupabasePartnerImmediateFields(
     .eq("id", input.partnerId);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 정보를 불러오지 못했습니다.",
+    );
   }
 
   return {
@@ -783,7 +808,10 @@ async function createSupabaseRequest(
     .maybeSingle();
 
   if (companyAccessError) {
-    throw new Error(companyAccessError.message);
+    throw wrapPartnerChangeRequestDbError(
+      companyAccessError,
+      "변경 요청 권한을 확인하지 못했습니다.",
+    );
   }
 
   const { data: created, error } = await supabase
@@ -824,7 +852,10 @@ async function createSupabaseRequest(
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청을 저장하지 못했습니다.",
+    );
   }
 
   const summary = created ? toSummary(created as PartnerChangeRequestRow) : null;
@@ -847,7 +878,10 @@ async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInput) {
     .maybeSingle();
 
   if (requestError) {
-    throw new Error(requestError.message);
+    throw wrapPartnerChangeRequestDbError(
+      requestError,
+      "변경 요청을 불러오지 못했습니다.",
+    );
   }
   if (!request) {
     throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");
@@ -868,7 +902,10 @@ async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInput) {
     .maybeSingle();
 
   if (currentPartnerError) {
-    throw new Error(currentPartnerError.message);
+    throw wrapPartnerChangeRequestDbError(
+      currentPartnerError,
+      "현재 브랜드 정보를 불러오지 못했습니다.",
+    );
   }
 
   if (
@@ -892,7 +929,10 @@ async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInput) {
     .eq("id", input.requestId);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 상태를 저장하지 못했습니다.",
+    );
   }
 
   const cancelled = await fetchRequestSummary(supabase, input.requestId);
@@ -923,7 +963,10 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     .maybeSingle();
 
   if (requestError) {
-    throw new Error(requestError.message);
+    throw wrapPartnerChangeRequestDbError(
+      requestError,
+      "변경 요청을 불러오지 못했습니다.",
+    );
   }
   if (!request) {
     throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");
@@ -944,7 +987,10 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     .maybeSingle();
 
   if (currentPartnerError) {
-    throw new Error(currentPartnerError.message);
+    throw wrapPartnerChangeRequestDbError(
+      currentPartnerError,
+      "현재 브랜드 정보를 불러오지 못했습니다.",
+    );
   }
   if (!currentPartner) {
     throw new PartnerChangeRequestError(
@@ -968,7 +1014,10 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     .eq("id", summary.partnerId);
 
   if (updatePartnerError) {
-    throw new Error(updatePartnerError.message);
+    throw wrapPartnerChangeRequestDbError(
+      updatePartnerError,
+      "브랜드 정보를 반영하지 못했습니다.",
+    );
   }
 
   const now = new Date().toISOString();
@@ -983,7 +1032,10 @@ async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     .eq("id", input.requestId);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 상태를 저장하지 못했습니다.",
+    );
   }
 
   const currentMediaUrls = collectPartnerMediaUrls(currentPartner as {
@@ -1014,7 +1066,10 @@ async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     .maybeSingle();
 
   if (requestError) {
-    throw new Error(requestError.message);
+    throw wrapPartnerChangeRequestDbError(
+      requestError,
+      "변경 요청을 불러오지 못했습니다.",
+    );
   }
   if (!request) {
     throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");
@@ -1035,7 +1090,10 @@ async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     .maybeSingle();
 
   if (currentPartnerError) {
-    throw new Error(currentPartnerError.message);
+    throw wrapPartnerChangeRequestDbError(
+      currentPartnerError,
+      "현재 브랜드 정보를 불러오지 못했습니다.",
+    );
   }
 
   const now = new Date().toISOString();
@@ -1050,7 +1108,10 @@ async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInput) {
     .eq("id", input.requestId);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 상태를 저장하지 못했습니다.",
+    );
   }
 
   const rejected = await fetchRequestSummary(supabase, input.requestId);

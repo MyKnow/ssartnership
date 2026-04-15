@@ -2,10 +2,16 @@ import AdminShell from "@/components/admin/AdminShell";
 import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
 import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
 import Card from "@/components/ui/Card";
+import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
+import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+const adminCompaniesErrorMessages: Record<string, string> = {
+  ...adminActionErrorMessages,
+};
 
 type PartnerCompanyRow = {
   id: string;
@@ -114,8 +120,14 @@ function normalizePartnerAccount(
   };
 }
 
-export default async function AdminCompaniesPage() {
+export default async function AdminCompaniesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string }>;
+}) {
   const supabase = getSupabaseAdminClient();
+  const params = (await searchParams) ?? {};
+  const companyError = params.error ? adminCompaniesErrorMessages[params.error] : null;
 
   const [partnersResult, companiesResult, accountsResult] = await Promise.all([
     supabase
@@ -177,6 +189,9 @@ export default async function AdminCompaniesPage() {
           title="협력사 리스트와 연결 관리"
           description="협력사 자체, 담당자 계정, 브랜드 연결 상태를 같은 기준 레이아웃에서 관리합니다."
         />
+        {companyError ? (
+          <FormMessage variant="error">{companyError}</FormMessage>
+        ) : null}
         <Card tone="elevated">
           <AdminCompanyManager companies={companyCards} />
         </Card>

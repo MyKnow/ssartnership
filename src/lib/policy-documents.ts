@@ -27,6 +27,21 @@ export type MemberPolicyVersionFields = {
 
 export type RequiredPolicyMap = Record<PolicyKind, PolicyDocument>;
 
+export type PolicyDocumentErrorCode =
+  | "db_error"
+  | "not_found"
+  | "invalid_request";
+
+export class PolicyDocumentError extends Error {
+  code: PolicyDocumentErrorCode;
+
+  constructor(code: PolicyDocumentErrorCode, message: string) {
+    super(message);
+    this.name = "PolicyDocumentError";
+    this.code = code;
+  }
+}
+
 const POLICY_DOCUMENTS_CACHE_KEY = "policy-documents";
 const REQUIRED_POLICY_CACHE_REVALIDATE_SECONDS = 300;
 
@@ -58,6 +73,16 @@ export function getPolicyHref(kind: PolicyKind, version?: number) {
 const POLICY_SELECT =
   "id,kind,version,title,summary,content,is_active,effective_at,created_at,updated_at";
 
+function wrapPolicyDocumentDbError(
+  error: { message?: string | null } | null | undefined,
+  message = "정책 문서를 처리하지 못했습니다.",
+) {
+  return new PolicyDocumentError(
+    "db_error",
+    error?.message?.trim() || message,
+  );
+}
+
 async function queryActiveRequiredPolicies(): Promise<RequiredPolicyMap> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -67,7 +92,10 @@ async function queryActiveRequiredPolicies(): Promise<RequiredPolicyMap> {
     .eq("is_active", true);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapPolicyDocumentDbError(
+      error,
+      "활성 정책 문서를 불러오지 못했습니다.",
+    );
   }
 
   const policies = (data ?? []).filter((entry): entry is PolicyDocument =>
@@ -83,7 +111,10 @@ async function queryActiveRequiredPolicies(): Promise<RequiredPolicyMap> {
 
   for (const kind of REQUIRED_POLICY_KINDS) {
     if (!policyMap[kind]) {
-      throw new Error(`${getPolicyKindLabel(kind)}의 활성 버전이 없습니다.`);
+      throw new PolicyDocumentError(
+        "not_found",
+        `${getPolicyKindLabel(kind)}의 활성 버전이 없습니다.`,
+      );
     }
   }
 
@@ -119,7 +150,10 @@ async function queryPolicyDocumentByKind(
     ? query.eq("version", version).maybeSingle()
     : query.eq("is_active", true).maybeSingle());
   if (error) {
-    throw new Error(error.message);
+    throw wrapPolicyDocumentDbError(
+      error,
+      "정책 문서를 불러오지 못했습니다.",
+    );
   }
 
   if (!data || !isPolicyKind(String(data.kind))) {
@@ -185,7 +219,10 @@ export async function getMemberRequiredPolicyStatus(memberId: string) {
   ]);
 
   if (memberResult.error) {
-    throw new Error(memberResult.error.message);
+    throw wrapPolicyDocumentDbError(
+      memberResult.error,
+      "회원 정책 상태를 확인하지 못했습니다.",
+    );
   }
 
   return {
@@ -245,10 +282,16 @@ export async function recordRequiredPolicyConsent(input: {
   ]);
 
   if (consentError) {
-    throw new Error(consentError.message);
+    throw wrapPolicyDocumentDbError(
+      consentError,
+      "정책 동의 내역을 저장하지 못했습니다.",
+    );
   }
   if (updateError) {
-    throw new Error(updateError.message);
+    throw wrapPolicyDocumentDbError(
+      updateError,
+      "회원 정책 동의 정보를 갱신하지 못했습니다.",
+    );
   }
 
   return agreedAt;

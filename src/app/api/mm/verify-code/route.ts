@@ -387,7 +387,13 @@ export async function POST(request: Request) {
         )
       : codeRow.year;
     if (senderYear === null) {
-      throw new Error("운영진 회원을 조회할 수 없습니다.");
+      return NextResponse.json(
+        {
+          error: "verify_failed",
+          message: "운영진 회원 정보를 확인하지 못했습니다. 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
     }
     const senderCredentials = getSenderCredentials(senderYear);
     const senderLogin = await loginWithPassword(
@@ -470,7 +476,13 @@ export async function POST(request: Request) {
     }
 
     if (!authenticatedMemberId) {
-      throw new Error("회원 생성에 실패했습니다.");
+      return NextResponse.json(
+        {
+          error: "verify_failed",
+          message: "회원 생성을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
     }
 
     await recordRequiredPolicyConsent({
@@ -520,6 +532,12 @@ export async function POST(request: Request) {
       },
     });
     await delayMemberAuthAttempt("verify-code", true);
-    return NextResponse.json({ error: "verify_failed" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "verify_failed",
+        message: "인증 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
   }
 }

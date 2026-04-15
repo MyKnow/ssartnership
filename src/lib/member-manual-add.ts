@@ -52,6 +52,18 @@ export type ManualMemberAddFormState = ManualMemberAddBatchResult & {
   message: string | null;
 };
 
+export type ManualMemberAddErrorCode = "db_error" | "lookup_failed" | "invalid_state";
+
+export class ManualMemberAddError extends Error {
+  code: ManualMemberAddErrorCode;
+
+  constructor(code: ManualMemberAddErrorCode, message: string) {
+    super(message);
+    this.name = "ManualMemberAddError";
+    this.code = code;
+  }
+}
+
 export const MANUAL_MEMBER_ADD_INITIAL_STATE: ManualMemberAddFormState = {
   status: "idle",
   message: null,
@@ -84,6 +96,13 @@ type ExistingMemberRecord = MemberRow & {
   password_salt?: string | null;
   must_change_password?: boolean;
 };
+
+function wrapManualMemberAddDbError(
+  error: { message?: string | null } | null | undefined,
+  message = "회원 추가를 처리하지 못했습니다.",
+) {
+  return new ManualMemberAddError("db_error", error?.message?.trim() || message);
+}
 
 export function parseManualMemberAddInputList(value: string): ManualMemberAddInput[] {
   const seen = new Set<string>();
@@ -183,7 +202,10 @@ async function findExistingMemberByMmUser(userId: string) {
     .eq("mm_user_id", userId)
     .maybeSingle();
   if (byUserId.error) {
-    throw new Error(byUserId.error.message);
+    throw wrapManualMemberAddDbError(
+      byUserId.error,
+      "기존 회원 정보를 불러오지 못했습니다.",
+    );
   }
   if (byUserId.data?.id) {
     return byUserId.data as ExistingMemberRecord;
@@ -204,7 +226,10 @@ async function rollbackManualMemberProvision(input: {
   if (!input.existingMember) {
     const { error } = await supabase.from("members").delete().eq("id", input.memberId);
     if (error) {
-      throw new Error(error.message);
+      throw wrapManualMemberAddDbError(
+        error,
+        "기존 회원 정보를 되돌리지 못했습니다.",
+      );
     }
     return;
   }
@@ -227,7 +252,10 @@ async function rollbackManualMemberProvision(input: {
     .eq("id", input.memberId);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapManualMemberAddDbError(
+      error,
+      "기존 회원 정보를 되돌리지 못했습니다.",
+    );
   }
 }
 
@@ -352,7 +380,7 @@ export async function provisionManualMembers(
           .update(payload)
           .eq("id", existingMember.id);
         if (error) {
-          throw new Error(error.message);
+          throw wrapManualMemberAddDbError(error, "회원 정보를 저장하지 못했습니다.");
         }
       } else {
         const { data: insertedMember, error } = await supabase
@@ -364,7 +392,7 @@ export async function provisionManualMembers(
           .select("id")
           .single();
         if (error) {
-          throw new Error(error.message);
+          throw wrapManualMemberAddDbError(error, "회원 정보를 저장하지 못했습니다.");
         }
         memberId = insertedMember?.id ?? null;
       }

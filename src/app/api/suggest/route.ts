@@ -16,6 +16,10 @@ function isEmpty(value: unknown) {
   return !value || String(value).trim().length === 0;
 }
 
+function errorResponse(message: string, status: number, code: string) {
+  return NextResponse.json({ ok: false, code, message }, { status });
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -66,17 +70,11 @@ export async function POST(request: Request) {
       isEmpty(payload.contactRole) ||
       isEmpty(payload.contactEmail)
     ) {
-      return NextResponse.json(
-        { message: "필수 항목이 누락되었습니다." },
-        { status: 400 },
-      );
+      return errorResponse("필수 항목이 누락되었습니다.", 400, "suggest_missing_required");
     }
 
     if (!isValidEmail(payload.contactEmail)) {
-      return NextResponse.json(
-        { message: "이메일 형식이 올바르지 않습니다." },
-        { status: 400 },
-      );
+      return errorResponse("이메일 형식이 올바르지 않습니다.", 400, "suggest_invalid_email");
     }
 
     const safeCompanyUrlValue =
@@ -84,9 +82,10 @@ export async function POST(request: Request) {
         ? sanitizeHttpUrl(payload.companyUrl)
         : null;
     if (payload.companyUrl?.trim() && !safeCompanyUrlValue) {
-      return NextResponse.json(
-        { message: "회사 사이트 URL 형식이 올바르지 않습니다." },
-        { status: 400 },
+      return errorResponse(
+        "회사 사이트 URL 형식이 올바르지 않습니다.",
+        400,
+        "suggest_invalid_company_url",
       );
     }
 
@@ -97,9 +96,10 @@ export async function POST(request: Request) {
     const recipient = process.env.SUGGEST_NOTIFY_EMAIL ?? BUG_REPORT_EMAIL;
 
     if (!smtpUser || !smtpPass) {
-      return NextResponse.json(
-        { message: "메일 설정이 누락되었습니다." },
-        { status: 400 },
+      return errorResponse(
+        "메일 설정이 누락되었습니다.",
+        503,
+        "suggest_mail_not_configured",
       );
     }
 
@@ -160,9 +160,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("suggest email error", error);
-    return NextResponse.json(
-      { message: "메일 전송에 실패했습니다." },
-      { status: 500 },
+    return errorResponse(
+      "메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      503,
+      "suggest_mail_send_failed",
     );
   }
 }

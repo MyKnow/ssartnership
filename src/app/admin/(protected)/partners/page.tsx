@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import ShellHeader from "@/components/ui/ShellHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
+import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import {
   createCategory,
@@ -24,6 +25,11 @@ import { listPartnerChangeRequests } from "@/lib/partner-change-requests";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+const adminPartnersErrorMessages: Record<string, string> = {
+  ...partnerFormErrorMessages,
+  ...adminActionErrorMessages,
+};
 
 type PartnerCompanyRow = {
   id: string;
@@ -80,7 +86,7 @@ export default async function AdminPartnersPage({
 }) {
   const supabase = getSupabaseAdminClient();
   const params = (await searchParams) ?? {};
-  const partnerFormError = params.error ? partnerFormErrorMessages[params.error] : null;
+  const partnerFormError = params.error ? adminPartnersErrorMessages[params.error] : null;
 
   const [
     categoriesResult,

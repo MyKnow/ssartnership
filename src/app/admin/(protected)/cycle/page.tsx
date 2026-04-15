@@ -22,6 +22,7 @@ import {
   getCurrentSsafySemester,
 } from "@/lib/ssafy-year";
 import { SITE_NAME } from "@/lib/site";
+import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +34,17 @@ export const metadata: Metadata = {
   },
 };
 
+const adminCycleErrorMessages: Record<string, string> = {
+  ...adminActionErrorMessages,
+};
+
 export default async function AdminCyclePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; error?: string }>;
 }) {
   const params = (await searchParams) ?? {};
+  const cycleError = params.error ? adminCycleErrorMessages[params.error] : null;
   const settings = await getSsafyCycleSettings();
   const overview = getSsafyCycleOverview(settings);
   const currentYear = getConfiguredCurrentSsafyYear(settings);
@@ -64,6 +70,9 @@ export default async function AdminCyclePage({
               description="기수 전환 기준과 현재 계산 결과를 확인합니다."
             />
 
+            {cycleError ? (
+              <FormMessage variant="error">{cycleError}</FormMessage>
+            ) : null}
             {params.status ? (
               <FormMessage variant="muted">
                 {params.status === "updated"

@@ -66,12 +66,9 @@ export async function POST(
     return NextResponse.json(
       {
         error: "setup_failed",
-        message:
-          error instanceof Error
-            ? error.message
-            : "초기 설정에 실패했습니다.",
+        message: "초기 설정에 실패했습니다. 잠시 후 다시 시도해 주세요.",
       },
-      { status: 500 },
+      { status: 503 },
     );
   }
 }

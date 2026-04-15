@@ -78,6 +78,18 @@ export type SsafyCycleOverview = {
   nextCohortStartLabel: string;
 };
 
+export type SsafyCycleSettingsErrorCode = "db_error";
+
+export class SsafyCycleSettingsError extends Error {
+  code: SsafyCycleSettingsErrorCode;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "SsafyCycleSettingsError";
+    this.code = "db_error";
+  }
+}
+
 const DEFAULT_SSAFY_CYCLE_SETTINGS: SsafyCycleSettings = {
   ...DEFAULT_SSAFY_YEAR_RULE,
   manualCurrentYear: null,
@@ -114,6 +126,13 @@ function normalizeNullableNumber(
     return null;
   }
   return value;
+}
+
+function wrapSsafyCycleSettingsError(
+  error: { message?: string | null } | null | undefined,
+  message = "기수 설정을 처리하지 못했습니다.",
+) {
+  return new SsafyCycleSettingsError(error?.message?.trim() || message);
 }
 
 export function normalizeSsafyCycleSettings(
@@ -170,7 +189,7 @@ export async function getSsafyCycleSettings() {
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapSsafyCycleSettingsError(error, "기수 설정을 불러오지 못했습니다.");
   }
 
   return normalizeSsafyCycleSettings(data as Partial<Record<string, unknown>> | null);
@@ -262,7 +281,7 @@ export async function upsertSsafyCycleSettings(input: {
   );
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapSsafyCycleSettingsError(error, "기수 설정을 저장하지 못했습니다.");
   }
 }
 
@@ -280,7 +299,7 @@ export async function setSsafyCycleEarlyStart(targetYear: number) {
     .eq("id", 1);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapSsafyCycleSettingsError(error, "기수 설정을 저장하지 못했습니다.");
   }
 }
 
@@ -298,6 +317,6 @@ export async function clearSsafyCycleOverride() {
     .eq("id", 1);
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapSsafyCycleSettingsError(error, "기수 설정을 저장하지 못했습니다.");
   }
 }

@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
 import InlineMessage from "@/components/ui/InlineMessage";
+import FormMessage from "@/components/ui/FormMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
@@ -155,6 +156,7 @@ export default function AdminPushManager({
   const [sort, setSort] = useState<SortOption>("newest");
   const [pending, setPending] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setLogs(recentLogs);
@@ -270,8 +272,9 @@ export default function AdminPushManager({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setErrorMessage(null);
     if (!configured) {
-      notify("VAPID 환경 변수와 CRON 시크릿이 준비된 뒤 발송할 수 있습니다.");
+      setErrorMessage("VAPID 환경 변수와 CRON 시크릿이 준비된 뒤 발송할 수 있습니다.");
       return;
     }
 
@@ -305,7 +308,8 @@ export default function AdminPushManager({
           }
         | null;
       if (!response.ok) {
-        throw new Error(data?.message ?? "공지 알림 발송에 실패했습니다.");
+        setErrorMessage(data?.message ?? "공지 알림 발송에 실패했습니다.");
+        return;
       }
 
       setTitle("");
@@ -321,7 +325,9 @@ export default function AdminPushManager({
         `공지 알림 발송 완료: ${data?.result?.delivered ?? 0}건 성공, ${data?.result?.failed ?? 0}건 실패`,
       );
     } catch (error) {
-      notify(error instanceof Error ? error.message : "공지 알림 발송에 실패했습니다.");
+      setErrorMessage(
+        error instanceof Error ? error.message : "공지 알림 발송에 실패했습니다.",
+      );
     } finally {
       setPending(false);
     }
@@ -398,6 +404,7 @@ export default function AdminPushManager({
 
     try {
       setDeletingLogId(logId);
+      setErrorMessage(null);
       const response = await fetch(`/api/push/admin/logs/${logId}`, {
         method: "DELETE",
       });
@@ -406,13 +413,14 @@ export default function AdminPushManager({
         | null;
 
       if (!response.ok) {
-        throw new Error(data?.message ?? "푸시 메시지 로그 삭제에 실패했습니다.");
+        setErrorMessage(data?.message ?? "푸시 메시지 로그 삭제에 실패했습니다.");
+        return;
       }
 
       setLogs((current) => current.filter((log) => log.id !== logId));
       notify("푸시 메시지 로그를 삭제했습니다.");
     } catch (error) {
-      notify(
+      setErrorMessage(
         error instanceof Error
           ? error.message
           : "푸시 메시지 로그 삭제에 실패했습니다.",
@@ -449,6 +457,8 @@ export default function AdminPushManager({
           title="공지 메시지 작성"
           description="발송 대상을 먼저 정하고, 직접 URL 입력 또는 등록된 제휴 업체 선택으로 이동 경로를 구성합니다."
         />
+
+        {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
 
         {!configured ? (
           <InlineMessage

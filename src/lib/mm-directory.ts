@@ -51,8 +51,27 @@ export type MmUserDirectorySyncResult = {
   }>;
 };
 
+export type MmDirectoryErrorCode = "db_error" | "invalid_state";
+
+export class MmDirectoryError extends Error {
+  code: MmDirectoryErrorCode;
+
+  constructor(code: MmDirectoryErrorCode, message: string) {
+    super(message);
+    this.name = "MmDirectoryError";
+    this.code = code;
+  }
+}
+
 function uniqueSortedYears(years: Iterable<number>) {
   return Array.from(new Set(years)).sort((a, b) => a - b);
+}
+
+function wrapMmDirectoryDbError(
+  error: { message?: string | null } | null | undefined,
+  message = "MM 유저 디렉토리를 처리하지 못했습니다.",
+) {
+  return new MmDirectoryError("db_error", error?.message?.trim() || message);
 }
 
 function buildSnapshotFromUser(user: MMUser, sourceYear: number): MmUserDirectorySnapshot {
@@ -247,7 +266,10 @@ export async function findMmUserDirectoryEntryByUsername(username: string) {
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapMmDirectoryDbError(
+      error,
+      "MM 유저 디렉토리를 불러오지 못했습니다.",
+    );
   }
 
   return (data as MmUserDirectoryRow | null) ?? null;
@@ -280,7 +302,10 @@ export async function findMmUserDirectoryStudentEntryByUsernameAndYear(
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapMmDirectoryDbError(
+      error,
+      "MM 유저 디렉토리를 불러오지 못했습니다.",
+    );
   }
 
   const row = (data as MmUserDirectoryRow | null) ?? null;
@@ -310,7 +335,10 @@ export async function findMmUserDirectoryStaffEntryByUsername(
     .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapMmDirectoryDbError(
+      error,
+      "MM 유저 디렉토리를 불러오지 못했습니다.",
+    );
   }
 
   return (data as MmUserDirectoryRow | null) ?? null;
@@ -325,7 +353,10 @@ export async function upsertMmUserDirectorySnapshot(snapshot: MmUserDirectorySna
     .maybeSingle();
 
   if (existingError) {
-    throw new Error(existingError.message);
+    throw wrapMmDirectoryDbError(
+      existingError,
+      "MM 유저 디렉토리를 불러오지 못했습니다.",
+    );
   }
 
   const sourceYears = uniqueSortedYears([
@@ -354,7 +385,10 @@ export async function upsertMmUserDirectorySnapshot(snapshot: MmUserDirectorySna
   );
 
   if (error) {
-    throw new Error(error.message);
+    throw wrapMmDirectoryDbError(
+      error,
+      "MM 유저 디렉토리를 저장하지 못했습니다.",
+    );
   }
 
   return {
@@ -371,7 +405,10 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
     .from("mm_user_directory")
     .select("mm_user_id,campus,is_staff,source_years");
   if (existingRowsError) {
-    throw new Error(existingRowsError.message);
+    throw wrapMmDirectoryDbError(
+      existingRowsError,
+      "MM 유저 디렉토리를 불러오지 못했습니다.",
+    );
   }
 
   const existingMap = new Map(
@@ -397,7 +434,10 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
   });
 
   if (rows.length === 0) {
-    throw new Error("MM 유저 디렉토리를 동기화할 수 없습니다.");
+    throw new MmDirectoryError(
+      "invalid_state",
+      "MM 유저 디렉토리를 동기화할 수 없습니다.",
+    );
   }
 
   const { error: upsertError } = await supabase
@@ -407,7 +447,10 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
     });
 
   if (upsertError) {
-    throw new Error(upsertError.message);
+    throw wrapMmDirectoryDbError(
+      upsertError,
+      "MM 유저 디렉토리를 저장하지 못했습니다.",
+    );
   }
 
   let staleIds: string[] = [];
@@ -416,7 +459,10 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
       .from("mm_user_directory")
       .select("mm_user_id");
     if (existingError) {
-      throw new Error(existingError.message);
+      throw wrapMmDirectoryDbError(
+        existingError,
+        "MM 유저 디렉토리를 불러오지 못했습니다.",
+      );
     }
 
     const seenIds = new Set(rows.map((row) => row.mm_user_id));
@@ -430,7 +476,10 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
         .delete()
         .in("mm_user_id", staleIds);
       if (deleteError) {
-        throw new Error(deleteError.message);
+        throw wrapMmDirectoryDbError(
+          deleteError,
+          "MM 유저 디렉토리를 정리하지 못했습니다.",
+        );
       }
     }
   }

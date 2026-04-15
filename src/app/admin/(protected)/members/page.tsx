@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineMessage from "@/components/ui/InlineMessage";
+import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import SubmitButton from "@/components/ui/SubmitButton";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -14,9 +15,14 @@ import {
   manualAddMembers,
   updateMember,
 } from "@/app/admin/(protected)/actions";
+import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+const adminMembersErrorMessages: Record<string, string> = {
+  ...adminActionErrorMessages,
+};
 
 export default async function AdminMembersPage({
   searchParams,
@@ -27,9 +33,11 @@ export default async function AdminMembersPage({
     updated?: string;
     skipped?: string;
     failures?: string;
+    error?: string;
   }>;
 }) {
   const params = (await searchParams) ?? {};
+  const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const supabase = getSupabaseAdminClient();
   const { data: members } = await supabase
     .from("members")
@@ -46,79 +54,82 @@ export default async function AdminMembersPage({
       backHref="/admin"
       backLabel="관리 홈"
     >
-    <div className="grid gap-6">
-      <ShellHeader
-        eyebrow="Members"
-        title="회원 계정 관리"
-        description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
-      />
-      <Card tone="elevated">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <SectionHeading
-            title="회원 관리"
-            description="회원의 표시 정보와 비밀번호 변경 강제 여부를 관리할 수 있습니다."
-          />
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <Button variant="ghost" href="/admin/members/mock">
-              Mock 미리보기
-            </Button>
-            <form action={backfillMemberProfiles}>
-              <SubmitButton pendingText="백필 중">
-                지금 백필 실행
-              </SubmitButton>
-            </form>
-          </div>
-        </div>
-
-        {params.backfill ? (
-          <InlineMessage
-            className="mt-6"
-            tone={
-              params.backfill === "partial"
-                ? "warning"
-                : params.backfill === "error"
-                  ? "danger"
-                  : "success"
-            }
-            title={
-              params.backfill === "partial"
-                ? "백필이 일부만 완료되었습니다."
-                : params.backfill === "error"
-                  ? "백필 중 오류가 발생했습니다."
-                  : "백필이 완료되었습니다."
-            }
-            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
-          />
-        ) : null}
-      </Card>
-
-      <Card tone="elevated">
-        <SectionHeading
-          title="유저 수동 추가"
-          description="MM 아이디를 입력하면 해당 기수에서 찾아 임시 비밀번호를 전송하고, 비밀번호 변경이 필요하도록 저장합니다. 운영진은 15기에서 먼저 찾고 없으면 14기에서 찾습니다."
+      <div className="grid gap-6">
+        <ShellHeader
+          eyebrow="Members"
+          title="회원 계정 관리"
+          description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
         />
-        <div className="mt-6">
-          <AdminMemberManualAddPanel action={manualAddMembers} />
-        </div>
-      </Card>
+        {memberError ? (
+          <FormMessage variant="error">{memberError}</FormMessage>
+        ) : null}
+        <Card tone="elevated">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <SectionHeading
+              title="회원 관리"
+              description="회원의 표시 정보와 비밀번호 변경 강제 여부를 관리할 수 있습니다."
+            />
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <Button variant="ghost" href="/admin/members/mock">
+                Mock 미리보기
+              </Button>
+              <form action={backfillMemberProfiles}>
+                <SubmitButton pendingText="백필 중">
+                  지금 백필 실행
+                </SubmitButton>
+              </form>
+            </div>
+          </div>
 
-      {safeMembers.length === 0 ? (
-        <Card tone="elevated">
-          <EmptyState
-            title="등록된 회원이 없습니다."
-            description="회원가입이 완료된 교육생이 생기면 이곳에서 관리할 수 있습니다."
-          />
+          {params.backfill ? (
+            <InlineMessage
+              className="mt-6"
+              tone={
+                params.backfill === "partial"
+                  ? "warning"
+                  : params.backfill === "error"
+                    ? "danger"
+                    : "success"
+              }
+              title={
+                params.backfill === "partial"
+                  ? "백필이 일부만 완료되었습니다."
+                  : params.backfill === "error"
+                    ? "백필 중 오류가 발생했습니다."
+                    : "백필이 완료되었습니다."
+              }
+              description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
+            />
+          ) : null}
         </Card>
-      ) : (
+
         <Card tone="elevated">
-          <AdminMemberManager
-            members={safeMembers}
-            updateMember={updateMember}
-            deleteMember={deleteMember}
+          <SectionHeading
+            title="유저 수동 추가"
+            description="MM 아이디를 입력하면 해당 기수에서 찾아 임시 비밀번호를 전송하고, 비밀번호 변경이 필요하도록 저장합니다. 운영진은 15기에서 먼저 찾고 없으면 14기에서 찾습니다."
           />
+          <div className="mt-6">
+            <AdminMemberManualAddPanel action={manualAddMembers} />
+          </div>
         </Card>
-      )}
-    </div>
-  </AdminShell>
+
+        {safeMembers.length === 0 ? (
+          <Card tone="elevated">
+            <EmptyState
+              title="등록된 회원이 없습니다."
+              description="회원가입이 완료된 교육생이 생기면 이곳에서 관리할 수 있습니다."
+            />
+          </Card>
+        ) : (
+          <Card tone="elevated">
+            <AdminMemberManager
+              members={safeMembers}
+              updateMember={updateMember}
+              deleteMember={deleteMember}
+            />
+          </Card>
+        )}
+      </div>
+    </AdminShell>
   );
 }

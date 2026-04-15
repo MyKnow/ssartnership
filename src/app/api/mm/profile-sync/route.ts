@@ -36,6 +36,13 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("member profile sync failed", error);
-    return NextResponse.json({ ok: false, updated: false }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        updated: false,
+        message: "프로필 동기화에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
   }
 }
