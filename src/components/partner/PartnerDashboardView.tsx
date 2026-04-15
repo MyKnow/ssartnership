@@ -3,6 +3,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
+import FormMessage from "@/components/ui/FormMessage";
 import MotionReveal from "@/components/ui/MotionReveal";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
@@ -213,6 +214,10 @@ export default function PartnerDashboardView({
                 description="협력사 단위로 연결된 브랜드와 조회·클릭 지표를 한 번에 확인합니다."
                 actions={<Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>}
               />
+
+              {dashboard.warningMessage ? (
+                <FormMessage variant="info">{dashboard.warningMessage}</FormMessage>
+              ) : null}
 
               <StatsRow
                 items={[

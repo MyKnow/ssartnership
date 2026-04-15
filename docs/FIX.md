@@ -19,6 +19,7 @@
 - `src/lib/mm-member-sync.ts`와 `src/lib/member-manual-add.ts`의 raw `Error`도 typed error로 바꿔, 회원 동기화/수동 추가 경로까지 동일한 예외 규칙으로 맞췄다.
 - `src/components/admin/AdminPushManager.tsx`와 `src/components/admin/AdminLogsManager.tsx`의 fetch 실패를 토스트만 남기지 않고 inline error로 보여주도록 바꿨다.
 - `src/app/api/mm/*`, `src/app/api/partner/change-password/route.ts`, `src/app/api/partner/reset-password/route.ts`, `src/app/api/partner/setup/[token]/route.ts`의 catch-all 500을 503 계열로 낮추고, 인증/초기설정/재설정 실패가 같은 화면에서 복구 가능하도록 정리했다.
+- `src/app/admin/(protected)/actions.ts`의 카테고리 생성 500과 잘못된 관리 페이지 리다이렉트를 바로잡고, `src/lib/partner-dashboard.supabase.ts`와 `src/app/api/cron/push-expiring-partners/route.ts`를 fail-soft하게 바꿔 통계 일부 실패나 개별 푸시 실패가 화면 전체/배치 전체를 죽이지 않도록 정리했다.
 
 ## P0. 서버 액션의 입력 오류가 500으로 승격되는 경로 (완료)
 

@@ -65,23 +65,47 @@ export async function GET(request: NextRequest) {
     delivered: 0,
     failed: 0,
   };
+  const failures: Array<{
+    partnerId: string;
+    name: string;
+    message: string;
+  }> = [];
 
   for (const partner of activePartners) {
-    const result = await sendPushToAudience(
-      createExpiringPartnerPayload({
+    try {
+      const result = await sendPushToAudience(
+        createExpiringPartnerPayload({
+          partnerId: partner.id,
+          name: partner.name,
+          endDate: partner.period_end,
+        }),
+      );
+      summary.targeted += result.targeted;
+      summary.delivered += result.delivered;
+      summary.failed += result.failed;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "만료 예정 알림 발송에 실패했습니다.";
+      failures.push({
         partnerId: partner.id,
         name: partner.name,
-        endDate: partner.period_end,
-      }),
-    );
-    summary.targeted += result.targeted;
-    summary.delivered += result.delivered;
-    summary.failed += result.failed;
+        message,
+      });
+      summary.failed += 1;
+      console.error("[push-expiring-partners] partner push failed", {
+        partnerId: partner.id,
+        message,
+      });
+    }
   }
 
   return NextResponse.json({
-    ok: true,
+    ok: failures.length === 0,
+    partialFailure: failures.length > 0,
     targetDate,
     summary,
+    failures,
   });
 }

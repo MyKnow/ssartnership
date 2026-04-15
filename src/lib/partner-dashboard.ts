@@ -39,6 +39,7 @@ export type PartnerPortalDashboard = {
     companyCount: number;
     serviceCount: number;
   };
+  warningMessage?: string | null;
 };
 
 export interface PartnerPortalDashboardRepository {
@@ -83,6 +84,7 @@ function createEmptyDashboard(): PartnerPortalDashboard {
       companyCount: 0,
       serviceCount: 0,
     },
+    warningMessage: null,
   };
 }
 

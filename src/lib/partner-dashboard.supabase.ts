@@ -38,6 +38,9 @@ type PartnerChangeRequestRow = {
   updated_at?: string | null;
 };
 
+const PARTNER_DASHBOARD_WARNING_MESSAGE =
+  "일부 통계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -82,6 +85,7 @@ async function countPartnerEvent(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   partnerId: string,
   eventName: string,
+  onError: () => void,
 ) {
   const { count, error } = await supabase
     .from("event_logs")
@@ -91,7 +95,13 @@ async function countPartnerEvent(
     .eq("event_name", eventName);
 
   if (error) {
-    throw new Error(error.message);
+    onError();
+    console.error("[partner-dashboard] event metric query failed", {
+      partnerId,
+      eventName,
+      message: error.message,
+    });
+    return 0;
   }
 
   return count ?? 0;
@@ -100,14 +110,15 @@ async function countPartnerEvent(
 async function getServiceMetrics(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   partnerId: string,
+  onError: () => void,
 ) {
   const [detailViews, cardClicks, mapClicks, reservationClicks, inquiryClicks] =
     await Promise.all([
-      countPartnerEvent(supabase, partnerId, "partner_detail_view"),
-      countPartnerEvent(supabase, partnerId, "partner_card_click"),
-      countPartnerEvent(supabase, partnerId, "partner_map_click"),
-      countPartnerEvent(supabase, partnerId, "reservation_click"),
-      countPartnerEvent(supabase, partnerId, "inquiry_click"),
+      countPartnerEvent(supabase, partnerId, "partner_detail_view", onError),
+      countPartnerEvent(supabase, partnerId, "partner_card_click", onError),
+      countPartnerEvent(supabase, partnerId, "partner_map_click", onError),
+      countPartnerEvent(supabase, partnerId, "reservation_click", onError),
+      countPartnerEvent(supabase, partnerId, "inquiry_click", onError),
     ]);
 
   return {
@@ -166,10 +177,15 @@ export async function getSupabasePartnerPortalDashboard(
         companyCount: 0,
         serviceCount: 0,
       },
+      warningMessage: null,
     };
   }
 
   const supabase = getSupabaseAdminClient();
+  let hasPartialFailure = false;
+  const markPartialFailure = () => {
+    hasPartialFailure = true;
+  };
   const [companyResult, serviceResult, changeRequestResult] = await Promise.all([
     supabase
       .from("partner_companies")
@@ -190,18 +206,32 @@ export async function getSupabasePartnerPortalDashboard(
   ]);
 
   if (companyResult.error) {
-    throw new Error(companyResult.error.message);
+    markPartialFailure();
+    console.error(
+      "[partner-dashboard] company query failed",
+      companyResult.error.message,
+    );
   }
   if (serviceResult.error) {
-    throw new Error(serviceResult.error.message);
+    markPartialFailure();
+    console.error(
+      "[partner-dashboard] service query failed",
+      serviceResult.error.message,
+    );
   }
   if (changeRequestResult.error) {
-    throw new Error(changeRequestResult.error.message);
+    markPartialFailure();
+    console.error(
+      "[partner-dashboard] change request query failed",
+      changeRequestResult.error.message,
+    );
   }
 
-  const companyRows = (companyResult.data ?? []) as PartnerCompanyRow[];
-  const serviceRows = (serviceResult.data ?? []) as PartnerServiceRow[];
-  const requestRows = (changeRequestResult.data ?? []) as PartnerChangeRequestRow[];
+  const companyRows = (companyResult.error ? [] : companyResult.data ?? []) as PartnerCompanyRow[];
+  const serviceRows = (serviceResult.error ? [] : serviceResult.data ?? []) as PartnerServiceRow[];
+  const requestRows = (
+    changeRequestResult.error ? [] : changeRequestResult.data ?? []
+  ) as PartnerChangeRequestRow[];
   const statusByCompanyId = new Map<string, string | null | undefined>();
 
   for (const request of requestRows) {
@@ -214,7 +244,7 @@ export async function getSupabasePartnerPortalDashboard(
 
   const serviceMetricsEntries = await Promise.all(
     serviceRows.map(async (row) => {
-      const metrics = await getServiceMetrics(supabase, row.id);
+      const metrics = await getServiceMetrics(supabase, row.id, markPartialFailure);
       return [row.id, metrics] as const;
     }),
   );
@@ -246,5 +276,6 @@ export async function getSupabasePartnerPortalDashboard(
         0,
       ),
     },
+    warningMessage: hasPartialFailure ? PARTNER_DASHBOARD_WARNING_MESSAGE : null,
   };
 }

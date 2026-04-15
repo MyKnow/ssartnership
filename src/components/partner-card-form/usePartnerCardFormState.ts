@@ -1,0 +1,131 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  DEFAULT_PARTNER_AUDIENCE,
+  normalizePartnerAudience,
+} from "../../lib/partner-audience.ts";
+import type {
+  PartnerCardFormField,
+  PartnerCardFormValues,
+} from "./types.ts";
+
+export function getCompanyFieldsLocked(selectedCompanyId: string) {
+  return Boolean(selectedCompanyId);
+}
+
+export function getPartnerCardInvalidClass(hasError: boolean) {
+  return hasError ? "border-danger/40 ring-2 ring-danger/15" : undefined;
+}
+
+export function createPartnerCardFormState(
+  partner: PartnerCardFormValues,
+  categoryId?: string,
+) {
+  return {
+    periodStart: partner.period?.start ?? "",
+    periodEnd: partner.period?.end ?? "",
+    selectedCompanyId: partner.company?.id ?? "",
+    nameValue: partner.name ?? "",
+    visibilityValue: partner.visibility ?? "public",
+    categoryValue: categoryId ?? "",
+    locationValue: partner.location ?? "",
+    mapUrlValue: partner.mapUrl ?? "",
+    reservationLinkValue: partner.reservationLink ?? "",
+    inquiryLinkValue: partner.inquiryLink ?? "",
+    companyNameValue: partner.company?.name ?? "",
+    companyContactNameValue: partner.company?.contactName ?? "",
+    companyContactEmailValue: partner.company?.contactEmail ?? "",
+    companyContactPhoneValue: partner.company?.contactPhone ?? "",
+    companyDescriptionValue: partner.company?.description ?? "",
+    appliesToValue: normalizePartnerAudience(
+      partner.appliesTo ?? DEFAULT_PARTNER_AUDIENCE,
+    ),
+  };
+}
+
+export default function usePartnerCardFormState({
+  partner,
+  categoryId,
+  focusField,
+}: {
+  partner: PartnerCardFormValues;
+  categoryId?: string;
+  focusField?: PartnerCardFormField;
+}) {
+  const defaults = createPartnerCardFormState(partner, categoryId);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(defaults.selectedCompanyId);
+  const [nameValue, setNameValue] = useState(defaults.nameValue);
+  const [visibilityValue, setVisibilityValue] = useState(defaults.visibilityValue);
+  const [categoryValue, setCategoryValue] = useState(defaults.categoryValue);
+  const [periodStartValue, setPeriodStartValue] = useState(defaults.periodStart);
+  const [periodEndValue, setPeriodEndValue] = useState(defaults.periodEnd);
+  const [locationValue, setLocationValue] = useState(defaults.locationValue);
+  const [mapUrlValue, setMapUrlValue] = useState(defaults.mapUrlValue);
+  const [reservationLinkValue, setReservationLinkValue] = useState(
+    defaults.reservationLinkValue,
+  );
+  const [inquiryLinkValue, setInquiryLinkValue] = useState(defaults.inquiryLinkValue);
+  const [companyNameValue, setCompanyNameValue] = useState(defaults.companyNameValue);
+  const [companyContactNameValue, setCompanyContactNameValue] = useState(
+    defaults.companyContactNameValue,
+  );
+  const [companyContactEmailValue, setCompanyContactEmailValue] = useState(
+    defaults.companyContactEmailValue,
+  );
+  const [companyContactPhoneValue, setCompanyContactPhoneValue] = useState(
+    defaults.companyContactPhoneValue,
+  );
+  const [companyDescriptionValue, setCompanyDescriptionValue] = useState(
+    defaults.companyDescriptionValue,
+  );
+  const [appliesToValue, setAppliesToValue] = useState<string[]>(defaults.appliesToValue);
+
+  useEffect(() => {
+    if (!focusField) {
+      return;
+    }
+    const target = formRef.current?.querySelector<HTMLElement>(`[name="${focusField}"]`);
+    target?.focus();
+  }, [focusField]);
+
+  return {
+    formRef,
+    periodStart: defaults.periodStart,
+    periodEnd: defaults.periodEnd,
+    selectedCompanyId,
+    setSelectedCompanyId,
+    nameValue,
+    setNameValue,
+    visibilityValue,
+    setVisibilityValue,
+    categoryValue,
+    setCategoryValue,
+    periodStartValue,
+    setPeriodStartValue,
+    periodEndValue,
+    setPeriodEndValue,
+    locationValue,
+    setLocationValue,
+    mapUrlValue,
+    setMapUrlValue,
+    reservationLinkValue,
+    setReservationLinkValue,
+    inquiryLinkValue,
+    setInquiryLinkValue,
+    companyNameValue,
+    setCompanyNameValue,
+    companyContactNameValue,
+    setCompanyContactNameValue,
+    companyContactEmailValue,
+    setCompanyContactEmailValue,
+    companyContactPhoneValue,
+    setCompanyContactPhoneValue,
+    companyDescriptionValue,
+    setCompanyDescriptionValue,
+    appliesToValue,
+    setAppliesToValue,
+    companyFieldsLocked: getCompanyFieldsLocked(selectedCompanyId),
+  };
+}
