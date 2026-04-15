@@ -7,6 +7,7 @@
 
 - `src/app/admin/(protected)/actions.ts`의 브랜드 create/update 검증 실패를 redirect/query param 기반으로 바꾸고, `/admin/partners`와 `/admin/partners/new`에서 inline error + focus 복구가 되도록 정리했다.
 - `src/app/admin/(protected)/partners/new/page.tsx`와 `src/components/PartnerCardForm.tsx`를 `useActionState` 기반으로 바꿔, `/admin/partners/new`에서 validation 실패 시 입력값과 이미지를 유지하고 필드 아래에 에러를 보여주도록 정리했다.
+- `src/components/PartnerCardForm.tsx`의 핵심 입력 필드를 controlled state로 바꿔, validation 실패 시 텍스트/선택값이 초기화되지 않도록 보강했다.
 - `src/components/partner/PartnerPortalActionLinks.tsx`의 로그아웃 프리패치를 꺼서, 미리 요청으로 세션이 풀리는 경로를 막았다.
 - `src/app/admin/(protected)/partners/page.tsx`와 `src/app/admin/(protected)/partners/new/page.tsx`를 분리해서, 브랜드 추가 실패 시 현재 작성 페이지에 남고 성공 시 목록으로 이동하도록 바꿨다.
 - `src/lib/partner-form-errors.ts`와 `src/components/admin/AdminPartnerCreateToast.tsx`를 추가해, 생성 성공/실패 메시지를 공용으로 다루게 했다.
