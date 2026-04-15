@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FaGithub } from "react-icons/fa";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
+import CampusFooterSelect from "@/components/CampusFooterSelect";
 import PwaInstallButton from "@/components/PwaInstallButton";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
@@ -25,6 +26,7 @@ export default function Footer() {
             <BrandWordmark className="text-base sm:text-lg" />
           </Link>
           <div className="flex flex-wrap items-center gap-2">
+            <CampusFooterSelect />
             <Button
               variant="secondary"
               href={GITHUB_URL}

@@ -1,7 +1,4 @@
 import HomeView from "@/components/HomeView";
-import CampusLandingSection from "@/components/CampusLandingSection";
-import { getCampusSummaries } from "@/lib/campuses";
-import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { partnerRepository } from "@/lib/repositories";
 import { isWithinPeriod } from "@/lib/partner-utils";
 
@@ -27,18 +24,11 @@ export default async function HomeContent({
       inquiryLink: undefined,
     };
   });
-  const campusSummaries = getCampusSummaries(
-    viewPartners.filter((partner) => canViewPartnerDetails(partner.visibility, false)),
-  );
-
   return (
-    <>
-      <CampusLandingSection campuses={campusSummaries} />
-      <HomeView
-        categories={categories}
-        partners={viewPartners}
-        viewerAuthenticated={viewerAuthenticated}
-      />
-    </>
+    <HomeView
+      categories={categories}
+      partners={viewPartners}
+      viewerAuthenticated={viewerAuthenticated}
+    />
   );
 }
