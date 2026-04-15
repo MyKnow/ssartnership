@@ -1,6 +1,4 @@
 "use client";
-
-import type { ReactElement, ReactNode } from "react";
 import Image from "next/image";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -14,12 +12,13 @@ import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import ShareLinkButton from "@/components/ShareLinkButton";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import ContactCopyRow from "@/components/ContactCopyRow";
+import { DiffCard } from "@/components/partner-change-request-ui/DiffPrimitives";
+import { buildPartnerChangeRequestDiffItems } from "@/components/partner-change-request-ui/buildDiffItems";
 import {
   getContactDisplay,
   getMapLink,
   normalizeReservationInquiry,
 } from "@/lib/partner-links";
-import { cn } from "@/lib/cn";
 import { getCachedImageUrl } from "@/lib/image-cache";
 import {
   getPartnerVisibilityBadgeClass,
@@ -36,145 +35,6 @@ function withAlpha(color: string, alphaHex: string) {
   return `${color}${alphaHex}`;
 }
 
-function ListChips({
-  values,
-  emptyText,
-  badgeClassName = "bg-surface text-foreground",
-}: {
-  values: string[];
-  emptyText: string;
-  badgeClassName?: string;
-}) {
-  if (values.length === 0) {
-    return <p className="text-sm text-muted-foreground">{emptyText}</p>;
-  }
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {values.map((value) => (
-        <Badge key={value} className={badgeClassName}>
-          {value}
-        </Badge>
-      ))}
-    </div>
-  );
-}
-
-function arraysEqual(a: string[], b: string[]) {
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every((value, index) => value === b[index]);
-}
-
-function formatRange(start: string | null, end: string | null) {
-  return `${start ?? "미정"} ~ ${end ?? "미정"}`;
-}
-
-function DiffText({
-  tone,
-  children,
-}: {
-  tone: "current" | "requested";
-  children: ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "break-words text-sm font-medium leading-6",
-        tone === "current"
-          ? "text-rose-700 dark:text-rose-100"
-          : "text-emerald-700 dark:text-emerald-100",
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function DiffLink({
-  tone,
-  href,
-}: {
-  tone: "current" | "requested";
-  href: string | null;
-}) {
-  if (!href) {
-    return <DiffText tone={tone}>없음</DiffText>;
-  }
-
-  return (
-    <a
-      className={cn(
-        "break-all text-sm font-medium leading-6 underline decoration-1 underline-offset-4",
-        tone === "current"
-          ? "text-rose-700 decoration-rose-300 hover:text-rose-600 dark:text-rose-100 dark:decoration-rose-400"
-          : "text-emerald-700 decoration-emerald-300 hover:text-emerald-600 dark:text-emerald-100 dark:decoration-emerald-400",
-      )}
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-    >
-      {href}
-    </a>
-  );
-}
-
-function DiffPanel({
-  tone,
-  label,
-  children,
-}: {
-  tone: "current" | "requested";
-  label: string;
-  children: ReactNode;
-}) {
-  const toneClass =
-    tone === "current"
-      ? "border-rose-500/20 bg-rose-500/5"
-      : "border-emerald-500/20 bg-emerald-500/5";
-  const labelClass =
-    tone === "current"
-      ? "text-rose-700 dark:text-rose-200"
-      : "text-emerald-700 dark:text-emerald-200";
-
-  return (
-    <div className={cn("rounded-2xl border p-4", toneClass)}>
-      <p className={cn("text-xs font-semibold uppercase tracking-[0.18em]", labelClass)}>
-        {label}
-      </p>
-      <div className="mt-3">{children}</div>
-    </div>
-  );
-}
-
-function DiffCard({
-  label,
-  current,
-  requested,
-}: {
-  label: string;
-  current: ReactNode;
-  requested: ReactNode;
-}) {
-  return (
-    <div className="rounded-3xl border border-border bg-background/70 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        <Badge className="bg-primary/10 text-primary">변경됨</Badge>
-      </div>
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <DiffPanel tone="current" label="현재">
-          {current}
-        </DiffPanel>
-        <DiffPanel tone="requested" label="요청">
-          {requested}
-        </DiffPanel>
-      </div>
-    </div>
-  );
-}
-
 function SectionTitle({
   label,
 }: {
@@ -187,140 +47,6 @@ function SectionTitle({
   );
 }
 
-type PendingDiffItem = {
-  key: string;
-  label: string;
-  current: ReactElement;
-  requested: ReactElement;
-};
-
-function getPendingDiffItems(
-  pendingRequest: PartnerChangeRequestContext["pendingRequest"],
-): PendingDiffItem[] {
-  if (!pendingRequest) {
-    return [];
-  }
-
-  return [
-    pendingRequest.currentPartnerName !== pendingRequest.requestedPartnerName
-      ? {
-          key: "partnerName",
-          label: "브랜드명",
-          current: <DiffText tone="current">{pendingRequest.currentPartnerName}</DiffText>,
-          requested: (
-            <DiffText tone="requested">{pendingRequest.requestedPartnerName}</DiffText>
-          ),
-        }
-      : null,
-    pendingRequest.currentPartnerLocation !== pendingRequest.requestedPartnerLocation
-      ? {
-          key: "partnerLocation",
-          label: "위치",
-          current: (
-            <DiffText tone="current">{pendingRequest.currentPartnerLocation}</DiffText>
-          ),
-          requested: (
-            <DiffText tone="requested">
-              {pendingRequest.requestedPartnerLocation}
-            </DiffText>
-          ),
-        }
-      : null,
-    pendingRequest.currentMapUrl !== pendingRequest.requestedMapUrl
-      ? {
-          key: "mapUrl",
-          label: "지도 URL",
-          current: (
-            <DiffLink tone="current" href={pendingRequest.currentMapUrl} />
-          ),
-          requested: (
-            <DiffLink tone="requested" href={pendingRequest.requestedMapUrl} />
-          ),
-        }
-      : null,
-    !arraysEqual(pendingRequest.currentConditions, pendingRequest.requestedConditions)
-      ? {
-          key: "conditions",
-          label: "이용 조건",
-          current: (
-            <ListChips
-              values={pendingRequest.currentConditions}
-              emptyText="조건이 없습니다."
-              badgeClassName="border border-rose-500/15 bg-rose-500/10 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-100"
-            />
-          ),
-          requested: (
-            <ListChips
-              values={pendingRequest.requestedConditions}
-              emptyText="조건이 없습니다."
-              badgeClassName="border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-100"
-            />
-          ),
-        }
-      : null,
-    !arraysEqual(pendingRequest.currentBenefits, pendingRequest.requestedBenefits)
-      ? {
-          key: "benefits",
-          label: "혜택",
-          current: (
-            <ListChips
-              values={pendingRequest.currentBenefits}
-              emptyText="혜택이 없습니다."
-              badgeClassName="border border-rose-500/15 bg-rose-500/10 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-100"
-            />
-          ),
-          requested: (
-            <ListChips
-              values={pendingRequest.requestedBenefits}
-              emptyText="혜택이 없습니다."
-              badgeClassName="border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-100"
-            />
-          ),
-        }
-      : null,
-    !arraysEqual(pendingRequest.currentAppliesTo, pendingRequest.requestedAppliesTo)
-      ? {
-          key: "appliesTo",
-          label: "적용 대상",
-          current: (
-            <PartnerAudienceChips
-              appliesTo={pendingRequest.currentAppliesTo}
-              badgeClassName="border border-rose-500/15 bg-rose-500/10 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/15 dark:text-rose-100"
-            />
-          ),
-          requested: (
-            <PartnerAudienceChips
-              appliesTo={pendingRequest.requestedAppliesTo}
-              badgeClassName="border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-100"
-            />
-          ),
-        }
-      : null,
-    pendingRequest.currentPeriodStart !== pendingRequest.requestedPeriodStart ||
-    pendingRequest.currentPeriodEnd !== pendingRequest.requestedPeriodEnd
-      ? {
-          key: "period",
-          label: "기간",
-          current: (
-            <DiffText tone="current">
-              {formatRange(
-                pendingRequest.currentPeriodStart,
-                pendingRequest.currentPeriodEnd,
-              )}
-            </DiffText>
-          ),
-          requested: (
-            <DiffText tone="requested">
-              {formatRange(
-                pendingRequest.requestedPeriodStart,
-                pendingRequest.requestedPeriodEnd,
-              )}
-            </DiffText>
-          ),
-        }
-      : null,
-  ].filter((item): item is PendingDiffItem => Boolean(item));
-}
 
 export default function PartnerServiceDetailView({
   session,
@@ -378,7 +104,7 @@ export default function PartnerServiceDetailView({
   const editHref = `${viewHref}?mode=edit`;
   const isEditMode = mode === "edit";
   const pendingRequest = context.pendingRequest;
-  const pendingDiffItems = getPendingDiffItems(pendingRequest);
+  const pendingDiffItems = buildPartnerChangeRequestDiffItems(pendingRequest);
   const canCancelPendingRequest = pendingRequest?.requestedByAccountId === session.accountId;
 
   return (

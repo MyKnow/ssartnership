@@ -17,21 +17,18 @@ import PartnerCardView from "@/components/PartnerCardView";
 import SectionHeading from "@/components/ui/SectionHeading";
 import EmptyState from "@/components/ui/EmptyState";
 import { HOME_COPY } from "@/lib/content";
-import { compareEndDate, isWithinPeriod } from "@/lib/partner-utils";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
-import { getPartnerLockKind } from "@/lib/partner-visibility";
 import {
-  getPartnerAudienceLabel,
   type PartnerAudienceFilter,
 } from "@/lib/partner-audience";
+import {
+  createHomeCategoryMap,
+  filterHomePartners,
+  normalizeHomePartners,
+} from "@/components/home-view/selectors";
 
 const APPLIES_TO_FILTER_STORAGE_KEY = "home:partner-applies-to-filter";
-
-const LOCK_ORDER = {
-  confidential: 0,
-  private: 1,
-} as const;
 
 export default function HomeView({
   categories,
@@ -71,88 +68,25 @@ export default function HomeView({
   const { notify } = useToast();
 
   const categoryMap = useMemo(() => {
-    return new Map(
-      categories.map((category) => [
-        category.key,
-        { label: category.label, color: category.color },
-      ]),
-    );
+    return createHomeCategoryMap(categories);
   }, [categories]);
 
   const normalizedPartners = useMemo(
-    () =>
-      partners.map((partner, index) => ({
-        ...partner,
-        _index: index,
-        _lockKind: getPartnerLockKind(partner.visibility, viewerAuthenticated),
-        _isActive: isWithinPeriod(partner.period.start, partner.period.end),
-        _search: [
-          partner.name,
-          partner.location,
-          partner.reservationLink ?? "",
-          partner.inquiryLink ?? "",
-          partner.conditions.join(" "),
-          partner.benefits.join(" "),
-          partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
-          (partner.tags ?? []).join(" "),
-        ]
-          .join(" ")
-          .toLowerCase(),
-      })),
+    () => normalizeHomePartners(partners, viewerAuthenticated),
     [partners, viewerAuthenticated],
   );
 
   const filteredPartners = useMemo(() => {
-    const query = deferredSearchValue.trim().toLowerCase();
-    const categoryFiltered =
-      activeCategory === "all"
-        ? normalizedPartners
-        : normalizedPartners.filter((partner) => partner.category === activeCategory);
-
-    const appliesFiltered =
-      appliesToFilter === "all"
-        ? categoryFiltered
-        : categoryFiltered.filter((partner) =>
-            partner.appliesTo.includes(appliesToFilter),
-          );
-
-    const visibleFiltered = appliesFiltered.filter((partner) => !partner._lockKind);
-    const lockedFiltered = appliesFiltered.filter((partner) => partner._lockKind);
-
-    const searchFiltered = query
-      ? visibleFiltered.filter((partner) => partner._search.includes(query))
-      : visibleFiltered;
-
-    const sortPartners = (items: typeof searchFiltered) =>
-      [...items].sort((a, b) => {
-        if (a._lockKind !== b._lockKind) {
-          return (
-            LOCK_ORDER[a._lockKind ?? "confidential"] -
-            LOCK_ORDER[b._lockKind ?? "confidential"]
-          );
-        }
-        if (a._isActive !== b._isActive) {
-          return a._isActive ? -1 : 1;
-        }
-        if (sortValue === "endingSoon") {
-          const compare = compareEndDate(a.period.end, b.period.end);
-          if (compare !== 0) {
-            return compare;
-          }
-        }
-        return a._index - b._index;
-      });
-
-    return {
-      visible: sortPartners(searchFiltered),
-      locked: sortPartners(lockedFiltered),
-    };
+    return filterHomePartners({
+      partners: normalizedPartners,
+      activeCategory,
+      appliesToFilter,
+      searchValue: deferredSearchValue,
+      sortValue,
+    });
   }, [activeCategory, appliesToFilter, deferredSearchValue, normalizedPartners, sortValue]);
 
-  const displayPartners = useMemo(
-    () => [...filteredPartners.visible, ...filteredPartners.locked],
-    [filteredPartners.locked, filteredPartners.visible],
-  );
+  const displayPartners = filteredPartners.display;
 
   const visibleResultCount = filteredPartners.visible.length;
 

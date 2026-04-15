@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
-import { useRouter } from "next/navigation";
 import type { PartnerPortalSetupContext } from "@/lib/partner-portal";
 import {
   getPartnerPortalSetupErrorMessage,
@@ -24,12 +25,20 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
   );
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(
+  const [fieldErrors, setFieldErrors] = useState<{
+    verificationCode?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
+  const [formError, setFormError] = useState<string | null>(
     context.isSetupComplete
       ? "이미 초기 설정이 완료된 계정입니다."
       : null,
   );
   const [pending, setPending] = useState(false);
+  const verificationCodeRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
   const isLocked = Boolean(context.account.initialSetupCompletedAt);
 
@@ -38,10 +47,26 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
       return;
     }
     if (!verificationCode.trim() || !password || !confirmPassword) {
-      setError("이메일 인증 코드와 비밀번호를 모두 입력해 주세요.");
+      setFieldErrors({
+        verificationCode: verificationCode.trim()
+          ? undefined
+          : "이메일 인증 코드를 입력해 주세요.",
+        password: password ? undefined : "새 비밀번호를 입력해 주세요.",
+        confirmPassword: confirmPassword ? undefined : "비밀번호 확인을 입력해 주세요.",
+      });
+      setFormError(null);
+      if (!verificationCode.trim()) {
+        focusField(verificationCodeRef);
+      } else if (!password) {
+        focusField(passwordRef);
+      } else {
+        focusField(confirmPasswordRef);
+      }
       return;
     }
 
+    setFieldErrors({});
+    setFormError(null);
     setPending(true);
     try {
       const response = await fetch(
@@ -64,12 +89,31 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
                 data.error as Parameters<typeof getPartnerPortalSetupErrorMessage>[0],
               )
             : "초기 설정에 실패했습니다.";
-        setError(message);
-        notify(message);
+        if (data.error === "invalid_code") {
+          setFieldErrors({ verificationCode: message });
+          setFormError(null);
+          focusField(verificationCodeRef);
+          return;
+        }
+        if (data.error === "invalid_password") {
+          setFieldErrors({ password: message });
+          setFormError(null);
+          focusField(passwordRef);
+          return;
+        }
+        if (data.error === "password_mismatch") {
+          setFieldErrors({ confirmPassword: message });
+          setFormError(null);
+          focusField(confirmPasswordRef);
+          return;
+        }
+        setFormError(message);
         return;
       }
 
-      setError(null);
+      setFieldErrors({});
+      setFormError(null);
+      notify("초기 설정이 완료되었습니다.");
       router.replace("/partner/login?setup=completed");
     } finally {
       setPending(false);
@@ -91,37 +135,67 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         이메일 인증 코드
         <Input
+          ref={verificationCodeRef}
           value={verificationCode}
-          onChange={(event) => setVerificationCode(event.target.value)}
+          onChange={(event) => {
+            setVerificationCode(event.target.value);
+            setFieldErrors((prev) => ({ ...prev, verificationCode: undefined }));
+            setFormError(null);
+          }}
           placeholder="인증 코드"
           autoComplete="one-time-code"
           disabled={pending}
+          aria-invalid={Boolean(fieldErrors.verificationCode) || undefined}
+          className={getFieldErrorClass(Boolean(fieldErrors.verificationCode))}
         />
+        {fieldErrors.verificationCode ? (
+          <FormMessage variant="error">{fieldErrors.verificationCode}</FormMessage>
+        ) : null}
       </label>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
           새 비밀번호
           <PasswordInput
+            ref={passwordRef}
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              setFieldErrors((prev) => ({ ...prev, password: undefined }));
+              setFormError(null);
+            }}
             placeholder="영문/숫자/특수문자 포함 8자 이상"
             disabled={pending}
+            aria-invalid={Boolean(fieldErrors.password) || undefined}
+            className={getFieldErrorClass(Boolean(fieldErrors.password))}
           />
+          {fieldErrors.password ? (
+            <FormMessage variant="error">{fieldErrors.password}</FormMessage>
+          ) : null}
         </label>
         <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
           비밀번호 확인
           <PasswordInput
+            ref={confirmPasswordRef}
             value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
+            onChange={(event) => {
+              setConfirmPassword(event.target.value);
+              setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+              setFormError(null);
+            }}
             placeholder="다시 입력해 주세요"
             disabled={pending}
+            aria-invalid={Boolean(fieldErrors.confirmPassword) || undefined}
+            className={getFieldErrorClass(Boolean(fieldErrors.confirmPassword))}
           />
+          {fieldErrors.confirmPassword ? (
+            <FormMessage variant="error">{fieldErrors.confirmPassword}</FormMessage>
+          ) : null}
         </label>
       </div>
 
       <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
-      {error ? <FormMessage variant="error">{error}</FormMessage> : null}
+      {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
       <button
         type="button"

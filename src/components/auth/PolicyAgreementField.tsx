@@ -1,6 +1,8 @@
 "use client";
 
+import type { Ref } from "react";
 import Link from "next/link";
+import { getFieldErrorClass } from "@/components/ui/form-field-state";
 import { getPolicyHref, getPolicyKindLabel, type PolicyDocument } from "@/lib/policy-documents";
 
 type PolicyAgreementFieldProps = {
@@ -8,6 +10,8 @@ type PolicyAgreementFieldProps = {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  invalid?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
 };
 
 export default function PolicyAgreementField({
@@ -15,19 +19,26 @@ export default function PolicyAgreementField({
   checked,
   onChange,
   disabled,
+  invalid = false,
+  inputRef,
 }: PolicyAgreementFieldProps) {
   const inputId = `policy-${policy.kind}-${policy.version}`;
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+    <div className={getFieldErrorClass(
+      invalid,
+      "rounded-2xl border border-border/70 bg-background/70 p-4",
+    )}>
       <div className="flex items-start gap-3">
         <input
+          ref={inputRef}
           id={inputId}
           type="checkbox"
           className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/30"
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
           disabled={disabled}
+          aria-invalid={invalid || undefined}
         />
         <div className="min-w-0 flex-1">
           <label

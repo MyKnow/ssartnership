@@ -5,14 +5,14 @@ import {
   SITE_LEGACY_NAME,
   SITE_NAME,
   SITE_RSS_URL,
-  SITE_URL,
 } from "@/lib/site";
 import { buildRssFeedXml } from "@/lib/rss";
+import { buildSiteUrl } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 function toAbsoluteUrl(pathname: string) {
-  return new URL(pathname, SITE_URL).toString();
+  return buildSiteUrl(pathname);
 }
 
 function formatPeriod(start?: string | null, end?: string | null) {
@@ -47,7 +47,7 @@ export async function GET() {
   const items = await getFeedItems();
   const xml = buildRssFeedXml({
     title: `${SITE_NAME}(${SITE_LEGACY_NAME}) | SSAFY(싸피) 공개 제휴 소식`,
-    link: SITE_URL,
+    link: buildSiteUrl("/"),
     description: `${SITE_DESCRIPTION} 공개 제휴 소식을 RSS로 받아보세요.`,
     items,
     selfLink: toAbsoluteUrl(SITE_RSS_URL),

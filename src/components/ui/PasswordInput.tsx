@@ -1,18 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-export default function PasswordInput({
+const PasswordInput = forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(function PasswordInput({
   className,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+}, ref) {
   const [visible, setVisible] = useState(false);
 
   return (
     <div className="relative">
       <input
+        ref={ref}
         {...props}
         type={visible ? "text" : "password"}
         className={cn(
@@ -31,4 +35,6 @@ export default function PasswordInput({
       </button>
     </div>
   );
-}
+});
+
+export default PasswordInput;

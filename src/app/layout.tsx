@@ -7,8 +7,8 @@ import {
   SITE_NAME,
   SITE_RSS_URL,
   SITE_TITLE,
-  SITE_URL,
 } from "@/lib/site";
+import { createCanonicalAlternates, getMetadataBase } from "@/lib/seo";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaProvider from "@/components/PwaProvider";
@@ -17,7 +17,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
-  metadataBase: new URL(SITE_URL),
+  metadataBase: getMetadataBase(),
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   alternates: {
-    canonical: "/",
+    ...createCanonicalAlternates("/"),
     types: {
       "application/rss+xml": SITE_RSS_URL,
     },

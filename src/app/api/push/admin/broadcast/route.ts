@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureAdminApiAccess } from "@/lib/admin-access";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
-import {
-  createAnnouncementPayload,
-  getPushDestinationLabel,
-  isPushConfigured,
-  parsePushAudience,
-  sendPushToAudience,
-} from "@/lib/push";
+import { createPushAuditProperties, isPushOpsConfigured, isSameOriginPushRequest, sendManualPushBroadcast } from "@/lib/push/ops";
 
 export const runtime = "nodejs";
 
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
-
 export async function POST(request: NextRequest) {
   const context = getRequestLogContext(request);
-  if (!isSameOrigin(request)) {
+  if (!isSameOriginPushRequest(request)) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
@@ -27,7 +16,7 @@ export async function POST(request: NextRequest) {
     return accessDenied;
   }
 
-  if (!isPushConfigured()) {
+  if (!isPushOpsConfigured()) {
     return NextResponse.json(
       { message: "Web Push 환경 변수가 설정되지 않았습니다." },
       { status: 503 },
@@ -41,40 +30,23 @@ export async function POST(request: NextRequest) {
       url?: string | null;
       audience?: unknown;
     };
-    const payload = createAnnouncementPayload({
-      title: body.title ?? "",
-      body: body.body ?? "",
-      url: body.url ?? null,
-    });
-    const audience = parsePushAudience(body.audience);
-    const result = await sendPushToAudience(payload, {
-      source: "manual",
-      audience,
-    });
+    const { payload, audience, result, destination } = await sendManualPushBroadcast(body);
 
     await logAdminAudit({
       ...context,
       action: "push_send",
       targetType: "push_message",
-        properties: {
-          type: payload.type,
-          title: payload.title,
-          hasUrl: Boolean(payload.url),
-          audienceScope: audience.scope,
-          audienceYear: "year" in audience ? audience.year : null,
-          audienceCampus: "campus" in audience ? audience.campus : null,
-          audienceMemberId: "memberId" in audience ? audience.memberId : null,
-          destination: getPushDestinationLabel(payload.url),
-          targeted: result.targeted,
-        delivered: result.delivered,
-        failed: result.failed,
-      },
+      properties: createPushAuditProperties({
+        payload,
+        audience,
+        result,
+      }),
     });
 
     return NextResponse.json({
       ok: true,
       result,
-      destination: getPushDestinationLabel(payload.url),
+      destination,
     });
   } catch (error) {
     const message =

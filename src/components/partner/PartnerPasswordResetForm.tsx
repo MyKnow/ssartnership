@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
@@ -20,9 +21,11 @@ type SuccessState = {
 export default function PartnerPasswordResetForm() {
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<SuccessState | null>(null);
   const { notify } = useToast();
+  const emailRef = useRef<HTMLInputElement>(null);
 
   const handleReset = async () => {
     if (pending) {
@@ -31,14 +34,20 @@ export default function PartnerPasswordResetForm() {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError("담당자 이메일을 입력해 주세요.");
+      setFieldError("담당자 이메일을 입력해 주세요.");
+      setFormError(null);
+      focusField(emailRef);
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
-      setError("이메일 형식이 올바르지 않습니다.");
+      setFieldError("이메일 형식이 올바르지 않습니다.");
+      setFormError(null);
+      focusField(emailRef);
       return;
     }
 
+    setFieldError(null);
+    setFormError(null);
     setPending(true);
     try {
       const response = await fetch("/api/partner/reset-password", {
@@ -54,8 +63,18 @@ export default function PartnerPasswordResetForm() {
                 data.error as Parameters<typeof getPartnerPortalPasswordResetErrorMessage>[0],
               )
             : "비밀번호 재설정에 실패했습니다.";
-        setError(message);
-        notify(message);
+        if (
+          data.error === "invalid_email" ||
+          data.error === "not_found" ||
+          data.error === "inactive_account" ||
+          data.error === "setup_required"
+        ) {
+          setFieldError(message);
+          setFormError(null);
+          focusField(emailRef);
+          return;
+        }
+        setFormError(message);
         return;
       }
 
@@ -64,7 +83,8 @@ export default function PartnerPasswordResetForm() {
           ? data.temporaryPassword
           : null;
 
-      setError(null);
+      setFieldError(null);
+      setFormError(null);
       setSuccess({
         emailSentTo:
           typeof data.emailSentTo === "string"
@@ -116,20 +136,28 @@ export default function PartnerPasswordResetForm() {
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         담당자 이메일
         <Input
+          ref={emailRef}
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            setFieldError(null);
+            setFormError(null);
+          }}
           placeholder="partner@example.com"
           autoComplete="email"
           inputMode="email"
           disabled={pending}
+          aria-invalid={Boolean(fieldError) || undefined}
+          className={getFieldErrorClass(Boolean(fieldError))}
         />
+        {fieldError ? <FormMessage variant="error">{fieldError}</FormMessage> : null}
       </label>
 
       <FormMessage>
         초기 설정이 완료된 계정이라면, 등록된 이메일로 임시 비밀번호가
         전송됩니다.
       </FormMessage>
-      {error ? <FormMessage variant="error">{error}</FormMessage> : null}
+      {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
       <Button
         onClick={handleReset}

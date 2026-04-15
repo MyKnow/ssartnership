@@ -1,25 +1,17 @@
 import type { MetadataRoute } from "next";
+import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
 import { partnerRepository } from "@/lib/repositories";
-import { SITE_URL } from "@/lib/site";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
+import { createSitemapEntry } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const lastModified = new Date();
-  const makeEntry = (
-    url: string,
-    changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"],
-    priority: number,
-  ): MetadataRoute.Sitemap[number] => ({
-    url,
-    lastModified,
-    changeFrequency,
-    priority,
-  });
-
   const entries: MetadataRoute.Sitemap = [
-    makeEntry(new URL("/", SITE_URL).toString(), "daily", 1),
+    createSitemapEntry("/", "daily", 1),
+    ...CAMPUS_DIRECTORY.map((campus) =>
+      createSitemapEntry(getCampusPageHref(campus.slug), "weekly", 0.8),
+    ),
   ];
 
   try {
@@ -32,11 +24,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     entries.push(
       ...publicPartners.map((partner) =>
-        makeEntry(
-          new URL(
-            `/partners/${encodeURIComponent(partner.id)}`,
-            SITE_URL,
-          ).toString(),
+        createSitemapEntry(
+          `/partners/${encodeURIComponent(partner.id)}`,
           "weekly",
           0.7,
         ),

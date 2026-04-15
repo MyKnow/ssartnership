@@ -1,4 +1,4 @@
-import { sanitizeHttpUrl } from "@/lib/validation";
+import { sanitizeHttpUrl } from "./validation.ts";
 
 function isPhone(value: string) {
   return /^[+0-9()\-\s]{7,}$/.test(value);

@@ -1,30 +1,37 @@
+import { forwardRef } from "react";
 import Input from "@/components/ui/Input";
 
-export default function MmUsernameInput({
-  name = "username",
-  value,
-  onChange,
-  disabled = false,
-}: {
-  name?: string;
-  value: string;
-  onChange: React.ChangeEventHandler<HTMLInputElement>;
-  disabled?: boolean;
-}) {
-  return (
-    <Input
-      name={name}
-      value={value}
-      onChange={onChange}
-      placeholder="MM 아이디"
-      type="text"
-      autoComplete="username"
-      autoCapitalize="none"
-      autoCorrect="off"
-      spellCheck={false}
-      inputMode="text"
-      disabled={disabled}
-      required
-    />
-  );
-}
+type MmUsernameInputProps = Omit<
+  React.ComponentProps<typeof Input>,
+  "type" | "autoComplete" | "autoCapitalize" | "autoCorrect" | "spellCheck" | "inputMode"
+>;
+
+const MmUsernameInput = forwardRef<HTMLInputElement, MmUsernameInputProps>(
+  function MmUsernameInput(
+    {
+      name = "username",
+      placeholder = "MM 아이디",
+      required = true,
+      ...props
+    },
+    ref,
+  ) {
+    return (
+      <Input
+        ref={ref}
+        name={name}
+        placeholder={placeholder}
+        type="text"
+        autoComplete="username"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="text"
+        required={required}
+        {...props}
+      />
+    );
+  },
+);
+
+export default MmUsernameInput;

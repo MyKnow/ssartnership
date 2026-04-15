@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/site";
+import { getSitemapLocation } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -20,6 +20,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/admin", "/admin/", "/api", "/api/"],
       },
     ],
-    sitemap: new URL("/sitemap.xml", SITE_URL).toString(),
+    sitemap: getSitemapLocation(),
   };
 }

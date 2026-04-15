@@ -5,6 +5,7 @@ import HomeContent from "@/components/HomeContent";
 import HomePushOptInBannerGate from "@/components/HomePushOptInBannerGate";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
+import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
 import { HOME_COPY } from "@/lib/content";
 import {
   SITE_ALTERNATE_NAMES,
@@ -13,8 +14,8 @@ import {
   SITE_NAME,
   SITE_RSS_URL,
   SITE_TITLE,
-  SITE_URL,
 } from "@/lib/site";
+import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const revalidate = 300;
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   keywords: SITE_KEYWORDS,
   alternates: {
-    canonical: "/",
+    ...createCanonicalAlternates("/"),
     types: {
       "application/rss+xml": SITE_RSS_URL,
     },
@@ -78,15 +79,25 @@ export default async function Home() {
         "@type": "WebSite",
         name: SITE_NAME,
         alternateName: SITE_ALTERNATE_NAMES,
-        url: SITE_URL,
+        url: buildSiteUrl("/"),
         description: SITE_DESCRIPTION,
       },
       {
         "@type": "Organization",
         name: SITE_NAME,
-        url: SITE_URL,
+        url: buildSiteUrl("/"),
         description: SITE_DESCRIPTION,
-        logo: `${SITE_URL}/icon.svg`,
+        logo: buildSiteUrl("/icon.svg"),
+      },
+      {
+        "@type": "ItemList",
+        name: "SSAFY 캠퍼스별 제휴 랜딩 페이지",
+        itemListElement: CAMPUS_DIRECTORY.map((campus, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          url: buildSiteUrl(getCampusPageHref(campus.slug)),
+          name: `${campus.fullLabel} 제휴 혜택`,
+        })),
       },
     ],
   };

@@ -23,12 +23,12 @@ import { isWithinPeriod } from "@/lib/partner-utils";
 import ContactCopyRow from "@/components/ContactCopyRow";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import ShareLinkButton from "@/components/ShareLinkButton";
+import { SITE_NAME } from "@/lib/site";
+import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import {
-  SITE_KEYWORDS,
-  SITE_LEGACY_NAME,
-  SITE_NAME,
-  SITE_URL,
-} from "@/lib/site";
+  buildPartnerSeoMetadata,
+  buildPartnerStructuredData,
+} from "@/lib/seo/partners";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -73,26 +73,30 @@ export async function generateMetadata({
   const categoryLabel =
     categories.find((item) => item.key === partner.category)?.label ?? "제휴";
   const canonicalPath = `/partners/${encodeURIComponent(rawId)}`;
-  const title = `${partner.name} | SSAFY(싸피) ${categoryLabel} 제휴 | ${SITE_NAME}(${SITE_LEGACY_NAME})`;
-  const description = `싸트너십(SSARTNERSHIP)에서 ${partner.name}을 확인하세요. SSAFY(싸피) 서울 캠퍼스 ${categoryLabel} 제휴이며, ${partner.location}에서 이용 가능한 혜택과 제휴 기간을 확인할 수 있습니다.`;
+  const seoMetadata = buildPartnerSeoMetadata({
+    partner: {
+      id: partner.id,
+      name: partner.name,
+      location: partner.location,
+      benefits: partner.benefits,
+      conditions: partner.conditions,
+      tags: partner.tags,
+      thumbnail: partner.thumbnail,
+      images: partner.images,
+      mapUrl: partner.mapUrl,
+      period: partner.period,
+    },
+    categoryLabel,
+  });
+  const title = seoMetadata.title;
+  const description = seoMetadata.description;
 
   return {
     title,
     description,
-    keywords: [
-      partner.name,
-      categoryLabel,
-      "싸트너십",
-      "SSARTNERSHIP",
-      "SSAFY",
-      "싸피",
-      "싸피 제휴",
-      "SSAFY 제휴",
-      "서울 캠퍼스 제휴",
-      ...SITE_KEYWORDS,
-    ],
+    keywords: seoMetadata.keywords,
     alternates: {
-      canonical: canonicalPath,
+      ...createCanonicalAlternates(canonicalPath),
     },
     openGraph: {
       title,
@@ -103,7 +107,7 @@ export async function generateMetadata({
       type: "article",
       images: [
         {
-          url: "/icon-512.png",
+          url: partner.thumbnail ?? "/icon-512.png",
           width: 512,
           height: 512,
           alt: title,
@@ -114,7 +118,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: ["/icon-512.png"],
+      images: [partner.thumbnail ?? "/icon-512.png"],
     },
     robots: {
       index: true,
@@ -193,7 +197,7 @@ export default async function PartnerDetailPage({
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
   const contactCount = [reservationDisplay, inquiryDisplay].filter(Boolean).length;
-  const partnerUrl = `${SITE_URL}/partners/${encodeURIComponent(partner.id)}`;
+  const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -202,7 +206,7 @@ export default async function PartnerDetailPage({
         "@type": "ListItem",
         position: 1,
         name: "홈",
-        item: SITE_URL,
+        item: buildSiteUrl("/"),
       },
       {
         "@type": "ListItem",
@@ -212,6 +216,21 @@ export default async function PartnerDetailPage({
       },
     ],
   };
+  const partnerJsonLd = buildPartnerStructuredData({
+    partner: {
+      id: partner.id,
+      name: partner.name,
+      location: partner.location,
+      benefits: partner.benefits,
+      conditions: partner.conditions,
+      tags: partner.tags,
+      thumbnail: partner.thumbnail,
+      images: partner.images,
+      mapUrl: partner.mapUrl,
+      period: partner.period,
+    },
+    categoryLabel,
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -222,6 +241,12 @@ export default async function PartnerDetailPage({
             type="application/ld+json"
             dangerouslySetInnerHTML={{
               __html: JSON.stringify(breadcrumbJsonLd),
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(partnerJsonLd),
             }}
           />
           <AnalyticsEventOnMount
