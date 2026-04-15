@@ -26,7 +26,10 @@ export const SITE_ALTERNATE_NAMES = [
   "SSAFY(싸피) 제휴",
 ];
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app";
+  (process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app").replace(
+    /\/+$/,
+    "",
+  );
 export const SITE_RSS_URL = "/rss.xml";
 
 export const GITHUB_URL = "https://github.com/MyKnow";

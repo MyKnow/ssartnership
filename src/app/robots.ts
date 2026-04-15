@@ -1,7 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app";
+import { SITE_URL } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -22,6 +20,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/admin", "/admin/", "/api", "/api/"],
       },
     ],
-    sitemap: `${siteUrl}/sitemap.xml`,
+    sitemap: new URL("/sitemap.xml", SITE_URL).toString(),
   };
 }

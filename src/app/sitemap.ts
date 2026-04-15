@@ -28,7 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     makeEntry(SITE_URL, "daily", 1),
     ...publicPartners.map((partner) =>
       makeEntry(
-        `${SITE_URL}/partners/${encodeURIComponent(partner.id)}`,
+        new URL(`/partners/${encodeURIComponent(partner.id)}`, SITE_URL).toString(),
         "weekly",
         0.7,
       ),
