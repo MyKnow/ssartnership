@@ -1,27 +1,10 @@
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPartnerCreateForm from "@/components/admin/AdminPartnerCreateForm";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import FormMessage from "@/components/ui/FormMessage";
-import PartnerCardForm, {
-  type PartnerCardFormField,
-} from "@/components/PartnerCardForm";
-import { createPartner } from "@/app/admin/(protected)/actions";
-import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-const partnerFormFocusByError: Record<string, PartnerCardFormField> = {
-  partner_form_missing_required: "name",
-  partner_form_invalid_period: "companyDescription",
-  partner_form_invalid_map_url: "mapUrl",
-  partner_form_invalid_reservation_url: "reservationLink",
-  partner_form_invalid_inquiry_url: "inquiryLink",
-  partner_form_invalid_visibility: "name",
-  partner_form_invalid_applies_to: "companyDescription",
-  partner_company_missing_name: "companyName",
-  partner_company_invalid_email: "companyContactEmail",
-};
 
 type PartnerCompanyRow = {
   id: string;
@@ -49,14 +32,8 @@ function normalizePartnerCompanies(value: unknown): PartnerCompanyRow[] {
   return [];
 }
 
-export default async function AdminPartnerNewPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ error?: string }>;
-}) {
+export default async function AdminPartnerNewPage() {
   const supabase = getSupabaseAdminClient();
-  const params = (await searchParams) ?? {};
-  const partnerFormError = params.error ? partnerFormErrorMessages[params.error] : null;
 
   const [categoriesResult, companiesResult] = await Promise.all([
     supabase
@@ -78,7 +55,6 @@ export default async function AdminPartnerNewPage({
     contactEmail: company.contact_email ?? null,
   }));
   const defaultCategoryId = categories[0]?.id ?? "";
-  const focusField = params.error ? partnerFormFocusByError[params.error] : undefined;
 
   return (
     <AdminShell
@@ -87,11 +63,6 @@ export default async function AdminPartnerNewPage({
       backLabel="브랜드 관리"
     >
       <section className="grid gap-6">
-
-        {partnerFormError ? (
-          <FormMessage variant="error">{partnerFormError}</FormMessage>
-        ) : null}
-
         {categories.length === 0 ? (
           <Card tone="elevated">
             <EmptyState
@@ -100,8 +71,7 @@ export default async function AdminPartnerNewPage({
             />
           </Card>
         ) : (
-          <PartnerCardForm
-            mode="create"
+          <AdminPartnerCreateForm
             partner={{
               name: "",
               visibility: "public",
@@ -124,11 +94,6 @@ export default async function AdminPartnerNewPage({
             }))}
             companyOptions={companies}
             categoryId={defaultCategoryId}
-            formAction={createPartner}
-            submitLabel="브랜드 추가"
-            className="mt-6"
-            focusField={focusField}
-            fieldErrors={focusField ? { [focusField]: partnerFormError ?? "" } : undefined}
           />
         )}
       </section>

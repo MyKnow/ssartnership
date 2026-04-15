@@ -53,6 +53,7 @@ import {
 } from "@/lib/validation";
 import { SITE_URL } from "@/lib/site";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
+import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import {
   approvePartnerChangeRequest as approvePartnerChangeRequestRecord,
   rejectPartnerChangeRequest as rejectPartnerChangeRequestRecord,
@@ -389,7 +390,7 @@ async function ensurePartnerCompanyRow(
 
   if (!hasCompanySelection && !hasCompanyFields) {
     if (requireCompany) {
-      throw new Error("회사명과 담당자 이메일을 입력해 주세요.");
+      throw new Error("partner_company_missing_name");
     }
     return {
       company: null,
@@ -434,12 +435,12 @@ async function ensurePartnerCompanyRow(
         createdLink: false,
       };
     } else {
-      if (!companyInput.name) {
-        throw new Error("회사명을 입력해 주세요.");
-      }
-      if (!companyInput.contactEmail) {
-        throw new Error("담당자 이메일을 입력해 주세요.");
-      }
+    if (!companyInput.name) {
+      throw new Error("partner_company_missing_name");
+    }
+    if (!companyInput.contactEmail) {
+      throw new Error("partner_company_missing_email");
+    }
 
       const { data: created, error } = await supabase
         .from("partner_companies")
@@ -473,7 +474,7 @@ async function ensurePartnerCompanyRow(
     const resolvedCompany = company;
     const loginId = toPartnerAccountLoginId(companyInput, resolvedCompany);
     if (!loginId) {
-      throw new Error("담당자 이메일을 입력해 주세요.");
+      throw new Error("partner_company_missing_email");
     }
     const displayName = toPartnerAccountDisplayName(companyInput, resolvedCompany);
 
@@ -1045,8 +1046,14 @@ function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const tags = String(formData.get("tags") || "").trim();
   const appliesTo = formData.getAll("appliesTo").map((item) => String(item).trim());
 
-  if (!name || !categoryId || !location) {
-    throw new Error("partner_form_missing_required");
+  if (!name) {
+    throw new Error("partner_form_missing_name");
+  }
+  if (!categoryId) {
+    throw new Error("partner_form_missing_category");
+  }
+  if (!location) {
+    throw new Error("partner_form_missing_location");
   }
 
   const dateRangeError = validateDateRange(periodStart, periodEnd);
@@ -1531,11 +1538,18 @@ export async function deletePartnerCompany(formData: FormData) {
   redirect("/admin/partners");
 }
 
-export async function createPartner(formData: FormData) {
-  await requireAdmin();
-  const payload = parsePartnerPayloadOrRedirect(formData, "/admin/partners/new");
+type CreatedPartnerRecord = {
+  partnerId: string;
+  payload: PartnerCoreInput;
+  companyProvision: Awaited<ReturnType<typeof ensurePartnerCompanyRow>> | null;
+  media: PartnerMediaInput;
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+};
+
+async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRecord> {
+  const payload = parsePartnerPayload(formData);
   const partnerId = randomUUID();
-  const companyPayload = parsePartnerCompanyPayloadOrRedirect(formData, "/admin/partners/new");
+  const companyPayload = parsePartnerCompanyPayload(formData);
   const media = await resolvePartnerMediaPayload(formData, partnerId);
 
   const supabase = getSupabaseAdminClient();
@@ -1572,6 +1586,18 @@ export async function createPartner(formData: FormData) {
     await cleanupPartnerCompanyProvision(supabase, companyProvision);
     throw error;
   }
+
+  return {
+    partnerId,
+    payload,
+    companyProvision,
+    media,
+    supabase,
+  };
+}
+
+async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
+  const { partnerId, payload, companyProvision, media, supabase } = record;
 
   await logAdminAction("partner_create", {
     targetType: "partner",
@@ -1625,6 +1651,31 @@ export async function createPartner(formData: FormData) {
 
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(partnerId);
+}
+
+export async function createPartner(formData: FormData) {
+  await requireAdmin();
+  const record = await createPartnerRecord(formData);
+  await finalizeCreatedPartner(record);
+  redirect("/admin/partners?created=partner_created");
+}
+
+export async function createPartnerFormAction(
+  _prevState: PartnerCreateFormState,
+  formData: FormData,
+): Promise<PartnerCreateFormState> {
+  await requireAdmin();
+  try {
+    const record = await createPartnerRecord(formData);
+    await finalizeCreatedPartner(record);
+  } catch (error) {
+    return {
+      status: "error",
+      errorCode:
+        error instanceof Error ? error.message : "partner_form_invalid_request",
+    };
+  }
+
   redirect("/admin/partners?created=partner_created");
 }
 

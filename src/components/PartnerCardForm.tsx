@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { PartnerVisibility } from "@/lib/types";
 import Badge from "@/components/ui/Badge";
@@ -10,6 +10,7 @@ import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
+import FormMessage from "@/components/ui/FormMessage";
 import { cn } from "@/lib/cn";
 import {
   PartnerGalleryField,
@@ -25,6 +26,7 @@ import {
   PARTNER_AUDIENCE_OPTIONS,
   normalizePartnerAudience,
 } from "@/lib/partner-audience";
+import type { PartnerFormField } from "@/lib/partner-form-state";
 
 export type PartnerCardCategoryOption = {
   id: string;
@@ -70,19 +72,7 @@ export type PartnerCardFormValues = {
 };
 
 export type PartnerCardFormMode = "edit" | "create";
-export type PartnerCardFormField =
-  | "name"
-  | "categoryId"
-  | "location"
-  | "mapUrl"
-  | "reservationLink"
-  | "inquiryLink"
-  | "companyName"
-  | "companyId"
-  | "companyContactName"
-  | "companyContactEmail"
-  | "companyContactPhone"
-  | "companyDescription";
+export type PartnerCardFormField = PartnerFormField;
 
 function FieldGroup({
   label,
@@ -97,7 +87,14 @@ function FieldGroup({
 }) {
   return (
     <label className={cn("grid gap-1.5", className)}>
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          "text-xs font-medium",
+          error ? "text-danger" : "text-muted-foreground",
+        )}
+      >
+        {label}
+      </span>
       {children}
       {error ? <span className="text-xs font-medium text-danger">{error}</span> : null}
     </label>
@@ -116,6 +113,7 @@ export default function PartnerCardForm({
   className,
   focusField,
   fieldErrors,
+  formError,
 }: {
   partner: PartnerCardFormValues;
   mode?: PartnerCardFormMode;
@@ -128,6 +126,7 @@ export default function PartnerCardForm({
   className?: string;
   focusField?: PartnerCardFormField;
   fieldErrors?: Partial<Record<PartnerCardFormField, string>>;
+  formError?: string | null;
 }) {
   const periodStart = partner.period?.start ?? "";
   const periodEnd = partner.period?.end ?? "";
@@ -146,9 +145,20 @@ export default function PartnerCardForm({
   const nameValue = partner.name ?? "";
   const companyValue = partner.company ?? null;
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyValue?.id ?? "");
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   const companyFieldsLocked = Boolean(selectedCompanyId);
   const invalidClass = "border-danger/40 ring-2 ring-danger/15";
+
+  useEffect(() => {
+    if (!focusField) {
+      return;
+    }
+    const target = formRef.current?.querySelector<HTMLElement>(
+      `[name="${focusField}"]`,
+    );
+    target?.focus();
+  }, [focusField]);
 
   return (
     <article className={cn("grid gap-6", className)}>
@@ -185,7 +195,7 @@ export default function PartnerCardForm({
         </div>
       </Card>
 
-      <form action={formAction} className="grid gap-6">
+      <form ref={formRef} action={formAction} className="grid gap-6">
         {mode === "edit" && partner.id ? (
           <input type="hidden" name="id" value={partner.id} />
         ) : null}
@@ -204,7 +214,7 @@ export default function PartnerCardForm({
                 className="w-full"
               />
 
-              <FieldGroup label="브랜드명">
+              <FieldGroup label="브랜드명" error={fieldErrors?.name}>
                 <Input
                   name="name"
                   defaultValue={nameValue}
@@ -216,18 +226,21 @@ export default function PartnerCardForm({
               </FieldGroup>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <FieldGroup label="노출 상태">
+                <FieldGroup label="노출 상태" error={fieldErrors?.visibility}>
                   <Select
                     name="visibility"
                     defaultValue={visibilityValue}
                     required
+                    autoFocus={focusField === "visibility"}
+                    aria-invalid={Boolean(fieldErrors?.visibility) || undefined}
+                    className={fieldErrors?.visibility ? invalidClass : undefined}
                   >
                     <option value="public">공개</option>
                     <option value="confidential">대외비</option>
                     <option value="private">비공개</option>
                   </Select>
                 </FieldGroup>
-                <FieldGroup label="카테고리">
+                <FieldGroup label="카테고리" error={fieldErrors?.categoryId}>
                   <Select
                     name="categoryId"
                     defaultValue={categoryId}
@@ -246,19 +259,29 @@ export default function PartnerCardForm({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <FieldGroup label="시작일">
+                <FieldGroup label="시작일" error={fieldErrors?.periodStart}>
                   <Input
                     type="date"
                     name="periodStart"
                     defaultValue={periodStart}
+                    autoFocus={focusField === "periodStart"}
+                    aria-invalid={Boolean(fieldErrors?.periodStart) || undefined}
+                    className={fieldErrors?.periodStart ? invalidClass : undefined}
                   />
                 </FieldGroup>
-                <FieldGroup label="종료일">
-                  <Input type="date" name="periodEnd" defaultValue={periodEnd} />
+                <FieldGroup label="종료일" error={fieldErrors?.periodEnd}>
+                  <Input
+                    type="date"
+                    name="periodEnd"
+                    defaultValue={periodEnd}
+                    autoFocus={focusField === "periodEnd"}
+                    aria-invalid={Boolean(fieldErrors?.periodEnd) || undefined}
+                    className={fieldErrors?.periodEnd ? invalidClass : undefined}
+                  />
                 </FieldGroup>
               </div>
 
-              <FieldGroup label="위치">
+              <FieldGroup label="위치" error={fieldErrors?.location}>
                 <Input
                   name="location"
                   defaultValue={partner.location ?? ""}
@@ -270,7 +293,7 @@ export default function PartnerCardForm({
               </FieldGroup>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <FieldGroup label="지도 URL">
+                <FieldGroup label="지도 URL" error={fieldErrors?.mapUrl}>
                   <Input
                     name="mapUrl"
                     defaultValue={partner.mapUrl ?? ""}
@@ -279,7 +302,7 @@ export default function PartnerCardForm({
                     className={fieldErrors?.mapUrl ? invalidClass : undefined}
                   />
                 </FieldGroup>
-                <FieldGroup label="예약 링크">
+                <FieldGroup label="예약 링크" error={fieldErrors?.reservationLink}>
                   <Input
                     name="reservationLink"
                     defaultValue={partner.reservationLink ?? ""}
@@ -290,7 +313,7 @@ export default function PartnerCardForm({
                 </FieldGroup>
               </div>
 
-              <FieldGroup label="문의 링크">
+              <FieldGroup label="문의 링크" error={fieldErrors?.inquiryLink}>
                 <Input
                   name="inquiryLink"
                   defaultValue={partner.inquiryLink ?? ""}
@@ -310,7 +333,7 @@ export default function PartnerCardForm({
           />
 
           <div className="mt-6 grid gap-5">
-            <FieldGroup label="기존 협력사 연결">
+            <FieldGroup label="기존 협력사 연결" error={fieldErrors?.companyId}>
               <Select
                 name="companyId"
                 defaultValue={companyValue?.id ?? ""}
@@ -335,7 +358,7 @@ export default function PartnerCardForm({
             </FieldGroup>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <FieldGroup label="협력사명">
+              <FieldGroup label="협력사명" error={fieldErrors?.companyName}>
                 <Input
                   name="companyName"
                   defaultValue={companyValue?.name ?? ""}
@@ -346,7 +369,7 @@ export default function PartnerCardForm({
                   className={fieldErrors?.companyName ? invalidClass : undefined}
                 />
               </FieldGroup>
-              <FieldGroup label="담당자 이름">
+              <FieldGroup label="담당자 이름" error={fieldErrors?.companyContactName}>
                 <Input
                   name="companyContactName"
                   defaultValue={companyValue?.contactName ?? ""}
@@ -360,7 +383,7 @@ export default function PartnerCardForm({
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <FieldGroup label="담당자 이메일">
+              <FieldGroup label="담당자 이메일" error={fieldErrors?.companyContactEmail}>
                 <Input
                   name="companyContactEmail"
                   type="email"
@@ -372,7 +395,7 @@ export default function PartnerCardForm({
                   className={fieldErrors?.companyContactEmail ? invalidClass : undefined}
                 />
               </FieldGroup>
-              <FieldGroup label="담당자 전화번호">
+              <FieldGroup label="담당자 전화번호" error={fieldErrors?.companyContactPhone}>
                 <Input
                   name="companyContactPhone"
                   defaultValue={companyValue?.contactPhone ?? ""}
@@ -385,7 +408,7 @@ export default function PartnerCardForm({
               </FieldGroup>
             </div>
 
-            <FieldGroup label="협력사 설명">
+            <FieldGroup label="협력사 설명" error={fieldErrors?.companyDescription}>
               <Textarea
                 name="companyDescription"
                 defaultValue={companyValue?.description ?? ""}
@@ -468,7 +491,12 @@ export default function PartnerCardForm({
               description="상세 페이지에서 보이는 적용 대상 칩을 기준으로 노출 범위를 관리합니다."
             />
             <div className="mt-6 grid gap-4">
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div
+                className={cn(
+                  "grid gap-2 rounded-[1.25rem] border border-border p-3 sm:grid-cols-3",
+                  fieldErrors?.appliesTo ? "border-danger/40 ring-2 ring-danger/15" : null,
+                )}
+              >
                 {PARTNER_AUDIENCE_OPTIONS.map((option) => (
                   <label
                     key={option.value}
@@ -479,15 +507,21 @@ export default function PartnerCardForm({
                       name="appliesTo"
                       value={option.value}
                       defaultChecked={selectedAppliesTo.includes(option.value)}
+                      aria-invalid={Boolean(fieldErrors?.appliesTo) || undefined}
                       className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                     />
                     <span>{option.label}</span>
                   </label>
                 ))}
               </div>
+              {fieldErrors?.appliesTo ? (
+                <span className="text-xs font-medium text-danger">{fieldErrors.appliesTo}</span>
+              ) : null}
             </div>
           </Card>
         </div>
+
+        {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">
