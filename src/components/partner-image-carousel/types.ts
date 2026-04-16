@@ -10,3 +10,4 @@ export type CarouselPinchState = {
   offset: CarouselOffset;
 };
 
+export type CarouselThumbPlacement = "side" | "bottom";

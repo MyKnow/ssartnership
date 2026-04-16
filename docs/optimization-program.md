@@ -167,3 +167,427 @@
   - `npx tsc --noEmit`
   - `node --test tests/seo-ops-helpers.test.mts tests/push/wave1-helpers.test.mts`
   - `git diff --check`
+
+### OPT-009
+- ID: `OPT-009`
+- Priority: `P0`
+- Category: `maintainability`
+- Targets: `src/app/admin/(protected)/_actions/partner-support.ts`
+- Current Problem: 협력사 연결, 계정 생성/재활성화, 초기설정 URL 발급, 미디어 파싱/업로드가 한 파일에 섞여 있어 수정 범위와 장애 범위가 불필요하게 넓다.
+- Planned Change: façade는 유지하고 내부를 `setup-link`, `company-provision`, `media`, `shared`, `slug` 모듈로 분리해 책임을 나눈다.
+- Validation: `npm run lint`, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/admin/(protected)/_actions/partner-support.ts`를 façade로 축소
+  - `src/app/admin/(protected)/_actions/partner-support/shared.ts`에 계정/회사 정규화와 표시명/로그인 ID helper 이동
+  - `src/app/admin/(protected)/_actions/partner-support/setup-link.ts`에 초기설정 URL 발급 로직 이동
+  - `src/app/admin/(protected)/_actions/partner-support/company-provision.ts`에 회사/계정/link provision 및 cleanup 로직 이동
+  - `src/app/admin/(protected)/_actions/partner-support/media.ts`에 media manifest 파싱과 업로드 로직 이동
+  - `src/app/admin/(protected)/_actions/partner-support/slug.ts`에 회사 slug 생성 로직 이동
+- Validation Result:
+  - `npm run lint`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-010
+- ID: `OPT-010`
+- Priority: `P0`
+- Category: `maintainability`
+- Targets: `src/app/api/mm/_shared/verify-code.ts`
+- Current Problem: MM 인증 완료 경로가 throttle, MM 사용자 해석, 인증코드 검증, 회원 생성/동기화, 실패 응답 매핑을 한 함수에 모두 담고 있어 테스트와 장애 격리가 어렵다.
+- Planned Change: façade는 유지하고 내부를 `verify-code-identity`, `verify-code-verification`, `verify-code-member`, `verify-code-failure`로 분리해 `parse -> resolve -> verify -> finalize -> respond` 구조로 줄인다.
+- Validation: `npm run lint`, `npx tsc --noEmit`, `node --test tests/mm-route-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/api/mm/_shared/verify-code.ts`를 orchestration으로 축소
+  - `src/app/api/mm/_shared/verify-code-identity.ts`에 MM 사용자/디렉터리 해석 로직 이동
+  - `src/app/api/mm/_shared/verify-code-verification.ts`에 인증 시도/차단/코드 검증/초기화 로직 이동
+  - `src/app/api/mm/_shared/verify-code-member.ts`에 회원 생성/동기화/세션 발급/정책 동의 기록 로직 이동
+  - `src/app/api/mm/_shared/verify-code-failure.ts`에 실패 응답 및 보안 로그 기록 로직 이동
+- Validation Result:
+  - `npm run lint`
+  - `npx tsc --noEmit`
+  - `node --test tests/mm-route-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-011
+- ID: `OPT-011`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/app/(site)/partners/[id]/page.tsx`
+- Current Problem: 공개 제휴 상세 페이지가 카테고리/파트너 조회, 메타 데이터 조립, structured data 생성, 요약 카드 렌더, 연락처 섹션 렌더를 한 파일에 모두 담고 있어 수정 범위가 넓고 데이터 매핑이 반복된다.
+- Planned Change: page는 orchestration만 남기고, 데이터 조립은 `_page/page-data.ts`, 렌더는 요약 카드와 연락처 섹션 컴포넌트로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/campus-seo.test.mts tests/seo-ops-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/(site)/partners/[id]/_page/page-data.ts` 추가
+  - `src/app/(site)/partners/[id]/_page/PartnerDetailSummaryCard.tsx` 추가
+  - `src/app/(site)/partners/[id]/_page/PartnerDetailContactSection.tsx` 추가
+  - `src/app/(site)/partners/[id]/page.tsx`를 메타/페이지 orchestration 위주로 축소
+- Validation Result:
+  - `npx eslint 'src/app/(site)/partners/[id]/page.tsx' 'src/app/(site)/partners/[id]/_page/page-data.ts' 'src/app/(site)/partners/[id]/_page/PartnerDetailSummaryCard.tsx' 'src/app/(site)/partners/[id]/_page/PartnerDetailContactSection.tsx'`
+  - `npx tsc --noEmit`
+  - `node --test tests/campus-seo.test.mts tests/seo-ops-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-012
+- ID: `OPT-012`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/mm-directory.ts`
+- Current Problem: MM 디렉터리 모듈이 외부 API 수집, snapshot merge, DB 조회/업서트/정리까지 한 파일에 모두 담고 있어 회귀 범위가 크고 테스트 경계가 불분명하다.
+- Planned Change: façade는 유지하고 내부를 `shared`, `collector`, `repository`로 분리해 수집/병합/저장을 나눈다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/mm-directory.ts`를 façade로 축소
+  - `src/lib/mm-directory/shared.ts`에 타입, 에러, snapshot merge helper 이동
+  - `src/lib/mm-directory/collector.ts`에 selectable year 수집 및 배치 merge 로직 이동
+  - `src/lib/mm-directory/repository.ts`에 디렉터리 조회, upsert, 전체 sync 로직 이동
+- Validation Result:
+  - `npx eslint src/lib/mm-directory.ts src/lib/mm-directory/shared.ts src/lib/mm-directory/collector.ts src/lib/mm-directory/repository.ts`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-013
+- ID: `OPT-013`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/components/push/push-settings/usePushSettingsController.ts`
+- Current Problem: 푸시 설정 훅이 브라우저 capability 판단, 초기 기기 상태 로드, API transport, UI orchestration을 한 파일에 모두 들고 있어 클라이언트 제어 흐름이 과도하게 뭉쳐 있다.
+- Planned Change: device state와 API transport를 별도 모듈로 분리하고, 컨트롤러 훅은 UI orchestration만 남긴다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+
+### OPT-020
+- ID: `OPT-020`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/components/auth/SignupForm.tsx`
+- Current Problem: 회원가입 폼이 step 상태, field validation, request/verify fetch, 포커스 제어, 안내 섹션 렌더를 한 파일에 모두 담고 있어 수정 범위가 넓고 helper 테스트 경계가 없다.
+- Planned Change: façade는 유지하고 내부를 state controller, 순수 validation/error mapping helper, identity/policy/guide/action section으로 분리해 테스트 가능한 단위로 축소한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/signup-form-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/components/auth/SignupForm.tsx`를 façade로 축소
+  - `src/components/auth/signup-form/` 아래에 `types`, `helpers`, `useSignupFormController`, `SignupGuideCard`, `SignupIdentityFields`, `SignupPoliciesSection`, `SignupVerificationField`, `SignupActions`, `SignupFormView` 추가
+  - request/verify 단계별 validation과 서버 응답 에러 매핑을 순수 helper로 이동
+  - `tests/signup-form-helpers.test.mts` 추가
+- Validation Result:
+  - `npx eslint src/components/auth/SignupForm.tsx src/components/auth/signup-form/types.ts src/components/auth/signup-form/helpers.ts src/components/auth/signup-form/useSignupFormController.ts src/components/auth/signup-form/SignupGuideCard.tsx src/components/auth/signup-form/SignupIdentityFields.tsx src/components/auth/signup-form/SignupPoliciesSection.tsx src/components/auth/signup-form/SignupVerificationField.tsx src/components/auth/signup-form/SignupActions.tsx src/components/auth/signup-form/SignupFormView.tsx`
+  - `npx tsc --noEmit`
+  - `node --test tests/signup-form-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-021
+- ID: `OPT-021`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/components/partner/PartnerServiceDetailView.tsx`
+- Current Problem: 파트너 상세 뷰가 승인 대기 섹션, 요약 카드, 예약/문의 카드, 링크/스타일 계산을 한 파일에 모두 담고 있어 읽기와 수정 단위가 너무 크다.
+- Planned Change: façade는 유지하고 내부를 view props, visual helper, pending section, summary section, contact section, orchestration view로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/partner-service-detail-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/components/partner/PartnerServiceDetailView.tsx`를 façade로 축소
+  - `src/components/partner/partner-service-detail-view/` 아래에 `types`, `helpers`, `SectionTitle`, `PartnerPendingRequestSection`, `PartnerServiceSummaryCard`, `PartnerServiceContacts`, `PartnerServiceDetailViewContent` 추가
+  - 카테고리 색상/예약 문의 상태/지도 링크 계산을 pure helper로 이동
+  - `tests/partner-service-detail-helpers.test.mts` 추가
+- Validation Result:
+  - `npx eslint src/components/partner/PartnerServiceDetailView.tsx src/components/partner/partner-service-detail-view/types.ts src/components/partner/partner-service-detail-view/helpers.ts src/components/partner/partner-service-detail-view/SectionTitle.tsx src/components/partner/partner-service-detail-view/PartnerPendingRequestSection.tsx src/components/partner/partner-service-detail-view/PartnerServiceSummaryCard.tsx src/components/partner/partner-service-detail-view/PartnerServiceContacts.tsx src/components/partner/partner-service-detail-view/PartnerServiceDetailViewContent.tsx`
+  - `npx tsc --noEmit`
+  - `node --test tests/partner-service-detail-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-022
+- ID: `OPT-022`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/components/admin/AdminPartnerAccountManager.tsx`
+- Current Problem: 협력사 계정 관리 화면이 헤더 상태 badge, 초기설정 URL 액션, 계정 편집 폼, 협력사 연결 리스트를 한 파일에 모두 담고 있어 읽기와 수정 단위가 너무 크다.
+- Planned Change: façade는 유지하고 내부를 타입, helper, header, account form, company links, account card, content orchestration으로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/partner-account-manager-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/components/admin/AdminPartnerAccountManager.tsx`를 façade로 축소
+  - `src/components/admin/partner-account-manager/` 아래에 `types`, `helpers`, `FieldGroup`, `PartnerAccountHeader`, `PartnerAccountForm`, `PartnerAccountLinks`, `PartnerAccountCard`, `AdminPartnerAccountManagerContent` 추가
+  - 초기설정 URL 생성과 datetime 포맷을 pure helper로 이동
+  - `tests/partner-account-manager-helpers.test.mts` 추가
+- Validation Result:
+  - `npx eslint src/components/admin/AdminPartnerAccountManager.tsx src/components/admin/partner-account-manager/types.ts src/components/admin/partner-account-manager/helpers.ts src/components/admin/partner-account-manager/FieldGroup.tsx src/components/admin/partner-account-manager/PartnerAccountHeader.tsx src/components/admin/partner-account-manager/PartnerAccountForm.tsx src/components/admin/partner-account-manager/PartnerAccountLinks.tsx src/components/admin/partner-account-manager/PartnerAccountCard.tsx src/components/admin/partner-account-manager/AdminPartnerAccountManagerContent.tsx tests/partner-account-manager-helpers.test.mts`
+  - `npx tsc --noEmit`
+  - `node --test tests/partner-account-manager-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-023
+- ID: `OPT-023`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/components/admin/AdminLogsManager.tsx`
+- Current Problem: 관리자 로그 화면이 range fetch, export, explorer filter state, dashboard selector binding을 한 컴포넌트에서 모두 관리하고 있어 상태 변경과 렌더링 책임이 과도하게 결합돼 있다.
+- Planned Change: façade는 유지하고 내부를 `useAdminLogsManager` controller와 `AdminLogsManagerContent` 렌더 orchestration으로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/components/admin/AdminLogsManager.tsx`를 façade로 축소
+  - `src/components/admin/logs-manager/useAdminLogsManager.ts` 추가
+  - `src/components/admin/logs-manager/AdminLogsManagerContent.tsx` 추가
+- Validation Result:
+  - `npx eslint src/components/admin/AdminLogsManager.tsx src/components/admin/logs-manager/useAdminLogsManager.ts src/components/admin/logs-manager/AdminLogsManagerContent.tsx`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-024
+- ID: `OPT-024`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/mattermost.ts`
+- Current Problem: Mattermost API 모듈이 env/config, HTTP client, 인증, 사용자 조회, 채널 탐색, selectable member 해석을 한 파일에 모두 담고 있어 회귀 범위가 크다.
+- Planned Change: façade는 유지하고 내부를 `types`, `config`, `client`, `auth`, `users`, `channels`, `resolver`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/mattermost-mm-profile-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/mattermost.ts`를 façade로 축소
+  - `src/lib/mattermost/` 아래에 `types`, `config`, `client`, `auth`, `users`, `channels`, `resolver` 추가
+  - Mattermost config 기본값 검증을 위해 helper 테스트 추가
+- Validation Result:
+  - `npx eslint src/lib/mattermost.ts src/lib/mattermost/types.ts src/lib/mattermost/config.ts src/lib/mattermost/client.ts src/lib/mattermost/auth.ts src/lib/mattermost/users.ts src/lib/mattermost/channels.ts src/lib/mattermost/resolver.ts tests/mattermost-mm-profile-helpers.test.mts`
+  - `npx tsc --noEmit`
+  - `node --test tests/mattermost-mm-profile-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-025
+- ID: `OPT-025`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/mm-profile.ts`
+- Current Problem: SSAFY 프로필 파서가 상수, 문자열 정규화, 소속 해석, parser 조립을 한 파일에 모두 담고 있어 읽기와 테스트 단위가 너무 크다.
+- Planned Change: façade는 유지하고 내부를 `types`, `constants`, `text`, `affiliation`, `parser`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/mattermost-mm-profile-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/mm-profile.ts`를 façade로 축소
+  - `src/lib/mm-profile/` 아래에 `types`, `constants`, `text`, `affiliation`, `parser` 추가
+  - 프로필 parser의 캠퍼스/운영진 해석 검증을 helper 테스트에 추가
+- Validation Result:
+  - `npx eslint src/lib/mm-profile.ts src/lib/mm-profile/types.ts src/lib/mm-profile/constants.ts src/lib/mm-profile/text.ts src/lib/mm-profile/affiliation.ts src/lib/mm-profile/parser.ts tests/mattermost-mm-profile-helpers.test.mts`
+  - `npx tsc --noEmit`
+  - `node --test tests/mattermost-mm-profile-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-026
+- ID: `OPT-026`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/app/admin/(protected)/_actions/partner-actions.ts`
+- Current Problem: 관리자 파트너 액션 파일이 생성, 수정, 승인/거절, 삭제 흐름과 push/audit/revalidate까지 한 파일에서 관리해 수정 범위가 넓다.
+- Planned Change: façade는 유지하고 내부를 `create`, `update`, `review`, `delete` 모듈로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/admin/(protected)/_actions/partner-actions.ts`를 façade로 축소
+  - `src/app/admin/(protected)/_actions/partner-actions/create.ts`, `update.ts`, `review.ts`, `delete.ts` 추가
+- Validation Result:
+  - `npx eslint 'src/app/admin/(protected)/_actions/partner-actions.ts' 'src/app/admin/(protected)/_actions/partner-actions/create.ts' 'src/app/admin/(protected)/_actions/partner-actions/update.ts' 'src/app/admin/(protected)/_actions/partner-actions/review.ts' 'src/app/admin/(protected)/_actions/partner-actions/delete.ts'`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-027
+- ID: `OPT-027`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/partner-change-requests/commands.ts`
+- Current Problem: 파트너 변경요청 명령 모듈이 생성, 취소, 승인, 거절 로직과 media cleanup을 한 파일에 모두 담고 있어 책임 구분이 약하다.
+- Planned Change: façade는 유지하고 내부를 `commands/create`, `commands/cancel`, `commands/review`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/partner-portal.mock.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/partner-change-requests/commands.ts`를 façade로 축소
+  - `src/lib/partner-change-requests/commands/create.ts`, `cancel.ts`, `review.ts` 추가
+- Validation Result:
+  - `npx eslint src/lib/partner-change-requests/commands.ts src/lib/partner-change-requests/commands/create.ts src/lib/partner-change-requests/commands/cancel.ts src/lib/partner-change-requests/commands/review.ts`
+  - `npx tsc --noEmit`
+  - `node --test tests/partner-portal.mock.test.mts`
+  - `git diff --check`
+
+### OPT-028
+- ID: `OPT-028`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/image-proxy.ts`
+- Current Problem: 이미지 프록시가 IP 필터링, DNS 해석, HTTP fetch, content validation을 한 파일에 모두 담고 있어 보안 로직과 네트워크 로직의 경계가 흐리다.
+- Planned Change: façade는 유지하고 내부를 `shared`, `ip`, `fetch`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/image-proxy-token-chip-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/image-proxy.ts`를 façade로 축소
+  - `src/lib/image-proxy/shared.ts`, `ip.ts`, `fetch.ts` 추가
+  - public IP 판별 helper 검증 추가
+- Validation Result:
+  - `npx eslint src/lib/image-proxy.ts src/lib/image-proxy/shared.ts src/lib/image-proxy/ip.ts src/lib/image-proxy/fetch.ts tests/image-proxy-token-chip-helpers.test.mts`
+  - `npx tsc --noEmit`
+  - `node --test tests/image-proxy-token-chip-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-029
+- ID: `OPT-029`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/components/admin/TokenChipField.tsx`
+- Current Problem: 토큰 칩 필드가 helper, 편집 상태, 리스트 렌더, 입력 composer를 한 파일에 모두 담고 있어 재사용성과 테스트성이 낮다.
+- Planned Change: façade는 유지하고 내부를 `helpers`, `useTokenChipField`, `TokenChipItems`, `TokenChipComposer`, `TokenChipFieldContent`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/image-proxy-token-chip-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/components/admin/TokenChipField.tsx`를 façade로 축소
+  - `src/components/admin/token-chip-field/` 아래에 `helpers`, `useTokenChipField`, `TokenChipItems`, `TokenChipComposer`, `TokenChipFieldContent` 추가
+  - dedupe/move helper 검증 추가
+- Validation Result:
+  - `npx eslint src/components/admin/TokenChipField.tsx src/components/admin/token-chip-field/helpers.ts src/components/admin/token-chip-field/useTokenChipField.ts src/components/admin/token-chip-field/TokenChipItems.tsx src/components/admin/token-chip-field/TokenChipComposer.tsx src/components/admin/token-chip-field/TokenChipFieldContent.tsx tests/image-proxy-token-chip-helpers.test.mts`
+  - `npx tsc --noEmit`
+  - `node --test tests/image-proxy-token-chip-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-030
+- ID: `OPT-030`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/app/partner/setup/[token]/page.tsx`
+- Current Problem: 파트너 초기 설정 페이지가 메타데이터, 히어로, 회사/서비스 정보, 폼 영역을 한 페이지 파일에 모두 담고 있어 page orchestration과 섹션 렌더가 결합돼 있다.
+- Planned Change: page는 metadata/context 조회만 남기고 내부를 hero, company section, page content, shared types로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/partner/setup/[token]/page.tsx`를 orchestration으로 축소
+  - `src/app/partner/setup/[token]/_page/PartnerSetupHero.tsx`, `PartnerSetupCompanySection.tsx`, `PartnerSetupPageContent.tsx`, `types.ts` 추가
+- Validation Result:
+  - `npx eslint 'src/app/partner/setup/[token]/page.tsx' 'src/app/partner/setup/[token]/_page/PartnerSetupHero.tsx' 'src/app/partner/setup/[token]/_page/PartnerSetupCompanySection.tsx' 'src/app/partner/setup/[token]/_page/PartnerSetupPageContent.tsx' 'src/app/partner/setup/[token]/_page/types.ts'`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+- Completed:
+  - `src/components/push/push-settings/api.ts` 추가
+  - `src/components/push/push-settings/usePushDeviceState.ts` 추가
+  - `src/components/push/push-settings/usePushSettingsController.ts`를 orchestration 위주로 축소
+- Validation Result:
+  - `npx eslint src/components/push/push-settings/api.ts src/components/push/push-settings/usePushDeviceState.ts src/components/push/push-settings/usePushSettingsController.ts src/components/push/PushSettingsCard.tsx`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-014
+- ID: `OPT-014`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/app/partner/login/page.tsx`
+- Current Problem: 파트너 로그인 페이지가 search param 해석, 에러 메시지 매핑, 서버 액션, rate limit 처리, 세션 발급, redirect 규칙, UI 렌더를 한 파일에 모두 담고 있어 변경 범위가 넓다.
+- Planned Change: 페이지는 렌더와 search param 해석만 남기고, 서버 액션과 redirect helper를 `_actions`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/partner/login/_actions/shared.ts` 추가
+  - `src/app/partner/login/_actions/login.ts` 추가
+  - `src/app/partner/login/page.tsx`를 UI orchestration 위주로 축소
+- Validation Result:
+  - `npx eslint 'src/app/partner/login/page.tsx' 'src/app/partner/login/_actions/shared.ts' 'src/app/partner/login/_actions/login.ts'`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-015
+- ID: `OPT-015`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/app/api/mm/_shared/request-code.ts`
+- Current Problem: MM 인증코드 발급 경로가 사용자 해석, 실패 응답, 재발송 제한, 기존 회원 검사, 인증코드 저장, DM 발송을 한 파일에 모두 담고 있어 테스트와 장애 격리가 어렵다.
+- Planned Change: façade는 유지하고 내부를 `request-code-identity`, `request-code-delivery`, `request-code-failure`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/mm-route-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/api/mm/_shared/request-code-identity.ts` 추가
+  - `src/app/api/mm/_shared/request-code-delivery.ts` 추가
+  - `src/app/api/mm/_shared/request-code-failure.ts` 추가
+  - `src/app/api/mm/_shared/request-code.ts`를 orchestration 위주로 축소
+- Validation Result:
+  - `npx eslint src/app/api/mm/_shared/request-code.ts src/app/api/mm/_shared/request-code-failure.ts src/app/api/mm/_shared/request-code-identity.ts src/app/api/mm/_shared/request-code-delivery.ts`
+  - `npx tsc --noEmit`
+  - `node --test tests/mm-route-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-016
+- ID: `OPT-016`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/app/api/mm/_shared/reset-password.ts`
+- Current Problem: MM 비밀번호 재설정 경로가 사용자 해석, 실패 응답, 운영진 발송자 선택, 회원 동기화, 임시 비밀번호 발급/DM 발송, 시도 제한 업데이트를 한 파일에 모두 담고 있다.
+- Planned Change: façade는 유지하고 내부를 `reset-password-identity`, `reset-password-execution`, `reset-password-failure`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `node --test tests/mm-route-helpers.test.mts`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/app/api/mm/_shared/reset-password-identity.ts` 추가
+  - `src/app/api/mm/_shared/reset-password-execution.ts` 추가
+  - `src/app/api/mm/_shared/reset-password-failure.ts` 추가
+  - `src/app/api/mm/_shared/reset-password.ts`를 orchestration 위주로 축소
+- Validation Result:
+  - `npx eslint src/app/api/mm/_shared/reset-password.ts src/app/api/mm/_shared/reset-password-failure.ts src/app/api/mm/_shared/reset-password-identity.ts src/app/api/mm/_shared/reset-password-execution.ts`
+  - `npx tsc --noEmit`
+  - `node --test tests/mm-route-helpers.test.mts`
+  - `git diff --check`
+
+### OPT-017
+- ID: `OPT-017`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/partner-auth/supabase.ts`
+- Current Problem: 파트너 인증 Supabase 구현이 회사 조회, 계정 조회, 로그인, 비밀번호 재설정, 초기 설정, 비밀번호 변경까지 한 파일에 모두 담고 있어 command 책임이 섞여 있다.
+- Planned Change: façade는 유지하고 내부를 `company`, `accounts`, `login`, `reset`, `setup`, `password` 모듈로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/partner-auth/company.ts` 추가
+  - `src/lib/partner-auth/accounts.ts` 추가
+  - `src/lib/partner-auth/login.ts` 추가
+  - `src/lib/partner-auth/reset.ts` 추가
+  - `src/lib/partner-auth/setup.ts` 추가
+  - `src/lib/partner-auth/password.ts` 추가
+  - `src/lib/partner-auth/supabase.ts`를 façade로 축소
+- Validation Result:
+  - `npx eslint src/lib/partner-auth/supabase.ts src/lib/partner-auth/company.ts src/lib/partner-auth/accounts.ts src/lib/partner-auth/login.ts src/lib/partner-auth/reset.ts src/lib/partner-auth/setup.ts src/lib/partner-auth/password.ts`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-018
+- ID: `OPT-018`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/member-manual-add.ts`
+- Current Problem: 수동 회원 추가 모듈이 입력 파싱, MM 사용자 해석, 기존 회원 조회, payload 생성, 임시 비밀번호 발송, 실패 롤백을 한 파일에 모두 담고 있어 회귀 범위가 넓다.
+- Planned Change: façade는 유지하고 내부를 `shared`, `lookup`, `rollback`, `provision`으로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/member-manual-add/shared.ts` 추가
+  - `src/lib/member-manual-add/lookup.ts` 추가
+  - `src/lib/member-manual-add/rollback.ts` 추가
+  - `src/lib/member-manual-add/provision.ts` 추가
+  - `src/lib/member-manual-add.ts`를 façade로 축소
+- Validation Result:
+  - `npx eslint src/lib/member-manual-add.ts src/lib/member-manual-add/shared.ts src/lib/member-manual-add/lookup.ts src/lib/member-manual-add/rollback.ts src/lib/member-manual-add/provision.ts`
+  - `npx tsc --noEmit`
+  - `git diff --check`
+
+### OPT-019
+- ID: `OPT-019`
+- Priority: `P1`
+- Category: `maintainability`
+- Targets: `src/lib/mm-member-sync.ts`
+- Current Problem: MM 회원 동기화 모듈이 snapshot 생성, sender session 캐시, diff 계산, 단건/배치 sync를 한 파일에 모두 담고 있어 책임이 과도하게 크다.
+- Planned Change: façade는 유지하고 내부를 `shared`, `snapshot`, `sync`로 분리한다.
+- Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
+- Status: `done`
+- Completed:
+  - `src/lib/mm-member-sync/shared.ts` 추가
+  - `src/lib/mm-member-sync/snapshot.ts` 추가
+  - `src/lib/mm-member-sync/sync.ts` 추가
+  - `src/lib/mm-member-sync.ts`를 façade로 축소
+- Validation Result:
+  - `npx eslint src/lib/mm-member-sync.ts src/lib/mm-member-sync/shared.ts src/lib/mm-member-sync/snapshot.ts src/lib/mm-member-sync/sync.ts`
+  - `npx tsc --noEmit`
+  - `git diff --check`

@@ -1,0 +1,160 @@
+import { randomUUID } from "node:crypto";
+import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth";
+import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
+import {
+  createNewPartnerPayload,
+  isPushConfigured,
+  sendPushToAudience,
+} from "@/lib/push";
+import type { PartnerCreateFormState } from "@/lib/partner-form-state";
+import { isWithinPeriod } from "@/lib/partner-utils";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  cleanupPartnerCompanyProvision,
+  ensurePartnerCompanyRow,
+  resolvePartnerMediaPayload,
+} from "@/app/admin/(protected)/_actions/partner-support";
+import {
+  logAdminAction,
+  revalidateAdminAndPublicPaths,
+  revalidatePartnerData,
+} from "@/app/admin/(protected)/_actions/shared-helpers";
+import {
+  parsePartnerCompanyPayload,
+  parsePartnerPayload,
+} from "@/app/admin/(protected)/_actions/shared-parsers";
+import type { CreatedPartnerRecord } from "@/app/admin/(protected)/_actions/shared-types";
+
+async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRecord> {
+  const payload = parsePartnerPayload(formData);
+  const partnerId = randomUUID();
+  const companyPayload = parsePartnerCompanyPayload(formData);
+  const media = await resolvePartnerMediaPayload(formData, partnerId);
+
+  const supabase = getSupabaseAdminClient();
+  let companyProvision = null;
+
+  try {
+    companyProvision = await ensurePartnerCompanyRow(supabase, companyPayload, false);
+
+    const { error } = await supabase.from("partners").insert({
+      id: partnerId,
+      company_id: companyProvision.company?.id ?? null,
+      name: payload.name,
+      category_id: payload.categoryId,
+      location: payload.location,
+      map_url: payload.mapUrl,
+      reservation_link: payload.reservationLink,
+      inquiry_link: payload.inquiryLink,
+      period_start: payload.periodStart,
+      period_end: payload.periodEnd,
+      conditions: payload.conditions,
+      benefits: payload.benefits,
+      applies_to: payload.appliesTo,
+      thumbnail: media.thumbnail,
+      images: media.images,
+      tags: payload.tags,
+      visibility: payload.visibility,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (error) {
+    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+    await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    throw error;
+  }
+
+  return {
+    partnerId,
+    payload,
+    companyProvision,
+    media,
+    supabase,
+  };
+}
+
+async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
+  const { partnerId, payload, companyProvision, media, supabase } = record;
+
+  await logAdminAction("partner_create", {
+    targetType: "partner",
+    targetId: partnerId,
+    properties: {
+      name: payload.name,
+      companyId: companyProvision?.company?.id ?? null,
+      companyName: companyProvision?.company?.name ?? null,
+      companyContactEmail: companyProvision?.company?.contact_email ?? null,
+      categoryId: payload.categoryId,
+      location: payload.location,
+      hasMapUrl: Boolean(payload.mapUrl),
+      hasReservationLink: Boolean(payload.reservationLink),
+      hasInquiryLink: Boolean(payload.inquiryLink),
+      periodStart: payload.periodStart,
+      periodEnd: payload.periodEnd,
+      conditionCount: payload.conditions.length,
+      visibility: payload.visibility,
+      benefitCount: payload.benefits.length,
+      appliesTo: payload.appliesTo,
+      hasThumbnail: Boolean(media.thumbnail),
+      imageCount: media.images.length,
+      tagCount: payload.tags.length,
+    },
+  });
+
+  if (
+    payload.visibility !== "private" &&
+    isPushConfigured() &&
+    isWithinPeriod(payload.periodStart, payload.periodEnd)
+  ) {
+    const { data: category } = await supabase
+      .from("categories")
+      .select("label")
+      .eq("id", payload.categoryId)
+      .maybeSingle();
+
+    try {
+      await sendPushToAudience(
+        createNewPartnerPayload({
+          partnerId,
+          name: payload.name,
+          location: payload.location,
+          categoryLabel: category?.label ?? null,
+        }),
+      );
+    } catch (pushError) {
+      console.error("new partner push failed", pushError);
+    }
+  }
+
+  revalidatePartnerData();
+  revalidateAdminAndPublicPaths(partnerId);
+}
+
+export async function createPartnerAction(formData: FormData) {
+  await requireAdmin();
+  const record = await createPartnerRecord(formData);
+  await finalizeCreatedPartner(record);
+  redirect("/admin/partners?created=partner_created");
+}
+
+export async function createPartnerFormActionImpl(
+  _prevState: PartnerCreateFormState,
+  formData: FormData,
+): Promise<PartnerCreateFormState> {
+  await requireAdmin();
+  try {
+    const record = await createPartnerRecord(formData);
+    await finalizeCreatedPartner(record);
+  } catch (error) {
+    return {
+      status: "error",
+      errorCode:
+        error instanceof Error ? error.message : "partner_form_invalid_request",
+    };
+  }
+
+  redirect("/admin/partners?created=partner_created");
+}

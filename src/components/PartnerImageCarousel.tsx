@@ -45,9 +45,10 @@ export default function PartnerImageCarousel({
     activeIndex,
     activeImage,
     canNavigate,
+    rootRef,
     activeThumbRef,
     thumbStripRef,
-    desktopHeight,
+    thumbPlacement,
     isPreloaded,
     isOpen,
     zoom,
@@ -72,18 +73,21 @@ export default function PartnerImageCarousel({
       <CarouselLoadingSkeleton
         className={className}
         imageCount={imageCount}
-        style={desktopHeight ? { height: `${desktopHeight}px` } : undefined}
+        thumbPlacement={thumbPlacement}
       />
     );
   }
 
   return (
     <div
+      ref={rootRef}
       className={cn(
-        "grid gap-3 xl:grid-cols-[minmax(0,1fr)_7.5rem] xl:items-stretch",
+        "grid gap-3 items-start",
+        thumbPlacement === "side"
+          ? "xl:grid-cols-[minmax(0,1fr)_7.5rem] xl:items-start"
+          : "xl:grid-cols-1 xl:items-start",
         className,
       )}
-      style={desktopHeight ? { height: `${desktopHeight}px` } : undefined}
     >
       <button
         type="button"
@@ -114,6 +118,7 @@ export default function PartnerImageCarousel({
         <ThumbStrip
           images={cachedImages}
           activeIndex={activeIndex}
+          placement={thumbPlacement}
           activeThumbRef={activeThumbRef}
           thumbStripRef={thumbStripRef}
           onSelect={activateImage}

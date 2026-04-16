@@ -44,6 +44,9 @@ export default function Footer() {
             <Button variant="secondary" href={SUGGESTION_URL}>
               제휴 제안
             </Button>
+            <Button variant="secondary" href="/partner">
+              파트너 포털
+            </Button>
             <Button variant="secondary" href="/legal/service">
               이용약관
             </Button>

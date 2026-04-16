@@ -3,15 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { trackProductEvent } from "@/lib/product-events";
+import {
+  savePushPreferences,
+  subscribePushDevice,
+  unsubscribePushDevice,
+  unsubscribePushEveryDevice,
+} from "./api";
 import { derivePushSettingsStatus } from "./status";
 import {
   getServiceWorkerRegistration,
-  isIosDevice,
-  isStandaloneDisplay,
-  parsePushSettingsJson,
   urlBase64ToUint8Array,
 } from "./device";
 import type { PreferenceKey, PushSettingsCardProps } from "./types";
+import { usePushDeviceState } from "./usePushDeviceState";
 
 export function usePushSettingsController({
   configured,
@@ -19,17 +23,11 @@ export function usePushSettingsController({
 }: PushSettingsCardProps) {
   const { notify } = useToast();
   const [preferences, setPreferences] = useState(initialPreferences);
-  const [loading, setLoading] = useState(true);
   const [pendingAction, setPendingAction] = useState<
     null | "subscribe" | "device-off" | "all-off" | "preference"
   >(null);
-  const [supported, setSupported] = useState(false);
-  const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
-    "default",
-  );
-  const [hasSubscription, setHasSubscription] = useState(false);
   const hasTrackedViewRef = useRef(false);
+  const deviceState = usePushDeviceState();
 
   useEffect(() => {
     if (hasTrackedViewRef.current) {
@@ -45,116 +43,41 @@ export function usePushSettingsController({
     });
   }, [configured]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadState() {
-      const iosDevice =
-        typeof window !== "undefined" &&
-        typeof navigator !== "undefined" &&
-        isIosDevice();
-      const needsInstall =
-        iosDevice &&
-        typeof window !== "undefined" &&
-        !isStandaloneDisplay();
-
-      if (needsInstall) {
-        await Promise.resolve();
-        if (!cancelled) {
-          setSupported(true);
-          setIosNeedsInstall(true);
-          setPermission("Notification" in window ? Notification.permission : "default");
-          setHasSubscription(false);
-          setLoading(false);
-        }
-        return;
-      }
-
-      const canUsePush =
-        typeof window !== "undefined" &&
-        "serviceWorker" in navigator &&
-        "PushManager" in window &&
-        "Notification" in window;
-
-      if (!canUsePush) {
-        await Promise.resolve();
-        if (!cancelled) {
-          setSupported(false);
-          setPermission("unsupported");
-          setLoading(false);
-        }
-        return;
-      }
-
-      await Promise.resolve();
-      if (!cancelled) {
-        setSupported(true);
-        setIosNeedsInstall(false);
-        setPermission(Notification.permission);
-      }
-
-      try {
-        const registration = await getServiceWorkerRegistration();
-        const subscription = await registration.pushManager.getSubscription();
-        if (!cancelled) {
-          setHasSubscription(Boolean(subscription));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadState();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
-  const deviceEnabled = hasSubscription;
+  const deviceEnabled = deviceState.hasSubscription;
   const accountEnabled = preferences.enabled;
   const isReceivingOnThisDevice = accountEnabled && deviceEnabled;
-  const canControlPush = configured && supported && !iosNeedsInstall;
+  const canControlPush =
+    configured && deviceState.supported && !deviceState.iosNeedsInstall;
   const hasPendingAction = pendingAction !== null;
   const status = useMemo(
     () =>
       derivePushSettingsStatus({
         configured,
-        supported,
-        iosNeedsInstall,
+        supported: deviceState.supported,
+        iosNeedsInstall: deviceState.iosNeedsInstall,
         isReceivingOnThisDevice,
         accountEnabled,
       }),
-    [accountEnabled, configured, iosNeedsInstall, isReceivingOnThisDevice, supported],
+    [
+      accountEnabled,
+      configured,
+      deviceState.iosNeedsInstall,
+      deviceState.supported,
+      isReceivingOnThisDevice,
+    ],
   );
-
-  async function requestNotificationPermission() {
-    if (!("Notification" in window)) {
-      throw new Error("이 브라우저에서는 알림 권한을 사용할 수 없습니다.");
-    }
-
-    const nextPermission =
-      Notification.permission === "granted"
-        ? "granted"
-        : await Notification.requestPermission();
-    setPermission(nextPermission);
-    if (nextPermission !== "granted") {
-      throw new Error("브라우저에서 알림 권한을 허용해 주세요.");
-    }
-  }
 
   async function handleSubscribe() {
     if (!configured) {
       notify("서버 알림 설정이 완료된 뒤 사용할 수 있습니다.");
       return;
     }
-    if (!supported) {
+    if (!deviceState.supported) {
       notify("현재 브라우저는 Web Push를 지원하지 않습니다.");
       return;
     }
-    if (iosNeedsInstall) {
+    if (deviceState.iosNeedsInstall) {
       notify("iPhone/iPad에서는 홈 화면에 추가한 뒤 설치된 앱에서 알림을 켤 수 있습니다.");
       return;
     }
@@ -165,7 +88,7 @@ export function usePushSettingsController({
 
     setPendingAction("subscribe");
     try {
-      await requestNotificationPermission();
+      await deviceState.requestNotificationPermission();
       const registration = await getServiceWorkerRegistration();
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
@@ -175,15 +98,8 @@ export function usePushSettingsController({
         });
       }
 
-      const response = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ subscription: subscription.toJSON() }),
-      });
-      const data = await parsePushSettingsJson(response);
-      setHasSubscription(true);
+      const data = await subscribePushDevice(subscription.toJSON());
+      deviceState.markSubscribed();
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {
@@ -207,21 +123,11 @@ export function usePushSettingsController({
     try {
       const registration = await getServiceWorkerRegistration();
       const subscription = await registration.pushManager.getSubscription();
-      const response = await fetch("/api/push/unsubscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          scope: "device",
-          endpoint: subscription?.endpoint ?? null,
-        }),
-      });
-      const data = await parsePushSettingsJson(response);
+      const data = await unsubscribePushDevice(subscription?.endpoint ?? null);
       if (subscription) {
         await subscription.unsubscribe().catch(() => undefined);
       }
-      setHasSubscription(false);
+      deviceState.markUnsubscribed();
       if (data?.preferences) {
         setPreferences(data.preferences);
       }
@@ -245,21 +151,11 @@ export function usePushSettingsController({
     try {
       const registration = await getServiceWorkerRegistration();
       const subscription = await registration.pushManager.getSubscription();
-      const response = await fetch("/api/push/unsubscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          scope: "all",
-          endpoint: subscription?.endpoint ?? null,
-        }),
-      });
-      const data = await parsePushSettingsJson(response);
+      const data = await unsubscribePushEveryDevice(subscription?.endpoint ?? null);
       if (subscription) {
         await subscription.unsubscribe().catch(() => undefined);
       }
-      setHasSubscription(false);
+      deviceState.markUnsubscribed();
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {
@@ -282,14 +178,7 @@ export function usePushSettingsController({
 
     setPendingAction("preference");
     try {
-      const response = await fetch("/api/push/preferences", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(nextPreferences),
-      });
-      const data = await parsePushSettingsJson(response);
+      const data = await savePushPreferences(nextPreferences);
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {
@@ -307,12 +196,12 @@ export function usePushSettingsController({
 
   return {
     preferences,
-    loading,
+    loading: deviceState.loading,
     pendingAction,
-    supported,
-    iosNeedsInstall,
-    permission,
-    hasSubscription,
+    supported: deviceState.supported,
+    iosNeedsInstall: deviceState.iosNeedsInstall,
+    permission: deviceState.permission,
+    hasSubscription: deviceState.hasSubscription,
     vapidPublicKey,
     deviceEnabled,
     accountEnabled,

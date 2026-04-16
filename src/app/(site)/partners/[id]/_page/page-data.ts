@@ -1,0 +1,170 @@
+import type { CSSProperties } from "react";
+import { cache } from "react";
+import { getCachedImageUrl } from "@/lib/image-cache";
+import {
+  getContactDisplay,
+  getMapLink,
+  normalizeReservationInquiry,
+} from "@/lib/partner-links";
+import { isWithinPeriod } from "@/lib/partner-utils";
+import { partnerRepository } from "@/lib/repositories";
+import { buildSiteUrl } from "@/lib/seo";
+import {
+  buildPartnerSeoMetadata,
+  buildPartnerStructuredData,
+} from "@/lib/seo/partners";
+import type { Category, Partner } from "@/lib/types";
+
+const getCategoriesCached = cache(async () => partnerRepository.getCategories());
+
+const getPartnerByIdCached = cache(async (id: string, authenticated: boolean) =>
+  partnerRepository.getPartnerById(id, { authenticated }),
+);
+
+function withAlpha(color: string, alphaHex: string) {
+  if (!color.startsWith("#") || color.length !== 7) {
+    return color;
+  }
+  return `${color}${alphaHex}`;
+}
+
+function toPartnerSeoTarget(partner: Partner) {
+  return {
+    id: partner.id,
+    name: partner.name,
+    location: partner.location,
+    benefits: partner.benefits,
+    conditions: partner.conditions,
+    tags: partner.tags,
+    thumbnail: partner.thumbnail,
+    images: partner.images,
+    mapUrl: partner.mapUrl,
+    period: partner.period,
+  };
+}
+
+function getCategoryLabel(categories: Category[], partner: Partner) {
+  return categories.find((item) => item.key === partner.category)?.label ?? "제휴";
+}
+
+export async function getPartnerMetadataData(rawId: string) {
+  const [categories, partner] = await Promise.all([
+    getCategoriesCached(),
+    getPartnerByIdCached(rawId, false),
+  ]);
+
+  if (!partner) {
+    return null;
+  }
+
+  const categoryLabel = getCategoryLabel(categories, partner);
+  return {
+    partner,
+    categoryLabel,
+    canonicalPath: `/partners/${encodeURIComponent(rawId)}`,
+    seoMetadata: buildPartnerSeoMetadata({
+      partner: toPartnerSeoTarget(partner),
+      categoryLabel,
+    }),
+  };
+}
+
+type ContactDisplay = NonNullable<ReturnType<typeof getContactDisplay>>;
+
+export type PartnerDetailPageData = {
+  partner: Partner;
+  categoryLabel: string;
+  isActive: boolean;
+  thumbnailUrl: string;
+  mapLink: string | undefined;
+  normalizedLinks: {
+    reservationLink: string;
+    inquiryLink: string;
+  };
+  reservationDisplay: ContactDisplay | null;
+  inquiryDisplay: ContactDisplay | null;
+  contactCount: number;
+  badgeStyle?: CSSProperties;
+  chipStyle?: CSSProperties;
+  breadcrumbJsonLd: Record<string, unknown>;
+  partnerJsonLd: Record<string, unknown>;
+  carouselKey: string;
+};
+
+export async function getPartnerDetailPageData(
+  rawId: string,
+  authenticated: boolean,
+): Promise<PartnerDetailPageData | null> {
+  const [categories, partner] = await Promise.all([
+    getCategoriesCached(),
+    getPartnerByIdCached(rawId, authenticated),
+  ]);
+
+  if (!partner) {
+    return null;
+  }
+
+  const category = categories.find((item) => item.key === partner.category);
+  const categoryLabel = category?.label ?? "알 수 없음";
+  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
+  const thumbnailUrl = partner.thumbnail ? getCachedImageUrl(partner.thumbnail) : "";
+  const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name) ?? undefined;
+  const normalizedLinks = isActive
+    ? normalizeReservationInquiry(partner.reservationLink, partner.inquiryLink)
+    : { reservationLink: "", inquiryLink: "" };
+  const reservationDisplay = isActive
+    ? getContactDisplay(normalizedLinks.reservationLink)
+    : null;
+  const inquiryDisplay = isActive
+    ? getContactDisplay(normalizedLinks.inquiryLink)
+    : null;
+  const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
+
+  return {
+    partner,
+    categoryLabel,
+    isActive,
+    thumbnailUrl,
+    mapLink,
+    normalizedLinks,
+    reservationDisplay,
+    inquiryDisplay,
+    contactCount: [reservationDisplay, inquiryDisplay].filter(Boolean).length,
+    badgeStyle: category?.color
+      ? {
+          backgroundColor: withAlpha(category.color, "1f"),
+          color: category.color,
+        }
+      : undefined,
+    chipStyle: category?.color
+      ? {
+          backgroundColor: withAlpha(category.color, "14"),
+          borderColor: withAlpha(category.color, "55"),
+          color: category.color,
+        }
+      : undefined,
+    breadcrumbJsonLd: {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "홈",
+          item: buildSiteUrl("/"),
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: partner.name,
+          item: partnerUrl,
+        },
+      ],
+    },
+    partnerJsonLd: buildPartnerStructuredData({
+      partner: toPartnerSeoTarget(partner),
+      categoryLabel,
+    }),
+    carouselKey: `${partner.id}:${(partner.images ?? []).join("|")}`,
+  };
+}

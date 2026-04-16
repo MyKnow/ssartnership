@@ -6,8 +6,12 @@ import {
   isCachedImageUrlPreloaded,
   preloadCachedImageUrls,
 } from "@/lib/image-cache";
-import { clampCarouselZoom, normalizeCarouselIndex } from "./helpers";
-import type { CarouselOffset } from "./types";
+import {
+  clampCarouselZoom,
+  getDesktopThumbPlacement,
+  normalizeCarouselIndex,
+} from "./helpers";
+import type { CarouselOffset, CarouselThumbPlacement } from "./types";
 
 export function useCarouselController({
   images,
@@ -32,9 +36,11 @@ export function useCarouselController({
   const imageCount = cachedImages.length;
   const activeImage = hasImages ? cachedImages[activeIndex] : "";
   const canNavigate = imageCount > 1;
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const activeThumbRef = useRef<HTMLButtonElement | null>(null);
   const thumbStripRef = useRef<HTMLDivElement | null>(null);
-  const [desktopHeight, setDesktopHeight] = useState<number | null>(null);
+  const [thumbPlacement, setThumbPlacement] =
+    useState<CarouselThumbPlacement>("side");
   const [isPreloaded, setIsPreloaded] = useState(
     () =>
       cachedImages.length === 0 ||
@@ -102,10 +108,8 @@ export function useCarouselController({
       return;
     }
 
-    const isDesktop = window.matchMedia(
-      "(min-width: 1280px) and (pointer: fine)",
-    ).matches;
-    if (isDesktop) {
+    const isDesktop = window.matchMedia("(min-width: 1280px)").matches;
+    if (isDesktop && thumbPlacement === "side") {
       const targetTop =
         thumb.offsetTop - strip.clientHeight / 2 + thumb.offsetHeight / 2;
       const nextTop = Math.max(
@@ -121,7 +125,7 @@ export function useCarouselController({
       block: "nearest",
       inline: "center",
     });
-  }, [activeIndex]);
+  }, [activeIndex, thumbPlacement]);
 
   useEffect(() => {
     if (!matchHeightSelector || typeof window === "undefined") {
@@ -130,38 +134,54 @@ export function useCarouselController({
 
     const media = window.matchMedia("(min-width: 1280px)");
     let observer: ResizeObserver | null = null;
+    let rootObserver: ResizeObserver | null = null;
 
-    const syncHeight = () => {
+    const syncLayout = () => {
       if (!media.matches) {
-        setDesktopHeight(null);
+        setThumbPlacement("side");
         return;
       }
+      const root = rootRef.current;
       const target = document.querySelector(matchHeightSelector);
-      if (!(target instanceof HTMLElement)) {
-        setDesktopHeight(null);
+      if (!(root instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+        setThumbPlacement("side");
         return;
       }
-      setDesktopHeight(target.getBoundingClientRect().height);
+      setThumbPlacement(
+        getDesktopThumbPlacement({
+          containerWidth: root.getBoundingClientRect().width,
+          targetHeight: target.getBoundingClientRect().height,
+          imageCount,
+        }),
+      );
     };
+
+    if (rootRef.current instanceof HTMLElement) {
+      rootObserver = new ResizeObserver(() => {
+        syncLayout();
+      });
+      rootObserver.observe(rootRef.current);
+    }
 
     const target = document.querySelector(matchHeightSelector);
     if (target instanceof HTMLElement) {
       observer = new ResizeObserver(() => {
-        syncHeight();
+        syncLayout();
       });
       observer.observe(target);
     }
 
-    syncHeight();
-    media.addEventListener("change", syncHeight);
-    window.addEventListener("resize", syncHeight);
+    syncLayout();
+    media.addEventListener("change", syncLayout);
+    window.addEventListener("resize", syncLayout);
 
     return () => {
       observer?.disconnect();
-      media.removeEventListener("change", syncHeight);
-      window.removeEventListener("resize", syncHeight);
+      rootObserver?.disconnect();
+      media.removeEventListener("change", syncLayout);
+      window.removeEventListener("resize", syncLayout);
     };
-  }, [matchHeightSelector]);
+  }, [imageCount, matchHeightSelector]);
 
   const resetInteractiveState = () => {
     setZoom(1);
@@ -218,9 +238,10 @@ export function useCarouselController({
     activeIndex,
     activeImage,
     canNavigate,
+    rootRef,
     activeThumbRef,
     thumbStripRef,
-    desktopHeight,
+    thumbPlacement,
     isPreloaded,
     isOpen,
     zoom,

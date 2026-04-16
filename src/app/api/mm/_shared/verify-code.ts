@@ -1,30 +1,12 @@
 import {
   getRequestLogContext,
-  logAdminAudit,
   logAuthSecurity,
 } from "@/lib/activity-logs";
 import {
-  buildMemberSyncLogProperties,
-  type MemberRow,
-  syncMemberSnapshot,
-} from "@/lib/mm-member-sync";
-import {
-  findMmUserDirectoryEntryByUsername,
-} from "@/lib/mm-directory";
-import { hashCode } from "@/lib/mm-verification";
-import {
   getSelectedPolicyValidationError,
   getActiveRequiredPolicies,
-  recordRequiredPolicyConsent,
 } from "@/lib/policy-documents";
-import { hashPassword, isValidPassword } from "@/lib/password";
-import { setUserSession } from "@/lib/user-auth";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import {
-  getEffectiveSsafyYear,
-  getPreferredStaffSourceYear,
-} from "@/lib/ssafy-year";
-import { getUserImage, resolveSelectableMemberByUsername } from "@/lib/mattermost";
+import { isValidPassword } from "@/lib/password";
 import {
   normalizeMmUsername,
   PASSWORD_POLICY_MESSAGE,
@@ -35,67 +17,22 @@ import {
   getMemberAuthBlockedScope,
   getMemberAuthBlockedState,
   createMemberAuthThrottleContext,
-  delayMemberAuthFailure,
-  recordMemberAuthFailure,
   recordMemberAuthSuccess,
 } from "./throttle";
-import { isMattermostApiError, loginAsSsafySender, upsertDirectorySnapshotFromMmUser } from "./mattermost";
 import { mmErrorResponse, mmOkResponse } from "./responses";
-import type { MemberAuthThrottleContext, MmRouteContext } from "./types";
+import {
+  clearVerificationState,
+  getLatestVerificationCode,
+  getVerificationAttempt,
+  isVerificationAttemptBlocked,
+  isVerificationCodeExpired,
+  recordInvalidVerificationCodeAttempt,
+} from "./verify-code-verification";
+import { failVerifyCode, failVerifyCodeException } from "./verify-code-failure";
+import { resolveVerifyCodeIdentity } from "./verify-code-identity";
+import { finalizeVerifiedMember } from "./verify-code-member";
 
 export const VERIFY_CODE_RUNTIME = "nodejs";
-
-const MAX_FAILS = 5;
-const BLOCK_MINUTES = 60;
-
-async function failVerifyCode({
-  context,
-  throttleContext,
-  error,
-  status,
-  reason,
-  identifier,
-  actorType = "guest",
-  actorId,
-  recordFailure = true,
-  blockedDelay = false,
-  message,
-  extra = {},
-}: {
-  context: MmRouteContext;
-  throttleContext: MemberAuthThrottleContext;
-  error: string;
-  status: number;
-  reason: string;
-  identifier?: string | null;
-  actorType?: "guest" | "member";
-  actorId?: string;
-  recordFailure?: boolean;
-  blockedDelay?: boolean;
-  message?: string;
-  extra?: Record<string, unknown>;
-}) {
-  await logAuthSecurity({
-    ...context,
-    eventName: "member_signup_complete",
-    status: blockedDelay ? "blocked" : "failure",
-    actorType,
-    actorId,
-    identifier: identifier ?? null,
-    properties: {
-      reason,
-      ...extra,
-    },
-  });
-
-  if (recordFailure) {
-    await recordMemberAuthFailure("verify-code", throttleContext, blockedDelay);
-  } else {
-    await delayMemberAuthFailure("verify-code", blockedDelay);
-  }
-
-  return mmErrorResponse(error, status, message);
-}
 
 export async function handleVerifyCodePost(request: Request) {
   const context = getRequestLogContext(request);
@@ -196,101 +133,53 @@ export async function handleVerifyCodePost(request: Request) {
       return mmErrorResponse("policy_outdated", 409, policyValidationError);
     }
 
-    const supabase = getSupabaseAdminClient();
-    let resolvedStudent:
-      | {
-          year: number;
-          token: string;
-          user: {
-            id: string;
-            username: string;
-            nickname?: string;
-            first_name?: string;
-            last_name?: string;
-            is_bot?: boolean;
-          };
-        }
-      | null = null;
-    const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
-    let mmUserId = directoryEntry?.mm_user_id ?? null;
-    let resolvedDisplayName = directoryEntry?.display_name ?? null;
-    let resolvedCampus = directoryEntry?.campus ?? null;
-
-    if (!mmUserId) {
-      try {
-        const resolved = await resolveSelectableMemberByUsername(username);
-        if (resolved) {
-          resolvedStudent = {
-            year: resolved.year,
-            token: "",
-            user: resolved.user,
-          };
-          const summary = await upsertDirectorySnapshotFromMmUser(
-            resolved.user,
-            [resolved.year],
-          );
-          resolvedDisplayName = summary.displayName;
-          resolvedCampus = summary.campus;
-          mmUserId = resolved.user.id;
-        }
-      } catch (error) {
-        if (isMattermostApiError(error)) {
-          return failVerifyCode({
-            context,
-            throttleContext,
-            error: "invalid_code",
-            status: 400,
-            reason: "team_or_channel_inaccessible",
-            identifier: username,
-            extra: {
-              status: error.status,
-            },
-          });
-        }
-        throw error;
-      }
-
-      if (!mmUserId) {
-        return failVerifyCode({
-          context,
-          throttleContext,
-          error: "invalid_code",
-          status: 400,
-          reason: "not_mm",
-          identifier: username,
-        });
-      }
+    const identity = await resolveVerifyCodeIdentity(username);
+    if (identity.kind === "inaccessible") {
+      return failVerifyCode({
+        context,
+        throttleContext,
+        error: "invalid_code",
+        status: 400,
+        reason: "team_or_channel_inaccessible",
+        identifier: username,
+        extra: {
+          status: identity.status,
+        },
+      });
+    }
+    if (identity.kind === "not-found") {
+      return failVerifyCode({
+        context,
+        throttleContext,
+        error: "invalid_code",
+        status: 400,
+        reason: "not_mm",
+        identifier: username,
+      });
     }
 
-    const { data: attempt } = await supabase
-      .from("mm_verification_attempts")
-      .select("id,count,blocked_until,first_attempt_at")
-      .eq("identifier", mmUserId)
-      .maybeSingle();
+    const {
+      directoryEntry,
+      resolvedStudent,
+      mmUserId,
+      resolvedDisplayName,
+      resolvedCampus,
+    } = identity;
 
-    if (attempt?.blocked_until) {
-      const blockedUntil = new Date(attempt.blocked_until);
-      if (blockedUntil > new Date()) {
-        return failVerifyCode({
-          context,
-          throttleContext,
-          error: "blocked",
-          status: 429,
-          reason: "verification_blocked",
-          identifier: mmUserId,
-          blockedDelay: true,
-        });
-      }
+    const attempt = await getVerificationAttempt(mmUserId);
+    if (isVerificationAttemptBlocked(attempt)) {
+      return failVerifyCode({
+        context,
+        throttleContext,
+        error: "blocked",
+        status: 429,
+        reason: "verification_blocked",
+        identifier: mmUserId,
+        blockedDelay: true,
+      });
     }
 
-    const { data: codeRow } = await supabase
-      .from("mm_verification_codes")
-      .select("*")
-      .eq("mm_user_id", mmUserId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+    const codeRow = await getLatestVerificationCode(mmUserId);
     if (!codeRow) {
       return failVerifyCode({
         context,
@@ -302,7 +191,7 @@ export async function handleVerifyCodePost(request: Request) {
       });
     }
 
-    if (new Date(codeRow.expires_at) < new Date()) {
+    if (isVerificationCodeExpired(codeRow)) {
       return failVerifyCode({
         context,
         throttleContext,
@@ -313,32 +202,14 @@ export async function handleVerifyCodePost(request: Request) {
       });
     }
 
-    if (codeRow.code_hash !== hashCode(code)) {
-      const nextCount = (attempt?.count ?? 0) + 1;
-      const firstAttemptAt = attempt?.first_attempt_at ?? new Date().toISOString();
-      const blockedUntil =
-        nextCount >= MAX_FAILS
-          ? new Date(Date.now() + BLOCK_MINUTES * 60 * 1000).toISOString()
-          : null;
+    const verificationResult = await recordInvalidVerificationCodeAttempt(
+      mmUserId,
+      attempt,
+      code,
+      codeRow,
+    );
 
-      if (attempt?.id) {
-        await supabase
-          .from("mm_verification_attempts")
-          .update({
-            count: nextCount,
-            blocked_until: blockedUntil,
-            first_attempt_at: firstAttemptAt,
-          })
-          .eq("id", attempt.id);
-      } else {
-        await supabase.from("mm_verification_attempts").insert({
-          identifier: mmUserId,
-          count: nextCount,
-          blocked_until: blockedUntil,
-          first_attempt_at: firstAttemptAt,
-        });
-      }
-
+    if (!verificationResult.matched) {
       return failVerifyCode({
         context,
         throttleContext,
@@ -346,141 +217,51 @@ export async function handleVerifyCodePost(request: Request) {
         status: 400,
         reason: "invalid_code",
         identifier: mmUserId,
-        blockedDelay: Boolean(blockedUntil),
+        blockedDelay: Boolean(verificationResult.blockedUntil),
         extra: {
-          attemptCount: nextCount,
+          attemptCount: verificationResult.nextCount,
         },
       });
     }
 
-    const { data: memberData } = await supabase
-      .from("members")
-      .select(
-        "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,updated_at",
-      )
-      .eq("mm_user_id", mmUserId)
-      .maybeSingle();
-    const member = (memberData as MemberRow | null) ?? null;
-    const passwordRecord = hashPassword(password);
-    const preferredStaffSourceYear = getPreferredStaffSourceYear(
-      directoryEntry?.source_years ?? [],
-    );
-    const senderYear =
-      codeRow.year === 0
-        ? getEffectiveSsafyYear(
-            member?.year ?? 0,
-            null,
-            [resolvedStudent?.year, preferredStaffSourceYear, 15, 14],
-          )
-        : codeRow.year;
-    if (senderYear === null) {
-      return mmErrorResponse(
-        "verify_failed",
-        503,
-        "운영진 회원 정보를 확인하지 못했습니다. 다시 시도해 주세요.",
-      );
-    }
-
-    const senderLogin = await loginAsSsafySender(senderYear);
-    const avatar = await getUserImage(senderLogin.token, mmUserId);
-    const snapshot = {
+    const finalizeResult = await finalizeVerifiedMember({
+      context,
       mmUserId,
-      mmUsername:
-        directoryEntry?.mm_username ?? resolvedStudent?.user.username ?? mmUserId,
-      displayName: resolvedDisplayName ?? member?.display_name ?? mmUserId,
-      campus: resolvedCampus ?? member?.campus ?? null,
-      avatarFetched: Boolean(avatar),
-      avatarContentType: avatar?.contentType ?? null,
-      avatarBase64: avatar?.base64 ?? null,
-    };
+      directoryEntry,
+      resolvedStudent,
+      resolvedDisplayName,
+      resolvedCampus,
+      password,
+      codeYear: codeRow.year,
+      activePolicies,
+    });
 
-    const nextYear = codeRow.year ?? member?.year ?? null;
-    let authenticatedMemberId = member?.id ?? null;
-    let nextMember: MemberRow | null = member ?? null;
-
-    if (member?.id) {
-      const syncResult = await syncMemberSnapshot(member, snapshot);
-      if (syncResult.updated) {
-        await logAdminAudit({
-          ...context,
-          action: "member_sync",
-          actorId: process.env.ADMIN_ID ?? "admin",
-          targetType: "member",
-          targetId: member.id,
-          properties: buildMemberSyncLogProperties(syncResult, {
-            source: "signup_complete",
-          }),
+    if (finalizeResult.kind === "error") {
+      if (finalizeResult.error === "sender_unavailable") {
+        return failVerifyCode({
+          context,
+          throttleContext,
+          error: "verify_failed",
+          status: 503,
+          reason: "sender_unavailable",
+          identifier: mmUserId,
+          recordFailure: false,
+          message: finalizeResult.message,
         });
       }
-      nextMember = syncResult.member;
-
-      await supabase
-        .from("members")
-        .update({
-          mm_user_id: mmUserId,
-          mm_username: snapshot.mmUsername,
-          display_name: snapshot.displayName,
-          year: nextYear ?? codeRow.year,
-          campus: nextMember.campus ?? null,
-          avatar_content_type: snapshot.avatarFetched
-            ? snapshot.avatarContentType
-            : nextMember.avatar_content_type ?? null,
-          avatar_base64: snapshot.avatarFetched
-            ? snapshot.avatarBase64
-            : nextMember.avatar_base64 ?? null,
-          password_hash: passwordRecord.hash,
-          password_salt: passwordRecord.salt,
-          must_change_password: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", member.id);
-    } else {
-      const { data: inserted } = await supabase
-        .from("members")
-        .insert({
-          mm_user_id: mmUserId,
-          mm_username: snapshot.mmUsername,
-          display_name: snapshot.displayName,
-          year: nextYear ?? codeRow.year,
-          campus: snapshot.campus,
-          avatar_content_type: snapshot.avatarContentType,
-          avatar_base64: snapshot.avatarBase64,
-          password_hash: passwordRecord.hash,
-          password_salt: passwordRecord.salt,
-          must_change_password: false,
-          updated_at: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
-      if (inserted?.id) {
-        authenticatedMemberId = inserted.id;
-      }
+      return failVerifyCode({
+        context,
+        throttleContext,
+        error: "verify_failed",
+        status: 503,
+        reason: "member_creation_failed",
+        identifier: mmUserId,
+        recordFailure: false,
+        message: finalizeResult.message,
+      });
     }
 
-    if (!authenticatedMemberId) {
-      return mmErrorResponse(
-        "verify_failed",
-        503,
-        "회원 생성을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-      );
-    }
-
-    await recordRequiredPolicyConsent({
-      memberId: authenticatedMemberId,
-      activePolicies,
-      ipAddress: context.ipAddress ?? null,
-      userAgent: context.userAgent ?? null,
-    });
-    await setUserSession(authenticatedMemberId, false);
-
-    await supabase
-      .from("mm_verification_attempts")
-      .delete()
-      .eq("identifier", mmUserId);
-    await supabase
-      .from("mm_verification_codes")
-      .delete()
-      .eq("mm_user_id", mmUserId);
+    await clearVerificationState(mmUserId);
     await recordMemberAuthSuccess("verify-code", throttleContext);
 
     await logAuthSecurity({
@@ -488,36 +269,19 @@ export async function handleVerifyCodePost(request: Request) {
       eventName: "member_signup_complete",
       status: "success",
       actorType: "member",
-      actorId: authenticatedMemberId,
+      actorId: finalizeResult.authenticatedMemberId,
       identifier: mmUserId,
       properties: {
-        year: nextYear ?? codeRow.year ?? null,
-        campus: nextMember?.campus ?? snapshot.campus,
-        existingMember: Boolean(member?.id),
-        mmUsername: snapshot.mmUsername,
+        year: finalizeResult.nextYear ?? codeRow.year ?? null,
+        campus: finalizeResult.campus,
+        existingMember: finalizeResult.existingMember,
+        mmUsername: finalizeResult.mmUsername,
         mmUserId,
       },
     });
 
     return mmOkResponse();
   } catch (error) {
-    const context = getRequestLogContext(request);
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_signup_complete",
-      status: "failure",
-      actorType: "guest",
-      properties: {
-        reason: "exception",
-        message: (error as Error).message,
-      },
-    });
-    await delayMemberAuthFailure("verify-code", true);
-
-    return mmErrorResponse(
-      "verify_failed",
-      503,
-      "인증 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-    );
+    return failVerifyCodeException(request, error);
   }
 }
