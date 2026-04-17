@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -6,19 +10,22 @@ import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import MotionReveal from "@/components/ui/MotionReveal";
 import ShellHeader from "@/components/ui/ShellHeader";
-import StatsRow from "@/components/ui/StatsRow";
-import Link from "next/link";
+import type {
+  PartnerPortalCompanyDashboard,
+  PartnerPortalDashboard,
+} from "@/lib/partner-dashboard";
+import type { PartnerSession } from "@/lib/partner-session";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
-import type { PartnerSession } from "@/lib/partner-session";
-import {
-  getPartnerPortalServiceStatusLabel,
-  type PartnerPortalDashboard,
-} from "@/lib/partner-dashboard";
 import { cn } from "@/lib/cn";
+
+const partnerPortalDataSource =
+  process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??
+  process.env.NEXT_PUBLIC_DATA_SOURCE ??
+  "supabase";
+const isPartnerPortalMock = partnerPortalDataSource !== "supabase";
 
 function formatCount(value: number) {
   return value.toLocaleString("ko-KR");
@@ -27,21 +34,14 @@ function formatCount(value: number) {
 function ServiceMetric({
   label,
   value,
-  className,
 }: {
   label: string;
   value: number;
-  className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-[1.2rem] border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-flat)]",
-        className,
-      )}
-    >
+    <div className="rounded-[1rem] border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-flat)]">
       <p className="ui-kicker">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-foreground">
+      <p className="mt-1 text-base font-semibold text-foreground">
         {formatCount(value)}
       </p>
     </div>
@@ -61,6 +61,19 @@ function getServiceStatusBadgeVariant(
   }
 }
 
+function getPartnerPortalServiceStatusLabel(
+  status: PartnerPortalDashboard["companies"][number]["services"][number]["status"],
+) {
+  switch (status) {
+    case "pending":
+      return "승인 대기 중";
+    case "rejected":
+      return "수정 반려됨";
+    default:
+      return "승인됨";
+  }
+}
+
 function ServiceCard({
   service,
 }: {
@@ -71,95 +84,139 @@ function ServiceCard({
       href={`/partner/services/${encodeURIComponent(service.id)}`}
       prefetch={false}
       aria-label={`${service.name} 상세 보기`}
-      className="group block rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-4 shadow-[var(--shadow-flat)] transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)]"
+      className="group block rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-5 shadow-[var(--shadow-flat)] transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              className={getPartnerVisibilityBadgeClass(service.visibility)}
-            >
+            <Badge className={getPartnerVisibilityBadgeClass(service.visibility)}>
               {getPartnerVisibilityLabel(service.visibility)}
             </Badge>
             <Badge variant={getServiceStatusBadgeVariant(service.status)}>
               {getPartnerPortalServiceStatusLabel(service.status)}
             </Badge>
-            <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
               {service.categoryLabel}
             </span>
           </div>
-          <p className="text-lg font-semibold text-foreground">{service.name}</p>
-          <p className="text-sm leading-6 text-muted-foreground">
-            {service.location}
-          </p>
+          <div className="space-y-1">
+            <p className="text-lg font-semibold text-foreground">{service.name}</p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {service.location}
+            </p>
+          </div>
         </div>
+
         <div className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted-foreground">
           상세 보기
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <ServiceMetric label="리뷰" value={service.metrics.reviewCount} />
         <ServiceMetric label="조회수" value={service.metrics.detailViews} />
         <ServiceMetric label="총 클릭" value={service.metrics.totalClicks} />
-        <ServiceMetric label="리뷰" value={service.metrics.reviewCount} />
-        <ServiceMetric label="카드 클릭" value={service.metrics.cardClicks} />
-        <ServiceMetric label="지도 클릭" value={service.metrics.mapClicks} />
-        <ServiceMetric
-          label="예약 클릭"
-          value={service.metrics.reservationClicks}
-        />
-        <ServiceMetric label="문의 클릭" value={service.metrics.inquiryClicks} />
       </div>
     </Link>
   );
 }
 
-function CompanySection({
-  company,
+function CompanyTabs({
+  companies,
+  activeCompanyId,
+  onChange,
 }: {
-  company: PartnerPortalDashboard["companies"][number];
+  companies: PartnerPortalCompanyDashboard[];
+  activeCompanyId: string;
+  onChange: (companyId: string) => void;
 }) {
   return (
-    <Card tone="elevated" className="space-y-6">
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      {companies.map((company) => {
+        const active = company.id === activeCompanyId;
+
+        return (
+          <button
+            key={company.id}
+            type="button"
+            onClick={() => onChange(company.id)}
+            className={cn(
+              "rounded-[1.1rem] border px-4 py-3 text-left transition-[background-color,border-color,color,box-shadow] duration-200 ease-out",
+              active
+                ? "border-primary/20 bg-primary-soft text-primary shadow-[var(--shadow-flat)]"
+                : "border-border/80 bg-surface text-foreground shadow-[var(--shadow-flat)] hover:border-strong hover:bg-surface-elevated",
+            )}
+          >
+            <p className="text-sm font-semibold">{company.name}</p>
+            <p
+              className={cn(
+                "mt-1 text-xs",
+                active ? "text-primary/80" : "text-muted-foreground",
+              )}
+            >
+              {company.services.length}개 브랜드
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CompanyHeader({
+  company,
+  showKicker,
+}: {
+  company: PartnerPortalCompanyDashboard;
+  showKicker: boolean;
+}) {
+  return (
+    <Card tone="default" padding="md" className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
-            {company.name}
-          </h2>
-          {company.description ? (
-            <p className="max-w-3xl ui-body">
-              {company.description}
+          {showKicker ? <p className="ui-kicker">선택된 협력사</p> : null}
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
+              {company.name}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {company.description?.trim()
+                ? company.description
+                : "연결된 브랜드와 핵심 지표를 확인할 수 있습니다."}
             </p>
-          ) : null}
+          </div>
         </div>
 
-        <div className="w-full lg:max-w-3xl">
-          <StatsRow
-            minItemWidth="11rem"
-            items={[
-              {
-                label: "조회수",
-                value: formatCount(company.totals.detailViews),
-                hint: "상세 페이지 조회 합계",
-              },
-              {
-                label: "총 클릭",
-                value: formatCount(company.totals.totalClicks),
-                hint: "카드, 지도, 예약, 문의 클릭 합계",
-              },
-              {
-                label: "브랜드 수",
-                value: formatCount(company.services.length),
-                hint: "포털에서 관리 가능한 연결 브랜드",
-              },
-              {
-                label: "리뷰 수",
-                value: formatCount(company.totals.reviewCount),
-                hint: "연결된 브랜드의 전체 리뷰 합계",
-              },
-            ]}
-          />
+        <Badge className="bg-surface-muted text-foreground">
+          {company.services.length}개 브랜드
+        </Badge>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ServiceMetric label="브랜드 수" value={company.services.length} />
+        <ServiceMetric label="리뷰 수" value={company.totals.reviewCount} />
+        <ServiceMetric label="조회수" value={company.totals.detailViews} />
+        <ServiceMetric label="총 클릭" value={company.totals.totalClicks} />
+      </div>
+    </Card>
+  );
+}
+
+function CompanyBrandList({
+  company,
+}: {
+  company: PartnerPortalCompanyDashboard;
+}) {
+  return (
+    <Card tone="default" padding="md" className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 pb-4">
+        <div className="space-y-1">
+          <p className="ui-kicker">Brands</p>
+          <h3 className="text-lg font-semibold text-foreground">소유 브랜드</h3>
         </div>
+        <p className="text-sm text-muted-foreground">
+          {company.services.length}개 브랜드
+        </p>
       </div>
 
       {company.services.length === 0 ? (
@@ -185,75 +242,87 @@ export default function PartnerDashboardView({
   session: PartnerSession;
   dashboard: PartnerPortalDashboard;
 }) {
+  const [activeCompanyId, setActiveCompanyId] = useState(
+    dashboard.companies[0]?.id ?? "",
+  );
+
+  const activeCompany =
+    dashboard.companies.find((company) => company.id === activeCompanyId) ??
+    dashboard.companies[0] ??
+    null;
+  const showCompanyTabs = dashboard.companies.length > 1;
+
   return (
     <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-6xl space-y-6">
           <MotionReveal>
-            <Card tone="elevated" className="space-y-6">
-              <ShellHeader
-                eyebrow="Partner Portal"
-                title="협력사별 브랜드 현황"
-                description="협력사 단위로 연결된 브랜드와 조회·클릭 지표를 한 번에 확인합니다."
-                actions={<Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>}
-              />
-
-              {dashboard.warningMessage ? (
-                <FormMessage variant="info">{dashboard.warningMessage}</FormMessage>
-              ) : null}
-
-              <StatsRow
-                items={[
-                  {
-                    label: "연결 협력사",
-                    value: formatCount(dashboard.totals.companyCount),
-                    hint: "이 계정이 관리하는 협력사 수",
-                  },
-                  {
-                    label: "브랜드 수",
-                    value: formatCount(dashboard.totals.serviceCount),
-                    hint: "연결된 협력사의 전체 브랜드 수",
-                  },
-                  {
-                    label: "리뷰 수",
-                    value: formatCount(dashboard.totals.reviewCount),
-                    hint: "연결된 브랜드의 전체 리뷰 합계",
-                  },
-                  {
-                    label: "조회수",
-                    value: formatCount(dashboard.totals.detailViews),
-                    hint: "전체 브랜드 상세 페이지 조회 합계",
-                  },
-                  {
-                    label: "총 클릭",
-                    value: formatCount(dashboard.totals.totalClicks),
-                    hint: "카드, 지도, 예약, 문의 클릭 합계",
-                  },
-                ]}
-              />
-            </Card>
+            <ShellHeader
+              eyebrow="Partner Portal"
+              title="브랜드 현황"
+              description={
+                showCompanyTabs
+                  ? "협력사를 선택하면 해당 협력사의 정보와 브랜드 목록을 볼 수 있습니다."
+                  : "연결된 브랜드와 핵심 지표를 한 화면에서 확인할 수 있습니다."
+              }
+              actions={
+                <Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>
+              }
+            />
           </MotionReveal>
+
+          {dashboard.warningMessage ? (
+            <MotionReveal delay={0.03}>
+              <FormMessage variant="info">{dashboard.warningMessage}</FormMessage>
+            </MotionReveal>
+          ) : null}
 
           {dashboard.companies.length === 0 ? (
             <EmptyState
               title="연결된 협력사가 없습니다."
-              description="관리자에서 이 협력사에 연결된 브랜드 정보를 먼저 생성해야 합니다."
+              description="관리자에서 이 계정과 협력사를 먼저 연결해야 합니다."
             />
           ) : (
-            dashboard.companies.map((company, index) => (
-              <MotionReveal key={company.id} delay={0.04 + index * 0.03}>
-                <CompanySection company={company} />
-              </MotionReveal>
-            ))
+            <>
+              {showCompanyTabs ? (
+                <MotionReveal delay={0.08}>
+                  <Card tone="default" padding="md" className="space-y-4">
+                    <div className="space-y-1">
+                      <p className="ui-kicker">Companies</p>
+                      <p className="text-sm text-muted-foreground">
+                        협력사 이름을 눌러 해당 브랜드 현황으로 전환합니다.
+                      </p>
+                    </div>
+                    <CompanyTabs
+                      companies={dashboard.companies}
+                      activeCompanyId={activeCompany?.id ?? ""}
+                      onChange={setActiveCompanyId}
+                    />
+                  </Card>
+                </MotionReveal>
+              ) : null}
+
+              {activeCompany ? (
+                <MotionReveal delay={showCompanyTabs ? 0.11 : 0.08}>
+                  <div className="grid gap-3">
+                    <CompanyHeader
+                      company={activeCompany}
+                      showKicker={showCompanyTabs}
+                    />
+                    <CompanyBrandList company={activeCompany} />
+                  </div>
+                </MotionReveal>
+              ) : null}
+            </>
           )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            {isPartnerPortalMock ? (
+          {isPartnerPortalMock ? (
+            <div className="flex flex-wrap items-center gap-3">
               <Button href="/partner/setup" variant="secondary">
                 초기 설정 데모
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </Container>
     </div>

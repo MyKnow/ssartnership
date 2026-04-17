@@ -11,6 +11,7 @@ import {
   SITE_NAME,
   SUGGESTION_URL,
 } from "@/lib/site";
+import { BUG_REPORT_HREF } from "@/lib/support-mail";
 import BrandWordmark from "@/components/BrandWordmark";
 
 export default function Footer() {
@@ -38,7 +39,7 @@ export default function Footer() {
             >
               <FaGithub className="h-5 w-5" />
             </Button>
-            <Button variant="secondary" href={`mailto:${BUG_REPORT_EMAIL}`}>
+            <Button variant="secondary" href={BUG_REPORT_HREF}>
               버그 제보
             </Button>
             <Button variant="secondary" href={SUGGESTION_URL}>
@@ -68,7 +69,7 @@ export default function Footer() {
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <p>Copyright © 2026 {SITE_NAME}. All rights reserved.</p>
           <a
-            href={`mailto:${BUG_REPORT_EMAIL}`}
+            href={BUG_REPORT_HREF}
             className="font-medium text-foreground hover:opacity-80"
           >
             {BUG_REPORT_EMAIL}

@@ -3,6 +3,7 @@ import Container from "@/components/ui/Container";
 import BrandWordmark from "@/components/BrandWordmark";
 import ThemeToggle from "@/components/ThemeToggle";
 import { BUG_REPORT_EMAIL } from "@/lib/site";
+import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import PartnerPortalActionLinks from "@/components/partner/PartnerPortalActionLinks";
@@ -31,10 +32,10 @@ export default async function PartnerPortalFooter() {
         <div className="flex flex-col gap-2 text-xs leading-6 sm:flex-row sm:items-center sm:justify-between">
           <p>협력사 담당자 전용 공간입니다. 정보 변경은 승인 절차를 거칩니다.</p>
           <a
-            href={`mailto:${BUG_REPORT_EMAIL}`}
+            href={TECH_SUPPORT_HREF}
             className="font-medium text-foreground hover:opacity-80"
           >
-            문의: {BUG_REPORT_EMAIL}
+            기술 지원: {BUG_REPORT_EMAIL}
           </a>
         </div>
       </Container>

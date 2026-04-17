@@ -86,7 +86,7 @@ export default async function PartnerLoginPage({
               </label>
 
               <FormMessage>
-                초기 설정이 끝난 계정만 로그인할 수 있습니다. 아직 설정하지
+                초기 설정이 끝난 계정만 로그인할 수 있습니다.< br/>아직 설정하지
                 않았다면 받은 초기 설정 링크를 먼저 열어 주세요.
               </FormMessage>
               {errorMessage ? (
@@ -97,9 +97,6 @@ export default async function PartnerLoginPage({
                 <SubmitButton pendingText="로그인 중">로그인</SubmitButton>
                 <Button variant="secondary" href="/partner/reset">
                   비밀번호 재설정
-                </Button>
-                <Button variant="secondary" href="/">
-                  홈으로
                 </Button>
               </div>
             </form>

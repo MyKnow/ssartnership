@@ -27,7 +27,12 @@ export default async function PartnerPortalHeader() {
 
         <div className="flex flex-wrap items-center justify-end gap-2">
           <ThemeToggle />
-          <PartnerPortalActionLinks session={session} isMock={isPartnerPortalMock} />
+          <PartnerPortalActionLinks
+            session={session}
+            isMock={isPartnerPortalMock}
+            logoutIconOnly
+            showPublicHome={false}
+          />
         </div>
       </Container>
     </header>
