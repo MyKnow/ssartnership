@@ -33,6 +33,9 @@ export default function PartnerReviewSummaryCard({
             </div>
           );
         })}
+        <p className="pt-1 text-xs text-muted-foreground">
+          비공개 처리된 리뷰는 평균과 분포 집계에서 제외됩니다.
+        </p>
       </div>
     </Card>
   );

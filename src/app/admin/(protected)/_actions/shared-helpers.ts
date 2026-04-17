@@ -64,6 +64,16 @@ export function revalidatePartnerCompanyData() {
   revalidatePath("/partner/services/[partnerId]/request", "page");
 }
 
+export function revalidateReviewPaths(partnerId?: string) {
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/reviews");
+  revalidatePath("/partners/[id]", "page");
+  if (partnerId) {
+    revalidatePath(`/partners/${partnerId}`);
+  }
+}
+
 export function revalidateMemberPaths() {
   revalidatePath("/admin");
   revalidatePath("/admin/members");

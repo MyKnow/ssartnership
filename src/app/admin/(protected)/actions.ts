@@ -37,6 +37,7 @@ import {
   rejectPartnerChangeRequestAction,
   updatePartnerAction,
 } from "./_actions/partner-actions";
+import { hidePartnerReviewAction, restorePartnerReviewAction } from "./_actions/review-actions";
 import { logAdminAction } from "./_actions/shared-helpers";
 
 export async function updatePartnerAccount(formData: FormData) {
@@ -100,6 +101,14 @@ export async function approvePartnerChangeRequest(formData: FormData) {
 
 export async function rejectPartnerChangeRequest(formData: FormData) {
   return rejectPartnerChangeRequestAction(formData);
+}
+
+export async function hidePartnerReview(formData: FormData) {
+  return hidePartnerReviewAction(formData);
+}
+
+export async function restorePartnerReview(formData: FormData) {
+  return restorePartnerReviewAction(formData);
 }
 
 export async function deletePartner(formData: FormData) {

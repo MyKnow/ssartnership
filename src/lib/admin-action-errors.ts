@@ -17,4 +17,6 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_invalid_request: "업체 계정 입력값을 확인해 주세요.",
   partner_account_company_missing: "연결할 계정과 회사를 찾을 수 없습니다.",
   partner_account_company_invalid_request: "연결 상태 입력값을 확인해 주세요.",
+  review_invalid_request: "리뷰 입력값을 확인해 주세요.",
+  review_not_found: "대상을 찾을 수 없습니다.",
 };

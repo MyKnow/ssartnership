@@ -19,6 +19,7 @@ export type PartnerReview = {
   authorMaskedName: string;
   authorRoleLabel: string;
   isMine: boolean;
+  isHidden: boolean;
 };
 
 export type PartnerReviewListResult = {

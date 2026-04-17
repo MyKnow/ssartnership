@@ -8,6 +8,7 @@ import {
 import { mockPreviewMembers } from "@/lib/mock/member-preview";
 import type {
   CreatePartnerReviewInput,
+  HidePartnerReviewResult,
   PartnerReviewListContext,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
@@ -90,6 +91,7 @@ function mapReview(record: MockReviewRecord, currentUserId?: string | null): Par
     authorMaskedName: maskPartnerReviewAuthorName(member?.display_name),
     authorRoleLabel: getPartnerReviewAuthorRoleLabel(member?.year),
     isMine: currentUserId === record.memberId,
+    isHidden: record.deletedAt !== null,
   };
 }
 
@@ -123,7 +125,7 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
       getStore().reviews.filter(
         (review) =>
           review.partnerId === context.partnerId &&
-          !review.deletedAt &&
+          (context.includeHidden || !review.deletedAt) &&
           (!context.imagesOnly || review.images.length > 0),
       ),
       sort,
@@ -131,8 +133,9 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     const items = rows
       .slice(offset, offset + limit)
       .map((review) => mapReview(review, context.currentUserId));
+    const summary = await this.getPartnerReviewSummary(context.partnerId);
     return {
-      summary: buildPartnerReviewSummary(rows.map((review) => review.rating)),
+      summary,
       items,
       nextOffset: offset + items.length,
       hasMore: offset + items.length < rows.length,
@@ -189,6 +192,34 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     review.deletedAt = new Date().toISOString();
     review.deletedByMemberId = input.memberId;
     review.updatedAt = review.deletedAt;
+  }
+
+  async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const review = getStore().reviews.find((item) => item.id === reviewId && item.deletedAt === null);
+    if (!review) {
+      return null;
+    }
+    review.deletedAt = new Date().toISOString();
+    review.deletedByMemberId = null;
+    review.updatedAt = review.deletedAt;
+    return {
+      reviewId: review.id,
+      partnerId: review.partnerId,
+    };
+  }
+
+  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const review = getStore().reviews.find((item) => item.id === reviewId && item.deletedAt !== null);
+    if (!review) {
+      return null;
+    }
+    review.deletedAt = null;
+    review.deletedByMemberId = null;
+    review.updatedAt = new Date().toISOString();
+    return {
+      reviewId: review.id,
+      partnerId: review.partnerId,
+    };
   }
 
   async getOwnedPartnerReview(reviewId: string, memberId: string): Promise<PartnerReviewOwnedRecord | null> {

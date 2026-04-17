@@ -51,6 +51,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_account_company_update',
   'partner_account_initial_setup_link_generate',
   'partner_account_initial_setup_link_send',
+  'partner_review_hide',
+  'partner_review_restore',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

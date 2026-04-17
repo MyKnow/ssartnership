@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import type { PartnerReview } from "@/lib/partner-reviews";
-import { formatPartnerReviewDate } from "@/components/partner-reviews/helpers";
-import PartnerReviewLightbox from "@/components/partner-reviews/PartnerReviewLightbox";
-import ReviewStarsInput from "@/components/partner-reviews/ReviewStarsInput";
+import { formatPartnerReviewDate } from "./helpers";
+import PartnerReviewLightbox from "./PartnerReviewLightbox";
+import ReviewStarsInput from "./ReviewStarsInput";
 
 export default function PartnerReviewCard({
   review,
@@ -21,6 +22,19 @@ export default function PartnerReviewCard({
   deleting?: boolean;
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  if (review.isHidden) {
+    return (
+      <Card className="grid gap-3 border-dashed border-border bg-surface-muted/40 p-5">
+        <Badge variant="warning" className="w-fit">
+          비공개 처리된 리뷰입니다
+        </Badge>
+        <p className="text-sm leading-7 text-muted-foreground">
+          이 리뷰는 비공개 처리된 리뷰입니다.
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <Card className="grid gap-4 p-5">

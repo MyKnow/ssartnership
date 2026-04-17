@@ -83,6 +83,7 @@ export default async function AdminPage() {
     partnerResult,
     categoryResult,
     accountResult,
+    reviewResult,
     pushResult,
     productLogResult,
     auditLogResult,
@@ -93,6 +94,7 @@ export default async function AdminPage() {
     supabase.from("partners").select("*", { count: "exact", head: true }),
     supabase.from("categories").select("*", { count: "exact", head: true }),
     supabase.from("partner_accounts").select("id", { count: "exact", head: true }),
+    supabase.from("partner_reviews").select("id", { count: "exact", head: true }),
     supabase
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
@@ -111,6 +113,7 @@ export default async function AdminPage() {
   const partnerCount = partnerResult.error ? 0 : partnerResult.count ?? 0;
   const categoryCount = categoryResult.error ? 0 : categoryResult.count ?? 0;
   const accountCount = accountResult.error ? 0 : accountResult.count ?? 0;
+  const reviewCount = reviewResult.error ? 0 : reviewResult.count ?? 0;
   const pushSubscriptionCount = pushResult.error ? 0 : pushResult.count ?? 0;
   const productLogCount = productLogResult.error ? 0 : productLogResult.count ?? 0;
   const auditLogCount = auditLogResult.error ? 0 : auditLogResult.count ?? 0;
@@ -146,6 +149,12 @@ export default async function AdminPage() {
           title="푸시 알림 관리"
           description="전체 공지 발송과 자동 Web Push 알림 상태를 관리합니다."
           meta={`활성 구독 ${pushSubscriptionCount}개`}
+        />
+        <SummaryCard
+          href="/admin/reviews"
+          title="리뷰 관리"
+          description="회원 리뷰를 최신순으로 살펴보고, 악성 리뷰를 비공개 처리합니다."
+          meta={`총 ${reviewCount.toLocaleString()}건 리뷰`}
         />
         <SummaryCard
           href="/admin/logs"

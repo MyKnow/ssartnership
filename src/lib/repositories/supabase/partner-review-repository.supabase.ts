@@ -8,6 +8,7 @@ import {
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type {
   CreatePartnerReviewInput,
+  HidePartnerReviewResult,
   PartnerReviewListContext,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
@@ -33,7 +34,7 @@ type PartnerReviewRow = {
 };
 
 const REVIEW_SELECT =
-  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,members!partner_reviews_member_id_fkey(display_name,year)";
+  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,members!partner_reviews_member_id_fkey(display_name,year)";
 
 function hasImages(row: PartnerReviewRow) {
   return (row.images ?? []).length > 0;
@@ -65,19 +66,17 @@ async function listReviewRows(
   offset: number,
   limit: number,
   imagesOnly: boolean,
+  includeHidden: boolean,
 ) {
   const supabase = getSupabaseAdminClient();
   const baseQuery = applyReviewSort(
-    supabase
-      .from("partner_reviews")
-      .select(REVIEW_SELECT)
-      .eq("partner_id", partnerId)
-      .is("deleted_at", null),
+    supabase.from("partner_reviews").select(REVIEW_SELECT).eq("partner_id", partnerId),
     sort,
   );
+  const filteredQuery = includeHidden ? baseQuery : baseQuery.is("deleted_at", null);
 
   if (!imagesOnly) {
-    const { data, error } = await baseQuery.range(offset, offset + limit);
+    const { data, error } = await filteredQuery.range(offset, offset + limit);
     if (error) {
       throw new Error(error.message);
     }
@@ -95,7 +94,7 @@ async function listReviewRows(
   let scanOffset = 0;
 
   while (true) {
-    const { data, error } = await baseQuery.range(scanOffset, scanOffset + pageSize - 1);
+    const { data, error } = await filteredQuery.range(scanOffset, scanOffset + pageSize - 1);
     if (error) {
       throw new Error(error.message);
     }
@@ -146,6 +145,7 @@ function mapReview(row: PartnerReviewRow, currentUserId?: string | null): Partne
     authorMaskedName: maskPartnerReviewAuthorName(row.members?.display_name),
     authorRoleLabel: getPartnerReviewAuthorRoleLabel(row.members?.year),
     isMine: currentUserId === row.member_id,
+    isHidden: row.deleted_at !== null,
   };
 }
 
@@ -177,6 +177,7 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       offset,
       limit,
       Boolean(context.imagesOnly),
+      Boolean(context.includeHidden),
     );
     const items = rows.map((row) => mapReview(row, context.currentUserId));
     const summary = await summaryPromise;
@@ -255,6 +256,62 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     if (error) {
       throw new Error(error.message);
     }
+  }
+
+  async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const supabase = getSupabaseAdminClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("partner_reviews")
+      .update({
+        deleted_at: now,
+        deleted_by_member_id: null,
+        updated_at: now,
+      })
+      .eq("id", reviewId)
+      .is("deleted_at", null)
+      .select("id,partner_id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return null;
+    }
+
+    return {
+      reviewId: data.id,
+      partnerId: data.partner_id,
+    };
+  }
+
+  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const supabase = getSupabaseAdminClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("partner_reviews")
+      .update({
+        deleted_at: null,
+        deleted_by_member_id: null,
+        updated_at: now,
+      })
+      .eq("id", reviewId)
+      .not("deleted_at", "is", null)
+      .select("id,partner_id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return null;
+    }
+
+    return {
+      reviewId: data.id,
+      partnerId: data.partner_id,
+    };
   }
 
   async getOwnedPartnerReview(reviewId: string, memberId: string): Promise<PartnerReviewOwnedRecord | null> {

@@ -13,8 +13,8 @@ import {
   validateReviewDraftInput,
   type ReviewFieldErrors,
 } from "@/lib/review-validation";
-import { buildReviewFormData } from "@/components/partner-reviews/helpers";
-import ReviewStarsInput from "@/components/partner-reviews/ReviewStarsInput";
+import { buildReviewFormData } from "./helpers";
+import ReviewStarsInput from "./ReviewStarsInput";
 import ReviewImageUploader from "@/components/review-media/ReviewImageUploader";
 import {
   createReviewImageItemFromExisting,

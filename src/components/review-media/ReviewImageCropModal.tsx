@@ -7,6 +7,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -28,6 +29,7 @@ export default function ReviewImageCropModal({
 }) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const portalRoot = typeof document === "undefined" ? null : document.body;
   const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
   const [imageState, setImageState] = useState<{
     naturalWidth: number;
@@ -59,6 +61,22 @@ export default function ReviewImageCropModal({
     observer.observe(frame);
     return () => observer.disconnect();
   }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    if (!portalRoot) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open, portalRoot]);
 
   useEffect(() => {
     if (!open) {
@@ -204,14 +222,18 @@ export default function ReviewImageCropModal({
     return null;
   }
 
-  return (
+  if (!portalRoot) {
+    return null;
+  }
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
       <div className="grid w-full max-w-4xl gap-4 rounded-[28px] border border-white/10 bg-surface p-4 shadow-2xl sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
             <p className="text-base font-semibold text-foreground">리뷰 사진 자르기</p>
             <p className="text-sm text-muted-foreground">
-              정방형으로 잘라 저장합니다. 저장 시 `webp`로 변환됩니다.
+              정방형으로 잘라 저장합니다.
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onCancel} ariaLabel="닫기" title="닫기">
@@ -280,6 +302,7 @@ export default function ReviewImageCropModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    portalRoot,
   );
 }

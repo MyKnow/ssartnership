@@ -12,6 +12,7 @@ export type PartnerReviewListContext = {
   offset?: number;
   limit?: number;
   imagesOnly?: boolean;
+  includeHidden?: boolean;
 };
 
 export type CreatePartnerReviewInput = {
@@ -38,6 +39,11 @@ export type SoftDeletePartnerReviewInput = {
   memberId: string;
 };
 
+export type HidePartnerReviewResult = {
+  reviewId: string;
+  partnerId: string;
+};
+
 export type PartnerReviewOwnedRecord = {
   id: string;
   partnerId: string;
@@ -52,6 +58,8 @@ export interface PartnerReviewRepository {
   createPartnerReview(input: CreatePartnerReviewInput): Promise<PartnerReview>;
   updatePartnerReview(input: UpdatePartnerReviewInput): Promise<PartnerReview>;
   softDeletePartnerReview(input: SoftDeletePartnerReviewInput): Promise<void>;
+  hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;
+  restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;
   getOwnedPartnerReview(
     reviewId: string,
     memberId: string,

@@ -41,6 +41,7 @@ export default function LightboxModal({
     zoom,
     offset: { ...offset },
   });
+  const mouseDraggingRef = useRef(false);
   const lastTapRef = useRef(0);
 
   if (!open) {
@@ -116,13 +117,23 @@ export default function LightboxModal({
         }}
         onMouseDown={(event) => {
           event.preventDefault();
+          mouseDraggingRef.current = true;
           onPanStart(event.clientX, event.clientY);
         }}
         onMouseMove={(event) => {
+          if (!mouseDraggingRef.current) {
+            return;
+          }
           onPanMove(event.clientX, event.clientY);
         }}
-        onMouseUp={onPanEnd}
-        onMouseLeave={onPanEnd}
+        onMouseUp={() => {
+          mouseDraggingRef.current = false;
+          onPanEnd();
+        }}
+        onMouseLeave={() => {
+          mouseDraggingRef.current = false;
+          onPanEnd();
+        }}
         onTouchStart={(event) => {
           event.preventDefault();
           if (event.touches.length === 2) {

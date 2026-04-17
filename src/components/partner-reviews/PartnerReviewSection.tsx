@@ -13,10 +13,10 @@ import type {
 import {
   appendPartnerReviewList,
   getPartnerReviewSortLabel,
-} from "@/components/partner-reviews/helpers";
-import PartnerReviewCard from "@/components/partner-reviews/PartnerReviewCard";
-import PartnerReviewForm from "@/components/partner-reviews/PartnerReviewForm";
-import PartnerReviewSummaryCard from "@/components/partner-reviews/PartnerReviewSummaryCard";
+} from "./helpers";
+import PartnerReviewCard from "./PartnerReviewCard";
+import PartnerReviewForm from "./PartnerReviewForm";
+import PartnerReviewSummaryCard from "./PartnerReviewSummaryCard";
 
 export default function PartnerReviewSection({
   partnerId,

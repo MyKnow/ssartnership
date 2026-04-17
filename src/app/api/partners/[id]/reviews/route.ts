@@ -31,6 +31,7 @@ export async function GET(
     offset,
     limit,
     imagesOnly,
+    includeHidden: true,
   });
 
   return NextResponse.json(result);
