@@ -235,6 +235,9 @@ create table if not exists partner_reviews (
   images text[] not null default '{}',
   deleted_at timestamp with time zone,
   deleted_by_member_id uuid references members(id) on delete set null,
+  hidden_at timestamp with time zone,
+  hidden_by_admin_id text,
+  hidden_by_partner_account_id uuid references partner_accounts(id) on delete set null,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
@@ -670,13 +673,13 @@ create index if not exists auth_security_logs_identifier_idx on auth_security_lo
 create index if not exists member_policy_consents_member_id_idx on member_policy_consents(member_id);
 create index if not exists member_policy_consents_policy_document_id_idx on member_policy_consents(policy_document_id);
 create index if not exists partner_reviews_partner_id_created_at_idx
-  on partner_reviews(partner_id, deleted_at, created_at desc);
+  on partner_reviews(partner_id, deleted_at, hidden_at, created_at desc);
 create index if not exists partner_reviews_partner_id_rating_desc_idx
-  on partner_reviews(partner_id, deleted_at, rating desc, created_at desc);
+  on partner_reviews(partner_id, deleted_at, hidden_at, rating desc, created_at desc);
 create index if not exists partner_reviews_partner_id_rating_asc_idx
-  on partner_reviews(partner_id, deleted_at, rating asc, created_at desc);
+  on partner_reviews(partner_id, deleted_at, hidden_at, rating asc, created_at desc);
 create index if not exists partner_reviews_member_id_partner_id_created_at_idx
-  on partner_reviews(member_id, partner_id, deleted_at, created_at desc);
+  on partner_reviews(member_id, partner_id, deleted_at, hidden_at, created_at desc);
 
 drop index if exists mm_verification_codes_email_idx;
 

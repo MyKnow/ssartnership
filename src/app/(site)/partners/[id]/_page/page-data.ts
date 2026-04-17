@@ -119,7 +119,7 @@ export async function getPartnerDetailPageData(
     sort: "latest",
     offset: 0,
     limit: 10,
-    includeHidden: true,
+    includeHidden: false,
   });
 
   const category = categories.find((item) => item.key === partner.category);

@@ -34,7 +34,7 @@ export default async function AdminReviewsPage({
         <ShellHeader
           eyebrow="Reviews"
           title="리뷰 관리"
-          description="회원 리뷰를 최신순으로 검토하고, 악성 리뷰는 비공개 처리합니다."
+          description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
         />
         <AdminReviewManager data={data} returnTo={returnTo} errorMessage={errorMessage} />
       </div>

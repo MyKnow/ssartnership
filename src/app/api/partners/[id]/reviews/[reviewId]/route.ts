@@ -38,6 +38,12 @@ export async function PATCH(
   if (ownedReview.deletedAt) {
     return NextResponse.json({ ok: false, message: "이미 삭제된 리뷰입니다." }, { status: 409 });
   }
+  if (ownedReview.hiddenAt) {
+    return NextResponse.json(
+      { ok: false, message: "비공개 처리된 리뷰는 수정할 수 없습니다." },
+      { status: 409 },
+    );
+  }
 
   const formData = await request.formData();
   const parsed = parseReviewFormFields(formData);
@@ -102,6 +108,12 @@ export async function DELETE(
   }
   if (ownedReview.deletedAt) {
     return NextResponse.json({ ok: false, message: "이미 삭제된 리뷰입니다." }, { status: 409 });
+  }
+  if (ownedReview.hiddenAt) {
+    return NextResponse.json(
+      { ok: false, message: "비공개 처리된 리뷰는 삭제할 수 없습니다." },
+      { status: 409 },
+    );
   }
 
   try {

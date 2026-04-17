@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { deleteReviewMediaUrls } from "@/lib/review-media-storage";
 import {
+  ensurePartnerReviewModerationAccess,
   ensureVisibleReviewPartner,
   getReviewMemberSession,
   parseReviewFormFields,
@@ -18,20 +19,28 @@ export async function GET(
 ) {
   const { id } = await context.params;
   const session = await getReviewMemberSession().catch(() => null);
-  const partner = await ensureVisibleReviewPartner(id, session?.userId ?? null);
-  if (!partner) {
-    return NextResponse.json({ message: "대상을 찾을 수 없습니다." }, { status: 404 });
+  const { sort, offset, limit, rating, imagesOnly, includeHidden } = parseReviewListParams(request);
+  const partnerSession = includeHidden
+    ? await ensurePartnerReviewModerationAccess(id)
+    : null;
+  if (includeHidden && !partnerSession) {
+    return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
   }
-
-  const { sort, offset, limit, imagesOnly } = parseReviewListParams(request);
+  if (!includeHidden) {
+    const partner = await ensureVisibleReviewPartner(id, session?.userId ?? null);
+    if (!partner) {
+      return NextResponse.json({ message: "대상을 찾을 수 없습니다." }, { status: 404 });
+    }
+  }
   const result = await partnerReviewRepository.listPartnerReviews({
     partnerId: id,
     currentUserId: session?.userId ?? null,
     sort,
     offset,
     limit,
+    rating,
     imagesOnly,
-    includeHidden: true,
+    includeHidden,
   });
 
   return NextResponse.json(result);

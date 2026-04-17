@@ -7,6 +7,7 @@ import {
 } from "@/lib/partner-change-requests";
 import type { PartnerChangeRequestErrorCode } from "@/lib/partner-change-request-errors";
 import { getPartnerSession } from "@/lib/partner-session";
+import { partnerReviewRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import {
   cancelPartnerChangeRequestAction,
@@ -74,6 +75,14 @@ export default async function PartnerServiceDetailPage({
     notFound();
   }
 
+  const reviewData = await partnerReviewRepository.listPartnerReviews({
+    partnerId,
+    sort: "latest",
+    offset: 0,
+    limit: 10,
+    includeHidden: true,
+  });
+
   const paramsData = (await searchParams) ?? {};
   const mode = readSearchParam(paramsData.mode) === "edit" ? "edit" : "view";
   const errorCode = readSearchParam(paramsData.error);
@@ -100,6 +109,11 @@ export default async function PartnerServiceDetailPage({
       saveImmediateAction={savePartnerImmediateChanges}
       createAction={submitPartnerChangeRequest}
       cancelAction={cancelPartnerChangeRequestAction}
+      reviewSummary={reviewData.summary}
+      initialReviews={reviewData.items}
+      initialReviewSort="latest"
+      initialReviewOffset={reviewData.nextOffset}
+      initialReviewHasMore={reviewData.hasMore}
     />
   );
 }

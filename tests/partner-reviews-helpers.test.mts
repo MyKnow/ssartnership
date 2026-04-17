@@ -20,6 +20,9 @@ test("partner review helpers build summary and mask author labels", async () => 
     buildPartnerReviewSummary,
     maskPartnerReviewAuthorName,
     getPartnerReviewAuthorRoleLabel,
+    getPartnerReviewRatingLabel,
+    matchesPartnerReviewRatingFilter,
+    normalizePartnerReviewRatingFilter,
     normalizePartnerReviewSort,
   } = await partnerReviewSharedPromise;
 
@@ -34,9 +37,15 @@ test("partner review helpers build summary and mask author labels", async () => 
   assert.equal(maskPartnerReviewAuthorName("가"), "가*");
   assert.equal(getPartnerReviewAuthorRoleLabel(0), "운영진");
   assert.equal(getPartnerReviewAuthorRoleLabel(15), "15기 교육생");
+  assert.equal(getPartnerReviewRatingLabel("all"), "전체 별점");
+  assert.equal(getPartnerReviewRatingLabel("4"), "4점");
   assert.equal(normalizePartnerReviewSort("oldest"), "oldest");
   assert.equal(normalizePartnerReviewSort("rating_desc"), "rating_desc");
   assert.equal(normalizePartnerReviewSort("something-else"), "latest");
+  assert.equal(normalizePartnerReviewRatingFilter("5"), "5");
+  assert.equal(normalizePartnerReviewRatingFilter("something-else"), "all");
+  assert.equal(matchesPartnerReviewRatingFilter(5, "5"), true);
+  assert.equal(matchesPartnerReviewRatingFilter(4, "5"), false);
 });
 
 test("review media manifest parser accepts existing and upload entries", async () => {

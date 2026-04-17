@@ -84,6 +84,7 @@ type AdminReviewRow = {
   updated_at: string;
   deleted_at: string | null;
   deleted_by_member_id: string | null;
+  hidden_at: string | null;
   partner?: {
     id: string;
     name: string;
@@ -144,7 +145,7 @@ function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 const REVIEW_SELECT =
-  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,deleted_by_member_id,partner:partners(id,name,company_id,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(id,display_name,mm_username,year,campus)";
+  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,deleted_by_member_id,hidden_at,partner:partners(id,name,company_id,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(id,display_name,mm_username,year,campus)";
 
 function parseBooleanParam(value: string | string[] | undefined) {
   const input = Array.isArray(value) ? value[0] : value;
@@ -246,7 +247,7 @@ function mapAdminReviewRow(row: AdminReviewRow): AdminReviewRecord {
     deletedByMemberId: row.deleted_by_member_id,
     authorMaskedName: maskPartnerReviewAuthorName(memberName),
     authorRoleLabel: getPartnerReviewAuthorRoleLabel(memberYear),
-    isHidden: row.deleted_at !== null,
+    isHidden: row.hidden_at !== null,
     imageCount: (row.images ?? []).length,
   };
 }
@@ -297,6 +298,7 @@ async function fetchAllAdminReviewRows(sort: AdminReviewSort) {
     const { data, error } = await supabase
       .from("partner_reviews")
       .select(REVIEW_SELECT)
+      .is("deleted_at", null)
       .order("created_at", { ascending: sort === "oldest" })
       .range(offset, offset + pageSize - 1);
 
@@ -318,7 +320,6 @@ async function fetchAllAdminReviewRows(sort: AdminReviewSort) {
 export async function getAdminReviewCounts(): Promise<AdminReviewCounts> {
   const supabase = getSupabaseAdminClient();
   const [totalResult, visibleResult, hiddenResult] = await Promise.all([
-    supabase.from("partner_reviews").select("id", { count: "exact", head: true }),
     supabase
       .from("partner_reviews")
       .select("id", { count: "exact", head: true })
@@ -326,7 +327,13 @@ export async function getAdminReviewCounts(): Promise<AdminReviewCounts> {
     supabase
       .from("partner_reviews")
       .select("id", { count: "exact", head: true })
-      .not("deleted_at", "is", null),
+      .is("deleted_at", null)
+      .is("hidden_at", null),
+    supabase
+      .from("partner_reviews")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .not("hidden_at", "is", null),
   ]);
 
   return {

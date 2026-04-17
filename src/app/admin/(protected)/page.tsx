@@ -94,7 +94,10 @@ export default async function AdminPage() {
     supabase.from("partners").select("*", { count: "exact", head: true }),
     supabase.from("categories").select("*", { count: "exact", head: true }),
     supabase.from("partner_accounts").select("id", { count: "exact", head: true }),
-    supabase.from("partner_reviews").select("id", { count: "exact", head: true }),
+    supabase
+      .from("partner_reviews")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null),
     supabase
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
@@ -153,7 +156,7 @@ export default async function AdminPage() {
         <SummaryCard
           href="/admin/reviews"
           title="리뷰 관리"
-          description="회원 리뷰를 최신순으로 살펴보고, 악성 리뷰를 비공개 처리합니다."
+          description="회원 리뷰의 공개 상태와 삭제를 관리합니다."
           meta={`총 ${reviewCount.toLocaleString()}건 리뷰`}
         />
         <SummaryCard

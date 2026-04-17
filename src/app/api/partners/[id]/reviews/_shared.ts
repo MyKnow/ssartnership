@@ -1,4 +1,9 @@
-import { normalizePartnerReviewSort } from "@/lib/partner-reviews";
+import {
+  normalizePartnerReviewRatingFilter,
+  normalizePartnerReviewSort,
+} from "@/lib/partner-reviews";
+import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
+import { getPartnerSession } from "@/lib/partner-session";
 import { partnerRepository } from "@/lib/repositories";
 import { parseReviewMediaManifest } from "@/lib/review-media";
 import { uploadReviewMediaFile } from "@/lib/review-media-storage";
@@ -27,8 +32,21 @@ export function parseReviewListParams(request: Request) {
   const sort = normalizePartnerReviewSort(url.searchParams.get("sort"));
   const offset = clampListNumber(url.searchParams.get("offset"), 0);
   const limit = clampListNumber(url.searchParams.get("limit"), 10, 1, 20);
+  const rating = normalizePartnerReviewRatingFilter(url.searchParams.get("rating"));
   const imagesOnly = parseBooleanParam(url.searchParams.get("imagesOnly"));
-  return { sort, offset, limit, imagesOnly };
+  const includeHidden = parseBooleanParam(url.searchParams.get("includeHidden"));
+  return { sort, offset, limit, rating, imagesOnly, includeHidden };
+}
+
+export async function ensurePartnerReviewModerationAccess(partnerId: string) {
+  const session = await getPartnerSession().catch(() => null);
+  if (!session || session.mustChangePassword) {
+    return null;
+  }
+  const context = await getPartnerChangeRequestContext(session.companyIds, partnerId).catch(
+    () => null,
+  );
+  return context ? session : null;
 }
 
 function parseBooleanParam(value: string | null) {

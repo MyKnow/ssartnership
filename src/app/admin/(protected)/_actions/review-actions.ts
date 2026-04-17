@@ -66,3 +66,31 @@ export async function restorePartnerReviewAction(formData: FormData) {
   revalidateReviewPaths(restored.partnerId);
   redirect(returnTo);
 }
+
+export async function deletePartnerReviewAction(formData: FormData) {
+  const reviewId = String(formData.get("reviewId") ?? "").trim();
+  const returnTo = getSafeReturnTo(formData.get("returnTo"));
+
+  if (!(await isAdminSession())) {
+    redirect("/admin/login");
+  }
+  if (!reviewId) {
+    redirectAdminActionError(returnTo, "review_invalid_request");
+  }
+
+  const deleted = await partnerReviewRepository.deletePartnerReview(reviewId);
+  if (!deleted) {
+    redirectAdminActionError(returnTo, "review_not_found");
+  }
+
+  await logAdminAction("partner_review_delete", {
+    targetType: "partner_review",
+    targetId: deleted.reviewId,
+    properties: {
+      partnerId: deleted.partnerId,
+    },
+  });
+
+  revalidateReviewPaths(deleted.partnerId);
+  redirect(returnTo);
+}

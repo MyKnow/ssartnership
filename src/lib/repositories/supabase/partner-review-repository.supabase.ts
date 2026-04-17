@@ -2,6 +2,7 @@ import {
   buildPartnerReviewSummary,
   getPartnerReviewAuthorRoleLabel,
   maskPartnerReviewAuthorName,
+  normalizePartnerReviewRatingFilter,
   normalizePartnerReviewSort,
   type PartnerReview,
 } from "@/lib/partner-reviews";
@@ -10,6 +11,7 @@ import type {
   CreatePartnerReviewInput,
   HidePartnerReviewResult,
   PartnerReviewListContext,
+  PartnerReviewModerationRecord,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
   SoftDeletePartnerReviewInput,
@@ -27,6 +29,7 @@ type PartnerReviewRow = {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  hidden_at?: string | null;
   members?: {
     display_name?: string | null;
     year?: number | null;
@@ -34,7 +37,7 @@ type PartnerReviewRow = {
 };
 
 const REVIEW_SELECT =
-  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,members!partner_reviews_member_id_fkey(display_name,year)";
+  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,hidden_at,members!partner_reviews_member_id_fkey(display_name,year)";
 
 function hasImages(row: PartnerReviewRow) {
   return (row.images ?? []).length > 0;
@@ -65,6 +68,7 @@ async function listReviewRows(
   sort: string,
   offset: number,
   limit: number,
+  rating: string,
   imagesOnly: boolean,
   includeHidden: boolean,
 ) {
@@ -73,7 +77,10 @@ async function listReviewRows(
     supabase.from("partner_reviews").select(REVIEW_SELECT).eq("partner_id", partnerId),
     sort,
   );
-  const filteredQuery = includeHidden ? baseQuery : baseQuery.is("deleted_at", null);
+  const ratingFilteredQuery =
+    rating === "all" ? baseQuery : baseQuery.eq("rating", Number(rating));
+  const activeQuery = ratingFilteredQuery.is("deleted_at", null);
+  const filteredQuery = includeHidden ? activeQuery : activeQuery.is("hidden_at", null);
 
   if (!imagesOnly) {
     const { data, error } = await filteredQuery.range(offset, offset + limit);
@@ -145,7 +152,8 @@ function mapReview(row: PartnerReviewRow, currentUserId?: string | null): Partne
     authorMaskedName: maskPartnerReviewAuthorName(row.members?.display_name),
     authorRoleLabel: getPartnerReviewAuthorRoleLabel(row.members?.year),
     isMine: currentUserId === row.member_id,
-    isHidden: row.deleted_at !== null,
+    isHidden: row.hidden_at !== null,
+    hiddenAt: row.hidden_at ?? null,
   };
 }
 
@@ -156,7 +164,8 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       .from("partner_reviews")
       .select("rating")
       .eq("partner_id", partnerId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .is("hidden_at", null);
 
     if (error) {
       throw new Error(error.message);
@@ -169,18 +178,23 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     const limit = Math.max(1, Math.min(20, context.limit ?? 10));
     const offset = Math.max(0, context.offset ?? 0);
     const sort = normalizePartnerReviewSort(context.sort);
+    const rating = normalizePartnerReviewRatingFilter(context.rating);
 
-    const summaryPromise = this.getPartnerReviewSummary(context.partnerId);
     const { rows, hasMore } = await listReviewRows(
       context.partnerId,
       sort,
       offset,
       limit,
+      rating,
       Boolean(context.imagesOnly),
       Boolean(context.includeHidden),
     );
     const items = rows.map((row) => mapReview(row, context.currentUserId));
-    const summary = await summaryPromise;
+    const summary = buildPartnerReviewSummary(
+      rows
+        .filter((row) => row.deleted_at === null && row.hidden_at === null)
+        .map((row) => row.rating),
+    );
     return {
       summary,
       items,
@@ -226,6 +240,7 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       .eq("id", input.reviewId)
       .eq("member_id", input.memberId)
       .is("deleted_at", null)
+      .is("hidden_at", null)
       .select(REVIEW_SELECT)
       .maybeSingle();
 
@@ -251,7 +266,8 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       })
       .eq("id", input.reviewId)
       .eq("member_id", input.memberId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .is("hidden_at", null);
 
     if (error) {
       throw new Error(error.message);
@@ -259,6 +275,62 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
   }
 
   async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const supabase = getSupabaseAdminClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("partner_reviews")
+      .update({
+        hidden_at: now,
+        updated_at: now,
+      })
+      .eq("id", reviewId)
+      .is("deleted_at", null)
+      .is("hidden_at", null)
+      .select("id,partner_id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return null;
+    }
+
+    return {
+      reviewId: data.id,
+      partnerId: data.partner_id,
+    };
+  }
+
+  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const supabase = getSupabaseAdminClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("partner_reviews")
+      .update({
+        hidden_at: null,
+        updated_at: now,
+      })
+      .eq("id", reviewId)
+      .is("deleted_at", null)
+      .not("hidden_at", "is", null)
+      .select("id,partner_id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return null;
+    }
+
+    return {
+      reviewId: data.id,
+      partnerId: data.partner_id,
+    };
+  }
+
+  async deletePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
     const supabase = getSupabaseAdminClient();
     const now = new Date().toISOString();
     const { data, error } = await supabase
@@ -286,19 +358,14 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     };
   }
 
-  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+  async getPartnerReviewModerationRecord(
+    reviewId: string,
+  ): Promise<PartnerReviewModerationRecord | null> {
     const supabase = getSupabaseAdminClient();
-    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from("partner_reviews")
-      .update({
-        deleted_at: null,
-        deleted_by_member_id: null,
-        updated_at: now,
-      })
+      .select("id,partner_id,deleted_at,hidden_at")
       .eq("id", reviewId)
-      .not("deleted_at", "is", null)
-      .select("id,partner_id")
       .maybeSingle();
 
     if (error) {
@@ -307,10 +374,11 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     if (!data) {
       return null;
     }
-
     return {
-      reviewId: data.id,
+      id: data.id,
       partnerId: data.partner_id,
+      deletedAt: data.deleted_at ?? null,
+      hiddenAt: data.hidden_at ?? null,
     };
   }
 
@@ -318,7 +386,7 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("partner_reviews")
-      .select("id,partner_id,member_id,images,deleted_at")
+      .select("id,partner_id,member_id,images,deleted_at,hidden_at")
       .eq("id", reviewId)
       .eq("member_id", memberId)
       .maybeSingle();
@@ -335,6 +403,7 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       memberId: data.member_id,
       images: data.images ?? [],
       deletedAt: data.deleted_at ?? null,
+      hiddenAt: data.hidden_at ?? null,
     };
   }
 }

@@ -23,7 +23,7 @@ export default function CertificationFooterActions() {
         </p>
       </div>
       <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-        <Button variant="ghost" href="/auth/change-password">
+        <Button variant="ghost" href="/auth/change-password" prefetch={false}>
           비밀번호 변경하기
         </Button>
         <Button

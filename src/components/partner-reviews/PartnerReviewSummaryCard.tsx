@@ -7,13 +7,13 @@ export default function PartnerReviewSummaryCard({
   summary: PartnerReviewSummary;
 }) {
   return (
-    <Card className="grid gap-5 p-5 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-center">
+    <Card padding="md" className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-center">
       <div className="grid gap-1 text-center sm:text-left">
-        <p className="text-sm text-muted-foreground">평균 별점</p>
-        <p className="text-4xl font-semibold text-foreground">
+        <p className="ui-caption">평균</p>
+        <p className="text-3xl font-semibold tracking-[-0.03em] text-foreground">
           {summary.totalCount > 0 ? summary.averageRating.toFixed(1) : "-"}
         </p>
-        <p className="text-sm text-muted-foreground">총 {summary.totalCount}개 리뷰</p>
+        <p className="text-xs text-muted-foreground">{summary.totalCount}개 리뷰</p>
       </div>
 
       <div className="grid gap-2">
@@ -21,9 +21,12 @@ export default function PartnerReviewSummaryCard({
           const count = summary.distribution[rating as 1 | 2 | 3 | 4 | 5] ?? 0;
           const width = summary.totalCount > 0 ? (count / summary.totalCount) * 100 : 0;
           return (
-            <div key={rating} className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-3 text-sm">
+            <div
+              key={rating}
+              className="grid grid-cols-[2.25rem_minmax(0,1fr)_2rem] items-center gap-2 text-xs"
+            >
               <span className="text-muted-foreground">{rating}점</span>
-              <div className="h-2.5 overflow-hidden rounded-full bg-surface-muted">
+              <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
                 <div
                   className="h-full rounded-full bg-primary"
                   style={{ width: `${width}%` }}
@@ -33,9 +36,7 @@ export default function PartnerReviewSummaryCard({
             </div>
           );
         })}
-        <p className="pt-1 text-xs text-muted-foreground">
-          비공개 처리된 리뷰는 평균과 분포 집계에서 제외됩니다.
-        </p>
+        <p className="text-xs text-muted-foreground">비공개 리뷰 제외</p>
       </div>
     </Card>
   );

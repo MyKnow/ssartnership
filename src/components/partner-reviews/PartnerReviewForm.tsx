@@ -113,18 +113,16 @@ export default function PartnerReviewForm({
   }
 
   return (
-    <Card className="grid gap-4 p-5">
-      <div className="grid gap-2">
+    <Card padding="md" className="grid gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-base font-semibold text-foreground">
           {isEditMode ? "리뷰 수정" : "리뷰 작성"}
         </p>
-        <p className="text-sm text-muted-foreground">
-          별점, 사진, 실제 이용 경험을 남겨 주세요.
-        </p>
+        <p className="text-xs text-muted-foreground">사진은 선택 사항</p>
       </div>
 
       <div className="grid gap-2">
-        <p className="text-sm font-medium text-foreground">별점</p>
+        <p className="ui-caption">별점</p>
         <div
           ref={ratingRef}
           className={getFieldErrorClass(Boolean(fieldErrors.rating), "w-fit rounded-[1rem]")}
@@ -160,7 +158,7 @@ export default function PartnerReviewForm({
             setBody(event.target.value);
             setFieldErrors((prev) => ({ ...prev, body: undefined }));
           }}
-          placeholder="실제 이용 경험을 자세히 남겨 주세요."
+          placeholder="이용 경험을 남겨 주세요."
           aria-invalid={Boolean(fieldErrors.body) || undefined}
           className={getFieldErrorClass(Boolean(fieldErrors.body))}
         />
@@ -179,19 +177,17 @@ export default function PartnerReviewForm({
 
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
-      <div className="mt-1 border-t border-border pt-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <Button variant="secondary" onClick={onCancel} disabled={pending}>
-            취소
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            loading={pending}
-            loadingText={isEditMode ? "수정 중" : "등록 중"}
-          >
-            {isEditMode ? "리뷰 수정" : "리뷰 등록"}
-          </Button>
-        </div>
+      <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+        <Button variant="secondary" onClick={onCancel} disabled={pending}>
+          취소
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          loading={pending}
+          loadingText={isEditMode ? "수정 중" : "등록 중"}
+        >
+          {isEditMode ? "수정 완료" : "등록"}
+        </Button>
       </div>
     </Card>
   );

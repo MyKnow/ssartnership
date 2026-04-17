@@ -24,7 +24,7 @@ export default function AdminReviewFilters({
     <form action="/admin/reviews" method="get">
       <FilterBar
         title="리뷰 필터"
-        description="협력사, 브랜드, 사진 여부, 별점, 작성자, 공개 상태 기준으로 빠르게 좁힙니다."
+        description="필요한 조건만 선택하세요."
         trailing={
           <Button href="/admin/reviews" variant="secondary">
             초기화
@@ -105,11 +105,11 @@ export default function AdminReviewFilters({
             defaultChecked={filters.imagesOnly}
             className="h-4 w-4 rounded border-border text-primary accent-primary"
           />
-          사진 있는 리뷰만 보기
+          사진만
         </label>
 
         <div className="flex items-end">
-          <Button type="submit">필터 적용</Button>
+          <Button type="submit">적용</Button>
         </div>
       </FilterBar>
     </form>

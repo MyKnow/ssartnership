@@ -108,11 +108,8 @@ export default function ReviewImageUploader({
 
   return (
     <div className="grid gap-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="grid gap-0.5">
-          <p className="text-sm font-medium text-foreground">리뷰 사진</p>
-          <span className="text-xs text-muted-foreground">{items.length} / 5장</span>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground">사진</p>
         <Button
           variant="secondary"
           size="sm"
@@ -122,17 +119,17 @@ export default function ReviewImageUploader({
         >
           <span className="inline-flex items-center gap-2">
             <PhotoIcon className="h-4 w-4" />
-            사진 추가
+            추가 ({items.length}/5)
           </span>
         </Button>
       </div>
 
       {items.length > 0 ? (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {items.map((item, index) => (
             <div
               key={item.id}
-              className="relative aspect-square overflow-hidden rounded-[1.15rem] border border-border bg-surface-muted"
+              className="relative aspect-square overflow-hidden rounded-xl border border-border bg-surface-muted"
             >
               <Image
                 src={item.url}
@@ -155,8 +152,8 @@ export default function ReviewImageUploader({
           ))}
         </div>
       ) : (
-        <div className="rounded-[1.15rem] border border-dashed border-border bg-surface-muted/70 px-4 py-5 text-sm text-muted-foreground">
-          사진은 선택사항입니다.
+        <div className="rounded-xl border border-dashed border-border bg-surface-muted/70 px-4 py-4 text-sm text-muted-foreground">
+          선택 사항
         </div>
       )}
 

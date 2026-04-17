@@ -53,6 +53,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_account_initial_setup_link_send',
   'partner_review_hide',
   'partner_review_restore',
+  'partner_review_delete',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

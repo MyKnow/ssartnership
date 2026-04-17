@@ -69,8 +69,10 @@ export function revalidateReviewPaths(partnerId?: string) {
   revalidatePath("/admin");
   revalidatePath("/admin/reviews");
   revalidatePath("/partners/[id]", "page");
+  revalidatePath("/partner/services/[partnerId]", "page");
   if (partnerId) {
     revalidatePath(`/partners/${partnerId}`);
+    revalidatePath(`/partner/services/${partnerId}`);
   }
 }
 

@@ -1,5 +1,16 @@
-import type { PartnerReview, PartnerReviewSort } from "@/lib/partner-reviews";
-import { buildReviewMediaManifestEntries, collectReviewMediaFiles, type ReviewImageItem } from "@/components/review-media/shared";
+import type {
+  PartnerReview,
+  PartnerReviewSort,
+} from "@/lib/partner-reviews";
+export {
+  getPartnerReviewRatingLabel,
+  getPartnerReviewRatingOptions,
+} from "@/lib/partner-reviews";
+import {
+  buildReviewMediaManifestEntries,
+  collectReviewMediaFiles,
+  type ReviewImageItem,
+} from "@/components/review-media/shared";
 
 export function getPartnerReviewSortLabel(sort: PartnerReviewSort) {
   if (sort === "oldest") {

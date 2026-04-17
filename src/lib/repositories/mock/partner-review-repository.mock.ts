@@ -2,6 +2,8 @@ import {
   buildPartnerReviewSummary,
   getPartnerReviewAuthorRoleLabel,
   maskPartnerReviewAuthorName,
+  matchesPartnerReviewRatingFilter,
+  normalizePartnerReviewRatingFilter,
   normalizePartnerReviewSort,
   type PartnerReview,
 } from "@/lib/partner-reviews";
@@ -10,6 +12,7 @@ import type {
   CreatePartnerReviewInput,
   HidePartnerReviewResult,
   PartnerReviewListContext,
+  PartnerReviewModerationRecord,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
   SoftDeletePartnerReviewInput,
@@ -26,6 +29,7 @@ type MockReviewRecord = {
   images: string[];
   deletedAt: string | null;
   deletedByMemberId: string | null;
+  hiddenAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -45,6 +49,7 @@ const seededReviews: MockReviewRecord[] = [
     images: [],
     deletedAt: null,
     deletedByMemberId: null,
+    hiddenAt: null,
     createdAt: "2026-04-10T03:00:00.000Z",
     updatedAt: "2026-04-10T03:00:00.000Z",
   },
@@ -58,6 +63,7 @@ const seededReviews: MockReviewRecord[] = [
     images: [],
     deletedAt: null,
     deletedByMemberId: null,
+    hiddenAt: null,
     createdAt: "2026-04-11T06:20:00.000Z",
     updatedAt: "2026-04-11T06:20:00.000Z",
   },
@@ -91,7 +97,8 @@ function mapReview(record: MockReviewRecord, currentUserId?: string | null): Par
     authorMaskedName: maskPartnerReviewAuthorName(member?.display_name),
     authorRoleLabel: getPartnerReviewAuthorRoleLabel(member?.year),
     isMine: currentUserId === record.memberId,
-    isHidden: record.deletedAt !== null,
+    isHidden: record.hiddenAt !== null,
+    hiddenAt: record.hiddenAt,
   };
 }
 
@@ -112,7 +119,9 @@ function sortReviews(reviews: MockReviewRecord[], sort: string) {
 export class MockPartnerReviewRepository implements PartnerReviewRepository {
   async getPartnerReviewSummary(partnerId: string) {
     const ratings = getStore()
-      .reviews.filter((review) => review.partnerId === partnerId && !review.deletedAt)
+      .reviews.filter(
+        (review) => review.partnerId === partnerId && !review.deletedAt && !review.hiddenAt,
+      )
       .map((review) => review.rating);
     return buildPartnerReviewSummary(ratings);
   }
@@ -121,11 +130,14 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     const limit = Math.max(1, Math.min(20, context.limit ?? 10));
     const offset = Math.max(0, context.offset ?? 0);
     const sort = normalizePartnerReviewSort(context.sort);
+    const rating = normalizePartnerReviewRatingFilter(context.rating);
     const rows = sortReviews(
       getStore().reviews.filter(
         (review) =>
           review.partnerId === context.partnerId &&
-          (context.includeHidden || !review.deletedAt) &&
+          matchesPartnerReviewRatingFilter(review.rating, rating) &&
+          !review.deletedAt &&
+          (context.includeHidden || !review.hiddenAt) &&
           (!context.imagesOnly || review.images.length > 0),
       ),
       sort,
@@ -133,7 +145,11 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     const items = rows
       .slice(offset, offset + limit)
       .map((review) => mapReview(review, context.currentUserId));
-    const summary = await this.getPartnerReviewSummary(context.partnerId);
+    const summary = buildPartnerReviewSummary(
+      rows
+        .filter((review) => !review.deletedAt && !review.hiddenAt)
+        .map((review) => review.rating),
+    );
     return {
       summary,
       items,
@@ -154,6 +170,7 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
       images: [...input.images],
       deletedAt: null,
       deletedByMemberId: null,
+      hiddenAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -166,7 +183,8 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
       (item) =>
         item.id === input.reviewId &&
         item.memberId === input.memberId &&
-        item.deletedAt === null,
+        item.deletedAt === null &&
+        item.hiddenAt === null,
     );
     if (!review) {
       throw new Error("리뷰를 찾을 수 없습니다.");
@@ -184,7 +202,8 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
       (item) =>
         item.id === input.reviewId &&
         item.memberId === input.memberId &&
-        item.deletedAt === null,
+        item.deletedAt === null &&
+        item.hiddenAt === null,
     );
     if (!review) {
       throw new Error("리뷰를 찾을 수 없습니다.");
@@ -195,6 +214,36 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
   }
 
   async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const review = getStore().reviews.find(
+      (item) => item.id === reviewId && item.deletedAt === null && item.hiddenAt === null,
+    );
+    if (!review) {
+      return null;
+    }
+    review.hiddenAt = new Date().toISOString();
+    review.updatedAt = review.hiddenAt;
+    return {
+      reviewId: review.id,
+      partnerId: review.partnerId,
+    };
+  }
+
+  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+    const review = getStore().reviews.find(
+      (item) => item.id === reviewId && item.deletedAt === null && item.hiddenAt !== null,
+    );
+    if (!review) {
+      return null;
+    }
+    review.hiddenAt = null;
+    review.updatedAt = new Date().toISOString();
+    return {
+      reviewId: review.id,
+      partnerId: review.partnerId,
+    };
+  }
+
+  async deletePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
     const review = getStore().reviews.find((item) => item.id === reviewId && item.deletedAt === null);
     if (!review) {
       return null;
@@ -208,17 +257,18 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     };
   }
 
-  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
-    const review = getStore().reviews.find((item) => item.id === reviewId && item.deletedAt !== null);
+  async getPartnerReviewModerationRecord(
+    reviewId: string,
+  ): Promise<PartnerReviewModerationRecord | null> {
+    const review = getStore().reviews.find((item) => item.id === reviewId);
     if (!review) {
       return null;
     }
-    review.deletedAt = null;
-    review.deletedByMemberId = null;
-    review.updatedAt = new Date().toISOString();
     return {
-      reviewId: review.id,
+      id: review.id,
       partnerId: review.partnerId,
+      deletedAt: review.deletedAt,
+      hiddenAt: review.hiddenAt,
     };
   }
 
@@ -235,6 +285,7 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
       memberId: review.memberId,
       images: [...review.images],
       deletedAt: review.deletedAt,
+      hiddenAt: review.hiddenAt,
     };
   }
 }

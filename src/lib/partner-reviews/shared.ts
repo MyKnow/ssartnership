@@ -1,5 +1,7 @@
 export type PartnerReviewSort = "latest" | "oldest" | "rating_desc" | "rating_asc";
 
+export type PartnerReviewRatingFilter = "all" | "1" | "2" | "3" | "4" | "5";
+
 export type PartnerReviewSummary = {
   averageRating: number;
   totalCount: number;
@@ -20,6 +22,7 @@ export type PartnerReview = {
   authorRoleLabel: string;
   isMine: boolean;
   isHidden: boolean;
+  hiddenAt: string | null;
 };
 
 export type PartnerReviewListResult = {
@@ -66,6 +69,45 @@ export function normalizePartnerReviewSort(value: string | null | undefined): Pa
     return value;
   }
   return "latest";
+}
+
+export function normalizePartnerReviewRatingFilter(
+  value: string | null | undefined,
+): PartnerReviewRatingFilter {
+  if (value === "1" || value === "2" || value === "3" || value === "4" || value === "5") {
+    return value;
+  }
+  return "all";
+}
+
+export function getPartnerReviewRatingLabel(
+  rating: PartnerReviewRatingFilter,
+) {
+  if (rating === "all") {
+    return "전체 별점";
+  }
+  return `${rating}점`;
+}
+
+export function getPartnerReviewRatingOptions() {
+  return [
+    { value: "all" as const, label: "전체 별점" },
+    { value: "5" as const, label: "5점" },
+    { value: "4" as const, label: "4점" },
+    { value: "3" as const, label: "3점" },
+    { value: "2" as const, label: "2점" },
+    { value: "1" as const, label: "1점" },
+  ];
+}
+
+export function matchesPartnerReviewRatingFilter(
+  reviewRating: number,
+  ratingFilter: PartnerReviewRatingFilter,
+) {
+  if (ratingFilter === "all") {
+    return true;
+  }
+  return reviewRating === Number(ratingFilter);
 }
 
 export function maskPartnerReviewAuthorName(name: string | null | undefined) {

@@ -17,12 +17,12 @@ export default function AdminReviewImageGallery({
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-6">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
         {images.map((image, index) => (
           <button
             key={`${image}-${index}`}
             type="button"
-            className="relative aspect-square overflow-hidden rounded-[1rem] border border-border bg-surface-muted"
+            className="relative aspect-square overflow-hidden rounded-xl border border-border bg-surface-muted"
             onClick={() => setLightboxIndex(index)}
             aria-label={`리뷰 사진 ${index + 1} 크게 보기`}
           >

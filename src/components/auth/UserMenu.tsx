@@ -48,10 +48,20 @@ export default function UserMenu({
   if (!session) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <Button variant="ghost" href="/auth/login" className={buttonClassName}>
+        <Button
+          variant="ghost"
+          href="/auth/login"
+          prefetch={false}
+          className={buttonClassName}
+        >
           로그인
         </Button>
-        <Button variant="ghost" href="/auth/signup" className={buttonClassName}>
+        <Button
+          variant="ghost"
+          href="/auth/signup"
+          prefetch={false}
+          className={buttonClassName}
+        >
           회원가입
         </Button>
       </div>
@@ -60,7 +70,12 @@ export default function UserMenu({
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Button variant="ghost" href="/certification" className={buttonClassName}>
+      <Button
+        variant="ghost"
+        href="/certification"
+        prefetch={false}
+        className={buttonClassName}
+      >
         내 프로필 조회
       </Button>
       {logoutIconOnly ? (

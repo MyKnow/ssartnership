@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import PartnerChangeRequestForm from "@/components/partner/PartnerChangeRequestForm";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
+import PartnerReviewSection from "@/components/partner-reviews/PartnerReviewSection";
 import ShareLinkButton from "@/components/ShareLinkButton";
 import { buildPartnerChangeRequestDiffItems } from "@/components/partner-change-request-ui/buildDiffItems";
 import {
@@ -27,6 +28,11 @@ export default function PartnerServiceDetailViewContent({
   saveImmediateAction,
   createAction,
   cancelAction,
+  reviewSummary,
+  initialReviews,
+  initialReviewSort,
+  initialReviewOffset,
+  initialReviewHasMore,
 }: PartnerServiceDetailViewProps) {
   const visualState = getPartnerServiceVisualState(context);
   const viewHref = `/partner/services/${encodeURIComponent(context.partnerId)}`;
@@ -160,6 +166,19 @@ export default function PartnerServiceDetailViewContent({
               cancelAction={cancelAction}
             />
           ) : null}
+
+          <PartnerReviewSection
+            partnerId={context.partnerId}
+            canWriteReview={false}
+            accessMode="partner"
+            showWriteControls={false}
+            title="리뷰"
+            initialSummary={reviewSummary}
+            initialReviews={initialReviews}
+            initialSort={initialReviewSort}
+            initialOffset={initialReviewOffset}
+            initialHasMore={initialReviewHasMore}
+          />
         </div>
       </Container>
     </div>

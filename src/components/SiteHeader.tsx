@@ -60,6 +60,7 @@ export default function SiteHeader({
                     variant="secondary"
                     size="icon"
                     href="/notifications"
+                    prefetch={false}
                     ariaLabel="알림 설정"
                     title="알림 설정"
                   >

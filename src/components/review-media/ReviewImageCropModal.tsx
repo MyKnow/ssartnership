@@ -228,23 +228,21 @@ export default function ReviewImageCropModal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
-      <div className="grid w-full max-w-4xl gap-4 rounded-[28px] border border-white/10 bg-surface p-4 shadow-2xl sm:p-5">
+      <div className="grid w-full max-w-3xl gap-4 rounded-[var(--radius-panel)] border border-white/10 bg-surface p-5 shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
-            <p className="text-base font-semibold text-foreground">리뷰 사진 자르기</p>
-            <p className="text-sm text-muted-foreground">
-              정방형으로 잘라 저장합니다.
-            </p>
+            <p className="text-base font-semibold text-foreground">사진 조정</p>
+            <p className="text-sm text-muted-foreground">정방형으로 저장됩니다.</p>
           </div>
           <Button variant="ghost" size="icon" onClick={onCancel} ariaLabel="닫기" title="닫기">
             <XMarkIcon className="h-5 w-5" />
           </Button>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
           <div
             ref={frameRef}
-            className="relative min-h-[16rem] overflow-hidden rounded-[24px] border border-border bg-slate-950/90 select-none touch-none overscroll-contain sm:min-h-[20rem]"
+            className="relative min-h-[16rem] overflow-hidden rounded-[1rem] border border-border bg-slate-950/90 select-none touch-none overscroll-contain sm:min-h-[20rem]"
             style={{ aspectRatio: REVIEW_IMAGE_ASPECT_RATIO, touchAction: "none" }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -285,13 +283,11 @@ export default function ReviewImageCropModal({
               />
             </label>
 
-            <div className="rounded-[1.25rem] border border-border bg-surface-muted/70 p-4 text-sm text-muted-foreground">
-              드래그해서 구도를 조정하고, 확대 슬라이더로 원하는 구도를 맞춘 뒤 적용하세요.
-            </div>
+            <p className="text-sm text-muted-foreground">드래그와 확대만 조정하세요.</p>
 
             {error ? <FormMessage variant="error">{error}</FormMessage> : null}
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button variant="secondary" onClick={onCancel}>
                 취소
               </Button>
