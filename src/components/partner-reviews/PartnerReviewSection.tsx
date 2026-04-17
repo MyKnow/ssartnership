@@ -38,6 +38,7 @@ export default function PartnerReviewSection({
   const [summary, setSummary] = useState(initialSummary);
   const [reviews, setReviews] = useState(initialReviews);
   const [sort, setSort] = useState<PartnerReviewSort>(initialSort);
+  const [onlyWithImages, setOnlyWithImages] = useState(false);
   const [nextOffset, setNextOffset] = useState(initialOffset);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [pending, setPending] = useState(false);
@@ -46,13 +47,26 @@ export default function PartnerReviewSection({
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
 
-  async function refreshList(nextSort = sort) {
+  function buildListUrl(nextSort: PartnerReviewSort, nextOnlyWithImages: boolean, offset = 0) {
+    const params = new URLSearchParams({
+      sort: nextSort,
+      offset: String(offset),
+      limit: "10",
+    });
+    if (nextOnlyWithImages) {
+      params.set("imagesOnly", "true");
+    }
+    return `/api/partners/${encodeURIComponent(partnerId)}/reviews?${params.toString()}`;
+  }
+
+  async function refreshList(
+    nextSort = sort,
+    nextOnlyWithImages = onlyWithImages,
+  ) {
     setPending(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(
-        `/api/partners/${encodeURIComponent(partnerId)}/reviews?sort=${encodeURIComponent(nextSort)}&offset=0&limit=10`,
-      );
+      const response = await fetch(buildListUrl(nextSort, nextOnlyWithImages));
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setErrorMessage(data.message ?? "리뷰를 불러오지 못했습니다.");
@@ -78,9 +92,7 @@ export default function PartnerReviewSection({
     setPending(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(
-        `/api/partners/${encodeURIComponent(partnerId)}/reviews?sort=${encodeURIComponent(sort)}&offset=${nextOffset}&limit=10`,
-      );
+      const response = await fetch(buildListUrl(sort, onlyWithImages, nextOffset));
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setErrorMessage(data.message ?? "리뷰를 더 불러오지 못했습니다.");
@@ -117,7 +129,12 @@ export default function PartnerReviewSection({
     }
   }
 
-  const emptyState = summary.totalCount === 0;
+  const emptyState = reviews.length === 0;
+  const listDescription = onlyWithImages
+    ? `${getPartnerReviewSortLabel(sort)}으로 사진이 포함된 리뷰만 보고 있습니다.`
+    : summary.totalCount > 0
+      ? `${getPartnerReviewSortLabel(sort)}으로 ${summary.totalCount}개 리뷰를 보고 있습니다.`
+      : "아직 등록된 리뷰가 없습니다.";
 
   return (
     <section className="grid gap-5">
@@ -153,24 +170,45 @@ export default function PartnerReviewSection({
 
       <PartnerReviewSummaryCard summary={summary} />
 
-      <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div className="text-sm text-muted-foreground">
-          {summary.totalCount > 0
-            ? `${getPartnerReviewSortLabel(sort)}으로 ${summary.totalCount}개 리뷰를 보고 있습니다.`
-            : "아직 등록된 리뷰가 없습니다."}
+      <Card className="grid gap-4 p-4">
+        <div className="grid gap-1">
+          <div className="text-sm font-medium text-foreground">정렬 및 필터</div>
+          <div className="text-sm text-muted-foreground">{listDescription}</div>
         </div>
-        <div className="w-full sm:w-56">
-          <Select
-            value={sort}
-            onChange={(event) => {
-              const nextSort = event.target.value as PartnerReviewSort;
-              void refreshList(nextSort);
-            }}
-          >
-            <option value="latest">최신순</option>
-            <option value="rating_desc">높은 별점순</option>
-            <option value="rating_asc">낮은 별점순</option>
-          </Select>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={onlyWithImages}
+              onChange={(event) => {
+                const nextOnlyWithImages = event.target.checked;
+                setComposerOpen(false);
+                setEditingReviewId(null);
+                setOnlyWithImages(nextOnlyWithImages);
+                void refreshList(sort, nextOnlyWithImages);
+              }}
+              className="h-4 w-4 rounded border-border text-primary accent-primary"
+            />
+            사진 있는 리뷰만 보기
+          </label>
+
+          <div className="w-full sm:w-56">
+            <Select
+              value={sort}
+              onChange={(event) => {
+                const nextSort = event.target.value as PartnerReviewSort;
+                setComposerOpen(false);
+                setEditingReviewId(null);
+                void refreshList(nextSort);
+              }}
+            >
+              <option value="latest">최신순</option>
+              <option value="oldest">오래된 순</option>
+              <option value="rating_desc">높은 별점순</option>
+              <option value="rating_asc">낮은 별점순</option>
+            </Select>
+          </div>
         </div>
       </Card>
 
@@ -178,9 +216,13 @@ export default function PartnerReviewSection({
 
       {emptyState ? (
         <Card className="grid gap-3 p-6">
-          <p className="text-base font-semibold text-foreground">아직 리뷰가 없습니다.</p>
+          <p className="text-base font-semibold text-foreground">
+            {onlyWithImages ? "사진이 포함된 리뷰가 아직 없습니다." : "아직 리뷰가 없습니다."}
+          </p>
           <p className="text-sm text-muted-foreground">
-            첫 리뷰를 남겨 다른 구성원에게 실제 이용 경험을 공유해 주세요.
+            {onlyWithImages
+              ? "사진이 포함된 리뷰가 없어 아직 목록을 보여드릴 수 없습니다."
+              : "첫 리뷰를 남겨 다른 구성원에게 실제 이용 경험을 공유해 주세요."}
           </p>
         </Card>
       ) : (

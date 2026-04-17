@@ -222,8 +222,8 @@ export default function ReviewImageCropModal({
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
           <div
             ref={frameRef}
-            className="relative min-h-[16rem] overflow-hidden rounded-[24px] border border-border bg-slate-950/90 sm:min-h-[20rem]"
-            style={{ aspectRatio: REVIEW_IMAGE_ASPECT_RATIO }}
+            className="relative min-h-[16rem] overflow-hidden rounded-[24px] border border-border bg-slate-950/90 select-none touch-none overscroll-contain sm:min-h-[20rem]"
+            style={{ aspectRatio: REVIEW_IMAGE_ASPECT_RATIO, touchAction: "none" }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

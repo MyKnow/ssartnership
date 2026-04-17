@@ -2,9 +2,12 @@ import { normalizePartnerReviewSort } from "@/lib/partner-reviews";
 import { partnerRepository } from "@/lib/repositories";
 import { parseReviewMediaManifest } from "@/lib/review-media";
 import { uploadReviewMediaFile } from "@/lib/review-media-storage";
+import {
+  normalizeReviewDraftInput,
+  validateReviewDraftInput,
+  type ReviewFieldErrors,
+} from "@/lib/review-validation";
 import { getUserSession } from "@/lib/user-auth";
-
-export type ReviewFieldErrors = Partial<Record<"rating" | "title" | "body" | "images", string>>;
 
 export async function getReviewMemberSession() {
   return getUserSession();
@@ -24,7 +27,12 @@ export function parseReviewListParams(request: Request) {
   const sort = normalizePartnerReviewSort(url.searchParams.get("sort"));
   const offset = clampListNumber(url.searchParams.get("offset"), 0);
   const limit = clampListNumber(url.searchParams.get("limit"), 10, 1, 20);
-  return { sort, offset, limit };
+  const imagesOnly = parseBooleanParam(url.searchParams.get("imagesOnly"));
+  return { sort, offset, limit, imagesOnly };
+}
+
+function parseBooleanParam(value: string | null) {
+  return value === "1" || value === "true";
 }
 
 function clampListNumber(
@@ -52,26 +60,16 @@ export function parseReviewFormFields(formData: FormData):
       fieldErrors: ReviewFieldErrors;
     } {
   const ratingRaw = String(formData.get("rating") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
-  const body = String(formData.get("body") ?? "").trim();
-  const fieldErrors: ReviewFieldErrors = {};
   const rating = Number.parseInt(ratingRaw, 10);
-
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-    fieldErrors.rating = "별점은 1점부터 5점까지 선택해 주세요.";
-  }
-  if (!title) {
-    fieldErrors.title = "제목을 입력해 주세요.";
-  } else if (title.length > 80) {
-    fieldErrors.title = "제목은 80자 이내로 입력해 주세요.";
-  }
-  if (!body) {
-    fieldErrors.body = "리뷰 내용을 입력해 주세요.";
-  } else if (body.length < 10) {
-    fieldErrors.body = "리뷰 내용은 10자 이상 입력해 주세요.";
-  } else if (body.length > 2000) {
-    fieldErrors.body = "리뷰 내용은 2000자 이내로 입력해 주세요.";
-  }
+  const normalized = normalizeReviewDraftInput({
+    rating,
+    title: String(formData.get("title") ?? ""),
+    body: String(formData.get("body") ?? ""),
+  });
+  const fieldErrors = validateReviewDraftInput({
+    ...normalized,
+    imageCount: formData.getAll("imageFiles").filter((item) => item instanceof File).length,
+  });
 
   if (Object.keys(fieldErrors).length > 0) {
     return {
@@ -82,9 +80,9 @@ export function parseReviewFormFields(formData: FormData):
 
   return {
     ok: true,
-    rating,
-    title,
-    body,
+    rating: normalized.rating,
+    title: normalized.title,
+    body: normalized.body,
   };
 }
 

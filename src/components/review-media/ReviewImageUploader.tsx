@@ -108,9 +108,23 @@ export default function ReviewImageUploader({
 
   return (
     <div className="grid gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground">리뷰 사진</p>
-        <span className="text-xs text-muted-foreground">{items.length} / 5</span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid gap-0.5">
+          <p className="text-sm font-medium text-foreground">리뷰 사진</p>
+          <span className="text-xs text-muted-foreground">{items.length} / 5장</span>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => inputRef.current?.click()}
+          disabled={disabled || remainingCount === 0}
+          className="sm:shrink-0"
+        >
+          <span className="inline-flex items-center gap-2">
+            <PhotoIcon className="h-4 w-4" />
+            사진 추가
+          </span>
+        </Button>
       </div>
 
       {items.length > 0 ? (
@@ -142,31 +156,19 @@ export default function ReviewImageUploader({
         </div>
       ) : (
         <div className="rounded-[1.15rem] border border-dashed border-border bg-surface-muted/70 px-4 py-5 text-sm text-muted-foreground">
-          사진은 선택사항입니다. 올리면 정방형으로 크롭하고 `webp`로 압축 저장합니다.
+          사진은 선택사항입니다.
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-          disabled={disabled || remainingCount === 0}
-        />
-        <Button
-          variant="secondary"
-          onClick={() => inputRef.current?.click()}
-          disabled={disabled || remainingCount === 0}
-        >
-          <span className="inline-flex items-center gap-2">
-            <PhotoIcon className="h-4 w-4" />
-            사진 추가
-          </span>
-        </Button>
-      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFileChange}
+        disabled={disabled || remainingCount === 0}
+      />
 
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
       {localError ? <FormMessage variant="error">{localError}</FormMessage> : null}

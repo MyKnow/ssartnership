@@ -32,6 +32,106 @@ type PartnerReviewRow = {
   } | null;
 };
 
+const REVIEW_SELECT =
+  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,members!partner_reviews_member_id_fkey(display_name,year)";
+
+function hasImages(row: PartnerReviewRow) {
+  return (row.images ?? []).length > 0;
+}
+
+function applyReviewSort<T extends { order(column: string, options: { ascending: boolean }): T }>(
+  query: T,
+  sort: string,
+) {
+  if (sort === "oldest") {
+    return query.order("created_at", { ascending: true });
+  }
+  if (sort === "rating_desc") {
+    return query.order("rating", { ascending: false }).order("created_at", {
+      ascending: false,
+    });
+  }
+  if (sort === "rating_asc") {
+    return query.order("rating", { ascending: true }).order("created_at", {
+      ascending: false,
+    });
+  }
+  return query.order("created_at", { ascending: false });
+}
+
+async function listReviewRows(
+  partnerId: string,
+  sort: string,
+  offset: number,
+  limit: number,
+  imagesOnly: boolean,
+) {
+  const supabase = getSupabaseAdminClient();
+  const baseQuery = applyReviewSort(
+    supabase
+      .from("partner_reviews")
+      .select(REVIEW_SELECT)
+      .eq("partner_id", partnerId)
+      .is("deleted_at", null),
+    sort,
+  );
+
+  if (!imagesOnly) {
+    const { data, error } = await baseQuery.range(offset, offset + limit);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const rows = (data ?? []) as PartnerReviewRow[];
+    return {
+      rows: rows.slice(0, limit),
+      hasMore: rows.length > limit,
+    };
+  }
+
+  const pageSize = Math.max(25, Math.min(100, limit * 5));
+  const collected: PartnerReviewRow[] = [];
+  let skipped = 0;
+  let scanOffset = 0;
+
+  while (true) {
+    const { data, error } = await baseQuery.range(scanOffset, scanOffset + pageSize - 1);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const rows = (data ?? []) as PartnerReviewRow[];
+    if (rows.length === 0) {
+      break;
+    }
+
+    for (const row of rows) {
+      if (!hasImages(row)) {
+        continue;
+      }
+      if (skipped < offset) {
+        skipped += 1;
+        continue;
+      }
+      collected.push(row);
+      if (collected.length > limit) {
+        break;
+      }
+    }
+
+    if (collected.length > limit || rows.length < pageSize) {
+      break;
+    }
+
+    scanOffset += pageSize;
+  }
+
+  return {
+    rows: collected.slice(0, limit),
+    hasMore: collected.length > limit,
+  };
+}
+
 function mapReview(row: PartnerReviewRow, currentUserId?: string | null): PartnerReview {
   return {
     id: row.id,
@@ -66,43 +166,25 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
   }
 
   async listPartnerReviews(context: PartnerReviewListContext) {
-    const supabase = getSupabaseAdminClient();
     const limit = Math.max(1, Math.min(20, context.limit ?? 10));
     const offset = Math.max(0, context.offset ?? 0);
     const sort = normalizePartnerReviewSort(context.sort);
 
     const summaryPromise = this.getPartnerReviewSummary(context.partnerId);
-    let query = supabase
-      .from("partner_reviews")
-      .select("id,partner_id,member_id,rating,title,body,images,created_at,updated_at,members!partner_reviews_member_id_fkey(display_name,year)")
-      .eq("partner_id", context.partnerId)
-      .is("deleted_at", null)
-      .range(offset, offset + limit);
-    if (sort === "rating_desc") {
-      query = query.order("rating", { ascending: false }).order("created_at", {
-        ascending: false,
-      });
-    } else if (sort === "rating_asc") {
-      query = query.order("rating", { ascending: true }).order("created_at", {
-        ascending: false,
-      });
-    } else {
-      query = query.order("created_at", { ascending: false });
-    }
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const rows = (data ?? []) as PartnerReviewRow[];
-    const items = rows.slice(0, limit).map((row) => mapReview(row, context.currentUserId));
+    const { rows, hasMore } = await listReviewRows(
+      context.partnerId,
+      sort,
+      offset,
+      limit,
+      Boolean(context.imagesOnly),
+    );
+    const items = rows.map((row) => mapReview(row, context.currentUserId));
     const summary = await summaryPromise;
     return {
       summary,
       items,
       nextOffset: offset + items.length,
-      hasMore: rows.length > limit,
+      hasMore,
     };
   }
 
@@ -119,7 +201,7 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
         body: input.body,
         images: input.images,
       })
-      .select("id,partner_id,member_id,rating,title,body,images,created_at,updated_at,members!partner_reviews_member_id_fkey(display_name,year)")
+      .select(REVIEW_SELECT)
       .single();
 
     if (error) {
@@ -143,7 +225,7 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       .eq("id", input.reviewId)
       .eq("member_id", input.memberId)
       .is("deleted_at", null)
-      .select("id,partner_id,member_id,rating,title,body,images,created_at,updated_at,members!partner_reviews_member_id_fkey(display_name,year)")
+      .select(REVIEW_SELECT)
       .maybeSingle();
 
     if (error) {

@@ -11,6 +11,7 @@ export type PartnerReviewListContext = {
   sort?: PartnerReviewSort;
   offset?: number;
   limit?: number;
+  imagesOnly?: boolean;
 };
 
 export type CreatePartnerReviewInput = {

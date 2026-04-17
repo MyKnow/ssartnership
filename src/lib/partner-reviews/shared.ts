@@ -1,4 +1,4 @@
-export type PartnerReviewSort = "latest" | "rating_desc" | "rating_asc";
+export type PartnerReviewSort = "latest" | "oldest" | "rating_desc" | "rating_asc";
 
 export type PartnerReviewSummary = {
   averageRating: number;
@@ -61,7 +61,7 @@ export function buildPartnerReviewSummary(ratings: number[]) {
 }
 
 export function normalizePartnerReviewSort(value: string | null | undefined): PartnerReviewSort {
-  if (value === "rating_desc" || value === "rating_asc") {
+  if (value === "oldest" || value === "rating_desc" || value === "rating_asc") {
     return value;
   }
   return "latest";

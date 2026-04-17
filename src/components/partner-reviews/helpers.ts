@@ -2,6 +2,9 @@ import type { PartnerReview, PartnerReviewSort } from "@/lib/partner-reviews";
 import { buildReviewMediaManifestEntries, collectReviewMediaFiles, type ReviewImageItem } from "@/components/review-media/shared";
 
 export function getPartnerReviewSortLabel(sort: PartnerReviewSort) {
+  if (sort === "oldest") {
+    return "오래된 순";
+  }
   if (sort === "rating_desc") {
     return "높은 별점순";
   }

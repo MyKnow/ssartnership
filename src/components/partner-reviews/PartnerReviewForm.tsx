@@ -8,7 +8,11 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import type { PartnerReview } from "@/lib/partner-reviews";
-import type { ReviewFieldErrors } from "@/app/api/partners/[id]/reviews/_shared";
+import {
+  normalizeReviewDraftInput,
+  validateReviewDraftInput,
+  type ReviewFieldErrors,
+} from "@/lib/review-validation";
 import { buildReviewFormData } from "@/components/partner-reviews/helpers";
 import ReviewStarsInput from "@/components/partner-reviews/ReviewStarsInput";
 import ReviewImageUploader from "@/components/review-media/ReviewImageUploader";
@@ -48,6 +52,24 @@ export default function PartnerReviewForm({
       return;
     }
 
+    const normalized = normalizeReviewDraftInput({ rating, title, body });
+    const nextFieldErrors = validateReviewDraftInput({
+      ...normalized,
+      imageCount: items.length,
+    });
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setFormError(null);
+      if (nextFieldErrors.rating) {
+        focusField(ratingRef);
+      } else if (nextFieldErrors.title) {
+        focusField(titleRef);
+      } else if (nextFieldErrors.body) {
+        focusField(bodyRef);
+      }
+      return;
+    }
+
     setPending(true);
     setFieldErrors({});
     setFormError(null);
@@ -60,9 +82,9 @@ export default function PartnerReviewForm({
         {
           method: isEditMode ? "PATCH" : "POST",
           body: buildReviewFormData({
-            rating,
-            title,
-            body,
+            rating: normalized.rating,
+            title: normalized.title,
+            body: normalized.body,
             items,
           }),
         },
@@ -157,13 +179,19 @@ export default function PartnerReviewForm({
 
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={onCancel} disabled={pending}>
-          취소
-        </Button>
-        <Button onClick={handleSubmit} loading={pending} loadingText={isEditMode ? "수정 중" : "등록 중"}>
-          {isEditMode ? "리뷰 수정" : "리뷰 등록"}
-        </Button>
+      <div className="mt-1 border-t border-border pt-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={onCancel} disabled={pending}>
+            취소
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            loading={pending}
+            loadingText={isEditMode ? "수정 중" : "등록 중"}
+          >
+            {isEditMode ? "리뷰 수정" : "리뷰 등록"}
+          </Button>
+        </div>
       </div>
     </Card>
   );

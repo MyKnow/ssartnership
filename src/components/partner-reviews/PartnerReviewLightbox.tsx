@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
-import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import Button from "@/components/ui/Button";
+import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import LightboxModal from "@/components/partner-image-carousel/LightboxModal";
+import { clampCarouselZoom, normalizeCarouselIndex } from "@/components/partner-image-carousel/helpers";
+import type { CarouselOffset } from "@/components/partner-image-carousel/types";
 
 export default function PartnerReviewLightbox({
   images,
@@ -15,57 +16,95 @@ export default function PartnerReviewLightbox({
   onClose: () => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState<CarouselOffset>({ x: 0, y: 0 });
+  const dragStartRef = useRef<CarouselOffset>({ x: 0, y: 0 });
+  const offsetStartRef = useRef<CarouselOffset>({ x: 0, y: 0 });
+  const portalRoot = typeof document === "undefined" ? null : document.body;
   const canNavigate = images.length > 1;
   const activeImage = images[index] ?? images[0] ?? "";
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm">
-      <div className="grid w-full max-w-5xl gap-4">
-        <div className="flex justify-end">
-          <Button variant="ghost" size="icon" onClick={onClose} ariaLabel="닫기">
-            <XMarkIcon className="h-5 w-5 text-white" />
-          </Button>
-        </div>
+  useEffect(() => {
+    setIndex(initialIndex);
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  }, [initialIndex]);
 
-        <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-black">
-          <div className="relative aspect-square w-full">
-            {activeImage ? (
-              <Image
-                src={activeImage}
-                alt=""
-                fill
-                sizes="90vw"
-                className="object-contain"
-                unoptimized
-              />
-            ) : null}
-          </div>
-        </div>
+  useEffect(() => {
+    if (!portalRoot) {
+      return;
+    }
 
-        {canNavigate ? (
-          <div className="flex items-center justify-center gap-3">
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => setIndex((prev) => (prev - 1 + images.length) % images.length)}
-              ariaLabel="이전 이미지"
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
-            </Button>
-            <span className="text-sm text-white">
-              {index + 1} / {images.length}
-            </span>
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => setIndex((prev) => (prev + 1) % images.length)}
-              ariaLabel="다음 이미지"
-            >
-              <ChevronRightIcon className="h-5 w-5" />
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    </div>
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [portalRoot]);
+
+  const normalizedIndex = useMemo(
+    () => normalizeCarouselIndex(index, images.length),
+    [images.length, index],
+  );
+
+  useEffect(() => {
+    setIndex(normalizedIndex);
+  }, [normalizedIndex]);
+
+  const activateImage = (nextIndex: number) => {
+    setIndex(normalizeCarouselIndex(nextIndex, images.length));
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  const handlePanStart = (x: number, y: number) => {
+    dragStartRef.current = { x, y };
+    offsetStartRef.current = { ...offset };
+  };
+
+  const handlePanMove = (x: number, y: number) => {
+    const deltaX = x - dragStartRef.current.x;
+    const deltaY = y - dragStartRef.current.y;
+    setOffset({
+      x: offsetStartRef.current.x + deltaX,
+      y: offsetStartRef.current.y + deltaY,
+    });
+  };
+
+  const handlePanEnd = () => {
+    dragStartRef.current = { x: 0, y: 0 };
+    offsetStartRef.current = { x: 0, y: 0 };
+  };
+
+  const handleZoomChange = (value: number | ((prev: number) => number)) => {
+    setZoom((prev) => {
+      const nextValue = typeof value === "function" ? value(prev) : value;
+      return clampCarouselZoom(nextValue);
+    });
+  };
+
+  if (!portalRoot) {
+    return null;
+  }
+
+  return createPortal(
+    <LightboxModal
+      open
+      canNavigate={canNavigate}
+      activeImage={activeImage}
+      name="리뷰 사진"
+      zoom={zoom}
+      offset={offset}
+      onClose={onClose}
+      onPrev={() => activateImage(index - 1)}
+      onNext={() => activateImage(index + 1)}
+      onZoomChange={handleZoomChange}
+      onOffsetChange={setOffset}
+      onPanStart={handlePanStart}
+      onPanMove={handlePanMove}
+      onPanEnd={handlePanEnd}
+      fallback={<div />}
+    />,
+    portalRoot,
   );
 }

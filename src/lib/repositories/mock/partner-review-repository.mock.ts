@@ -95,6 +95,9 @@ function mapReview(record: MockReviewRecord, currentUserId?: string | null): Par
 
 function sortReviews(reviews: MockReviewRecord[], sort: string) {
   const copy = [...reviews];
+  if (sort === "oldest") {
+    return copy.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
   if (sort === "rating_desc") {
     return copy.sort((a, b) => b.rating - a.rating || b.createdAt.localeCompare(a.createdAt));
   }
@@ -118,7 +121,10 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     const sort = normalizePartnerReviewSort(context.sort);
     const rows = sortReviews(
       getStore().reviews.filter(
-        (review) => review.partnerId === context.partnerId && !review.deletedAt,
+        (review) =>
+          review.partnerId === context.partnerId &&
+          !review.deletedAt &&
+          (!context.imagesOnly || review.images.length > 0),
       ),
       sort,
     );

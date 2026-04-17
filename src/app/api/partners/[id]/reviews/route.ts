@@ -23,13 +23,14 @@ export async function GET(
     return NextResponse.json({ message: "대상을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const { sort, offset, limit } = parseReviewListParams(request);
+  const { sort, offset, limit, imagesOnly } = parseReviewListParams(request);
   const result = await partnerReviewRepository.listPartnerReviews({
     partnerId: id,
     currentUserId: session?.userId ?? null,
     sort,
     offset,
     limit,
+    imagesOnly,
   });
 
   return NextResponse.json(result);
