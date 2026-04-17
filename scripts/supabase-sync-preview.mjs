@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
+import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
 const DEFAULT_CACHE_CONTROL = "31536000";
@@ -127,6 +128,43 @@ async function listPublicTables(dbUrl) {
     .filter(Boolean);
 }
 
+async function listPublicTableColumns(dbUrl) {
+  const { stdout } = await runCommand(
+    "psql",
+    [
+      "--dbname",
+      dbUrl,
+      "--tuples-only",
+      "--no-align",
+      "--command",
+      `select table_name || '|' || string_agg(column_name, ',' order by ordinal_position)
+       from information_schema.columns
+       where table_schema = '${PUBLIC_SCHEMA}'
+       group by table_name
+       order by table_name;`,
+    ],
+    {
+      captureStdout: true,
+    },
+  );
+
+  return new Map(
+    stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const separatorIndex = line.indexOf("|");
+        const table = line.slice(0, separatorIndex);
+        const rawColumns = line.slice(separatorIndex + 1);
+        return [
+          table,
+          new Set(rawColumns.split(",").map((column) => column.trim()).filter(Boolean)),
+        ];
+      }),
+  );
+}
+
 async function dumpProductionDatabase(dumpPath, productionDbUrl) {
   const args = [
     "db",
@@ -147,6 +185,19 @@ async function dumpProductionDatabase(dumpPath, productionDbUrl) {
 
   console.log("Syncing production public data dump...");
   await runCommand("supabase", args);
+}
+
+async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
+  const previewColumnsByTable = await listPublicTableColumns(previewDbUrl);
+  const sourceSql = await readFile(dumpPath, "utf8");
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  if (!sanitized.changed) {
+    return;
+  }
+
+  console.log("Sanitizing production dump for preview schema differences...");
+  await writeFile(dumpPath, sanitized.sql, "utf8");
 }
 
 async function truncatePreviewDatabase(previewDbUrl) {
@@ -437,6 +488,7 @@ async function main() {
 
   try {
     await dumpProductionDatabase(dumpPath, productionDbUrl);
+    await sanitizeDumpForPreview(dumpPath, previewDbUrl);
     await truncatePreviewDatabase(previewDbUrl);
     await restorePreviewDatabase(dumpPath, previewDbUrl);
     await syncStorageBuckets(
