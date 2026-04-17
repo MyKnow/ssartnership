@@ -294,32 +294,57 @@ export function SuggestPageSkeleton() {
     <div className="min-h-screen bg-background">
       <LoadingHeader />
       <main>
-        <Container className="pb-16 pt-10">
-          <Skeleton className="h-8 w-40" />
-          <Skeleton className="mt-2 h-4 w-full max-w-2xl" />
-          <Card className="mt-6">
-            <div className="grid gap-4">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="grid gap-1">
-                  <Skeleton className="h-4 w-20 rounded-lg" />
-                  <Skeleton className="h-12 w-full rounded-2xl" />
-                </div>
-              ))}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-1">
-                  <Skeleton className="h-4 w-24 rounded-lg" />
-                  <Skeleton className="h-12 w-full rounded-2xl" />
-                </div>
-                <div className="grid gap-1">
-                  <Skeleton className="h-4 w-24 rounded-lg" />
-                  <Skeleton className="h-12 w-full rounded-2xl" />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Skeleton className="h-12 w-32 rounded-full" />
-              </div>
+        <Container className="pb-16 pt-8 sm:pt-10" size="wide">
+          <div className="mx-auto max-w-5xl space-y-5">
+            <div className="rounded-[var(--radius-panel)] border border-border/70 bg-surface-overlay px-5 py-5 shadow-[var(--shadow-flat)] backdrop-blur-md sm:px-6 sm:py-6">
+              <Skeleton className="h-4 w-28 rounded-lg" />
+              <Skeleton className="mt-3 h-9 w-44" />
+              <Skeleton className="mt-3 h-4 w-full max-w-2xl" />
+              <Skeleton className="mt-2 h-4 w-full max-w-xl" />
             </div>
-          </Card>
+
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+              <Card padding="md">
+                <div className="grid gap-6">
+                  <Skeleton className="h-16 w-full rounded-3xl" />
+                  {Array.from({ length: 2 }).map((_, sectionIndex) => (
+                    <div
+                      key={sectionIndex}
+                      className="grid gap-4 border-t border-border/70 pt-5 first:border-t-0 first:pt-0"
+                    >
+                      <Skeleton className="h-6 w-28" />
+                      <Skeleton className="h-4 w-full max-w-md" />
+                      <Skeleton className="h-12 w-full rounded-2xl" />
+                      <Skeleton className="h-28 w-full rounded-2xl" />
+                    </div>
+                  ))}
+                  <div className="rounded-3xl border border-border/70 bg-surface-muted p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <Skeleton className="h-4 w-full max-w-sm" />
+                      <Skeleton className="h-12 w-32 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card padding="md" className="order-first lg:order-none">
+                <div className="grid gap-4">
+                  <Skeleton className="h-4 w-20 rounded-lg" />
+                  <Skeleton className="h-6 w-28" />
+                  <Skeleton className="h-4 w-full" />
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="rounded-3xl border border-border/70 bg-surface p-4"
+                    >
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="mt-2 h-4 w-full" />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
         </Container>
       </main>
     </div>

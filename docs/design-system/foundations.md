@@ -11,12 +11,12 @@
 - `success / warning / danger`: 상태색
 
 ## Typography
-- `ui-display`: 메인 히어로/강한 페이지 메시지
-- `ui-page-title`: 페이지 제목
-- `ui-section-title`: 섹션 제목
-- `ui-body`: 본문/설명
-- `ui-caption`: 메타 정보
-- `ui-kicker`: 작은 upper meta label
+- `ui-display`: 메인 히어로/강한 페이지 메시지. 36px~60px 범위와 매우 타이트한 line-height를 사용한다.
+- `ui-page-title`: 페이지 제목. 32px~48px 범위와 tight line-height를 사용한다.
+- `ui-section-title`: 섹션 제목. 22px~32px 범위와 tight line-height를 사용한다.
+- `ui-body`: 본문/설명. 모바일은 14px, `sm` 이상은 16px, line-height는 24px을 사용한다.
+- `ui-caption`: 메타 정보. 모바일은 12px, `sm` 이상은 13px, line-height는 20px을 사용한다.
+- `ui-kicker`: 작은 upper meta label. 모바일은 11px, `sm` 이상은 12px, line-height는 20px을 사용한다.
 
 ## Elevation
 - `flat`: 정보 밀도가 높은 기본 카드

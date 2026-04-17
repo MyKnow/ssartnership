@@ -239,27 +239,27 @@ body {
   }
 
   .ui-kicker {
-    @apply text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground;
+    @apply text-[11px] font-semibold uppercase leading-5 tracking-[0.24em] text-muted-foreground sm:text-xs;
   }
 
   .ui-display {
-    @apply text-[clamp(2rem,4vw,3.75rem)] font-semibold tracking-[-0.04em] text-foreground;
+    @apply text-[clamp(2.25rem,4vw,3.75rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-foreground;
   }
 
   .ui-page-title {
-    @apply text-[clamp(1.9rem,3vw,3rem)] font-semibold tracking-[-0.03em] text-foreground;
+    @apply text-[clamp(2rem,3vw,3rem)] font-semibold leading-tight tracking-[-0.03em] text-foreground;
   }
 
   .ui-section-title {
-    @apply text-[clamp(1.25rem,2vw,1.9rem)] font-semibold tracking-[-0.02em] text-foreground;
+    @apply text-[clamp(1.375rem,2vw,2rem)] font-semibold leading-tight tracking-[-0.02em] text-foreground;
   }
 
   .ui-body {
-    @apply text-sm leading-6 text-muted-foreground sm:text-[0.96rem];
+    @apply text-sm leading-6 text-muted-foreground sm:text-base;
   }
 
   .ui-caption {
-    @apply text-xs font-medium tracking-[0.08em] text-muted-foreground;
+    @apply text-xs font-medium leading-5 tracking-[0.08em] text-muted-foreground sm:text-[0.8125rem];
   }
 
   .ui-decor-grid {
