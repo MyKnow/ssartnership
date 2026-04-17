@@ -12,7 +12,12 @@ export function getFieldErrorClass(
 
 export function focusField(
   ref?: RefObject<
-    HTMLInputElement | HTMLSelectElement | HTMLButtonElement | HTMLDivElement | null
+    | HTMLInputElement
+    | HTMLSelectElement
+    | HTMLButtonElement
+    | HTMLDivElement
+    | HTMLTextAreaElement
+    | null
   >,
 ) {
   ref?.current?.focus();

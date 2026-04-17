@@ -1,5 +1,6 @@
 const PROXY_PREFIX = "/api/image?url=";
 const PARTNER_MEDIA_STORAGE_MARKER = "/storage/v1/object/public/partner-media/";
+const REVIEW_MEDIA_STORAGE_MARKER = "/storage/v1/object/public/review-media/";
 const warmedImageUrls = new Set<string>();
 const pendingImagePreloads = new Map<string, Promise<void>>();
 
@@ -14,7 +15,10 @@ function shouldBypassProxy(src: string) {
 
   try {
     const parsed = new URL(src);
-    return parsed.pathname.includes(PARTNER_MEDIA_STORAGE_MARKER);
+    return (
+      parsed.pathname.includes(PARTNER_MEDIA_STORAGE_MARKER) ||
+      parsed.pathname.includes(REVIEW_MEDIA_STORAGE_MARKER)
+    );
   } catch {
     return false;
   }

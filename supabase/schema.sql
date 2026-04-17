@@ -1,5 +1,9 @@
 create extension if not exists "uuid-ossp";
 
+insert into storage.buckets (id, name, public)
+values ('review-media', 'review-media', true)
+on conflict (id) do update set public = excluded.public;
+
 create table if not exists categories (
   id uuid primary key default uuid_generate_v4(),
   key text not null unique,
@@ -220,6 +224,26 @@ create table if not exists members (
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
+
+create table if not exists partner_reviews (
+  id uuid primary key default uuid_generate_v4(),
+  partner_id uuid not null references partners(id) on delete cascade,
+  member_id uuid not null references members(id) on delete cascade,
+  rating integer not null,
+  title text not null,
+  body text not null,
+  images text[] not null default '{}',
+  deleted_at timestamp with time zone,
+  deleted_by_member_id uuid references members(id) on delete set null,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+alter table partner_reviews
+  drop constraint if exists partner_reviews_rating_check;
+alter table partner_reviews
+  add constraint partner_reviews_rating_check
+  check (rating between 1 and 5);
 
 alter table members drop column if exists email;
 alter table members drop column if exists region;
@@ -645,6 +669,14 @@ create index if not exists auth_security_logs_actor_id_idx on auth_security_logs
 create index if not exists auth_security_logs_identifier_idx on auth_security_logs(identifier);
 create index if not exists member_policy_consents_member_id_idx on member_policy_consents(member_id);
 create index if not exists member_policy_consents_policy_document_id_idx on member_policy_consents(policy_document_id);
+create index if not exists partner_reviews_partner_id_created_at_idx
+  on partner_reviews(partner_id, deleted_at, created_at desc);
+create index if not exists partner_reviews_partner_id_rating_desc_idx
+  on partner_reviews(partner_id, deleted_at, rating desc, created_at desc);
+create index if not exists partner_reviews_partner_id_rating_asc_idx
+  on partner_reviews(partner_id, deleted_at, rating asc, created_at desc);
+create index if not exists partner_reviews_member_id_partner_id_created_at_idx
+  on partner_reviews(member_id, partner_id, deleted_at, created_at desc);
 
 drop index if exists mm_verification_codes_email_idx;
 
@@ -665,6 +697,7 @@ alter table mm_verification_codes enable row level security;
 alter table mm_verification_attempts enable row level security;
 alter table password_reset_attempts enable row level security;
 alter table partner_change_requests enable row level security;
+alter table partner_reviews enable row level security;
 alter table push_preferences enable row level security;
 alter table push_subscriptions enable row level security;
 alter table push_message_logs enable row level security;
@@ -700,6 +733,8 @@ revoke all on table partner_auth_attempts from anon;
 revoke all on table partner_auth_attempts from authenticated;
 revoke all on table partner_change_requests from anon;
 revoke all on table partner_change_requests from authenticated;
+revoke all on table partner_reviews from anon;
+revoke all on table partner_reviews from authenticated;
 revoke all on table members from anon;
 revoke all on table members from authenticated;
 revoke all on table policy_documents from anon;

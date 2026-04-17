@@ -1,6 +1,9 @@
 import { MockPartnerRepository } from "@/lib/repositories/mock/partner-repository.mock";
+import { MockPartnerReviewRepository } from "@/lib/repositories/mock/partner-review-repository.mock";
 import { SupabasePartnerRepository } from "@/lib/repositories/supabase/partner-repository.supabase";
+import { SupabasePartnerReviewRepository } from "@/lib/repositories/supabase/partner-review-repository.supabase";
 import type { PartnerRepository } from "@/lib/repositories/partner-repository";
+import type { PartnerReviewRepository } from "@/lib/repositories/partner-review-repository";
 
 const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
 const hasSupabaseEnv =
@@ -12,4 +15,10 @@ const repository: PartnerRepository =
     ? new MockPartnerRepository()
     : new SupabasePartnerRepository();
 
+const reviewRepository: PartnerReviewRepository =
+  dataSource === "mock" || !hasSupabaseEnv
+    ? new MockPartnerReviewRepository()
+    : new SupabasePartnerReviewRepository();
+
 export const partnerRepository = repository;
+export const partnerReviewRepository = reviewRepository;

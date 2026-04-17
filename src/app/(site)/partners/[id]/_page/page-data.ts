@@ -7,7 +7,8 @@ import {
   normalizeReservationInquiry,
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
-import { partnerRepository } from "@/lib/repositories";
+import type { PartnerReviewListResult, PartnerReviewSort, PartnerReviewSummary } from "@/lib/partner-reviews";
+import { partnerRepository, partnerReviewRepository } from "@/lib/repositories";
 import { buildSiteUrl } from "@/lib/seo";
 import {
   buildPartnerSeoMetadata,
@@ -89,11 +90,19 @@ export type PartnerDetailPageData = {
   breadcrumbJsonLd: Record<string, unknown>;
   partnerJsonLd: Record<string, unknown>;
   carouselKey: string;
+  reviewSummary: PartnerReviewSummary;
+  initialReviews: PartnerReviewListResult["items"];
+  initialReviewSort: PartnerReviewSort;
+  initialReviewOffset: number;
+  initialReviewHasMore: boolean;
+  canWriteReview: boolean;
+  currentUserId: string | null;
 };
 
 export async function getPartnerDetailPageData(
   rawId: string,
   authenticated: boolean,
+  currentUserId?: string | null,
 ): Promise<PartnerDetailPageData | null> {
   const [categories, partner] = await Promise.all([
     getCategoriesCached(),
@@ -103,6 +112,14 @@ export async function getPartnerDetailPageData(
   if (!partner) {
     return null;
   }
+
+  const initialReviewData = await partnerReviewRepository.listPartnerReviews({
+    partnerId: rawId,
+    currentUserId,
+    sort: "latest",
+    offset: 0,
+    limit: 10,
+  });
 
   const category = categories.find((item) => item.key === partner.category);
   const categoryLabel = category?.label ?? "알 수 없음";
@@ -166,5 +183,12 @@ export async function getPartnerDetailPageData(
       categoryLabel,
     }),
     carouselKey: `${partner.id}:${(partner.images ?? []).join("|")}`,
+    reviewSummary: initialReviewData.summary,
+    initialReviews: initialReviewData.items,
+    initialReviewSort: "latest",
+    initialReviewOffset: initialReviewData.nextOffset,
+    initialReviewHasMore: initialReviewData.hasMore,
+    canWriteReview: Boolean(currentUserId),
+    currentUserId: currentUserId ?? null,
   };
 }

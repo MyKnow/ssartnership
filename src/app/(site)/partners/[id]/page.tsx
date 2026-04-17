@@ -11,6 +11,7 @@ import { SITE_NAME } from "@/lib/site";
 import { createCanonicalAlternates } from "@/lib/seo";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
+import PartnerReviewSection from "@/components/partner-reviews/PartnerReviewSection";
 import PartnerDetailSummaryCard from "./_page/PartnerDetailSummaryCard";
 
 export const dynamic = "force-dynamic";
@@ -105,6 +106,7 @@ export default async function PartnerDetailPage({
   const pageData = await getPartnerDetailPageData(
     rawId,
     Boolean(headerSession?.userId),
+    headerSession?.userId ?? null,
   );
   if (!pageData) {
     redirect("/");
@@ -124,6 +126,12 @@ export default async function PartnerDetailPage({
     breadcrumbJsonLd,
     partnerJsonLd,
     carouselKey,
+    reviewSummary,
+    initialReviews,
+    initialReviewSort,
+    initialReviewOffset,
+    initialReviewHasMore,
+    canWriteReview,
   } = pageData;
 
   return (
@@ -203,6 +211,16 @@ export default async function PartnerDetailPage({
               inquiryDisplay={inquiryDisplay}
               normalizedLinks={normalizedLinks}
               partnerId={partner.id}
+            />
+
+            <PartnerReviewSection
+              partnerId={partner.id}
+              canWriteReview={canWriteReview}
+              initialSummary={reviewSummary}
+              initialReviews={initialReviews}
+              initialSort={initialReviewSort}
+              initialOffset={initialReviewOffset}
+              initialHasMore={initialReviewHasMore}
             />
           </div>
         </Container>

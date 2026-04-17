@@ -1,11 +1,13 @@
+import { forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
-export default function Textarea({
-  className,
-  ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+const Textarea = forwardRef<
+  HTMLTextAreaElement,
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>
+>(function Textarea({ className, ...props }, ref) {
   return (
     <textarea
+      ref={ref}
       {...props}
       className={cn(
         "min-h-28 w-full rounded-[1.15rem] border border-border bg-surface/90 px-4 py-3 text-sm text-foreground shadow-[var(--shadow-flat)] transition-[border-color,background-color,box-shadow] duration-200 ease-out placeholder:text-muted-foreground",
@@ -15,4 +17,6 @@ export default function Textarea({
       )}
     />
   );
-}
+});
+
+export default Textarea;
