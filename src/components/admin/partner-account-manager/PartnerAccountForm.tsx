@@ -14,7 +14,7 @@ export default function PartnerAccountForm({
   formId: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-background/60 p-4">
+    <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-foreground">계정 정보</h4>
@@ -23,10 +23,10 @@ export default function PartnerAccountForm({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-surface text-muted-foreground">
+          <Badge variant="neutral">
             생성 {formatPartnerAccountDateTime(account.created_at)}
           </Badge>
-          <Badge className="bg-surface text-muted-foreground">
+          <Badge variant="neutral">
             수정 {formatPartnerAccountDateTime(account.updated_at)}
           </Badge>
         </div>
@@ -56,7 +56,7 @@ export default function PartnerAccountForm({
           />
         </FieldGroup>
 
-        <div className="md:col-span-2 grid gap-3 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2">
+        <div className="md:col-span-2 grid gap-3 rounded-2xl border border-border/70 bg-surface-muted/70 p-4 sm:grid-cols-2">
           <label className="flex items-center gap-3 text-sm font-medium text-foreground">
             <input type="hidden" name="isActive" value="false" />
             <input

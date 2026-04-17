@@ -31,7 +31,7 @@ export async function getSupabasePartnerPortalSetupCompany(
   const { data: companyLink, error: companyLinkError } = await supabase
     .from("partner_account_companies")
     .select(
-      "company_id,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active)",
+      "company_id,company:partner_companies(id,name,slug,description,is_active)",
     )
     .eq("account_id", accountId)
     .eq("is_active", true)

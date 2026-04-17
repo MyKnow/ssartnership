@@ -32,9 +32,6 @@ export type AdminPartner = {
         name: string;
         slug: string;
         description?: string | null;
-        contact_name?: string | null;
-        contact_email?: string | null;
-        contact_phone?: string | null;
         is_active?: boolean | null;
       }
     | null;
@@ -45,9 +42,6 @@ export type AdminCompany = {
   name: string;
   slug: string;
   description?: string | null;
-  contact_name?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
   is_active?: boolean | null;
 };
 

@@ -225,7 +225,7 @@ test("resets a partner password and forces change on the next login", async () =
   assert.equal(finalLogin.companyIds[0], "mock-partner-company-cafe-haeon");
 });
 
-test("builds a company dashboard with aggregate metrics only", async () => {
+test("builds a company dashboard with aggregate metrics and service statuses", async () => {
   const { getMockPartnerPortalDashboard } = await mockPartnerPortalModulePromise;
   const dashboard = await getMockPartnerPortalDashboard([
     "mock-partner-company-cafe-haeon",
@@ -236,10 +236,14 @@ test("builds a company dashboard with aggregate metrics only", async () => {
   assert.equal(dashboard.totals.serviceCount, 5);
   assert.equal(dashboard.totals.detailViews, 3750);
   assert.equal(dashboard.totals.totalClicks, 1460);
+  assert.equal(dashboard.totals.reviewCount, 65);
   assert.equal(dashboard.companies[0]?.services.length, 3);
   assert.equal(dashboard.companies[1]?.services.length, 2);
   assert.equal(dashboard.companies[0]?.totals.detailViews, 1950);
   assert.equal(dashboard.companies[1]?.totals.totalClicks, 718);
+  assert.equal(dashboard.companies[0]?.totals.reviewCount, 40);
+  assert.equal(dashboard.companies[1]?.totals.reviewCount, 25);
+  assert.equal(dashboard.companies[1]?.services[1]?.status, "pending");
 });
 
 test("updates immediate partner fields without approval", async () => {

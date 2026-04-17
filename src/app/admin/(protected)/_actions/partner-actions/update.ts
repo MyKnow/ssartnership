@@ -16,7 +16,7 @@ import {
 import {
   parsePartnerCompanyPayloadOrRedirect,
   parsePartnerPayloadOrRedirect,
-} from "@/app/admin/(protected)/_actions/shared-parsers";
+} from "@/app/admin/(protected)/_actions/shared-parser-redirects";
 
 export async function updatePartnerAction(formData: FormData) {
   await requireAdmin();
@@ -110,13 +110,12 @@ export async function updatePartnerAction(formData: FormData) {
   await logAdminAction("partner_update", {
     targetType: "partner",
     targetId: id,
-    properties: {
-      name: payload.name,
-      companyId: nextCompanyId,
-      companyName: companyProvision?.company?.name ?? null,
-      companyContactEmail: companyProvision?.company?.contact_email ?? null,
-      categoryId: payload.categoryId,
-      location: payload.location,
+      properties: {
+        name: payload.name,
+        companyId: nextCompanyId,
+        companyName: companyProvision?.company?.name ?? null,
+        categoryId: payload.categoryId,
+        location: payload.location,
       hasMapUrl: Boolean(payload.mapUrl),
       hasReservationLink: Boolean(payload.reservationLink),
       hasInquiryLink: Boolean(payload.inquiryLink),

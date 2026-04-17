@@ -15,6 +15,7 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_missing_id: "대상을 찾을 수 없습니다.",
   partner_account_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   partner_account_invalid_request: "업체 계정 입력값을 확인해 주세요.",
+  partner_account_exists: "이미 존재하는 로그인 아이디입니다.",
   partner_account_company_missing: "연결할 계정과 회사를 찾을 수 없습니다.",
   partner_account_company_invalid_request: "연결 상태 입력값을 확인해 주세요.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",

@@ -36,9 +36,6 @@ type PartnerCompanyRow = {
   name: string;
   slug: string;
   description?: string | null;
-  contact_name?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -100,11 +97,11 @@ export default async function AdminPartnersPage({
       .order("created_at", { ascending: true }),
     supabase
       .from("partners")
-      .select("id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active)")
+      .select("id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active)")
       .order("created_at", { ascending: false }),
     supabase
       .from("partner_companies")
-      .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active,created_at,updated_at")
+      .select("id,name,slug,description,is_active,created_at,updated_at")
       .order("name", { ascending: true }),
     listPartnerChangeRequests(),
   ]);

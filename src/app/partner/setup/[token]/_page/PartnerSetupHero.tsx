@@ -74,9 +74,7 @@ export default function PartnerSetupHero({
               <p className="mt-2 text-sm font-semibold text-foreground">
                 {context.account.displayName}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {context.company.contactEmail ?? context.account.email}
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{context.account.email}</p>
             </div>
             <div className="rounded-2xl border border-border bg-background/70 p-4">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">

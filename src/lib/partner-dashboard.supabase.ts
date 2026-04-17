@@ -4,7 +4,7 @@ import {
   type PartnerPortalDashboard,
   type PartnerPortalServiceDashboard,
   type PartnerPortalServiceMetrics,
-  normalizePartnerPortalCompanyStatus,
+  normalizePartnerPortalServiceStatus,
   sumPartnerPortalMetrics,
 } from "./partner-dashboard.ts";
 import { normalizePartnerVisibility } from "./partner-visibility.ts";
@@ -14,9 +14,6 @@ type PartnerCompanyRow = {
   name: string;
   slug: string;
   description?: string | null;
-  contact_name?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
   is_active?: boolean | null;
 };
 
@@ -33,7 +30,7 @@ type PartnerServiceRow = {
 };
 
 type PartnerChangeRequestRow = {
-  company_id: string;
+  partner_id: string;
   status?: string | null;
   updated_at?: string | null;
 };
@@ -67,6 +64,7 @@ function createEmptyMetrics(): PartnerPortalServiceMetrics {
     mapClicks: 0,
     reservationClicks: 0,
     inquiryClicks: 0,
+    reviewCount: 0,
     totalClicks: 0,
   };
 }
@@ -112,14 +110,38 @@ async function getServiceMetrics(
   partnerId: string,
   onError: () => void,
 ) {
-  const [detailViews, cardClicks, mapClicks, reservationClicks, inquiryClicks] =
-    await Promise.all([
-      countPartnerEvent(supabase, partnerId, "partner_detail_view", onError),
-      countPartnerEvent(supabase, partnerId, "partner_card_click", onError),
-      countPartnerEvent(supabase, partnerId, "partner_map_click", onError),
-      countPartnerEvent(supabase, partnerId, "reservation_click", onError),
-      countPartnerEvent(supabase, partnerId, "inquiry_click", onError),
-    ]);
+  const [
+    detailViews,
+    cardClicks,
+    mapClicks,
+    reservationClicks,
+    inquiryClicks,
+    reviewCount,
+  ] = await Promise.all([
+    countPartnerEvent(supabase, partnerId, "partner_detail_view", onError),
+    countPartnerEvent(supabase, partnerId, "partner_card_click", onError),
+    countPartnerEvent(supabase, partnerId, "partner_map_click", onError),
+    countPartnerEvent(supabase, partnerId, "reservation_click", onError),
+    countPartnerEvent(supabase, partnerId, "inquiry_click", onError),
+    (async () => {
+      const { count, error } = await supabase
+        .from("partner_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("partner_id", partnerId)
+        .is("deleted_at", null);
+
+      if (error) {
+        onError();
+        console.error("[partner-dashboard] review metric query failed", {
+          partnerId,
+          message: error.message,
+        });
+        return 0;
+      }
+
+      return count ?? 0;
+    })(),
+  ]);
 
   return {
     detailViews,
@@ -127,6 +149,7 @@ async function getServiceMetrics(
     mapClicks,
     reservationClicks,
     inquiryClicks,
+    reviewCount,
     totalClicks:
       cardClicks + mapClicks + reservationClicks + inquiryClicks,
   } satisfies PartnerPortalServiceMetrics;
@@ -135,6 +158,7 @@ async function getServiceMetrics(
 function toServiceDashboard(
   row: PartnerServiceRow,
   metrics: PartnerPortalServiceMetrics,
+  status: string | null | undefined,
 ): PartnerPortalServiceDashboard {
   return {
     id: row.id,
@@ -142,6 +166,7 @@ function toServiceDashboard(
     location: row.location,
     categoryLabel: extractCategoryLabel(row.categories),
     visibility: normalizePartnerVisibility(row.visibility),
+    status: normalizePartnerPortalServiceStatus(status),
     metrics,
   };
 }
@@ -149,17 +174,12 @@ function toServiceDashboard(
 function toCompanyDashboard(
   row: PartnerCompanyRow,
   services: PartnerPortalServiceDashboard[],
-  status: string | null | undefined,
 ): PartnerPortalCompanyDashboard {
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
     description: row.description ?? null,
-    contactName: row.contact_name ?? null,
-    contactEmail: row.contact_email ?? null,
-    contactPhone: row.contact_phone ?? null,
-    status: normalizePartnerPortalCompanyStatus(status),
     services,
     totals: sumPartnerPortalMetrics(services.map((service) => service.metrics)),
   };
@@ -189,7 +209,7 @@ export async function getSupabasePartnerPortalDashboard(
   const [companyResult, serviceResult, changeRequestResult] = await Promise.all([
     supabase
       .from("partner_companies")
-      .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+      .select("id,name,slug,description,is_active")
       .in("id", uniqueCompanyIds)
       .eq("is_active", true)
       .order("created_at", { ascending: true }),
@@ -200,7 +220,7 @@ export async function getSupabasePartnerPortalDashboard(
       .order("created_at", { ascending: true }),
     supabase
       .from("partner_change_requests")
-      .select("company_id,status,updated_at")
+      .select("partner_id,status,updated_at")
       .in("company_id", uniqueCompanyIds)
       .order("updated_at", { ascending: false }),
   ]);
@@ -232,14 +252,14 @@ export async function getSupabasePartnerPortalDashboard(
   const requestRows = (
     changeRequestResult.error ? [] : changeRequestResult.data ?? []
   ) as PartnerChangeRequestRow[];
-  const statusByCompanyId = new Map<string, string | null | undefined>();
+  const statusByPartnerId = new Map<string, string | null | undefined>();
 
   for (const request of requestRows) {
-    if (statusByCompanyId.has(request.company_id)) {
+    if (statusByPartnerId.has(request.partner_id)) {
       continue;
     }
 
-    statusByCompanyId.set(request.company_id, request.status ?? null);
+    statusByPartnerId.set(request.partner_id, request.status ?? null);
   }
 
   const serviceMetricsEntries = await Promise.all(
@@ -257,9 +277,10 @@ export async function getSupabasePartnerPortalDashboard(
         toServiceDashboard(
           serviceRow,
           metricsByServiceId.get(serviceRow.id) ?? createEmptyMetrics(),
+          statusByPartnerId.get(serviceRow.id),
         ),
       );
-    return toCompanyDashboard(row, services, statusByCompanyId.get(row.id));
+    return toCompanyDashboard(row, services);
   });
 
   const totals = sumPartnerPortalMetrics(

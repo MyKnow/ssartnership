@@ -6,7 +6,7 @@ import { isPartnerPortalMock } from "./partner-portal.ts";
 import { getMockPartnerPortalDashboard } from "./mock/partner-portal.ts";
 import { getSupabasePartnerPortalDashboard } from "./partner-dashboard.supabase.ts";
 
-export type PartnerPortalCompanyStatus =
+export type PartnerPortalServiceStatus =
   | "approved"
   | "pending"
   | "rejected";
@@ -17,10 +17,12 @@ export type PartnerPortalServiceMetrics = {
   mapClicks: number;
   reservationClicks: number;
   inquiryClicks: number;
+  reviewCount: number;
   totalClicks: number;
 };
 
 export type PartnerPortalServiceDashboard = PartnerPortalServiceSummary & {
+  status: PartnerPortalServiceStatus;
   metrics: PartnerPortalServiceMetrics;
 };
 
@@ -28,7 +30,6 @@ export type PartnerPortalCompanyDashboard = Omit<
   PartnerPortalCompanySummary,
   "services"
 > & {
-  status: PartnerPortalCompanyStatus;
   services: PartnerPortalServiceDashboard[];
   totals: PartnerPortalServiceMetrics;
 };
@@ -52,6 +53,7 @@ const zeroMetrics = (): PartnerPortalServiceMetrics => ({
   mapClicks: 0,
   reservationClicks: 0,
   inquiryClicks: 0,
+  reviewCount: 0,
   totalClicks: 0,
 });
 
@@ -70,6 +72,7 @@ export function sumPartnerPortalMetrics(
       reservationClicks:
         accumulator.reservationClicks + metrics.reservationClicks,
       inquiryClicks: accumulator.inquiryClicks + metrics.inquiryClicks,
+      reviewCount: accumulator.reviewCount + metrics.reviewCount,
       totalClicks: accumulator.totalClicks + metrics.totalClicks,
     }),
     zeroMetrics(),
@@ -88,9 +91,9 @@ function createEmptyDashboard(): PartnerPortalDashboard {
   };
 }
 
-export function normalizePartnerPortalCompanyStatus(
+export function normalizePartnerPortalServiceStatus(
   value?: string | null,
-): PartnerPortalCompanyStatus {
+): PartnerPortalServiceStatus {
   if (value === "pending" || value === "rejected") {
     return value;
   }
@@ -98,8 +101,8 @@ export function normalizePartnerPortalCompanyStatus(
   return "approved";
 }
 
-export function getPartnerPortalCompanyStatusLabel(
-  status: PartnerPortalCompanyStatus,
+export function getPartnerPortalServiceStatusLabel(
+  status: PartnerPortalServiceStatus,
 ) {
   switch (status) {
     case "pending":

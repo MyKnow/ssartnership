@@ -11,9 +11,6 @@ type PartnerCompanyRow = {
   name: string;
   slug: string;
   description?: string | null;
-  contact_name?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -42,7 +39,7 @@ export default async function AdminPartnerNewPage() {
       .order("created_at", { ascending: true }),
     supabase
       .from("partner_companies")
-      .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active,created_at,updated_at")
+      .select("id,name,slug,description,is_active,created_at,updated_at")
       .order("name", { ascending: true }),
   ]);
 
@@ -51,8 +48,6 @@ export default async function AdminPartnerNewPage() {
     id: company.id,
     name: company.name,
     slug: company.slug,
-    contactName: company.contact_name ?? null,
-    contactEmail: company.contact_email ?? null,
   }));
   const defaultCategoryId = categories[0]?.id ?? "";
 

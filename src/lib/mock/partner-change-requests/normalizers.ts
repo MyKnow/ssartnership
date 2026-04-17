@@ -78,9 +78,6 @@ export function normalizeServiceRecord(
     companyId: string;
     companyName: string;
     companySlug: string;
-    companyContactName?: string | null;
-    companyContactEmail?: string | null;
-    companyContactPhone?: string | null;
     partnerId: string;
     partnerName: string;
     partnerLocation: string;
@@ -91,9 +88,6 @@ export function normalizeServiceRecord(
     companyId: service.companyId,
     companyName: service.companyName,
     companySlug: service.companySlug,
-    companyContactName: service.companyContactName ?? null,
-    companyContactEmail: service.companyContactEmail ?? null,
-    companyContactPhone: service.companyContactPhone ?? null,
     partnerId: service.partnerId,
     partnerName: service.partnerName,
     partnerLocation: service.partnerLocation,
@@ -258,9 +252,6 @@ export function normalizeRequestRecord(
         service?.partnerLocation ||
         request.partnerLocation,
     ),
-    companyContactName: service?.companyContactName ?? null,
-    companyContactEmail: service?.companyContactEmail ?? null,
-    companyContactPhone: service?.companyContactPhone ?? null,
     currentMapUrl: sanitizeHttpUrl(currentMapUrlSource ?? undefined),
     currentConditions: normalizeTextList(currentConditionsSource),
     currentBenefits: normalizeTextList(currentBenefitsSource),

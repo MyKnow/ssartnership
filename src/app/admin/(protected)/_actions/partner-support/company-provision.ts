@@ -52,7 +52,7 @@ export async function ensurePartnerCompanyRow(
     if (hasCompanySelection) {
       const { data, error } = await supabase
         .from("partner_companies")
-        .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+        .select("id,name,slug,description,is_active")
         .eq("id", companyInput.companyId)
         .maybeSingle();
 
@@ -89,12 +89,9 @@ export async function ensurePartnerCompanyRow(
         name: companyInput.name,
         slug: buildPartnerCompanySlug(companyInput.name),
         description: companyInput.description,
-        contact_name: companyInput.contactName,
-        contact_email: companyInput.contactEmail.toLowerCase(),
-        contact_phone: companyInput.contactPhone,
         is_active: true,
       })
-      .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+      .select("id,name,slug,description,is_active")
       .single();
 
     if (error) {
@@ -111,11 +108,11 @@ export async function ensurePartnerCompanyRow(
       throw new Error("회사 정보를 처리하지 못했습니다.");
     }
 
-    const loginId = toPartnerAccountLoginId(companyInput, company);
+    const loginId = toPartnerAccountLoginId(companyInput);
     if (!loginId) {
       throw new Error("partner_company_missing_email");
     }
-    const displayName = toPartnerAccountDisplayName(companyInput, company);
+    const displayName = toPartnerAccountDisplayName(companyInput);
 
     const { data: existingLink, error: linkError } = await supabase
       .from("partner_account_companies")

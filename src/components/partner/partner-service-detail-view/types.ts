@@ -1,4 +1,5 @@
 import type { PartnerChangeRequestContext } from "@/lib/partner-change-requests";
+import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { PartnerSession } from "@/lib/partner-session";
 import type {
   PartnerReview,
@@ -16,6 +17,8 @@ export type PartnerServiceDetailViewProps = {
   createAction: (formData: FormData) => void | Promise<void>;
   cancelAction: (formData: FormData) => void | Promise<void>;
   reviewSummary: PartnerReviewSummary;
+  serviceMetrics: PartnerPortalServiceMetrics;
+  serviceMetricsWarningMessage?: string | null;
   initialReviews: PartnerReview[];
   initialReviewSort: PartnerReviewSort;
   initialReviewOffset: number;

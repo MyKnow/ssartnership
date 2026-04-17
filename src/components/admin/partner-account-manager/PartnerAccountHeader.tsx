@@ -17,37 +17,25 @@ export default function PartnerAccountHeader({
   account: AdminPartnerAccount;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="space-y-2">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+      <div className="min-w-0 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            className={
-              account.is_active
-                ? "bg-emerald-500/10 text-emerald-700"
-                : "bg-danger/10 text-danger"
-            }
-          >
+          <Badge variant={account.is_active ? "success" : "danger"}>
             {account.is_active ? "활성" : "비활성"}
           </Badge>
-          <Badge
-            className={
-              account.must_change_password
-                ? "bg-amber-500/10 text-amber-700"
-                : "bg-surface text-muted-foreground"
-            }
-          >
+          <Badge variant={account.must_change_password ? "warning" : "neutral"}>
             {account.must_change_password ? "비밀번호 변경 필요" : "일반"}
           </Badge>
-          <Badge className="bg-surface text-muted-foreground">
+          <Badge variant="neutral">
             협력사 연결 {account.links.length}개
           </Badge>
           <Badge
-            className={
+            variant={
               account.initial_setup_completed_at
-                ? "bg-emerald-500/10 text-emerald-700"
+                ? "success"
                 : account.initial_setup_token
-                  ? "bg-sky-500/10 text-sky-700"
-                  : "bg-surface text-muted-foreground"
+                  ? "primary"
+                  : "neutral"
             }
           >
             {account.initial_setup_completed_at
@@ -64,7 +52,10 @@ export default function PartnerAccountHeader({
           <p className="mt-1 text-sm text-muted-foreground">
             로그인 아이디: {account.login_id}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 break-all text-xs text-muted-foreground">
+            계정 ID: {account.id}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
             이메일 인증: {formatPartnerAccountDateTime(account.email_verified_at)}
             {" · "}
             마지막 로그인: {formatPartnerAccountDateTime(account.last_login_at)}
@@ -72,10 +63,8 @@ export default function PartnerAccountHeader({
         </div>
       </div>
 
-      <div className="text-right text-xs text-muted-foreground">
-        <p className="break-all">계정 ID</p>
-        <p className="mt-1 break-all font-mono text-foreground">{account.id}</p>
-        <div className="mt-4 flex flex-col gap-2 sm:items-end">
+      <div className="grid gap-2 xl:justify-items-end">
+        <div className="flex flex-wrap gap-2 xl:justify-end">
           {!account.initial_setup_completed_at && account.is_active !== false ? (
             <form action={createPartnerAccountInitialSetupUrl}>
               <input type="hidden" name="id" value={account.id} />

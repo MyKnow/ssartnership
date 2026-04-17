@@ -17,9 +17,6 @@ export type PartnerPortalCompanySummary = {
   name: string;
   slug: string;
   description?: string | null;
-  contactName?: string | null;
-  contactEmail?: string | null;
-  contactPhone?: string | null;
   services: PartnerPortalServiceSummary[];
 };
 

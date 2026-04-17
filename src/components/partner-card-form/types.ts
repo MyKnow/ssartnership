@@ -10,8 +10,6 @@ export type PartnerCardCompanyOption = {
   id: string;
   name: string;
   slug: string;
-  contactName?: string | null;
-  contactEmail?: string | null;
 };
 
 export type PartnerCardCompanyValues = {

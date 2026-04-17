@@ -47,9 +47,6 @@ export function toPartnerPortalSetupCompanySummary(
     name: company.name,
     slug: company.slug,
     description: company.description ?? null,
-    contactName: company.contact_name ?? null,
-    contactEmail: company.contact_email ?? null,
-    contactPhone: company.contact_phone ?? null,
     services: services.map((service) => ({
       id: service.id,
       name: service.name,

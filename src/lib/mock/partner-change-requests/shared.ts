@@ -8,9 +8,6 @@ export type MockChangeRequestServiceRecord = {
   companyId: string;
   companyName: string;
   companySlug: string;
-  companyContactName: string | null;
-  companyContactEmail: string | null;
-  companyContactPhone: string | null;
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
@@ -59,9 +56,6 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-cafe-haeon",
     companyName: "카페 해온",
     companySlug: "cafe-haeon",
-    companyContactName: "김도연",
-    companyContactEmail: "partner@cafehaeon.example",
-    companyContactPhone: "02-555-8123",
     partnerId: "mock-partner-service-cafe-haeon-main",
     partnerName: "카페 해온 본점",
     partnerLocation: "서울 강남구 역삼로 123",
@@ -84,9 +78,6 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-cafe-haeon",
     companyName: "카페 해온",
     companySlug: "cafe-haeon",
-    companyContactName: "김도연",
-    companyContactEmail: "partner@cafehaeon.example",
-    companyContactPhone: "02-555-8123",
     partnerId: "mock-partner-service-cafe-haeon-dessert",
     partnerName: "카페 해온 디저트 바",
     partnerLocation: "서울 강남구 논현로 45",
@@ -109,9 +100,6 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-urban-gym",
     companyName: "어반짐 역삼",
     companySlug: "urban-gym",
-    companyContactName: "박지수",
-    companyContactEmail: "admin@urbangym.example",
-    companyContactPhone: "02-777-8811",
     partnerId: "mock-partner-service-urban-gym-pt",
     partnerName: "어반짐 PT 패키지",
     partnerLocation: "서울 강남구 봉은사로 11",
@@ -134,9 +122,6 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-urban-gym",
     companyName: "어반짐 역삼",
     companySlug: "urban-gym",
-    companyContactName: "박지수",
-    companyContactEmail: "admin@urbangym.example",
-    companyContactPhone: "02-777-8811",
     partnerId: "mock-partner-service-urban-gym-sauna",
     partnerName: "어반짐 사우나",
     partnerLocation: "서울 강남구 봉은사로 11, B1",

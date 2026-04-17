@@ -26,7 +26,10 @@ export type MockPortalAccountRecord = {
   lastLoginAt: string | null;
 };
 
-export type MockPortalServiceRecord = PartnerPortalServiceDashboard;
+export type MockPortalServiceRecord = Omit<
+  PartnerPortalServiceDashboard,
+  "status"
+>;
 
 export type MockPortalCompanyRecord = Omit<PartnerPortalCompanySummary, "services"> & {
   services: MockPortalServiceRecord[];
@@ -93,9 +96,6 @@ export const seededSetups: MockPortalSetupRecord[] = [
       name: "카페 해온",
       slug: "cafe-haeon",
       description: "역삼역 인근에서 세 개의 매장을 운영하는 카페 브랜드입니다.",
-      contactName: "김도연",
-      contactEmail: "partner@cafehaeon.example",
-      contactPhone: "02-555-8123",
       services: [
         {
           id: "mock-partner-service-cafe-haeon-main",
@@ -109,6 +109,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
             mapClicks: 58,
             reservationClicks: 81,
             inquiryClicks: 26,
+            reviewCount: 24,
             totalClicks: 525,
           },
         },
@@ -124,6 +125,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
             mapClicks: 22,
             reservationClicks: 14,
             inquiryClicks: 6,
+            reviewCount: 11,
             totalClicks: 162,
           },
         },
@@ -139,6 +141,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
             mapClicks: 7,
             reservationClicks: 3,
             inquiryClicks: 1,
+            reviewCount: 5,
             totalClicks: 55,
           },
         },
@@ -160,9 +163,6 @@ export const seededSetups: MockPortalSetupRecord[] = [
       name: "어반짐 역삼",
       slug: "urban-gym",
       description: "헬스와 PT 패키지를 운영하는 복합 피트니스 브랜드입니다.",
-      contactName: "박지수",
-      contactEmail: "admin@urbangym.example",
-      contactPhone: "02-777-8811",
       services: [
         {
           id: "mock-partner-service-urban-gym-pt",
@@ -176,6 +176,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
             mapClicks: 74,
             reservationClicks: 126,
             inquiryClicks: 31,
+            reviewCount: 18,
             totalClicks: 641,
           },
         },
@@ -191,6 +192,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
             mapClicks: 10,
             reservationClicks: 8,
             inquiryClicks: 3,
+            reviewCount: 7,
             totalClicks: 77,
           },
         },

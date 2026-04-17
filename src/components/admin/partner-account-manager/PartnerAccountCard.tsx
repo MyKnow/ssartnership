@@ -1,3 +1,4 @@
+import Card from "@/components/ui/Card";
 import PartnerAccountForm from "@/components/admin/partner-account-manager/PartnerAccountForm";
 import PartnerAccountHeader from "@/components/admin/partner-account-manager/PartnerAccountHeader";
 import PartnerAccountLinks from "@/components/admin/partner-account-manager/PartnerAccountLinks";
@@ -17,13 +18,13 @@ export default function PartnerAccountCard({
   const accountFormId = `partner-account-form-${account.id}`;
 
   return (
-    <article className="rounded-3xl border border-border bg-surface-elevated p-4 shadow-sm">
+    <Card padding="md" className="grid gap-5">
       <PartnerAccountHeader account={account} />
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <PartnerAccountForm account={account} formId={accountFormId} />
         <PartnerAccountLinks account={account} companies={companies} />
       </div>
-    </article>
+    </Card>
   );
 }

@@ -20,9 +20,6 @@ create table if not exists partner_companies (
   name text not null,
   slug text not null unique,
   description text,
-  contact_name text,
-  contact_email text,
-  contact_phone text,
   is_active boolean not null default true,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()

@@ -42,9 +42,6 @@ type PartnerValue = {
         name: string;
         slug: string;
         description?: string | null;
-        contact_name?: string | null;
-        contact_email?: string | null;
-        contact_phone?: string | null;
         is_active?: boolean | null;
       }
     | null;
@@ -63,8 +60,6 @@ export default function AdminPartnerEditorCard({
     id: string;
     name: string;
     slug: string;
-    contactName?: string | null;
-    contactEmail?: string | null;
   }>;
   formAction: (formData: FormData) => void | Promise<void>;
   deleteAction: (formData: FormData) => void | Promise<void>;
@@ -143,9 +138,9 @@ export default function AdminPartnerEditorCard({
                     id: company.id,
                     name: company.name,
                     description: company.description ?? "",
-                    contactName: company.contact_name ?? "",
-                    contactEmail: company.contact_email ?? "",
-                    contactPhone: company.contact_phone ?? "",
+                    contactName: "",
+                    contactEmail: "",
+                    contactPhone: "",
                   }
                 : null,
             }}

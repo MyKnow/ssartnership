@@ -26,8 +26,6 @@ export function createAdminPartnerCompanyOptions(companies: AdminCompany[]) {
     id: company.id,
     name: company.name,
     slug: company.slug,
-    contactName: company.contact_name ?? "",
-    contactEmail: company.contact_email ?? "",
   }));
 }
 
@@ -67,7 +65,6 @@ export function filterAndSortAdminPartners({
       _search: [
         partner.name,
         partner.company?.name ?? "",
-        partner.company?.contact_email ?? "",
         partner.location,
         partner.reservation_link ?? "",
         partner.inquiry_link ?? "",

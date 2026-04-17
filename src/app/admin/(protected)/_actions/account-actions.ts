@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
+import { generateTempPassword, hashPassword } from "@/lib/password";
+import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
 import { sendPartnerPortalInitialSetupEmail } from "@/lib/partner-email";
 import {
+  parsePartnerAccountCreatePayload,
   parsePartnerAccountCompanyPayload,
   parsePartnerAccountPayload,
 } from "./shared-parsers";
@@ -12,7 +15,6 @@ import {
   revalidatePartnerCompanyData,
   revalidatePartnerAccountData,
 } from "./shared-helpers";
-import { issuePartnerAccountInitialSetupLink } from "./partner-support";
 
 export async function updatePartnerAccountAction(formData: FormData) {
   await requireAdmin();
@@ -88,6 +90,122 @@ export async function updatePartnerAccountAction(formData: FormData) {
   });
 
   revalidatePartnerAccountData();
+  redirect("/admin/companies");
+}
+
+export async function createPartnerAccountAction(formData: FormData) {
+  await requireAdmin();
+  let payload: ReturnType<typeof parsePartnerAccountCreatePayload>;
+  try {
+    payload = parsePartnerAccountCreatePayload(formData);
+  } catch (error) {
+    redirectAdminActionError(
+      "/admin/companies",
+      error instanceof Error ? error.message : "partner_account_invalid_request",
+    );
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: existingAccount, error: lookupError } = await supabase
+    .from("partner_accounts")
+    .select("id")
+    .eq("login_id", payload.loginId)
+    .maybeSingle();
+
+  if (lookupError) {
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+  }
+  if (existingAccount) {
+    redirectAdminActionError("/admin/companies", "partner_account_exists");
+  }
+
+  const { data: company, error: companyError } = await supabase
+    .from("partner_companies")
+    .select("id,name,slug,description,is_active")
+    .eq("id", payload.companyId)
+    .maybeSingle();
+
+  if (companyError || !company) {
+    redirectAdminActionError("/admin/companies", "partner_account_company_missing");
+  }
+
+  const passwordRecord = hashPassword(generateTempPassword(12));
+  const now = new Date().toISOString();
+
+  const { data: createdAccount, error: createError } = await supabase
+    .from("partner_accounts")
+    .insert({
+      login_id: payload.loginId,
+      display_name: payload.displayName,
+      email: payload.loginId,
+      password_hash: passwordRecord.hash,
+      password_salt: passwordRecord.salt,
+      must_change_password: true,
+      is_active: payload.isActive,
+      email_verified_at: null,
+      initial_setup_completed_at: null,
+      initial_setup_token: null,
+      initial_setup_verification_code_hash: null,
+      initial_setup_link_sent_at: null,
+      created_at: now,
+      updated_at: now,
+    })
+    .select(
+      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_token,initial_setup_verification_code_hash,initial_setup_link_sent_at",
+    )
+    .single();
+
+  if (createError || !createdAccount) {
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+  }
+
+  const cleanup = async () => {
+    await supabase.from("partner_accounts").delete().eq("id", createdAccount.id);
+  };
+
+  let setupLink = null as Awaited<
+    ReturnType<typeof issuePartnerAccountInitialSetupLink>
+  > | null;
+
+  try {
+    if (payload.isActive) {
+      setupLink = await issuePartnerAccountInitialSetupLink(
+        supabase,
+        createdAccount.id,
+      );
+    }
+
+    const { error: linkError } = await supabase
+      .from("partner_account_companies")
+      .insert({
+        account_id: createdAccount.id,
+        company_id: company.id,
+        is_active: true,
+      });
+
+    if (linkError) {
+      throw new Error(linkError.message);
+    }
+  } catch (error) {
+    await cleanup();
+    console.error("[admin] partner account create failed", error);
+    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+  }
+
+  await logAdminAction("partner_account_create", {
+    targetType: "partner_account",
+    targetId: createdAccount.id,
+    properties: {
+      loginId: payload.loginId,
+      displayName: payload.displayName,
+      companyId: company.id,
+      isActive: payload.isActive,
+      setupLinkGenerated: Boolean(setupLink),
+    },
+  });
+
+  revalidatePartnerAccountData();
+  revalidatePartnerCompanyData();
   redirect("/admin/companies");
 }
 

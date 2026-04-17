@@ -3,7 +3,6 @@ import Button from "@/components/ui/Button";
 import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
-import SubmitButton from "@/components/ui/SubmitButton";
 import TokenChipField from "@/components/admin/TokenChipField";
 import { PARTNER_AUDIENCE_OPTIONS } from "@/lib/partner-audience";
 import type {
@@ -12,6 +11,7 @@ import type {
 } from "@/lib/partner-change-requests";
 import { cn } from "@/lib/cn";
 import { FieldGroup } from "./FieldGroup";
+import FloatingSubmitButton from "./FloatingSubmitButton";
 
 export function ApprovalChangeForm({
   context,
@@ -23,7 +23,7 @@ export function ApprovalChangeForm({
   createAction: (formData: FormData) => void | Promise<void>;
 }) {
   return (
-    <form action={createAction} className="space-y-6">
+    <form action={createAction} className="space-y-6 pb-24 sm:pb-28">
       <input type="hidden" name="partnerId" value={context.partnerId} />
 
       <InlineMessage
@@ -174,15 +174,33 @@ export function ApprovalChangeForm({
           <Badge className="bg-amber-500/10 text-amber-700">
             승인 대기 중에는 새 요청을 제출할 수 없습니다. 기존 요청을 취소해 주세요.
           </Badge>
-        ) : (
-          <SubmitButton pendingText="요청 중" className="w-full sm:w-auto">
-            변경 요청
-          </SubmitButton>
-        )}
+        ) : null}
         <Button href="/partner" variant="secondary" className="w-full sm:w-auto">
           포털로 돌아가기
         </Button>
       </div>
+
+      {!pendingRequest ? (
+        <FloatingSubmitButton pendingText="요청 중">
+          <span className="inline-flex items-center gap-2">
+            <svg
+              width={18}
+              height={18}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m22 2-7 20-4-9-9-4Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+            변경 요청
+          </span>
+        </FloatingSubmitButton>
+      ) : null}
     </form>
   );
 }

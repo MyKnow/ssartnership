@@ -24,7 +24,7 @@ export default function PartnerSetupCompanySection({
             </Badge>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3">
             <div className="rounded-2xl border border-border bg-background/60 p-4">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 회사명
@@ -34,20 +34,6 @@ export default function PartnerSetupCompanySection({
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {context.company.description ?? "설명이 없습니다."}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-border bg-background/60 p-4">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                연락처
-              </p>
-              <p className="mt-2 text-sm font-semibold text-foreground">
-                {context.company.contactName ?? "미정"}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {context.company.contactEmail ?? context.account.email}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {context.company.contactPhone ?? "전화번호 미등록"}
               </p>
             </div>
           </div>

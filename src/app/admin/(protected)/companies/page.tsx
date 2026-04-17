@@ -19,9 +19,6 @@ type PartnerCompanyRow = {
   name: string;
   slug: string;
   description?: string | null;
-  contact_name?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -121,6 +118,26 @@ function normalizePartnerAccount(
   };
 }
 
+function SummaryMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <Card tone="muted" padding="md" className="grid gap-2">
+      <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+      <p className="text-sm text-muted-foreground">{detail}</p>
+    </Card>
+  );
+}
+
 export default async function AdminCompaniesPage({
   searchParams,
 }: {
@@ -134,19 +151,17 @@ export default async function AdminCompaniesPage({
     supabase
       .from("partners")
       .select(
-        "id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active)",
+        "id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active)",
       )
       .order("created_at", { ascending: false }),
     supabase
       .from("partner_companies")
-      .select(
-        "id,name,slug,description,contact_name,contact_email,contact_phone,is_active,created_at,updated_at",
-      )
+      .select("id,name,slug,description,is_active,created_at,updated_at")
       .order("name", { ascending: true }),
     supabase
       .from("partner_accounts")
       .select(
-        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_token,last_login_at,created_at,updated_at,links:partner_account_companies(id,is_active,created_at,company:partner_companies(id,name,slug,description,contact_name,contact_email,contact_phone,is_active))",
+        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_token,last_login_at,created_at,updated_at,links:partner_account_companies(id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active))",
       )
       .order("created_at", { ascending: false }),
   ]);
@@ -159,6 +174,12 @@ export default async function AdminCompaniesPage({
   const safeAccounts = (accountsResult.data ?? [])
     .map((account) => normalizePartnerAccount(account))
     .filter((account): account is PartnerAccountRow => Boolean(account));
+  const activeCompanyCount = safeCompanies.filter((company) => company.is_active !== false).length;
+  const activeAccountCount = safeAccounts.filter((account) => account.is_active !== false).length;
+  const totalAccountLinks = safeAccounts.reduce(
+    (sum, account) => sum + account.links.length,
+    0,
+  );
 
   const companyCards = safeCompanies.map((company) => {
     const brandCount = safePartners.filter((partner) => {
@@ -188,34 +209,53 @@ export default async function AdminCompaniesPage({
         <ShellHeader
           eyebrow="Companies"
           title="협력사와 계정 연결 관리"
-          description="협력사 섹션과 계정 섹션을 분리해 다대다 연결을 각각 관리합니다."
+          description="협력사 등록, 계정 생성, 다대다 연결을 한 화면에서 정리합니다."
         />
         {companyError ? (
           <FormMessage variant="error">{companyError}</FormMessage>
         ) : null}
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryMetric
+            label="협력사"
+            value={`${safeCompanies.length}`}
+            detail={`활성 ${activeCompanyCount}개`}
+          />
+          <SummaryMetric
+            label="브랜드"
+            value={`${safePartners.length}`}
+            detail="협력사에 연결된 전체 브랜드"
+          />
+          <SummaryMetric
+            label="계정"
+            value={`${safeAccounts.length}`}
+            detail={`활성 ${activeAccountCount}개`}
+          />
+          <SummaryMetric
+            label="연결"
+            value={`${totalAccountLinks}`}
+            detail="계정과 협력사의 전체 연결 수"
+          />
+        </section>
+
         <section className="grid gap-4">
           <SectionHeading
             eyebrow="Companies"
             title="협력사 섹션"
-            description="협력사 등록, 수정, 삭제와 해당 협력사를 관리하는 계정 연결을 함께 다룹니다."
+            description="협력사 기본 정보와 연결 계정을 같은 흐름에서 관리합니다."
           />
-          <Card tone="elevated">
-            <AdminCompanyManager companies={companyCards} accounts={safeAccounts} />
-          </Card>
+          <AdminCompanyManager companies={companyCards} accounts={safeAccounts} />
         </section>
 
         <section className="grid gap-4">
           <SectionHeading
             eyebrow="Accounts"
             title="계정 섹션"
-            description="계정 정보와 계정이 관리하는 협력사를 한곳에서 확인하고 추가할 수 있습니다."
+            description="협력사 담당 계정을 만들고, 연결 상태를 간단하게 조정합니다."
           />
-          <Card tone="elevated">
-            <AdminPartnerAccountManager
-              accounts={safeAccounts}
-              companies={safeCompanies}
-            />
-          </Card>
+          <AdminPartnerAccountManager
+            accounts={safeAccounts}
+            companies={safeCompanies}
+          />
         </section>
       </section>
     </AdminShell>

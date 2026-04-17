@@ -2,7 +2,7 @@ export {
   resetMockPartnerChangeRequestStore,
 } from "./partner-change-requests/shared.ts";
 export {
-  getMockPartnerChangeRequestCompanyStatuses,
+  getMockPartnerChangeRequestPartnerStatuses,
 } from "./partner-change-requests/service-store.ts";
 export {
   listMockPartnerChangeRequests,

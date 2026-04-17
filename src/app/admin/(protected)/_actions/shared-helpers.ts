@@ -1,6 +1,6 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
+import { getServerActionLogContext, logAdminAudit } from "../../../../lib/activity-logs.ts";
 
 export async function logAdminAction(
   action: Parameters<typeof logAdminAudit>[0]["action"],

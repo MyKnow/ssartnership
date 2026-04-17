@@ -11,7 +11,7 @@ import {
   logAdminAction,
   revalidateCyclePaths,
 } from "./shared-helpers";
-import { parseSsafyCycleSettingsPayloadOrRedirect } from "./shared-parsers";
+import { parseSsafyCycleSettingsPayloadOrRedirect } from "./shared-parser-redirects";
 
 export async function updateSsafyCycleSettingsAction(formData: FormData) {
   await requireAdmin();

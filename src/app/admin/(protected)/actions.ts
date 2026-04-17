@@ -5,6 +5,7 @@ import { clearAdminSession } from "@/lib/auth";
 import type { ManualMemberAddFormState } from "@/lib/member-manual-add";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import {
+  createPartnerAccountAction,
   createPartnerAccountInitialSetupUrlAction,
   sendPartnerAccountInitialSetupUrlAction,
   updatePartnerAccountAction,
@@ -46,6 +47,10 @@ import { logAdminAction } from "./_actions/shared-helpers";
 
 export async function updatePartnerAccount(formData: FormData) {
   return updatePartnerAccountAction(formData);
+}
+
+export async function createPartnerAccount(formData: FormData) {
+  return createPartnerAccountAction(formData);
 }
 
 export async function createPartnerAccountInitialSetupUrl(formData: FormData) {

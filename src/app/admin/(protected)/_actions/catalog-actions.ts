@@ -4,8 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { buildPartnerCompanySlug } from "./partner-support";
 import {
   parseCategoryPayloadOrRedirect,
-  parsePartnerCompanyCrudPayload,
-} from "./shared-parsers";
+} from "./shared-parser-redirects";
+import { parsePartnerCompanyCrudPayload } from "./shared-parsers";
 import {
   logAdminAction,
   revalidateAdminAndPublicPaths,
@@ -24,9 +24,6 @@ function normalizePartnerCompanyRow(row: PartnerCompanyRow | null | undefined) {
     name: row.name,
     slug: row.slug,
     description: row.description ?? null,
-    contact_name: row.contact_name ?? null,
-    contact_email: row.contact_email ?? null,
-    contact_phone: row.contact_phone ?? null,
     is_active: row.is_active ?? true,
   } satisfies PartnerCompanyRow;
 }
@@ -131,12 +128,9 @@ export async function createPartnerCompanyAction(formData: FormData) {
       name: payload.name,
       slug: buildPartnerCompanySlug(payload.name),
       description: payload.description,
-      contact_name: payload.contactName,
-      contact_email: payload.contactEmail?.toLowerCase() ?? null,
-      contact_phone: payload.contactPhone,
       is_active: payload.isActive,
     })
-    .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+    .select("id,name,slug,description,is_active")
     .single();
 
   if (error) {
@@ -155,9 +149,6 @@ export async function createPartnerCompanyAction(formData: FormData) {
       name: company.name,
       slug: company.slug,
       description: company.description ?? null,
-      contactName: company.contact_name ?? null,
-      contactEmail: company.contact_email ?? null,
-      contactPhone: company.contact_phone ?? null,
       isActive: company.is_active ?? true,
     },
   });
@@ -185,7 +176,7 @@ export async function updatePartnerCompanyAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: existingCompany, error: companyError } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active,created_at,updated_at")
+    .select("id,name,slug,description,is_active,created_at,updated_at")
     .eq("id", payload.companyId)
     .maybeSingle();
 
@@ -197,9 +188,6 @@ export async function updatePartnerCompanyAction(formData: FormData) {
     name: payload.name,
     slug: existingCompany.slug,
     description: payload.description,
-    contact_name: payload.contactName,
-    contact_email: payload.contactEmail?.toLowerCase() ?? null,
-    contact_phone: payload.contactPhone,
     is_active: payload.isActive,
     updated_at: new Date().toISOString(),
   };
@@ -208,9 +196,6 @@ export async function updatePartnerCompanyAction(formData: FormData) {
     nextCompany.name !== existingCompany.name ||
     nextCompany.slug !== existingCompany.slug ||
     nextCompany.description !== existingCompany.description ||
-    nextCompany.contact_name !== existingCompany.contact_name ||
-    nextCompany.contact_email !== existingCompany.contact_email ||
-    nextCompany.contact_phone !== existingCompany.contact_phone ||
     Boolean(existingCompany.is_active) !== nextCompany.is_active;
 
   if (hasChanges) {
@@ -231,9 +216,6 @@ export async function updatePartnerCompanyAction(formData: FormData) {
       name: nextCompany.name,
       slug: nextCompany.slug,
       description: nextCompany.description,
-      contactName: nextCompany.contact_name,
-      contactEmail: nextCompany.contact_email,
-      contactPhone: nextCompany.contact_phone,
       isActive: nextCompany.is_active,
     },
   });
@@ -252,7 +234,7 @@ export async function deletePartnerCompanyAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: existingCompany, error: companyError } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,contact_name,contact_email,contact_phone,is_active")
+    .select("id,name,slug,description,is_active")
     .eq("id", companyId)
     .maybeSingle();
 

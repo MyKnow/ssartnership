@@ -82,13 +82,12 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
   await logAdminAction("partner_create", {
     targetType: "partner",
     targetId: partnerId,
-    properties: {
-      name: payload.name,
-      companyId: companyProvision?.company?.id ?? null,
-      companyName: companyProvision?.company?.name ?? null,
-      companyContactEmail: companyProvision?.company?.contact_email ?? null,
-      categoryId: payload.categoryId,
-      location: payload.location,
+      properties: {
+        name: payload.name,
+        companyId: companyProvision?.company?.id ?? null,
+        companyName: companyProvision?.company?.name ?? null,
+        categoryId: payload.categoryId,
+        location: payload.location,
       hasMapUrl: Boolean(payload.mapUrl),
       hasReservationLink: Boolean(payload.reservationLink),
       hasInquiryLink: Boolean(payload.inquiryLink),

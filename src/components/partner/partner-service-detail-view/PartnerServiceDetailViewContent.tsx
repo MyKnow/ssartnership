@@ -13,6 +13,7 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
+import PartnerServiceMetricsPanel from "@/components/partner/partner-service-detail-view/PartnerServiceMetricsPanel";
 import PartnerPendingRequestSection from "@/components/partner/partner-service-detail-view/PartnerPendingRequestSection";
 import PartnerServiceContacts from "@/components/partner/partner-service-detail-view/PartnerServiceContacts";
 import PartnerServiceSummaryCard from "@/components/partner/partner-service-detail-view/PartnerServiceSummaryCard";
@@ -29,6 +30,8 @@ export default function PartnerServiceDetailViewContent({
   createAction,
   cancelAction,
   reviewSummary,
+  serviceMetrics,
+  serviceMetricsWarningMessage,
   initialReviews,
   initialReviewSort,
   initialReviewOffset,
@@ -116,6 +119,12 @@ export default function PartnerServiceDetailViewContent({
                   ) : null}
                 </div>
               </Card>
+
+              <PartnerServiceMetricsPanel
+                metrics={serviceMetrics}
+                reviewSummary={reviewSummary}
+                warningMessage={serviceMetricsWarningMessage}
+              />
 
               {pendingRequest ? (
                 <PartnerPendingRequestSection

@@ -6,7 +6,6 @@ import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
-import { ContactPopupButton } from "./partner-change-request-queue/ContactPopupButton";
 import { DiffCard } from "../partner-change-request-ui/DiffPrimitives";
 import { buildPartnerChangeRequestDiffItems } from "../partner-change-request-ui/buildDiffItems";
 
@@ -77,7 +76,6 @@ function PartnerChangeRequestCard({
             거절
           </SubmitButton>
         </form>
-        <ContactPopupButton request={request} />
       </div>
     </article>
   );

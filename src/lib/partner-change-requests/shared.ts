@@ -31,9 +31,6 @@ export type PartnerChangeRequestSummary = {
   companyId: string;
   companyName: string;
   companySlug: string;
-  companyContactName: string | null;
-  companyContactEmail: string | null;
-  companyContactPhone: string | null;
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
@@ -180,9 +177,6 @@ export type PartnerCompanyRow = {
   id: string;
   name: string;
   slug: string;
-  contact_name?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
 };
 
 export type PartnerCategoryRow = {
@@ -266,7 +260,7 @@ export type PartnerChangeRequestRow = {
 };
 
 export const REQUEST_SELECT =
-  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_map_url,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_map_url,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug,contact_name,contact_email,contact_phone),partner:partners(id,name,location,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
+  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_map_url,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_map_url,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
 
 export type PartnerChangeRequestSupabaseClient = ReturnType<
   typeof getSupabaseAdminClient

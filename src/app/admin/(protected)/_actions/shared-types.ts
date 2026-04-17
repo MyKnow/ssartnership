@@ -1,4 +1,4 @@
-import type { PartnerVisibility } from "@/lib/types";
+import type { PartnerVisibility } from "../../../../lib/types.ts";
 
 export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getSupabaseAdminClient>;
 
@@ -37,9 +37,13 @@ export type PartnerCompanyCrudInput = {
   companyId: string | null;
   name: string;
   description: string | null;
-  contactName: string | null;
-  contactEmail: string | null;
-  contactPhone: string | null;
+  isActive: boolean;
+};
+
+export type PartnerAccountCreateInput = {
+  loginId: string;
+  displayName: string;
+  companyId: string;
   isActive: boolean;
 };
 
@@ -48,9 +52,6 @@ export type PartnerCompanyRow = {
   name: string;
   slug: string;
   description?: string | null;
-  contact_name?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
   is_active?: boolean | null;
 };
 

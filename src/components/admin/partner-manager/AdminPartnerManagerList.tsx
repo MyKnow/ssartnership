@@ -27,8 +27,6 @@ export default function AdminPartnerManagerList({
     id: string;
     name: string;
     slug: string;
-    contactName: string;
-    contactEmail: string;
   }>;
   updatePartner: (formData: FormData) => void | Promise<void>;
   deletePartner: (formData: FormData) => void | Promise<void>;

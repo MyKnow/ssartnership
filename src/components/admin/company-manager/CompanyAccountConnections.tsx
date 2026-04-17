@@ -62,15 +62,15 @@ export default function CompanyAccountConnections({
   const connectionFormId = `company-account-connection-${company.id}`;
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-border bg-background/60 p-4">
+    <div className="grid gap-4 rounded-2xl border border-border/70 bg-background/55 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-foreground">계정 연결</h4>
+          <h4 className="text-sm font-semibold text-foreground">기존 계정 연결</h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            이 협력사를 관리할 계정을 기존 목록에서 추가합니다.
+            이미 존재하는 계정을 선택해 이 협력사를 관리하도록 추가합니다.
           </p>
         </div>
-        <Badge className="bg-surface text-muted-foreground">
+        <Badge variant="neutral">
           연결 {linkedAccounts.length}개
         </Badge>
       </div>
@@ -100,7 +100,7 @@ export default function CompanyAccountConnections({
           </Select>
         </FieldGroup>
         <FieldGroup label="연결 상태">
-          <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border bg-surface px-3.5 text-sm font-medium text-foreground">
+          <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border/70 bg-surface-muted/70 px-3.5 text-sm font-medium text-foreground">
             <input type="hidden" name="isActive" value="false" />
             <input
               type="checkbox"
@@ -120,7 +120,7 @@ export default function CompanyAccountConnections({
             className="w-full md:w-auto"
             disabled={accounts.length === 0}
           >
-            계정 연결
+            기존 계정 연결
           </SubmitButton>
         </div>
       </form>
@@ -143,7 +143,7 @@ export default function CompanyAccountConnections({
             return (
               <div
                 key={`${company.id}:${account.id}`}
-                className="grid gap-4 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-[minmax(0,1fr)_auto]"
+                className="grid gap-4 rounded-2xl border border-border/70 bg-surface-muted/70 p-4 sm:grid-cols-[minmax(0,1fr)_auto]"
               >
                 <div className="min-w-0">
                   <p className="font-semibold text-foreground">
@@ -157,13 +157,7 @@ export default function CompanyAccountConnections({
                   </p>
                 </div>
                 <div className="flex flex-col items-start gap-3 sm:items-end">
-                  <Badge
-                    className={
-                      link.is_active !== false
-                        ? "bg-emerald-500/10 text-emerald-700"
-                        : "bg-danger/10 text-danger"
-                    }
-                  >
+                  <Badge variant={link.is_active !== false ? "success" : "danger"}>
                     {link.is_active !== false ? "활성" : "비활성"}
                   </Badge>
                   <form
@@ -174,7 +168,7 @@ export default function CompanyAccountConnections({
                     <input type="hidden" name="accountId" value={account.id} />
                     <input type="hidden" name="companyId" value={company.id} />
                     <FieldGroup label="연결 활성">
-                      <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border bg-background px-3.5 text-sm font-medium text-foreground">
+                      <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border/70 bg-background px-3.5 text-sm font-medium text-foreground">
                         <input type="hidden" name="isActive" value="false" />
                         <input
                           type="checkbox"

@@ -66,7 +66,6 @@ test("partner card form helpers derive defaults and company lock state", async (
       company: {
         id: "company-1",
         name: "오디터스",
-        contactEmail: "owner@example.com",
       },
     },
     "category-1",
@@ -95,7 +94,7 @@ test("admin partner selectors preserve search, filters, and active-first sorting
     { id: "cat-2", key: "fitness", label: "운동", description: "운동" },
   ];
   const companies = [
-    { id: "co-1", name: "오디터스", slug: "auditors", contact_email: "owner@example.com" },
+    { id: "co-1", name: "오디터스", slug: "auditors" },
   ];
   const partners = [
     {
@@ -110,7 +109,7 @@ test("admin partner selectors preserve search, filters, and active-first sorting
       conditions: ["학생증"],
       applies_to: ["student"],
       tags: ["삼겹살"],
-      company: { id: "co-1", name: "오디터스", slug: "auditors", contact_email: "owner@example.com" },
+      company: { id: "co-1", name: "오디터스", slug: "auditors" },
     },
     {
       id: "partner-inactive",
@@ -129,7 +128,7 @@ test("admin partner selectors preserve search, filters, and active-first sorting
   ];
 
   assert.equal(createAdminPartnerCategoryOptions(categories).length, 2);
-  assert.equal(createAdminPartnerCompanyOptions(companies)[0]?.contactEmail, "owner@example.com");
+  assert.equal(createAdminPartnerCompanyOptions(companies)[0]?.slug, "auditors");
 
   const filtered = filterAndSortAdminPartners({
     partners,

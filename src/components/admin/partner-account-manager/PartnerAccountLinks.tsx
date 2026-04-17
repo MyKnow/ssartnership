@@ -22,7 +22,7 @@ export default function PartnerAccountLinks({
   const connectionFormId = `partner-account-company-connection-${account.id}`;
 
   return (
-    <div className="rounded-2xl border border-border bg-background/60 p-4">
+    <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-foreground">협력사 연결</h4>
@@ -56,7 +56,7 @@ export default function PartnerAccountLinks({
           </Select>
         </FieldGroup>
         <FieldGroup label="연결 상태">
-          <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border bg-surface px-3.5 text-sm font-medium text-foreground">
+          <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border/70 bg-surface-muted/70 px-3.5 text-sm font-medium text-foreground">
             <input type="hidden" name="isActive" value="false" />
             <input
               type="checkbox"
@@ -99,7 +99,10 @@ export default function PartnerAccountLinks({
           const linkFormId = `partner-account-link-${account.id}-${link.id}`;
 
           return (
-            <div key={link.id} className="rounded-2xl border border-border bg-surface p-4">
+            <div
+              key={link.id}
+              className="rounded-2xl border border-border/70 bg-surface-muted/70 p-4"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold text-foreground">
@@ -110,13 +113,7 @@ export default function PartnerAccountLinks({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    className={
-                      link.is_active !== false
-                        ? "bg-emerald-500/10 text-emerald-700"
-                        : "bg-danger/10 text-danger"
-                    }
-                  >
+                  <Badge variant={link.is_active !== false ? "success" : "danger"}>
                     {link.is_active !== false ? "활성" : "비활성"}
                   </Badge>
                 </div>

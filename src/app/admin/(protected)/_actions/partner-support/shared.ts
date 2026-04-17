@@ -7,22 +7,14 @@ import type {
 
 export function toPartnerAccountDisplayName(
   company: PartnerCompanyInput,
-  companyRow?: PartnerCompanyRow | null,
 ) {
-  return (
-    company.contactName ||
-    companyRow?.contact_name ||
-    company.name ||
-    companyRow?.name ||
-    "제휴 담당자"
-  );
+  return company.contactName || company.name || "제휴 담당자";
 }
 
 export function toPartnerAccountLoginId(
   company: PartnerCompanyInput,
-  companyRow?: PartnerCompanyRow | null,
 ) {
-  const email = company.contactEmail || companyRow?.contact_email || "";
+  const email = company.contactEmail || "";
   return normalizePartnerLoginId(email);
 }
 
@@ -38,9 +30,6 @@ export function normalizePartnerCompanyRow(
     name: row.name,
     slug: row.slug,
     description: row.description ?? null,
-    contact_name: row.contact_name ?? null,
-    contact_email: row.contact_email ?? null,
-    contact_phone: row.contact_phone ?? null,
     is_active: row.is_active ?? true,
   } satisfies PartnerCompanyRow;
 }

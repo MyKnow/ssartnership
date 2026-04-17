@@ -33,9 +33,6 @@ export function toMockPartnerPortalSetupContext(
       name: record.company.name,
       slug: record.company.slug,
       description: record.company.description ?? null,
-      contactName: record.company.contactName ?? null,
-      contactEmail: record.company.contactEmail ?? null,
-      contactPhone: record.company.contactPhone ?? null,
       services: record.company.services.map((service) => ({
         id: service.id,
         name: service.name,

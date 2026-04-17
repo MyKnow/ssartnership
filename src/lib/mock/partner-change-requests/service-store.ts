@@ -1,4 +1,4 @@
-import type { PartnerPortalCompanyStatus } from "../../partner-dashboard.ts";
+import type { PartnerPortalServiceStatus } from "../../partner-dashboard.ts";
 import { getRawMockPartnerChangeRequestStore } from "./shared.ts";
 import { normalizeRequestRecord, normalizeServiceRecord } from "./normalizers.ts";
 
@@ -39,9 +39,9 @@ export function findDisplayNameByAccountId(accountId: string) {
   return request?.requestedByDisplayName ?? request?.requestedByLoginId ?? null;
 }
 
-function normalizeCompanyStatus(
+function normalizeServiceStatus(
   status: "pending" | "approved" | "rejected" | "cancelled",
-): PartnerPortalCompanyStatus {
+): PartnerPortalServiceStatus {
   if (status === "pending" || status === "rejected") {
     return status;
   }
@@ -49,18 +49,18 @@ function normalizeCompanyStatus(
   return "approved";
 }
 
-export function getMockPartnerChangeRequestCompanyStatuses(
-  companyIds?: string[],
+export function getMockPartnerChangeRequestPartnerStatuses(
+  partnerIds?: string[],
 ) {
-  const uniqueCompanyIds = [
-    ...new Set((companyIds ?? []).map((id) => id.trim()).filter(Boolean)),
+  const uniquePartnerIds = [
+    ...new Set((partnerIds ?? []).map((id) => id.trim()).filter(Boolean)),
   ];
-  const statusByCompanyId = new Map<string, PartnerPortalCompanyStatus>();
+  const statusByPartnerId = new Map<string, PartnerPortalServiceStatus>();
   const requests = [...getStore().requests]
     .filter(
       (request) =>
-        uniqueCompanyIds.length === 0 ||
-        uniqueCompanyIds.includes(request.companyId),
+        uniquePartnerIds.length === 0 ||
+        uniquePartnerIds.includes(request.partnerId),
     )
     .sort(
       (a, b) =>
@@ -69,12 +69,12 @@ export function getMockPartnerChangeRequestCompanyStatuses(
     );
 
   for (const request of requests) {
-    if (statusByCompanyId.has(request.companyId)) {
+    if (statusByPartnerId.has(request.partnerId)) {
       continue;
     }
 
-    statusByCompanyId.set(request.companyId, normalizeCompanyStatus(request.status));
+    statusByPartnerId.set(request.partnerId, normalizeServiceStatus(request.status));
   }
 
-  return statusByCompanyId;
+  return statusByPartnerId;
 }

@@ -1,9 +1,9 @@
 import {
   isPartnerVisibility,
   normalizePartnerVisibility,
-} from "@/lib/partner-visibility";
-import { parsePartnerAudienceSelection } from "@/lib/partner-audience";
-import { normalizePartnerLoginId } from "@/lib/partner-utils";
+} from "../../../../lib/partner-visibility.ts";
+import { parsePartnerAudienceSelection } from "../../../../lib/partner-audience.ts";
+import { normalizePartnerLoginId } from "../../../../lib/partner-utils.ts";
 import {
   isValidEmail,
   sanitizeHexColor,
@@ -11,16 +11,13 @@ import {
   sanitizePartnerLinkValue,
   validateCategoryKey,
   validateDateRange,
-} from "@/lib/validation";
+} from "../../../../lib/validation.ts";
 import type {
+  PartnerAccountCreateInput,
   PartnerCompanyCrudInput,
   PartnerCompanyInput,
   PartnerCoreInput,
-} from "./shared-types";
-import {
-  redirectAdminActionError,
-  redirectPartnerFormError,
-} from "./shared-helpers";
+} from "./shared-types.ts";
 
 function parseList(value: string) {
   return Array.from(
@@ -71,25 +68,16 @@ export function parsePartnerCompanyCrudPayload(
   const companyId = String(formData.get("companyId") || "").trim();
   const name = String(formData.get("companyName") || "").trim();
   const description = String(formData.get("companyDescription") || "").trim();
-  const contactName = String(formData.get("companyContactName") || "").trim();
-  const contactEmail = String(formData.get("companyContactEmail") || "").trim();
-  const contactPhone = String(formData.get("companyContactPhone") || "").trim();
   const isActive = formData.getAll("companyIsActive").includes("true");
 
   if (!name) {
     throw new Error("partner_company_missing_name");
-  }
-  if (contactEmail && !isValidEmail(contactEmail)) {
-    throw new Error("partner_company_invalid_email");
   }
 
   return {
     companyId: companyId || null,
     name,
     description: description || null,
-    contactName: contactName || null,
-    contactEmail: contactEmail || null,
-    contactPhone: contactPhone || null,
     isActive,
   };
 }
@@ -123,6 +111,34 @@ export function parsePartnerAccountPayload(formData: FormData) {
   };
 }
 
+export function parsePartnerAccountCreatePayload(
+  formData: FormData,
+): PartnerAccountCreateInput {
+  const loginId = normalizePartnerLoginId(
+    String(formData.get("loginId") || "").trim(),
+  );
+  const displayName = String(formData.get("displayName") || "").trim();
+  const companyId = String(formData.get("companyId") || "").trim();
+  const isActive = formData.getAll("isActive").includes("true");
+
+  if (!loginId || !displayName) {
+    throw new Error("partner_account_invalid_request");
+  }
+  if (!isValidEmail(loginId)) {
+    throw new Error("partner_account_invalid_email");
+  }
+  if (!companyId) {
+    throw new Error("partner_account_company_missing");
+  }
+
+  return {
+    loginId,
+    displayName,
+    companyId,
+    isActive,
+  };
+}
+
 export function parsePartnerAccountCompanyPayload(formData: FormData) {
   const accountId = String(formData.get("accountId") || "").trim();
   const companyId = String(formData.get("companyId") || "").trim();
@@ -139,7 +155,7 @@ export function parsePartnerAccountCompanyPayload(formData: FormData) {
   };
 }
 
-function parseCategoryPayload(formData: FormData) {
+export function parseCategoryPayload(formData: FormData) {
   const key = String(formData.get("key") || "")
     .trim()
     .toLowerCase();
@@ -182,7 +198,7 @@ function parseSsafyCycleNumber(
   return parsed;
 }
 
-function parseSsafyCycleSettingsPayload(formData: FormData) {
+export function parseSsafyCycleSettingsPayload(formData: FormData) {
   const anchorYearRaw = String(formData.get("anchorYear") || "").trim();
   const anchorCalendarYearRaw = String(formData.get("anchorCalendarYear") || "").trim();
   const anchorMonthRaw = String(formData.get("anchorMonth") || "").trim();
@@ -271,60 +287,4 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     tags: parseList(tags),
     visibility: normalizePartnerVisibility(rawVisibility || "public"),
   };
-}
-
-export function parsePartnerPayloadOrRedirect(
-  formData: FormData,
-  path: string,
-): PartnerCoreInput {
-  try {
-    return parsePartnerPayload(formData);
-  } catch (error) {
-    return redirectPartnerFormError(
-      error instanceof Error ? error.message : "partner_form_invalid_request",
-      path,
-    );
-  }
-}
-
-export function parsePartnerCompanyPayloadOrRedirect(
-  formData: FormData,
-  path: string,
-): PartnerCompanyInput {
-  try {
-    return parsePartnerCompanyPayload(formData);
-  } catch (error) {
-    return redirectPartnerFormError(
-      error instanceof Error ? error.message : "partner_company_invalid_request",
-      path,
-    );
-  }
-}
-
-export function parseCategoryPayloadOrRedirect(
-  formData: FormData,
-  path: string,
-) {
-  try {
-    return parseCategoryPayload(formData);
-  } catch (error) {
-    return redirectAdminActionError(
-      path,
-      error instanceof Error ? error.message : "category_invalid_request",
-    );
-  }
-}
-
-export function parseSsafyCycleSettingsPayloadOrRedirect(
-  formData: FormData,
-  path: string,
-) {
-  try {
-    return parseSsafyCycleSettingsPayload(formData);
-  } catch (error) {
-    return redirectAdminActionError(
-      path,
-      error instanceof Error ? error.message : "cycle_invalid_request",
-    );
-  }
 }

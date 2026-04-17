@@ -15,7 +15,7 @@ import {
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import type { PartnerSession } from "@/lib/partner-session";
 import {
-  getPartnerPortalCompanyStatusLabel,
+  getPartnerPortalServiceStatusLabel,
   type PartnerPortalDashboard,
 } from "@/lib/partner-dashboard";
 import { cn } from "@/lib/cn";
@@ -48,16 +48,16 @@ function ServiceMetric({
   );
 }
 
-function getCompanyStatusTextClass(
-  status: PartnerPortalDashboard["companies"][number]["status"],
+function getServiceStatusBadgeVariant(
+  status: PartnerPortalDashboard["companies"][number]["services"][number]["status"],
 ) {
   switch (status) {
     case "pending":
-      return "text-amber-600 dark:text-amber-400";
+      return "warning";
     case "rejected":
-      return "text-danger";
+      return "danger";
     default:
-      return "text-emerald-600 dark:text-emerald-400";
+      return "success";
   }
 }
 
@@ -81,6 +81,9 @@ function ServiceCard({
             >
               {getPartnerVisibilityLabel(service.visibility)}
             </Badge>
+            <Badge variant={getServiceStatusBadgeVariant(service.status)}>
+              {getPartnerPortalServiceStatusLabel(service.status)}
+            </Badge>
             <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
               {service.categoryLabel}
             </span>
@@ -95,9 +98,10 @@ function ServiceCard({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <ServiceMetric label="조회수" value={service.metrics.detailViews} />
         <ServiceMetric label="총 클릭" value={service.metrics.totalClicks} />
+        <ServiceMetric label="리뷰" value={service.metrics.reviewCount} />
         <ServiceMetric label="카드 클릭" value={service.metrics.cardClicks} />
         <ServiceMetric label="지도 클릭" value={service.metrics.mapClicks} />
         <ServiceMetric
@@ -148,34 +152,13 @@ function CompanySection({
                 value: formatCount(company.services.length),
                 hint: "포털에서 관리 가능한 연결 브랜드",
               },
+              {
+                label: "리뷰 수",
+                value: formatCount(company.totals.reviewCount),
+                hint: "연결된 브랜드의 전체 리뷰 합계",
+              },
             ]}
           />
-        </div>
-      </div>
-
-      <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-        <div className="rounded-[1.2rem] border border-border/80 bg-surface-muted/90 p-4 shadow-[var(--shadow-flat)]">
-          <p className="ui-kicker">담당자</p>
-          <p className="mt-2 text-sm font-semibold text-foreground">
-            {company.contactName ?? "미지정"}
-          </p>
-        </div>
-        <div className="rounded-[1.2rem] border border-border/80 bg-surface-muted/90 p-4 shadow-[var(--shadow-flat)]">
-          <p className="ui-kicker">연락처</p>
-          <p className="mt-2 break-all text-sm font-semibold text-foreground">
-            {company.contactEmail ?? company.contactPhone ?? "미지정"}
-          </p>
-        </div>
-        <div className="rounded-[1.2rem] border border-border/80 bg-surface-muted/90 p-4 shadow-[var(--shadow-flat)]">
-          <p className="ui-kicker">상태</p>
-          <p
-            className={cn(
-              "mt-2 text-center text-sm font-semibold",
-              getCompanyStatusTextClass(company.status),
-            )}
-          >
-            {getPartnerPortalCompanyStatusLabel(company.status)}
-          </p>
         </div>
       </div>
 
@@ -230,6 +213,11 @@ export default function PartnerDashboardView({
                     label: "브랜드 수",
                     value: formatCount(dashboard.totals.serviceCount),
                     hint: "연결된 협력사의 전체 브랜드 수",
+                  },
+                  {
+                    label: "리뷰 수",
+                    value: formatCount(dashboard.totals.reviewCount),
+                    hint: "연결된 브랜드의 전체 리뷰 합계",
                   },
                   {
                     label: "조회수",

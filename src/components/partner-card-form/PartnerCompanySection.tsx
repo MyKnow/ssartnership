@@ -43,7 +43,7 @@ export default function PartnerCompanySection({
     <Card className="overflow-hidden">
       <SectionHeading
         title="협력사 / 담당자"
-        description="한 협력사가 여러 브랜드를 가질 수 있으니, 협력사와 담당자 이메일을 함께 묶어 관리합니다."
+        description="한 협력사가 여러 브랜드를 가질 수 있으니, 기존 협력사를 연결하거나 새 협력사를 생성합니다."
       />
 
       <div className="mt-6 grid gap-5">
@@ -60,7 +60,6 @@ export default function PartnerCompanySection({
             {(companyOptions ?? []).map((company) => (
               <option key={company.id} value={company.id}>
                 {company.name}
-                {company.contactEmail ? ` · ${company.contactEmail}` : ""}
               </option>
             ))}
           </Select>
