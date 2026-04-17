@@ -4,8 +4,14 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 
 export default function AdminPartnerAccountManagerContent({
   accounts,
+  companies,
 }: {
   accounts: AdminPartnerAccount[];
+  companies: {
+    id: string;
+    name: string;
+    slug: string;
+  }[];
 }) {
   if (accounts.length === 0) {
     return (
@@ -21,7 +27,11 @@ export default function AdminPartnerAccountManagerContent({
   return (
     <div className="mt-6 grid gap-4">
       {accounts.map((account) => (
-        <PartnerAccountCard key={account.id} account={account} />
+        <PartnerAccountCard
+          key={account.id}
+          account={account}
+          companies={companies}
+        />
       ))}
     </div>
   );

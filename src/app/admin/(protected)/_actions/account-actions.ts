@@ -9,6 +9,7 @@ import {
 import {
   logAdminAction,
   redirectAdminActionError,
+  revalidatePartnerCompanyData,
   revalidatePartnerAccountData,
 } from "./shared-helpers";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support";
@@ -197,11 +198,10 @@ export async function updatePartnerAccountCompanyConnectionAction(formData: Form
   if (linkError) {
     redirectAdminActionError("/admin/companies", "partner_account_company_invalid_request");
   }
-  if (!existingLink) {
-    redirectAdminActionError("/admin/companies", "partner_account_company_missing");
-  }
 
-  if (Boolean(existingLink.is_active) !== payload.isActive) {
+  const createdLink = !existingLink;
+
+  if (existingLink && Boolean(existingLink.is_active) !== payload.isActive) {
     const { error } = await supabase
       .from("partner_account_companies")
       .update({ is_active: payload.isActive })
@@ -210,18 +210,32 @@ export async function updatePartnerAccountCompanyConnectionAction(formData: Form
     if (error) {
       redirectAdminActionError("/admin/companies", "partner_account_company_invalid_request");
     }
+  } else if (!existingLink) {
+    const { error } = await supabase
+      .from("partner_account_companies")
+      .insert({
+        account_id: payload.accountId,
+        company_id: payload.companyId,
+        is_active: payload.isActive,
+      });
+
+    if (error) {
+      redirectAdminActionError("/admin/companies", "partner_account_company_invalid_request");
+    }
   }
 
   await logAdminAction("partner_account_company_update", {
     targetType: "partner_account_company",
-    targetId: existingLink.id,
+    targetId: existingLink?.id ?? `${payload.accountId}:${payload.companyId}`,
     properties: {
       accountId: payload.accountId,
       companyId: payload.companyId,
       isActive: payload.isActive,
+      createdLink,
     },
   });
 
   revalidatePartnerAccountData();
+  revalidatePartnerCompanyData();
   redirect("/admin/companies");
 }

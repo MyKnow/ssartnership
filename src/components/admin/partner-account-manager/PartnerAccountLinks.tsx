@@ -1,15 +1,26 @@
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
+import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { updatePartnerAccountCompanyConnection } from "@/app/admin/(protected)/actions";
 import FieldGroup from "@/components/admin/partner-account-manager/FieldGroup";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
+type AdminCompany = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 export default function PartnerAccountLinks({
   account,
+  companies,
 }: {
   account: AdminPartnerAccount;
+  companies: AdminCompany[];
 }) {
+  const connectionFormId = `partner-account-company-connection-${account.id}`;
+
   return (
     <div className="rounded-2xl border border-border bg-background/60 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -20,6 +31,61 @@ export default function PartnerAccountLinks({
           </p>
         </div>
       </div>
+
+      <form
+        id={connectionFormId}
+        action={updatePartnerAccountCompanyConnection}
+        className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+      >
+        <input type="hidden" name="accountId" value={account.id} />
+        <FieldGroup label="협력사 선택">
+          <Select name="companyId" defaultValue="" required disabled={companies.length === 0}>
+            <option value="" disabled>
+              협력사를 선택해 주세요
+            </option>
+            {companies.map((company) => {
+              const isLinked = account.links.some(
+                (link) => link.company?.id === company.id,
+              );
+              return (
+                <option key={company.id} value={company.id}>
+                  {company.name} ({company.slug}){isLinked ? " · 연결됨" : ""}
+                </option>
+              );
+            })}
+          </Select>
+        </FieldGroup>
+        <FieldGroup label="연결 상태">
+          <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border bg-surface px-3.5 text-sm font-medium text-foreground">
+            <input type="hidden" name="isActive" value="false" />
+            <input
+              type="checkbox"
+              name="isActive"
+              value="true"
+              defaultChecked
+              disabled={companies.length === 0}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            연결 활성
+          </div>
+        </FieldGroup>
+        <div className="flex items-end">
+          <SubmitButton
+            form={connectionFormId}
+            pendingText="연결 중"
+            className="w-full md:w-auto"
+            disabled={companies.length === 0}
+          >
+            협력사 연결
+          </SubmitButton>
+        </div>
+      </form>
+
+      {companies.length === 0 ? (
+        <p className="mt-4 text-xs text-muted-foreground">
+          등록된 협력사가 없어 새 연결을 추가할 수 없습니다.
+        </p>
+      ) : null}
 
       <div className="mt-4 space-y-3">
         {account.links.length === 0 ? (

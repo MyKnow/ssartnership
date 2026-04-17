@@ -5,8 +5,14 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 
 export default function PartnerAccountCard({
   account,
+  companies,
 }: {
   account: AdminPartnerAccount;
+  companies: {
+    id: string;
+    name: string;
+    slug: string;
+  }[];
 }) {
   const accountFormId = `partner-account-form-${account.id}`;
 
@@ -16,7 +22,7 @@ export default function PartnerAccountCard({
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <PartnerAccountForm account={account} formId={accountFormId} />
-        <PartnerAccountLinks account={account} />
+        <PartnerAccountLinks account={account} companies={companies} />
       </div>
     </article>
   );

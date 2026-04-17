@@ -10,6 +10,8 @@ import {
   deletePartnerCompany,
   updatePartnerCompany,
 } from "@/app/admin/(protected)/actions";
+import CompanyAccountConnections from "@/components/admin/company-manager/CompanyAccountConnections";
+import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
 type AdminCompany = {
   id: string;
@@ -62,8 +64,10 @@ function formatDateTime(value?: string | null) {
 
 export default function AdminCompanyManager({
   companies,
+  accounts,
 }: {
   companies: AdminCompany[];
+  accounts: AdminPartnerAccount[];
 }) {
   return (
     <div className="mt-6 grid gap-5">
@@ -242,6 +246,8 @@ export default function AdminCompanyManager({
                     </SubmitButton>
                   </div>
                 </form>
+
+                <CompanyAccountConnections company={company} accounts={accounts} />
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs leading-5 text-muted-foreground">

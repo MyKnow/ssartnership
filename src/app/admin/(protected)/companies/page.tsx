@@ -4,6 +4,7 @@ import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountMa
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
+import SectionHeading from "@/components/ui/SectionHeading";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -170,7 +171,7 @@ export default async function AdminCompaniesPage({
 
     const accountCount = safeAccounts.filter((account) =>
       account.links.some(
-        (link) => link.company?.id === company.id && link.is_active !== false,
+        (link) => link.company?.id === company.id,
       ),
     ).length;
 
@@ -186,19 +187,36 @@ export default async function AdminCompaniesPage({
       <section className="grid gap-6">
         <ShellHeader
           eyebrow="Companies"
-          title="협력사 리스트와 연결 관리"
-          description="협력사 자체, 담당자 계정, 브랜드 연결 상태를 같은 기준 레이아웃에서 관리합니다."
+          title="협력사와 계정 연결 관리"
+          description="협력사 섹션과 계정 섹션을 분리해 다대다 연결을 각각 관리합니다."
         />
         {companyError ? (
           <FormMessage variant="error">{companyError}</FormMessage>
         ) : null}
-        <Card tone="elevated">
-          <AdminCompanyManager companies={companyCards} />
-        </Card>
+        <section className="grid gap-4">
+          <SectionHeading
+            eyebrow="Companies"
+            title="협력사 섹션"
+            description="협력사 등록, 수정, 삭제와 해당 협력사를 관리하는 계정 연결을 함께 다룹니다."
+          />
+          <Card tone="elevated">
+            <AdminCompanyManager companies={companyCards} accounts={safeAccounts} />
+          </Card>
+        </section>
 
-        <Card tone="elevated">
-          <AdminPartnerAccountManager accounts={safeAccounts} />
-        </Card>
+        <section className="grid gap-4">
+          <SectionHeading
+            eyebrow="Accounts"
+            title="계정 섹션"
+            description="계정 정보와 계정이 관리하는 협력사를 한곳에서 확인하고 추가할 수 있습니다."
+          />
+          <Card tone="elevated">
+            <AdminPartnerAccountManager
+              accounts={safeAccounts}
+              companies={safeCompanies}
+            />
+          </Card>
+        </section>
       </section>
     </AdminShell>
   );

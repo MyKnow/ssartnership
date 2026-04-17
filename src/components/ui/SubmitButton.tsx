@@ -11,12 +11,14 @@ export default function SubmitButton({
   variant,
   className,
   form,
+  disabled,
 }: {
   children: React.ReactNode;
   pendingText?: string;
   variant?: ButtonVariant;
   className?: string;
   form?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
 
@@ -25,7 +27,7 @@ export default function SubmitButton({
       type="submit"
       variant={variant}
       className={className}
-      disabled={pending}
+      disabled={pending || disabled}
       form={form}
     >
       <span className="inline-flex items-center gap-2">
