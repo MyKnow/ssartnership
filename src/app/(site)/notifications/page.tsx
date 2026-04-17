@@ -30,11 +30,11 @@ export default async function NotificationsPage() {
       <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10" size="wide">
-          <div className="mx-auto max-w-4xl space-y-6">
+          <div className="mx-auto max-w-2xl space-y-4">
             <ShellHeader
-              eyebrow="Notifications"
-              title="알림 설정"
-              description="기기별 푸시 알림 수신 여부와 세부 알림 항목을 관리합니다."
+              title="알림"
+              description="새 제휴, 종료 임박, 운영 공지만 간단하게 받아보세요."
+              className="px-5 py-4 sm:px-6 sm:py-5"
             />
             <PushSettingsCard
               initialPreferences={pushPreferences}

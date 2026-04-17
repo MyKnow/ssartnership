@@ -40,8 +40,9 @@ export default function CertificationCardFrame({
   return (
     <div
       className={cn(
-        "relative mx-auto min-h-[250px] min-w-0 max-w-2xl overflow-hidden rounded-[clamp(24px,4vw,38px)] border p-3 text-white shadow-2xl transform-gpu sm:aspect-[1.58/1] sm:min-h-0 sm:p-5",
+        "relative mx-auto min-h-[250px] min-w-0 max-w-2xl overflow-hidden rounded-[clamp(24px,4vw,38px)] border p-3 text-white shadow-2xl ring-1 transform-gpu sm:aspect-[1.58/1] sm:min-h-0 sm:p-5",
         scheme.cardClassName,
+        scheme.frameRingClassName,
         className,
       )}
     >
@@ -73,7 +74,6 @@ export default function CertificationCardFrame({
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.04),transparent_18%,transparent_84%,rgba(15,23,42,0.14))] mix-blend-soft-light" />
         <div className="absolute -right-14 -top-12 h-44 w-44 rounded-full border border-white/8 opacity-40" />
         <div className="absolute -right-2 top-14 h-20 w-20 rounded-full border border-white/7 opacity-30" />
-        <div className="absolute inset-x-6 top-0 h-px bg-white/12" />
         <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
       </div>
 
@@ -94,7 +94,7 @@ export default function CertificationCardFrame({
           <div className="flex flex-wrap items-center gap-2">
             {yearLabel ? <Badge className={scheme.yearChipClassName}>{yearLabel}</Badge> : null}
             {campusLabel ? (
-              <Badge className="bg-white/10 text-white/90 ring-1 ring-white/10">
+              <Badge className={scheme.campusBadgeClassName}>
                 {campusLabel}
               </Badge>
             ) : null}
@@ -107,7 +107,10 @@ export default function CertificationCardFrame({
             ) : null}
         </div>
 
-        <div className="relative aspect-square w-full self-start overflow-hidden rounded-[26px] border border-white/15 bg-white/10 shadow-[0_24px_50px_rgba(15,23,42,0.26)] ring-1 ring-white/10 animate-[cert-float_10s_ease-in-out_infinite] motion-reduce:animate-none row-start-1 col-start-2">
+        <div className={cn(
+          "relative aspect-square w-full self-start overflow-hidden rounded-[26px] border bg-white/10 shadow-[0_24px_50px_rgba(15,23,42,0.26)] ring-1 animate-[cert-float_10s_ease-in-out_infinite] motion-reduce:animate-none row-start-1 col-start-2",
+          scheme.avatarFrameClassName,
+        )}>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.24),transparent_35%)] opacity-80" />
           <div className="pointer-events-none absolute inset-x-3 top-3 h-px rounded-full bg-white/20" />
           <div className="pointer-events-none absolute inset-x-3 bottom-3 h-1 rounded-full bg-white/15" />

@@ -21,7 +21,7 @@ export function derivePushSettingsStatus(params: {
     return { label: "이 브라우저 미지원", tone: "muted" };
   }
   if (iosNeedsInstall) {
-    return { label: "홈 화면 설치 필요", tone: "warn" };
+    return { label: "앱 설치 필요", tone: "warn" };
   }
   if (isReceivingOnThisDevice) {
     return { label: "알림 수신 중", tone: "success" };

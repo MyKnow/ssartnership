@@ -183,6 +183,7 @@ export default function PartnerReviewSection({
   }
 
   const emptyState = reviews.length === 0;
+  const hasAnyReviews = summary.totalCount > 0;
   const listDescription = `${reviews.length}개`;
   const emptyTitle =
     rating !== "all"
@@ -235,67 +236,69 @@ export default function PartnerReviewSection({
 
       <PartnerReviewSummaryCard summary={summary} />
 
-      <Card padding="md">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_10rem] lg:items-end">
-          <div className="grid gap-1">
-            <span className="ui-caption">목록</span>
-            <p className="text-sm font-medium text-foreground">{listDescription}</p>
+      {hasAnyReviews ? (
+        <Card padding="md">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_10rem] lg:items-end">
+            <div className="grid gap-1">
+              <span className="ui-caption">목록</span>
+              <p className="text-sm font-medium text-foreground">{listDescription}</p>
+            </div>
+
+            <label className="grid gap-1">
+              <span className="ui-caption">별점</span>
+              <Select
+                value={rating}
+                onChange={(event) => {
+                  const nextRating = event.target.value as PartnerReviewRatingFilter;
+                  setComposerOpen(false);
+                  setEditingReviewId(null);
+                  void refreshList(sort, nextRating, onlyWithImages);
+                }}
+              >
+                {getPartnerReviewRatingOptions().map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+
+            <label className="grid gap-1">
+              <span className="ui-caption">정렬</span>
+              <Select
+                value={sort}
+                onChange={(event) => {
+                  const nextSort = event.target.value as PartnerReviewSort;
+                  setComposerOpen(false);
+                  setEditingReviewId(null);
+                  void refreshList(nextSort, rating, onlyWithImages);
+                }}
+              >
+                <option value="latest">최신순</option>
+                <option value="oldest">오래된 순</option>
+                <option value="rating_desc">높은 별점순</option>
+                <option value="rating_asc">낮은 별점순</option>
+              </Select>
+            </label>
+
+            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-foreground">
+              <input
+                type="checkbox"
+                checked={onlyWithImages}
+                onChange={(event) => {
+                  const nextOnlyWithImages = event.target.checked;
+                  setComposerOpen(false);
+                  setEditingReviewId(null);
+                  setOnlyWithImages(nextOnlyWithImages);
+                  void refreshList(sort, rating, nextOnlyWithImages);
+                }}
+                className="h-4 w-4 rounded border-border text-primary accent-primary"
+              />
+              사진만
+            </label>
           </div>
-
-          <label className="grid gap-1">
-            <span className="ui-caption">별점</span>
-            <Select
-              value={rating}
-              onChange={(event) => {
-                const nextRating = event.target.value as PartnerReviewRatingFilter;
-                setComposerOpen(false);
-                setEditingReviewId(null);
-                void refreshList(sort, nextRating, onlyWithImages);
-              }}
-            >
-              {getPartnerReviewRatingOptions().map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </label>
-
-          <label className="grid gap-1">
-            <span className="ui-caption">정렬</span>
-            <Select
-              value={sort}
-              onChange={(event) => {
-                const nextSort = event.target.value as PartnerReviewSort;
-                setComposerOpen(false);
-                setEditingReviewId(null);
-                void refreshList(nextSort, rating, onlyWithImages);
-              }}
-            >
-              <option value="latest">최신순</option>
-              <option value="oldest">오래된 순</option>
-              <option value="rating_desc">높은 별점순</option>
-              <option value="rating_asc">낮은 별점순</option>
-            </Select>
-          </label>
-
-          <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-foreground">
-            <input
-              type="checkbox"
-              checked={onlyWithImages}
-              onChange={(event) => {
-                const nextOnlyWithImages = event.target.checked;
-                setComposerOpen(false);
-                setEditingReviewId(null);
-                setOnlyWithImages(nextOnlyWithImages);
-                void refreshList(sort, rating, nextOnlyWithImages);
-              }}
-              className="h-4 w-4 rounded border-border text-primary accent-primary"
-            />
-            사진만
-          </label>
-        </div>
-      </Card>
+        </Card>
+      ) : null}
 
       {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
 

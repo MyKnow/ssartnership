@@ -170,45 +170,51 @@ export function NotificationsPageSkeleton() {
       <main>
         <Container className="pb-16 pt-10">
           <div className="mx-auto max-w-2xl">
-            <Skeleton className="h-8 w-28" />
-            <Skeleton className="mt-2 h-4 w-full max-w-md" />
+            <div className="rounded-[var(--radius-panel)] border border-border/70 bg-surface-overlay px-5 py-4 shadow-[var(--shadow-flat)] backdrop-blur-md sm:px-6 sm:py-5">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="mt-2 h-4 w-full max-w-sm" />
+            </div>
 
-            <Card className="mt-6 p-6">
+            <Card className="mt-4 p-6">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <Skeleton className="h-7 w-32" />
-                  <Skeleton className="mt-2 h-4 w-full max-w-lg" />
+                  <Skeleton className="h-7 w-24" />
+                  <Skeleton className="mt-2 h-4 w-full max-w-md" />
                 </div>
-                <Skeleton className="h-7 w-28 rounded-full" />
+                <Skeleton className="h-7 w-20 rounded-full" />
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <Skeleton className="h-24 w-full rounded-2xl" />
-                <Skeleton className="h-24 w-full rounded-2xl" />
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Skeleton className="h-8 w-20 rounded-full" />
+                <Skeleton className="h-8 w-24 rounded-full" />
+                <Skeleton className="h-8 w-20 rounded-full" />
               </div>
 
               <div className="mt-6 rounded-2xl border border-border bg-surface-muted p-4">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="mt-3 h-4 w-full max-w-xl" />
-                <Skeleton className="mt-2 h-4 w-full max-w-lg" />
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="mt-3 h-4 w-full max-w-lg" />
+                <Skeleton className="mt-2 h-4 w-full max-w-md" />
               </div>
 
-              <div className="mt-6 grid gap-3">
-                <div className="flex justify-end gap-2">
-                  <Skeleton className="h-12 w-36 rounded-full" />
-                  <Skeleton className="h-12 w-40 rounded-full" />
+              <div className="mt-6 grid gap-4">
+                <div className="rounded-2xl border border-border bg-surface p-4">
+                  <Skeleton className="h-5 w-28" />
+                  <Skeleton className="mt-2 h-4 w-full max-w-md" />
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <Skeleton className="h-12 w-40 rounded-full" />
+                    <Skeleton className="h-12 w-36 rounded-full" />
+                  </div>
                 </div>
                 <div className="grid gap-3">
+                  <Skeleton className="h-5 w-20" />
+                  <Skeleton className="h-12 w-36 rounded-full" />
                   {Array.from({ length: 3 }).map((_, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-muted p-4"
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4"
                     >
-                      <div className="min-w-0 flex-1">
-                        <Skeleton className="h-5 w-28" />
-                        <Skeleton className="mt-2 h-4 w-full max-w-sm" />
-                      </div>
-                      <Skeleton className="h-8 w-16 rounded-full" />
+                      <Skeleton className="h-5 w-24" />
+                      <Skeleton className="h-7 w-16 rounded-full" />
                     </div>
                   ))}
                 </div>
