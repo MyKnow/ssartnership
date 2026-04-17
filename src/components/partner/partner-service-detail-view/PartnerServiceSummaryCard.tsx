@@ -20,6 +20,8 @@ export default function PartnerServiceSummaryCard({
   thumbnailUrl: string;
   mapLink?: string | null;
 }) {
+  const categoryBadgeClass = "px-2 py-0.5 text-[10px] tracking-[0.06em]";
+
   return (
     <Card
       className="order-1 relative overflow-hidden p-6 xl:order-1"
@@ -32,7 +34,11 @@ export default function PartnerServiceSummaryCard({
       <div className="relative flex flex-col">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Badge
-            className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
+            className={
+              badgeStyle
+                ? categoryBadgeClass
+                : `${categoryBadgeClass} bg-surface-muted text-foreground`
+            }
             style={badgeStyle}
           >
             {context.categoryLabel}

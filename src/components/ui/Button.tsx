@@ -45,6 +45,7 @@ type ButtonProps = {
   title?: string;
   style?: React.CSSProperties;
   form?: string;
+  formAction?: React.ButtonHTMLAttributes<HTMLButtonElement>["formAction"];
 };
 
 function isInternalHref(href: string) {
@@ -79,6 +80,7 @@ export default function Button({
   title,
   style,
   form,
+  formAction,
 }: ButtonProps) {
   const isDisabled = Boolean(disabled || loading);
   const safeRel = buildLinkRel(target, rel);
@@ -147,6 +149,7 @@ export default function Button({
       title={title}
       style={style}
       form={form}
+      formAction={formAction}
       aria-busy={loading || undefined}
     >
       {content}

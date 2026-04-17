@@ -11,13 +11,13 @@ export default function PartnerCardMedia({
   const blurDataURL = getBlurDataURL(32, 32);
 
   return (
-    <div className="relative aspect-square w-28 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
+    <div className="relative aspect-square w-32 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted sm:w-36">
       {cachedThumbnailUrl ? (
         <Image
           src={cachedThumbnailUrl}
           alt=""
           fill
-          sizes="112px"
+          sizes="(max-width: 640px) 128px, 144px"
           className="object-cover"
           placeholder="blur"
           blurDataURL={blurDataURL}
@@ -45,4 +45,3 @@ export default function PartnerCardMedia({
     </div>
   );
 }
-

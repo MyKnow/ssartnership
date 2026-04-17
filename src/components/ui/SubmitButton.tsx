@@ -11,6 +11,7 @@ export default function SubmitButton({
   variant,
   className,
   form,
+  formAction,
   disabled,
 }: {
   children: React.ReactNode;
@@ -18,6 +19,7 @@ export default function SubmitButton({
   variant?: ButtonVariant;
   className?: string;
   form?: string;
+  formAction?: React.ButtonHTMLAttributes<HTMLButtonElement>["formAction"];
   disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
@@ -29,6 +31,7 @@ export default function SubmitButton({
       className={className}
       disabled={pending || disabled}
       form={form}
+      formAction={formAction}
     >
       <span className="inline-flex items-center gap-2">
         {pending ? <Spinner /> : null}

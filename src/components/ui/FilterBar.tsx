@@ -8,15 +8,17 @@ export default function FilterBar({
   title,
   description,
   trailing,
+  tone = "muted",
 }: {
   children: ReactNode;
   className?: string;
   title?: string;
   description?: string;
   trailing?: ReactNode;
+  tone?: "default" | "muted" | "elevated" | "hero";
 }) {
   return (
-    <Card tone="muted" padding="md" className={cn("space-y-4", className)}>
+    <Card tone={tone} padding="md" className={cn("space-y-4", className)}>
       {title ? (
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">

@@ -23,20 +23,18 @@ export default function PartnerFormActions({
         <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">
           {submitLabel ?? (mode === "create" ? "브랜드 추가" : "수정")}
         </SubmitButton>
-      </div>
 
-      {mode === "edit" && deleteAction && partnerId ? (
-        <form action={deleteAction}>
-          <input type="hidden" name="id" value={partnerId} />
+        {mode === "edit" && deleteAction && partnerId ? (
           <SubmitButton
             variant="danger"
             pendingText="삭제 중"
             className="w-full sm:w-auto"
+            formAction={deleteAction}
           >
             삭제
           </SubmitButton>
-        </form>
-      ) : null}
+        ) : null}
+      </div>
     </>
   );
 }

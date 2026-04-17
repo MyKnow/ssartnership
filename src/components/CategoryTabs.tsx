@@ -26,10 +26,10 @@ export default function CategoryTabs({
             type="button"
             onClick={() => onChange(option.key)}
             className={cn(
-              "flex min-h-11 min-w-11 flex-col gap-1 rounded-[1rem] border px-4 py-3 text-left shadow-[var(--shadow-flat)] transition-[transform,background-color,border-color,color,box-shadow] duration-200 ease-out",
+              "flex min-h-11 min-w-11 flex-col gap-0.5 rounded-[1rem] border px-4 py-2.5 text-left transition-[background-color,border-color,color,box-shadow] duration-200 ease-out",
               isActive
-                ? "border-primary bg-primary text-primary-foreground shadow-[var(--shadow-raised)]"
-                : "border-border bg-surface/90 text-foreground hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
+                ? "border-primary/20 bg-primary-soft text-primary shadow-[var(--shadow-flat)]"
+                : "border-border/80 bg-surface/95 text-foreground shadow-[var(--shadow-flat)] hover:border-strong hover:bg-surface-elevated",
             )}
           >
             <span className="text-sm font-semibold">{option.label}</span>
@@ -37,7 +37,7 @@ export default function CategoryTabs({
               <span
                 className={cn(
                   "text-xs leading-5",
-                  isActive ? "text-primary-foreground/80" : "text-muted-foreground",
+                  isActive ? "text-primary/80" : "text-muted-foreground",
                 )}
               >
                 {option.description}

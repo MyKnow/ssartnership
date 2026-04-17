@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import { cn } from "@/lib/cn";
 
 type PartnerAction = {
   href: string;
@@ -19,11 +20,18 @@ export default function PartnerCardActions({
   onInquiryClick: () => void;
 }) {
   if (isActive && (reservationAction || inquiryAction)) {
+    const hasBothActions = Boolean(reservationAction && inquiryAction);
+
     return (
-      <div className="mt-5 flex flex-col gap-2">
+      <div
+        className={cn(
+          "mt-5 gap-2",
+          hasBothActions ? "grid grid-cols-2" : "flex flex-col",
+        )}
+      >
         {reservationAction ? (
           <Button
-            variant="ghost"
+            variant="primary"
             href={reservationAction.href}
             target={reservationAction.href.startsWith("http") ? "_blank" : undefined}
             rel={reservationAction.href.startsWith("http") ? "noreferrer" : undefined}
@@ -35,11 +43,16 @@ export default function PartnerCardActions({
         ) : null}
         {inquiryAction ? (
           <Button
-            variant="ghost"
+            variant="primary"
             href={inquiryAction.href}
             target={inquiryAction.href.startsWith("http") ? "_blank" : undefined}
             rel={inquiryAction.href.startsWith("http") ? "noreferrer" : undefined}
-            className="w-full justify-center"
+            className={cn(
+              "w-full justify-center",
+              hasBothActions
+                ? "!border-primary/20 !bg-primary-foreground !text-primary shadow-[var(--shadow-flat)] hover:!bg-primary-soft hover:!text-primary-emphasis"
+                : null,
+            )}
             onClick={onInquiryClick}
           >
             {inquiryAction.label}
@@ -59,4 +72,3 @@ export default function PartnerCardActions({
 
   return null;
 }
-

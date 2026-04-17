@@ -30,7 +30,7 @@ export default function PartnerCardView({
   viewerAuthenticated?: boolean;
 }) {
   const router = useRouter();
-  const { badgeStyle, chipStyle } = createCategoryAccentStyles(categoryColor);
+  const { badgeStyle } = createCategoryAccentStyles(categoryColor);
   const {
     lockKind,
     thumbnailUrl,
@@ -103,7 +103,6 @@ export default function PartnerCardView({
         partner={partner}
         categoryLabel={categoryLabel}
         badgeStyle={badgeStyle}
-        chipStyle={chipStyle}
         detailHref={detailHref}
         canNavigate={canNavigate}
         mapLink={mapLink}

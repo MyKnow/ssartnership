@@ -1,7 +1,6 @@
 import type { MouseEvent } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
-import Chip from "@/components/ui/Chip";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import type { CategoryKey, Partner } from "@/lib/types";
 
@@ -9,7 +8,6 @@ export default function PartnerCardMeta({
   partner,
   categoryLabel,
   badgeStyle,
-  chipStyle,
   detailHref,
   canNavigate,
   mapLink,
@@ -21,7 +19,6 @@ export default function PartnerCardMeta({
   partner: Partner;
   categoryLabel?: string;
   badgeStyle?: React.CSSProperties;
-  chipStyle?: React.CSSProperties;
   detailHref: string;
   canNavigate: boolean;
   mapLink?: string | null;
@@ -37,59 +34,67 @@ export default function PartnerCardMeta({
         onCategoryClick(partner.category);
       }
     : null;
+  const categoryBadgeClass = "px-2 py-0.5 text-[10px] tracking-[0.06em]";
+  const categoryBadge = handleCategoryClick ? (
+    <button
+      type="button"
+      onClick={handleCategoryClick}
+      className="inline-flex min-h-10 min-w-10 items-center self-start"
+      aria-label={`${categoryLabel ?? "카테고리"} 필터 적용`}
+    >
+      <Badge
+        className={
+          badgeStyle
+            ? categoryBadgeClass
+            : `${categoryBadgeClass} bg-surface-muted text-foreground`
+        }
+        style={badgeStyle}
+      >
+        {categoryLabel}
+      </Badge>
+    </button>
+  ) : (
+    <Badge
+      className={
+        badgeStyle
+          ? categoryBadgeClass
+          : `${categoryBadgeClass} bg-surface-muted text-foreground`
+      }
+      style={badgeStyle}
+    >
+      {categoryLabel}
+    </Badge>
+  );
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        {handleCategoryClick ? (
-          <button
-            type="button"
-            onClick={handleCategoryClick}
-            className="inline-flex min-h-12 min-w-12 items-center"
-            aria-label={`${categoryLabel ?? "카테고리"} 필터 적용`}
-          >
-            <Badge
-              className={
-                badgeStyle ? undefined : "bg-surface-muted text-foreground"
-              }
-              style={badgeStyle}
-            >
-              {categoryLabel}
-            </Badge>
-          </button>
-        ) : (
-          <Badge
-            className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
-            style={badgeStyle}
-          >
-            {categoryLabel}
-          </Badge>
-        )}
-        <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
-          {partner.period.start} ~ {partner.period.end}
-        </span>
-      </div>
       <div className="flex items-start gap-4">
         {media}
         <div className="grid flex-1 gap-2">
-          <div className="flex items-center gap-2">
-            {canNavigate ? (
-              <Link
-                href={detailHref}
-                className="min-w-0 flex-1 text-left text-xl font-semibold leading-none text-foreground line-clamp-2 hover:underline"
-                aria-label={`${partner.name} 상세 보기`}
-                onClick={onTitleClick}
-              >
-                {partner.name}
-              </Link>
-            ) : (
-              <h3 className="min-w-0 flex-1 text-xl font-semibold leading-none text-foreground line-clamp-2">
-                {partner.name}
-              </h3>
-            )}
+          <div className="grid gap-1">
+            {categoryBadge}
+            <div className="flex items-center gap-2">
+              {canNavigate ? (
+                <Link
+                  href={detailHref}
+                  className="min-w-0 flex-1 text-left text-xl font-semibold leading-none text-foreground line-clamp-2 hover:underline"
+                  aria-label={`${partner.name} 상세 보기`}
+                  onClick={onTitleClick}
+                >
+                  {partner.name}
+                </Link>
+              ) : (
+                <h3 className="min-w-0 flex-1 text-xl font-semibold leading-none text-foreground line-clamp-2">
+                  {partner.name}
+                </h3>
+              )}
+            </div>
+          </div>
+          <div className="flex items-start justify-between gap-2 text-sm text-muted-foreground">
+            <span className="min-w-0 flex-1 leading-snug">{partner.location}</span>
             {mapLink ? (
               <a
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
+                className="inline-flex h-8 w-8 shrink-0 self-start items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
                 href={mapLink}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -115,22 +120,6 @@ export default function PartnerCardMeta({
               </a>
             ) : null}
           </div>
-          <div className="text-sm text-muted-foreground">
-            <span className="line-clamp-2">{partner.location}</span>
-          </div>
-        </div>
-      </div>
-      <div className="text-sm text-foreground">
-        <p className="font-medium text-foreground">이용 조건</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {partner.conditions.map((condition) => (
-            <Badge
-              key={condition}
-              className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-            >
-              {condition}
-            </Badge>
-          ))}
         </div>
       </div>
       <div className="text-sm text-foreground">
@@ -150,18 +139,6 @@ export default function PartnerCardMeta({
         <p className="font-medium text-foreground">적용 대상</p>
         <PartnerAudienceChips appliesTo={partner.appliesTo} className="mt-2" />
       </div>
-      {partner.tags && partner.tags.length > 0 ? (
-        <div className="text-sm text-foreground">
-          <p className="font-medium text-foreground">태그</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {partner.tags.map((tag) => (
-              <Chip key={tag} style={chipStyle}>
-                #{tag}
-              </Chip>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
