@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
+import {
+  deactivateAllMockPushDevices,
+  deactivateMockPushDevice,
+  isMockNotificationPreferenceMode,
+} from "@/lib/notification-preferences";
 import { getSignedUserSession } from "@/lib/user-auth";
 import {
   deactivateAllPushSubscriptions,
@@ -32,13 +37,21 @@ export async function POST(request: NextRequest) {
     };
     const scope = body?.scope === "all" ? "all" : "device";
     const preferences =
-      scope === "all"
-        ? await deactivateAllPushSubscriptions(session.userId)
-        : await deactivatePushSubscription({
-            memberId: session.userId,
-            endpoint: body?.endpoint ?? null,
-            subscriptionId: body?.subscriptionId ?? null,
-          });
+      isMockNotificationPreferenceMode()
+        ? scope === "all"
+          ? await deactivateAllMockPushDevices(session.userId)
+          : await deactivateMockPushDevice({
+              memberId: session.userId,
+              endpoint: body?.endpoint ?? null,
+              subscriptionId: body?.subscriptionId ?? null,
+            })
+        : scope === "all"
+          ? await deactivateAllPushSubscriptions(session.userId)
+          : await deactivatePushSubscription({
+              memberId: session.userId,
+              endpoint: body?.endpoint ?? null,
+              subscriptionId: body?.subscriptionId ?? null,
+            });
 
     await logProductEvent({
       ...context,
@@ -57,6 +70,7 @@ export async function POST(request: NextRequest) {
         announcementEnabled: preferences.announcementEnabled,
         newPartnerEnabled: preferences.newPartnerEnabled,
         expiringPartnerEnabled: preferences.expiringPartnerEnabled,
+        reviewEnabled: preferences.reviewEnabled,
       },
     });
 

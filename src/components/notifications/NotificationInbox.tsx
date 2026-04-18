@@ -7,7 +7,6 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import IconActionButton, { IconActionGroup } from "@/components/ui/IconActionButton";
-import InlineMessage from "@/components/ui/InlineMessage";
 import { useToast } from "@/components/ui/Toast";
 import {
   emitNotificationUnreadCount,
@@ -235,9 +234,9 @@ export default function NotificationInbox({
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-foreground sm:text-lg">수신함</h2>
         </div>
-        <Badge variant={state.unreadCount > 0 ? "danger" : "neutral"}>
-          안 읽음 {unreadLabel}
-        </Badge>
+        {state.unreadCount > 0 ? (
+          <Badge variant="danger">안 읽음 {unreadLabel}</Badge>
+        ) : null}
       </div>
 
       {state.items.length > 0 ? (
@@ -348,14 +347,25 @@ export default function NotificationInbox({
           })}
         </div>
       ) : (
-        <div className="px-4 py-4 sm:px-6 sm:py-5">
-          <InlineMessage
-            tone="info"
-            title="도착한 알림이 없습니다"
-            description="새 제휴와 운영 공지가 생기면 이곳에 표시됩니다."
-            actionHref="/"
-            actionLabel="혜택 둘러보기"
-          />
+        <div className="px-4 py-6 sm:px-5 sm:py-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">
+                아직 도착한 알림이 없습니다
+              </p>
+              <p className="text-sm text-muted-foreground">
+                알림이 도착하면 이곳에 표시됩니다.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              href="/"
+              className="w-full justify-center sm:w-auto"
+            >
+              혜택 둘러보기
+            </Button>
+          </div>
         </div>
       )}
 

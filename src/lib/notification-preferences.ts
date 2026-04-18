@@ -4,7 +4,7 @@ import {
   getMemberPushPreferences,
   upsertMemberPushPreferences,
 } from "@/lib/push";
-import type { PushPreferenceState } from "@/lib/push";
+import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
 
 export type NotificationPreferenceState = PushPreferenceState;
 
@@ -15,6 +15,7 @@ const hasSupabaseEnv =
 const useMockPreferences = dataSource === "mock" || !hasSupabaseEnv;
 
 const mockPreferenceStore = new Map<string, PushPreferenceState>();
+const mockPushDeviceStore = new Map<string, PushSubscriptionDevice[]>();
 
 function getMockPreferences(memberId: string) {
   const current = mockPreferenceStore.get(memberId);
@@ -24,6 +25,88 @@ function getMockPreferences(memberId: string) {
   const initial = { ...DEFAULT_PUSH_PREFERENCES };
   mockPreferenceStore.set(memberId, initial);
   return initial;
+}
+
+function getMockDeviceLabel(userAgent: string | null) {
+  const source = userAgent ?? "";
+  const browser = source.includes("Chrome")
+    ? "Chrome"
+    : source.includes("Safari")
+      ? "Safari"
+      : source.includes("Firefox")
+        ? "Firefox"
+        : "브라우저";
+  const os = source.includes("Mac")
+    ? "macOS"
+    : source.includes("Windows")
+      ? "Windows"
+      : source.includes("Android")
+        ? "Android"
+        : source.includes("iPhone") || source.includes("iPad")
+          ? "iOS"
+          : "기기";
+
+  return `${browser} · ${os}`;
+}
+
+export function isMockNotificationPreferenceMode() {
+  return useMockPreferences;
+}
+
+export function listMockPushDevices(
+  memberId: string,
+  currentEndpoint?: string | null,
+) {
+  return (mockPushDeviceStore.get(memberId) ?? []).map((device) => ({
+    ...device,
+    isCurrent: Boolean(currentEndpoint && device.id === currentEndpoint),
+  }));
+}
+
+export function upsertMockPushDevice(params: {
+  memberId: string;
+  endpoint: string;
+  userAgent?: string | null;
+}) {
+  const now = new Date().toISOString();
+  const devices = mockPushDeviceStore.get(params.memberId) ?? [];
+  const nextDevice: PushSubscriptionDevice = {
+    id: params.endpoint,
+    label: getMockDeviceLabel(params.userAgent ?? null),
+    userAgent: params.userAgent ?? null,
+    isCurrent: true,
+    createdAt:
+      devices.find((device) => device.id === params.endpoint)?.createdAt ?? now,
+    updatedAt: now,
+    lastSuccessAt: null,
+  };
+  mockPushDeviceStore.set(params.memberId, [
+    nextDevice,
+    ...devices.filter((device) => device.id !== params.endpoint),
+  ]);
+  return updateMemberNotificationPreferences(params.memberId, { enabled: true });
+}
+
+export function deactivateMockPushDevice(params: {
+  memberId: string;
+  endpoint?: string | null;
+  subscriptionId?: string | null;
+}) {
+  const targetId = params.subscriptionId ?? params.endpoint;
+  if (targetId) {
+    mockPushDeviceStore.set(
+      params.memberId,
+      (mockPushDeviceStore.get(params.memberId) ?? []).filter(
+        (device) => device.id !== targetId,
+      ),
+    );
+  }
+  return getMemberNotificationPreferences(params.memberId);
+}
+
+export function deactivateAllMockPushDevices(memberId: string) {
+  mockPushDeviceStore.set(memberId, []);
+  return updateMemberNotificationPreferences(memberId, { enabled: false });
 }
 
 export async function getMemberNotificationPreferences(memberId: string) {

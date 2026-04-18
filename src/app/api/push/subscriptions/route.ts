@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isMockNotificationPreferenceMode,
+  listMockPushDevices,
+} from "@/lib/notification-preferences";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { listPushSubscriptionDevices } from "@/lib/push";
 
@@ -21,10 +25,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const currentEndpoint = request.nextUrl.searchParams.get("currentEndpoint");
-    const devices = await listPushSubscriptionDevices({
-      memberId: session.userId,
-      currentEndpoint,
-    });
+    const devices = isMockNotificationPreferenceMode()
+      ? listMockPushDevices(session.userId, currentEndpoint)
+      : await listPushSubscriptionDevices({
+          memberId: session.userId,
+          currentEndpoint,
+        });
 
     return NextResponse.json({ ok: true, devices });
   } catch (error) {

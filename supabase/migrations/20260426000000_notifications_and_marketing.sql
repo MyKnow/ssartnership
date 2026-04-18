@@ -38,7 +38,7 @@ values (
 
 ## 4. 문의
 마케팅 정보 수신 관련 문의는 아래 연락처로 접수합니다.
-- 책임자: myknow
+- 책임자: 정민호
 - 이메일: myknow00@naver.com$$,
   true,
   now()
