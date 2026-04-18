@@ -1,5 +1,10 @@
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 import {
+  applyPartnerMetricRollupRows,
+  fetchPartnerMetricRollupRows,
+  PARTNER_METRIC_EVENT_NAMES,
+} from "./partner-metric-rollups.ts";
+import {
   type PartnerPortalCompanyDashboard,
   type PartnerPortalDashboard,
   type PartnerPortalServiceDashboard,
@@ -77,82 +82,6 @@ function normalizeSupabaseCompanyIds(companyIds: string[]) {
         .filter((id): id is string => Boolean(id) && isUuid(id)),
     ),
   ];
-}
-
-async function countPartnerEvent(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  partnerId: string,
-  eventName: string,
-  onError: () => void,
-) {
-  const { count, error } = await supabase
-    .from("event_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("target_type", "partner")
-    .eq("target_id", partnerId)
-    .eq("event_name", eventName);
-
-  if (error) {
-    onError();
-    console.error("[partner-dashboard] event metric query failed", {
-      partnerId,
-      eventName,
-      message: error.message,
-    });
-    return 0;
-  }
-
-  return count ?? 0;
-}
-
-async function getServiceMetrics(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  partnerId: string,
-  onError: () => void,
-) {
-  const [
-    detailViews,
-    cardClicks,
-    mapClicks,
-    reservationClicks,
-    inquiryClicks,
-    reviewCount,
-  ] = await Promise.all([
-    countPartnerEvent(supabase, partnerId, "partner_detail_view", onError),
-    countPartnerEvent(supabase, partnerId, "partner_card_click", onError),
-    countPartnerEvent(supabase, partnerId, "partner_map_click", onError),
-    countPartnerEvent(supabase, partnerId, "reservation_click", onError),
-    countPartnerEvent(supabase, partnerId, "inquiry_click", onError),
-    (async () => {
-      const { count, error } = await supabase
-        .from("partner_reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", partnerId)
-        .is("deleted_at", null);
-
-      if (error) {
-        onError();
-        console.error("[partner-dashboard] review metric query failed", {
-          partnerId,
-          message: error.message,
-        });
-        return 0;
-      }
-
-      return count ?? 0;
-    })(),
-  ]);
-
-  return {
-    detailViews,
-    cardClicks,
-    mapClicks,
-    reservationClicks,
-    inquiryClicks,
-    reviewCount,
-    totalClicks:
-      cardClicks + mapClicks + reservationClicks + inquiryClicks,
-  } satisfies PartnerPortalServiceMetrics;
 }
 
 function toServiceDashboard(
@@ -262,13 +191,56 @@ export async function getSupabasePartnerPortalDashboard(
     statusByPartnerId.set(request.partner_id, request.status ?? null);
   }
 
-  const serviceMetricsEntries = await Promise.all(
+  const serviceMetricsEntries = serviceRows.map((row) => [
+    row.id,
+    createEmptyMetrics(),
+  ] as const);
+  const metricsByServiceId = new Map(serviceMetricsEntries);
+
+  const rollupResult = await fetchPartnerMetricRollupRows(supabase, {
+    partnerIds: serviceRows.map((serviceRow) => serviceRow.id),
+    metricNames: PARTNER_METRIC_EVENT_NAMES,
+    granularity: "total",
+  });
+
+  if (rollupResult.errorMessage) {
+    markPartialFailure();
+    console.error(
+      "[partner-dashboard] event metric query failed",
+      rollupResult.errorMessage,
+    );
+  } else {
+    applyPartnerMetricRollupRows(metricsByServiceId, rollupResult.rows);
+  }
+
+  const reviewCountResult = await Promise.all(
     serviceRows.map(async (row) => {
-      const metrics = await getServiceMetrics(supabase, row.id, markPartialFailure);
-      return [row.id, metrics] as const;
+      const { count, error } = await supabase
+        .from("partner_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("partner_id", row.id)
+        .is("deleted_at", null);
+
+      if (error) {
+        markPartialFailure();
+        console.error("[partner-dashboard] review metric query failed", {
+          partnerId: row.id,
+          message: error.message,
+        });
+        return [row.id, 0] as const;
+      }
+
+      return [row.id, count ?? 0] as const;
     }),
   );
-  const metricsByServiceId = new Map(serviceMetricsEntries);
+
+  for (const [partnerId, reviewCount] of reviewCountResult) {
+    const metrics = metricsByServiceId.get(partnerId);
+    if (!metrics) {
+      continue;
+    }
+    metrics.reviewCount = reviewCount;
+  }
 
   const companies = companyRows.map((row) => {
     const services = serviceRows

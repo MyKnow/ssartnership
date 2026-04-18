@@ -1,26 +1,16 @@
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
+import {
+  applyPartnerMetricRollupRows,
+  fetchPartnerMetricRollupRows,
+  PARTNER_METRIC_EVENT_NAMES,
+} from "@/lib/partner-metric-rollups";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const PARTNER_ADMIN_METRICS_WARNING_MESSAGE =
   "일부 브랜드 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
-
-type PartnerEventName =
-  | "partner_detail_view"
-  | "partner_card_click"
-  | "partner_map_click"
-  | "reservation_click"
-  | "inquiry_click";
-
-const TRACKED_EVENT_NAMES: PartnerEventName[] = [
-  "partner_detail_view",
-  "partner_card_click",
-  "partner_map_click",
-  "reservation_click",
-  "inquiry_click",
-];
 
 export type AdminPartnerMetricsResult = {
   metricsByPartnerId: Map<string, PartnerPortalServiceMetrics>;
@@ -31,35 +21,6 @@ function createMetricsMap(partnerIds: string[]) {
   return new Map(
     partnerIds.map((partnerId) => [partnerId, createEmptyPartnerServiceMetrics()]),
   );
-}
-
-function applyEventCount(
-  metrics: PartnerPortalServiceMetrics,
-  eventName: PartnerEventName,
-) {
-  switch (eventName) {
-    case "partner_detail_view":
-      metrics.detailViews += 1;
-      break;
-    case "partner_card_click":
-      metrics.cardClicks += 1;
-      break;
-    case "partner_map_click":
-      metrics.mapClicks += 1;
-      break;
-    case "reservation_click":
-      metrics.reservationClicks += 1;
-      break;
-    case "inquiry_click":
-      metrics.inquiryClicks += 1;
-      break;
-  }
-
-  metrics.totalClicks =
-    metrics.cardClicks +
-    metrics.mapClicks +
-    metrics.reservationClicks +
-    metrics.inquiryClicks;
 }
 
 function getMockMetrics(partnerId: string) {
@@ -97,12 +58,11 @@ export async function getAdminPartnerMetrics(
   let hasPartialFailure = false;
 
   const [eventResult, reviewResult] = await Promise.all([
-    supabase
-      .from("event_logs")
-      .select("target_id,event_name")
-      .eq("target_type", "partner")
-      .in("target_id", uniquePartnerIds)
-      .in("event_name", TRACKED_EVENT_NAMES),
+    fetchPartnerMetricRollupRows(supabase, {
+      partnerIds: uniquePartnerIds,
+      metricNames: PARTNER_METRIC_EVENT_NAMES,
+      granularity: "total",
+    }),
     supabase
       .from("partner_reviews")
       .select("partner_id")
@@ -110,17 +70,11 @@ export async function getAdminPartnerMetrics(
       .is("deleted_at", null),
   ]);
 
-  if (eventResult.error) {
+  if (eventResult.errorMessage) {
     hasPartialFailure = true;
-    console.error("[admin-partner-metrics] event query failed", eventResult.error.message);
+    console.error("[admin-partner-metrics] event query failed", eventResult.errorMessage);
   } else {
-    for (const row of eventResult.data ?? []) {
-      const metrics = metricsByPartnerId.get(row.target_id ?? "");
-      if (!metrics) {
-        continue;
-      }
-      applyEventCount(metrics, row.event_name as PartnerEventName);
-    }
+    applyPartnerMetricRollupRows(metricsByPartnerId, eventResult.rows);
   }
 
   if (reviewResult.error) {

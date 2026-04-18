@@ -1,4 +1,9 @@
 import type { PartnerPortalServiceMetrics } from "./partner-dashboard.ts";
+import {
+  applyPartnerMetricRollupRows,
+  fetchPartnerMetricRollupRows,
+  PARTNER_METRIC_EVENT_NAMES,
+} from "./partner-metric-rollups.ts";
 import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store.ts";
 import { isPartnerPortalMock } from "./partner-portal.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
@@ -23,88 +28,6 @@ export function createEmptyPartnerServiceMetrics(): PartnerPortalServiceMetrics 
   };
 }
 
-async function countPartnerEvent(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  partnerId: string,
-  eventName: string,
-  onError: () => void,
-) {
-  const { count, error } = await supabase
-    .from("event_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("target_type", "partner")
-    .eq("target_id", partnerId)
-    .eq("event_name", eventName);
-
-  if (error) {
-    onError();
-    console.error("[partner-service-metrics] event query failed", {
-      partnerId,
-      eventName,
-      message: error.message,
-    });
-    return 0;
-  }
-
-  return count ?? 0;
-}
-
-async function getSupabasePartnerServiceMetrics(
-  partnerId: string,
-): Promise<PartnerServiceMetricsSnapshot> {
-  const supabase = getSupabaseAdminClient();
-  let hasPartialFailure = false;
-  const markPartialFailure = () => {
-    hasPartialFailure = true;
-  };
-
-  const [
-    detailViews,
-    cardClicks,
-    mapClicks,
-    reservationClicks,
-    inquiryClicks,
-    reviewCount,
-  ] = await Promise.all([
-    countPartnerEvent(supabase, partnerId, "partner_detail_view", markPartialFailure),
-    countPartnerEvent(supabase, partnerId, "partner_card_click", markPartialFailure),
-    countPartnerEvent(supabase, partnerId, "partner_map_click", markPartialFailure),
-    countPartnerEvent(supabase, partnerId, "reservation_click", markPartialFailure),
-    countPartnerEvent(supabase, partnerId, "inquiry_click", markPartialFailure),
-    (async () => {
-      const { count, error } = await supabase
-        .from("partner_reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", partnerId)
-        .is("deleted_at", null);
-
-      if (error) {
-        markPartialFailure();
-        console.error("[partner-service-metrics] review query failed", {
-          partnerId,
-          message: error.message,
-        });
-        return 0;
-      }
-
-      return count ?? 0;
-    })(),
-  ]);
-
-  return {
-    metrics: {
-      detailViews,
-      cardClicks,
-      mapClicks,
-      reservationClicks,
-      inquiryClicks,
-      reviewCount,
-      totalClicks: cardClicks + mapClicks + reservationClicks + inquiryClicks,
-    },
-    warningMessage: hasPartialFailure ? PARTNER_SERVICE_METRICS_WARNING_MESSAGE : null,
-  };
-}
-
 function getMockPartnerServiceMetrics(partnerId: string): PartnerServiceMetricsSnapshot {
   const setup = listMockPartnerPortalSetupsInternal().find((candidate) =>
     candidate.company.services.some((service) => service.id === partnerId),
@@ -126,5 +49,54 @@ export async function getPartnerServiceMetrics(
     return getMockPartnerServiceMetrics(partnerId);
   }
 
-  return getSupabasePartnerServiceMetrics(partnerId);
+  const supabase = getSupabaseAdminClient();
+  let hasPartialFailure = false;
+  const markPartialFailure = () => {
+    hasPartialFailure = true;
+  };
+  const metrics = createEmptyPartnerServiceMetrics();
+
+  const [rollupResult, reviewResult] = await Promise.all([
+    fetchPartnerMetricRollupRows(supabase, {
+      partnerIds: [partnerId],
+      metricNames: PARTNER_METRIC_EVENT_NAMES,
+      granularity: "total",
+    }),
+    (async () => {
+      const { count, error } = await supabase
+        .from("partner_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("partner_id", partnerId)
+        .is("deleted_at", null);
+
+      if (error) {
+        markPartialFailure();
+        console.error("[partner-service-metrics] review query failed", {
+          partnerId,
+          message: error.message,
+        });
+        return 0;
+      }
+
+      return count ?? 0;
+    })(),
+  ]);
+
+  if (rollupResult.errorMessage) {
+    markPartialFailure();
+    console.error("[partner-service-metrics] event query failed", {
+      partnerId,
+      message: rollupResult.errorMessage,
+    });
+  } else {
+    const metricsByPartnerId = new Map([[partnerId, metrics]]);
+    applyPartnerMetricRollupRows(metricsByPartnerId, rollupResult.rows);
+  }
+
+  metrics.reviewCount = reviewResult;
+
+  return {
+    metrics,
+    warningMessage: hasPartialFailure ? PARTNER_SERVICE_METRICS_WARNING_MESSAGE : null,
+  };
 }
