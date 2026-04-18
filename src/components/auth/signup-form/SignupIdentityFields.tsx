@@ -67,7 +67,7 @@ export default function SignupIdentityFields({
               <Button
                 key={optionYear}
                 type="button"
-                variant={selected ? "primary" : "ghost"}
+                variant={selected ? "primary" : "secondary"}
                 className="w-full justify-center rounded-2xl"
                 onClick={() => {
                   if (step !== "verify") {

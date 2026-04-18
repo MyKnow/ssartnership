@@ -2,6 +2,7 @@
 
 import type { Ref } from "react";
 import Link from "next/link";
+import { ArrowTopRightOnSquareIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { getFieldErrorClass } from "@/components/ui/form-field-state";
 import { getPolicyHref, getPolicyKindLabel, type PolicyDocument } from "@/lib/policy-documents";
 
@@ -25,51 +26,64 @@ export default function PolicyAgreementField({
   required = true,
 }: PolicyAgreementFieldProps) {
   const inputId = `policy-${policy.kind}-${policy.version}`;
+  const effectiveDate = new Date(policy.effective_at).toLocaleDateString("ko-KR");
+  const label = getPolicyKindLabel(policy.kind);
+  const agreementLabel = label.endsWith("동의") ? label : `${label} 동의`;
 
   return (
     <div className={getFieldErrorClass(
       invalid,
-      "rounded-2xl border border-border/70 bg-background/70 p-4",
+      "relative rounded-2xl border border-border/60 bg-background/35 p-3 pr-12 transition-colors",
     )}>
-      <div className="flex items-start gap-3">
-        <input
-          ref={inputRef}
-          id={inputId}
-          type="checkbox"
-          className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/30"
-          checked={checked}
-          onChange={(event) => onChange(event.target.checked)}
-          disabled={disabled}
-          aria-invalid={invalid || undefined}
-        />
-        <div className="min-w-0 flex-1">
+      <div className="flex min-h-9 items-center gap-3">
+        <label
+          htmlFor={inputId}
+          className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-2xl has-[:disabled]:cursor-not-allowed"
+        >
+          <input
+            ref={inputRef}
+            id={inputId}
+            type="checkbox"
+            className="peer sr-only"
+            checked={checked}
+            onChange={(event) => onChange(event.target.checked)}
+            disabled={disabled}
+            aria-invalid={invalid || undefined}
+          />
+          <span
+            aria-hidden="true"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-border/70 bg-surface text-transparent shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)] active:bg-primary/10 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:hover:border-primary peer-checked:hover:bg-primary peer-checked:hover:text-primary-foreground peer-checked:active:bg-primary peer-focus-visible:border-primary/60 peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15 peer-disabled:opacity-60 peer-disabled:hover:border-border/70 peer-disabled:hover:bg-surface peer-disabled:hover:shadow-[var(--shadow-flat)] peer-checked:peer-disabled:hover:bg-primary"
+          >
+            <CheckIcon className="h-5 w-5 stroke-[2.4]" />
+          </span>
+        </label>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 self-center">
           <label
             htmlFor={inputId}
-            className="block text-sm font-semibold text-foreground"
+            className="min-w-0 shrink text-sm font-semibold leading-snug text-foreground"
           >
-            [{required ? "필수" : "선택"}] {getPolicyKindLabel(policy.kind)} 동의
+            [{required ? "필수" : "선택"}] {agreementLabel}
           </label>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {policy.summary ?? "약관 전문을 확인한 뒤 동의해 주세요."}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="inline-flex h-5 items-center rounded-full border border-border/70 bg-surface px-2 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)]">
               v{policy.version}
             </span>
-            <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
-              시행 {new Date(policy.effective_at).toLocaleDateString("ko-KR")}
+            <span className="inline-flex h-5 items-center rounded-full border border-border/70 bg-surface px-2 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)]">
+              시행 {effectiveDate}
             </span>
-            <Link
-              href={getPolicyHref(policy.kind, policy.version)}
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium text-primary hover:opacity-80"
-            >
-              상세 보기
-            </Link>
           </div>
         </div>
       </div>
+      <Link
+        href={getPolicyHref(policy.kind, policy.version)}
+        target="_blank"
+        rel="noreferrer"
+        className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-surface text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"
+        aria-label={`${getPolicyKindLabel(policy.kind)} 상세 보기`}
+        title="상세 보기"
+      >
+        <ArrowTopRightOnSquareIcon className="h-4 w-4" aria-hidden="true" />
+      </Link>
     </div>
   );
 }

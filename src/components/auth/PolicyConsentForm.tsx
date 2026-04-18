@@ -11,11 +11,13 @@ import type { PolicyDocument, RequiredPolicyMap } from "@/lib/policy-documents";
 
 type PolicyConsentFormProps = {
   policies: RequiredPolicyMap;
+  marketingPolicy?: PolicyDocument | null;
   mustChangePassword: boolean;
 };
 
 export default function PolicyConsentForm({
   policies,
+  marketingPolicy,
   mustChangePassword,
 }: PolicyConsentFormProps) {
   const router = useRouter();
@@ -30,17 +32,25 @@ export default function PolicyConsentForm({
   const [pending, setPending] = useState(false);
   const serviceRef = useRef<HTMLInputElement>(null);
 
+  const formatAgreedAt = (value: string) =>
+    new Intl.DateTimeFormat("ko-KR", {
+      dateStyle: "long",
+      timeStyle: "short",
+      timeZone: "Asia/Seoul",
+    }).format(new Date(value));
+
   const handleSubmit = async () => {
     if (pending) {
       return;
     }
 
-    if (!checked.service || !checked.privacy) {
-      setAgreementError("필수 약관에 모두 동의해 주세요.");
-      setFormError(null);
-      focusField(serviceRef);
-      return;
-    }
+    const nextChecked = {
+      service: true,
+      privacy: true,
+      marketing: Boolean(marketingPolicy),
+    } satisfies Record<PolicyDocument["kind"], boolean>;
+
+    setChecked(nextChecked);
 
     setAgreementError(null);
     setFormError(null);
@@ -53,6 +63,8 @@ export default function PolicyConsentForm({
         body: JSON.stringify({
           servicePolicyId: policies.service.id,
           privacyPolicyId: policies.privacy.id,
+          marketingPolicyId: marketingPolicy?.id ?? null,
+          marketingPolicyChecked: nextChecked.marketing,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -75,7 +87,11 @@ export default function PolicyConsentForm({
 
       setAgreementError(null);
       setFormError(null);
-      notify("약관 동의가 완료되었습니다.");
+      notify(
+        marketingPolicy && data.marketingAgreedAt
+          ? `필수 약관 및 마케팅 정보 수신 동의가 ${formatAgreedAt(data.agreedAt)}에 완료되었습니다.`
+          : `필수 약관 동의가 ${formatAgreedAt(data.agreedAt)}에 완료되었습니다.`,
+      );
       router.replace(
         data.redirectTo ??
           (mustChangePassword ? "/auth/change-password" : "/"),
@@ -110,12 +126,26 @@ export default function PolicyConsentForm({
         disabled={pending}
         invalid={Boolean(agreementError)}
       />
+      {marketingPolicy ? (
+        <PolicyAgreementField
+          policy={marketingPolicy}
+          checked={checked.marketing}
+          onChange={(next) => {
+            setChecked((prev) => ({ ...prev, marketing: next }));
+            setAgreementError(null);
+            setFormError(null);
+          }}
+          disabled={pending}
+          invalid={false}
+          required={false}
+        />
+      ) : null}
 
       {agreementError ? <FormMessage variant="error">{agreementError}</FormMessage> : null}
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
       <Button onClick={handleSubmit} loading={pending} loadingText="동의 처리 중">
-        약관 동의 후 계속하기
+        약관 전부 동의하고 계속하기
       </Button>
     </div>
   );

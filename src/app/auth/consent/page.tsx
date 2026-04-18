@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import PolicyConsentForm from "@/components/auth/PolicyConsentForm";
 import { getHeaderSession } from "@/lib/header-session";
 import { getUserSession } from "@/lib/user-auth";
-import { getActiveRequiredPolicies } from "@/lib/policy-documents";
+import { getActiveRequiredPolicies, getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -31,6 +31,7 @@ export default async function ConsentPage() {
   }
 
   const policies = await getActiveRequiredPolicies();
+  const marketingPolicy = await getPolicyDocumentByKind("marketing").catch(() => null);
   const headerSession = await getHeaderSession(session.userId);
 
   return (
@@ -46,6 +47,7 @@ export default async function ConsentPage() {
             </p>
             <PolicyConsentForm
               policies={policies}
+              marketingPolicy={marketingPolicy}
               mustChangePassword={Boolean(session.mustChangePassword)}
             />
           </Card>

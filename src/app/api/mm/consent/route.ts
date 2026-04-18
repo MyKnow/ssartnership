@@ -3,7 +3,9 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getUserSession } from "@/lib/user-auth";
 import {
   getActiveRequiredPolicies,
+  getPolicyDocumentByKind,
   getSelectedPolicyValidationError,
+  recordMarketingPolicyConsent,
   recordRequiredPolicyConsent,
 } from "@/lib/policy-documents";
 
@@ -27,6 +29,8 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as {
       servicePolicyId?: string;
       privacyPolicyId?: string;
+      marketingPolicyId?: string | null;
+      marketingPolicyChecked?: boolean;
     };
 
     if (!payload.servicePolicyId || !payload.privacyPolicyId) {
@@ -42,7 +46,14 @@ export async function POST(request: Request) {
     }
 
     const activePolicies = await getActiveRequiredPolicies();
-    const validationError = getSelectedPolicyValidationError(payload, activePolicies);
+    const activeMarketingPolicy = payload.marketingPolicyChecked
+      ? await getPolicyDocumentByKind("marketing")
+      : null;
+    const validationError = getSelectedPolicyValidationError(
+      payload,
+      activePolicies,
+      activeMarketingPolicy,
+    );
     if (validationError) {
       await logAuthSecurity({
         ...context,
@@ -58,9 +69,16 @@ export async function POST(request: Request) {
       );
     }
 
-    await recordRequiredPolicyConsent({
+    const agreedAt = await recordRequiredPolicyConsent({
       memberId: session.userId,
       activePolicies,
+      ipAddress: context.ipAddress ?? null,
+      userAgent: context.userAgent ?? null,
+    });
+    const marketingAgreedAt = await recordMarketingPolicyConsent({
+      memberId: session.userId,
+      activePolicy: activeMarketingPolicy,
+      agreed: Boolean(payload.marketingPolicyChecked),
       ipAddress: context.ipAddress ?? null,
       userAgent: context.userAgent ?? null,
     });
@@ -74,11 +92,15 @@ export async function POST(request: Request) {
       properties: {
         serviceVersion: activePolicies.service.version,
         privacyVersion: activePolicies.privacy.version,
+        marketingVersion: activeMarketingPolicy?.version ?? null,
+        marketingChecked: Boolean(payload.marketingPolicyChecked),
       },
     });
 
     return NextResponse.json({
       ok: true,
+      agreedAt,
+      marketingAgreedAt,
       redirectTo: session.mustChangePassword ? "/auth/change-password" : "/",
     });
   } catch (error) {

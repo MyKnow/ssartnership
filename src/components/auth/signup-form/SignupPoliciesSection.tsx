@@ -22,7 +22,7 @@ export default function SignupPoliciesSection({
   onPolicyChange: (key: keyof SignupPolicyState, checked: boolean) => void;
 }) {
   return (
-    <section className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+    <section className="rounded-2xl border border-border/70 bg-surface px-4 py-4 shadow-[var(--shadow-flat)]">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold text-foreground">필수 약관 동의</h2>
         <p className="text-sm text-muted-foreground">
