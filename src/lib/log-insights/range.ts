@@ -6,6 +6,10 @@ import type {
   TimedLogRow,
 } from './shared';
 import { DEFAULT_PRESET, RANGE_PRESET_MS } from './shared';
+import {
+  formatKoreanDate,
+  formatKoreanDateTime,
+} from "@/lib/datetime";
 
 function isRangePreset(value: string | null | undefined): value is LogRangePreset {
   return (
@@ -27,13 +31,12 @@ function parseDateInput(value?: string | null) {
 }
 
 export function formatRangeDateTime(date: Date) {
-  return date.toLocaleString('ko-KR', {
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
+  return formatKoreanDateTime(date, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -80,18 +83,14 @@ export function getBucketSizeMs(durationMs: number) {
 
 function formatBucketLabel(start: Date, bucketSizeMs: number) {
   if (bucketSizeMs <= 2 * 60 * 60 * 1000) {
-    return start.toLocaleString('ko-KR', {
-      hour12: false,
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
+    return formatKoreanDateTime(start, {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
-  return start.toLocaleDateString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-  });
+  return formatKoreanDate(start);
 }
 
 function formatBucketRangeLabel(start: Date, end: Date) {

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
   formatSsafyMemberLifecycleLabel,
   formatSsafyYearLabel,
@@ -27,15 +28,6 @@ type AdminMember = {
   updated_at?: string | null;
 };
 
-const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Asia/Seoul",
-});
-
 function formatDateTime(value?: string | null) {
   if (!value) {
     return "-";
@@ -44,7 +36,7 @@ function formatDateTime(value?: string | null) {
   if (Number.isNaN(parsed.getTime())) {
     return "-";
   }
-  return dateTimeFormatter.format(parsed);
+  return formatKoreanDateTimeToMinute(parsed);
 }
 
 export default function AdminMemberCard({

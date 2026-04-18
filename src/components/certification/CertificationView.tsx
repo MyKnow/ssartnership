@@ -15,6 +15,7 @@ import {
 } from "@/lib/certification-scheme";
 import CertificationCardFrame from "@/components/certification/CertificationCardFrame";
 import CertificationQrButton from "@/components/certification/CertificationQrButton";
+import { formatKoreanDateTime } from "@/lib/datetime";
 
 type Member = {
   id?: string | null;
@@ -99,21 +100,18 @@ export default function CertificationView({
   }, [isAvatarOpen]);
 
   const dateLabel = useMemo(() => {
-    return now.toLocaleDateString("ko-KR", {
+    return formatKoreanDateTime(now, {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-      timeZone: "Asia/Seoul",
     });
   }, [now]);
 
   const timeLabel = useMemo(() => {
-    return now.toLocaleTimeString("ko-KR", {
-      hour12: false,
+    return formatKoreanDateTime(now, {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-      timeZone: "Asia/Seoul",
     });
   }, [now]);
 

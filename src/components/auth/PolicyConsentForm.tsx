@@ -7,17 +7,22 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { focusField } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
-import type { PolicyDocument, RequiredPolicyMap } from "@/lib/policy-documents";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import type {
+  PolicyDocument,
+  PolicyReviewItem,
+  RequiredPolicyMap,
+} from "@/lib/policy-documents";
 
 type PolicyConsentFormProps = {
-  policies: RequiredPolicyMap;
-  marketingPolicy?: PolicyDocument | null;
+  requiredPolicies: RequiredPolicyMap;
+  reviewPolicies: PolicyReviewItem[];
   mustChangePassword: boolean;
 };
 
 export default function PolicyConsentForm({
-  policies,
-  marketingPolicy,
+  requiredPolicies,
+  reviewPolicies,
   mustChangePassword,
 }: PolicyConsentFormProps) {
   const router = useRouter();
@@ -31,26 +36,38 @@ export default function PolicyConsentForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const serviceRef = useRef<HTMLInputElement>(null);
+  const privacyRef = useRef<HTMLInputElement>(null);
+  const visibleRequiredPolicies = reviewPolicies.filter((item) => item.required);
+  const marketingReviewPolicy =
+    reviewPolicies.find((item) => item.policy.kind === "marketing")?.policy ?? null;
+  const canContinue = visibleRequiredPolicies.every(
+    (item) => checked[item.policy.kind],
+  );
+  const requiredInputRefs = {
+    service: serviceRef,
+    privacy: privacyRef,
+  } satisfies Record<"service" | "privacy", typeof serviceRef>;
 
-  const formatAgreedAt = (value: string) =>
-    new Intl.DateTimeFormat("ko-KR", {
-      dateStyle: "long",
-      timeStyle: "short",
-      timeZone: "Asia/Seoul",
-    }).format(new Date(value));
+  const focusFirstRequiredPolicy = () => {
+    for (const item of visibleRequiredPolicies) {
+      const ref = requiredInputRefs[item.policy.kind as "service" | "privacy"];
+      if (ref?.current) {
+        focusField(ref);
+        return;
+      }
+    }
+  };
 
   const handleSubmit = async () => {
     if (pending) {
       return;
     }
-
-    const nextChecked = {
-      service: true,
-      privacy: true,
-      marketing: Boolean(marketingPolicy),
-    } satisfies Record<PolicyDocument["kind"], boolean>;
-
-    setChecked(nextChecked);
+    if (!canContinue) {
+      setAgreementError("필수 약관에 모두 동의해 주세요.");
+      setFormError(null);
+      focusFirstRequiredPolicy();
+      return;
+    }
 
     setAgreementError(null);
     setFormError(null);
@@ -61,10 +78,10 @@ export default function PolicyConsentForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          servicePolicyId: policies.service.id,
-          privacyPolicyId: policies.privacy.id,
-          marketingPolicyId: marketingPolicy?.id ?? null,
-          marketingPolicyChecked: nextChecked.marketing,
+          servicePolicyId: requiredPolicies.service.id,
+          privacyPolicyId: requiredPolicies.privacy.id,
+          marketingPolicyId: marketingReviewPolicy?.id ?? null,
+          marketingPolicyChecked: Boolean(marketingReviewPolicy && checked.marketing),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -73,7 +90,7 @@ export default function PolicyConsentForm({
         if (data.error === "missing_fields") {
           setAgreementError("필수 약관에 모두 동의해 주세요.");
           setFormError(null);
-          focusField(serviceRef);
+          focusFirstRequiredPolicy();
           return;
         }
         if (data.error === "policy_outdated") {
@@ -88,9 +105,9 @@ export default function PolicyConsentForm({
       setAgreementError(null);
       setFormError(null);
       notify(
-        marketingPolicy && data.marketingAgreedAt
-          ? `필수 약관 및 마케팅 정보 수신 동의가 ${formatAgreedAt(data.agreedAt)}에 완료되었습니다.`
-          : `필수 약관 동의가 ${formatAgreedAt(data.agreedAt)}에 완료되었습니다.`,
+        marketingReviewPolicy && data.marketingAgreedAt
+          ? `필수 약관 및 마케팅 정보 수신 동의가 ${formatKoreanDateTimeToMinute(data.marketingAgreedAt ?? data.agreedAt)}에 완료되었습니다.`
+          : `필수 약관 동의가 ${formatKoreanDateTimeToMinute(data.agreedAt)}에 완료되었습니다.`,
       );
       router.replace(
         data.redirectTo ??
@@ -103,49 +120,63 @@ export default function PolicyConsentForm({
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-      <PolicyAgreementField
-        policy={policies.service}
-        checked={checked.service}
-        onChange={(next) => {
-          setChecked((prev) => ({ ...prev, service: next }));
-          setAgreementError(null);
-          setFormError(null);
-        }}
-        disabled={pending}
-        invalid={Boolean(agreementError)}
-        inputRef={serviceRef}
-      />
-      <PolicyAgreementField
-        policy={policies.privacy}
-        checked={checked.privacy}
-        onChange={(next) => {
-          setChecked((prev) => ({ ...prev, privacy: next }));
-          setAgreementError(null);
-          setFormError(null);
-        }}
-        disabled={pending}
-        invalid={Boolean(agreementError)}
-      />
-      {marketingPolicy ? (
-        <PolicyAgreementField
-          policy={marketingPolicy}
-          checked={checked.marketing}
-          onChange={(next) => {
-            setChecked((prev) => ({ ...prev, marketing: next }));
+      {reviewPolicies.length > 0 ? (
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setChecked((prev) => {
+              const next = { ...prev };
+              for (const item of reviewPolicies) {
+                next[item.policy.kind] = true;
+              }
+              return next;
+            });
             setAgreementError(null);
             setFormError(null);
           }}
           disabled={pending}
-          invalid={false}
-          required={false}
-        />
+          className="w-full"
+        >
+          전체 동의하기
+        </Button>
       ) : null}
+
+      <div className="flex flex-col gap-4">
+        {reviewPolicies.map(({ policy, required }) => (
+          <PolicyAgreementField
+            key={`${policy.kind}-${policy.version}`}
+            policy={policy}
+            checked={checked[policy.kind]}
+            onChange={(next) => {
+              setChecked((prev) => ({ ...prev, [policy.kind]: next }));
+              setAgreementError(null);
+              setFormError(null);
+            }}
+            disabled={pending}
+            invalid={Boolean(agreementError)}
+            inputRef={
+              policy.kind === "service"
+                ? serviceRef
+                : policy.kind === "privacy"
+                  ? privacyRef
+                  : undefined
+            }
+            required={required}
+          />
+        ))}
+      </div>
 
       {agreementError ? <FormMessage variant="error">{agreementError}</FormMessage> : null}
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
-      <Button onClick={handleSubmit} loading={pending} loadingText="동의 처리 중">
-        약관 전부 동의하고 계속하기
+      <Button
+        onClick={handleSubmit}
+        loading={pending}
+        loadingText="동의 처리 중"
+        disabled={!canContinue}
+        className="w-full"
+      >
+        필수 약관 동의하고 계속하기
       </Button>
     </div>
   );

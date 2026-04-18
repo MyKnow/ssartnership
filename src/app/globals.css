@@ -368,15 +368,15 @@ body {
 }
 
 .cert-shape-a {
-  animation: cert-shape-float-a 18s ease-in-out infinite;
+  animation: cert-shape-float-a 12s ease-in-out infinite;
 }
 
 .cert-shape-b {
-  animation: cert-shape-float-b 24s ease-in-out infinite;
+  animation: cert-shape-float-b 16s ease-in-out infinite;
 }
 
 .cert-shape-c {
-  animation: cert-shape-float-c 20s ease-in-out infinite;
+  animation: cert-shape-float-c 13s ease-in-out infinite;
 }
 
 @keyframes cert-glow-drift-a {
@@ -420,9 +420,9 @@ body {
 }
 
 .cert-glow-a {
-  animation: cert-glow-drift-a 10s ease-in-out infinite;
+  animation: cert-glow-drift-a 7s ease-in-out infinite;
 }
 
 .cert-glow-b {
-  animation: cert-glow-drift-b 13s ease-in-out infinite;
+  animation: cert-glow-drift-b 9s ease-in-out infinite;
 }

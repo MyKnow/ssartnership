@@ -1,6 +1,7 @@
 import Badge from "@/components/ui/Badge";
 import InlineMessage from "@/components/ui/InlineMessage";
 import SubmitButton from "@/components/ui/SubmitButton";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 
 export function PendingRequestNotice({
@@ -44,7 +45,7 @@ export function PendingRequestNotice({
         )}
       </div>
       <div className="text-xs text-muted-foreground">
-        요청 시각 {new Date(pendingRequest.createdAt).toLocaleString("ko-KR")}
+        요청 시각 {formatKoreanDateTimeToMinute(pendingRequest.createdAt)}
       </div>
     </div>
   );

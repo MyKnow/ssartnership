@@ -1,8 +1,10 @@
+import type { PolicyDocument } from "@/lib/policy-documents";
 import type { PushPreferenceState } from "@/lib/push";
 
 export type PushSettingsCardProps = {
   initialPreferences: PushPreferenceState;
   configured: boolean;
+  marketingPolicy?: PolicyDocument | null;
 };
 
 export type PreferenceKey = Exclude<keyof PushPreferenceState, "enabled">;
@@ -18,6 +20,7 @@ export type PushSettingsStatus = {
 export type PushSettingsApiResponse = {
   message?: string;
   preferences?: PushPreferenceState;
+  appliedAt?: string;
 } | null;
 
 export type PushDeviceSummary = {

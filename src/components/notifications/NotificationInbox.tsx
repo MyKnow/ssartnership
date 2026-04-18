@@ -17,6 +17,7 @@ import {
   type NotificationListResult,
 } from "@/lib/notifications/shared";
 import { cn } from "@/lib/cn";
+import { formatKoreanDateTime } from "@/lib/datetime";
 
 type NotificationInboxState = NotificationListResult;
 
@@ -26,12 +27,12 @@ type NotificationInboxProps = {
 };
 
 function formatNotificationDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
+  return formatKoreanDateTime(value, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(value));
+  });
 }
 
 async function parseNotificationResponse(response: Response) {

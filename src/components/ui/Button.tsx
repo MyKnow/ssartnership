@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import Spinner from "@/components/ui/Spinner";
 
 const base =
-  "group inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-[transform,background-color,border-color,color,box-shadow,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "group inline-flex min-h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-[transform,background-color,border-color,color,box-shadow,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const sizes = {
   sm: "h-10 rounded-[0.95rem] px-4 text-sm",
@@ -13,16 +13,36 @@ const sizes = {
 };
 
 const variants = {
-  primary:
-    "border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-raised)] hover:-translate-y-px hover:bg-primary-emphasis hover:shadow-[var(--shadow-floating)]",
-  ghost:
-    "border-border bg-surface/90 text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
-  danger:
-    "border-danger/20 bg-danger/10 text-danger shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-danger/35 hover:bg-danger/12",
-  soft:
-    "border-primary/10 bg-primary-soft text-primary shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-primary/20 hover:bg-primary-soft/90",
-  secondary:
-    "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface",
+  primary: {
+    enabled:
+      "border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-raised)] hover:-translate-y-px hover:bg-primary-emphasis hover:shadow-[var(--shadow-floating)]",
+    disabled:
+      "border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-raised)]",
+  },
+  ghost: {
+    enabled:
+      "border-border bg-surface/90 text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
+    disabled:
+      "border-border bg-surface/90 text-foreground shadow-[var(--shadow-flat)]",
+  },
+  danger: {
+    enabled:
+      "border-danger/20 bg-danger/10 text-danger shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-danger/35 hover:bg-danger/12",
+    disabled:
+      "border-danger/20 bg-danger/10 text-danger shadow-[var(--shadow-flat)]",
+  },
+  soft: {
+    enabled:
+      "border-primary/10 bg-primary-soft text-primary shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-primary/20 hover:bg-primary-soft/90",
+    disabled:
+      "border-primary/10 bg-primary-soft text-primary shadow-[var(--shadow-flat)]",
+  },
+  secondary: {
+    enabled:
+      "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface",
+    disabled:
+      "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)]",
+  },
 };
 
 export type ButtonVariant = keyof typeof variants;
@@ -86,13 +106,14 @@ export default function Button({
   const safeRel = buildLinkRel(target, rel);
   const classes = cn(
     base,
-    variants[variant],
+    isDisabled ? "cursor-default" : "cursor-pointer",
+    isDisabled ? variants[variant].disabled : variants[variant].enabled,
     sizes[size],
-    isDisabled ? "cursor-not-allowed opacity-60 shadow-none hover:translate-y-0" : null,
+    isDisabled ? "opacity-60" : null,
     className,
   );
   const content = (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-3">
       {loading ? <Spinner /> : null}
       {loading ? (size === "icon" ? null : (loadingText ?? children)) : children}
     </span>

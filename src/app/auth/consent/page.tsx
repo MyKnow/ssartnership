@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import PolicyConsentForm from "@/components/auth/PolicyConsentForm";
 import { getHeaderSession } from "@/lib/header-session";
 import { getUserSession } from "@/lib/user-auth";
-import { getActiveRequiredPolicies, getPolicyDocumentByKind } from "@/lib/policy-documents";
+import { getMemberPolicyReviewBundle } from "@/lib/policy-documents";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -30,8 +30,7 @@ export default async function ConsentPage() {
     redirect("/");
   }
 
-  const policies = await getActiveRequiredPolicies();
-  const marketingPolicy = await getPolicyDocumentByKind("marketing").catch(() => null);
+  const policyReview = await getMemberPolicyReviewBundle(session.userId);
   const headerSession = await getHeaderSession(session.userId);
 
   return (
@@ -46,8 +45,8 @@ export default async function ConsentPage() {
               동의해 주세요.
             </p>
             <PolicyConsentForm
-              policies={policies}
-              marketingPolicy={marketingPolicy}
+              requiredPolicies={policyReview.requiredPolicies}
+              reviewPolicies={policyReview.reviewPolicies}
               mustChangePassword={Boolean(session.mustChangePassword)}
             />
           </Card>

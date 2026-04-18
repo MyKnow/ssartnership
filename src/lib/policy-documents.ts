@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const REQUIRED_POLICY_KINDS = ["service", "privacy"] as const;
@@ -33,6 +32,16 @@ export type MemberPolicyVersionFields = {
 
 export type RequiredPolicyMap = Record<RequiredPolicyKind, PolicyDocument>;
 
+export type PolicyReviewItem = {
+  policy: PolicyDocument;
+  required: boolean;
+};
+
+export type MemberPolicyReviewBundle = {
+  requiredPolicies: RequiredPolicyMap;
+  reviewPolicies: PolicyReviewItem[];
+};
+
 export type PolicyDocumentErrorCode =
   | "db_error"
   | "not_found"
@@ -47,9 +56,6 @@ export class PolicyDocumentError extends Error {
     this.code = code;
   }
 }
-
-const POLICY_DOCUMENTS_CACHE_KEY = "policy-documents";
-const REQUIRED_POLICY_CACHE_REVALIDATE_SECONDS = 300;
 
 export function isPolicyKind(value: string): value is PolicyKind {
   return POLICY_KINDS.includes(value as PolicyKind);
@@ -178,20 +184,66 @@ async function queryPolicyDocumentByKind(
   return data as PolicyDocument;
 }
 
-const getCachedPolicyDocumentByKind = unstable_cache(
-  queryPolicyDocumentByKind,
-  [POLICY_DOCUMENTS_CACHE_KEY, "by-kind"],
-  {
-    revalidate: REQUIRED_POLICY_CACHE_REVALIDATE_SECONDS,
-    tags: [POLICY_DOCUMENTS_CACHE_KEY],
-  },
-);
-
 export async function getPolicyDocumentByKind(
   kind: PolicyKind,
   version?: number | null,
 ) {
-  return getCachedPolicyDocumentByKind(kind, version);
+  return queryPolicyDocumentByKind(kind, version);
+}
+
+export async function getMemberPolicyReviewBundle(
+  memberId: string,
+): Promise<MemberPolicyReviewBundle> {
+  const supabase = getSupabaseAdminClient();
+  const [requiredPolicies, marketingPolicy, memberResult] = await Promise.all([
+    getActiveRequiredPolicies(),
+    getPolicyDocumentByKind("marketing"),
+    supabase
+      .from("members")
+      .select(
+        "service_policy_version,privacy_policy_version,marketing_policy_version",
+      )
+      .eq("id", memberId)
+      .maybeSingle(),
+  ]);
+
+  if (memberResult.error) {
+    throw wrapPolicyDocumentDbError(
+      memberResult.error,
+      "회원 정책 상태를 불러오지 못했습니다.",
+    );
+  }
+
+  if (!memberResult.data) {
+    throw new PolicyDocumentError(
+      "not_found",
+      "회원 정책 상태를 확인하지 못했습니다.",
+    );
+  }
+
+  const reviewPolicies: PolicyReviewItem[] = [];
+
+  for (const kind of REQUIRED_POLICY_KINDS) {
+    const acceptedVersion =
+      kind === "service"
+        ? memberResult.data.service_policy_version
+        : memberResult.data.privacy_policy_version;
+    if (acceptedVersion !== requiredPolicies[kind].version) {
+      reviewPolicies.push({ policy: requiredPolicies[kind], required: true });
+    }
+  }
+
+  if (
+    marketingPolicy &&
+    memberResult.data.marketing_policy_version !== marketingPolicy.version
+  ) {
+    reviewPolicies.push({ policy: marketingPolicy, required: false });
+  }
+
+  return {
+    requiredPolicies,
+    reviewPolicies,
+  };
 }
 
 export function evaluateRequiredPolicyStatus(

@@ -4,6 +4,7 @@ import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { updatePartnerAccountCompanyConnection } from "@/app/admin/(protected)/actions";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
@@ -33,14 +34,7 @@ function formatDateTime(value?: string | null) {
     return "없음";
   }
 
-  return new Date(value).toLocaleString("ko-KR", {
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatKoreanDateTimeToMinute(value);
 }
 
 export default function CompanyAccountConnections({

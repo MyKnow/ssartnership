@@ -4,6 +4,7 @@ import SiteHeader from "@/components/SiteHeader";
 import NotificationInbox from "@/components/notifications/NotificationInbox";
 import PushSettingsCard from "@/components/push/PushSettingsCard";
 import Container from "@/components/ui/Container";
+import { getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { getMemberNotificationPreferences } from "@/lib/notification-preferences";
 import { notificationRepository } from "@/lib/repositories";
 import { isPushConfigured } from "@/lib/push";
@@ -24,14 +25,17 @@ export default async function NotificationsPage() {
     redirect("/auth/login");
   }
 
-  const [notificationResult, pushPreferences] = await Promise.all([
-    notificationRepository.listMemberNotifications({
-      memberId: session.userId,
-      offset: 0,
-      limit: 10,
-    }),
-    getMemberNotificationPreferences(session.userId),
-  ]);
+  const [notificationResult, pushPreferences, marketingPolicy] = await Promise.all(
+    [
+      notificationRepository.listMemberNotifications({
+        memberId: session.userId,
+        offset: 0,
+        limit: 10,
+      }),
+      getMemberNotificationPreferences(session.userId),
+      getPolicyDocumentByKind("marketing").catch(() => null),
+    ],
+  );
   const headerSession = {
     userId: session.userId,
     notificationUnreadCount: notificationResult.unreadCount,
@@ -51,6 +55,7 @@ export default async function NotificationsPage() {
               <PushSettingsCard
                 initialPreferences={pushPreferences}
                 configured={isPushConfigured()}
+                marketingPolicy={marketingPolicy}
               />
             </section>
           </div>

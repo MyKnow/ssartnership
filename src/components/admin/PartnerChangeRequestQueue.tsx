@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 import { DiffCard } from "../partner-change-request-ui/DiffPrimitives";
 import { buildPartnerChangeRequestDiffItems } from "../partner-change-request-ui/buildDiffItems";
@@ -43,7 +44,7 @@ function PartnerChangeRequestCard({
             </span>
           </p>
           <p className="mt-1">
-            요청 시각 {new Date(request.createdAt).toLocaleString("ko-KR")}
+            요청 시각 {formatKoreanDateTimeToMinute(request.createdAt)}
           </p>
         </div>
       </div>

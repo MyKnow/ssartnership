@@ -16,6 +16,7 @@ import {
   getServiceWorkerRegistration,
   urlBase64ToUint8Array,
 } from "./device";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type {
   ChannelPreferenceKey,
   PreferenceKey,
@@ -194,7 +195,9 @@ export function usePushSettingsController({
         setPreferences(data.preferences);
       }
       await refreshDevices(null);
-      notify("이 기기 알림을 껐습니다.");
+      notify(
+        `이 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
+      );
     } catch (error) {
       notify(error instanceof Error ? error.message : "알림 해제에 실패했습니다.");
     } finally {
@@ -225,7 +228,9 @@ export function usePushSettingsController({
         setPreferences((current) => ({ ...current, enabled: false }));
       }
       await refreshDevices(null);
-      notify("모든 기기에서 알림을 껐습니다.");
+      notify(
+        `모든 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
+      );
     } catch (error) {
       notify(error instanceof Error ? error.message : "전체 알림 해제에 실패했습니다.");
     } finally {
@@ -250,7 +255,16 @@ export function usePushSettingsController({
       } else {
         setPreferences((current) => ({ ...current, [key]: nextValue }));
       }
-      notify("알림 설정을 저장했습니다.");
+      if (key === "marketingEnabled") {
+        const appliedAt = data?.appliedAt ?? new Date().toISOString();
+        notify(
+          nextValue
+            ? `마케팅 정보 수신에 동의했습니다. (${formatKoreanDateTimeToMinute(appliedAt)})`
+            : `마케팅 정보 수신 동의를 철회했습니다. (${formatKoreanDateTimeToMinute(appliedAt)})`,
+        );
+      } else {
+        notify("알림 설정을 저장했습니다.");
+      }
     } catch (error) {
       notify(
         error instanceof Error ? error.message : "알림 설정 저장에 실패했습니다.",

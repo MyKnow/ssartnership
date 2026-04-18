@@ -5,6 +5,8 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import IconActionButton, { IconActionGroup } from "@/components/ui/IconActionButton";
+import { getPolicyHref } from "@/lib/policy-documents";
+import { formatKoreanDateTime } from "@/lib/datetime";
 import { getPushSettingsStatusClassName } from "./push-settings/status";
 import { InstallGuideStep } from "./push-settings/InstallGuideStep";
 import { PreferenceToggle } from "./push-settings/PreferenceToggle";
@@ -29,10 +31,10 @@ function formatDeviceDate(value: string | null) {
   if (Number.isNaN(date.getTime())) {
     return "최근 기록 없음";
   }
-  return new Intl.DateTimeFormat("ko-KR", {
+  return formatKoreanDateTime(date, {
     month: "short",
     day: "numeric",
-  }).format(date);
+  });
 }
 
 function IOSInstallGuide({ className }: { className?: string }) {
@@ -70,6 +72,9 @@ export { derivePushSettingsStatus, getPushSettingsStatusClassName } from "./push
 
 export default function PushSettingsCard(props: PushSettingsCardProps) {
   const controller = usePushSettingsController(props);
+  const marketingPolicyHref = props.marketingPolicy
+    ? getPolicyHref(props.marketingPolicy.kind, props.marketingPolicy.version)
+    : "/legal/marketing";
 
   return (
     <Card
@@ -83,7 +88,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
             <h2 className="text-lg font-semibold text-foreground">알림 설정</h2>
             <p className="text-sm text-muted-foreground">받을 항목과 기기 상태를 관리합니다.</p>
           </div>
-          {!controller.iosNeedsInstall ? (
+          {controller.status && !controller.iosNeedsInstall ? (
             <Badge className={getPushSettingsStatusClassName(controller.status)}>
               {controller.status.label}
             </Badge>
@@ -108,6 +113,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
               </span>
             </div>
             <PreferenceToggle
+              id="push-pref-mm"
               label="Mattermost"
               checked={controller.preferences.mmEnabled}
               disabled={controller.hasPendingAction}
@@ -261,12 +267,14 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
             {(Object.keys(preferenceLabels) as ItemPreferenceKey[]).map((key) => (
               <PreferenceToggle
                 key={key}
+                id={`push-pref-${key}`}
                 label={preferenceLabels[key]}
                 checked={controller.preferences[key]}
                 disabled={controller.hasPendingAction}
                 onChange={(next) => {
                   void controller.updatePreference(key, next);
                 }}
+                actionHref={key === "marketingEnabled" ? marketingPolicyHref : undefined}
               />
             ))}
           </div>

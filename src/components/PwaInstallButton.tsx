@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { trackProductEvent } from "@/lib/product-events";
 import Button from "@/components/ui/Button";
 import type { ButtonVariant } from "@/components/ui/Button";
@@ -133,6 +134,7 @@ export default function PwaInstallButton({
       loadingText="설치 준비 중"
       className={className}
     >
+      <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
       앱 설치
     </Button>
   );

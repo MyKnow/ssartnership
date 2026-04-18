@@ -17,6 +17,7 @@ import {
 } from "@/lib/certification-scheme";
 import CertificationCardFrame from "@/components/certification/CertificationCardFrame";
 import { cn } from "@/lib/cn";
+import { formatKoreanDateTimeToSecond } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -29,16 +30,7 @@ export const metadata = {
 } satisfies Metadata;
 
 function formatDate(value: number) {
-  return new Date(value).toLocaleString("ko-KR", {
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZone: "Asia/Seoul",
-  });
+  return formatKoreanDateTimeToSecond(value);
 }
 
 export default async function CertificationVerifyPage({

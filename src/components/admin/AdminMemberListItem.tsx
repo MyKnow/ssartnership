@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
   formatSsafyMemberLifecycleLabel,
   formatSsafyYearLabel,
@@ -12,15 +13,6 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import type { AdminMember } from "@/components/admin/member-manager/selectors";
-
-const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Asia/Seoul",
-});
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -32,7 +24,7 @@ function formatDateTime(value?: string | null) {
     return "-";
   }
 
-  return dateTimeFormatter.format(parsed);
+  return formatKoreanDateTimeToMinute(parsed);
 }
 
 function getConsentLabel(kind: "service" | "privacy" | "marketing") {

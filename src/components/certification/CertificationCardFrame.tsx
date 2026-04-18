@@ -108,7 +108,7 @@ export default function CertificationCardFrame({
         </div>
 
         <div className={cn(
-          "relative aspect-square w-full self-start overflow-hidden rounded-[26px] border bg-white/10 shadow-[0_24px_50px_rgba(15,23,42,0.26)] ring-1 animate-[cert-float_10s_ease-in-out_infinite] motion-reduce:animate-none row-start-1 col-start-2",
+          "relative aspect-square w-full self-start overflow-hidden rounded-[26px] border bg-white/10 shadow-[0_24px_50px_rgba(15,23,42,0.26)] ring-1 animate-[cert-float_7s_ease-in-out_infinite] motion-reduce:animate-none row-start-1 col-start-2",
           scheme.avatarFrameClassName,
         )}>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.24),transparent_35%)] opacity-80" />

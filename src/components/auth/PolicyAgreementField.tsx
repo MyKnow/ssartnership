@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowTopRightOnSquareIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { getFieldErrorClass } from "@/components/ui/form-field-state";
 import { getPolicyHref, getPolicyKindLabel, type PolicyDocument } from "@/lib/policy-documents";
+import { formatKoreanDate } from "@/lib/datetime";
 
 type PolicyAgreementFieldProps = {
   policy: PolicyDocument;
@@ -26,7 +27,7 @@ export default function PolicyAgreementField({
   required = true,
 }: PolicyAgreementFieldProps) {
   const inputId = `policy-${policy.kind}-${policy.version}`;
-  const effectiveDate = new Date(policy.effective_at).toLocaleDateString("ko-KR");
+  const effectiveDate = formatKoreanDate(policy.effective_at);
   const label = getPolicyKindLabel(policy.kind);
   const agreementLabel = label.endsWith("동의") ? label : `${label} 동의`;
 

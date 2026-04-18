@@ -62,6 +62,7 @@ export default async function CertificationPage() {
               eyebrow="Certification"
               title="SSAFY 인증"
               description="현재 계정의 인증 상태와 표시 정보를 확인합니다."
+              className="mx-auto max-w-2xl"
             />
             <CertificationView
               member={member as CertificationMember}

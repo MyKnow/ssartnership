@@ -7,6 +7,7 @@ import {
   formatOptionalSsafyYearLabel,
   formatSsafyMemberLifecycleLabel,
 } from "@/lib/ssafy-year";
+import { formatKoreanDateTime } from "@/lib/datetime";
 import type { MemberOption } from "./types";
 
 export const audienceLabels: Record<PushAudienceScope, string> = {
@@ -53,8 +54,7 @@ export function getPushLogStatusBadgeClass(status: AdminNotificationOperationLog
 }
 
 export function formatPushLogDateTime(value: string) {
-  return new Date(value).toLocaleString("ko-KR", {
-    hour12: false,
+  return formatKoreanDateTime(value, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

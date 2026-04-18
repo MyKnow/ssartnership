@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const appliedAt = new Date().toISOString();
     const body = (await request.json()) as Record<string, unknown>;
     const preferences = await updateMemberNotificationPreferences(
       session.userId,
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ ok: true, preferences });
+    return NextResponse.json({ ok: true, preferences, appliedAt });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "알림 설정을 저장하지 못했습니다.";

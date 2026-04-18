@@ -17,12 +17,9 @@ function buildMailtoHref({
   subject: string;
   bodyLines: string[];
 }) {
-  const params = new URLSearchParams({
-    subject,
-    body: bodyLines.join("\n"),
-  });
-
-  return `mailto:${to}?${params.toString()}`;
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
+    bodyLines.join("\n"),
+  )}`;
 }
 
 function buildSupportMailTemplate({

@@ -1,4 +1,9 @@
 import type { LogGroup, LogRangePreset } from '@/lib/log-insights';
+import {
+  formatKoreanDateTime,
+  formatKoreanDateTimeLocalValue,
+  toIsoFromKoreanDateTimeLocalValue,
+} from "@/lib/datetime";
 
 export const RANGE_PRESET_OPTIONS: Array<{ value: LogRangePreset; label: string }> = [
   { value: '1h', label: '1시간' },
@@ -81,24 +86,21 @@ const securityLabels: Record<string, string> = {
 };
 
 export function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('ko-KR', {
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
+  return formatKoreanDateTime(value, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
 export function toDateTimeLocalValue(value: string) {
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60 * 1000).toISOString().slice(0, 16);
+  return formatKoreanDateTimeLocalValue(value);
 }
 
 export function toIsoFromLocalValue(value: string) {
-  return new Date(value).toISOString();
+  return toIsoFromKoreanDateTimeLocalValue(value);
 }
 
 export function getPropertyEntries(properties: Record<string, unknown> | null) {

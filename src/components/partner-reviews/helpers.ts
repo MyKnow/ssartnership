@@ -11,6 +11,7 @@ import {
   collectReviewMediaFiles,
   type ReviewImageItem,
 } from "@/components/review-media/shared";
+import { formatKoreanDate } from "@/lib/datetime";
 
 export function getPartnerReviewSortLabel(sort: PartnerReviewSort) {
   if (sort === "oldest") {
@@ -27,11 +28,7 @@ export function getPartnerReviewSortLabel(sort: PartnerReviewSort) {
 
 export function formatPartnerReviewDate(value: string) {
   try {
-    return new Intl.DateTimeFormat("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date(value));
+    return formatKoreanDate(value);
   } catch {
     return value;
   }

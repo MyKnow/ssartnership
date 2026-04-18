@@ -3,6 +3,7 @@ import Card from "@/components/ui/Card";
 import { DiffCard } from "@/components/partner-change-request-ui/DiffPrimitives";
 import type { PartnerChangeRequestDiffItem } from "@/components/partner-change-request-ui/buildDiffItems";
 import type { PartnerChangeRequestContext } from "@/lib/partner-change-requests";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
 export default function PartnerPendingRequestSection({
   pendingRequest,
@@ -21,7 +22,7 @@ export default function PartnerPendingRequestSection({
           </p>
         </div>
         <div className="text-xs text-muted-foreground">
-          요청 시각 {new Date(pendingRequest.createdAt).toLocaleString("ko-KR")}
+          요청 시각 {formatKoreanDateTimeToMinute(pendingRequest.createdAt)}
         </div>
       </div>
 

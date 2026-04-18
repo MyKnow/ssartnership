@@ -6,7 +6,7 @@ export function derivePushSettingsStatus(params: {
   iosNeedsInstall: boolean;
   isReceivingOnThisDevice: boolean;
   accountEnabled: boolean;
-}): PushSettingsStatus {
+}): PushSettingsStatus | null {
   const {
     accountEnabled,
     configured,
@@ -29,7 +29,7 @@ export function derivePushSettingsStatus(params: {
   if (accountEnabled) {
     return { label: "다른 기기에서만 수신 중", tone: "muted" };
   }
-  return { label: "알림 꺼짐", tone: "muted" };
+  return null;
 }
 
 export function getPushSettingsStatusClassName(status: PushSettingsStatus) {

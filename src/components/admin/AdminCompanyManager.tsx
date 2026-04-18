@@ -6,6 +6,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
   createPartnerCompany,
   deletePartnerCompany,
@@ -50,14 +51,7 @@ function formatDateTime(value?: string | null) {
     return "없음";
   }
 
-  return new Date(value).toLocaleString("ko-KR", {
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatKoreanDateTimeToMinute(value);
 }
 
 export default function AdminCompanyManager({
