@@ -5,6 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
+import {
+  formatStorageError,
+  runStorageOperation,
+} from "./supabase-sync-preview-storage.mjs";
 import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
@@ -267,18 +271,18 @@ async function collectBucketFilePaths(storageClient, bucketName, prefix = "", pa
   let offset = 0;
 
   while (true) {
-    const { data, error } = await storageClient.storage.from(bucketName).list(prefix, {
-      limit,
-      offset,
-      sortBy: {
-        column: "name",
-        order: "asc",
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    const data = await runStorageOperation(
+      `Listing preview objects in ${bucketName}/${prefix || "."}`,
+      () =>
+        storageClient.storage.from(bucketName).list(prefix, {
+          limit,
+          offset,
+          sortBy: {
+            column: "name",
+            order: "asc",
+          },
+        }),
+    );
 
     const entries = data ?? [];
     if (entries.length === 0) {
@@ -321,10 +325,9 @@ async function ensureBucket(previewClient, bucket, previewBucketsByName) {
 
   if (!previewBucket) {
     console.log(`Creating preview bucket: ${bucketName}`);
-    const { error } = await previewClient.storage.createBucket(bucketName, options);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await runStorageOperation(`Creating preview bucket ${bucketName}`, () =>
+      previewClient.storage.createBucket(bucketName, options),
+    );
     return;
   }
 
@@ -339,10 +342,9 @@ async function ensureBucket(previewClient, bucket, previewBucketsByName) {
   }
 
   console.log(`Updating preview bucket: ${bucketName}`);
-  const { error } = await previewClient.storage.updateBucket(bucketName, options);
-  if (error) {
-    throw new Error(error.message);
-  }
+  await runStorageOperation(`Updating preview bucket ${bucketName}`, () =>
+    previewClient.storage.updateBucket(bucketName, options),
+  );
 }
 
 async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = "") {
@@ -350,18 +352,18 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
   let offset = 0;
 
   while (true) {
-    const { data, error } = await prodClient.storage.from(bucketName).list(prefix, {
-      limit,
-      offset,
-      sortBy: {
-        column: "name",
-        order: "asc",
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    const data = await runStorageOperation(
+      `Listing production objects in ${bucketName}/${prefix || "."}`,
+      () =>
+        prodClient.storage.from(bucketName).list(prefix, {
+          limit,
+          offset,
+          sortBy: {
+            column: "name",
+            order: "asc",
+          },
+        }),
+    );
 
     const entries = data ?? [];
     if (entries.length === 0) {
@@ -375,34 +377,36 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
         continue;
       }
 
-      const { data: file, error: downloadError } = await prodClient.storage
-        .from(bucketName)
-        .download(objectPath);
+      try {
+        const file = await runStorageOperation(
+          `Downloading ${bucketName}/${objectPath}`,
+          () => prodClient.storage.from(bucketName).download(objectPath),
+        );
 
-      if (downloadError) {
-        throw new Error(downloadError.message);
-      }
-      if (!file) {
-        throw new Error(`다운로드할 파일을 찾을 수 없습니다: ${bucketName}/${objectPath}`);
-      }
+        if (!file) {
+          throw new Error(`다운로드할 파일을 찾을 수 없습니다: ${bucketName}/${objectPath}`);
+        }
 
-      const contentType =
-        file.type ||
-        entry.metadata?.mimetype ||
-        entry.metadata?.content_type ||
-        "application/octet-stream";
+        const contentType =
+          file.type ||
+          entry.metadata?.mimetype ||
+          entry.metadata?.content_type ||
+          "application/octet-stream";
 
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const { error: uploadError } = await previewClient.storage
-        .from(bucketName)
-        .upload(objectPath, buffer, {
-          contentType,
-          cacheControl: DEFAULT_CACHE_CONTROL,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        throw new Error(uploadError.message);
+        const buffer = Buffer.from(await file.arrayBuffer());
+        await runStorageOperation(
+          `Uploading ${bucketName}/${objectPath}`,
+          () =>
+            previewClient.storage.from(bucketName).upload(objectPath, buffer, {
+              contentType,
+              cacheControl: DEFAULT_CACHE_CONTROL,
+              upsert: true,
+            }),
+        );
+      } catch (error) {
+        console.warn(
+          `Skipping object ${bucketName}/${objectPath} after storage sync failure: ${formatStorageError(error)}`,
+        );
       }
     }
 
@@ -425,10 +429,9 @@ async function removePreviewOnlyObjects(prodClient, previewClient, bucketName) {
 
   console.log(`Removing ${extraPaths.length} stale preview objects from ${bucketName}`);
   for (const batch of chunkArray(extraPaths, 100)) {
-    const { error } = await previewClient.storage.from(bucketName).remove(batch);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await runStorageOperation(`Removing preview objects from ${bucketName}`, () =>
+      previewClient.storage.from(bucketName).remove(batch),
+    );
   }
 }
 
@@ -436,9 +439,16 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
   const prodClient = createStorageClient(productionUrl, productionServiceRoleKey);
   const previewClient = createStorageClient(previewUrl, previewServiceRoleKey);
 
-  const { data: prodBuckets, error } = await prodClient.storage.listBuckets();
-  if (error) {
-    throw new Error(error.message);
+  let prodBuckets;
+  try {
+    prodBuckets = await runStorageOperation("Listing production buckets", () =>
+      prodClient.storage.listBuckets(),
+    );
+  } catch (error) {
+    console.warn(
+      `Skipping storage sync because production buckets could not be listed: ${formatStorageError(error)}`,
+    );
+    return;
   }
 
   const buckets = prodBuckets ?? [];
@@ -447,10 +457,16 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
     return;
   }
 
-  const { data: previewBuckets, error: previewBucketsError } =
-    await previewClient.storage.listBuckets();
-  if (previewBucketsError) {
-    throw new Error(previewBucketsError.message);
+  let previewBuckets;
+  try {
+    previewBuckets = await runStorageOperation("Listing preview buckets", () =>
+      previewClient.storage.listBuckets(),
+    );
+  } catch (error) {
+    console.warn(
+      `Skipping storage sync because preview buckets could not be listed: ${formatStorageError(error)}`,
+    );
+    return;
   }
 
   const previewBucketsByName = new Map(
@@ -468,10 +484,20 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       continue;
     }
 
-    await ensureBucket(previewClient, bucket, previewBucketsByName);
-    console.log(`Syncing bucket: ${bucketName}`);
-    await syncBucketPrefix(prodClient, previewClient, bucketName);
-    await removePreviewOnlyObjects(prodClient, previewClient, bucketName);
+    try {
+      await ensureBucket(previewClient, bucket, previewBucketsByName);
+      console.log(`Syncing bucket: ${bucketName}`);
+      await syncBucketPrefix(prodClient, previewClient, bucketName);
+      try {
+        await removePreviewOnlyObjects(prodClient, previewClient, bucketName);
+      } catch (error) {
+        console.warn(
+          `Skipping stale-object cleanup for ${bucketName}: ${formatStorageError(error)}`,
+        );
+      }
+    } catch (error) {
+      console.warn(`Skipping bucket ${bucketName} after storage sync failure: ${formatStorageError(error)}`);
+    }
   }
 }
 
