@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
-import { getUserSession } from "@/lib/user-auth";
+import { getUserSession, setUserSession } from "@/lib/user-auth";
 import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
@@ -94,6 +94,13 @@ export async function POST(request: Request) {
         privacyVersion: activePolicies.privacy.version,
         marketingVersion: activeMarketingPolicy?.version ?? null,
         marketingChecked: Boolean(payload.marketingPolicyChecked),
+      },
+    });
+
+    await setUserSession(session.userId, Boolean(session.mustChangePassword), {
+      policyConsentSnapshot: {
+        serviceVersion: activePolicies.service.version,
+        privacyVersion: activePolicies.privacy.version,
       },
     });
 

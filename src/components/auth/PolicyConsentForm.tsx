@@ -176,7 +176,7 @@ export default function PolicyConsentForm({
         disabled={!canContinue}
         className="w-full"
       >
-        필수 약관 동의하고 계속하기
+        계속하기
       </Button>
     </div>
   );
