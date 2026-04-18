@@ -18,6 +18,9 @@ export function getPushPreferencesOrDefault(
     expiringPartnerEnabled:
       value?.expiringPartnerEnabled ??
       DEFAULT_PUSH_PREFERENCES.expiringPartnerEnabled,
+    mmEnabled: value?.mmEnabled ?? DEFAULT_PUSH_PREFERENCES.mmEnabled,
+    marketingEnabled:
+      value?.marketingEnabled ?? DEFAULT_PUSH_PREFERENCES.marketingEnabled,
   };
 }
 
@@ -26,7 +29,7 @@ export async function getMemberPushPreferences(memberId: string) {
   const { data, error } = await supabase
     .from("push_preferences")
     .select(
-      "enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled",
+      "enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,mm_enabled,marketing_enabled",
     )
     .eq("member_id", memberId)
     .maybeSingle();
@@ -45,6 +48,8 @@ export async function getMemberPushPreferences(memberId: string) {
           announcementEnabled: data.announcement_enabled,
           newPartnerEnabled: data.new_partner_enabled,
           expiringPartnerEnabled: data.expiring_partner_enabled,
+          mmEnabled: data.mm_enabled,
+          marketingEnabled: data.marketing_enabled,
         }
       : null,
   );
@@ -64,6 +69,10 @@ export function getActiveSubscriptionPushPreferences(
     expiringPartnerEnabled:
       value?.expiringPartnerEnabled ??
       ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES.expiringPartnerEnabled,
+    mmEnabled: value?.mmEnabled ?? ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES.mmEnabled,
+    marketingEnabled:
+      value?.marketingEnabled ??
+      ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES.marketingEnabled,
   };
 }
 
@@ -79,6 +88,8 @@ export async function upsertMemberPushPreferences(
     newPartnerEnabled: value.newPartnerEnabled ?? current.newPartnerEnabled,
     expiringPartnerEnabled:
       value.expiringPartnerEnabled ?? current.expiringPartnerEnabled,
+    mmEnabled: value.mmEnabled ?? current.mmEnabled,
+    marketingEnabled: value.marketingEnabled ?? current.marketingEnabled,
   };
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("push_preferences").upsert(
@@ -88,6 +99,8 @@ export async function upsertMemberPushPreferences(
       announcement_enabled: next.announcementEnabled,
       new_partner_enabled: next.newPartnerEnabled,
       expiring_partner_enabled: next.expiringPartnerEnabled,
+      mm_enabled: next.mmEnabled,
+      marketing_enabled: next.marketingEnabled,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "member_id" },

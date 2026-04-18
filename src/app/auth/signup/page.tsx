@@ -5,7 +5,7 @@ import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import SignupForm from "@/components/auth/SignupForm";
 import FormMessage from "@/components/ui/FormMessage";
-import { getActiveRequiredPolicies } from "@/lib/policy-documents";
+import { getActiveRequiredPolicies, getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { SITE_NAME } from "@/lib/site";
 import {
   getConfiguredCurrentSsafyYear,
@@ -36,6 +36,7 @@ export default async function SignupPage() {
   } catch (error) {
     policyError = (error as Error).message;
   }
+  const marketingPolicy = await getPolicyDocumentByKind("marketing").catch(() => null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,6 +51,7 @@ export default async function SignupPage() {
             {policies ? (
               <SignupForm
                 policies={policies}
+                marketingPolicy={marketingPolicy}
                 selectableYears={selectableYears}
                 signupYearsText={signupYearsText}
                 defaultYear={selectableYears[selectableYears.length - 1] ?? currentYear}

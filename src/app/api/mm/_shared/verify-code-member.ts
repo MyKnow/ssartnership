@@ -4,7 +4,11 @@ import {
   syncMemberSnapshot,
   type MemberRow,
 } from "@/lib/mm-member-sync";
-import { recordRequiredPolicyConsent } from "@/lib/policy-documents";
+import {
+  recordMarketingPolicyConsent,
+  recordRequiredPolicyConsent,
+  type PolicyDocument,
+} from "@/lib/policy-documents";
 import { hashPassword } from "@/lib/password";
 import { setUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -42,6 +46,8 @@ export async function finalizeVerifiedMember({
   password,
   codeYear,
   activePolicies,
+  marketingPolicy,
+  marketingPolicyAgreed = false,
 }: {
   context: MmRouteContext;
   mmUserId: string;
@@ -52,6 +58,8 @@ export async function finalizeVerifiedMember({
   password: string;
   codeYear: number | null;
   activePolicies: ActivePoliciesLike;
+  marketingPolicy?: PolicyDocument | null;
+  marketingPolicyAgreed?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
   const { data: memberData } = await supabase
@@ -170,6 +178,13 @@ export async function finalizeVerifiedMember({
   await recordRequiredPolicyConsent({
     memberId: authenticatedMemberId,
     activePolicies,
+    ipAddress: context.ipAddress ?? null,
+    userAgent: context.userAgent ?? null,
+  });
+  await recordMarketingPolicyConsent({
+    memberId: authenticatedMemberId,
+    activePolicy: marketingPolicy ?? null,
+    agreed: marketingPolicyAgreed,
     ipAddress: context.ipAddress ?? null,
     userAgent: context.userAgent ?? null,
   });

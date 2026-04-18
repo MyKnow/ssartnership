@@ -24,6 +24,7 @@ import { parseSignupSsafyYearValue } from "@/lib/ssafy-year";
 
 export function useSignupFormController({
   policies,
+  marketingPolicy,
   selectableYears,
   signupYearsText,
   defaultYear,
@@ -36,6 +37,7 @@ export function useSignupFormController({
   const [policyChecked, setPolicyChecked] = useState<SignupPolicyState>({
     service: false,
     privacy: false,
+    marketing: false,
   });
   const [fieldErrors, setFieldErrors] = useState<SignupFieldError>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -184,6 +186,8 @@ export function useSignupFormController({
           password,
           servicePolicyId: policies.service.id,
           privacyPolicyId: policies.privacy.id,
+          marketingPolicyId: marketingPolicy?.id ?? null,
+          marketingPolicyChecked: policyChecked.marketing,
         }),
       });
       const data = await response.json().catch(() => ({}));

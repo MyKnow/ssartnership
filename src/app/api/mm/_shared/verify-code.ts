@@ -5,6 +5,7 @@ import {
 import {
   getSelectedPolicyValidationError,
   getActiveRequiredPolicies,
+  getPolicyDocumentByKind,
 } from "@/lib/policy-documents";
 import { isValidPassword } from "@/lib/password";
 import {
@@ -114,12 +115,18 @@ export async function handleVerifyCodePost(request: Request) {
     }
 
     const activePolicies = await getActiveRequiredPolicies();
+    const activeMarketingPolicy = payload.marketingPolicyChecked
+      ? await getPolicyDocumentByKind("marketing")
+      : null;
     const policyValidationError = getSelectedPolicyValidationError(
       {
         servicePolicyId: payload.servicePolicyId,
         privacyPolicyId: payload.privacyPolicyId,
+        marketingPolicyId: payload.marketingPolicyId,
+        marketingPolicyChecked: payload.marketingPolicyChecked,
       },
       activePolicies,
+      activeMarketingPolicy,
     );
     if (policyValidationError) {
       await logAuthSecurity({
@@ -234,6 +241,8 @@ export async function handleVerifyCodePost(request: Request) {
       password,
       codeYear: codeRow.year,
       activePolicies,
+      marketingPolicy: activeMarketingPolicy,
+      marketingPolicyAgreed: Boolean(payload.marketingPolicyChecked),
     });
 
     if (finalizeResult.kind === "error") {

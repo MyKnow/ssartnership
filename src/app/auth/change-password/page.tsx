@@ -4,6 +4,7 @@ import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import { getUserSession } from "@/lib/user-auth";
+import { getHeaderSession } from "@/lib/header-session";
 import ChangePasswordForm from "@/components/auth/ChangePasswordForm";
 import { SITE_NAME } from "@/lib/site";
 
@@ -24,7 +25,7 @@ export default async function ChangePasswordPage() {
     redirect("/auth/consent");
   }
 
-  const headerSession = { userId: session.userId };
+  const headerSession = await getHeaderSession(session.userId);
 
   return (
     <div className="min-h-screen bg-background">

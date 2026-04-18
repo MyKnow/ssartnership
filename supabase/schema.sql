@@ -216,6 +216,8 @@ create table if not exists members (
   service_policy_consented_at timestamp with time zone,
   privacy_policy_version integer,
   privacy_policy_consented_at timestamp with time zone,
+  marketing_policy_version integer,
+  marketing_policy_consented_at timestamp with time zone,
   avatar_content_type text,
   avatar_base64 text,
   created_at timestamp with time zone default now(),
@@ -317,7 +319,7 @@ create table if not exists policy_documents (
 
 alter table policy_documents drop constraint if exists policy_documents_kind_check;
 alter table policy_documents add constraint policy_documents_kind_check
-  check (kind in ('service', 'privacy'));
+  check (kind in ('service', 'privacy', 'marketing'));
 alter table policy_documents drop constraint if exists policy_documents_version_check;
 alter table policy_documents add constraint policy_documents_version_check
   check (version > 0);
@@ -344,7 +346,7 @@ alter table member_policy_consents
   drop constraint if exists member_policy_consents_kind_check;
 alter table member_policy_consents
   add constraint member_policy_consents_kind_check
-  check (kind in ('service', 'privacy'));
+  check (kind in ('service', 'privacy', 'marketing'));
 alter table member_policy_consents
   drop constraint if exists member_policy_consents_version_check;
 alter table member_policy_consents
@@ -448,6 +450,31 @@ values
     true,
     now()
   )
+  ,
+  (
+    'marketing',
+    1,
+    '마케팅 정보 수신 동의',
+    '제휴 소식, 혜택 안내, 이벤트 등 알림 수신 동의입니다.',
+    $$## 1. 목적
+싸트너십은 제휴 혜택, 신규 제휴, 종료 임박, 운영 공지와 같은 서비스 관련 정보와 함께, 이용자가 동의한 경우 마케팅성 안내를 전송할 수 있습니다.
+
+## 2. 수신 범위
+- 제휴 소식
+- 혜택 안내
+- 이벤트 및 캠페인 안내
+- 기타 서비스 관련 소식
+
+## 3. 동의 및 철회
+이 동의는 선택 사항이며, 회원은 언제든지 알림 설정에서 동의를 변경할 수 있습니다.
+
+## 4. 문의
+마케팅 정보 수신 관련 문의는 아래 연락처로 접수합니다.
+- 책임자: myknow
+- 이메일: myknow00@naver.com$$,
+    true,
+    now()
+  )
 on conflict (kind, version) do update set
   title = excluded.title,
   summary = excluded.summary,
@@ -527,8 +554,43 @@ create table if not exists push_preferences (
   announcement_enabled boolean not null default true,
   new_partner_enabled boolean not null default true,
   expiring_partner_enabled boolean not null default true,
+  mm_enabled boolean not null default true,
+  marketing_enabled boolean not null default false,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
+);
+
+create table if not exists notifications (
+  id uuid primary key default uuid_generate_v4(),
+  type text not null,
+  title text not null,
+  body text not null,
+  target_url text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_by_member_id uuid references members(id) on delete set null,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists member_notifications (
+  id uuid primary key default uuid_generate_v4(),
+  notification_id uuid not null references notifications(id) on delete cascade,
+  member_id uuid not null references members(id) on delete cascade,
+  read_at timestamp with time zone,
+  deleted_at timestamp with time zone,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  unique (notification_id, member_id)
+);
+
+create table if not exists notification_deliveries (
+  id uuid primary key default uuid_generate_v4(),
+  notification_id uuid not null references notifications(id) on delete cascade,
+  member_id uuid references members(id) on delete cascade,
+  channel text not null,
+  status text not null,
+  error_message text,
+  delivered_at timestamp with time zone,
+  created_at timestamp with time zone default now()
 );
 
 create table if not exists push_subscriptions (
@@ -652,6 +714,20 @@ create index if not exists push_message_logs_type_idx on push_message_logs(type)
 create index if not exists push_message_logs_status_idx on push_message_logs(status);
 create index if not exists push_delivery_logs_member_id_idx on push_delivery_logs(member_id);
 create index if not exists push_delivery_logs_created_at_idx on push_delivery_logs(created_at desc);
+create index if not exists notifications_created_at_idx on notifications(created_at desc);
+create index if not exists notifications_type_idx on notifications(type);
+create index if not exists member_notifications_member_id_created_at_idx
+  on member_notifications(member_id, deleted_at, created_at desc);
+create index if not exists member_notifications_notification_id_idx
+  on member_notifications(notification_id);
+create index if not exists member_notifications_member_read_idx
+  on member_notifications(member_id, read_at, deleted_at);
+create index if not exists notification_deliveries_notification_id_idx
+  on notification_deliveries(notification_id);
+create index if not exists notification_deliveries_member_id_idx
+  on notification_deliveries(member_id);
+create index if not exists notification_deliveries_created_at_idx
+  on notification_deliveries(created_at desc);
 create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
 create index if not exists event_logs_event_name_idx on event_logs(event_name);
 create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
@@ -699,6 +775,9 @@ alter table password_reset_attempts enable row level security;
 alter table partner_change_requests enable row level security;
 alter table partner_reviews enable row level security;
 alter table push_preferences enable row level security;
+alter table notifications enable row level security;
+alter table member_notifications enable row level security;
+alter table notification_deliveries enable row level security;
 alter table push_subscriptions enable row level security;
 alter table push_message_logs enable row level security;
 alter table push_delivery_logs enable row level security;
@@ -751,6 +830,12 @@ revoke all on table password_reset_attempts from anon;
 revoke all on table password_reset_attempts from authenticated;
 revoke all on table push_preferences from anon;
 revoke all on table push_preferences from authenticated;
+revoke all on table notifications from anon;
+revoke all on table notifications from authenticated;
+revoke all on table member_notifications from anon;
+revoke all on table member_notifications from authenticated;
+revoke all on table notification_deliveries from anon;
+revoke all on table notification_deliveries from authenticated;
 revoke all on table push_subscriptions from anon;
 revoke all on table push_subscriptions from authenticated;
 revoke all on table push_message_logs from anon;

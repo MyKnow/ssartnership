@@ -44,6 +44,7 @@ export default function SignupFormView(props: SignupFormProps) {
 
       <SignupPoliciesSection
         policies={props.policies}
+        marketingPolicy={props.marketingPolicy}
         policyChecked={signup.policyChecked}
         pending={signup.pending}
         error={signup.fieldErrors.policies}

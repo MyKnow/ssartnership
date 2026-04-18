@@ -23,6 +23,7 @@ export default function PolicyConsentForm({
   const [checked, setChecked] = useState<Record<PolicyDocument["kind"], boolean>>({
     service: false,
     privacy: false,
+    marketing: false,
   });
   const [agreementError, setAgreementError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);

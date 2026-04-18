@@ -43,7 +43,7 @@ export async function unsubscribePushEveryDevice(endpoint: string | null) {
 }
 
 export async function savePushPreferences(preferences: PushPreferenceState) {
-  const response = await fetch("/api/push/preferences", {
+  const response = await fetch("/api/notifications/preferences", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

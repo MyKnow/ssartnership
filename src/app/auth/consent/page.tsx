@@ -4,6 +4,7 @@ import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import PolicyConsentForm from "@/components/auth/PolicyConsentForm";
+import { getHeaderSession } from "@/lib/header-session";
 import { getUserSession } from "@/lib/user-auth";
 import { getActiveRequiredPolicies } from "@/lib/policy-documents";
 import { SITE_NAME } from "@/lib/site";
@@ -30,7 +31,7 @@ export default async function ConsentPage() {
   }
 
   const policies = await getActiveRequiredPolicies();
-  const headerSession = { userId: session.userId };
+  const headerSession = await getHeaderSession(session.userId);
 
   return (
     <div className="min-h-screen bg-background">

@@ -17,6 +17,12 @@ import {
 import type { PreferenceKey, PushSettingsCardProps } from "./types";
 import { usePushDeviceState } from "./usePushDeviceState";
 
+const PUSH_PREFERENCE_KEYS = new Set<PreferenceKey>([
+  "announcementEnabled",
+  "newPartnerEnabled",
+  "expiringPartnerEnabled",
+]);
+
 export function usePushSettingsController({
   configured,
   initialPreferences,
@@ -108,6 +114,8 @@ export function usePushSettingsController({
           announcementEnabled: true,
           newPartnerEnabled: true,
           expiringPartnerEnabled: true,
+          mmEnabled: true,
+          marketingEnabled: false,
         });
       }
       notify("기기 알림을 켰습니다.");
@@ -172,9 +180,11 @@ export function usePushSettingsController({
   async function updatePreference(key: PreferenceKey, nextValue: boolean) {
     const nextPreferences = {
       ...preferences,
-      enabled: true,
       [key]: nextValue,
     };
+    if (PUSH_PREFERENCE_KEYS.has(key) && nextValue) {
+      nextPreferences.enabled = true;
+    }
 
     setPendingAction("preference");
     try {

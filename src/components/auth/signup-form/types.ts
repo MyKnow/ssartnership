@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import type { RequiredPolicyMap } from "@/lib/policy-documents";
+import type { PolicyDocument, RequiredPolicyMap } from "@/lib/policy-documents";
 
 export type SignupStep = "request" | "verify";
 export type SignupField = "username" | "year" | "password" | "code" | "policies";
@@ -7,6 +7,7 @@ export type SignupField = "username" | "year" | "password" | "code" | "policies"
 export type SignupPolicyState = {
   service: boolean;
   privacy: boolean;
+  marketing: boolean;
 };
 
 export type SignupGuideItem = {
@@ -16,6 +17,7 @@ export type SignupGuideItem = {
 
 export type SignupFormProps = {
   policies: RequiredPolicyMap;
+  marketingPolicy?: PolicyDocument | null;
   selectableYears: number[];
   signupYearsText: string;
   defaultYear: number;

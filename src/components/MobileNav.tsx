@@ -4,10 +4,14 @@ import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import UserMenu from "@/components/auth/UserMenu";
 import PwaInstallButton from "@/components/PwaInstallButton";
+import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import type { HeaderSession } from "@/lib/header-session";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
+import {
+  useNotificationUnreadCount,
+} from "@/hooks/useNotificationUnreadCount";
 
 function DrawerSection({
   title,
@@ -37,6 +41,9 @@ export default function MobileNav({
   initialSession?: HeaderSession | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [notificationUnreadCount] = useNotificationUnreadCount(
+    initialSession?.notificationUnreadCount ?? 0,
+  );
 
   useEffect(() => {
     if (!open) {
@@ -152,13 +159,25 @@ export default function MobileNav({
                         description="로그인, 회원가입, 프로필, 알림 관련 메뉴입니다."
                       >
                         {initialSession ? (
-                          <Button
-                            variant="ghost"
-                            href="/notifications"
-                            className="mb-2 w-full rounded-2xl px-4"
-                          >
-                            알림 설정
-                          </Button>
+                          <div className="relative mb-2">
+                            <Button
+                              variant="ghost"
+                              href="/notifications"
+                              className="w-full rounded-2xl px-4"
+                            >
+                              알림
+                            </Button>
+                            {notificationUnreadCount > 0 ? (
+                              <Badge
+                                variant="danger"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 min-w-5 justify-center px-1.5 py-0.5 text-[10px] tracking-normal"
+                              >
+                                {notificationUnreadCount > 99
+                                  ? "99+"
+                                  : notificationUnreadCount}
+                              </Badge>
+                            ) : null}
+                          </div>
                         ) : null}
                         <UserMenu
                           initialSession={initialSession}

@@ -16,6 +16,7 @@ import {
   SITE_TITLE,
 } from "@/lib/site";
 import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
+import { getHeaderSession } from "@/lib/header-session";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const revalidate = 300;
@@ -70,7 +71,7 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const session = await getSignedUserSession();
-  const headerSession = session?.userId ? { userId: session.userId } : null;
+  const headerSession = await getHeaderSession(session?.userId ?? undefined);
 
   const jsonLd = {
     "@context": "https://schema.org",

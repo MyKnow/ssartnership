@@ -1,3 +1,5 @@
+import { notificationRepository } from "@/lib/repositories";
+import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { getPushEnv, isPushConfigured, wrapPushDbError } from "./config.ts";
 import { getDefaultPushAudience, resolvePushAudience } from "./audience.ts";
@@ -58,6 +60,40 @@ export async function sendPushToAudience(
   });
 
   const supabase = getSupabaseAdminClient();
+  let notificationRecipientIds = resolvedAudience.memberIds;
+  if (!notificationRecipientIds) {
+    const memberQuery = supabase.from("members").select("id");
+    const { data: memberRows, error: memberError } =
+      resolvedAudience.scope === "year"
+        ? await memberQuery.eq("year", resolvedAudience.year)
+        : resolvedAudience.scope === "campus"
+          ? await memberQuery.eq("campus", resolvedAudience.campus)
+          : await memberQuery;
+
+    if (memberError) {
+      throw wrapPushDbError(memberError, "알림 수신 대상을 불러오지 못했습니다.");
+    }
+
+    notificationRecipientIds = (memberRows ?? []).map((item) => item.id);
+  }
+
+  const createdNotification = notificationRecipientIds.length
+    ? await notificationRepository.createNotification({
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        targetUrl: normalizeNotificationTargetUrl(payload.url) ?? "/notifications",
+        metadata: {
+          source: options.source ?? "automatic",
+          audience: resolvedAudience.scope,
+          audienceLabel: resolvedAudience.label,
+          notificationType: payload.type,
+          tag: payload.tag ?? null,
+        },
+        recipientMemberIds: notificationRecipientIds,
+      })
+    : null;
+
   let subscriptionQuery = supabase
     .from("push_subscriptions")
     .select("id,member_id,endpoint,p256dh,auth")
@@ -98,7 +134,7 @@ export async function sendPushToAudience(
   const { data: preferences, error: preferenceError } = await supabase
     .from("push_preferences")
     .select(
-      "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled",
+      "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,mm_enabled,marketing_enabled",
     )
     .in("member_id", memberIds);
 
@@ -115,6 +151,8 @@ export async function sendPushToAudience(
         announcementEnabled: item.announcement_enabled,
         newPartnerEnabled: item.new_partner_enabled,
         expiringPartnerEnabled: item.expiring_partner_enabled,
+        mmEnabled: item.mm_enabled,
+        marketingEnabled: item.marketing_enabled,
       } satisfies PushPreferenceState,
     ]),
   );
@@ -168,6 +206,14 @@ export async function sendPushToAudience(
           payload,
           status: "sent",
         }),
+        createdNotification
+          ? notificationRepository.recordNotificationDelivery({
+              notificationId: createdNotification.notification.id,
+              memberId: subscription.member_id,
+              channel: "push",
+              status: "sent",
+            })
+          : Promise.resolve(),
       ]);
     } catch (error) {
       failed += 1;
@@ -188,6 +234,15 @@ export async function sendPushToAudience(
           status: "failed",
           errorMessage,
         }),
+        createdNotification
+          ? notificationRepository.recordNotificationDelivery({
+              notificationId: createdNotification.notification.id,
+              memberId: subscription.member_id,
+              channel: "push",
+              status: "failed",
+              errorMessage,
+            })
+          : Promise.resolve(),
       ]);
     }
   }

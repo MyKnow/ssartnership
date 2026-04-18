@@ -24,7 +24,7 @@ test("signup request validation returns field-level errors deterministically", a
       password: "Strong!123",
       signupYears: [15, 0],
       signupYearsText: "15기",
-      policyChecked: { service: true, privacy: true },
+      policyChecked: { service: true, privacy: true, marketing: false },
     }),
     {
       kind: "field",
@@ -40,7 +40,7 @@ test("signup request validation returns field-level errors deterministically", a
       password: "Strong!123",
       signupYears: [15, 0],
       signupYearsText: "15기",
-      policyChecked: { service: true, privacy: true },
+      policyChecked: { service: true, privacy: true, marketing: false },
     }),
     {
       kind: "field",

@@ -2,10 +2,11 @@ import type { RefObject } from "react";
 import PolicyAgreementField from "@/components/auth/PolicyAgreementField";
 import FormMessage from "@/components/ui/FormMessage";
 import type { SignupPolicyState } from "@/components/auth/signup-form/types";
-import type { RequiredPolicyMap } from "@/lib/policy-documents";
+import type { PolicyDocument, RequiredPolicyMap } from "@/lib/policy-documents";
 
 export default function SignupPoliciesSection({
   policies,
+  marketingPolicy,
   policyChecked,
   pending,
   error,
@@ -13,6 +14,7 @@ export default function SignupPoliciesSection({
   onPolicyChange,
 }: {
   policies: RequiredPolicyMap;
+  marketingPolicy?: PolicyDocument | null;
   policyChecked: SignupPolicyState;
   pending: boolean;
   error?: string;
@@ -43,6 +45,16 @@ export default function SignupPoliciesSection({
           disabled={pending}
           invalid={Boolean(error)}
         />
+        {marketingPolicy ? (
+          <PolicyAgreementField
+            policy={marketingPolicy}
+            checked={policyChecked.marketing}
+            onChange={(checked) => onPolicyChange("marketing", checked)}
+            disabled={pending}
+            invalid={false}
+            required={false}
+          />
+        ) : null}
       </div>
       {error ? (
         <FormMessage className="mt-4" variant="error">

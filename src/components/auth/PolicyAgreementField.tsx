@@ -12,6 +12,7 @@ type PolicyAgreementFieldProps = {
   disabled?: boolean;
   invalid?: boolean;
   inputRef?: Ref<HTMLInputElement>;
+  required?: boolean;
 };
 
 export default function PolicyAgreementField({
@@ -21,6 +22,7 @@ export default function PolicyAgreementField({
   disabled,
   invalid = false,
   inputRef,
+  required = true,
 }: PolicyAgreementFieldProps) {
   const inputId = `policy-${policy.kind}-${policy.version}`;
 
@@ -45,7 +47,7 @@ export default function PolicyAgreementField({
             htmlFor={inputId}
             className="block text-sm font-semibold text-foreground"
           >
-            [필수] {getPolicyKindLabel(policy.kind)} 동의
+            [{required ? "필수" : "선택"}] {getPolicyKindLabel(policy.kind)} 동의
           </label>
           <p className="mt-1 text-sm text-muted-foreground">
             {policy.summary ?? "약관 전문을 확인한 뒤 동의해 주세요."}

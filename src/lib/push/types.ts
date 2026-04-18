@@ -3,6 +3,8 @@ export const DEFAULT_PUSH_PREFERENCES = {
   announcementEnabled: true,
   newPartnerEnabled: true,
   expiringPartnerEnabled: true,
+  mmEnabled: true,
+  marketingEnabled: false,
 } as const;
 
 export const ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES = {
@@ -10,6 +12,8 @@ export const ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES = {
   announcementEnabled: true,
   newPartnerEnabled: true,
   expiringPartnerEnabled: true,
+  mmEnabled: true,
+  marketingEnabled: false,
 } as const;
 
 export type PushPreferenceState = {
@@ -17,6 +21,8 @@ export type PushPreferenceState = {
   announcementEnabled: boolean;
   newPartnerEnabled: boolean;
   expiringPartnerEnabled: boolean;
+  mmEnabled: boolean;
+  marketingEnabled: boolean;
 };
 
 export type PushNotificationType =

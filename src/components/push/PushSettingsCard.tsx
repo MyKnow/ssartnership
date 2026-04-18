@@ -14,6 +14,8 @@ const preferenceLabels: Record<PreferenceKey, string> = {
   announcementEnabled: "운영 공지",
   newPartnerEnabled: "신규 제휴",
   expiringPartnerEnabled: "종료 7일 전",
+  mmEnabled: "MM 알림",
+  marketingEnabled: "마케팅 정보 수신",
 };
 
 export type { PreferenceKey, PushSettingsCardProps } from "./push-settings/types";
@@ -25,7 +27,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
     !props.configured
       ? "알림 기능을 준비 중입니다. 잠시 후 다시 확인해 주세요."
       : !controller.supported
-        ? "현재 브라우저에서는 알림을 받을 수 없습니다."
+        ? "현재 브라우저에서는 푸시 알림을 받을 수 없습니다."
         : controller.iosNeedsInstall
           ? "iPhone/iPad에서는 홈 화면에 추가한 뒤 알림을 켤 수 있습니다."
           : controller.isReceivingOnThisDevice
@@ -61,14 +63,14 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
             ? "브라우저 설정에서 알림을 다시 허용한 뒤 이 화면으로 돌아와 주세요."
             : controller.accountEnabled
               ? "필요하면 이 기기에서도 알림을 켜 두세요."
-              : "새 제휴, 종료 임박, 운영 공지만 간단히 받아볼 수 있습니다.";
+              : "새 제휴, 종료 임박, 운영 공지와 함께 MM 알림과 마케팅 수신 여부를 관리할 수 있습니다.";
 
   return (
     <Card tone="default" className="mx-auto mt-4 max-w-2xl min-w-0 overflow-hidden">
       <div className="space-y-3 border-b border-border/70 pb-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
-            <h2 className="text-lg font-semibold text-foreground">기기 알림</h2>
+            <h2 className="text-lg font-semibold text-foreground">알림 설정</h2>
             <p className="text-sm text-muted-foreground">{summary}</p>
           </div>
           {!controller.iosNeedsInstall ? (
@@ -177,29 +179,27 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
         </div>
       ) : null}
 
-      {controller.canControlPush && controller.accountEnabled ? (
-        <div className="mt-6">
-          <div className="mb-3 space-y-1">
-            <h3 className="text-sm font-semibold text-foreground">받을 알림</h3>
-            <p className="text-sm text-muted-foreground">
-              필요한 항목만 남겨 두세요.
-            </p>
-          </div>
-          <div className="grid gap-3">
-            {(Object.keys(preferenceLabels) as PreferenceKey[]).map((key) => (
-              <PreferenceToggle
-                key={key}
-                label={preferenceLabels[key]}
-                checked={controller.preferences[key]}
-                disabled={controller.hasPendingAction}
-                onChange={(next) => {
-                  void controller.updatePreference(key, next);
-                }}
-              />
-            ))}
-          </div>
+      <div className="mt-6">
+        <div className="mb-3 space-y-1">
+          <h3 className="text-sm font-semibold text-foreground">받을 알림</h3>
+          <p className="text-sm text-muted-foreground">
+            푸시, MM, 마케팅 수신을 각각 관리할 수 있습니다.
+          </p>
         </div>
-      ) : null}
+        <div className="grid gap-3">
+          {(Object.keys(preferenceLabels) as PreferenceKey[]).map((key) => (
+            <PreferenceToggle
+              key={key}
+              label={preferenceLabels[key]}
+              checked={controller.preferences[key]}
+              disabled={controller.hasPendingAction}
+              onChange={(next) => {
+                void controller.updatePreference(key, next);
+              }}
+            />
+          ))}
+        </div>
+      </div>
     </Card>
   );
 }

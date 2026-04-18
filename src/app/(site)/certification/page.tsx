@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
+import { getHeaderSession } from "@/lib/header-session";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
@@ -36,7 +37,7 @@ export default async function CertificationPage() {
     redirect("/auth/login");
   }
 
-  const headerSession = session?.userId ? { userId: session.userId } : null;
+  const headerSession = await getHeaderSession(session.userId);
 
   const supabase = getSupabaseAdminClient();
   const { data: member } = await supabase

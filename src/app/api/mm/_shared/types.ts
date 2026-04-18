@@ -20,9 +20,10 @@ export type VerifyCodeBody = {
   password?: string;
   servicePolicyId?: string;
   privacyPolicyId?: string;
+  marketingPolicyId?: string | null;
+  marketingPolicyChecked?: boolean;
 };
 
 export type ResetPasswordBody = {
   username?: string;
 };
-
