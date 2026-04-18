@@ -30,6 +30,7 @@ export default function PartnerCardForm({
   focusField,
   fieldErrors,
   formError,
+  hiddenFields,
 }: {
   partner: PartnerCardFormValues;
   mode?: PartnerCardFormMode;
@@ -43,6 +44,7 @@ export default function PartnerCardForm({
   focusField?: PartnerCardFormField;
   fieldErrors?: Partial<Record<PartnerCardFormField, string>>;
   formError?: string | null;
+  hiddenFields?: Array<{ name: string; value: string }>;
 }) {
   const {
     formRef,
@@ -96,6 +98,9 @@ export default function PartnerCardForm({
         {mode === "edit" && partner.id ? (
           <input type="hidden" name="id" value={partner.id} />
         ) : null}
+        {hiddenFields?.map((field) => (
+          <input key={`${field.name}-${field.value}`} type="hidden" name={field.name} value={field.value} />
+        ))}
 
         <div className="grid gap-6">
           <PartnerBasicInfoSection

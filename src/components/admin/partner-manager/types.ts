@@ -1,4 +1,5 @@
 import type { CategoryKey } from "@/lib/types";
+import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 
 export type AdminCategory = {
   id: string;
@@ -35,6 +36,7 @@ export type AdminPartner = {
         is_active?: boolean | null;
       }
     | null;
+  metrics?: PartnerPortalServiceMetrics | null;
 };
 
 export type AdminCompany = {

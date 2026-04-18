@@ -30,6 +30,7 @@ export type PushPreferenceState = {
 
 export type PushNotificationType =
   | "announcement"
+  | "marketing"
   | "new_partner"
   | "expiring_partner";
 

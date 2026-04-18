@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { AdminNotificationOperationLog } from "../../src/lib/admin-notification-ops.ts";
 
 type PushModule = typeof import("../../src/lib/push.ts");
 type PushSelectorModule = typeof import("../../src/components/admin/push-manager/selectors.ts");
@@ -86,44 +87,56 @@ test("admin push selectors derive options, counts, and filtered logs", async () 
     { id: "m2", display_name: "김싸피", mm_username: "kim", year: 16, campus: "부울경" },
     { id: "m3", display_name: null, mm_username: "lee", year: 15, campus: "서울" },
   ];
-  const logs = [
+  const logs: AdminNotificationOperationLog[] = [
     {
       id: "log-1",
-      type: "announcement" as const,
+      notificationType: "announcement" as const,
       source: "manual" as const,
-      target_scope: "all" as const,
-      target_label: "전체",
-      target_year: null,
-      target_campus: null,
-      target_member_id: null,
+      selectedChannels: ["in_app", "push"],
+      targetScope: "all" as const,
+      targetLabel: "전체",
+      targetYear: null,
+      targetCampus: null,
+      targetMemberId: null,
       title: "전체 공지",
       body: "안내",
       url: "/partners/1",
       status: "sent" as const,
-      targeted: 10,
-      delivered: 8,
-      failed: 2,
-      created_at: "2026-04-15T01:00:00.000Z",
-      completed_at: "2026-04-15T01:01:00.000Z",
+      totalAudienceCount: 10,
+      marketing: false,
+      channelResults: {
+        in_app: { targeted: 10, sent: 10, failed: 0, skipped: 0 },
+        push: { targeted: 8, sent: 8, failed: 2, skipped: 2 },
+        mm: { targeted: 0, sent: 0, failed: 0, skipped: 10 },
+      },
+      exclusionReasons: [],
+      createdAt: "2026-04-15T01:00:00.000Z",
+      completedAt: "2026-04-15T01:01:00.000Z",
     },
     {
       id: "log-2",
-      type: "new_partner" as const,
+      notificationType: "new_partner" as const,
       source: "automatic" as const,
-      target_scope: "year" as const,
-      target_label: "SSAFY 15기",
-      target_year: 15,
-      target_campus: null,
-      target_member_id: null,
+      selectedChannels: ["in_app", "push"],
+      targetScope: "year" as const,
+      targetLabel: "SSAFY 15기",
+      targetYear: 15,
+      targetCampus: null,
+      targetMemberId: null,
       title: "신규 제휴",
       body: "소식",
       url: "/partners/2",
       status: "failed" as const,
-      targeted: 3,
-      delivered: 0,
-      failed: 3,
-      created_at: "2026-04-14T01:00:00.000Z",
-      completed_at: "2026-04-14T01:01:00.000Z",
+      totalAudienceCount: 3,
+      marketing: false,
+      channelResults: {
+        in_app: { targeted: 0, sent: 0, failed: 0, skipped: 3 },
+        push: { targeted: 3, sent: 0, failed: 3, skipped: 0 },
+        mm: { targeted: 0, sent: 0, failed: 0, skipped: 3 },
+      },
+      exclusionReasons: [],
+      createdAt: "2026-04-14T01:00:00.000Z",
+      completedAt: "2026-04-14T01:01:00.000Z",
     },
   ];
 

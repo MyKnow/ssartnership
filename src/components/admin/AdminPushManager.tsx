@@ -1,6 +1,7 @@
 "use client";
 
-import StatsRow from "@/components/ui/StatsRow";
+import { useState } from "react";
+import Tabs from "@/components/ui/Tabs";
 import { getMemberLabel } from "./push-manager/constants";
 import { PushComposerSection } from "./push-manager/PushComposerSection";
 import { PushLogsSection } from "./push-manager/PushLogsSection";
@@ -23,69 +24,90 @@ export {
   filterPushLogs,
 } from "./push-manager/selectors";
 
+type AdminPushTab = "logs" | "send";
+
+const adminPushTabOptions = [
+  {
+    value: "logs",
+    label: "로그 조회",
+    description: "발송 이력과 자동 규칙을 확인합니다.",
+  },
+  {
+    value: "send",
+    label: "알림 전송",
+    description: "대상과 메시지를 정리해 발송합니다.",
+  },
+] as const satisfies ReadonlyArray<{
+  value: AdminPushTab;
+  label: string;
+  description: string;
+}>;
+
 export default function AdminPushManager({
-  activeSubscriptions,
-  configured,
-  enabledMembers,
+  pushConfigured,
+  mattermostConfigured,
   members,
   partners,
   recentLogs,
+  automaticSummaries,
 }: AdminPushManagerProps) {
   const controller = useAdminPushManager({
-    configured,
+    pushConfigured,
     members,
     partners,
     recentLogs,
   });
+  const [activeTab, setActiveTab] = useState<AdminPushTab>("logs");
 
   return (
     <div className="grid min-w-0 gap-8 overflow-x-hidden">
-      <StatsRow
-        items={[
-          {
-            label: "활성 구독",
-            value: `${activeSubscriptions}개`,
-            hint: "실제 전송 가능한 기기 구독 수",
-          },
-          {
-            label: "공지 가능 회원",
-            value: `${enabledMembers}명`,
-            hint: "공지 푸시를 받을 수 있는 회원 수",
-          },
-          {
-            label: "최근 메시지 로그",
-            value: `${recentLogs.length}건`,
-            hint: "최근 발송 및 자동 알림 이력",
-          },
-        ]}
-      />
+      <Tabs value={activeTab} onChange={setActiveTab} options={adminPushTabOptions} />
 
-      <PushComposerSection
-        configured={configured}
-        errorMessage={controller.errorMessage}
-        targetableCount={controller.targetableCount}
-        pending={controller.pending}
-        audienceYearOptions={controller.audienceYearOptions}
-        campusOptions={controller.campusOptions}
-        composer={controller.composer}
-        partners={partners}
-        members={members}
-        getMemberLabel={getMemberLabel}
-        onSubmit={controller.handleSubmit}
-        onUpdateComposer={controller.updateComposer}
-        onPartnerChange={controller.handlePartnerChange}
-        onUrlChange={controller.handleUrlChange}
-        onAudienceScopeChange={controller.handleAudienceScopeChange}
-      />
-
-      <PushLogsSection
-        filteredLogs={controller.filteredLogs}
-        filters={controller.filters}
-        deletingLogId={controller.deletingLogId}
-        onUpdateFilter={controller.updateFilter}
-        onLoadLog={controller.loadLog}
-        onDeleteLog={controller.deleteLog}
-      />
+      {activeTab === "logs" ? (
+        <PushLogsSection
+          automaticSummaries={automaticSummaries}
+          filteredLogs={controller.filteredLogs}
+          filters={controller.filters}
+          deletingLogId={controller.deletingLogId}
+          onUpdateFilter={controller.updateFilter}
+          onLoadLog={controller.loadLog}
+          onDeleteLog={controller.deleteLog}
+        />
+      ) : (
+        <PushComposerSection
+          pushConfigured={pushConfigured}
+          mattermostConfigured={mattermostConfigured}
+          errorMessage={controller.errorMessage}
+          pending={controller.pending}
+          previewPending={controller.previewPending}
+          reviewState={controller.reviewState}
+          canSearchAudience={controller.canSearchAudience}
+          memberPickerOpen={controller.memberPickerOpen}
+          recipientModalOpen={controller.recipientModalOpen}
+          sendConfirmOpen={controller.sendConfirmOpen}
+          audienceYearOptions={controller.audienceYearOptions}
+          campusOptions={controller.campusOptions}
+          composer={controller.composer}
+          partners={partners}
+          members={members}
+          getMemberLabel={getMemberLabel}
+          onSubmit={controller.handleSubmit}
+          onConfirmSubmit={controller.confirmSubmit}
+          onReview={controller.reviewComposer}
+          onOpenMemberPicker={controller.openMemberPicker}
+          onCloseMemberPicker={controller.closeMemberPicker}
+          onSelectMember={controller.selectMember}
+          onOpenRecipientModal={controller.openRecipientModal}
+          onCloseRecipientModal={controller.closeRecipientModal}
+          onCloseSendConfirm={controller.closeSendConfirm}
+          onUpdateComposer={controller.updateComposer}
+          onUpdateChannel={controller.updateChannel}
+          onUpdateNotificationType={controller.updateNotificationType}
+          onPartnerChange={controller.handlePartnerChange}
+          onUrlChange={controller.handleUrlChange}
+          onAudienceScopeChange={controller.handleAudienceScopeChange}
+        />
+      )}
     </div>
   );
 }

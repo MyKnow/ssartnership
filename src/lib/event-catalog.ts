@@ -54,6 +54,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_account_initial_setup_link_send',
   'partner_review_hide',
   'partner_review_restore',
+  'partner_review_update',
   'partner_review_delete',
 ] as const;
 

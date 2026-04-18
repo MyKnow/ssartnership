@@ -1,4 +1,5 @@
-import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
+import type { PushAudienceScope } from "@/lib/push";
+import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
 import type { MemberOption, SortOption } from "./types";
 
 export function createCampusOptions(members: MemberOption[]) {
@@ -56,11 +57,11 @@ export function countTargetableMembers(params: {
 }
 
 export function filterPushLogs(params: {
-  logs: PushMessageLog[];
+  logs: AdminNotificationOperationLog[];
   search: string;
-  typeFilter: PushMessageLog["type"] | "all";
-  sourceFilter: PushMessageLog["source"] | "all";
-  statusFilter: PushMessageLog["status"] | "all";
+  typeFilter: AdminNotificationType | "all";
+  sourceFilter: AdminNotificationOperationLog["source"] | "all";
+  statusFilter: AdminNotificationOperationLog["status"] | "all";
   audienceFilter: PushAudienceScope | "all";
   sort: SortOption;
 }) {
@@ -77,13 +78,13 @@ export function filterPushLogs(params: {
   const next = logs.filter((log) => {
     const matchesSearch =
       !normalizedSearch ||
-      [log.title, log.body, log.url ?? "", log.target_label].some((value) =>
+      [log.title, log.body, log.url ?? "", log.targetLabel].some((value) =>
         value.toLowerCase().includes(normalizedSearch),
       );
-    const matchesType = typeFilter === "all" || log.type === typeFilter;
+    const matchesType = typeFilter === "all" || log.notificationType === typeFilter;
     const matchesSource = sourceFilter === "all" || log.source === sourceFilter;
     const matchesStatus = statusFilter === "all" || log.status === statusFilter;
-    const matchesAudience = audienceFilter === "all" || log.target_scope === audienceFilter;
+    const matchesAudience = audienceFilter === "all" || log.targetScope === audienceFilter;
 
     return (
       matchesSearch &&
@@ -97,14 +98,28 @@ export function filterPushLogs(params: {
   next.sort((a, b) => {
     switch (sort) {
       case "oldest":
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       case "delivered":
-        return b.delivered - a.delivered;
+        return (
+          b.channelResults.in_app.sent +
+          b.channelResults.push.sent +
+          b.channelResults.mm.sent -
+          (a.channelResults.in_app.sent +
+            a.channelResults.push.sent +
+            a.channelResults.mm.sent)
+        );
       case "failed":
-        return b.failed - a.failed;
+        return (
+          b.channelResults.in_app.failed +
+          b.channelResults.push.failed +
+          b.channelResults.mm.failed -
+          (a.channelResults.in_app.failed +
+            a.channelResults.push.failed +
+            a.channelResults.mm.failed)
+        );
       case "newest":
       default:
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
   });
 

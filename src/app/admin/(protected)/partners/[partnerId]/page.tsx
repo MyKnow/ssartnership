@@ -1,0 +1,296 @@
+import { notFound } from "next/navigation";
+import AdminShell from "@/components/admin/AdminShell";
+import AdminPartnerReviewManager from "@/components/admin/partner-detail/AdminPartnerReviewManager";
+import PartnerCardForm from "@/components/PartnerCardForm";
+import CategoryColorBadge from "@/components/ui/CategoryColorBadge";
+import Badge from "@/components/ui/Badge";
+import Card from "@/components/ui/Card";
+import FormMessage from "@/components/ui/FormMessage";
+import InlineMessage from "@/components/ui/InlineMessage";
+import SectionHeading from "@/components/ui/SectionHeading";
+import ShellHeader from "@/components/ui/ShellHeader";
+import StatsRow from "@/components/ui/StatsRow";
+import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
+import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
+import {
+  getAdminReviewPageData,
+  parseAdminReviewFilters,
+  serializeAdminReviewFilters,
+} from "@/lib/admin-reviews";
+import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
+import {
+  getPartnerVisibilityBadgeClass,
+  getPartnerVisibilityLabel,
+} from "@/lib/partner-visibility";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+const adminPartnerDetailErrorMessages: Record<string, string> = {
+  ...partnerFormErrorMessages,
+  ...adminActionErrorMessages,
+};
+
+type PartnerCompanyRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  is_active?: boolean | null;
+};
+
+type PartnerCategoryRow = {
+  id: string;
+  key: string;
+  label: string;
+  color?: string | null;
+  description?: string | null;
+};
+
+function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) {
+    return null;
+  }
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+export default async function AdminPartnerDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ partnerId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { partnerId } = await params;
+  const query = (await searchParams) ?? {};
+  const detailPath = `/admin/partners/${partnerId}`;
+  const partnerError = query.error
+    ? adminPartnerDetailErrorMessages[String(query.error)] ?? null
+    : null;
+
+  const supabase = getSupabaseAdminClient();
+  const reviewFilters = {
+    ...parseAdminReviewFilters(query),
+    partnerId,
+    companyId: "",
+  };
+
+  const [
+    categoriesResult,
+    companiesResult,
+    partnerResult,
+    metricsResult,
+    reviewData,
+    totalReviewResult,
+    visibleReviewResult,
+    hiddenReviewResult,
+  ] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id,key,label,description,color")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("partner_companies")
+      .select("id,name,slug,description,is_active")
+      .order("name", { ascending: true }),
+    supabase
+      .from("partners")
+      .select(
+        "id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
+      )
+      .eq("id", partnerId)
+      .maybeSingle(),
+    getAdminPartnerMetrics([partnerId]),
+    getAdminReviewPageData(reviewFilters),
+    supabase
+      .from("partner_reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_id", partnerId)
+      .is("deleted_at", null),
+    supabase
+      .from("partner_reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_id", partnerId)
+      .is("deleted_at", null)
+      .is("hidden_at", null),
+    supabase
+      .from("partner_reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_id", partnerId)
+      .is("deleted_at", null)
+      .not("hidden_at", "is", null),
+  ]);
+
+  if (!partnerResult.data) {
+    notFound();
+  }
+
+  const partner = partnerResult.data;
+  const company = normalizeRelation<PartnerCompanyRow>(
+    (partner as { company?: PartnerCompanyRow | PartnerCompanyRow[] | null }).company,
+  );
+  const category = normalizeRelation<PartnerCategoryRow>(
+    (partner as {
+      categories?: PartnerCategoryRow | PartnerCategoryRow[] | null;
+    }).categories,
+  );
+  const metrics = metricsResult.metricsByPartnerId.get(partnerId);
+  const reviewQueryString = serializeAdminReviewFilters(reviewFilters);
+  const returnTo = reviewQueryString ? `${detailPath}?${reviewQueryString}` : detailPath;
+  const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
+  const galleryImages = partner.thumbnail
+    ? partner.images ?? []
+    : (partner.images ?? []).slice(1);
+
+  return (
+    <AdminShell title={partner.name} backHref="/admin/partners" backLabel="브랜드 관리">
+      <section className="grid gap-6">
+        <ShellHeader
+          eyebrow="Partner Detail"
+          title={partner.name}
+          description="브랜드 정보, 성과 집계, 리뷰 운영을 한 화면에서 관리합니다."
+        />
+
+        {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
+
+        <Card tone="elevated">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={getPartnerVisibilityBadgeClass(partner.visibility)}>
+              {getPartnerVisibilityLabel(partner.visibility)}
+            </Badge>
+            <CategoryColorBadge
+              label={category?.label ?? "미분류"}
+              color={category?.color}
+            />
+            <Badge>{company?.name ?? "회사 미연결"}</Badge>
+          </div>
+
+          <div className="mt-6">
+            <StatsRow
+              minItemWidth="11rem"
+              items={[
+                {
+                  label: "PV",
+                  value: `${metrics?.detailViews ?? 0}`,
+                  hint: "상세 페이지 조회",
+                },
+                {
+                  label: "CTA",
+                  value: `${metrics?.totalClicks ?? 0}`,
+                  hint: "전체 클릭 합계",
+                },
+                {
+                  label: "카드 클릭",
+                  value: `${metrics?.cardClicks ?? 0}`,
+                  hint: "리스트 유입",
+                },
+                {
+                  label: "지도 클릭",
+                  value: `${metrics?.mapClicks ?? 0}`,
+                  hint: "위치 탐색",
+                },
+                {
+                  label: "예약 클릭",
+                  value: `${metrics?.reservationClicks ?? 0}`,
+                  hint: "예약 CTA",
+                },
+                {
+                  label: "문의 클릭",
+                  value: `${metrics?.inquiryClicks ?? 0}`,
+                  hint: "문의 CTA",
+                },
+                {
+                  label: "리뷰",
+                  value: `${metrics?.reviewCount ?? 0}`,
+                  hint: "삭제 제외",
+                },
+              ]}
+            />
+          </div>
+
+          {metricsResult.warningMessage ? (
+            <InlineMessage
+              className="mt-6"
+              tone="warning"
+              title="브랜드 집계 일부를 불러오지 못했습니다."
+              description={metricsResult.warningMessage}
+            />
+          ) : null}
+        </Card>
+
+        <Card tone="elevated">
+          <SectionHeading
+            title="브랜드 수정"
+            description="리스트 화면이 아니라 상세 편집 화면에서 브랜드 정보를 수정합니다."
+          />
+          <div className="mt-6">
+            <PartnerCardForm
+              mode="edit"
+              partner={{
+                id: partner.id,
+                name: partner.name ?? "",
+                visibility: partner.visibility,
+                location: partner.location ?? "",
+                mapUrl: partner.map_url ?? "",
+                reservationLink: partner.reservation_link ?? "",
+                inquiryLink: partner.inquiry_link ?? "",
+                period: {
+                  start: partner.period_start ?? "",
+                  end: partner.period_end ?? "",
+                },
+                conditions: partner.conditions ?? [],
+                benefits: partner.benefits ?? [],
+                appliesTo: partner.applies_to ?? [],
+                thumbnail,
+                images: galleryImages,
+                tags: partner.tags ?? [],
+                company: company
+                  ? {
+                      id: company.id,
+                      name: company.name,
+                      description: company.description ?? "",
+                      contactName: "",
+                      contactEmail: "",
+                      contactPhone: "",
+                    }
+                  : null,
+              }}
+              categoryOptions={(categoriesResult.data ?? []).map((item) => ({
+                id: item.id,
+                label: item.label,
+              }))}
+              companyOptions={(companiesResult.data ?? []).map((item) => ({
+                id: item.id,
+                name: item.name,
+                slug: item.slug,
+              }))}
+              categoryId={partner.category_id}
+              formAction={updatePartner}
+              deleteAction={deletePartner}
+              submitLabel="브랜드 저장"
+              hiddenFields={[
+                { name: "updateRedirectTo", value: detailPath },
+                { name: "deleteRedirectTo", value: "/admin/partners" },
+              ]}
+            />
+          </div>
+        </Card>
+
+        <Card tone="elevated">
+          <AdminPartnerReviewManager
+            reviews={reviewData.reviews}
+            counts={{
+              totalCount: totalReviewResult.error ? 0 : totalReviewResult.count ?? 0,
+              visibleCount: visibleReviewResult.error ? 0 : visibleReviewResult.count ?? 0,
+              hiddenCount: hiddenReviewResult.error ? 0 : hiddenReviewResult.count ?? 0,
+            }}
+            filters={reviewFilters}
+            basePath={detailPath}
+            returnTo={returnTo}
+          />
+        </Card>
+      </section>
+    </AdminShell>
+  );
+}

@@ -3,6 +3,7 @@ import {
   createExpiringPartnerPayload,
   getPushDestinationLabel,
 } from "./payloads.ts";
+import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import { isPushConfigured } from "./config.ts";
 import { parsePushAudience } from "./audience.ts";
 import { sendPushToAudience } from "./send.ts";
@@ -92,14 +93,40 @@ export async function runExpiringPartnerPushBatch(
 
   for (const partner of partners) {
     try {
-      const result = await sendPushToAudience(
-        createExpiringPartnerPayload({
-          partnerId: partner.id,
-          name: partner.name,
-          endDate: partner.period_end,
-        }),
+      const payload = createExpiringPartnerPayload({
+        partnerId: partner.id,
+        name: partner.name,
+        endDate: partner.period_end,
+      });
+      const result = await sendAdminNotificationCampaign(
+        {
+          notificationType: "expiring_partner",
+          title: payload.title,
+          body: payload.body,
+          url: payload.url,
+          audience: { scope: "all" },
+          channels: {
+            in_app: true,
+            push: true,
+            mm: false,
+          },
+        },
+        "automatic",
       );
-      summary = mergePushBatchSummary(summary, result);
+      summary = {
+        ...summary,
+        targeted:
+          summary.targeted +
+          result.channelResults.in_app.targeted +
+          result.channelResults.push.targeted,
+        delivered:
+          summary.delivered +
+          result.channelResults.in_app.sent +
+          result.channelResults.push.sent,
+        failed:
+          summary.failed +
+          result.channelResults.push.failed,
+      };
     } catch (error) {
       const message =
         error instanceof Error

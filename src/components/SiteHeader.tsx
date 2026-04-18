@@ -93,6 +93,31 @@ export default function SiteHeader({
               <div className="hidden sm:flex">
                 <ThemeToggle />
               </div>
+              {initialSession ? (
+                <div className="sm:hidden">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    href="/notifications"
+                    prefetch={false}
+                    className={cn(
+                      notificationUnreadCount > 0
+                        ? NOTIFICATION_BELL_ACTIVE_ICON_BUTTON_CLASS
+                        : null,
+                    )}
+                    ariaLabel="알림"
+                    title="알림"
+                  >
+                    {notificationUnreadCount > 0 ? (
+                      <BellAlertIcon
+                        className={cn("h-5 w-5", NOTIFICATION_BELL_ACTIVE_ICON_CLASS)}
+                      />
+                    ) : (
+                      <BellIcon className="h-5 w-5" />
+                    )}
+                  </Button>
+                </div>
+              ) : null}
               <div className="sm:hidden">
                 <ThemeToggle />
               </div>

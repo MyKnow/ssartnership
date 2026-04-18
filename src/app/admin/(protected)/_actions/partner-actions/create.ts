@@ -5,8 +5,8 @@ import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import {
   createNewPartnerPayload,
   isPushConfigured,
-  sendPushToAudience,
 } from "@/lib/push";
+import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -115,13 +115,26 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
       .maybeSingle();
 
     try {
-      await sendPushToAudience(
-        createNewPartnerPayload({
-          partnerId,
-          name: payload.name,
-          location: payload.location,
-          categoryLabel: category?.label ?? null,
-        }),
+      const notificationPayload = createNewPartnerPayload({
+        partnerId,
+        name: payload.name,
+        location: payload.location,
+        categoryLabel: category?.label ?? null,
+      });
+      await sendAdminNotificationCampaign(
+        {
+          notificationType: "new_partner",
+          title: notificationPayload.title,
+          body: notificationPayload.body,
+          url: notificationPayload.url,
+          audience: { scope: "all" },
+          channels: {
+            in_app: true,
+            push: true,
+            mm: false,
+          },
+        },
+        "automatic",
       );
     } catch (pushError) {
       console.error("new partner push failed", pushError);

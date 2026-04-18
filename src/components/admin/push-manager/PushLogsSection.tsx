@@ -6,24 +6,26 @@ import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
-import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
+import type { PushAudienceScope } from "@/lib/push";
+import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
 import {
   audienceLabels,
+  formatNotificationChannels,
   formatPushLogDateTime,
   getPushLogStatusBadgeClass,
-  sourceLabels,
   statusLabels,
   typeLabels,
 } from "./constants";
-import type { SortOption } from "./types";
+import type { AdminPushManagerProps, SortOption } from "./types";
 
 type Props = {
-  filteredLogs: PushMessageLog[];
+  automaticSummaries: AdminPushManagerProps["automaticSummaries"];
+  filteredLogs: AdminNotificationOperationLog[];
   filters: {
     search: string;
-    typeFilter: PushMessageLog["type"] | "all";
-    sourceFilter: PushMessageLog["source"] | "all";
-    statusFilter: PushMessageLog["status"] | "all";
+    typeFilter: AdminNotificationType | "all";
+    sourceFilter: AdminNotificationOperationLog["source"] | "all";
+    statusFilter: AdminNotificationOperationLog["status"] | "all";
     audienceFilter: PushAudienceScope | "all";
     sort: SortOption;
   };
@@ -32,12 +34,43 @@ type Props = {
     key: "search" | "typeFilter" | "sourceFilter" | "statusFilter" | "audienceFilter" | "sort",
     value: string,
   ) => void;
-  onLoadLog: (log: PushMessageLog) => void;
+  onLoadLog: (log: AdminNotificationOperationLog) => void;
   onDeleteLog: (logId: string) => Promise<void>;
 };
 
+function AutomaticSummaryStrip({
+  summaries,
+}: {
+  summaries: AdminPushManagerProps["automaticSummaries"];
+}) {
+  return (
+    <FilterBar
+      title="자동 알림 상태"
+      description="자동 규칙은 간단히만 확인하고, 상세 이력은 아래 로그에서 봅니다."
+      tone="default"
+    >
+      {summaries.map((summary) => (
+        <div
+          key={summary.notificationType}
+          className="grid min-w-[14rem] gap-1 rounded-2xl border border-border bg-surface px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-foreground">{summary.label}</p>
+          <p className="text-sm text-muted-foreground">
+            최근 실행 {summary.lastRunAt ? formatPushLogDateTime(summary.lastRunAt) : "기록 없음"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            실패 {summary.failedCount}건
+            {summary.failureSamples[0] ? ` · ${summary.failureSamples[0]}` : ""}
+          </p>
+        </div>
+      ))}
+    </FilterBar>
+  );
+}
+
 export function PushLogsSection({
   deletingLogId,
+  automaticSummaries,
   filteredLogs,
   filters,
   onDeleteLog,
@@ -47,11 +80,13 @@ export function PushLogsSection({
   return (
     <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface-muted/50 p-4 sm:p-5">
       <SectionHeading
-        title="푸시 메시지 로그"
-        description="과거 메시지를 검색, 정렬, 필터링하고 필요하면 입력 폼으로 다시 불러올 수 있습니다."
+        title="알림 운영 로그"
+        description="최근 발송 이력을 검색하고 같은 구성을 다시 불러옵니다."
       />
 
-      <FilterBar title="로그 필터" description="유형, 대상, 상태, 정렬 기준으로 이력을 압축해서 봅니다.">
+      <AutomaticSummaryStrip summaries={automaticSummaries} />
+
+      <FilterBar title="로그 검색" description="필요한 조건만 남겨서 최근 이력을 찾습니다.">
         <div className="grid min-w-[14rem] flex-1 gap-1">
           <span className="ui-caption">검색</span>
           <Input
@@ -68,31 +103,9 @@ export function PushLogsSection({
           >
             <option value="all">전체 유형</option>
             <option value="announcement">운영 공지</option>
+            <option value="marketing">마케팅/이벤트</option>
             <option value="new_partner">신규 제휴</option>
             <option value="expiring_partner">종료 임박</option>
-          </Select>
-        </div>
-        <div className="grid min-w-[10rem] gap-1">
-          <span className="ui-caption">발송 방식</span>
-          <Select
-            value={filters.sourceFilter}
-            onChange={(event) => onUpdateFilter("sourceFilter", event.target.value)}
-          >
-            <option value="all">전체 발송 방식</option>
-            <option value="manual">수동 발송</option>
-            <option value="automatic">자동 발송</option>
-          </Select>
-        </div>
-        <div className="grid min-w-[10rem] gap-1">
-          <span className="ui-caption">대상</span>
-          <Select
-            value={filters.audienceFilter}
-            onChange={(event) => onUpdateFilter("audienceFilter", event.target.value)}
-          >
-            <option value="all">전체</option>
-            <option value="year">기수</option>
-            <option value="campus">캠퍼스</option>
-            <option value="member">개인</option>
           </Select>
         </div>
         <div className="grid min-w-[10rem] gap-1">
@@ -126,7 +139,7 @@ export function PushLogsSection({
       <div className="grid min-w-0 gap-3">
         {filteredLogs.length === 0 ? (
           <div className="min-w-0 overflow-hidden rounded-2xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
-            조건에 맞는 푸시 메시지 로그가 없습니다.
+            조건에 맞는 알림 운영 로그가 없습니다.
           </div>
         ) : (
           filteredLogs.map((log) => (
@@ -138,13 +151,10 @@ export function PushLogsSection({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="bg-surface-muted text-foreground">
-                      {typeLabels[log.type]}
+                      {typeLabels[log.notificationType]}
                     </Badge>
                     <Badge className="bg-surface-muted text-muted-foreground">
-                      {audienceLabels[log.target_scope]}
-                    </Badge>
-                    <Badge className="bg-surface-muted text-muted-foreground">
-                      {sourceLabels[log.source]}
+                      {audienceLabels[log.targetScope]}
                     </Badge>
                     <Badge className={getPushLogStatusBadgeClass(log.status)}>
                       {statusLabels[log.status]}
@@ -156,13 +166,20 @@ export function PushLogsSection({
                   <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
                     {log.body}
                   </p>
-                  <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
-                    <p>발송 시각: {formatPushLogDateTime(log.created_at)}</p>
-                    <p className="break-all">발송 대상: {log.target_label}</p>
-                    <p className="break-all">이동 URL: {log.url || "없음"}</p>
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
                     <p>
-                      대상 {log.targeted} · 성공 {log.delivered} · 실패 {log.failed}
+                      {formatPushLogDateTime(log.createdAt)} · {log.source === "manual" ? "수동" : "자동"} · {formatNotificationChannels(log.selectedChannels)}
                     </p>
+                    <p className="break-all">대상 {log.targetLabel}</p>
+                    <p>
+                      발송 인앱 {log.channelResults.in_app.sent} · 푸시 {log.channelResults.push.sent} · MM {log.channelResults.mm.sent}
+                    </p>
+                    {log.url ? <p className="break-all">이동 URL {log.url}</p> : null}
+                    {log.exclusionReasons.length > 0 ? (
+                      <p>
+                        제외 {log.exclusionReasons.map((reason) => `${reason.label} ${reason.count}명`).join(", ")}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -172,7 +189,7 @@ export function PushLogsSection({
                     variant="ghost"
                     onClick={() => onLoadLog(log)}
                   >
-                    메시지 불러오기
+                    불러오기
                   </Button>
                   <Button
                     variant="danger"

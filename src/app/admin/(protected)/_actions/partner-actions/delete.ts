@@ -8,12 +8,25 @@ import {
   revalidateAdminAndPublicPaths,
   revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
+import { redirect } from "next/navigation";
+
+function getSafeAdminPartnerPath(value: FormDataEntryValue | null, fallback: string) {
+  const candidate = typeof value === "string" ? value.trim() : "";
+  if (candidate.startsWith("/admin/partners")) {
+    return candidate;
+  }
+  return fallback;
+}
 
 export async function deletePartnerAction(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
+  const redirectPath = getSafeAdminPartnerPath(
+    formData.get("deleteRedirectTo"),
+    "/admin/partners",
+  );
   if (!id) {
-    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+    redirectAdminActionError(redirectPath, "partner_form_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -24,12 +37,12 @@ export async function deletePartnerAction(formData: FormData) {
     .maybeSingle();
 
   if (previousPartnerError) {
-    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+    redirectAdminActionError(redirectPath, "partner_form_invalid_request");
   }
 
   const { error } = await supabase.from("partners").delete().eq("id", id);
   if (error) {
-    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+    redirectAdminActionError(redirectPath, "partner_form_invalid_request");
   }
 
   await deletePartnerMediaUrls(collectPartnerMediaUrls(previousPartner)).catch(
@@ -42,4 +55,5 @@ export async function deletePartnerAction(formData: FormData) {
   });
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
+  redirect(redirectPath);
 }

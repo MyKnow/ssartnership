@@ -7,6 +7,8 @@ export function getPreferenceKey(type: PushNotificationType) {
   switch (type) {
     case "announcement":
       return "announcementEnabled" as const;
+    case "marketing":
+      return "marketingEnabled" as const;
     case "new_partner":
       return "newPartnerEnabled" as const;
     case "expiring_partner":
@@ -69,6 +71,31 @@ export function createAnnouncementPayload(params: {
     body,
     url: safeUrl,
     tag: `announcement-${Date.now()}`,
+  };
+}
+
+export function createMarketingPayload(params: {
+  title: string;
+  body: string;
+  url?: string | null;
+}) {
+  const title = params.title.trim();
+  const body = params.body.trim();
+  if (!title || !body) {
+    throw new PushError("invalid_request", "제목과 내용을 모두 입력해 주세요.");
+  }
+
+  const safeUrl = sanitizeNotificationUrl(params.url);
+  if (params.url?.trim() && !safeUrl) {
+    throw new PushError("invalid_request", "알림 이동 URL 형식을 확인해 주세요.");
+  }
+
+  return {
+    type: "marketing" as const,
+    title,
+    body,
+    url: safeUrl,
+    tag: `marketing-${Date.now()}`,
   };
 }
 

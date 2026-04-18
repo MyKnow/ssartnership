@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { isAdminSession } from "@/lib/auth";
 import { partnerReviewRepository } from "@/lib/repositories";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { logAdminAction, revalidateReviewPaths } from "./shared-helpers";
 import { redirectAdminActionError } from "./shared-helpers";
 
@@ -64,6 +65,56 @@ export async function restorePartnerReviewAction(formData: FormData) {
   });
 
   revalidateReviewPaths(restored.partnerId);
+  redirect(returnTo);
+}
+
+export async function updatePartnerReviewAction(formData: FormData) {
+  const reviewId = String(formData.get("reviewId") ?? "").trim();
+  const returnTo = getSafeReturnTo(formData.get("returnTo"));
+  const title = String(formData.get("title") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const rating = Number.parseInt(String(formData.get("rating") ?? "").trim(), 10);
+
+  if (!(await isAdminSession())) {
+    redirect("/admin/login");
+  }
+  if (!reviewId || !title || !body || !Number.isFinite(rating) || rating < 1 || rating > 5) {
+    redirectAdminActionError(returnTo, "review_invalid_request");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: review, error } = await supabase
+    .from("partner_reviews")
+    .update({
+      title,
+      body,
+      rating,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", reviewId)
+    .is("deleted_at", null)
+    .select("id,partner_id")
+    .maybeSingle();
+
+  if (error) {
+    redirectAdminActionError(returnTo, "review_invalid_request");
+  }
+  if (!review) {
+    redirectAdminActionError(returnTo, "review_not_found");
+  }
+
+  await logAdminAction("partner_review_update", {
+    targetType: "partner_review",
+    targetId: review.id,
+    properties: {
+      partnerId: review.partner_id,
+      rating,
+      titleLength: title.length,
+      bodyLength: body.length,
+    },
+  });
+
+  revalidateReviewPaths(review.partner_id);
   redirect(returnTo);
 }
 

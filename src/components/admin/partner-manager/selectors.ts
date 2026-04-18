@@ -18,6 +18,7 @@ export function createAdminPartnerCategoryOptions(categories: AdminCategory[]) {
     label: category.label,
     key: category.key,
     description: category.description ?? "",
+    color: category.color ?? null,
   }));
 }
 

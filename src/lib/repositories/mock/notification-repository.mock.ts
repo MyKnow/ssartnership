@@ -149,6 +149,17 @@ export class MockNotificationRepository implements NotificationRepository {
     });
   }
 
+  async updateNotificationMetadata(
+    notificationId: string,
+    metadata: Record<string, unknown>,
+  ) {
+    const notification = getStore().notifications.find((item) => item.id === notificationId);
+    if (!notification) {
+      throw new Error("알림을 찾을 수 없습니다.");
+    }
+    notification.metadata = metadata;
+  }
+
   async getUnreadNotificationCount(memberId: string) {
     return getStore().memberNotifications.filter(
       (item) => item.memberId === memberId && item.deletedAt === null && item.readAt === null,

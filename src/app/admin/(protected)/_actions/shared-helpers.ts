@@ -23,8 +23,10 @@ export async function logAdminAction(
 export function revalidateAdminAndPublicPaths(partnerId?: string) {
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/admin/partners/[partnerId]", "page");
   revalidatePath("/partners/[id]", "page");
   if (partnerId) {
+    revalidatePath(`/admin/partners/${partnerId}`);
     revalidatePath(`/partners/${partnerId}`);
   }
 }
@@ -68,9 +70,11 @@ export function revalidateReviewPaths(partnerId?: string) {
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/reviews");
+  revalidatePath("/admin/partners/[partnerId]", "page");
   revalidatePath("/partners/[id]", "page");
   revalidatePath("/partner/services/[partnerId]", "page");
   if (partnerId) {
+    revalidatePath(`/admin/partners/${partnerId}`);
     revalidatePath(`/partners/${partnerId}`);
     revalidatePath(`/partner/services/${partnerId}`);
   }

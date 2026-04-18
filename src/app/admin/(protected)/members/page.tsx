@@ -16,6 +16,7 @@ import {
   updateMember,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { getPushPreferencesOrDefault } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -42,11 +43,121 @@ export default async function AdminMembersPage({
   const { data: members } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,avatar_content_type,avatar_base64,created_at,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,must_change_password,service_policy_version,service_policy_consented_at,privacy_policy_version,privacy_policy_consented_at,marketing_policy_version,marketing_policy_consented_at,avatar_content_type,avatar_base64,created_at,updated_at",
     )
     .order("created_at", { ascending: false });
 
   const safeMembers = members ?? [];
+  const memberIds = safeMembers.map((member) => member.id);
+  let preferenceRows: Array<{
+    member_id: string;
+    enabled: boolean;
+    announcement_enabled: boolean;
+    new_partner_enabled: boolean;
+    expiring_partner_enabled: boolean;
+    review_enabled: boolean;
+    mm_enabled: boolean;
+    marketing_enabled: boolean;
+  }> = [];
+  let subscriptionRows: Array<{ member_id: string }> = [];
+
+  if (memberIds.length) {
+    const [preferenceResult, subscriptionResult] = await Promise.all([
+      supabase
+        .from("push_preferences")
+        .select(
+          "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
+        )
+        .in("member_id", memberIds),
+      supabase
+        .from("push_subscriptions")
+        .select("member_id")
+        .eq("is_active", true)
+        .in("member_id", memberIds),
+    ]);
+
+    preferenceRows = (preferenceResult.data ?? []) as typeof preferenceRows;
+    subscriptionRows = (subscriptionResult.data ?? []) as typeof subscriptionRows;
+  }
+  let consentRows: Array<{
+    member_id: string;
+    kind: "service" | "privacy" | "marketing";
+    version: number;
+    agreed_at: string;
+    policy_documents:
+      | { title?: string | null; effective_at?: string | null }
+      | Array<{ title?: string | null; effective_at?: string | null }>
+      | null;
+  }> = [];
+
+  if (memberIds.length) {
+    const { data } = await supabase
+      .from("member_policy_consents")
+      .select(
+        "member_id,kind,version,agreed_at,policy_documents(title,effective_at)",
+      )
+      .in("member_id", memberIds)
+      .order("agreed_at", { ascending: false });
+
+    consentRows = (data ?? []) as typeof consentRows;
+  }
+
+  const consentHistoryByMemberId = new Map<
+    string,
+    Array<{
+      kind: "service" | "privacy" | "marketing";
+      version: number;
+      agreed_at: string;
+      title?: string | null;
+      effective_at?: string | null;
+    }>
+  >();
+
+  for (const row of consentRows) {
+    const current = consentHistoryByMemberId.get(row.member_id) ?? [];
+    const document = Array.isArray(row.policy_documents)
+      ? row.policy_documents[0]
+      : row.policy_documents;
+    current.push({
+      kind: row.kind,
+      version: row.version,
+      agreed_at: row.agreed_at,
+      title: document?.title ?? null,
+      effective_at: document?.effective_at ?? null,
+    });
+    consentHistoryByMemberId.set(row.member_id, current);
+  }
+
+  const preferenceMap = new Map(
+    (preferenceRows ?? []).map((row) => [
+      row.member_id,
+      getPushPreferencesOrDefault({
+        enabled: row.enabled,
+        announcementEnabled: row.announcement_enabled,
+        newPartnerEnabled: row.new_partner_enabled,
+        expiringPartnerEnabled: row.expiring_partner_enabled,
+        reviewEnabled: row.review_enabled,
+        mmEnabled: row.mm_enabled,
+        marketingEnabled: row.marketing_enabled,
+      }),
+    ]),
+  );
+  const activeDeviceCountByMemberId = new Map<string, number>();
+  for (const row of subscriptionRows ?? []) {
+    activeDeviceCountByMemberId.set(
+      row.member_id,
+      (activeDeviceCountByMemberId.get(row.member_id) ?? 0) + 1,
+    );
+  }
+
+  const enrichedMembers = safeMembers.map((member) => ({
+    ...member,
+    notification_preferences: {
+      ...getPushPreferencesOrDefault(preferenceMap.get(member.id)),
+      activeDeviceCount: activeDeviceCountByMemberId.get(member.id) ?? 0,
+    },
+    consent_history: consentHistoryByMemberId.get(member.id) ?? [],
+  }));
 
   return (
     <AdminShell
@@ -123,7 +234,7 @@ export default async function AdminMembersPage({
         ) : (
           <Card tone="elevated">
             <AdminMemberManager
-              members={safeMembers}
+              members={enrichedMembers}
               updateMember={updateMember}
               deleteMember={deleteMember}
             />

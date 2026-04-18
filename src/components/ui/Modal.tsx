@@ -9,12 +9,16 @@ export default function Modal({
   description,
   onClose,
   children,
+  panelClassName,
+  bodyClassName,
 }: {
   open: boolean;
   title: string;
   description?: string;
   onClose: () => void;
   children: React.ReactNode;
+  panelClassName?: string;
+  bodyClassName?: string;
 }) {
   const shouldReduceMotion = useReducedMotion();
 
@@ -39,6 +43,7 @@ export default function Modal({
             transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             className={cn(
               "relative w-full max-w-lg rounded-[var(--radius-overlay)] border border-border/80 bg-surface-overlay p-6 shadow-[var(--shadow-overlay)] backdrop-blur-xl",
+              panelClassName,
             )}
           >
             <div>
@@ -51,7 +56,7 @@ export default function Modal({
                 </p>
               ) : null}
             </div>
-            <div className="mt-6 flex items-center justify-end gap-2">
+            <div className={cn("mt-6 flex items-center justify-end gap-2", bodyClassName)}>
               {children}
             </div>
           </motion.div>

@@ -4,16 +4,9 @@ import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import UserMenu from "@/components/auth/UserMenu";
 import PwaInstallButton from "@/components/PwaInstallButton";
-import Button from "@/components/ui/Button";
 import type { HeaderSession } from "@/lib/header-session";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
-import {
-  NOTIFICATION_BELL_ACTIVE_ROW_CLASS,
-} from "@/components/notifications/notification-bell";
-import {
-  useNotificationUnreadCount,
-} from "@/hooks/useNotificationUnreadCount";
 
 function DrawerSection({
   title,
@@ -43,9 +36,6 @@ export default function MobileNav({
   initialSession?: HeaderSession | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [notificationUnreadCount] = useNotificationUnreadCount(
-    initialSession?.notificationUnreadCount ?? 0,
-  );
 
   useEffect(() => {
     if (!open) {
@@ -160,22 +150,6 @@ export default function MobileNav({
                         title="계정"
                         description="로그인, 회원가입, 프로필, 알림 관련 메뉴입니다."
                       >
-                        {initialSession ? (
-                          <div className="relative mb-2">
-                            <Button
-                              variant="ghost"
-                              href="/notifications"
-                              className={cn(
-                                "w-full rounded-2xl px-4",
-                                notificationUnreadCount > 0
-                                  ? NOTIFICATION_BELL_ACTIVE_ROW_CLASS
-                                  : null,
-                              )}
-                            >
-                              알림
-                            </Button>
-                          </div>
-                        ) : null}
                         <UserMenu
                           initialSession={initialSession}
                           className="flex-col items-stretch"

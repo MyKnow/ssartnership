@@ -2,13 +2,17 @@ import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Textarea from "@/components/ui/Textarea";
 import type { AdminReviewRecord } from "@/lib/admin-reviews";
 import { formatPartnerReviewDate } from "@/components/partner-reviews/helpers";
 import {
   deletePartnerReview,
   hidePartnerReview,
   restorePartnerReview,
+  updatePartnerReview,
 } from "@/app/admin/(protected)/actions";
 import { cn } from "@/lib/cn";
 import AdminReviewImageGallery from "./AdminReviewImageGallery";
@@ -48,9 +52,11 @@ function MetaItem({
 export default function AdminReviewCard({
   review,
   returnTo,
+  editable = false,
 }: {
   review: AdminReviewRecord;
   returnTo: string;
+  editable?: boolean;
 }) {
   const statusLabel = review.isHidden ? "비공개" : "공개";
   const hiddenReason = review.isHidden ? "비공개 처리" : "공개 중";
@@ -119,6 +125,43 @@ export default function AdminReviewCard({
       </div>
 
       <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">{review.body}</p>
+
+      {editable ? (
+        <details className="rounded-xl border border-border bg-surface-muted/60 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-foreground">
+            리뷰 수정
+          </summary>
+          <form action={updatePartnerReview} className="mt-3 grid gap-3">
+            <input type="hidden" name="reviewId" value={review.id} />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <div className="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
+              <label className="grid gap-2 text-sm font-medium text-foreground">
+                별점
+                <Select name="rating" defaultValue={String(review.rating)}>
+                  <option value="5">5점</option>
+                  <option value="4">4점</option>
+                  <option value="3">3점</option>
+                  <option value="2">2점</option>
+                  <option value="1">1점</option>
+                </Select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-foreground">
+                제목
+                <Input name="title" defaultValue={review.title} maxLength={80} />
+              </label>
+            </div>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              내용
+              <Textarea name="body" defaultValue={review.body} rows={4} maxLength={1000} />
+            </label>
+            <div className="flex justify-end">
+              <SubmitButton variant="secondary" pendingText="수정 중">
+                리뷰 수정
+              </SubmitButton>
+            </div>
+          </form>
+        </details>
+      ) : null}
 
       <dl className="grid gap-3 rounded-xl border border-border bg-surface-muted/60 p-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetaItem label="상태" value={hiddenReason} />

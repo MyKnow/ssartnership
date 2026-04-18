@@ -42,6 +42,7 @@ import {
   deletePartnerReviewAction,
   hidePartnerReviewAction,
   restorePartnerReviewAction,
+  updatePartnerReviewAction,
 } from "./_actions/review-actions";
 import { logAdminAction } from "./_actions/shared-helpers";
 
@@ -118,6 +119,10 @@ export async function hidePartnerReview(formData: FormData) {
 
 export async function restorePartnerReview(formData: FormData) {
   return restorePartnerReviewAction(formData);
+}
+
+export async function updatePartnerReview(formData: FormData) {
+  return updatePartnerReviewAction(formData);
 }
 
 export async function deletePartnerReview(formData: FormData) {

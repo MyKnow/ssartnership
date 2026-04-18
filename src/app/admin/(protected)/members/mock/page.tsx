@@ -42,7 +42,7 @@ export default function AdminMemberMockPreviewPage() {
           </div>
         </Card>
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className="grid gap-6">
           <Card className="p-6">
             <SectionHeading
               title="운영진 카드 예시"
@@ -55,29 +55,31 @@ export default function AdminMemberMockPreviewPage() {
             />
           </Card>
 
-          <Card className="p-6">
-            <SectionHeading
-              title="15기 카드 예시"
-              description="15기 교육생 인증 카드 표현"
-            />
-            <CertificationView
-              member={mockPreviewCertificationMembers.year15}
-              initialTimestamp={initialTimestamp}
-              disableTracking
-            />
-          </Card>
+          <div className="grid gap-6 xl:grid-cols-2">
+            <Card className="p-6">
+              <SectionHeading
+                title="15기 카드 예시"
+                description="15기 교육생 인증 카드 표현"
+              />
+              <CertificationView
+                member={mockPreviewCertificationMembers.year15}
+                initialTimestamp={initialTimestamp}
+                disableTracking
+              />
+            </Card>
 
-          <Card className="p-6">
-            <SectionHeading
-              title="14기 카드 예시"
-              description="14기 교육생 인증 카드 표현"
-            />
-            <CertificationView
-              member={mockPreviewCertificationMembers.year14}
-              initialTimestamp={initialTimestamp}
-              disableTracking
-            />
-          </Card>
+            <Card className="p-6">
+              <SectionHeading
+                title="14기 카드 예시"
+                description="14기 교육생 인증 카드 표현"
+              />
+              <CertificationView
+                member={mockPreviewCertificationMembers.year14}
+                initialTimestamp={initialTimestamp}
+                disableTracking
+              />
+            </Card>
+          </div>
         </div>
 
         <Card>

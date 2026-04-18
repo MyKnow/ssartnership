@@ -1,6 +1,8 @@
 "use client";
 
-import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
+import type { PushAudienceScope } from "@/lib/push";
+import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
+import { getNotificationChannelLabel, type NotificationChannel } from "@/lib/notifications/shared";
 import {
   formatOptionalSsafyYearLabel,
   formatSsafyMemberLifecycleLabel,
@@ -14,18 +16,19 @@ export const audienceLabels: Record<PushAudienceScope, string> = {
   member: "개인",
 };
 
-export const typeLabels: Record<PushMessageLog["type"], string> = {
+export const typeLabels: Record<AdminNotificationType, string> = {
   announcement: "운영 공지",
+  marketing: "마케팅/이벤트",
   new_partner: "신규 제휴",
   expiring_partner: "종료 임박",
 };
 
-export const sourceLabels: Record<PushMessageLog["source"], string> = {
+export const sourceLabels: Record<AdminNotificationOperationLog["source"], string> = {
   manual: "수동 발송",
   automatic: "자동 발송",
 };
 
-export const statusLabels: Record<PushMessageLog["status"], string> = {
+export const statusLabels: Record<AdminNotificationOperationLog["status"], string> = {
   pending: "대기",
   sent: "발송 완료",
   partial_failed: "일부 실패",
@@ -33,7 +36,7 @@ export const statusLabels: Record<PushMessageLog["status"], string> = {
   no_target: "대상 없음",
 };
 
-export function getPushLogStatusBadgeClass(status: PushMessageLog["status"]) {
+export function getPushLogStatusBadgeClass(status: AdminNotificationOperationLog["status"]) {
   switch (status) {
     case "sent":
       return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
@@ -58,6 +61,10 @@ export function formatPushLogDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+export function formatNotificationChannels(channels: NotificationChannel[]) {
+  return channels.map((channel) => getNotificationChannelLabel(channel)).join(" · ");
 }
 
 export function extractPartnerIdFromUrl(url: string | null | undefined) {

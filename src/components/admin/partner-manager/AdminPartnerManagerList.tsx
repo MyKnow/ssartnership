@@ -1,35 +1,21 @@
 "use client";
 
 import EmptyState from "@/components/ui/EmptyState";
-import AdminPartnerEditorCard from "@/components/admin/AdminPartnerEditorCard";
+import AdminPartnerListItem from "@/components/admin/partner-manager/AdminPartnerListItem";
 import { ADMIN_COPY } from "@/lib/content";
 import type {
+  AdminCategory,
   AdminPartner,
 } from "@/components/admin/partner-manager/types";
 
 export default function AdminPartnerManagerList({
   partners,
   filteredPartners,
-  categoryOptions,
-  companyOptions,
-  updatePartner,
-  deletePartner,
+  categories,
 }: {
   partners: AdminPartner[];
   filteredPartners: AdminPartner[];
-  categoryOptions: Array<{
-    id: string;
-    label: string;
-    key: string;
-    description: string;
-  }>;
-  companyOptions: Array<{
-    id: string;
-    name: string;
-    slug: string;
-  }>;
-  updatePartner: (formData: FormData) => void | Promise<void>;
-  deletePartner: (formData: FormData) => void | Promise<void>;
+  categories: AdminCategory[];
 }) {
   if (filteredPartners.length === 0) {
     return (
@@ -51,13 +37,10 @@ export default function AdminPartnerManagerList({
   return (
     <div className="grid gap-6">
       {filteredPartners.map((partner) => (
-        <AdminPartnerEditorCard
+        <AdminPartnerListItem
           key={partner.id}
           partner={partner}
-          categoryOptions={categoryOptions}
-          companyOptions={companyOptions}
-          formAction={updatePartner}
-          deleteAction={deletePartner}
+          category={categories.find((category) => category.id === partner.category_id) ?? null}
         />
       ))}
     </div>

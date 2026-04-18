@@ -1,4 +1,11 @@
-import type { PushAudienceScope, PushMessageLog } from "@/lib/push";
+import type { PushAudienceScope } from "@/lib/push";
+import type {
+  AdminNotificationOperationLog,
+  AdminNotificationPreview,
+  AdminNotificationSendResult,
+  AdminNotificationType,
+} from "@/lib/admin-notification-ops";
+import type { NotificationChannel } from "@/lib/notifications/shared";
 
 export type PartnerOption = {
   id: string;
@@ -14,17 +21,26 @@ export type MemberOption = {
 };
 
 export type AdminPushManagerProps = {
-  configured: boolean;
-  activeSubscriptions: number;
-  enabledMembers: number;
+  pushConfigured: boolean;
+  mattermostConfigured: boolean;
   partners: PartnerOption[];
   members: MemberOption[];
-  recentLogs: PushMessageLog[];
+  recentLogs: AdminNotificationOperationLog[];
+  automaticSummaries: Array<{
+    notificationType: Extract<AdminNotificationType, "new_partner" | "expiring_partner">;
+    label: string;
+    lastRunAt: string | null;
+    recentCount: number;
+    failedCount: number;
+    failureSamples: string[];
+  }>;
 };
 
 export type SortOption = "newest" | "oldest" | "delivered" | "failed";
 
 export type AdminPushComposerState = {
+  notificationType: AdminNotificationType;
+  channels: Record<NotificationChannel, boolean>;
   title: string;
   body: string;
   url: string;
@@ -33,13 +49,26 @@ export type AdminPushComposerState = {
   selectedYear: string;
   selectedCampus: string;
   selectedMemberId: string;
+  confirmationText: string;
 };
 
 export type AdminPushLogFilterState = {
   search: string;
-  typeFilter: PushMessageLog["type"] | "all";
-  sourceFilter: PushMessageLog["source"] | "all";
-  statusFilter: PushMessageLog["status"] | "all";
+  typeFilter: AdminNotificationType | "all";
+  sourceFilter: AdminNotificationOperationLog["source"] | "all";
+  statusFilter: AdminNotificationOperationLog["status"] | "all";
   audienceFilter: PushAudienceScope | "all";
   sort: SortOption;
+};
+
+export type RestorableAudienceState = {
+  targetYear: number | null;
+  targetCampus: string | null;
+  targetMemberId: string | null;
+};
+
+export type AdminPushReviewState = {
+  preview: AdminNotificationPreview;
+  lastSubmittedPayload: string;
+  lastSendResult?: AdminNotificationSendResult | null;
 };

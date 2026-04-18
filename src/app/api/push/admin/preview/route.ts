@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureAdminApiAccess } from "@/lib/admin-access";
-import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { isSameOriginPushRequest } from "@/lib/push/ops";
-import { sendAdminNotificationCampaign, type AdminNotificationChannelSelection, type AdminNotificationType } from "@/lib/admin-notification-ops";
 import { parsePushAudience } from "@/lib/push";
+import {
+  previewAdminNotificationCampaign,
+  type AdminNotificationChannelSelection,
+  type AdminNotificationType,
+} from "@/lib/admin-notification-ops";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  const context = getRequestLogContext(request);
   if (!isSameOriginPushRequest(request)) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
@@ -26,9 +28,9 @@ export async function POST(request: NextRequest) {
       url?: string | null;
       channels?: Partial<AdminNotificationChannelSelection>;
       audience?: unknown;
-      confirmationText?: string | null;
     };
-    const result = await sendAdminNotificationCampaign({
+
+    const preview = await previewAdminNotificationCampaign({
       notificationType: body.notificationType ?? "announcement",
       title: body.title ?? "",
       body: body.body ?? "",
@@ -39,31 +41,12 @@ export async function POST(request: NextRequest) {
         push: Boolean(body.channels?.push),
         mm: Boolean(body.channels?.mm),
       },
-      confirmationText: body.confirmationText ?? null,
     });
 
-    await logAdminAudit({
-      ...context,
-      action: "push_send",
-      targetType: "push_message",
-      properties: {
-        type: result.preview.notificationType,
-        channels: result.preview.selectedChannels,
-        audienceScope: result.preview.audienceScope,
-        audienceLabel: result.preview.audienceLabel,
-        destination: result.preview.destinationLabel,
-        totalAudienceCount: result.preview.totalAudienceCount,
-        channelResults: result.channelResults,
-      },
-    });
-
-    return NextResponse.json({
-      ok: true,
-      result,
-    });
+    return NextResponse.json({ ok: true, preview });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "공지 알림 발송에 실패했습니다.";
+      error instanceof Error ? error.message : "알림 검토 정보를 불러오지 못했습니다.";
     return NextResponse.json({ message }, { status: 400 });
   }
 }

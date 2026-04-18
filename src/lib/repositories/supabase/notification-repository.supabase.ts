@@ -177,6 +177,20 @@ export class SupabaseNotificationRepository implements NotificationRepository {
     }
   }
 
+  async updateNotificationMetadata(
+    notificationId: string,
+    metadata: Record<string, unknown>,
+  ) {
+    const supabase = getSupabaseAdminClient();
+    const { error } = await supabase
+      .from("notifications")
+      .update({ metadata })
+      .eq("id", notificationId);
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
   async getUnreadNotificationCount(memberId: string) {
     const supabase = getSupabaseAdminClient();
     const { count, error } = await supabase

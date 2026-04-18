@@ -8,41 +8,31 @@ import AdminPartnerManagerList from "@/components/admin/partner-manager/AdminPar
 import {
   buildCategoryKeyById,
   createAdminPartnerCategoryOptions,
-  createAdminPartnerCompanyOptions,
   filterAndSortAdminPartners,
 } from "@/components/admin/partner-manager/selectors";
 import type {
   AdminCategory,
-  AdminCompany,
   AdminPartner,
   VisibilityFilter,
 } from "@/components/admin/partner-manager/types";
 
 export type {
   AdminCategory,
-  AdminCompany,
   AdminPartner,
   VisibilityFilter,
 } from "@/components/admin/partner-manager/types";
 export {
   buildCategoryKeyById,
   createAdminPartnerCategoryOptions,
-  createAdminPartnerCompanyOptions,
   filterAndSortAdminPartners,
 } from "@/components/admin/partner-manager/selectors";
 
 export default function AdminPartnerManager({
   categories,
   partners,
-  companies,
-  updatePartner,
-  deletePartner,
 }: {
   categories: AdminCategory[];
   partners: AdminPartner[];
-  companies: AdminCompany[];
-  updatePartner: (formData: FormData) => void | Promise<void>;
-  deletePartner: (formData: FormData) => void | Promise<void>;
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">("all");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
@@ -52,10 +42,6 @@ export default function AdminPartnerManager({
   const categoryOptions = useMemo(
     () => createAdminPartnerCategoryOptions(categories),
     [categories],
-  );
-  const companyOptions = useMemo(
-    () => createAdminPartnerCompanyOptions(companies),
-    [companies],
   );
   const categoryKeyById = useMemo(() => buildCategoryKeyById(categories), [categories]);
   const filteredPartners = useMemo(
@@ -93,10 +79,7 @@ export default function AdminPartnerManager({
       <AdminPartnerManagerList
         partners={partners}
         filteredPartners={filteredPartners}
-        categoryOptions={categoryOptions}
-        companyOptions={companyOptions}
-        updatePartner={updatePartner}
-        deletePartner={deletePartner}
+        categories={categories}
       />
     </div>
   );

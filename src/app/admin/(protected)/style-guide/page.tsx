@@ -80,6 +80,19 @@ export default function AdminStyleGuidePage() {
                   <Button variant="ghost">Ghost</Button>
                   <Button variant="danger">Danger</Button>
                 </div>
+                <div className="grid gap-3 rounded-2xl border border-border bg-surface px-4 py-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="lg">Primary CTA</Button>
+                    <Button size="lg" variant="secondary" disabled>
+                      Disabled CTA
+                    </Button>
+                  </div>
+                  <p className="ui-caption max-w-2xl">
+                    주요 CTA는 태블릿 이상에서 섹션의 우측 하단에 두고, 활성 상태는
+                    primary, 비활성 상태는 disabled로 표현합니다. 버튼 높이는
+                    `lg`를 기본으로 사용합니다.
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-3">

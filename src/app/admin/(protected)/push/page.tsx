@@ -3,10 +3,11 @@ import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
 import ShellHeader from "@/components/ui/ShellHeader";
 import {
-  getActiveSubscriptionPushPreferences,
-  getRecentPushMessageLogs,
-  isPushConfigured,
-} from "@/lib/push";
+  getAutomaticNotificationRuleSummaries,
+  getRecentAdminNotificationOperationLogs,
+  isMattermostNotificationConfigured,
+} from "@/lib/admin-notification-ops";
+import { isPushConfigured } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -15,81 +16,43 @@ export default async function AdminPushPage() {
   const supabase = getSupabaseAdminClient();
 
   const [
-    activeSubscriptionResult,
-    activeSubscriptionMembersResult,
-    enabledPreferenceMembersResult,
+    memberResult,
     partnerResult,
     recentLogs,
+    automaticSummaries,
   ] = await Promise.all([
     supabase
-      .from("push_subscriptions")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
-    supabase
-      .from("push_subscriptions")
-      .select("member_id")
-      .eq("is_active", true),
-    supabase
-      .from("push_preferences")
-      .select("member_id,enabled,announcement_enabled"),
-    supabase.from("partners").select("id,name").order("name", { ascending: true }),
-    getRecentPushMessageLogs(50),
-  ]);
-
-  const activeSubscriptions = activeSubscriptionResult.error
-    ? 0
-    : activeSubscriptionResult.count ?? 0;
-  const partners = partnerResult.error ? [] : partnerResult.data ?? [];
-  const activeMemberIds = Array.from(
-    new Set((activeSubscriptionMembersResult.data ?? []).map((item) => item.member_id)),
-  );
-  const preferenceMap = new Map(
-    (enabledPreferenceMembersResult.data ?? []).map((item) => [
-      item.member_id,
-      getActiveSubscriptionPushPreferences({
-        enabled: item.enabled,
-        announcementEnabled: item.announcement_enabled,
-      }),
-    ]),
-  );
-  const targetableMemberIds = activeMemberIds.filter((memberId) => {
-    const preference = getActiveSubscriptionPushPreferences(
-      preferenceMap.get(memberId),
-    );
-    return Boolean(preference.enabled && preference.announcementEnabled);
-  });
-  const enabledMembers = targetableMemberIds.length;
-
-  const { data: members, error: membersError } = targetableMemberIds.length
-      ? await supabase
       .from("members")
       .select("id,display_name,mm_username,year,campus")
-      .in("id", targetableMemberIds)
       .order("year", { ascending: true })
       .order("campus", { ascending: true })
-      .order("display_name", { ascending: true })
-    : { data: [], error: null };
+      .order("display_name", { ascending: true }),
+    supabase.from("partners").select("id,name").order("name", { ascending: true }),
+    getRecentAdminNotificationOperationLogs(50),
+    getAutomaticNotificationRuleSummaries(30),
+  ]);
+
+  const partners = partnerResult.error ? [] : partnerResult.data ?? [];
+  const safeMembers = memberResult.error ? [] : memberResult.data ?? [];
 
   return (
-    <AdminShell title="푸시 알림 관리" backHref="/admin" backLabel="관리 홈">
+    <AdminShell title="통합 알림 운영" backHref="/admin" backLabel="관리 홈">
       <div className="grid gap-6">
         <ShellHeader
-          eyebrow="Push"
-          title="푸시 알림 운영"
-          description="전체 공지는 수동 발송하고, 신규 제휴와 종료 7일 전 알림은 자동 발송됩니다."
+          eyebrow="Notifications"
+          title="통합 알림 운영"
+          description="운영 공지와 마케팅을 검토 후 발송하고, 신규 제휴와 종료 임박 자동 알림 상태까지 함께 봅니다."
         />
-        <Card tone="elevated">
           <div className="mt-6">
             <AdminPushManager
-              configured={isPushConfigured()}
-              activeSubscriptions={activeSubscriptions}
-              enabledMembers={enabledMembers}
+              pushConfigured={isPushConfigured()}
+              mattermostConfigured={isMattermostNotificationConfigured()}
               partners={partners}
-              members={membersError ? [] : members ?? []}
+              members={safeMembers}
               recentLogs={recentLogs}
+              automaticSummaries={automaticSummaries}
             />
           </div>
-        </Card>
       </div>
     </AdminShell>
   );

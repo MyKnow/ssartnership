@@ -21,6 +21,10 @@ export interface NotificationRepository {
   createNotification(
     input: NotificationBroadcastInput,
   ): Promise<CreateNotificationResult>;
+  updateNotificationMetadata(
+    notificationId: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void>;
   recordNotificationDelivery(input: NotificationDeliveryInput): Promise<void>;
   getUnreadNotificationCount(memberId: string): Promise<number>;
   listMemberNotifications(context: NotificationListContext): Promise<NotificationListResult>;

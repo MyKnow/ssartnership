@@ -18,6 +18,14 @@ import {
   parsePartnerPayloadOrRedirect,
 } from "@/app/admin/(protected)/_actions/shared-parser-redirects";
 
+function getSafeAdminPartnerPath(value: FormDataEntryValue | null, fallback: string) {
+  const candidate = typeof value === "string" ? value.trim() : "";
+  if (candidate.startsWith("/admin/partners")) {
+    return candidate;
+  }
+  return fallback;
+}
+
 export async function updatePartnerAction(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
@@ -25,7 +33,12 @@ export async function updatePartnerAction(formData: FormData) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
   }
 
-  const payload = parsePartnerPayloadOrRedirect(formData, "/admin/partners");
+  const redirectPath = getSafeAdminPartnerPath(
+    formData.get("updateRedirectTo"),
+    "/admin/partners",
+  );
+
+  const payload = parsePartnerPayloadOrRedirect(formData, redirectPath);
   const supabase = getSupabaseAdminClient();
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
@@ -42,7 +55,7 @@ export async function updatePartnerAction(formData: FormData) {
 
   const companyPayload = parsePartnerCompanyPayloadOrRedirect(
     formData,
-    "/admin/partners",
+    redirectPath,
   );
   const media = await resolvePartnerMediaPayload(formData, id);
   const hasCompanyPayload = Boolean(
@@ -132,5 +145,5 @@ export async function updatePartnerAction(formData: FormData) {
   });
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
-  redirect("/admin/partners");
+  redirect(redirectPath);
 }

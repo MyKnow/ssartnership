@@ -6,11 +6,13 @@ import EmptyState from "@/components/ui/EmptyState";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-import AdminMemberCard from "@/components/admin/AdminMemberCard";
+import AdminMemberListItem from "@/components/admin/AdminMemberListItem";
 import {
   type AdminMember,
+  type ConsentFilterOption,
   type MemberFilterOption,
   type MemberSortOption,
+  type NotificationPreferenceFilterOption,
   type YearFilterOption,
   filterAdminMembers,
   getAdminMemberCampusOptions,
@@ -32,6 +34,26 @@ export default function AdminMemberManager({
   const [filterValue, setFilterValue] = useState<MemberFilterOption>("all");
   const [yearFilter, setYearFilter] = useState<YearFilterOption>("all");
   const [campusFilter, setCampusFilter] = useState("all");
+  const [serviceConsentFilter, setServiceConsentFilter] =
+    useState<ConsentFilterOption>("all");
+  const [privacyConsentFilter, setPrivacyConsentFilter] =
+    useState<ConsentFilterOption>("all");
+  const [marketingConsentFilter, setMarketingConsentFilter] =
+    useState<ConsentFilterOption>("all");
+  const [pushEnabledFilter, setPushEnabledFilter] =
+    useState<NotificationPreferenceFilterOption>("all");
+  const [announcementEnabledFilter, setAnnouncementEnabledFilter] =
+    useState<NotificationPreferenceFilterOption>("all");
+  const [newPartnerEnabledFilter, setNewPartnerEnabledFilter] =
+    useState<NotificationPreferenceFilterOption>("all");
+  const [expiringPartnerEnabledFilter, setExpiringPartnerEnabledFilter] =
+    useState<NotificationPreferenceFilterOption>("all");
+  const [reviewEnabledFilter, setReviewEnabledFilter] =
+    useState<NotificationPreferenceFilterOption>("all");
+  const [mmEnabledFilter, setMmEnabledFilter] =
+    useState<NotificationPreferenceFilterOption>("all");
+  const [marketingEnabledFilter, setMarketingEnabledFilter] =
+    useState<NotificationPreferenceFilterOption>("all");
 
   const normalizedMembers = useMemo(() => normalizeAdminMembers(members), [members]);
   const campusOptions = useMemo(
@@ -51,12 +73,32 @@ export default function AdminMemberManager({
       filterValue,
       yearFilter,
       campusFilter,
+      serviceConsentFilter,
+      privacyConsentFilter,
+      marketingConsentFilter,
+      pushEnabledFilter,
+      announcementEnabledFilter,
+      newPartnerEnabledFilter,
+      expiringPartnerEnabledFilter,
+      reviewEnabledFilter,
+      mmEnabledFilter,
+      marketingEnabledFilter,
     });
   }, [
+    announcementEnabledFilter,
     campusFilter,
     filterValue,
+    expiringPartnerEnabledFilter,
+    marketingConsentFilter,
+    marketingEnabledFilter,
+    mmEnabledFilter,
+    newPartnerEnabledFilter,
     normalizedMembers,
+    privacyConsentFilter,
+    pushEnabledFilter,
+    reviewEnabledFilter,
     searchValue,
+    serviceConsentFilter,
     sortValue,
     yearFilter,
   ]);
@@ -127,6 +169,148 @@ export default function AdminMemberManager({
             ))}
           </Select>
         </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">서비스 약관</span>
+          <Select
+            value={serviceConsentFilter}
+            onChange={(event) =>
+              setServiceConsentFilter(event.target.value as ConsentFilterOption)
+            }
+          >
+            <option value="all">전체</option>
+            <option value="agreed">동의</option>
+            <option value="pending">미동의</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">개인정보 약관</span>
+          <Select
+            value={privacyConsentFilter}
+            onChange={(event) =>
+              setPrivacyConsentFilter(event.target.value as ConsentFilterOption)
+            }
+          >
+            <option value="all">전체</option>
+            <option value="agreed">동의</option>
+            <option value="pending">미동의</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">마케팅 약관</span>
+          <Select
+            value={marketingConsentFilter}
+            onChange={(event) =>
+              setMarketingConsentFilter(event.target.value as ConsentFilterOption)
+            }
+          >
+            <option value="all">전체</option>
+            <option value="agreed">동의</option>
+            <option value="pending">미동의</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">푸시 채널</span>
+          <Select
+            value={pushEnabledFilter}
+            onChange={(event) =>
+              setPushEnabledFilter(event.target.value as NotificationPreferenceFilterOption)
+            }
+          >
+            <option value="all">전체</option>
+            <option value="enabled">켜짐</option>
+            <option value="disabled">꺼짐</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">운영 공지</span>
+          <Select
+            value={announcementEnabledFilter}
+            onChange={(event) =>
+              setAnnouncementEnabledFilter(
+                event.target.value as NotificationPreferenceFilterOption,
+              )
+            }
+          >
+            <option value="all">전체</option>
+            <option value="enabled">켜짐</option>
+            <option value="disabled">꺼짐</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">신규 제휴</span>
+          <Select
+            value={newPartnerEnabledFilter}
+            onChange={(event) =>
+              setNewPartnerEnabledFilter(
+                event.target.value as NotificationPreferenceFilterOption,
+              )
+            }
+          >
+            <option value="all">전체</option>
+            <option value="enabled">켜짐</option>
+            <option value="disabled">꺼짐</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">종료 임박</span>
+          <Select
+            value={expiringPartnerEnabledFilter}
+            onChange={(event) =>
+              setExpiringPartnerEnabledFilter(
+                event.target.value as NotificationPreferenceFilterOption,
+              )
+            }
+          >
+            <option value="all">전체</option>
+            <option value="enabled">켜짐</option>
+            <option value="disabled">꺼짐</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">리뷰 알림</span>
+          <Select
+            value={reviewEnabledFilter}
+            onChange={(event) =>
+              setReviewEnabledFilter(
+                event.target.value as NotificationPreferenceFilterOption,
+              )
+            }
+          >
+            <option value="all">전체</option>
+            <option value="enabled">켜짐</option>
+            <option value="disabled">꺼짐</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">Mattermost</span>
+          <Select
+            value={mmEnabledFilter}
+            onChange={(event) =>
+              setMmEnabledFilter(
+                event.target.value as NotificationPreferenceFilterOption,
+              )
+            }
+          >
+            <option value="all">전체</option>
+            <option value="enabled">켜짐</option>
+            <option value="disabled">꺼짐</option>
+          </Select>
+        </div>
+        <div className="grid min-w-[10rem] gap-1">
+          <span className="ui-caption">마케팅 알림</span>
+          <Select
+            value={marketingEnabledFilter}
+            onChange={(event) =>
+              setMarketingEnabledFilter(
+                event.target.value as NotificationPreferenceFilterOption,
+              )
+            }
+          >
+            <option value="all">전체</option>
+            <option value="enabled">켜짐</option>
+            <option value="disabled">꺼짐</option>
+          </Select>
+        </div>
       </FilterBar>
 
       <p className="text-sm text-muted-foreground">
@@ -139,9 +323,9 @@ export default function AdminMemberManager({
           description="검색어나 상태 필터를 조정해 다시 확인해 주세요."
         />
       ) : (
-        <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+        <div className="grid min-w-0 gap-3">
           {filteredMembers.map((member) => (
-            <AdminMemberCard
+            <AdminMemberListItem
               key={member.id}
               member={member}
               updateAction={updateMember}

@@ -35,6 +35,36 @@ function formatDeviceDate(value: string | null) {
   }).format(date);
 }
 
+function IOSInstallGuide({ className }: { className?: string }) {
+  return (
+    <div className={className}>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">iPhone/iPad 설정</p>
+        <p className="text-sm text-muted-foreground">
+          아래 순서대로 한 번만 설정하면 됩니다.
+        </p>
+      </div>
+      <div className="mt-4 grid gap-4">
+        <InstallGuideStep
+          step="1"
+          title="브라우저의 공유 버튼을 누르세요."
+          description="페이지 안 버튼이 아니라 브라우저 기본 공유 버튼을 사용합니다."
+        />
+        <InstallGuideStep
+          step="2"
+          title="홈 화면에 추가를 선택하세요."
+          description="홈 화면에 SSARTNERSHIP 아이콘이 생깁니다."
+        />
+        <InstallGuideStep
+          step="3"
+          title="설치된 앱을 열고 이 화면에서 알림을 켜세요."
+          description="설치형 앱 안에서만 알림 권한을 요청할 수 있습니다."
+        />
+      </div>
+    </div>
+  );
+}
+
 export type { PreferenceKey, PushSettingsCardProps } from "./push-settings/types";
 export { derivePushSettingsStatus, getPushSettingsStatusClassName } from "./push-settings/status";
 
@@ -61,31 +91,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
         </div>
 
         {controller.iosNeedsInstall ? (
-          <div className="rounded-2xl border border-border/70 bg-surface px-4 py-4">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">iPhone/iPad 설정</p>
-              <p className="text-sm text-muted-foreground">
-                아래 순서대로 한 번만 설정하면 됩니다.
-              </p>
-            </div>
-            <div className="mt-4 grid gap-4">
-              <InstallGuideStep
-                step="1"
-                title="브라우저의 공유 버튼을 누르세요."
-                description="페이지 안 버튼이 아니라 브라우저 기본 공유 버튼을 사용합니다."
-              />
-              <InstallGuideStep
-                step="2"
-                title="홈 화면에 추가를 선택하세요."
-                description="홈 화면에 SSARTNERSHIP 아이콘이 생깁니다."
-              />
-              <InstallGuideStep
-                step="3"
-                title="설치된 앱을 열고 이 화면에서 알림을 켜세요."
-                description="설치형 앱 안에서만 알림 권한을 요청할 수 있습니다."
-              />
-            </div>
-          </div>
+          <IOSInstallGuide className="hidden rounded-2xl border border-border/70 bg-surface px-4 py-4 sm:block" />
         ) : null}
 
         <div className="space-y-3">
@@ -241,6 +247,9 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                     이 기기에서 푸시 받기
                   </Button>
                 </div>
+              ) : null}
+              {controller.iosNeedsInstall ? (
+                <IOSInstallGuide className="border-t border-border/70 pt-4 sm:hidden" />
               ) : null}
             </div>
           </div>

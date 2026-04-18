@@ -6,19 +6,19 @@ import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import InlineMessage from "@/components/ui/InlineMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import {
   createCategory,
   approvePartnerChangeRequest,
   deleteCategory,
-  deletePartner,
   rejectPartnerChangeRequest,
   updateCategory,
-  updatePartner,
 } from "@/app/admin/(protected)/actions";
 import { ADMIN_COPY } from "@/lib/content";
 import { listPartnerChangeRequests } from "@/lib/partner-change-requests";
@@ -88,7 +88,6 @@ export default async function AdminPartnersPage({
   const [
     categoriesResult,
     partnersResult,
-    companiesResult,
     changeRequests,
   ] = await Promise.all([
     supabase
@@ -99,19 +98,21 @@ export default async function AdminPartnersPage({
       .from("partners")
       .select("id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active)")
       .order("created_at", { ascending: false }),
-    supabase
-      .from("partner_companies")
-      .select("id,name,slug,description,is_active,created_at,updated_at")
-      .order("name", { ascending: true }),
     listPartnerChangeRequests(),
   ]);
 
   const safeCategories = categoriesResult.data ?? [];
-  const safePartners = (partnersResult.data ?? []).map((partner) => ({
+  const normalizedPartners = (partnersResult.data ?? []).map((partner) => ({
     ...partner,
     company: normalizePartnerCompany((partner as { company?: unknown }).company),
   }));
-  const safeCompanies = companiesResult.data ?? [];
+  const partnerMetrics = await getAdminPartnerMetrics(
+    normalizedPartners.map((partner) => partner.id),
+  );
+  const safePartners = normalizedPartners.map((partner) => ({
+    ...partner,
+    metrics: partnerMetrics.metricsByPartnerId.get(partner.id) ?? null,
+  }));
 
   return (
     <AdminShell
@@ -263,12 +264,17 @@ export default async function AdminPartnersPage({
             title="브랜드 관리"
             description="협력사와 담당자 이메일을 함께 관리하고, 이용 조건/혜택/태그는 칩으로 다룹니다."
           />
+          {partnerMetrics.warningMessage ? (
+            <InlineMessage
+              className="mt-6"
+              tone="warning"
+              title="브랜드 집계 일부를 불러오지 못했습니다."
+              description={partnerMetrics.warningMessage}
+            />
+          ) : null}
           <AdminPartnerManager
             categories={safeCategories}
             partners={safePartners}
-            companies={safeCompanies}
-            updatePartner={updatePartner}
-            deletePartner={deletePartner}
           />
         </Card>
 

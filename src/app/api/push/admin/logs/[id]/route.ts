@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureAdminApiAccess } from "@/lib/admin-access";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
-import { deletePushMessageLog } from "@/lib/push";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -26,11 +26,15 @@ export async function DELETE(
 
   try {
     const { id } = await context.params;
-    await deletePushMessageLog(id);
+    const supabase = getSupabaseAdminClient();
+    const { error } = await supabase.from("notifications").delete().eq("id", id);
+    if (error) {
+      throw new Error(error.message);
+    }
     await logAdminAudit({
       ...requestContext,
       action: "push_log_delete",
-      targetType: "push_message_log",
+      targetType: "notification_operation_log",
       targetId: id,
     });
     return NextResponse.json({ ok: true });
@@ -38,7 +42,7 @@ export async function DELETE(
     const message =
       error instanceof Error
         ? error.message
-        : "푸시 메시지 로그 삭제에 실패했습니다.";
+        : "알림 운영 로그 삭제에 실패했습니다.";
     return NextResponse.json({ message }, { status: 400 });
   }
 }
