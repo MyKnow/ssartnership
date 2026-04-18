@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { trackProductEvent } from "@/lib/product-events";
 import Button from "@/components/ui/Button";
+import type { ButtonVariant } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
 type BeforeInstallPromptEvent = Event & {
@@ -34,8 +35,10 @@ function subscribeClient() {
 
 export default function PwaInstallButton({
   className,
+  variant = "ghost",
 }: {
   className?: string;
+  variant?: ButtonVariant;
 }) {
   const isClient = useSyncExternalStore(
     subscribeClient,
@@ -124,7 +127,7 @@ export default function PwaInstallButton({
 
   return (
     <Button
-      variant="ghost"
+      variant={variant}
       onClick={() => void handleInstall()}
       loading={pending}
       loadingText="설치 준비 중"

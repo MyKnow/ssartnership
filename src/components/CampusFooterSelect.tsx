@@ -3,6 +3,7 @@
 import { useMemo, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Select from "@/components/ui/Select";
+import { cn } from "@/lib/cn";
 import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
 
 function getSelectedCampus(pathname: string) {
@@ -10,7 +11,11 @@ function getSelectedCampus(pathname: string) {
   return match?.[1] ?? "all";
 }
 
-export default function CampusFooterSelect() {
+export default function CampusFooterSelect({
+  className,
+}: {
+  className?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -25,7 +30,7 @@ export default function CampusFooterSelect() {
   return (
     <Select
       aria-label="캠퍼스별 제휴 페이지 이동"
-      className="min-w-[11rem] bg-surface-muted/90"
+      className={cn("min-w-[11rem] bg-surface-muted/90", className)}
       disabled={isPending}
       value={selectedCampus}
       onChange={(event) => {
