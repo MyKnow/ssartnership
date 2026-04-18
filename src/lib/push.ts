@@ -24,8 +24,10 @@ export {
 export {
   deactivateAllPushSubscriptions,
   deactivatePushSubscription,
+  listPushSubscriptionDevices,
   upsertPushSubscription,
 } from "./push/subscriptions.ts";
+export type { PushSubscriptionDevice } from "./push/subscriptions.ts";
 export {
   createAnnouncementPayload,
   createExpiringPartnerPayload,

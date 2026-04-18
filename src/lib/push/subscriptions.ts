@@ -8,6 +8,16 @@ import {
   upsertMemberPushPreferences,
 } from "./preferences.ts";
 
+export type PushSubscriptionDevice = {
+  id: string;
+  label: string;
+  userAgent: string | null;
+  isCurrent: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  lastSuccessAt: string | null;
+};
+
 function validateSubscription(input: SubscriptionInput) {
   const endpoint = sanitizeHttpUrl(input.endpoint);
   if (!endpoint?.startsWith("https://")) {
@@ -64,14 +74,16 @@ export async function upsertPushSubscription(params: {
     announcementEnabled: true,
     newPartnerEnabled: true,
     expiringPartnerEnabled: true,
+    reviewEnabled: true,
   });
 }
 
 export async function deactivatePushSubscription(params: {
   memberId: string;
   endpoint?: string | null;
+  subscriptionId?: string | null;
 }) {
-  const { memberId, endpoint } = params;
+  const { memberId, endpoint, subscriptionId } = params;
   const supabase = getSupabaseAdminClient();
 
   let query = supabase
@@ -84,6 +96,8 @@ export async function deactivatePushSubscription(params: {
 
   if (endpoint) {
     query = query.eq("endpoint", endpoint);
+  } else if (subscriptionId) {
+    query = query.eq("id", subscriptionId);
   }
 
   const { error } = await query;
@@ -92,6 +106,69 @@ export async function deactivatePushSubscription(params: {
   }
 
   return getMemberPushPreferences(memberId);
+}
+
+function getDeviceLabel(userAgent: string | null) {
+  const source = userAgent ?? "";
+  const clientHints = source.includes("client-hints=")
+    ? source.slice(source.indexOf("client-hints="))
+    : "";
+  const browser =
+    clientHints.includes("Microsoft Edge") || source.includes("Edg/")
+      ? "Edge"
+      : clientHints.includes("Google Chrome") ||
+          clientHints.includes("Chromium") ||
+          source.includes("Chrome/")
+        ? "Chrome"
+      : source.includes("Firefox/")
+        ? "Firefox"
+        : source.includes("Safari/") && !clientHints
+          ? "Safari"
+          : "브라우저";
+  const os =
+    clientHints.includes("macOS") ||
+    source.includes("Mac OS X") ||
+    source.includes("macOS") ||
+    source.includes("Macintosh")
+      ? "macOS"
+      : clientHints.includes("Windows") || source.includes("Windows")
+        ? "Windows"
+        : clientHints.includes("Android") || source.includes("Android")
+          ? "Android"
+          : source.includes("iPhone") || source.includes("iPad") || source.includes("iOS")
+            ? "iOS"
+            : source.includes("Linux")
+              ? "Linux"
+              : "기기";
+
+  return `${browser} · ${os}`;
+}
+
+export async function listPushSubscriptionDevices(params: {
+  memberId: string;
+  currentEndpoint?: string | null;
+}): Promise<PushSubscriptionDevice[]> {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .select("id, endpoint, user_agent, created_at, updated_at, last_success_at")
+    .eq("member_id", params.memberId)
+    .eq("is_active", true)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    throw wrapPushDbError(error, "Push 기기 목록을 불러오지 못했습니다.");
+  }
+
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    label: getDeviceLabel(row.user_agent),
+    userAgent: row.user_agent ?? null,
+    isCurrent: Boolean(params.currentEndpoint && row.endpoint === params.currentEndpoint),
+    createdAt: row.created_at ?? null,
+    updatedAt: row.updated_at ?? null,
+    lastSuccessAt: row.last_success_at ?? null,
+  }));
 }
 
 export async function deactivateAllPushSubscriptions(memberId: string) {

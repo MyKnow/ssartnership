@@ -134,7 +134,7 @@ export async function sendPushToAudience(
   const { data: preferences, error: preferenceError } = await supabase
     .from("push_preferences")
     .select(
-      "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,mm_enabled,marketing_enabled",
+      "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
     )
     .in("member_id", memberIds);
 
@@ -151,6 +151,7 @@ export async function sendPushToAudience(
         announcementEnabled: item.announcement_enabled,
         newPartnerEnabled: item.new_partner_enabled,
         expiringPartnerEnabled: item.expiring_partner_enabled,
+        reviewEnabled: item.review_enabled,
         mmEnabled: item.mm_enabled,
         marketingEnabled: item.marketing_enabled,
       } satisfies PushPreferenceState,

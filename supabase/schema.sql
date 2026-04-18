@@ -554,6 +554,7 @@ create table if not exists push_preferences (
   announcement_enabled boolean not null default true,
   new_partner_enabled boolean not null default true,
   expiring_partner_enabled boolean not null default true,
+  review_enabled boolean not null default true,
   mm_enabled boolean not null default true,
   marketing_enabled boolean not null default false,
   created_at timestamp with time zone default now(),

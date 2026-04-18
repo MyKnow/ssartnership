@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import IconActionButton, { IconActionGroup } from "@/components/ui/IconActionButton";
 import InlineMessage from "@/components/ui/InlineMessage";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -64,6 +66,63 @@ export default function NotificationInbox({
     () => (state.unreadCount > 99 ? "99+" : String(state.unreadCount)),
     [state.unreadCount],
   );
+
+  async function markAsRead(item: MemberNotificationRecord) {
+    if (pendingId || !item.isUnread) {
+      return;
+    }
+
+    setPendingId(item.id);
+    setState((current) => ({
+      ...current,
+      unreadCount: Math.max(0, current.unreadCount - 1),
+      items: current.items.map((row) =>
+        row.id === item.id
+          ? {
+              ...row,
+              readAt: row.readAt ?? new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              isUnread: false,
+            }
+          : row,
+      ),
+    }));
+
+    try {
+      const response = await fetch(`/api/notifications/${item.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await parseNotificationResponse(response);
+      if (typeof data.summary?.unreadCount === "number") {
+        emitNotificationUnreadCount(data.summary.unreadCount);
+        setState((current) => ({
+          ...current,
+          unreadCount: data.summary?.unreadCount ?? current.unreadCount,
+        }));
+      }
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        unreadCount: current.unreadCount + 1,
+        items: current.items.map((row) =>
+          row.id === item.id
+            ? {
+                ...row,
+                readAt: item.readAt,
+                updatedAt: item.updatedAt,
+                isUnread: true,
+              }
+            : row,
+        ),
+      }));
+      notify(error instanceof Error ? error.message : "읽음 처리에 실패했습니다.");
+    } finally {
+      setPendingId(null);
+    }
+  }
 
   async function markAsReadAndOpen(item: MemberNotificationRecord) {
     if (pendingId) {
@@ -168,20 +227,17 @@ export default function NotificationInbox({
   }
 
   return (
-    <Card className={cn("mx-auto w-full max-w-3xl overflow-hidden", className)}>
-      <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-5 sm:px-6">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-foreground">알림 수신함</h2>
-            <Badge variant={state.unreadCount > 0 ? "danger" : "neutral"}>
-              {unreadLabel}
-            </Badge>
-          </div>
-          <p className="ui-body max-w-2xl">
-            읽지 않은 알림만 badge에 반영됩니다. 항목을 누르면 읽음 처리 후 바로
-            이동합니다.
-          </p>
+    <Card
+      padding="none"
+      className={cn("mx-auto w-full max-w-3xl overflow-hidden", className)}
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5 sm:py-4">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-foreground sm:text-lg">수신함</h2>
         </div>
+        <Badge variant={state.unreadCount > 0 ? "danger" : "neutral"}>
+          안 읽음 {unreadLabel}
+        </Badge>
       </div>
 
       {state.items.length > 0 ? (
@@ -195,8 +251,10 @@ export default function NotificationInbox({
                 tabIndex={0}
                 aria-label={`${item.title} 알림 열기`}
                 className={cn(
-                  "group relative flex cursor-pointer gap-4 px-5 py-4 outline-none transition-colors hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 sm:px-6",
-                  item.isUnread ? "bg-primary-soft/20" : "bg-surface",
+                  "group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3.5 outline-none transition-colors hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 sm:px-5 sm:py-4",
+                  item.isUnread
+                    ? "bg-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
+                    : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)] opacity-[0.74]",
                   isBusy ? "pointer-events-none opacity-70" : null,
                 )}
                 onClick={() => {
@@ -209,46 +267,92 @@ export default function NotificationInbox({
                   }
                 }}
               >
-                <div className="min-w-0 flex-1 space-y-3">
+                <div className="mt-1 shrink-0 pt-1">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "block h-2.5 w-2.5 rounded-full",
+                      item.isUnread ? "bg-danger shadow-[0_0_0_4px_rgba(194,65,92,0.12)]" : "bg-border/75",
+                    )}
+                  />
+                </div>
+
+                <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="primary">{getNotificationTypeLabel(item.type)}</Badge>
-                    {item.isUnread ? <Badge variant="danger">새 알림</Badge> : null}
+                    <Badge
+                      variant={item.isUnread ? "primary" : "neutral"}
+                      className={cn(
+                        "px-2 py-0.5 text-[10px]",
+                        item.isUnread
+                          ? "border-primary/20 bg-primary-soft text-primary"
+                          : "border-border/40 bg-surface-muted/55 text-muted-foreground/75",
+                      )}
+                    >
+                      {getNotificationTypeLabel(item.type)}
+                    </Badge>
+                    <span
+                      className={cn(
+                        "text-xs text-muted-foreground",
+                        item.isUnread ? "text-foreground-soft" : "text-muted-foreground/65",
+                      )}
+                    >
+                      {formatNotificationDate(item.createdAt)}
+                    </span>
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="text-base font-semibold leading-6 text-foreground">
+                  <div className="space-y-1">
+                    <h3
+                      className={cn(
+                        "text-sm font-semibold leading-6 text-foreground sm:text-[15px]",
+                        item.isUnread ? "text-foreground" : "text-foreground-soft/75",
+                      )}
+                    >
                       {item.title}
                     </h3>
-                    <p className="ui-body line-clamp-2">{item.body}</p>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>{formatNotificationDate(item.createdAt)}</span>
-                    <span>{item.isUnread ? "읽지 않음" : "읽음"}</span>
+                    <p
+                      className={cn(
+                        "line-clamp-2 text-sm leading-5 text-muted-foreground sm:leading-6",
+                        item.isUnread ? "text-muted-foreground" : "text-muted-foreground/60",
+                      )}
+                    >
+                      {item.body}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-surface text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                <IconActionGroup className="self-center">
+                  {item.isUnread ? (
+                    <IconActionButton
+                      tone="success"
+                      aria-label="읽음 처리"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void markAsRead(item);
+                      }}
+                    >
+                      <CheckIcon className="h-4 w-4" />
+                    </IconActionButton>
+                  ) : null}
+                  <IconActionButton
+                    tone="danger"
                     aria-label="알림 삭제"
                     onClick={(event) => {
                       event.stopPropagation();
                       void deleteNotification(item);
                     }}
                   >
-                    <span aria-hidden="true">×</span>
-                  </button>
-                </div>
+                      <XMarkIcon className="h-4 w-4" />
+                  </IconActionButton>
+                </IconActionGroup>
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="px-5 py-5 sm:px-6">
+        <div className="px-4 py-4 sm:px-6 sm:py-5">
           <InlineMessage
             tone="info"
-            title="아직 도착한 알림이 없습니다"
-            description="새 제휴, 종료 임박, 운영 공지, 마케팅 안내가 이곳에 쌓입니다."
+            title="도착한 알림이 없습니다"
+            description="새 제휴와 운영 공지가 생기면 이곳에 표시됩니다."
             actionHref="/"
             actionLabel="혜택 둘러보기"
           />
@@ -256,7 +360,7 @@ export default function NotificationInbox({
       )}
 
       {state.hasMore ? (
-        <div className="border-t border-border/70 px-5 py-4 sm:px-6">
+        <div className="border-t border-border/70 px-4 py-4 sm:px-6">
           <div className="flex justify-center">
             <Button
               variant="secondary"

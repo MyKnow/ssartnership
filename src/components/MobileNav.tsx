@@ -4,11 +4,13 @@ import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import UserMenu from "@/components/auth/UserMenu";
 import PwaInstallButton from "@/components/PwaInstallButton";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import type { HeaderSession } from "@/lib/header-session";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
+import {
+  NOTIFICATION_BELL_ACTIVE_ROW_CLASS,
+} from "@/components/notifications/notification-bell";
 import {
   useNotificationUnreadCount,
 } from "@/hooks/useNotificationUnreadCount";
@@ -163,20 +165,15 @@ export default function MobileNav({
                             <Button
                               variant="ghost"
                               href="/notifications"
-                              className="w-full rounded-2xl px-4"
+                              className={cn(
+                                "w-full rounded-2xl px-4",
+                                notificationUnreadCount > 0
+                                  ? NOTIFICATION_BELL_ACTIVE_ROW_CLASS
+                                  : null,
+                              )}
                             >
                               알림
                             </Button>
-                            {notificationUnreadCount > 0 ? (
-                              <Badge
-                                variant="danger"
-                                className="absolute right-3 top-1/2 -translate-y-1/2 min-w-5 justify-center px-1.5 py-0.5 text-[10px] tracking-normal"
-                              >
-                                {notificationUnreadCount > 99
-                                  ? "99+"
-                                  : notificationUnreadCount}
-                              </Badge>
-                            ) : null}
                           </div>
                         ) : null}
                         <UserMenu

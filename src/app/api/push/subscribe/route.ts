@@ -10,6 +10,23 @@ function isSameOrigin(request: NextRequest) {
   return !origin || origin === request.nextUrl.origin;
 }
 
+function getPushDeviceUserAgent(request: NextRequest) {
+  const userAgent = request.headers.get("user-agent")?.trim() ?? "";
+  const clientHints = [
+    request.headers.get("sec-ch-ua")?.trim(),
+    request.headers.get("sec-ch-ua-platform")?.trim(),
+    request.headers.get("sec-ch-ua-mobile")?.trim(),
+  ].filter(Boolean);
+
+  if (clientHints.length === 0) {
+    return userAgent || null;
+  }
+
+  return [userAgent, `client-hints=${clientHints.join("; ")}`]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export async function POST(request: NextRequest) {
   const context = getRequestLogContext(request);
   if (!isSameOrigin(request)) {
@@ -46,7 +63,7 @@ export async function POST(request: NextRequest) {
     const preferences = await upsertPushSubscription({
       memberId: session.userId,
       subscription: body.subscription,
-      userAgent: request.headers.get("user-agent"),
+      userAgent: getPushDeviceUserAgent(request),
     });
 
     await logProductEvent({

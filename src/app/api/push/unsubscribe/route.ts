@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       endpoint?: string | null;
+      subscriptionId?: string | null;
       scope?: "device" | "all";
     };
     const scope = body?.scope === "all" ? "all" : "device";
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
         : await deactivatePushSubscription({
             memberId: session.userId,
             endpoint: body?.endpoint ?? null,
+            subscriptionId: body?.subscriptionId ?? null,
           });
 
     await logProductEvent({
@@ -45,7 +47,10 @@ export async function POST(request: NextRequest) {
       actorType: "member",
       actorId: session.userId,
       targetType: "push_subscription",
-      targetId: scope === "all" ? session.userId : (body?.endpoint ?? null),
+      targetId:
+        scope === "all"
+          ? session.userId
+          : (body?.subscriptionId ?? body?.endpoint ?? null),
       properties: {
         scope,
         enabled: preferences.enabled,

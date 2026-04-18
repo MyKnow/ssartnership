@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { BellIcon } from "@heroicons/react/24/outline";
+import { BellAlertIcon } from "@heroicons/react/24/solid";
 import ThemeToggle from "@/components/ThemeToggle";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
@@ -13,6 +13,10 @@ import type { HeaderSession } from "@/lib/header-session";
 import { cn } from "@/lib/cn";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
 import BrandWordmark from "@/components/BrandWordmark";
+import {
+  NOTIFICATION_BELL_ACTIVE_ICON_CLASS,
+  NOTIFICATION_BELL_ACTIVE_ICON_BUTTON_CLASS,
+} from "@/components/notifications/notification-bell";
 import {
   useNotificationUnreadCount,
 } from "@/hooks/useNotificationUnreadCount";
@@ -68,19 +72,22 @@ export default function SiteHeader({
                     size="icon"
                     href="/notifications"
                     prefetch={false}
+                    className={cn(
+                      notificationUnreadCount > 0
+                        ? NOTIFICATION_BELL_ACTIVE_ICON_BUTTON_CLASS
+                        : null,
+                    )}
                     ariaLabel="알림"
                     title="알림"
                   >
-                    <BellIcon className="h-5 w-5" />
+                    {notificationUnreadCount > 0 ? (
+                      <BellAlertIcon
+                        className={cn("h-5 w-5", NOTIFICATION_BELL_ACTIVE_ICON_CLASS)}
+                      />
+                    ) : (
+                      <BellIcon className="h-5 w-5" />
+                    )}
                   </Button>
-                  {notificationUnreadCount > 0 ? (
-                    <Badge
-                      variant="danger"
-                      className="absolute -right-1 -top-1 min-w-5 justify-center px-1.5 py-0.5 text-[10px] tracking-normal"
-                    >
-                      {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
-                    </Badge>
-                  ) : null}
                 </div>
               ) : null}
               <div className="hidden sm:flex">

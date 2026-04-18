@@ -15,6 +15,7 @@ export function usePushDeviceState() {
     "default",
   );
   const [hasSubscription, setHasSubscription] = useState(false);
+  const [subscriptionEndpoint, setSubscriptionEndpoint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +37,7 @@ export function usePushDeviceState() {
           setIosNeedsInstall(true);
           setPermission("Notification" in window ? Notification.permission : "default");
           setHasSubscription(false);
+          setSubscriptionEndpoint(null);
           setLoading(false);
         }
         return;
@@ -69,6 +71,7 @@ export function usePushDeviceState() {
         const subscription = await registration.pushManager.getSubscription();
         if (!cancelled) {
           setHasSubscription(Boolean(subscription));
+          setSubscriptionEndpoint(subscription?.endpoint ?? null);
         }
       } finally {
         if (!cancelled) {
@@ -104,12 +107,15 @@ export function usePushDeviceState() {
     iosNeedsInstall,
     permission,
     hasSubscription,
+    subscriptionEndpoint,
     requestNotificationPermission,
-    markSubscribed() {
+    markSubscribed(endpoint?: string | null) {
       setHasSubscription(true);
+      setSubscriptionEndpoint(endpoint ?? null);
     },
     markUnsubscribed() {
       setHasSubscription(false);
+      setSubscriptionEndpoint(null);
     },
   };
 }
