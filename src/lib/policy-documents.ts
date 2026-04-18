@@ -144,17 +144,9 @@ async function queryActiveRequiredPolicies(): Promise<RequiredPolicyMap> {
   return policyMap as RequiredPolicyMap;
 }
 
-const getCachedActiveRequiredPolicies = unstable_cache(
-  queryActiveRequiredPolicies,
-  [POLICY_DOCUMENTS_CACHE_KEY, "active-required"],
-  {
-    revalidate: REQUIRED_POLICY_CACHE_REVALIDATE_SECONDS,
-    tags: [POLICY_DOCUMENTS_CACHE_KEY],
-  },
-);
-
 export async function getActiveRequiredPolicies() {
-  return getCachedActiveRequiredPolicies();
+  // 인증/동의 가드는 현재 활성 버전과 즉시 일치해야 하므로 캐시하지 않는다.
+  return queryActiveRequiredPolicies();
 }
 
 async function queryPolicyDocumentByKind(
