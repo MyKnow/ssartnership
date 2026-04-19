@@ -36,7 +36,7 @@ export async function getSupabaseRequestContext(
   const { data: partner, error } = await supabase
     .from("partners")
     .select(
-      "id,company_id,name,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
+      "id,company_id,created_at,name,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
     )
     .eq("id", partnerId)
     .maybeSingle();
@@ -70,6 +70,7 @@ export async function getSupabaseRequestContext(
     partnerId: row.id,
     partnerName: row.name,
     partnerLocation: row.location,
+    partnerCreatedAt: row.created_at,
     categoryLabel: extractCategoryLabel(row.categories ?? null),
     categoryColor: extractCategoryColor(row.categories ?? null),
     visibility: normalizePartnerVisibility(row.visibility),

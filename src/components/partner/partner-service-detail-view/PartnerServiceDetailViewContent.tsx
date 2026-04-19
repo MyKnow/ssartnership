@@ -17,6 +17,7 @@ import PartnerServiceMetricsPanel from "@/components/partner/partner-service-det
 import PartnerPendingRequestSection from "@/components/partner/partner-service-detail-view/PartnerPendingRequestSection";
 import PartnerServiceContacts from "@/components/partner/partner-service-detail-view/PartnerServiceContacts";
 import PartnerServiceSummaryCard from "@/components/partner/partner-service-detail-view/PartnerServiceSummaryCard";
+import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { getPartnerServiceVisualState } from "@/components/partner/partner-service-detail-view/helpers";
 import type { PartnerServiceDetailViewProps } from "@/components/partner/partner-service-detail-view/types";
 
@@ -31,6 +32,7 @@ export default function PartnerServiceDetailViewContent({
   cancelAction,
   reviewSummary,
   serviceMetrics,
+  metricTimeseries,
   serviceMetricsWarningMessage,
   initialReviews,
   initialReviewSort,
@@ -48,7 +50,7 @@ export default function PartnerServiceDetailViewContent({
   return (
     <div className="bg-background">
       <Container className="pb-16 pt-10">
-        <div className="mx-auto max-w-6xl space-y-6">
+        <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <Button href="/partner" variant="ghost">
@@ -125,6 +127,8 @@ export default function PartnerServiceDetailViewContent({
                 reviewSummary={reviewSummary}
                 warningMessage={serviceMetricsWarningMessage}
               />
+
+              <PartnerMetricTimeseriesPanel data={metricTimeseries} />
 
               {pendingRequest ? (
                 <PartnerPendingRequestSection

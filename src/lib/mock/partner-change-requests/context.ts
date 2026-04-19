@@ -34,6 +34,7 @@ export async function getMockPartnerChangeRequestContext(
     partnerId: normalizedService.partnerId,
     partnerName: normalizedService.partnerName,
     partnerLocation: normalizedService.partnerLocation,
+    partnerCreatedAt: normalizedService.partnerCreatedAt,
     categoryLabel: normalizedService.categoryLabel,
     categoryColor: normalizedService.categoryColor,
     visibility: normalizedService.visibility,

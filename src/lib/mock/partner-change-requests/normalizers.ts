@@ -80,6 +80,7 @@ export function normalizeServiceRecord(
     companySlug: string;
     partnerId: string;
     partnerName: string;
+    partnerCreatedAt: string;
     partnerLocation: string;
     categoryLabel: string;
   },
@@ -90,6 +91,7 @@ export function normalizeServiceRecord(
     companySlug: service.companySlug,
     partnerId: service.partnerId,
     partnerName: service.partnerName,
+    partnerCreatedAt: service.partnerCreatedAt,
     partnerLocation: service.partnerLocation,
     categoryLabel: service.categoryLabel,
     categoryColor: service.categoryColor ?? null,

@@ -7,6 +7,7 @@ import {
 } from "@/lib/partner-change-requests";
 import type { PartnerChangeRequestErrorCode } from "@/lib/partner-change-request-errors";
 import { getPartnerSession } from "@/lib/partner-session";
+import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { getPartnerServiceMetrics } from "@/lib/partner-service-metrics";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
@@ -76,17 +77,19 @@ export default async function PartnerServiceDetailPage({
     notFound();
   }
 
-  const [reviewData, publicReviewSummary, serviceMetricsSnapshot] = await Promise.all([
-    partnerReviewRepository.listPartnerReviews({
-      partnerId,
-      sort: "latest",
-      offset: 0,
-      limit: 10,
-      includeHidden: true,
-    }),
-    partnerReviewRepository.getPartnerReviewSummary(partnerId),
-    getPartnerServiceMetrics(partnerId),
-  ]);
+  const [reviewData, publicReviewSummary, serviceMetricsSnapshot, metricTimeseries] =
+    await Promise.all([
+      partnerReviewRepository.listPartnerReviews({
+        partnerId,
+        sort: "latest",
+        offset: 0,
+        limit: 10,
+        includeHidden: true,
+      }),
+      partnerReviewRepository.getPartnerReviewSummary(partnerId),
+      getPartnerServiceMetrics(partnerId),
+      getPartnerMetricTimeseriesSnapshot(partnerId, context.partnerCreatedAt),
+    ]);
 
   const paramsData = (await searchParams) ?? {};
   const mode = readSearchParam(paramsData.mode) === "edit" ? "edit" : "view";
@@ -116,6 +119,7 @@ export default async function PartnerServiceDetailPage({
       cancelAction={cancelPartnerChangeRequestAction}
       reviewSummary={publicReviewSummary}
       serviceMetrics={serviceMetricsSnapshot.metrics}
+      metricTimeseries={metricTimeseries}
       serviceMetricsWarningMessage={serviceMetricsSnapshot.warningMessage}
       initialReviews={reviewData.items}
       initialReviewSort="latest"

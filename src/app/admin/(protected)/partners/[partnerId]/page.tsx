@@ -10,6 +10,7 @@ import InlineMessage from "@/components/ui/InlineMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
+import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
@@ -23,6 +24,7 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
+import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -97,7 +99,7 @@ export default async function AdminPartnerDetailPage({
     supabase
       .from("partners")
       .select(
-        "id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
+        "id,created_at,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
       )
       .eq("id", partnerId)
       .maybeSingle(),
@@ -136,6 +138,10 @@ export default async function AdminPartnerDetailPage({
     }).categories,
   );
   const metrics = metricsResult.metricsByPartnerId.get(partnerId);
+  const metricTimeseries = await getPartnerMetricTimeseriesSnapshot(
+    partnerId,
+    partner.created_at,
+  );
   const reviewQueryString = serializeAdminReviewFilters(reviewFilters);
   const returnTo = reviewQueryString ? `${detailPath}?${reviewQueryString}` : detailPath;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
@@ -145,7 +151,7 @@ export default async function AdminPartnerDetailPage({
 
   return (
     <AdminShell title={partner.name} backHref="/admin/partners" backLabel="브랜드 관리">
-      <section className="grid gap-6">
+      <section className="grid min-w-0 gap-6">
         <ShellHeader
           eyebrow="Partner Detail"
           title={partner.name}
@@ -223,6 +229,8 @@ export default async function AdminPartnerDetailPage({
             />
           ) : null}
         </Card>
+
+        <PartnerMetricTimeseriesPanel data={metricTimeseries} />
 
         <Card tone="elevated">
           <SectionHeading

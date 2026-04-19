@@ -20,11 +20,12 @@ test("home selectors keep locked cards after visible matches and respect search"
 
   const normalized = normalizeHomePartners(
     [
-      {
-        id: "partner-public",
-        name: "레코디드",
-        location: "역삼",
-        category: "food",
+    {
+      id: "partner-public",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      name: "레코디드",
+      location: "역삼",
+      category: "food",
         visibility: "public",
         period: { start: "2026-01-01", end: "2099-12-31" },
         thumbnail: null,
@@ -37,11 +38,12 @@ test("home selectors keep locked cards after visible matches and respect search"
         inquiryLink: undefined,
         tags: ["삼겹살"],
       },
-      {
-        id: "partner-private",
-        name: "어반짐",
-        location: "선릉",
-        category: "fitness",
+    {
+      id: "partner-private",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      name: "어반짐",
+      location: "선릉",
+      category: "fitness",
         visibility: "private",
         period: { start: "2026-01-01", end: "2099-12-31" },
         thumbnail: null,

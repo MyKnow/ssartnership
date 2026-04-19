@@ -80,6 +80,7 @@ export type PartnerChangeRequestContext = {
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
+  partnerCreatedAt: string;
   categoryLabel: string;
   categoryColor: string | null;
   visibility: PartnerVisibility;
@@ -189,6 +190,7 @@ export type PartnerRow = {
   id: string;
   company_id?: string | null;
   name: string;
+  created_at: string;
   location: string;
   thumbnail?: string | null;
   map_url?: string | null;

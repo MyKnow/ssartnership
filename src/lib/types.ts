@@ -18,6 +18,7 @@ export type Partner = {
   name: string;
   category: CategoryKey;
   visibility: PartnerVisibility;
+  createdAt: string;
   location: string;
   mapUrl?: string;
   reservationLink?: string;

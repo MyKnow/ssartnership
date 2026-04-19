@@ -55,6 +55,7 @@ test("partner card helpers derive accent styles and CTA presentation", async () 
   const activePresentation = createPartnerCardPresentation(
     {
       id: "partner-1",
+      createdAt: "2026-01-01T00:00:00.000Z",
       name: "레코디드",
       location: "역삼",
       category: "food",
@@ -83,6 +84,7 @@ test("partner card helpers derive accent styles and CTA presentation", async () 
   const inactivePresentation = createPartnerCardPresentation(
     {
       id: "partner-2",
+      createdAt: "2026-01-01T00:00:00.000Z",
       name: "비공개 제휴",
       location: "선릉",
       category: "fitness",

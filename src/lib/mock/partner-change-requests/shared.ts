@@ -10,6 +10,7 @@ export type MockChangeRequestServiceRecord = {
   companySlug: string;
   partnerId: string;
   partnerName: string;
+  partnerCreatedAt: string;
   partnerLocation: string;
   categoryLabel: string;
   categoryColor: string | null;
@@ -58,6 +59,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companySlug: "cafe-haeon",
     partnerId: "mock-partner-service-cafe-haeon-main",
     partnerName: "카페 해온 본점",
+    partnerCreatedAt: "2026-03-01T00:00:00.000Z",
     partnerLocation: "서울 강남구 역삼로 123",
     categoryLabel: "카페",
     categoryColor: "#38bdf8",
@@ -80,6 +82,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companySlug: "cafe-haeon",
     partnerId: "mock-partner-service-cafe-haeon-dessert",
     partnerName: "카페 해온 디저트 바",
+    partnerCreatedAt: "2026-03-01T00:00:00.000Z",
     partnerLocation: "서울 강남구 논현로 45",
     categoryLabel: "카페",
     categoryColor: "#38bdf8",
@@ -102,6 +105,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companySlug: "urban-gym",
     partnerId: "mock-partner-service-urban-gym-pt",
     partnerName: "어반짐 PT 패키지",
+    partnerCreatedAt: "2026-03-10T00:00:00.000Z",
     partnerLocation: "서울 강남구 봉은사로 11",
     categoryLabel: "헬스",
     categoryColor: "#10b981",
@@ -124,6 +128,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companySlug: "urban-gym",
     partnerId: "mock-partner-service-urban-gym-sauna",
     partnerName: "어반짐 사우나",
+    partnerCreatedAt: "2026-03-10T00:00:00.000Z",
     partnerLocation: "서울 강남구 봉은사로 11, B1",
     categoryLabel: "헬스",
     categoryColor: "#10b981",
