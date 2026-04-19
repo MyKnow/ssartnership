@@ -7,9 +7,9 @@
   --background: #f4f7fb;
   --background-muted: #edf2f8;
   --surface: rgba(255, 255, 255, 0.9);
-  --surface-muted: rgba(244, 247, 252, 0.92);
-  --surface-elevated: rgba(255, 255, 255, 0.97);
-  --surface-overlay: rgba(255, 255, 255, 0.86);
+  --surface-muted: rgba(244, 247, 252, 0.94);
+  --surface-elevated: rgba(250, 252, 255, 0.99);
+  --surface-overlay: rgba(255, 255, 255, 0.96);
   --border: rgba(191, 203, 220, 0.8);
   --border-strong: rgba(148, 164, 188, 0.95);
   --foreground: #152033;
@@ -52,9 +52,9 @@ html.dark {
   --background: #07101d;
   --background-muted: #0b1526;
   --surface: rgba(12, 22, 38, 0.86);
-  --surface-muted: rgba(15, 28, 48, 0.84);
-  --surface-elevated: rgba(18, 33, 56, 0.94);
-  --surface-overlay: rgba(10, 18, 32, 0.88);
+  --surface-muted: rgba(15, 27, 46, 0.9);
+  --surface-elevated: rgba(20, 36, 61, 0.98);
+  --surface-overlay: rgba(9, 16, 29, 0.98);
   --border: rgba(58, 76, 105, 0.76);
   --border-strong: rgba(96, 120, 158, 0.88);
   --foreground: #eef5ff;
@@ -73,16 +73,25 @@ html.dark {
   --hero-to: #13233e;
   --hero-foreground: #f8fbff;
   --hero-muted: rgba(215, 228, 255, 0.78);
-  --shadow-flat: 0 1px 2px rgba(2, 6, 23, 0.28);
+  --shadow-flat:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(203, 213, 225, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.24);
   --shadow-raised:
-    0 24px 56px rgba(2, 6, 23, 0.36),
-    0 8px 20px rgba(2, 6, 23, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(203, 213, 225, 0.12),
+    0 18px 36px rgba(0, 0, 0, 0.42),
+    0 0 18px rgba(148, 163, 184, 0.1);
   --shadow-floating:
-    0 32px 90px rgba(2, 6, 23, 0.44),
-    0 14px 32px rgba(2, 6, 23, 0.26);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(203, 213, 225, 0.14),
+    0 28px 60px rgba(0, 0, 0, 0.5),
+    0 0 24px rgba(148, 163, 184, 0.12);
   --shadow-overlay:
-    0 40px 110px rgba(2, 6, 23, 0.56),
-    0 20px 48px rgba(2, 6, 23, 0.34);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 1px rgba(203, 213, 225, 0.16),
+    0 36px 84px rgba(0, 0, 0, 0.56),
+    0 0 32px rgba(148, 163, 184, 0.14);
 }
 
 @theme inline {
