@@ -11,10 +11,11 @@ export default function ThemeModeButtons() {
     resolvedTheme ?? (theme === "system" ? systemTheme : theme) ?? "light";
 
   return (
-    <div className="rounded-[1.4rem] border border-border/80 bg-surface-muted/90 p-1 shadow-[var(--shadow-flat)]">
+    <div className="@container min-w-0 w-full rounded-[1.4rem] border border-border/80 bg-surface-muted/90 p-1 shadow-[var(--shadow-flat)]">
       <div className="grid grid-cols-2">
         <button
           type="button"
+          aria-label="라이트 모드"
           aria-pressed={activeTheme === "light"}
           onClick={() => setTheme("light")}
           className={cn(
@@ -30,17 +31,20 @@ export default function ThemeModeButtons() {
             />
           ) : null}
           <SunIcon className="relative h-5 w-5 shrink-0 text-warning" />
-          <span className="relative">라이트 모드</span>
+          <span className="relative whitespace-nowrap @max-[20rem]:hidden">
+            라이트 모드
+          </span>
         </button>
         <button
           type="button"
+          aria-label="다크 모드"
           aria-pressed={activeTheme === "dark"}
           onClick={() => setTheme("dark")}
           className={cn(
             "relative flex min-h-11 items-center justify-center gap-2 overflow-hidden rounded-[1.05rem] px-4 py-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
             activeTheme === "dark" ? "text-primary-foreground" : "text-foreground",
           )}
-          >
+        >
           {activeTheme === "dark" ? (
             <motion.span
               layoutId="theme-mode-active-pill"
@@ -54,7 +58,9 @@ export default function ThemeModeButtons() {
               activeTheme === "dark" ? "text-primary-foreground" : "text-primary",
             )}
           />
-          <span className="relative">다크 모드</span>
+          <span className="relative whitespace-nowrap @max-[20rem]:hidden">
+            다크 모드
+          </span>
         </button>
       </div>
     </div>
