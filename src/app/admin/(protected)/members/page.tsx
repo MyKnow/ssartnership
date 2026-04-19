@@ -40,10 +40,10 @@ export default async function AdminMembersPage({
   const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const supabase = getSupabaseAdminClient();
-  const { data: members } = await supabase
+  const { data: members, error: membersError } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,must_change_password,service_policy_version,service_policy_consented_at,privacy_policy_version,privacy_policy_consented_at,marketing_policy_version,marketing_policy_consented_at,avatar_content_type,avatar_base64,created_at,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,avatar_base64,created_at,updated_at",
     )
     .order("created_at", { ascending: false });
 
@@ -171,6 +171,11 @@ export default async function AdminMembersPage({
           title="회원 계정 관리"
           description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
         />
+        {membersError ? (
+          <FormMessage variant="error">
+            회원 목록을 불러오지 못했습니다. {membersError.message}
+          </FormMessage>
+        ) : null}
         {memberError ? (
           <FormMessage variant="error">{memberError}</FormMessage>
         ) : null}
