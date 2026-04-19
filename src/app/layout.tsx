@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import ThemeProvider from "@/components/ThemeProvider";
+import RouteScrollManager from "@/components/RouteScrollManager";
 import { ToastProvider } from "@/components/ui/Toast";
 import {
   SITE_DESCRIPTION,
@@ -89,6 +90,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ToastProvider>
             <PwaProvider />
+            <RouteScrollManager />
             {children}
           </ToastProvider>
         </ThemeProvider>

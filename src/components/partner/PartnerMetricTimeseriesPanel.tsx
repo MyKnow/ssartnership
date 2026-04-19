@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
@@ -402,9 +401,6 @@ export default function PartnerMetricTimeseriesPanel({
               {data.periodLabel} 기준으로, 0이었던 구간까지 포함해 평균을 계산합니다.
             </p>
           </div>
-          <Badge className="bg-surface-muted text-muted-foreground">
-            0 구간 포함
-          </Badge>
         </div>
       </div>
 
