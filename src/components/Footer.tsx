@@ -54,7 +54,7 @@ export default function Footer() {
             <BrandWordmark className="text-base sm:text-lg" />
           </Link>
           <p className="max-w-xl leading-6">
-            서울 캠퍼스 제휴와 혜택, 공지와 정책을 한곳에서 확인합니다.
+            SSAFY 구성원을 위한 제휴 혜택, 공지와 정책을 한곳에서 확인합니다.
           </p>
           <p className="text-xs leading-6">
             Copyright © 2026 {SITE_NAME}. All rights reserved.
