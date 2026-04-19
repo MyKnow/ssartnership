@@ -64,6 +64,9 @@ export function formatPushLogDateTime(value: string) {
 }
 
 export function formatNotificationChannels(channels: NotificationChannel[]) {
+  if (channels.length === 0) {
+    return "채널 정보 없음";
+  }
   return channels.map((channel) => getNotificationChannelLabel(channel)).join(" · ");
 }
 

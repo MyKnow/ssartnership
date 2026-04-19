@@ -215,6 +215,26 @@ type NotificationDeliveryRow = {
   status: "pending" | "sent" | "failed" | "skipped";
 };
 
+type PushMessageLogRow = {
+  id: string;
+  type: string;
+  source: "manual" | "automatic";
+  target_scope: ResolvedPushAudience["scope"];
+  target_label: string;
+  target_year: number | null;
+  target_campus: string | null;
+  target_member_id: string | null;
+  title: string;
+  body: string;
+  url: string | null;
+  status: "pending" | "sent" | "partial_failed" | "failed" | "no_target";
+  targeted: number;
+  delivered: number;
+  failed: number;
+  created_at: string | null;
+  completed_at: string | null;
+};
+
 let webPushPromise: Promise<WebPushModule> | null = null;
 
 const EMPTY_CHANNEL_RESULTS: AdminNotificationSendResult["channelResults"] = {
@@ -1041,94 +1061,127 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
     .limit(limit);
   if (error) {
     console.error("[admin-notification-ops] notifications query failed", error.message);
-    return [] as AdminNotificationOperationLog[];
-  }
-
-  const rows = (notifications ?? []) as NotificationRow[];
-  if (!rows.length) {
-    return [] as AdminNotificationOperationLog[];
-  }
-
-  const { data: deliveries, error: deliveryError } = await supabase
-    .from("notification_deliveries")
-    .select("notification_id,channel,status")
-    .in("notification_id", rows.map((row) => row.id));
-  if (deliveryError) {
-    console.error(
-      "[admin-notification-ops] notification_deliveries query failed",
-      deliveryError.message,
-    );
-  }
-
-  const deliveriesByNotification = new Map<string, NotificationDeliveryRow[]>();
-  for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
-    const current = deliveriesByNotification.get(delivery.notification_id) ?? [];
-    current.push(delivery);
-    deliveriesByNotification.set(delivery.notification_id, current);
-  }
-
-  return rows
-    .map((row) => {
-      const metadata = parseLogMetadata(row.metadata);
-      const notificationType = metadata.notificationType ?? (isAdminNotificationType(row.type) ? row.type : "announcement");
-      const channelResults = structuredClone(EMPTY_CHANNEL_RESULTS);
-      const channelDeliveries = deliveriesByNotification.get(row.id) ?? [];
-
-      for (const channel of metadata.selectedChannels) {
-        const entries = channelDeliveries.filter((item) => item.channel === channel);
-        const sent = entries.filter((item) => item.status === "sent").length;
-        const failed = entries.filter((item) => item.status === "failed").length;
-        const skipped = entries.filter((item) => item.status === "skipped").length;
-        const fallback = metadata.channelResults?.[channel];
-        const targeted = sent + failed + skipped;
-        channelResults[channel] =
-          targeted || fallback
-            ? {
-                targeted: Math.max(targeted, fallback?.targeted ?? 0),
-                sent: Math.max(sent, fallback?.sent ?? 0),
-                failed: Math.max(failed, fallback?.failed ?? 0),
-                skipped: Math.max(skipped, fallback?.skipped ?? 0),
-              }
-            : channelResults[channel];
+  } else {
+    const rows = (notifications ?? []) as NotificationRow[];
+    if (rows.length) {
+      const { data: deliveries, error: deliveryError } = await supabase
+        .from("notification_deliveries")
+        .select("notification_id,channel,status")
+        .in("notification_id", rows.map((row) => row.id));
+      if (deliveryError) {
+        console.error(
+          "[admin-notification-ops] notification_deliveries query failed",
+          deliveryError.message,
+        );
       }
 
-      const exclusionReasons = metadata.previewChannels
-        .flatMap((channel) => channel.reasons)
-        .reduce<AdminNotificationPreviewReason[]>((accumulator, reason) => {
-          const existing = accumulator.find((item) => item.code === reason.code);
-          if (existing) {
-            existing.count += reason.count;
-            return accumulator;
-          }
-          accumulator.push({ ...reason });
-          return accumulator;
-        }, [])
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 3);
+      const deliveriesByNotification = new Map<string, NotificationDeliveryRow[]>();
+      for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
+        const current = deliveriesByNotification.get(delivery.notification_id) ?? [];
+        current.push(delivery);
+        deliveriesByNotification.set(delivery.notification_id, current);
+      }
 
-      return {
-        id: row.id,
-        notificationType,
-        source: metadata.source,
-        selectedChannels: metadata.selectedChannels,
-        targetScope: metadata.audience,
-        targetLabel: metadata.audienceLabel,
-        targetYear: metadata.audienceYear,
-        targetCampus: metadata.audienceCampus,
-        targetMemberId: metadata.audienceMemberId,
-        title: row.title,
-        body: row.body,
-        url: row.target_url,
-        status: metadata.campaignStatus ?? computeOperationStatus(channelResults),
-        totalAudienceCount: metadata.totalAudienceCount,
-        marketing: notificationType === "marketing",
-        channelResults,
-        exclusionReasons,
-        createdAt: row.created_at,
-        completedAt: metadata.completedAt,
-      } satisfies AdminNotificationOperationLog;
-    })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return rows
+        .map((row) => {
+          const metadata = parseLogMetadata(row.metadata);
+          const notificationType =
+            metadata.notificationType ?? (isAdminNotificationType(row.type) ? row.type : "announcement");
+          const channelResults = structuredClone(EMPTY_CHANNEL_RESULTS);
+          const channelDeliveries = deliveriesByNotification.get(row.id) ?? [];
+
+          for (const channel of metadata.selectedChannels) {
+            const entries = channelDeliveries.filter((item) => item.channel === channel);
+            const sent = entries.filter((item) => item.status === "sent").length;
+            const failed = entries.filter((item) => item.status === "failed").length;
+            const skipped = entries.filter((item) => item.status === "skipped").length;
+            const fallback = metadata.channelResults?.[channel];
+            const targeted = sent + failed + skipped;
+            channelResults[channel] =
+              targeted || fallback
+                ? {
+                    targeted: Math.max(targeted, fallback?.targeted ?? 0),
+                    sent: Math.max(sent, fallback?.sent ?? 0),
+                    failed: Math.max(failed, fallback?.failed ?? 0),
+                    skipped: Math.max(skipped, fallback?.skipped ?? 0),
+                  }
+                : channelResults[channel];
+          }
+
+          const exclusionReasons = metadata.previewChannels
+            .flatMap((channel) => channel.reasons)
+            .reduce<AdminNotificationPreviewReason[]>((accumulator, reason) => {
+              const existing = accumulator.find((item) => item.code === reason.code);
+              if (existing) {
+                existing.count += reason.count;
+                return accumulator;
+              }
+              accumulator.push({ ...reason });
+              return accumulator;
+            }, [])
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3);
+
+          return {
+            id: row.id,
+            notificationType,
+            source: metadata.source,
+            selectedChannels: metadata.selectedChannels,
+            targetScope: metadata.audience,
+            targetLabel: metadata.audienceLabel,
+            targetYear: metadata.audienceYear,
+            targetCampus: metadata.audienceCampus,
+            targetMemberId: metadata.audienceMemberId,
+            title: row.title,
+            body: row.body,
+            url: row.target_url,
+            status: metadata.campaignStatus ?? computeOperationStatus(channelResults),
+            totalAudienceCount: metadata.totalAudienceCount,
+            marketing: notificationType === "marketing",
+            channelResults,
+            exclusionReasons,
+            createdAt: row.created_at,
+            completedAt: metadata.completedAt,
+          } satisfies AdminNotificationOperationLog;
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  }
+
+  const { data: pushLogs, error: pushLogError } = await supabase
+    .from("push_message_logs")
+    .select(
+      "id,type,source,target_scope,target_label,target_year,target_campus,target_member_id,title,body,url,status,targeted,delivered,failed,created_at,completed_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (pushLogError) {
+    console.error("[admin-notification-ops] push_message_logs query failed", pushLogError.message);
+    return [] as AdminNotificationOperationLog[];
+  }
+
+  return ((pushLogs ?? []) as PushMessageLogRow[]).map((row) => ({
+    id: row.id,
+    notificationType: isAdminNotificationType(row.type) ? row.type : "announcement",
+    source: row.source,
+    selectedChannels: [],
+    targetScope: row.target_scope,
+    targetLabel: row.target_label,
+    targetYear: row.target_year,
+    targetCampus: row.target_campus,
+    targetMemberId: row.target_member_id,
+    title: row.title,
+    body: row.body,
+    url: row.url,
+    status: row.status,
+    totalAudienceCount: row.targeted,
+    marketing: row.type === "marketing",
+    channelResults: structuredClone(EMPTY_CHANNEL_RESULTS),
+    exclusionReasons: [],
+    createdAt: row.created_at ?? new Date(0).toISOString(),
+    completedAt: row.completed_at,
+  }));
 }
 
 export async function getAutomaticNotificationRuleSummaries(limit = 30) {

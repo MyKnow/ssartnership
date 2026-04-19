@@ -27,7 +27,12 @@ export async function DELETE(
   try {
     const { id } = await context.params;
     const supabase = getSupabaseAdminClient();
-    const { error } = await supabase.from("notifications").delete().eq("id", id);
+    const [notificationResult, pushMessageResult] = await Promise.all([
+      supabase.from("notifications").delete().eq("id", id),
+      supabase.from("push_message_logs").delete().eq("id", id),
+    ]);
+
+    const error = notificationResult.error ?? pushMessageResult.error;
     if (error) {
       throw new Error(error.message);
     }
