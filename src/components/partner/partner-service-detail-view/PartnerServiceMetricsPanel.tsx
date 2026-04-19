@@ -43,7 +43,7 @@ export default function PartnerServiceMetricsPanel({
           {
             label: "평균 별점",
             value: averageRating,
-            hint: "비공개·삭제 리뷰 제외",
+            hint: "비공개 · 삭제 리뷰 제외",
           },
           {
             label: "공개 리뷰",
@@ -51,29 +51,29 @@ export default function PartnerServiceMetricsPanel({
             hint: "공개 상태 리뷰 수",
           },
           {
-            label: "상세 조회",
+            label: "PV",
             value: formatCount(metrics.detailViews),
-            hint: "브랜드 상세 페이지 조회 수",
+            hint: "브랜드 상세 페이지 총 조회 수",
           },
           {
             label: "UV",
             value: formatCount(metrics.detailUv),
-            hint: "고유 세션 기준 조회 수",
+            hint: "브랜드 상세 페이지 고유 방문자 수",
           },
           {
-            label: "총 클릭",
+            label: "CTA",
             value: formatCount(metrics.totalClicks),
-            hint: "카드·지도·예약·문의 클릭 합계",
+            hint: "카드 · 지도 · 예약 · 문의 클릭 수 총합",
           },
           {
-            label: "예약 클릭",
+            label: "예약 클릭 수",
             value: formatCount(metrics.reservationClicks),
-            hint: "예약 링크 또는 연락 클릭",
+            hint: "예약 링크 클릭 수",
           },
           {
-            label: "문의 클릭",
+            label: "문의 클릭 수",
             value: formatCount(metrics.inquiryClicks),
-            hint: "문의 링크 또는 연락 클릭",
+            hint: "문의 링크 클릭 수",
           },
         ]}
       />
