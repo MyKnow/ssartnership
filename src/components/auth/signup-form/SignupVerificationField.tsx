@@ -16,12 +16,12 @@ export default function SignupVerificationField({
 }) {
   return (
     <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-      인증코드
+      인증 번호
       <Input
         ref={codeRef}
         value={code}
         onChange={(event) => onCodeChange(event.target.value)}
-        placeholder="MM DM으로 받은 코드"
+        placeholder="MM DM으로 받은 인증 번호"
         required
         aria-invalid={Boolean(error) || undefined}
         className={getFieldErrorClass(Boolean(error))}

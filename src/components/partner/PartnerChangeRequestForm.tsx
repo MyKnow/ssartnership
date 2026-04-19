@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Tabs from "@/components/ui/Tabs";
 import type {
@@ -51,22 +50,22 @@ export default function PartnerChangeRequestForm({
         />
       ) : null}
 
-        <Tabs
-          value={activeTab}
-          onChange={setActiveTab}
-          options={[
-            {
-              value: "immediate",
-              label: "즉시 반영",
-              description: "썸네일 · 추가 이미지 · 링크 · 태그",
-            },
-            {
-              value: "approval",
-              label: "승인 요청",
-              description: "브랜드 정보 · 기간 · 조건 · 혜택 · 적용 대상",
-            },
-          ]}
-        />
+      <Tabs
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+          {
+            value: "immediate",
+            label: "즉시 반영",
+            description: "썸네일 · 추가 이미지 · 링크 · 태그",
+          },
+          {
+            value: "approval",
+            label: "승인 요청",
+            description: "브랜드 정보 · 기간 · 조건 · 혜택 · 적용 대상",
+          },
+        ]}
+      />
 
       <div hidden={activeTab !== "immediate"} className="space-y-6">
         <ImmediateChangeForm

@@ -14,7 +14,7 @@ export default function PartnerAccountForm({
   formId: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+    <div className="rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-foreground">계정 정보</h4>

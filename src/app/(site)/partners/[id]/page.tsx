@@ -165,7 +165,7 @@ export default async function PartnerDetailPage({
             <div className="flex items-center gap-2">
               <Link
                 href="/"
-                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground hover:border-strong"
                 aria-label="목록으로 돌아가기"
               >
                 <svg

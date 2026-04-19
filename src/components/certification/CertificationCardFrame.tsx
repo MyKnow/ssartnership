@@ -40,7 +40,7 @@ export default function CertificationCardFrame({
   return (
     <div
       className={cn(
-        "relative mx-auto min-h-[250px] min-w-0 max-w-2xl overflow-hidden rounded-[clamp(24px,4vw,38px)] border p-3 text-white shadow-2xl ring-1 transform-gpu sm:aspect-[1.58/1] sm:min-h-0 sm:p-5",
+        "relative mx-auto min-h-[250px] min-w-0 max-w-2xl overflow-hidden rounded-[clamp(24px,4vw,38px)] border p-3 text-white shadow-[var(--shadow-overlay)] ring-1 transform-gpu sm:aspect-[1.58/1] sm:min-h-0 sm:p-5",
         scheme.cardClassName,
         scheme.frameRingClassName,
         className,

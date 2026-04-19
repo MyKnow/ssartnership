@@ -13,7 +13,7 @@ export default function Chip({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border border-border bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-[var(--shadow-flat)]",
+        "inline-flex items-center rounded-full border border-border bg-surface-inset px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-none",
         className,
       )}
       style={style}

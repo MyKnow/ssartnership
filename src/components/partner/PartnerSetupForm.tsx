@@ -191,7 +191,7 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
         {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
       </div>
 
-      <div className="rounded-2xl border border-border bg-background/60 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+      <div className="rounded-2xl border border-border bg-surface-inset/80 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
         <div className="space-y-1">
           <p className="text-sm font-semibold text-foreground">설정 완료</p>
           <p className="text-sm leading-6 text-muted-foreground">

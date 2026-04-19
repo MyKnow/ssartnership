@@ -110,7 +110,7 @@ export default function PartnerPasswordResetForm() {
             로그인 후에는 반드시 새 비밀번호로 변경해야 합니다.
           </p>
           {success.temporaryPassword ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-3">
+            <div className="rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 임시 비밀번호
               </p>

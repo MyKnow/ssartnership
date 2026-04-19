@@ -69,7 +69,7 @@ export default function ImageListEditor({
           {images.map((url, index) => (
             <div
               key={`${url}-${index}`}
-              className="flex flex-col gap-2 rounded-2xl border border-border bg-surface px-3 py-3"
+              className="flex flex-col gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-3"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Input

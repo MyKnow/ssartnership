@@ -57,7 +57,7 @@ export default function PartnerFilters({
         activeKey={activeCategory}
         onChange={onCategoryChange}
       />
-      <FilterBar tone="default" className="border-border/70 bg-surface/95">
+      <FilterBar tone="default" className="border-border/70 bg-surface">
         <div className="flex flex-1 flex-col gap-1 lg:min-w-[20rem]">
           <span className="ui-caption">검색</span>
           <Input

@@ -29,7 +29,7 @@ export default function PartnerAudienceSection({
           {PARTNER_AUDIENCE_OPTIONS.map((option) => (
             <label
               key={option.value}
-              className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground"
+              className="flex items-center gap-2 rounded-2xl border border-border bg-surface-control px-3 py-2 text-sm font-medium text-foreground"
             >
               <input
                 type="checkbox"

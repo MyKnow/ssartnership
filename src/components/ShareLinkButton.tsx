@@ -34,7 +34,7 @@ export default function ShareLinkButton({
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
+      className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground hover:border-strong"
       aria-label="공유 링크 복사"
       title="공유 링크 복사"
     >

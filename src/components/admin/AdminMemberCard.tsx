@@ -72,7 +72,7 @@ export default function AdminMemberCard({
   };
 
   return (
-    <Card className="grid gap-5 bg-surface-elevated shadow-md">
+    <Card className="grid gap-5 bg-surface-elevated shadow-[var(--shadow-raised)]">
       <div className="grid gap-5 md:grid-cols-[196px_minmax(0,1fr)] md:items-stretch">
         <div
           className={`relative aspect-square w-full max-w-[196px] overflow-hidden rounded-[28px] border border-border bg-surface-muted md:max-w-none ${topPanelSizeClass}`}

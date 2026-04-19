@@ -115,7 +115,7 @@ export default async function AdminCyclePage({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-border bg-surface px-4 py-4">
+            <div className="rounded-3xl border border-border bg-surface-inset px-4 py-4">
               <p className="text-sm font-semibold text-foreground">작업 예정사항</p>
               <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
                 <div className="rounded-2xl border border-border bg-surface-muted px-4 py-3">

@@ -18,6 +18,7 @@ export type VerifyCodeBody = {
   username?: string;
   code?: string;
   password?: string;
+  autoLogin?: boolean;
   servicePolicyId?: string;
   privacyPolicyId?: string;
   marketingPolicyId?: string | null;

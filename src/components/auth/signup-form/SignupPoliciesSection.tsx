@@ -22,11 +22,11 @@ export default function SignupPoliciesSection({
   onPolicyChange: (key: keyof SignupPolicyState, checked: boolean) => void;
 }) {
   return (
-    <section className="rounded-2xl border border-border/70 bg-surface px-4 py-4 shadow-[var(--shadow-flat)]">
+    <section className="rounded-2xl border border-border/70 bg-surface-inset px-4 py-4 shadow-none">
       <div className="space-y-1">
         <h2 className="text-sm font-semibold text-foreground">필수 약관 동의</h2>
         <p className="text-sm text-muted-foreground">
-          회원가입을 진행하려면 아래 약관에 모두 동의해야 합니다.
+          회원가입을 진행하려면 아래 필수 약관에 모두 동의해야 합니다.
         </p>
       </div>
       <div className="mt-4 space-y-3">

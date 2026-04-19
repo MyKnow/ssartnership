@@ -34,7 +34,7 @@ export default function PolicyAgreementField({
   return (
     <div className={getFieldErrorClass(
       invalid,
-      "relative rounded-2xl border border-border/60 bg-background/35 p-3 pr-12 transition-colors",
+      "relative rounded-2xl border border-border/60 bg-surface-inset/70 p-3 pr-12 transition-colors",
     )}>
       <div className="flex min-h-9 items-center gap-3">
         <label
@@ -53,7 +53,7 @@ export default function PolicyAgreementField({
           />
           <span
             aria-hidden="true"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-border/70 bg-surface text-transparent shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)] active:bg-primary/10 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:hover:border-primary peer-checked:hover:bg-primary peer-checked:hover:text-primary-foreground peer-checked:active:bg-primary peer-focus-visible:border-primary/60 peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15 peer-disabled:opacity-60 peer-disabled:hover:border-border/70 peer-disabled:hover:bg-surface peer-disabled:hover:shadow-[var(--shadow-flat)] peer-checked:peer-disabled:hover:bg-primary"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-border/70 bg-surface-control text-transparent shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)] active:bg-primary/10 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:hover:border-primary peer-checked:hover:bg-primary peer-checked:hover:text-primary-foreground peer-checked:active:bg-primary peer-focus-visible:border-primary/60 peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15 peer-disabled:opacity-60 peer-disabled:hover:border-border/70 peer-disabled:hover:bg-surface-control peer-disabled:hover:shadow-[var(--shadow-flat)] peer-checked:peer-disabled:hover:bg-primary"
           >
             <CheckIcon className="h-5 w-5 stroke-[2.4]" />
           </span>
@@ -66,10 +66,10 @@ export default function PolicyAgreementField({
             [{required ? "필수" : "선택"}] {agreementLabel}
           </label>
           <div className="flex shrink-0 items-center gap-2">
-            <span className="inline-flex h-5 items-center rounded-full border border-border/70 bg-surface px-2 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)]">
+            <span className="inline-flex h-5 items-center rounded-full border border-border/70 bg-surface-control px-2 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)]">
               v{policy.version}
             </span>
-            <span className="inline-flex h-5 items-center rounded-full border border-border/70 bg-surface px-2 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)]">
+            <span className="inline-flex h-5 items-center rounded-full border border-border/70 bg-surface-control px-2 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)]">
               시행 {effectiveDate}
             </span>
           </div>
@@ -79,7 +79,7 @@ export default function PolicyAgreementField({
         href={getPolicyHref(policy.kind, policy.version)}
         target="_blank"
         rel="noreferrer"
-        className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-surface text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"
+        className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-surface-control text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"
         aria-label={`${getPolicyKindLabel(policy.kind)} 상세 보기`}
         title="상세 보기"
       >

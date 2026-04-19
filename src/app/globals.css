@@ -8,6 +8,8 @@
   --background-muted: #edf2f8;
   --surface: rgba(255, 255, 255, 0.9);
   --surface-muted: rgba(244, 247, 252, 0.94);
+  --surface-inset: rgba(238, 244, 251, 0.86);
+  --surface-control: rgba(255, 255, 255, 0.98);
   --surface-elevated: rgba(250, 252, 255, 0.99);
   --surface-overlay: rgba(255, 255, 255, 0.96);
   --border: rgba(191, 203, 220, 0.8);
@@ -53,6 +55,8 @@ html.dark {
   --background-muted: #0b1526;
   --surface: rgba(12, 22, 38, 0.86);
   --surface-muted: rgba(15, 27, 46, 0.9);
+  --surface-inset: rgba(8, 17, 31, 0.74);
+  --surface-control: rgba(18, 33, 56, 0.98);
   --surface-elevated: rgba(20, 36, 61, 0.98);
   --surface-overlay: rgba(9, 16, 29, 0.98);
   --border: rgba(58, 76, 105, 0.76);
@@ -74,24 +78,20 @@ html.dark {
   --hero-foreground: #f8fbff;
   --hero-muted: rgba(215, 228, 255, 0.78);
   --shadow-flat:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 0 1px rgba(203, 213, 225, 0.08),
-    0 1px 4px rgba(0, 0, 0, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 3px rgba(0, 0, 0, 0.24);
   --shadow-raised:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 1px rgba(203, 213, 225, 0.12),
-    0 18px 36px rgba(0, 0, 0, 0.42),
-    0 0 18px rgba(148, 163, 184, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 16px 34px rgba(0, 0, 0, 0.36),
+    0 4px 12px rgba(0, 0, 0, 0.24);
   --shadow-floating:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 0 1px rgba(203, 213, 225, 0.14),
-    0 28px 60px rgba(0, 0, 0, 0.5),
-    0 0 24px rgba(148, 163, 184, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 24px 58px rgba(0, 0, 0, 0.44),
+    0 8px 22px rgba(0, 0, 0, 0.28);
   --shadow-overlay:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 0 0 1px rgba(203, 213, 225, 0.16),
-    0 36px 84px rgba(0, 0, 0, 0.56),
-    0 0 32px rgba(148, 163, 184, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 36px 84px rgba(0, 0, 0, 0.58),
+    0 14px 34px rgba(0, 0, 0, 0.38);
 }
 
 @theme inline {
@@ -99,6 +99,8 @@ html.dark {
   --color-background-muted: var(--background-muted);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-control: var(--surface-control);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
   --color-border: var(--border);
@@ -230,8 +232,8 @@ body {
 
   .ui-panel-muted {
     border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-    background: var(--surface-muted);
-    box-shadow: var(--shadow-flat);
+    background: var(--surface-inset);
+    box-shadow: none;
     border-radius: var(--radius-panel);
   }
 
@@ -241,6 +243,36 @@ body {
     box-shadow: var(--shadow-raised);
     border-radius: var(--radius-panel);
     backdrop-filter: blur(18px);
+  }
+
+  .ui-surface {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow-flat);
+  }
+
+  .ui-surface-inset {
+    border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+    background: var(--surface-inset);
+    box-shadow: none;
+  }
+
+  .ui-surface-elevated {
+    border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+    background: var(--surface-elevated);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .ui-surface-overlay {
+    border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    background: var(--surface-overlay);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .ui-control {
+    border: 1px solid var(--border);
+    background: var(--surface-control);
+    box-shadow: var(--shadow-flat);
   }
 
   .ui-grid-cards {

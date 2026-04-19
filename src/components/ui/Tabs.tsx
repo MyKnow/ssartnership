@@ -21,7 +21,7 @@ export default function Tabs<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn("grid gap-2 rounded-[1.6rem] border border-border/80 bg-surface-overlay p-2 shadow-[var(--shadow-flat)] sm:grid-cols-2", className)}>
+    <div className={cn("grid gap-2 rounded-[1.6rem] border border-border/80 bg-surface-inset p-2 shadow-none sm:grid-cols-2", className)}>
       {options.map((option) => {
         const active = option.value === value;
         return (

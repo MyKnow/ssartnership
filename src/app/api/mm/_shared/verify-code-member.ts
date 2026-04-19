@@ -48,6 +48,7 @@ export async function finalizeVerifiedMember({
   activePolicies,
   marketingPolicy,
   marketingPolicyAgreed = false,
+  autoLogin = true,
 }: {
   context: MmRouteContext;
   mmUserId: string;
@@ -60,6 +61,7 @@ export async function finalizeVerifiedMember({
   activePolicies: ActivePoliciesLike;
   marketingPolicy?: PolicyDocument | null;
   marketingPolicyAgreed?: boolean;
+  autoLogin?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
   const { data: memberData } = await supabase
@@ -188,7 +190,9 @@ export async function finalizeVerifiedMember({
     ipAddress: context.ipAddress ?? null,
     userAgent: context.userAgent ?? null,
   });
-  await setUserSession(authenticatedMemberId, false);
+  if (autoLogin) {
+    await setUserSession(authenticatedMemberId, false);
+  }
 
   return {
     kind: "success" as const,

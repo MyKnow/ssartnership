@@ -163,7 +163,7 @@ export default async function AdminPartnersPage({
                   type="color"
                   name="color"
                   defaultValue="#0f172a"
-                  className="h-12 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
+                  className="h-12 w-full cursor-pointer rounded-2xl border border-border bg-surface-control p-1"
                   title="카테고리 색상"
                 />
               </FieldGroup>
@@ -219,7 +219,7 @@ export default async function AdminPartnersPage({
                                 type="color"
                                 name="color"
                                 defaultValue={category.color ?? "#0f172a"}
-                                className="h-12 w-full cursor-pointer rounded-2xl border border-border bg-surface p-1"
+                                className="h-12 w-full cursor-pointer rounded-2xl border border-border bg-surface-control p-1"
                                 title="카테고리 색상"
                               />
                             </FieldGroup>

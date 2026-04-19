@@ -55,7 +55,7 @@ export default function AdminMemberManualAddPanel({
 
   return (
     <div className="grid gap-4">
-      <form action={formAction} className="grid gap-4 rounded-3xl border border-border bg-surface-muted/40 p-4">
+      <form action={formAction} className="grid gap-4 rounded-3xl border border-border bg-surface p-4 shadow-[var(--shadow-flat)]">
         <div className="grid gap-3 lg:grid-cols-[160px_minmax(0,1fr)] lg:items-end">
           <label className="grid gap-2 text-sm font-medium text-foreground">
             대상 기수
@@ -92,7 +92,7 @@ export default function AdminMemberManualAddPanel({
       </form>
 
       {state.status !== "idle" ? (
-        <div className="grid gap-4 rounded-3xl border border-border bg-surface-elevated p-4 shadow-sm">
+        <div className="grid gap-4 rounded-3xl border border-border bg-surface-elevated p-4 shadow-[var(--shadow-flat)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="grid gap-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -123,19 +123,19 @@ export default function AdminMemberManualAddPanel({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="rounded-2xl border border-border bg-surface-inset px-4 py-3">
               <p className="text-xs font-medium text-muted-foreground">대상</p>
               <p className="mt-1 text-lg font-semibold text-foreground">
                 {getRequestedYearLabel(state.requestedYear)}
               </p>
             </div>
-            <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="rounded-2xl border border-border bg-surface-inset px-4 py-3">
               <p className="text-xs font-medium text-muted-foreground">성공</p>
               <p className="mt-1 text-lg font-semibold text-emerald-600 dark:text-emerald-300">
                 {state.success}명
               </p>
             </div>
-            <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="rounded-2xl border border-border bg-surface-inset px-4 py-3">
               <p className="text-xs font-medium text-muted-foreground">실패</p>
               <p className="mt-1 text-lg font-semibold text-danger">
                 {state.failed}명
@@ -147,7 +147,7 @@ export default function AdminMemberManualAddPanel({
             {state.items.map((item) => (
               <div
                 key={`${item.username}-${item.raw}`}
-                className="rounded-2xl border border-border bg-surface px-4 py-3"
+                className="rounded-2xl border border-border bg-surface-inset px-4 py-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={getItemStatusClass(item.status)}>

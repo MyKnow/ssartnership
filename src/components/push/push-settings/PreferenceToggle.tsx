@@ -16,7 +16,7 @@ export function PreferenceToggle({
   actionHref?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface-inset px-4 py-3">
       <div className="min-w-0 flex items-center gap-2">
         <label htmlFor={id} className="text-sm font-medium text-foreground">
           {label}
@@ -26,7 +26,7 @@ export function PreferenceToggle({
             href={actionHref}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"
+            className="inline-flex items-center rounded-full border border-border/70 bg-surface-control px-2.5 py-1 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"
             aria-label={`${label} 약관 보기`}
             title="약관 보기"
           >

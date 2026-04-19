@@ -37,7 +37,7 @@ export default function PartnerSetupCompanySection({
               </div>
             </div>
 
-            <div className="border-t border-border bg-background/60 p-5 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-6">
+            <div className="border-t border-border bg-surface-inset/80 p-5 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-6">
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-foreground">다음 단계</p>
                 <p className="text-sm leading-6 text-muted-foreground">
@@ -105,7 +105,7 @@ export default function PartnerSetupCompanySection({
           {context.company.services.map((service) => (
             <li
               key={service.id}
-              className="rounded-2xl border border-border bg-background/60 p-4"
+              className="rounded-2xl border border-border bg-surface-inset/80 p-4"
             >
               <div className="min-w-0">
                 <div className="flex items-start justify-between gap-3">

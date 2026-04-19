@@ -11,7 +11,10 @@ test("signup helpers append 운영진 option and build guide copy", async () => 
   const { buildSignupYears, buildSignupGuideItems } = await signupHelpersPromise;
 
   assert.deepStrictEqual(buildSignupYears([13, 14, 15]), [13, 14, 15, 0]);
-  assert.equal(buildSignupGuideItems("14기, 15기")[1]?.description.includes("14기, 15기"), true);
+  assert.equal(
+    buildSignupGuideItems("14기, 15기")[0]?.description.includes("14기, 15기"),
+    true,
+  );
 });
 
 test("signup request validation returns field-level errors deterministically", async () => {
@@ -21,7 +24,6 @@ test("signup request validation returns field-level errors deterministically", a
     validateSignupRequestInput({
       username: "",
       year: "15",
-      password: "Strong!123",
       signupYears: [15, 0],
       signupYearsText: "15기",
       policyChecked: { service: true, privacy: true, marketing: false },
@@ -37,7 +39,6 @@ test("signup request validation returns field-level errors deterministically", a
     validateSignupRequestInput({
       username: "student",
       year: "99",
-      password: "Strong!123",
       signupYears: [15, 0],
       signupYearsText: "15기",
       policyChecked: { service: true, privacy: true, marketing: false },
@@ -46,6 +47,32 @@ test("signup request validation returns field-level errors deterministically", a
       kind: "field",
       field: "year",
       message: "회원가입은 현재 선택 가능한 15기만 선택할 수 있습니다.",
+    },
+  );
+});
+
+test("signup auth next and verify validation split code and password steps", async () => {
+  const { validateSignupAuthNextInput, validateSignupVerifyInput } =
+    await signupHelpersPromise;
+
+  assert.deepStrictEqual(validateSignupAuthNextInput({ code: "" }), {
+    kind: "field",
+    field: "code",
+    message: "인증 번호를 입력해 주세요.",
+  });
+
+  assert.deepStrictEqual(
+    validateSignupVerifyInput({
+      username: "student",
+      code: "123456",
+      password: "Strong!123",
+      passwordConfirm: "Strong!124",
+      policyChecked: { service: true, privacy: true, marketing: false },
+    }),
+    {
+      kind: "field",
+      field: "passwordConfirm",
+      message: "비밀번호가 일치하지 않습니다.",
     },
   );
 });
@@ -65,7 +92,7 @@ test("signup error mapping preserves step reset and field targeting", async () =
 
   assert.deepStrictEqual(getSignupVerifyErrorAction("expired", undefined), {
     kind: "form",
-    message: "인증코드가 만료되었습니다. 다시 요청해 주세요.",
-    nextStep: "request",
+    message: "인증 번호가 만료되었습니다. 다시 요청해 주세요.",
+    nextStep: "auth",
   });
 });

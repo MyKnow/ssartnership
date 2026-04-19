@@ -90,7 +90,7 @@ function ChannelToggle({
   description: string;
 }) {
   return (
-    <label className="grid gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
+    <label className="grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold text-foreground">{label}</span>
         <input
@@ -146,7 +146,7 @@ function AudienceResultCard({
         {preview.channels.map((channel) => (
           <span
             key={channel.channel}
-            className="inline-flex h-8 items-center rounded-full border border-border bg-surface px-3 text-xs font-medium text-foreground"
+            className="inline-flex h-8 items-center rounded-full border border-border bg-surface-control px-3 text-xs font-medium text-foreground"
           >
             {channel.label} {channel.eligibleCount}
           </span>
@@ -227,13 +227,13 @@ function RecipientListModal({
               placeholder="이름, Mattermost 아이디, 캠퍼스"
             />
           </label>
-          <div className="grid gap-1 rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
+          <div className="grid gap-1 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-muted-foreground">
             <p>선택 채널 {preview.selectedChannels.map(getNotificationChannelLabel).join(" · ")}</p>
             <p>현재 표시 {filteredMembers.length}명</p>
           </div>
         </div>
 
-        <div className="max-h-[58vh] overflow-y-auto rounded-2xl border border-border bg-surface">
+        <div className="max-h-[58vh] overflow-y-auto rounded-2xl border border-border bg-surface-inset">
           {filteredMembers.length > 0 ? (
             <div className="divide-y divide-border/70">
               {filteredMembers.map((member) => (
@@ -256,7 +256,7 @@ function RecipientListModal({
                     {member.channels.map((channel) => (
                       <span
                         key={`${member.id}-${channel}`}
-                        className="inline-flex h-8 items-center rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground"
+                        className="inline-flex h-8 items-center rounded-full border border-border bg-surface-control px-3 text-xs font-medium text-foreground"
                       >
                         {getNotificationChannelLabel(channel)}
                       </span>
@@ -331,13 +331,13 @@ function MemberPickerModal({
               placeholder="이름, Mattermost 아이디, 기수, 캠퍼스"
             />
           </label>
-          <div className="grid gap-1 rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
+          <div className="grid gap-1 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-muted-foreground">
             <p>검색 결과 {filteredMembers.length}명</p>
             <p>현재 선택 {selectedMember ? getMemberLabel(selectedMember) : "없음"}</p>
           </div>
         </div>
 
-        <div className="max-h-[58vh] overflow-y-auto rounded-2xl border border-border bg-surface">
+        <div className="max-h-[58vh] overflow-y-auto rounded-2xl border border-border bg-surface-inset">
           {filteredMembers.length > 0 ? (
             <div className="divide-y divide-border/70">
               {filteredMembers.map((member) => {
@@ -422,14 +422,14 @@ function SendConfirmModal({
       bodyClassName="block"
     >
       <div className="w-full space-y-4">
-        <div className="grid gap-3 rounded-2xl border border-border bg-surface px-4 py-4 text-sm text-muted-foreground">
+        <div className="grid gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-4 text-sm text-muted-foreground">
           <p>대상 범위 {preview.audienceLabel}</p>
           <p>선택 채널 {preview.selectedChannels.map(getNotificationChannelLabel).join(" · ")}</p>
           <p>예상 수신자 {preview.eligibleMemberCount}명</p>
           <p>예상 전송 {preview.channels.reduce((sum, channel) => sum + channel.eligibleCount, 0)}건</p>
         </div>
 
-        <div className="grid gap-2 rounded-2xl border border-border bg-surface px-4 py-4">
+        <div className="grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-4">
           <div className="grid gap-1">
             <p className="text-sm font-semibold text-foreground">제목</p>
             <p className="text-sm text-muted-foreground">{title}</p>
@@ -511,7 +511,7 @@ export function PushComposerSection({
   const selectedMember = members.find((member) => member.id === composer.selectedMemberId) ?? null;
 
   return (
-    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface-muted/50 p-4 sm:p-5">
+    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-[var(--shadow-flat)] sm:p-5">
       <SectionHeading
         title="통합 알림 운영"
         description="대상 설정, 메시지 작성, 최종 확인 순서로만 진행합니다."

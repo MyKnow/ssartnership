@@ -92,7 +92,7 @@ function RowCardSkeleton({
   metricCount?: number;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+    <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -120,7 +120,7 @@ function ListRowSkeleton({
   metricCount?: number;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+    <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -144,7 +144,7 @@ function ListRowSkeleton({
 
 function ReviewCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+    <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-2">
           <Skeleton className="h-5 w-36" />
@@ -626,7 +626,7 @@ export function AdminStyleGuideSkeleton() {
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="rounded-2xl border border-border bg-surface-muted/50 p-4">
+              <div key={index} className="rounded-2xl border border-border bg-surface-inset/70 p-4">
                 <Skeleton className="h-4 w-20 rounded-lg" />
                 <Skeleton className="mt-3 h-8 w-32" />
                 <Skeleton className="mt-2 h-4 w-full max-w-md" />
@@ -638,7 +638,7 @@ export function AdminStyleGuideSkeleton() {
           <Skeleton className="h-6 w-40" />
           <div className="grid gap-3 md:grid-cols-2">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="rounded-2xl border border-border bg-surface-muted/50 p-4">
+              <div key={index} className="rounded-2xl border border-border bg-surface-inset/70 p-4">
                 <Skeleton className="h-4 w-24 rounded-lg" />
                 <Skeleton className="mt-3 h-12 w-full rounded-2xl" />
               </div>
@@ -659,7 +659,7 @@ export function AdminPushSkeleton() {
           {Array.from({ length: 2 }).map((_, index) => (
             <div
               key={index}
-              className="grid gap-2 rounded-2xl border border-border bg-surface px-4 py-3"
+              className="grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-3"
             >
               <Skeleton className="h-4 w-20 rounded-lg" />
               <Skeleton className="h-5 w-28" />
@@ -676,7 +676,7 @@ export function AdminPushSkeleton() {
               {Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-2xl border border-border bg-surface px-4 py-3"
+                  className="rounded-2xl border border-border bg-surface-inset px-4 py-3"
                 >
                   <Skeleton className="h-4 w-20 rounded-lg" />
                   <Skeleton className="mt-2 h-8 w-24" />
@@ -690,7 +690,7 @@ export function AdminPushSkeleton() {
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="rounded-2xl border border-border bg-surface px-4 py-4"
+                className="rounded-2xl border border-border bg-surface-inset px-4 py-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1 space-y-3">
@@ -734,14 +734,14 @@ export function AdminLogsSkeleton() {
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <Card className="bg-surface-elevated shadow-md">
+          <Card className="bg-surface-elevated shadow-[var(--shadow-raised)]">
             <Skeleton className="h-8 w-32" />
             <Skeleton className="mt-2 h-4 w-full max-w-md" />
             <div className="mt-5 grid gap-3">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-2xl border border-border bg-surface px-4 py-4"
+                  className="rounded-2xl border border-border bg-surface-inset px-4 py-4"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <Skeleton className="h-5 w-16" />
@@ -760,14 +760,14 @@ export function AdminLogsSkeleton() {
 
           <div className="grid gap-4">
             {Array.from({ length: 3 }).map((_, index) => (
-              <Card key={index} className="bg-surface-elevated shadow-md">
+              <Card key={index} className="bg-surface-elevated shadow-[var(--shadow-raised)]">
                 <Skeleton className="h-7 w-32" />
                 <Skeleton className="mt-2 h-4 w-full max-w-xs" />
                 <div className="mt-4 grid gap-2">
                   {Array.from({ length: 3 }).map((__, rowIndex) => (
                     <div
                       key={rowIndex}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3"
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3"
                     >
                       <Skeleton className="h-4 w-24" />
                       <Skeleton className="h-4 w-10" />
@@ -779,7 +779,7 @@ export function AdminLogsSkeleton() {
           </div>
         </section>
 
-        <section className="grid gap-4 rounded-3xl border border-border bg-surface-muted/50 p-5">
+        <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
           <Skeleton className="h-8 w-28" />
           <Skeleton className="h-4 w-full max-w-md" />
 
@@ -791,7 +791,7 @@ export function AdminLogsSkeleton() {
 
           <div className="grid gap-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <Card key={index} className="bg-surface-elevated shadow-md">
+              <Card key={index} className="bg-surface-elevated shadow-[var(--shadow-raised)]">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

@@ -33,7 +33,7 @@ export default function TokenChipComposer({
   onFocus: () => void;
 }) {
   return (
-    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-3">
+    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-3">
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <Input
           value={draft}

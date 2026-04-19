@@ -39,7 +39,7 @@ function ServiceMetric({
   value: number;
 }) {
   return (
-    <div className="rounded-[1rem] border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-flat)]">
+    <div className="rounded-[1rem] border border-border/80 bg-surface-inset p-4 shadow-none">
       <p className="ui-kicker">{label}</p>
       <p className="mt-1 text-base font-semibold text-foreground">
         {formatCount(value)}
@@ -84,7 +84,7 @@ function ServiceCard({
       href={`/partner/services/${encodeURIComponent(service.id)}`}
       prefetch={false}
       aria-label={`${service.name} 상세 보기`}
-      className="group block rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-5 shadow-[var(--shadow-flat)] transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)]"
+      className="group block rounded-[var(--radius-card)] border border-border/80 bg-surface-elevated p-5 shadow-[var(--shadow-flat)] transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:shadow-[var(--shadow-raised)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-2">
@@ -107,7 +107,7 @@ function ServiceCard({
           </div>
         </div>
 
-        <div className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted-foreground">
+        <div className="rounded-full border border-border bg-surface-control px-3 py-1 text-xs font-medium text-muted-foreground">
           상세 보기
         </div>
       </div>
@@ -145,7 +145,7 @@ function CompanyTabs({
               "rounded-[1.1rem] border px-4 py-3 text-left transition-[background-color,border-color,color,box-shadow] duration-200 ease-out",
               active
                 ? "border-primary/20 bg-primary-soft text-primary shadow-[var(--shadow-flat)]"
-                : "border-border/80 bg-surface text-foreground shadow-[var(--shadow-flat)] hover:border-strong hover:bg-surface-elevated",
+                : "border-border/80 bg-surface-control text-foreground shadow-[var(--shadow-flat)] hover:border-strong hover:bg-surface-elevated",
             )}
           >
             <p className="text-sm font-semibold">{company.name}</p>

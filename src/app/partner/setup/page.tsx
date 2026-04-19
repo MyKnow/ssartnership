@@ -28,7 +28,7 @@ export default async function PartnerSetupIndexPage() {
     <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-8 flex flex-col gap-4 rounded-[2rem] border border-border bg-surface px-6 py-8 shadow-sm sm:px-8">
+          <div className="mb-8 flex flex-col gap-4 rounded-[2rem] border border-border bg-surface px-6 py-8 shadow-[var(--shadow-flat)] sm:px-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">
                 제휴 포털 초기 설정
@@ -44,13 +44,13 @@ export default async function PartnerSetupIndexPage() {
               설정하면, 이후부터는 업체 포털로 로그인할 수 있습니다.
             </p>
             <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-background/60 p-4">
+              <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
                 1. 담당자 이메일 확인
               </div>
-              <div className="rounded-2xl border border-border bg-background/60 p-4">
+              <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
                 2. 초기 설정 링크 접속
               </div>
-              <div className="rounded-2xl border border-border bg-background/60 p-4">
+              <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
                 3. 새 비밀번호 설정
               </div>
             </div>
@@ -86,7 +86,7 @@ export default async function PartnerSetupIndexPage() {
                   </div>
 
                   <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-                    <div className="rounded-2xl border border-border bg-background/60 p-4">
+                    <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
                         서비스 수
                       </p>
@@ -94,7 +94,7 @@ export default async function PartnerSetupIndexPage() {
                         {setup.serviceCount}개
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-border bg-background/60 p-4">
+                    <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
                         초기 설정 상태
                       </p>
@@ -104,7 +104,7 @@ export default async function PartnerSetupIndexPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-border bg-background/60 p-4">
+                  <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
                     <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
                       토큰
                     </p>

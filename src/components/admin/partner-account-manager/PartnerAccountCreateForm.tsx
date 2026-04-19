@@ -77,7 +77,7 @@ export default function PartnerAccountCreateForm({
           </FieldGroup>
         </div>
 
-        <div className="grid gap-4 rounded-2xl border border-border/70 bg-background/70 p-4">
+        <div className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/85 p-4">
           <div className="space-y-1">
             <h4 className="text-sm font-semibold text-foreground">생성 옵션</h4>
             <p className="text-xs leading-5 text-muted-foreground">

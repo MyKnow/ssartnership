@@ -25,7 +25,7 @@ export default function MediaCardToolbar({
   };
 
   return (
-    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-2.5">
+    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-2.5">
       <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <div className="min-w-0">
           <Input

@@ -85,7 +85,7 @@ export default function MediaField({
 
         {!hasItems ? (
           <div
-            className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-2.5"
+            className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-2.5"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
@@ -124,7 +124,7 @@ export default function MediaField({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-background/60 px-4 py-2.5 text-xs leading-6 text-muted-foreground">
+            <div className="rounded-2xl border border-border bg-surface-inset/80 px-4 py-2.5 text-xs leading-6 text-muted-foreground">
               {emptyMessage}
             </div>
           </div>
@@ -136,7 +136,7 @@ export default function MediaField({
               multiple ? (
                 <div
                   key={item.id}
-                  className="grid min-w-0 gap-2 rounded-2xl border border-border bg-surface p-2"
+                  className="grid min-w-0 gap-2 rounded-2xl border border-border bg-surface-inset p-2"
                 >
                   <div
                     className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
@@ -150,9 +150,9 @@ export default function MediaField({
                     />
                     <Badge
                       className={cn(
-                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-sm backdrop-blur-sm",
+                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-[var(--shadow-flat)] backdrop-blur-sm",
                         item.kind === "existing"
-                          ? "border-border bg-background/95 text-foreground"
+                          ? "border-border bg-surface-control/95 text-foreground"
                           : "border-primary/40 bg-primary/90 text-white dark:text-black",
                       )}
                     >
@@ -216,7 +216,7 @@ export default function MediaField({
               ) : (
                 <div
                   key={item.id}
-                  className="grid min-w-0 gap-2.5 rounded-2xl border border-border bg-surface p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:items-start"
+                  className="grid min-w-0 gap-2.5 rounded-2xl border border-border bg-surface-inset p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:items-start"
                 >
                   <div
                     className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
@@ -230,9 +230,9 @@ export default function MediaField({
                     />
                     <Badge
                       className={cn(
-                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-sm backdrop-blur-sm",
+                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-[var(--shadow-flat)] backdrop-blur-sm",
                         item.kind === "existing"
-                          ? "border-border bg-background/95 text-foreground"
+                          ? "border-border bg-surface-control/95 text-foreground"
                           : "border-primary/40 bg-primary/90 text-white dark:text-black",
                       )}
                     >

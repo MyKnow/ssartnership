@@ -4,7 +4,7 @@ import Skeleton from "@/components/ui/Skeleton";
 
 function LoadingTopBar({ actionCount = 3 }: { actionCount?: number }) {
   return (
-    <div className="border-b border-border/70 bg-surface/90 backdrop-blur">
+    <div className="border-b border-border/70 bg-surface-overlay/90 backdrop-blur">
       <Container className="flex items-center justify-between gap-3 py-4" size="wide">
         <Skeleton className="h-7 w-36 rounded-lg" />
         <div className="flex items-center gap-2">
@@ -39,7 +39,7 @@ function TextStack({
 
 function MetricTileSkeleton() {
   return (
-    <div className="rounded-[1rem] border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-flat)]">
+    <div className="rounded-[1rem] border border-border/80 bg-surface p-4 shadow-[var(--shadow-flat)]">
       <Skeleton className="h-4 w-16 rounded-lg" />
       <Skeleton className="mt-2 h-8 w-24" />
       <Skeleton className="mt-2 h-4 w-full max-w-[12rem]" />
@@ -95,7 +95,7 @@ function CenteredAuthCardSkeleton({
 
 function PartnerSetupHeroSkeleton() {
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-border bg-surface/90 p-6 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.35)] backdrop-blur md:p-8">
+    <section className="relative overflow-hidden rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-[var(--shadow-floating)] backdrop-blur md:p-8">
       <div className="relative grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
@@ -115,7 +115,7 @@ function PartnerSetupHeroSkeleton() {
             <Skeleton className="h-24 w-full rounded-2xl" />
           </div>
         </div>
-        <Card className="space-y-4 border-border/80 bg-background/85 p-5 shadow-sm">
+        <Card className="space-y-4 border-border/80 bg-surface-inset/90 p-5 shadow-[var(--shadow-flat)]">
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-2">
               <Skeleton className="h-4 w-28 rounded-lg" />
@@ -125,7 +125,7 @@ function PartnerSetupHeroSkeleton() {
           </div>
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-4">
+              <div key={index} className="flex items-start gap-3 rounded-2xl border border-border bg-surface-inset p-4">
                 <Skeleton className="h-9 w-9 rounded-full" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-5 w-20" />
@@ -185,7 +185,7 @@ function PartnerReviewSectionSkeleton() {
       </Card>
       <div className="grid gap-3">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="rounded-2xl border border-border bg-surface px-4 py-4">
+          <div key={index} className="rounded-2xl border border-border bg-surface-inset px-4 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="grid gap-2">
                 <Skeleton className="h-5 w-32" />
@@ -225,7 +225,7 @@ export function GlobalRouteSkeleton() {
                 {Array.from({ length: 3 }).map((_, index) => (
                   <div
                     key={index}
-                    className="rounded-2xl border border-border bg-surface-muted p-4"
+                    className="rounded-2xl border border-border bg-surface-inset p-4"
                   >
                     <Skeleton className="h-4 w-16 rounded-lg" />
                     <Skeleton className="mt-3 h-8 w-24" />
@@ -443,7 +443,7 @@ export function PartnerSetupPageSkeleton() {
                   {Array.from({ length: 3 }).map((_, index) => (
                     <div
                       key={index}
-                      className="rounded-2xl border border-border bg-background/60 p-4"
+                      className="rounded-2xl border border-border bg-surface-inset/80 p-4"
                     >
                       <Skeleton className="h-5 w-32" />
                       <Skeleton className="mt-2 h-4 w-full max-w-lg" />
@@ -509,7 +509,7 @@ export function PartnerServiceDetailSkeleton() {
             <Skeleton className="h-6 w-28" />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="rounded-2xl border border-border bg-surface-muted p-4">
+                <div key={index} className="rounded-2xl border border-border bg-surface-inset p-4">
                   <Skeleton className="h-5 w-28" />
                   <Skeleton className="mt-2 h-4 w-full max-w-md" />
                   <Skeleton className="mt-2 h-4 w-full max-w-sm" />
@@ -537,7 +537,7 @@ export function PartnerServiceDetailSkeleton() {
 export function LegalRouteSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/70 bg-surface/90 backdrop-blur">
+      <header className="border-b border-border/70 bg-surface-overlay/90 backdrop-blur">
         <LoadingTopBar actionCount={3} />
       </header>
 
@@ -574,7 +574,7 @@ export function LegalRouteSkeleton() {
                 {Array.from({ length: 4 }).map((_, index) => (
                   <div
                     key={index}
-                    className="rounded-2xl border border-border bg-surface-muted p-4"
+                    className="rounded-2xl border border-border bg-surface-inset p-4"
                   >
                     <Skeleton className="h-4 w-20 rounded-lg" />
                     <Skeleton className="mt-3 h-6 w-28" />

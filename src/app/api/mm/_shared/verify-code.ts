@@ -43,6 +43,7 @@ export async function handleVerifyCodePost(request: Request) {
     const username = normalizeMmUsername(String(payload.username ?? ""));
     const code = String(payload.code ?? "").trim().toUpperCase();
     const password = String(payload.password ?? "").trim();
+    const autoLogin = payload.autoLogin !== false;
     const throttleContext = createMemberAuthThrottleContext(
       context.ipAddress ?? null,
       username || null,
@@ -243,6 +244,7 @@ export async function handleVerifyCodePost(request: Request) {
       activePolicies,
       marketingPolicy: activeMarketingPolicy,
       marketingPolicyAgreed: Boolean(payload.marketingPolicyChecked),
+      autoLogin,
     });
 
     if (finalizeResult.kind === "error") {

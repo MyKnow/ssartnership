@@ -91,7 +91,7 @@ export default function AdminCompanyManager({
             </FieldGroup>
           </div>
 
-          <div className="grid gap-4 rounded-2xl border border-border/70 bg-background/70 p-4">
+          <div className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/85 p-4">
             <div className="space-y-1">
               <h4 className="text-sm font-semibold text-foreground">기본 상태</h4>
               <p className="text-xs leading-5 text-muted-foreground">
@@ -189,7 +189,7 @@ export default function AdminCompanyManager({
                   <form
                     id={updateFormId}
                     action={updatePartnerCompany}
-                    className="grid gap-4 rounded-2xl border border-border/70 bg-background/55 p-4"
+                    className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/80 p-4"
                   >
                     <input type="hidden" name="companyId" value={company.id} />
                     <div className="space-y-1">
@@ -236,7 +236,7 @@ export default function AdminCompanyManager({
                   </form>
 
                   <div className="grid gap-4">
-                    <div className="grid gap-3 rounded-2xl border border-border/70 bg-background/55 p-4">
+                    <div className="grid gap-3 rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
                       <div className="space-y-1">
                         <h4 className="text-sm font-semibold text-foreground">연결 현황</h4>
                         <p className="text-xs leading-5 text-muted-foreground">

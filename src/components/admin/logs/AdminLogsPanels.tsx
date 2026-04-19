@@ -16,7 +16,7 @@ export function MetricCard({
   description: string;
 }) {
   return (
-    <Card className="h-full min-w-0 overflow-hidden bg-surface-elevated shadow-md">
+    <Card className="h-full min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {title}
       </p>
@@ -36,18 +36,18 @@ export function InsightListCard({
   items: Array<{ label: string; value: string }>;
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-md">
+    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
       <SectionHeading title={title} description={description} />
       <div className="mt-4 grid gap-2">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface px-4 py-4 text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4 text-sm text-muted-foreground">
             데이터가 없습니다.
           </div>
         ) : (
           items.map((item) => (
             <div
               key={`${title}-${item.label}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm"
             >
               <span className="min-w-0 flex-1 break-all text-left font-medium text-foreground">
                 {item.label}
@@ -71,13 +71,13 @@ export function SecurityStatusCard({
   blocked: number;
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-md">
+    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
       <SectionHeading
         title="보안 상태 분포"
         description="조회 범위 안에서 인증과 보안 이벤트가 어떤 상태로 기록됐는지 보여줍니다."
       />
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-surface px-4 py-4 text-center">
+        <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Success
           </p>
@@ -85,13 +85,13 @@ export function SecurityStatusCard({
             {success}
           </p>
         </div>
-        <div className="rounded-2xl border border-border bg-surface px-4 py-4 text-center">
+        <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Failure
           </p>
           <p className="mt-2 text-2xl font-semibold text-danger">{failure}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-surface px-4 py-4 text-center">
+        <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Blocked
           </p>
@@ -124,7 +124,7 @@ export function RangePresetButton({
         'inline-flex min-h-12 min-w-0 items-center justify-center rounded-full border px-4 text-center text-sm font-semibold whitespace-normal break-keep transition',
         active
           ? 'border-primary bg-primary text-primary-foreground'
-          : 'border-border bg-surface text-foreground hover:border-strong',
+          : 'border-border bg-surface-control text-foreground hover:border-strong',
         disabled ? 'cursor-not-allowed opacity-60' : null,
       ]
         .filter(Boolean)
@@ -147,7 +147,7 @@ export function ActivityChart({
   const maxTotal = Math.max(...buckets.map((bucket) => bucket.total), 1);
 
   return (
-    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-md">
+    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
       <SectionHeading
         title="조회 범위 활동량"
         description="막대를 누르면 해당 구간으로 바로 좁혀서 다시 조회합니다."
@@ -189,7 +189,7 @@ export function ActivityChart({
                 <span className="text-[11px] font-medium text-muted-foreground">
                   {bucket.total}
                 </span>
-                <div className="flex h-40 w-full items-end rounded-[1.4rem] border border-border bg-surface px-2 py-2 transition group-hover:border-strong sm:h-44 md:h-52 sm:px-2.5 sm:py-2.5 md:px-3 md:py-3">
+                <div className="flex h-40 w-full items-end rounded-[1.4rem] border border-border bg-surface-inset px-2 py-2 transition group-hover:border-strong sm:h-44 md:h-52 sm:px-2.5 sm:py-2.5 md:px-3 md:py-3">
                   <div
                     className="flex w-full flex-col justify-end overflow-hidden rounded-2xl bg-surface-muted"
                     style={{ height: `${totalHeight}px` }}
@@ -265,7 +265,7 @@ export function ExportDialog({
         aria-label="CSV 다운로드 닫기"
         onClick={onClose}
       />
-      <Card className="relative z-10 w-full max-w-xl overflow-hidden bg-surface">
+      <Card className="relative z-10 w-full max-w-xl overflow-hidden bg-surface-overlay shadow-[var(--shadow-overlay)]">
         <SectionHeading
           title="CSV 다운로드"
           description="현재 조회 범위 또는 별도 사용자 지정 범위를 골라 로그를 CSV로 내보냅니다."
@@ -323,7 +323,7 @@ export function ExportDialog({
               ] as Array<[LogGroup, string]>).map(([group, label]) => (
                 <label
                   key={group}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-foreground"
+                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-foreground"
                 >
                   <input
                     type="checkbox"

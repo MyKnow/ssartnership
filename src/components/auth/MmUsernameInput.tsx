@@ -10,7 +10,7 @@ const MmUsernameInput = forwardRef<HTMLInputElement, MmUsernameInputProps>(
   function MmUsernameInput(
     {
       name = "username",
-      placeholder = "MM 아이디",
+      placeholder = "예시: myknow",
       required = true,
       ...props
     },

@@ -32,6 +32,12 @@ export default function LoginForm() {
     if (flag) {
       sessionStorage.removeItem("reset:success");
       notify("임시 비밀번호가 발급되었습니다. 로그인해 주세요.");
+      return;
+    }
+    const signupFlag = sessionStorage.getItem("signup:success");
+    if (signupFlag) {
+      sessionStorage.removeItem("signup:success");
+      notify("회원가입이 완료되었습니다.");
     }
   }, [notify]);
 

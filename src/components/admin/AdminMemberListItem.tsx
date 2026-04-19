@@ -46,7 +46,7 @@ function NotificationPreferenceItem({
   enabled: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/60 px-3 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
       <span className="text-sm font-medium text-foreground">{label}</span>
       <span
         className={
@@ -180,7 +180,7 @@ export default function AdminMemberListItem({
                 </div>
                 {consentHistory.length === 0 ? (
                   <div className="grid gap-3 md:grid-cols-3">
-                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-background/60 px-3 py-3">
+                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
                       <p className="text-sm font-medium text-foreground">서비스 이용약관</p>
                       <p className="text-sm text-muted-foreground">
                         {member.service_policy_version ? `v${member.service_policy_version}` : "미동의"}
@@ -189,7 +189,7 @@ export default function AdminMemberListItem({
                         {formatDateTime(member.service_policy_consented_at)}
                       </p>
                     </div>
-                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-background/60 px-3 py-3">
+                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
                       <p className="text-sm font-medium text-foreground">개인정보 처리방침</p>
                       <p className="text-sm text-muted-foreground">
                         {member.privacy_policy_version ? `v${member.privacy_policy_version}` : "미동의"}
@@ -198,7 +198,7 @@ export default function AdminMemberListItem({
                         {formatDateTime(member.privacy_policy_consented_at)}
                       </p>
                     </div>
-                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-background/60 px-3 py-3">
+                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
                       <p className="text-sm font-medium text-foreground">마케팅 정보 수신</p>
                       <p className="text-sm text-muted-foreground">
                         {member.marketing_policy_version ? `v${member.marketing_policy_version}` : "미동의"}
@@ -213,7 +213,7 @@ export default function AdminMemberListItem({
                     {consentHistory.map((consent, index) => (
                       <div
                         key={`${consent.kind}-${consent.version}-${consent.agreed_at}-${index}`}
-                        className="grid gap-1 rounded-2xl border border-border/70 bg-background/60 px-3 py-3 text-sm"
+                        className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3 text-sm"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-medium text-foreground">
@@ -263,7 +263,7 @@ export default function AdminMemberListItem({
                         label="Mattermost"
                         enabled={notificationPreferences?.mmEnabled ?? false}
                       />
-                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/60 px-3 py-3">
+                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
                         <span className="text-sm font-medium text-foreground">활성 기기 수</span>
                         <span className="text-xs font-semibold text-foreground">
                           {(notificationPreferences?.activeDeviceCount ?? 0).toLocaleString()}대

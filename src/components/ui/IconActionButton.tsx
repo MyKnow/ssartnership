@@ -15,7 +15,7 @@ export function IconActionGroup({
   return (
     <div
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-surface/95 p-1 shadow-[var(--shadow-raised)]",
+        "inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-surface-elevated p-1 shadow-[var(--shadow-raised)]",
         className,
       )}
       {...props}

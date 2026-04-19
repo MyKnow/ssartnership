@@ -36,7 +36,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           {toasts.map((toast) => (
             <motion.div
               key={toast.id}
-              className="pointer-events-auto w-full rounded-[1.25rem] border border-border/80 bg-surface-overlay px-4 py-3 text-sm text-foreground shadow-[var(--shadow-raised)] backdrop-blur-xl sm:w-auto sm:min-w-[18rem]"
+              className="pointer-events-auto w-full rounded-[1.25rem] border border-border/80 bg-surface-overlay px-4 py-3 text-sm text-foreground shadow-[var(--shadow-overlay)] backdrop-blur-xl sm:w-auto sm:min-w-[18rem]"
               initial={
                 shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 16, scale: 0.98 }
               }

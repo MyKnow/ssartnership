@@ -28,7 +28,7 @@ export default function AdminLogsManagerContent({
   return (
     <>
       <div className="grid min-w-0 gap-8 overflow-x-hidden">
-        <section className="grid gap-4 rounded-3xl border border-border bg-surface-muted/50 p-5">
+        <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeading
               title="로그 집계 뷰"
@@ -54,7 +54,7 @@ export default function AdminLogsManagerContent({
             ))}
           </div>
 
-          <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+          <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="grid gap-1">
                 <p className="text-sm font-semibold text-foreground">현재 조회 범위</p>

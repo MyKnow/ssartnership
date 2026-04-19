@@ -61,7 +61,7 @@ function PartnerChangeRequestCard({
       </div>
 
       {diffItems.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-background/70 px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-border bg-surface-inset/85 px-4 py-3 text-sm text-muted-foreground">
           변경된 항목이 없습니다.
         </div>
       ) : null}

@@ -9,7 +9,7 @@ export default function PartnerSetupHero({
   context: AwaitedPartnerSetupContext;
 }) {
   return (
-    <section className="rounded-[2rem] border border-border bg-surface/90 p-6 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.25)] backdrop-blur md:p-8">
+    <section className="rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-[var(--shadow-floating)] backdrop-blur md:p-8">
       <div className="flex flex-wrap items-center gap-2">
         <Badge className="bg-primary/10 text-primary">초기 설정</Badge>
         <Badge
@@ -34,7 +34,7 @@ export default function PartnerSetupHero({
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-background/70 p-4">
+        <div className="rounded-2xl border border-border bg-surface-inset/85 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             로그인 아이디
           </p>
@@ -42,7 +42,7 @@ export default function PartnerSetupHero({
             {context.account.loginId}
           </p>
         </div>
-        <div className="rounded-2xl border border-border bg-background/70 p-4">
+        <div className="rounded-2xl border border-border bg-surface-inset/85 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             담당자
           </p>
@@ -53,7 +53,7 @@ export default function PartnerSetupHero({
             {context.account.email}
           </p>
         </div>
-        <div className="rounded-2xl border border-border bg-background/70 p-4">
+        <div className="rounded-2xl border border-border bg-surface-inset/85 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             소유 브랜드 수
           </p>

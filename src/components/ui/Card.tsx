@@ -3,11 +3,11 @@ import { cn } from "@/lib/cn";
 
 const tones = {
   default:
-    "border-border bg-surface/90 shadow-[var(--shadow-flat)] backdrop-blur-md",
+    "border-border bg-surface shadow-[var(--shadow-flat)] backdrop-blur-md",
   muted:
-    "border-border/80 bg-surface-muted/92 shadow-[var(--shadow-flat)]",
+    "border-border/80 bg-surface-inset shadow-none",
   elevated:
-    "border-border/70 bg-surface-elevated/95 shadow-[var(--shadow-raised)] backdrop-blur-lg",
+    "border-border/70 bg-surface-elevated shadow-[var(--shadow-raised)] backdrop-blur-lg",
   hero:
     "border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(111,211,255,0.16),transparent_32%),linear-gradient(135deg,var(--hero-from),var(--hero-via),var(--hero-to))] text-[var(--hero-foreground)] shadow-[var(--shadow-floating)]",
 } as const;

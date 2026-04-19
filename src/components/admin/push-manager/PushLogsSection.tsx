@@ -52,7 +52,7 @@ function AutomaticSummaryStrip({
       {summaries.map((summary) => (
         <div
           key={summary.notificationType}
-          className="grid min-w-[14rem] gap-1 rounded-2xl border border-border bg-surface px-4 py-3"
+          className="grid min-w-[14rem] gap-1 rounded-2xl border border-border bg-surface-inset px-4 py-3"
         >
           <p className="text-sm font-semibold text-foreground">{summary.label}</p>
           <p className="text-sm text-muted-foreground">
@@ -78,7 +78,7 @@ export function PushLogsSection({
   onUpdateFilter,
 }: Props) {
   return (
-    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface-muted/50 p-4 sm:p-5">
+    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-[var(--shadow-flat)] sm:p-5">
       <SectionHeading
         title="알림 운영 로그"
         description="최근 발송 이력을 검색하고 같은 구성을 다시 불러옵니다."
@@ -138,14 +138,14 @@ export function PushLogsSection({
 
       <div className="grid min-w-0 gap-3">
         {filteredLogs.length === 0 ? (
-          <div className="min-w-0 overflow-hidden rounded-2xl border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-8 text-center text-sm text-muted-foreground">
             조건에 맞는 알림 운영 로그가 없습니다.
           </div>
         ) : (
           filteredLogs.map((log) => (
             <div
               key={log.id}
-              className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4"
+              className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-inset px-4 py-4"
             >
               <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">

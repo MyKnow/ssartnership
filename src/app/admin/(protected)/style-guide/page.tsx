@@ -14,6 +14,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
+import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
 
 export const dynamic = "force-dynamic";
@@ -45,8 +46,8 @@ export default function AdminStyleGuidePage() {
             />
             <ResponsiveGrid minItemWidth="14rem">
               <DataPanel label="surface" title="기본 표면" description="카드/필터/폼의 기본 레이어" />
-              <DataPanel label="surface-muted" title="보조 표면" description="필터 바, 보조 정보 패널" className="bg-surface-muted/90" />
-              <DataPanel label="surface-elevated" title="강조 표면" description="핵심 카드, CTA, 주요 섹션" className="bg-surface-elevated/95 shadow-[var(--shadow-raised)]" />
+              <DataPanel label="surface-inset" title="내부 표면" description="카드 안의 행, 요약 박스, 보조 정보" />
+              <DataPanel label="surface-elevated" title="강조 표면" description="핵심 카드, CTA, 주요 섹션" className="bg-surface-elevated shadow-[var(--shadow-raised)]" />
               <DataPanel
                 label="status"
                 title={
@@ -59,6 +60,37 @@ export default function AdminStyleGuidePage() {
                 description="상태색은 정보 구분에만 제한적으로 사용합니다."
               />
             </ResponsiveGrid>
+            <div className="grid gap-4 rounded-[var(--radius-panel)] border border-border/70 bg-background-muted/70 p-4">
+              <div className="grid gap-1">
+                <p className="ui-kicker">Depth Ladder</p>
+                <p className="ui-body">
+                  배경, 패널, elevated 카드, inset, control, overlay가 같은 화면에서
+                  어떻게 구분되는지 확인합니다.
+                </p>
+              </div>
+              <Surface level="default" className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-base font-semibold text-foreground">Level 1 Panel</p>
+                    <p className="ui-caption">일반 섹션과 목록 컨테이너</p>
+                  </div>
+                  <Badge>surface</Badge>
+                </div>
+                <Surface level="elevated" className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-foreground">Level 2 Card</p>
+                      <p className="ui-caption">주요 액션 또는 핵심 정보</p>
+                    </div>
+                    <Badge variant="primary">elevated</Badge>
+                  </div>
+                  <Surface level="inset" className="grid gap-3">
+                    <p className="text-sm font-semibold text-foreground">Inset Surface</p>
+                    <Input placeholder="Control surface" />
+                  </Surface>
+                </Surface>
+              </Surface>
+            </div>
           </Card>
         </MotionReveal>
 
@@ -80,7 +112,7 @@ export default function AdminStyleGuidePage() {
                   <Button variant="ghost">Ghost</Button>
                   <Button variant="danger">Danger</Button>
                 </div>
-                <div className="grid gap-3 rounded-2xl border border-border bg-surface px-4 py-4">
+                <Surface level="inset" className="grid gap-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Button size="lg">Primary CTA</Button>
                     <Button size="lg" variant="secondary" disabled>
@@ -92,7 +124,7 @@ export default function AdminStyleGuidePage() {
                     primary, 비활성 상태는 disabled로 표현합니다. 버튼 높이는
                     `lg`를 기본으로 사용합니다.
                   </p>
-                </div>
+                </Surface>
               </div>
 
               <div className="space-y-3">

@@ -48,7 +48,7 @@ export function AdminLogsExplorer({
   onSortFilterChange: (value: SortFilter) => void;
 }) {
   return (
-    <section className="grid gap-4 rounded-3xl border border-border bg-surface-muted/50 p-5">
+    <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <SectionHeading
           title="로그 탐색기"
@@ -134,7 +134,7 @@ export function AdminLogsExplorer({
 
       <div className="grid gap-4">
         {filteredLogs.length === 0 ? (
-          <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-md">
+          <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
             <EmptyState
               title="조건에 맞는 로그가 없습니다."
               description="검색어나 범위, 필터 조건을 조정해 다시 확인해 주세요."
@@ -146,7 +146,7 @@ export function AdminLogsExplorer({
             return (
               <Card
                 key={`${log.group}-${log.id}`}
-                className="min-w-0 overflow-hidden bg-surface-elevated shadow-md"
+                className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
@@ -223,7 +223,7 @@ export function AdminLogsExplorer({
                   </div>
                 ) : null}
 
-                <details className="mt-4 rounded-2xl border border-border bg-surface px-4 py-3">
+                <details className="mt-4 rounded-2xl border border-border bg-surface-inset px-4 py-3">
                   <summary className="cursor-pointer select-none text-sm font-semibold text-foreground">
                     상세 보기
                   </summary>

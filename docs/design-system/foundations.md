@@ -3,7 +3,12 @@
 ## Color
 - `background`: 페이지 기본 배경
 - `background-muted`: 페이지 depth를 만드는 보조 배경
-- `surface / surface-muted / surface-elevated / surface-overlay`: 카드와 레이어 계층
+- `surface`: 일반 패널과 카드
+- `surface-muted`: 낮은 강조의 보조 영역
+- `surface-inset`: 카드 내부 행, 요약 박스, 세부 정보처럼 부모 카드보다 낮은 영역
+- `surface-control`: input/select/textarea/button 같은 조작 요소
+- `surface-elevated`: 핵심 카드, CTA, 주요 섹션
+- `surface-overlay`: modal, drawer, toast
 - `border / border-strong`: 보더 강도 2단계
 - `foreground / foreground-soft / muted-foreground`: 텍스트 위계
 - `primary / primary-emphasis / primary-soft`: 핵심 액션 색
@@ -24,8 +29,9 @@
 - `floating`: hero, 큰 CTA, 강조 surface
 - `overlay`: modal, drawer, toast
 - elevation은 shadow만이 아니라 surface 톤도 분리한다. `flat`은 기본 surface, `raised`는 약간 더 선명한 surface, `floating`과 `overlay`는 더 진한 또는 더 밀도 높은 surface를 사용해 레이어가 색으로도 읽히게 한다.
-- 다크모드 elevation은 검은 그림자만으로 구분하지 않는다. 전역 `--shadow-*` 토큰은 상단 inset highlight, 약한 gray halo, 적은 수의 drop shadow로 레이어를 드러내되 과한 광택감은 피한다.
+- 다크모드 elevation은 검은 그림자만으로 구분하지 않는다. surface 명도 차이와 border 강도를 먼저 읽히게 하고, 전역 `--shadow-*` 토큰은 상단 inset highlight와 적은 수의 drop shadow만 보조로 사용한다.
 - 새 컴포넌트는 `shadow-sm/md/lg/2xl` 대신 `shadow-[var(--shadow-flat)]`, `shadow-[var(--shadow-raised)]`, `shadow-[var(--shadow-floating)]`, `shadow-[var(--shadow-overlay)]` 중 의미에 맞는 토큰을 우선 사용한다.
+- 카드 내부의 단순 정보 박스는 `Surface level="inset"` 또는 `bg-surface-inset`을 사용한다. 독립 의미 단위가 아닌데 `Card`를 중첩하지 않는다.
 
 ## Radius
 - control: 1rem

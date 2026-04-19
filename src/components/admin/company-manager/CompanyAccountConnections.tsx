@@ -56,7 +56,7 @@ export default function CompanyAccountConnections({
   const connectionFormId = `company-account-connection-${company.id}`;
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-border/70 bg-background/55 p-4">
+    <div className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-foreground">기존 계정 연결</h4>
@@ -162,7 +162,7 @@ export default function CompanyAccountConnections({
                     <input type="hidden" name="accountId" value={account.id} />
                     <input type="hidden" name="companyId" value={company.id} />
                     <FieldGroup label="연결 활성">
-                      <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border/70 bg-background px-3.5 text-sm font-medium text-foreground">
+                      <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border/70 bg-surface-inset px-3.5 text-sm font-medium text-foreground">
                         <input type="hidden" name="isActive" value="false" />
                         <input
                           type="checkbox"

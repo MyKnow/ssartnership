@@ -136,7 +136,7 @@ export default function AdminMobileNav({
     <>
       <button
         type="button"
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground"
         aria-label="관리 메뉴 열기"
         onClick={() => setOpen(true)}
       >
@@ -170,9 +170,9 @@ export default function AdminMobileNav({
               <aside
                 role="dialog"
                 aria-modal="true"
-                className="fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface shadow-2xl"
+                className="fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-[var(--shadow-overlay)]"
               >
-                <div className="flex h-full flex-col bg-surface">
+                <div className="flex h-full flex-col bg-surface-overlay">
                   <div className="border-b border-border px-6 pb-5 pt-6">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -193,7 +193,7 @@ export default function AdminMobileNav({
                       </div>
                       <button
                         type="button"
-                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-foreground"
+                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface-control text-foreground"
                         onClick={() => setOpen(false)}
                         aria-label="관리 메뉴 닫기"
                       >

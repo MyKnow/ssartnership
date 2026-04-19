@@ -46,7 +46,7 @@ export default async function SignupPage() {
           <Card className="mx-auto max-w-lg p-6">
             <h1 className="text-2xl font-semibold text-foreground">회원가입</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Mattermost 아이디로 본인 인증을 진행합니다.
+              Mattermost 인증 후 로그인에 사용할 비밀번호를 설정합니다.
             </p>
             {policies ? (
               <SignupForm

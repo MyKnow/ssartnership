@@ -281,7 +281,7 @@ export default function PartnerReviewSection({
               </Select>
             </label>
 
-            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-foreground">
+            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface-control px-3 text-sm font-medium text-foreground">
               <input
                 type="checkbox"
                 checked={onlyWithImages}

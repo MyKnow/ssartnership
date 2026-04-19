@@ -6,6 +6,7 @@ import { Sparkles } from "lucide-react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
+import Surface from "@/components/ui/Surface";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
@@ -117,7 +118,7 @@ export default function PartnerPasswordChangeForm({
       ) : null}
 
       <div className="space-y-4">
-        <div className="space-y-3 rounded-2xl border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-raised)]">
+        <Surface level="inset" padding="md" className="space-y-3">
           <h2 className="text-lg font-semibold tracking-tight text-foreground">
             현재 비밀번호
           </h2>
@@ -144,9 +145,9 @@ export default function PartnerPasswordChangeForm({
               <FormMessage variant="error">{fieldErrors.currentPassword}</FormMessage>
             ) : null}
           </label>
-        </div>
+        </Surface>
 
-        <div className="space-y-4 rounded-2xl border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-raised)]">
+        <Surface level="elevated" padding="md" className="space-y-4">
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             <span className="flex items-center justify-between gap-3">
               <span className="text-lg font-semibold tracking-tight text-foreground">
@@ -202,7 +203,7 @@ export default function PartnerPasswordChangeForm({
               비밀번호 변경
             </Button>
           </div>
-        </div>
+        </Surface>
       </div>
     </div>
   );

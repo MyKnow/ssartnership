@@ -43,7 +43,7 @@ export default function TokenChipFieldContent({
           onMoveItem={tokenField.moveItem}
         />
       ) : (
-        <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-4 text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-4 text-sm text-muted-foreground">
           {emptyText}
         </div>
       )}

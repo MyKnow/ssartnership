@@ -21,9 +21,9 @@ const variants = {
   },
   ghost: {
     enabled:
-      "border-border bg-surface/90 text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
+      "border-border bg-surface-control text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
     disabled:
-      "border-border bg-surface/90 text-foreground shadow-[var(--shadow-flat)]",
+      "border-border bg-surface-control text-foreground shadow-[var(--shadow-flat)]",
   },
   danger: {
     enabled:
@@ -39,7 +39,7 @@ const variants = {
   },
   secondary: {
     enabled:
-      "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface",
+      "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-control",
     disabled:
       "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)]",
   },

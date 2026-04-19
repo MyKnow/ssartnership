@@ -60,7 +60,7 @@ export default function MobileNav({
     <>
       <button
         type="button"
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground sm:hidden"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground sm:hidden"
         aria-label="메뉴 열기"
         onClick={() => setOpen(true)}
       >
@@ -104,11 +104,11 @@ export default function MobileNav({
                 role="dialog"
                 aria-modal="true"
                 className={cn(
-                  "fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface shadow-2xl transition-transform",
+                  "fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-[var(--shadow-overlay)] transition-transform",
                   open ? "translate-x-0" : "translate-x-full",
                 )}
               >
-                <div className="flex h-full flex-col bg-surface">
+                <div className="flex h-full flex-col bg-surface-overlay">
                   <div className="border-b border-border px-6 pb-5 pt-6">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -122,7 +122,7 @@ export default function MobileNav({
 
                       <button
                         type="button"
-                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-foreground"
+                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface-control text-foreground"
                         onClick={() => setOpen(false)}
                         aria-label="메뉴 닫기"
                       >

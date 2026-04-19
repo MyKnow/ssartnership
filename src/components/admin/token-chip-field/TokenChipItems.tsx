@@ -39,7 +39,7 @@ export default function TokenChipItems({
       {items.map((value, index) => (
         <div
           key={value}
-          className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-surface px-3 py-3 sm:flex-row sm:items-center"
+          className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-surface-inset px-3 py-3 sm:flex-row sm:items-center"
         >
           <div className="min-w-0 flex-1">
             {editingIndex === index ? (

@@ -43,7 +43,7 @@ export default function PartnerPendingRequestSection({
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-border bg-background/70 px-4 py-3 text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border bg-surface-inset/85 px-4 py-3 text-sm text-muted-foreground">
         요청자{" "}
         <span className="font-medium text-foreground">
           {pendingRequest.requestedByDisplayName ??

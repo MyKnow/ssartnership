@@ -5,6 +5,7 @@ import {
   validateMmUsername,
 } from "../../../lib/validation.ts";
 import type {
+  SignupAuthNextValidationInput,
   SignupErrorAction,
   SignupGuideItem,
   SignupPolicyState,
@@ -19,17 +20,13 @@ export function buildSignupYears(selectableYears: number[]) {
 export function buildSignupGuideItems(signupYearsText: string): SignupGuideItem[] {
   return [
     {
-      label: "비밀번호 규칙",
-      description: PASSWORD_POLICY_MESSAGE,
-    },
-    {
       label: "가입 가능한 기수",
       description: `회원가입은 현재 선택 가능한 ${signupYearsText}만 가능합니다.`,
     },
     {
-      label: "인증코드 안내",
+      label: "인증 번호 안내",
       description:
-        "인증코드는 5분간 유효하며, 5회 실패 시 1시간 동안 인증이 제한됩니다.",
+        "인증 번호는 5분간 유효하며, 5회 실패 시 1시간 동안 인증이 제한됩니다.",
     },
   ];
 }
@@ -59,16 +56,18 @@ export function validateSignupRequestInput(
     };
   }
 
-  if (!input.password) {
-    return { kind: "field", field: "password", message: "사이트 비밀번호를 입력해 주세요." };
-  }
-
-  if (!isValidPassword(input.password)) {
-    return { kind: "field", field: "password", message: PASSWORD_POLICY_MESSAGE };
-  }
-
   if (!hasRequiredPolicies(input.policyChecked)) {
     return { kind: "field", field: "policies", message: "필수 약관에 모두 동의해 주세요." };
+  }
+
+  return null;
+}
+
+export function validateSignupAuthNextInput(
+  input: SignupAuthNextValidationInput,
+): SignupErrorAction | null {
+  if (!input.code.trim()) {
+    return { kind: "field", field: "code", message: "인증 번호를 입력해 주세요." };
   }
 
   return null;
@@ -83,7 +82,31 @@ export function validateSignupVerifyInput(
   }
 
   if (!input.code.trim()) {
-    return { kind: "field", field: "code", message: "인증코드를 입력해 주세요." };
+    return { kind: "field", field: "code", message: "인증 번호를 입력해 주세요." };
+  }
+
+  if (!input.password) {
+    return { kind: "field", field: "password", message: "사용할 비밀번호를 입력해 주세요." };
+  }
+
+  if (!isValidPassword(input.password)) {
+    return { kind: "field", field: "password", message: PASSWORD_POLICY_MESSAGE };
+  }
+
+  if (!input.passwordConfirm) {
+    return {
+      kind: "field",
+      field: "passwordConfirm",
+      message: "비밀번호를 한 번 더 입력해 주세요.",
+    };
+  }
+
+  if (input.password !== input.passwordConfirm) {
+    return {
+      kind: "field",
+      field: "passwordConfirm",
+      message: "비밀번호가 일치하지 않습니다.",
+    };
   }
 
   if (!hasRequiredPolicies(input.policyChecked)) {
@@ -126,7 +149,7 @@ export function getSignupRequestErrorAction(
   if (error === "cooldown") {
     return {
       kind: "form",
-      message: "인증코드 요청이 너무 잦습니다. 60초 후 다시 시도해 주세요.",
+      message: "인증 번호 요청이 너무 잦습니다. 60초 후 다시 시도해 주세요.",
     };
   }
 
@@ -167,8 +190,8 @@ export function getSignupVerifyErrorAction(
   if (error === "expired") {
     return {
       kind: "form",
-      message: "인증코드가 만료되었습니다. 다시 요청해 주세요.",
-      nextStep: "request",
+      message: "인증 번호가 만료되었습니다. 다시 요청해 주세요.",
+      nextStep: "auth",
     };
   }
 
@@ -190,6 +213,6 @@ export function getSignupVerifyErrorAction(
   return {
     kind: "field",
     field: "code",
-    message: "인증코드가 올바르지 않습니다.",
+    message: "인증 번호가 올바르지 않습니다.",
   };
 }

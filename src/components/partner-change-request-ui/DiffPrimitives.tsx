@@ -130,7 +130,7 @@ export function DiffCard({
   requested: ReactNode;
 }) {
   return (
-    <div className="rounded-3xl border border-border bg-background/70 p-4">
+    <div className="rounded-3xl border border-border bg-surface-inset/85 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-foreground">{label}</p>
         <Badge className="bg-primary/10 text-primary">변경됨</Badge>

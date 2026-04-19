@@ -137,7 +137,7 @@ export function ApprovalChangeForm({
                   key={option.value}
                   htmlFor={id}
                   className={cn(
-                    "flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3",
+                    "flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3",
                     defaultChecked ? "border-primary/30 bg-primary/5" : null,
                   )}
                 >

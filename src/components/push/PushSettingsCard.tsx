@@ -96,13 +96,13 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
         </div>
 
         {controller.iosNeedsInstall ? (
-          <IOSInstallGuide className="hidden rounded-2xl border border-border/70 bg-surface px-4 py-4 sm:block" />
+          <IOSInstallGuide className="hidden rounded-2xl border border-border/70 bg-surface-inset px-4 py-4 sm:block" />
         ) : null}
 
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-foreground">알림 채널</h3>
           <div className="grid gap-3">
-            <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface-inset px-4 py-3">
               <span className="text-sm font-medium text-foreground">인 앱</span>
               <span
                 aria-hidden="true"
@@ -121,7 +121,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                 void controller.updateChannelPreference("mmEnabled", next);
               }}
             />
-            <div className="space-y-3 rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="space-y-3 rounded-2xl border border-border bg-surface-inset px-4 py-3">
               <label className="flex items-center justify-between gap-4">
                 <span className="text-sm font-medium text-foreground">푸시</span>
                 <span className="flex items-center gap-3">
@@ -178,7 +178,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                     ) : null}
                   </div>
                   {controller.devices.length > 0 ? (
-                    <div className="divide-y divide-border/60 rounded-[1.15rem] border border-border/70 bg-background/40">
+                    <div className="divide-y divide-border/60 rounded-[1.15rem] border border-border/70 bg-surface-inset/70">
                       {controller.devices.map((device) => (
                         <div
                           key={device.id}
@@ -226,7 +226,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-border bg-background/45 px-3 py-3">
+                    <div className="rounded-2xl border border-dashed border-border bg-surface-inset/75 px-3 py-3">
                       <p className="text-sm text-muted-foreground">
                         아직 푸시를 받을 기기가 없습니다.
                       </p>
