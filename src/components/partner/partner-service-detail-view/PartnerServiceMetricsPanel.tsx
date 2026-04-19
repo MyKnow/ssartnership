@@ -56,6 +56,11 @@ export default function PartnerServiceMetricsPanel({
             hint: "브랜드 상세 페이지 조회 수",
           },
           {
+            label: "UV",
+            value: formatCount(metrics.detailUv),
+            hint: "고유 세션 기준 조회 수",
+          },
+          {
             label: "총 클릭",
             value: formatCount(metrics.totalClicks),
             hint: "카드·지도·예약·문의 클릭 합계",

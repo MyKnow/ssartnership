@@ -19,6 +19,7 @@ export type PartnerServiceMetricsSnapshot = {
 export function createEmptyPartnerServiceMetrics(): PartnerPortalServiceMetrics {
   return {
     detailViews: 0,
+    detailUv: 0,
     cardClicks: 0,
     mapClicks: 0,
     reservationClicks: 0,
@@ -60,6 +61,7 @@ export async function getPartnerServiceMetrics(
     fetchPartnerMetricRollupRows(supabase, {
       partnerIds: [partnerId],
       metricNames: PARTNER_METRIC_EVENT_NAMES,
+      metricKinds: ["pv", "uv"],
       granularity: "total",
     }),
     (async () => {

@@ -12,11 +12,16 @@ export const PARTNER_METRIC_EVENT_NAMES = [
 export type PartnerMetricEventName =
   (typeof PARTNER_METRIC_EVENT_NAMES)[number];
 
+export const PARTNER_METRIC_KINDS = ["pv", "uv"] as const;
+
+export type PartnerMetricKind = (typeof PARTNER_METRIC_KINDS)[number];
+
 export type PartnerMetricGranularity = "total" | "hour" | "day" | "weekday";
 
 export type PartnerMetricRollupRow = {
   partner_id: string;
   metric_name: PartnerMetricEventName;
+  metric_kind: PartnerMetricKind;
   granularity: PartnerMetricGranularity;
   bucket_timezone: string;
   bucket_local_start: string | null;
@@ -26,10 +31,14 @@ export type PartnerMetricRollupRow = {
 };
 
 const PARTNER_METRIC_ROLLUP_SELECT =
-  "partner_id,metric_name,granularity,bucket_timezone,bucket_local_start,bucket_local_date,bucket_local_dow,metric_count";
+  "partner_id,metric_name,metric_kind,granularity,bucket_timezone,bucket_local_start,bucket_local_date,bucket_local_dow,metric_count";
 
 function isPartnerMetricEventName(value: string): value is PartnerMetricEventName {
   return (PARTNER_METRIC_EVENT_NAMES as readonly string[]).includes(value);
+}
+
+function isPartnerMetricKind(value: string): value is PartnerMetricKind {
+  return value === "pv" || value === "uv";
 }
 
 function isPartnerMetricGranularity(value: string): value is PartnerMetricGranularity {
@@ -52,6 +61,9 @@ function normalizeRollupRow(row: Record<string, unknown>): PartnerMetricRollupRo
   if (typeof row.metric_name !== "string" || !isPartnerMetricEventName(row.metric_name)) {
     return null;
   }
+  if (typeof row.metric_kind !== "string" || !isPartnerMetricKind(row.metric_kind)) {
+    return null;
+  }
   if (typeof row.granularity !== "string" || !isPartnerMetricGranularity(row.granularity)) {
     return null;
   }
@@ -70,6 +82,7 @@ function normalizeRollupRow(row: Record<string, unknown>): PartnerMetricRollupRo
   return {
     partner_id: row.partner_id,
     metric_name: row.metric_name,
+    metric_kind: row.metric_kind,
     granularity: row.granularity,
     bucket_timezone: row.bucket_timezone,
     bucket_local_start: bucketLocalStart,
@@ -82,8 +95,16 @@ function normalizeRollupRow(row: Record<string, unknown>): PartnerMetricRollupRo
 export function applyPartnerMetricCount(
   metrics: PartnerPortalServiceMetrics,
   metricName: PartnerMetricEventName,
+  metricKind: PartnerMetricKind,
   count: number,
 ) {
+  if (metricKind === "uv") {
+    if (metricName === "partner_detail_view") {
+      metrics.detailUv += count;
+    }
+    return;
+  }
+
   switch (metricName) {
     case "partner_detail_view":
       metrics.detailViews += count;
@@ -119,7 +140,7 @@ export function applyPartnerMetricRollupRows(
       continue;
     }
 
-    applyPartnerMetricCount(metrics, row.metric_name, row.metric_count);
+    applyPartnerMetricCount(metrics, row.metric_name, row.metric_kind, row.metric_count);
   }
 }
 
@@ -132,6 +153,7 @@ export async function fetchPartnerMetricRollupRows(
   filters: {
     partnerIds?: readonly string[];
     metricNames?: readonly PartnerMetricEventName[];
+    metricKinds?: readonly PartnerMetricKind[];
     granularity?: PartnerMetricGranularity;
     bucketTimezone?: string;
     bucketLocalStart?: string;
@@ -142,8 +164,16 @@ export async function fetchPartnerMetricRollupRows(
   const normalizedPartnerIds = filters.partnerIds
     ? normalizePartnerIds(filters.partnerIds)
     : [];
+  const metricKinds = [...(filters.metricKinds ?? ["pv"])];
 
   if (filters.partnerIds && normalizedPartnerIds.length === 0) {
+    return {
+      rows: [],
+      errorMessage: null,
+    };
+  }
+
+  if (metricKinds.length === 0) {
     return {
       rows: [],
       errorMessage: null,
@@ -156,7 +186,10 @@ export async function fetchPartnerMetricRollupRows(
     query = query.in("partner_id", normalizedPartnerIds);
   }
   if (filters.metricNames && filters.metricNames.length > 0) {
-    query = query.in("metric_name", filters.metricNames);
+    query = query.in("metric_name", [...filters.metricNames]);
+  }
+  if (metricKinds.length > 0) {
+    query = query.in("metric_kind", metricKinds);
   }
   if (filters.granularity) {
     query = query.eq("granularity", filters.granularity);

@@ -112,9 +112,10 @@ function ServiceCard({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <ServiceMetric label="리뷰" value={service.metrics.reviewCount} />
-        <ServiceMetric label="조회수" value={service.metrics.detailViews} />
+        <ServiceMetric label="PV" value={service.metrics.detailViews} />
+        <ServiceMetric label="UV" value={service.metrics.detailUv} />
         <ServiceMetric label="총 클릭" value={service.metrics.totalClicks} />
       </div>
     </Link>
@@ -192,10 +193,11 @@ function CompanyHeader({
         </Badge>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <ServiceMetric label="브랜드 수" value={company.services.length} />
         <ServiceMetric label="리뷰 수" value={company.totals.reviewCount} />
-        <ServiceMetric label="조회수" value={company.totals.detailViews} />
+        <ServiceMetric label="PV" value={company.totals.detailViews} />
+        <ServiceMetric label="UV" value={company.totals.detailUv} />
         <ServiceMetric label="총 클릭" value={company.totals.totalClicks} />
       </div>
     </Card>

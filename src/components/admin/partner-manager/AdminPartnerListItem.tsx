@@ -72,8 +72,9 @@ export default function AdminPartnerListItem({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <MetricPill label="PV" value={metrics?.detailViews ?? 0} />
+        <MetricPill label="UV" value={metrics?.detailUv ?? 0} />
         <MetricPill label="CTA" value={metrics?.totalClicks ?? 0} />
         <MetricPill label="예약" value={metrics?.reservationClicks ?? 0} />
         <MetricPill label="문의" value={metrics?.inquiryClicks ?? 0} />

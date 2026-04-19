@@ -25,6 +25,7 @@ test("rollup rows are accumulated into service metrics", async () => {
     {
       partner_id: "partner-a",
       metric_name: "partner_detail_view",
+      metric_kind: "pv",
       granularity: "total",
       bucket_timezone: "Asia/Seoul",
       bucket_local_start: null,
@@ -35,6 +36,7 @@ test("rollup rows are accumulated into service metrics", async () => {
     {
       partner_id: "partner-a",
       metric_name: "partner_card_click",
+      metric_kind: "pv",
       granularity: "total",
       bucket_timezone: "Asia/Seoul",
       bucket_local_start: null,
@@ -45,6 +47,7 @@ test("rollup rows are accumulated into service metrics", async () => {
     {
       partner_id: "partner-a",
       metric_name: "reservation_click",
+      metric_kind: "pv",
       granularity: "total",
       bucket_timezone: "Asia/Seoul",
       bucket_local_start: null,
@@ -52,11 +55,23 @@ test("rollup rows are accumulated into service metrics", async () => {
       bucket_local_dow: null,
       metric_count: 2,
     },
+    {
+      partner_id: "partner-a",
+      metric_name: "partner_detail_view",
+      metric_kind: "uv",
+      granularity: "total",
+      bucket_timezone: "Asia/Seoul",
+      bucket_local_start: null,
+      bucket_local_date: null,
+      bucket_local_dow: null,
+      metric_count: 7,
+    },
   ]);
 
   const metrics = metricsByPartnerId.get("partner-a");
   assert.ok(metrics);
   assert.equal(metrics.detailViews, 12);
+  assert.equal(metrics.detailUv, 7);
   assert.equal(metrics.cardClicks, 3);
   assert.equal(metrics.reservationClicks, 2);
   assert.equal(metrics.totalClicks, 5);

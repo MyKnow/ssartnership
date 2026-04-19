@@ -105,6 +105,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           visibility: "public",
           metrics: {
             detailViews: 1240,
+            detailUv: 782,
             cardClicks: 360,
             mapClicks: 58,
             reservationClicks: 81,
@@ -121,6 +122,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           visibility: "public",
           metrics: {
             detailViews: 520,
+            detailUv: 338,
             cardClicks: 120,
             mapClicks: 22,
             reservationClicks: 14,
@@ -137,6 +139,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           visibility: "confidential",
           metrics: {
             detailViews: 190,
+            detailUv: 121,
             cardClicks: 44,
             mapClicks: 7,
             reservationClicks: 3,
@@ -172,6 +175,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           visibility: "public",
           metrics: {
             detailViews: 1560,
+            detailUv: 968,
             cardClicks: 410,
             mapClicks: 74,
             reservationClicks: 126,
@@ -188,6 +192,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           visibility: "confidential",
           metrics: {
             detailViews: 240,
+            detailUv: 155,
             cardClicks: 56,
             mapClicks: 10,
             reservationClicks: 8,

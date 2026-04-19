@@ -176,6 +176,11 @@ export default async function AdminPartnerDetailPage({
                   hint: "상세 페이지 조회",
                 },
                 {
+                  label: "UV",
+                  value: `${metrics?.detailUv ?? 0}`,
+                  hint: "고유 세션 기준 조회",
+                },
+                {
                   label: "CTA",
                   value: `${metrics?.totalClicks ?? 0}`,
                   hint: "전체 클릭 합계",

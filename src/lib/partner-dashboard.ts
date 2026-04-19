@@ -13,6 +13,7 @@ export type PartnerPortalServiceStatus =
 
 export type PartnerPortalServiceMetrics = {
   detailViews: number;
+  detailUv: number;
   cardClicks: number;
   mapClicks: number;
   reservationClicks: number;
@@ -49,6 +50,7 @@ export interface PartnerPortalDashboardRepository {
 
 const zeroMetrics = (): PartnerPortalServiceMetrics => ({
   detailViews: 0,
+  detailUv: 0,
   cardClicks: 0,
   mapClicks: 0,
   reservationClicks: 0,
@@ -67,6 +69,7 @@ export function sumPartnerPortalMetrics(
   return metricsList.reduce<PartnerPortalServiceMetrics>(
     (accumulator, metrics) => ({
       detailViews: accumulator.detailViews + metrics.detailViews,
+      detailUv: accumulator.detailUv + metrics.detailUv,
       cardClicks: accumulator.cardClicks + metrics.cardClicks,
       mapClicks: accumulator.mapClicks + metrics.mapClicks,
       reservationClicks:

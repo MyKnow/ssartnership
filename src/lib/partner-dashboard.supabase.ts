@@ -65,6 +65,7 @@ function extractCategoryLabel(
 function createEmptyMetrics(): PartnerPortalServiceMetrics {
   return {
     detailViews: 0,
+    detailUv: 0,
     cardClicks: 0,
     mapClicks: 0,
     reservationClicks: 0,
@@ -200,6 +201,7 @@ export async function getSupabasePartnerPortalDashboard(
   const rollupResult = await fetchPartnerMetricRollupRows(supabase, {
     partnerIds: serviceRows.map((serviceRow) => serviceRow.id),
     metricNames: PARTNER_METRIC_EVENT_NAMES,
+    metricKinds: ["pv", "uv"],
     granularity: "total",
   });
 

@@ -61,6 +61,7 @@ export async function getAdminPartnerMetrics(
     fetchPartnerMetricRollupRows(supabase, {
       partnerIds: uniquePartnerIds,
       metricNames: PARTNER_METRIC_EVENT_NAMES,
+      metricKinds: ["pv", "uv"],
       granularity: "total",
     }),
     supabase
