@@ -1040,7 +1040,8 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
-    throw new Error("알림 운영 로그를 불러오지 못했습니다.");
+    console.error("[admin-notification-ops] notifications query failed", error.message);
+    return [] as AdminNotificationOperationLog[];
   }
 
   const rows = (notifications ?? []) as NotificationRow[];
@@ -1053,7 +1054,10 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
     .select("notification_id,channel,status")
     .in("notification_id", rows.map((row) => row.id));
   if (deliveryError) {
-    throw new Error("알림 채널 로그를 불러오지 못했습니다.");
+    console.error(
+      "[admin-notification-ops] notification_deliveries query failed",
+      deliveryError.message,
+    );
   }
 
   const deliveriesByNotification = new Map<string, NotificationDeliveryRow[]>();
