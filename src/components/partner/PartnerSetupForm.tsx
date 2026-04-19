@@ -13,89 +13,15 @@ import {
   getPartnerPortalSetupErrorMessage,
 } from "@/lib/partner-portal-errors";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
+import {
+  copyPasswordToClipboard,
+  generateBrowserPassword,
+  storePasswordCredential,
+} from "@/lib/browser-password";
 
 type PartnerSetupFormProps = {
   context: PartnerPortalSetupContext;
 };
-
-async function copyToClipboard(value: string) {
-  if (
-    typeof navigator === "undefined" ||
-    !navigator.clipboard ||
-    typeof navigator.clipboard.writeText !== "function"
-  ) {
-    throw new Error("clipboard_unavailable");
-  }
-  await navigator.clipboard.writeText(value);
-}
-
-async function storePasswordCredential(input: {
-  loginId: string;
-  password: string;
-  displayName: string;
-}) {
-  const passwordCredentialCtor = (
-    globalThis as typeof globalThis & {
-      PasswordCredential?: new (init: {
-        id: string;
-        password: string;
-        name?: string;
-      }) => Credential;
-    }
-  ).PasswordCredential;
-
-  if (
-    typeof navigator === "undefined" ||
-    !("credentials" in navigator) ||
-    !passwordCredentialCtor
-  ) {
-    return;
-  }
-
-  try {
-    const credential = new passwordCredentialCtor({
-      id: input.loginId,
-      password: input.password,
-      name: input.displayName,
-    });
-    await navigator.credentials.store(credential);
-  } catch {
-    // Browsers may reject credential storage depending on policy or support.
-  }
-}
-
-function generateBrowserPassword(length = 12) {
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  const numbers = "0123456789";
-  const symbols = "!@#$%^&*_-+=?";
-  const all = letters + numbers + symbols;
-
-  const getRandomIndex = (max: number) => {
-    if (
-      typeof globalThis.crypto !== "undefined" &&
-      typeof globalThis.crypto.getRandomValues === "function"
-    ) {
-      const buffer = new Uint32Array(1);
-      globalThis.crypto.getRandomValues(buffer);
-      return buffer[0] % max;
-    }
-    return Math.floor(Math.random() * max);
-  };
-
-  const pick = (set: string) => set[getRandomIndex(set.length)];
-  const chars = [pick(letters), pick(numbers), pick(symbols)];
-
-  while (chars.length < length) {
-    chars.push(pick(all));
-  }
-
-  for (let index = chars.length - 1; index > 0; index -= 1) {
-    const swapIndex = getRandomIndex(index + 1);
-    [chars[index], chars[swapIndex]] = [chars[swapIndex], chars[index]];
-  }
-
-  return chars.join("");
-}
 
 export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
   const { notify } = useToast();
@@ -123,7 +49,7 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
     setFieldErrors({});
     setFormError(null);
     try {
-      await copyToClipboard(nextPassword);
+      await copyPasswordToClipboard(nextPassword);
       notify("랜덤 비밀번호를 복사했습니다.");
     } catch {
       notify("랜덤 비밀번호를 입력했습니다.");

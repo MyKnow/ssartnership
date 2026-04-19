@@ -2,12 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
+import {
+  copyPasswordToClipboard,
+  generateBrowserPassword,
+} from "@/lib/browser-password";
 import {
   getPartnerPortalPasswordChangeErrorMessage,
 } from "@/lib/partner-password-errors";
@@ -29,6 +34,22 @@ export default function PartnerPasswordChangeForm({
   const router = useRouter();
   const currentPasswordRef = useRef<HTMLInputElement>(null);
   const nextPasswordRef = useRef<HTMLInputElement>(null);
+
+  const handleGeneratePassword = async () => {
+    if (pending) {
+      return;
+    }
+    const generatedPassword = generateBrowserPassword(12);
+    setNextPassword(generatedPassword);
+    setFieldErrors((prev) => ({ ...prev, nextPassword: undefined }));
+    setFormError(null);
+    try {
+      await copyPasswordToClipboard(generatedPassword);
+      notify("랜덤 비밀번호를 복사했습니다.");
+    } catch {
+      notify("랜덤 비밀번호를 입력했습니다.");
+    }
+  };
 
   const handleSubmit = async () => {
     if (pending) {
@@ -87,7 +108,7 @@ export default function PartnerPasswordChangeForm({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {mustChangePassword ? (
         <FormMessage>
           임시 비밀번호로 로그인한 상태입니다. 지금 새 비밀번호를 설정해야
@@ -95,58 +116,94 @@ export default function PartnerPasswordChangeForm({
         </FormMessage>
       ) : null}
 
-      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        현재 비밀번호
-        <PasswordInput
-          ref={currentPasswordRef}
-          value={currentPassword}
-          onChange={(event) => {
-            setCurrentPassword(event.target.value);
-            setFieldErrors((prev) => ({ ...prev, currentPassword: undefined }));
-            setFormError(null);
-          }}
-          placeholder="현재 비밀번호"
-          autoComplete="current-password"
-          disabled={pending}
-          aria-invalid={Boolean(fieldErrors.currentPassword) || undefined}
-          className={getFieldErrorClass(Boolean(fieldErrors.currentPassword))}
-        />
-        {fieldErrors.currentPassword ? (
-          <FormMessage variant="error">{fieldErrors.currentPassword}</FormMessage>
-        ) : null}
-      </label>
+      <div className="space-y-4">
+        <div className="space-y-3 rounded-2xl border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-raised)]">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            현재 비밀번호
+          </h2>
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            <span className="sr-only">현재 비밀번호</span>
+            <PasswordInput
+              ref={currentPasswordRef}
+              value={currentPassword}
+              onChange={(event) => {
+                setCurrentPassword(event.target.value);
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  currentPassword: undefined,
+                }));
+                setFormError(null);
+              }}
+              placeholder="현재 비밀번호"
+              autoComplete="current-password"
+              disabled={pending}
+              aria-invalid={Boolean(fieldErrors.currentPassword) || undefined}
+              className={getFieldErrorClass(Boolean(fieldErrors.currentPassword))}
+            />
+            {fieldErrors.currentPassword ? (
+              <FormMessage variant="error">{fieldErrors.currentPassword}</FormMessage>
+            ) : null}
+          </label>
+        </div>
 
-      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        새 비밀번호
-        <PasswordInput
-          ref={nextPasswordRef}
-          value={nextPassword}
-          onChange={(event) => {
-            setNextPassword(event.target.value);
-            setFieldErrors((prev) => ({ ...prev, nextPassword: undefined }));
-            setFormError(null);
-          }}
-          placeholder="영문/숫자/특수문자 포함 8자 이상"
-          autoComplete="new-password"
-          disabled={pending}
-          aria-invalid={Boolean(fieldErrors.nextPassword) || undefined}
-          className={getFieldErrorClass(Boolean(fieldErrors.nextPassword))}
-        />
-        {fieldErrors.nextPassword ? (
-          <FormMessage variant="error">{fieldErrors.nextPassword}</FormMessage>
-        ) : null}
-      </label>
+        <div className="space-y-4 rounded-2xl border border-border/80 bg-surface/90 p-4 shadow-[var(--shadow-raised)]">
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            <span className="flex items-center justify-between gap-3">
+              <span className="text-lg font-semibold tracking-tight text-foreground">
+                새 비밀번호
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleGeneratePassword}
+                disabled={pending}
+              >
+                <Sparkles size={16} />
+                랜덤 생성
+              </Button>
+            </span>
+            <PasswordInput
+              ref={nextPasswordRef}
+              value={nextPassword}
+              onChange={(event) => {
+                setNextPassword(event.target.value);
+                setFieldErrors((prev) => ({ ...prev, nextPassword: undefined }));
+                setFormError(null);
+              }}
+              placeholder="영문/숫자/특수문자 포함 8자 이상"
+              autoComplete="new-password"
+              disabled={pending}
+              aria-invalid={Boolean(fieldErrors.nextPassword) || undefined}
+              className={getFieldErrorClass(Boolean(fieldErrors.nextPassword))}
+            />
+            {fieldErrors.nextPassword ? (
+              <FormMessage variant="error">{fieldErrors.nextPassword}</FormMessage>
+            ) : null}
+          </label>
 
-      {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
-      <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
+          <div className="space-y-2">
+            {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
+            <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
+          </div>
 
-      <Button
-        onClick={handleSubmit}
-        loading={pending}
-        loadingText="변경 중"
-      >
-        비밀번호 변경
-      </Button>
+          <div className="border-t border-border pt-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">변경 완료</p>
+              <p className="text-sm leading-6 text-muted-foreground">
+                저장하면 협력사 포털 홈으로 이동합니다.
+              </p>
+            </div>
+            <Button
+              className="mt-4 w-full sm:mt-0 sm:w-auto"
+              onClick={handleSubmit}
+              loading={pending}
+              loadingText="변경 중"
+            >
+              비밀번호 변경
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

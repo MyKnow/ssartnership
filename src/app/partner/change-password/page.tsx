@@ -30,14 +30,6 @@ export default async function PartnerPasswordChangePage() {
           <Card className="space-y-6 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">제휴 포털</Badge>
-              <Badge className="bg-surface text-muted-foreground">
-                비밀번호 변경
-              </Badge>
-              {session.mustChangePassword ? (
-                <Badge className="bg-amber-500/10 text-amber-700">
-                  변경 필요
-                </Badge>
-              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -45,9 +37,7 @@ export default async function PartnerPasswordChangePage() {
                 비밀번호 변경
               </h1>
               <p className="text-sm leading-6 text-muted-foreground">
-                현재 비밀번호와 새 비밀번호를 입력해 주세요. 임시 비밀번호로
-                로그인한 경우, 변경을 완료해야 다른 페이지를 이용할 수
-                있습니다.
+                임시 비밀번호로 로그인한 경우, 변경을 완료해야 다른 페이지를 이용할 수 있습니다.
               </p>
             </div>
 
