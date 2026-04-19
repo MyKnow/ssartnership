@@ -1,6 +1,5 @@
 import AdminPushManager from "@/components/admin/AdminPushManager";
 import AdminShell from "@/components/admin/AdminShell";
-import Card from "@/components/ui/Card";
 import ShellHeader from "@/components/ui/ShellHeader";
 import {
   getAutomaticNotificationRuleSummaries,

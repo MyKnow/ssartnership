@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Select from "@/components/ui/Select";
 import { cn } from "@/lib/cn";
@@ -18,7 +18,6 @@ export default function CampusFooterSelect({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isPending, startTransition] = useTransition();
 
   const selectedCampus = useMemo(() => {
     if (!pathname) {
@@ -31,7 +30,6 @@ export default function CampusFooterSelect({
     <Select
       aria-label="캠퍼스별 제휴 페이지 이동"
       className={cn("min-w-[11rem] bg-surface-muted/90", className)}
-      disabled={isPending}
       value={selectedCampus}
       onChange={(event) => {
         const nextValue = event.target.value;
@@ -39,18 +37,14 @@ export default function CampusFooterSelect({
           return;
         }
         if (nextValue === "all") {
-          startTransition(() => {
-            router.push("/");
-          });
+          router.push("/");
           return;
         }
         const campus = CAMPUS_DIRECTORY.find((item) => item.slug === nextValue);
         if (!campus) {
           return;
         }
-        startTransition(() => {
-          router.push(getCampusPageHref(campus.slug));
-        });
+        router.push(getCampusPageHref(campus.slug));
       }}
     >
       <option value="all">전체 캠퍼스</option>

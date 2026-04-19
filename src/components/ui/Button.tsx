@@ -147,7 +147,7 @@ export default function Button({
 
     if (isInternalHref(href)) {
       return (
-        <Link href={href} prefetch={prefetch} {...sharedProps}>
+        <Link href={href} prefetch={prefetch ?? false} {...sharedProps}>
           {content}
         </Link>
       );

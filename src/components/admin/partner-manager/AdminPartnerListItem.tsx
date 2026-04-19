@@ -54,6 +54,7 @@ export default function AdminPartnerListItem({
           <div className="grid gap-1">
             <Link
               href={`/admin/partners/${partner.id}`}
+              prefetch={false}
               className="inline-flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary"
             >
               <span className="truncate">{partner.name}</span>
