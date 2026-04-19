@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { cn } from "@/lib/cn";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
@@ -22,10 +23,23 @@ export default function Modal({
 }) {
   const shouldReduceMotion = useReducedMotion();
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:px-4 sm:py-6">
           <motion.button
             type="button"
             className="absolute inset-0 bg-slate-950/52 backdrop-blur-md"
@@ -42,7 +56,7 @@ export default function Modal({
             exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 12, scale: 0.99 }}
             transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             className={cn(
-              "relative w-full max-w-lg rounded-[var(--radius-overlay)] border border-border/80 bg-surface-overlay p-6 shadow-[var(--shadow-overlay)] backdrop-blur-xl",
+              "relative flex w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-overlay)] border border-border/80 bg-surface-overlay p-4 shadow-[var(--shadow-overlay)] backdrop-blur-xl sm:p-6",
               panelClassName,
             )}
           >
@@ -56,7 +70,7 @@ export default function Modal({
                 </p>
               ) : null}
             </div>
-            <div className={cn("mt-6 flex items-center justify-end gap-2", bodyClassName)}>
+            <div className={cn("mt-4 min-h-0 flex-1", bodyClassName)}>
               {children}
             </div>
           </motion.div>

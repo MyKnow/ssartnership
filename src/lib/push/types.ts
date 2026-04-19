@@ -48,7 +48,7 @@ export type PushAudience =
   | { scope: "all" }
   | { scope: "year"; year: number }
   | { scope: "campus"; campus: string }
-  | { scope: "member"; memberId: string };
+  | { scope: "member"; memberId?: string; memberIds?: string[] };
 
 export type PushMessageLog = {
   id: string;

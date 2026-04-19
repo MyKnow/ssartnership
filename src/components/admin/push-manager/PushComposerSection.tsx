@@ -15,7 +15,11 @@ import {
   formatSsafyMemberLifecycleLabel,
   formatSsafyYearLabel,
 } from "@/lib/ssafy-year";
-import type { AdminNotificationType, AdminNotificationPreview } from "@/lib/admin-notification-ops";
+import type {
+  AdminNotificationEligibleMember,
+  AdminNotificationType,
+  AdminNotificationPreview,
+} from "@/lib/admin-notification-ops";
 import type { PushAudienceScope } from "@/lib/push";
 import type { AdminPushManagerProps } from "./types";
 import { typeLabels } from "./constants";
@@ -43,7 +47,7 @@ type Props = {
     audienceScope: PushAudienceScope;
     selectedYear: string;
     selectedCampus: string;
-    selectedMemberId: string;
+    selectedMemberIds: string[];
     confirmationText: string;
   };
   partners: AdminPushManagerProps["partners"];
@@ -54,7 +58,8 @@ type Props = {
   onReview: () => Promise<void>;
   onOpenMemberPicker: () => void;
   onCloseMemberPicker: () => void;
-  onSelectMember: (memberId: string) => void;
+  onToggleMember: (memberId: string) => void;
+  onSelectAllFilteredMembers: (memberIds: string[]) => void;
   onOpenRecipientModal: () => void;
   onCloseRecipientModal: () => void;
   onCloseSendConfirm: () => void;
@@ -65,7 +70,7 @@ type Props = {
       | "url"
       | "selectedYear"
       | "selectedCampus"
-      | "selectedMemberId"
+      | "selectedMemberIds"
       | "confirmationText",
     value: string,
   ) => void;
@@ -113,6 +118,8 @@ function formatRecipientMeta(year: number, campus: string | null) {
 
 const ctaButtonClassName = "w-full justify-center lg:w-auto";
 
+type MemberSortOption = "name" | "year" | "campus";
+
 function AudienceResultCard({
   preview,
   onOpen,
@@ -122,6 +129,16 @@ function AudienceResultCard({
 }) {
   const totalDeliveries = preview.channels.reduce((sum, channel) => sum + channel.eligibleCount, 0);
   const excludedMembers = Math.max(preview.totalAudienceCount - preview.eligibleMemberCount, 0);
+  const selectedLabel =
+    preview.eligibleMemberCount === 1
+      ? preview.eligibleMembers[0]
+        ? `${preview.eligibleMembers[0].name} (@${preview.eligibleMembers[0].mmUsername})`
+        : "대상자 1명"
+      : preview.eligibleMembers[0]
+        ? `${preview.eligibleMembers[0].name} (@${preview.eligibleMembers[0].mmUsername}) 외 ${
+            preview.eligibleMemberCount - 1
+          }명`
+        : `대상자 ${preview.eligibleMemberCount}명`;
 
   return (
     <button
@@ -174,8 +191,10 @@ function AudienceResultCard({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">카드를 누르면 실제 대상자를 확인할 수 있습니다.</p>
-        <span className="text-sm font-medium text-foreground">대상자 보기</span>
+        <p className="min-w-0 truncate text-sm text-muted-foreground" title={selectedLabel}>
+          {selectedLabel}
+        </p>
+        <span className="shrink-0 text-sm font-medium text-foreground">대상자 보기</span>
       </div>
 
       {preview.validationMessage ? <FormMessage variant="error">{preview.validationMessage}</FormMessage> : null}
@@ -208,6 +227,9 @@ function RecipientListModal({
     );
   }, [preview.eligibleMembers, query]);
 
+  const showMemberLabel = (member: AdminNotificationEligibleMember) =>
+    `${member.name} (@${member.mmUsername})`;
+
   return (
     <Modal
       open={open}
@@ -237,22 +259,19 @@ function RecipientListModal({
           {filteredMembers.length > 0 ? (
             <div className="divide-y divide-border/70">
               {filteredMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_auto]"
-                >
-                  <div className="grid gap-1">
-                    <p className="text-sm font-semibold text-foreground">
+                <div key={member.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="min-w-0 grid gap-1">
+                    <p className="truncate text-sm font-semibold text-foreground" title={showMemberLabel(member)}>
                       {member.name}
                       <span className="ml-2 font-normal text-muted-foreground">
                         @{member.mmUsername}
                       </span>
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="truncate text-sm text-muted-foreground" title={formatRecipientMeta(member.year, member.campus)}>
                       {formatRecipientMeta(member.year, member.campus)}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     {member.channels.map((channel) => (
                       <span
                         key={`${member.id}-${channel}`}
@@ -285,83 +304,176 @@ function RecipientListModal({
 function MemberPickerModal({
   open,
   members,
-  selectedMemberId,
+  selectedMemberIds,
   getMemberLabel,
-  onSelectMember,
+  onToggleMember,
+  onSelectAllFiltered,
   onClose,
 }: {
   open: boolean;
   members: AdminPushManagerProps["members"];
-  selectedMemberId: string;
+  selectedMemberIds: string[];
   getMemberLabel: (member: AdminPushManagerProps["members"][number]) => string;
-  onSelectMember: (memberId: string) => void;
+  onToggleMember: (memberId: string) => void;
+  onSelectAllFiltered: (memberIds: string[]) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<MemberSortOption>("name");
 
   const filteredMembers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return members;
-    }
+    const next = normalized
+      ? members.filter((member) => {
+          const memberLabel = [
+            member.display_name ?? "",
+            member.mm_username,
+            member.year ?? "",
+            member.campus ?? "",
+            getMemberLabel(member),
+          ]
+            .join(" ")
+            .toLowerCase();
+          return memberLabel.includes(normalized);
+        })
+      : members;
 
-    return members.filter((member) =>
-      getMemberLabel(member).toLowerCase().includes(normalized),
-    );
-  }, [getMemberLabel, members, query]);
+    return [...next].sort((left, right) => {
+      switch (sortBy) {
+        case "year":
+          return (right.year ?? -1) - (left.year ?? -1) || (left.campus ?? "").localeCompare(right.campus ?? "", "ko-KR") || getMemberLabel(left).localeCompare(getMemberLabel(right), "ko-KR");
+        case "campus":
+          return (left.campus ?? "zzz").localeCompare(right.campus ?? "zzz", "ko-KR") || (right.year ?? -1) - (left.year ?? -1) || getMemberLabel(left).localeCompare(getMemberLabel(right), "ko-KR");
+        case "name":
+        default:
+          return getMemberLabel(left).localeCompare(getMemberLabel(right), "ko-KR");
+      }
+    });
+  }, [getMemberLabel, members, query, sortBy]);
 
-  const selectedMember = members.find((member) => member.id === selectedMemberId) ?? null;
+  const selectedMembers = members.filter((member) => selectedMemberIds.includes(member.id));
+  const selectedSummary =
+    selectedMembers.length === 0
+      ? "없음"
+      : selectedMembers.length === 1
+        ? getMemberLabel(selectedMembers[0])
+        : `${getMemberLabel(selectedMembers[0])} 외 ${selectedMembers.length - 1}명`;
 
   return (
     <Modal
       open={open}
       title="개인 대상 선택"
-      description="이름, Mattermost 아이디, 기수, 캠퍼스로 검색해 한 명을 선택합니다."
+      description="이름, Mattermost 아이디, 기수, 캠퍼스로 검색해 여러 명을 선택합니다."
       onClose={onClose}
-      panelClassName="max-w-4xl"
-      bodyClassName="block"
+      panelClassName="h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] max-w-4xl sm:h-auto sm:max-h-[min(78vh,calc(100vh-2rem))]"
+      bodyClassName="flex min-h-0 flex-col gap-3 overflow-hidden"
     >
-      <div className="w-full space-y-4">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            대상자 검색
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="이름, Mattermost 아이디, 기수, 캠퍼스"
-            />
-          </label>
-          <div className="grid gap-1 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-muted-foreground">
-            <p>검색 결과 {filteredMembers.length}명</p>
-            <p>현재 선택 {selectedMember ? getMemberLabel(selectedMember) : "없음"}</p>
-          </div>
-        </div>
+      <div className="shrink-0 space-y-3">
+        <label className="grid gap-1.5 text-sm font-medium text-foreground">
+          대상자 검색
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="이름, Mattermost 아이디, 기수, 캠퍼스"
+            className="h-10 sm:h-11"
+          />
+        </label>
 
-        <div className="max-h-[58vh] overflow-y-auto rounded-2xl border border-border bg-surface-inset">
+        <div className="grid gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 grid gap-0.5 text-sm text-muted-foreground">
+              <p className="truncate">검색 결과 {filteredMembers.length}명</p>
+              <p className="truncate">현재 선택 {selectedMembers.length}명</p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="shrink-0"
+              onClick={() => onSelectAllFiltered(filteredMembers.map((member) => member.id))}
+            >
+              전체 선택
+            </Button>
+          </div>
+
+          <div className="grid gap-1.5">
+            <span className="text-sm text-muted-foreground">정렬</span>
+            <div className="grid grid-cols-3 gap-1 rounded-[1rem] border border-border bg-surface-control p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={sortBy === "name" ? "primary" : "secondary"}
+                className="min-w-0 rounded-[0.85rem] px-2"
+                onClick={() => setSortBy("name")}
+              >
+                이름순
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={sortBy === "year" ? "primary" : "secondary"}
+                className="min-w-0 rounded-[0.85rem] px-2"
+                onClick={() => setSortBy("year")}
+              >
+                기수순
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={sortBy === "campus" ? "primary" : "secondary"}
+                className="min-w-0 rounded-[0.85rem] px-2"
+                onClick={() => setSortBy("campus")}
+              >
+                캠퍼스순
+              </Button>
+            </div>
+          </div>
+
+          <p className="whitespace-normal break-words text-sm text-muted-foreground" title={selectedSummary}>
+            선택된 인원 {selectedSummary}
+          </p>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-surface-inset">
+        <div className="h-full overflow-y-auto">
           {filteredMembers.length > 0 ? (
             <div className="divide-y divide-border/70">
               {filteredMembers.map((member) => {
-                const isSelected = member.id === selectedMemberId;
+                const isSelected = selectedMemberIds.includes(member.id);
                 return (
-                  <button
+                  <div
                     key={member.id}
-                    type="button"
-                    className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left hover:bg-surface-muted"
-                    onClick={() => onSelectMember(member.id)}
+                    role="button"
+                    tabIndex={0}
+                    className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-3 px-3 py-2 text-left hover:bg-surface-muted"
+                    onClick={() => onToggleMember(member.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onToggleMember(member.id);
+                      }
+                    }}
                   >
-                    <div className="grid gap-1">
-                      <p className="text-sm font-semibold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={() => onToggleMember(member.id)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <div className="min-w-0 grid gap-0.5">
+                      <p className="min-w-0 break-words text-sm font-semibold text-foreground" title={getMemberLabel(member)}>
                         {member.display_name?.trim() || member.mm_username}
                         <span className="ml-2 font-normal text-muted-foreground">
                           @{member.mm_username}
                         </span>
                       </p>
-                      <p className="text-sm text-muted-foreground">{getMemberLabel(member)}</p>
+                      <p className="min-w-0 break-words text-sm text-muted-foreground" title={member.year === null ? (member.campus ?? "캠퍼스 미지정") : formatRecipientMeta(member.year, member.campus)}>
+                        {member.year === null ? (member.campus ?? "캠퍼스 미지정") : formatRecipientMeta(member.year, member.campus)}
+                      </p>
                     </div>
-                    <span className="text-sm font-medium text-foreground">
-                      {isSelected ? "선택됨" : "선택"}
-                    </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -371,17 +483,20 @@ function MemberPickerModal({
             </div>
           )}
         </div>
+      </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          {selectedMember ? (
-            <Button variant="secondary" onClick={() => onSelectMember("")}>
-              선택 해제
-            </Button>
-          ) : null}
-          <Button variant="secondary" onClick={onClose}>
-            닫기
+      <div className="shrink-0 grid gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-3 sm:flex sm:flex-row sm:justify-end">
+        {selectedMembers.length > 0 ? (
+          <Button variant="secondary" className="w-full sm:w-auto" onClick={() => onSelectAllFiltered([])}>
+            선택 해제
           </Button>
-        </div>
+        ) : null}
+        <Button variant="secondary" className="w-full sm:w-auto" onClick={onClose}>
+          취소
+        </Button>
+        <Button className="w-full sm:w-auto" onClick={onClose}>
+          완료
+        </Button>
       </div>
     </Modal>
   );
@@ -493,7 +608,8 @@ export function PushComposerSection({
   onUpdateChannel,
   onUpdateComposer,
   onUpdateNotificationType,
-  onSelectMember,
+  onToggleMember,
+  onSelectAllFilteredMembers,
   onUrlChange,
   partners,
   pending,
@@ -508,7 +624,15 @@ export function PushComposerSection({
     !pushConfigured ? "푸시" : null,
     !mattermostConfigured ? "Mattermost" : null,
   ].filter((value): value is string => Boolean(value));
-  const selectedMember = members.find((member) => member.id === composer.selectedMemberId) ?? null;
+  const selectedMembers = members.filter((member) =>
+    composer.selectedMemberIds.includes(member.id),
+  );
+  const selectedMemberLabel =
+    selectedMembers.length === 0
+      ? "개인 선택"
+      : selectedMembers.length === 1
+        ? getMemberLabel(selectedMembers[0])
+        : `${getMemberLabel(selectedMembers[0])} 외 ${selectedMembers.length - 1}명`;
 
   return (
     <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-[var(--shadow-flat)] sm:p-5">
@@ -623,10 +747,12 @@ export function PushComposerSection({
                   <Button
                     type="button"
                     variant="secondary"
-                    className="w-full justify-start text-left"
+                    className="h-auto w-full min-w-0 items-start justify-start whitespace-normal px-4 py-3 text-left"
                     onClick={onOpenMemberPicker}
                   >
-                    {selectedMember ? getMemberLabel(selectedMember) : "개인 선택"}
+                    <span className="block min-w-0 whitespace-normal break-words text-left leading-tight">
+                      {selectedMemberLabel}
+                    </span>
                   </Button>
                 </div>
               ) : null}
@@ -730,15 +856,15 @@ export function PushComposerSection({
           </div>
 
           <div className="flex w-full justify-end">
-            <Button
-              type="submit"
-              size="lg"
-              className={ctaButtonClassName}
-              disabled={!reviewState?.preview.canSend}
-            >
-              발송하기
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            size="lg"
+            className={ctaButtonClassName}
+            disabled={!reviewState || !reviewState.preview.canSend}
+          >
+            발송하기
+          </Button>
+        </div>
         </FilterBar>
       </form>
 
@@ -767,9 +893,10 @@ export function PushComposerSection({
       <MemberPickerModal
         open={memberPickerOpen}
         members={members}
-        selectedMemberId={composer.selectedMemberId}
+        selectedMemberIds={composer.selectedMemberIds}
         getMemberLabel={getMemberLabel}
-        onSelectMember={onSelectMember}
+        onToggleMember={onToggleMember}
+        onSelectAllFiltered={onSelectAllFilteredMembers}
         onClose={onCloseMemberPicker}
       />
     </section>

@@ -48,7 +48,7 @@ export type AdminPushComposerState = {
   audienceScope: PushAudienceScope;
   selectedYear: string;
   selectedCampus: string;
-  selectedMemberId: string;
+  selectedMemberIds: string[];
   confirmationText: string;
 };
 
@@ -64,7 +64,7 @@ export type AdminPushLogFilterState = {
 export type RestorableAudienceState = {
   targetYear: number | null;
   targetCampus: string | null;
-  targetMemberId: string | null;
+  targetMemberIds: string[] | null;
 };
 
 export type AdminPushReviewState = {

@@ -70,7 +70,10 @@ export default function AdminPushManager({
           filters={controller.filters}
           deletingLogId={controller.deletingLogId}
           onUpdateFilter={controller.updateFilter}
-          onLoadLog={controller.loadLog}
+          onLoadLog={(log) => {
+            setActiveTab("send");
+            controller.loadLog(log);
+          }}
           onDeleteLog={controller.deleteLog}
         />
       ) : (
@@ -96,7 +99,8 @@ export default function AdminPushManager({
           onReview={controller.reviewComposer}
           onOpenMemberPicker={controller.openMemberPicker}
           onCloseMemberPicker={controller.closeMemberPicker}
-          onSelectMember={controller.selectMember}
+          onToggleMember={controller.selectMember}
+          onSelectAllFilteredMembers={controller.selectAllFilteredMembers}
           onOpenRecipientModal={controller.openRecipientModal}
           onCloseRecipientModal={controller.closeRecipientModal}
           onCloseSendConfirm={controller.closeSendConfirm}

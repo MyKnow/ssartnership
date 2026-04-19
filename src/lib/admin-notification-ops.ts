@@ -402,7 +402,7 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
       : resolvedAudience.scope === "campus"
         ? baseQuery.eq("campus", resolvedAudience.campus)
         : resolvedAudience.scope === "member"
-          ? baseQuery.eq("id", resolvedAudience.memberId)
+          ? baseQuery.in("id", resolvedAudience.memberIds ?? (resolvedAudience.memberId ? [resolvedAudience.memberId] : []))
           : baseQuery;
 
   const { data, error } = await query.order("display_name", { ascending: true });

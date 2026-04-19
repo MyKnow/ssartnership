@@ -37,7 +37,7 @@ const initialComposerState: AdminPushComposerState = {
   audienceScope: "all",
   selectedYear: "",
   selectedCampus: "",
-  selectedMemberId: "",
+  selectedMemberIds: [],
   confirmationText: "",
 };
 
@@ -57,7 +57,7 @@ function serializeComposerForReview(composer: AdminPushComposerState) {
     audienceScope: composer.audienceScope,
     selectedYear: composer.selectedYear,
     selectedCampus: composer.selectedCampus,
-    selectedMemberId: composer.selectedMemberId,
+    selectedMemberIds: composer.selectedMemberIds,
   });
 }
 
@@ -73,7 +73,7 @@ function isAudienceSelectionComplete(composer: AdminPushComposerState) {
     case "campus":
       return Boolean(composer.selectedCampus);
     case "member":
-      return Boolean(composer.selectedMemberId);
+      return composer.selectedMemberIds.length > 0;
     case "all":
     default:
       return true;
@@ -117,9 +117,6 @@ export function useAdminPushManager({
     setReviewState((current) =>
       current && current.lastSubmittedPayload !== composerFingerprint ? null : current,
     );
-    setMemberPickerOpen(false);
-    setRecipientModalOpen(false);
-    setSendConfirmOpen(false);
   }, [composerFingerprint]);
 
   const campusOptions = useMemo(() => createCampusOptions(members), [members]);
@@ -206,7 +203,7 @@ export function useAdminPushManager({
       audienceScope: scope,
       selectedYear: scope === "year" ? current.selectedYear : "",
       selectedCampus: scope === "campus" ? current.selectedCampus : "",
-      selectedMemberId: scope === "member" ? current.selectedMemberId : "",
+      selectedMemberIds: scope === "member" ? current.selectedMemberIds : [],
     }));
     if (scope !== "member") {
       setMemberPickerOpen(false);
@@ -224,9 +221,17 @@ export function useAdminPushManager({
   function selectMember(memberId: string) {
     setComposer((current) => ({
       ...current,
-      selectedMemberId: memberId,
+      selectedMemberIds: current.selectedMemberIds.includes(memberId)
+        ? current.selectedMemberIds.filter((id) => id !== memberId)
+        : [...current.selectedMemberIds, memberId],
     }));
-    setMemberPickerOpen(false);
+  }
+
+  function selectAllFilteredMembers(memberIds: string[]) {
+    setComposer((current) => ({
+      ...current,
+      selectedMemberIds: Array.from(new Set(memberIds)),
+    }));
   }
 
   async function reviewComposer() {
@@ -248,7 +253,7 @@ export function useAdminPushManager({
             scope: composer.audienceScope,
             year: composer.selectedYear || undefined,
             campus: composer.selectedCampus || undefined,
-            memberId: composer.selectedMemberId || undefined,
+            memberIds: composer.selectedMemberIds.length > 0 ? composer.selectedMemberIds : undefined,
           },
         }),
       });
@@ -316,7 +321,7 @@ export function useAdminPushManager({
             scope: composer.audienceScope,
             year: composer.selectedYear || undefined,
             campus: composer.selectedCampus || undefined,
-            memberId: composer.selectedMemberId || undefined,
+            memberIds: composer.selectedMemberIds.length > 0 ? composer.selectedMemberIds : undefined,
           },
           confirmationText: composer.confirmationText,
         }),
@@ -383,7 +388,7 @@ export function useAdminPushManager({
       audienceScope: log.targetScope,
       selectedYear: typeof log.targetYear === "number" ? String(log.targetYear) : "",
       selectedCampus: log.targetCampus ?? "",
-      selectedMemberId: log.targetMemberId ?? "",
+      selectedMemberIds: log.targetMemberId ? [log.targetMemberId] : [],
       confirmationText: "",
     });
     setReviewState(null);
@@ -454,6 +459,7 @@ export function useAdminPushManager({
     openMemberPicker,
     closeMemberPicker,
     selectMember,
+    selectAllFilteredMembers,
     reviewComposer,
     handleSubmit,
     confirmSubmit,
