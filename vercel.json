@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/member-sync",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/rss",
+      "schedule": "0 0 * * *"
     }
   ]
 }
