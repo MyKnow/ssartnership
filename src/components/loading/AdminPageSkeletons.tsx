@@ -10,12 +10,12 @@ function ShellHeaderSkeleton({
   descriptionWidth?: string;
 }) {
   return (
-    <Card tone="default" padding="md" className="space-y-3">
+    <div className="grid gap-3">
       <Skeleton className="h-4 w-24 rounded-lg" />
       <Skeleton className={`h-8 ${titleWidth}`} />
       <Skeleton className={`h-4 w-full ${descriptionWidth}`} />
       <Skeleton className="h-4 w-full max-w-xl" />
-    </Card>
+    </div>
   );
 }
 

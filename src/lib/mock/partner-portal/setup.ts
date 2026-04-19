@@ -41,7 +41,6 @@ export function toMockPartnerPortalSetupContext(
         visibility: service.visibility,
       })),
     },
-    demoVerificationCode: record.account.setupVerificationCode,
     isSetupComplete: Boolean(record.account.initialSetupCompletedAt),
     isMock: true,
   };
@@ -74,13 +73,6 @@ export async function completeMockPartnerPortalInitialSetup(
     throw new PartnerPortalSetupError(
       "already_completed",
       "이미 초기 설정이 완료되었습니다.",
-    );
-  }
-
-  if (input.verificationCode.trim() !== setup.account.setupVerificationCode) {
-    throw new PartnerPortalSetupError(
-      "invalid_code",
-      "이메일 인증 코드가 올바르지 않습니다.",
     );
   }
 

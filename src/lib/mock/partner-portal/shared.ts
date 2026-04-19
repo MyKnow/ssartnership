@@ -22,7 +22,6 @@ export type MockPortalAccountRecord = {
   passwordHash: string;
   passwordSalt: string;
   setupToken: string;
-  setupVerificationCode: string;
   lastLoginAt: string | null;
 };
 
@@ -51,14 +50,12 @@ function createMockPortalAccountRecord({
   displayName,
   email,
   setupToken,
-  setupVerificationCode,
 }: {
   id: string;
   loginId: string;
   displayName: string;
   email: string;
   setupToken: string;
-  setupVerificationCode: string;
 }): MockPortalAccountRecord {
   const generatedPassword = generateTempPassword(12);
   const passwordRecord = hashPassword(generatedPassword);
@@ -75,7 +72,6 @@ function createMockPortalAccountRecord({
     passwordHash: passwordRecord.hash,
     passwordSalt: passwordRecord.salt,
     setupToken,
-    setupVerificationCode,
     lastLoginAt: null,
   };
 }
@@ -89,7 +85,6 @@ export const seededSetups: MockPortalSetupRecord[] = [
       displayName: "김도연",
       email: "partner@cafehaeon.example",
       setupToken: "mock-partner-setup-cafe-haeon",
-      setupVerificationCode: "HAEON-2041",
     }),
     company: {
       id: "mock-partner-company-cafe-haeon",
@@ -159,7 +154,6 @@ export const seededSetups: MockPortalSetupRecord[] = [
       displayName: "박지수",
       email: "admin@urbangym.example",
       setupToken: "mock-partner-setup-urban-gym",
-      setupVerificationCode: "URBAN-7782",
     }),
     company: {
       id: "mock-partner-company-urban-gym",
@@ -226,7 +220,6 @@ export function cloneSetupSummary(record: MockPortalSetupRecord): PartnerPortalD
     companyName: record.company.name,
     loginId: record.account.loginId,
     serviceCount: record.company.services.length,
-    demoVerificationCode: record.account.setupVerificationCode,
     isSetupComplete: Boolean(record.account.initialSetupCompletedAt),
   };
 }

@@ -61,7 +61,7 @@ export default function MediaField({
     : "썸네일을 선택하거나 이미지를 끌어오세요.";
 
   return (
-    <div className={cn("grid gap-3", className)}>
+    <div className={cn("grid gap-2.5", className)}>
       <input type="hidden" name={`${role}Manifest`} value={currentManifest} />
       <input
         ref={fileInputRef}
@@ -73,62 +73,62 @@ export default function MediaField({
         onChange={(event) => ingestFiles(event.target.files)}
       />
 
-      <div className="grid gap-3 rounded-3xl border border-border bg-surface-muted p-3">
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="grid gap-1">
-              <p className="text-sm font-semibold text-foreground">{title}</p>
-              <p className="text-xs leading-5 text-muted-foreground">{subtitle}</p>
+      <div className="grid gap-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="grid gap-1">
+            <p className="text-base font-semibold leading-6 text-foreground sm:text-lg">
+              {title}
+            </p>
+            <p className="text-sm leading-6 text-muted-foreground">{subtitle}</p>
+          </div>
+        </div>
+
+        {!hasItems ? (
+          <div
+            className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-2.5"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              ingestFiles(event.dataTransfer.files);
+            }}
+          >
+            <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <Input
+                value={draftUrl}
+                onChange={(event) => setDraftUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleAddUrl();
+                  }
+                }}
+                placeholder="이미지 링크를 붙여넣으세요"
+              />
+              <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleAddUrl()}
+                  className="w-auto"
+                >
+                  추가
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-auto"
+                >
+                  파일
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-background/60 px-4 py-2.5 text-xs leading-6 text-muted-foreground">
+              {emptyMessage}
             </div>
           </div>
-
-          {!hasItems ? (
-            <div
-              className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-3"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                ingestFiles(event.dataTransfer.files);
-              }}
-            >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Input
-                  value={draftUrl}
-                  onChange={(event) => setDraftUrl(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleAddUrl();
-                    }
-                  }}
-                  placeholder="이미지 링크를 붙여넣으세요"
-                />
-                <div className="flex shrink-0 items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => handleAddUrl()}
-                    className="w-full sm:w-auto"
-                  >
-                    추가
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full sm:w-auto"
-                  >
-                    파일
-                  </Button>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-background/60 px-4 py-3 text-xs leading-6 text-muted-foreground">
-                {emptyMessage}
-              </div>
-            </div>
-          ) : null}
-        </div>
+        ) : null}
 
         {hasItems ? (
           <div className={cn("grid gap-3", multiple ? "sm:grid-cols-2" : null)}>
@@ -166,7 +166,7 @@ export default function MediaField({
                     onAddFiles={(files) => ingestFiles(files, index + 1)}
                   />
 
-                  <div className="flex flex-wrap items-center gap-1 sm:justify-end">
+                  <div className="flex flex-wrap items-center justify-end gap-1">
                     <Button
                       type="button"
                       variant="ghost"
@@ -174,7 +174,7 @@ export default function MediaField({
                       onClick={() => moveItem(index, -1)}
                       ariaLabel="위로"
                       title="위로"
-                      className="h-10 w-10 min-h-10 min-w-10"
+                      className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
                     >
                       <ArrowUpIcon className="h-4 w-4" />
                     </Button>
@@ -185,7 +185,7 @@ export default function MediaField({
                       onClick={() => moveItem(index, 1)}
                       ariaLabel="아래로"
                       title="아래로"
-                      className="h-10 w-10 min-h-10 min-w-10"
+                      className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
                     >
                       <ArrowDownIcon className="h-4 w-4" />
                     </Button>
@@ -216,7 +216,7 @@ export default function MediaField({
               ) : (
                 <div
                   key={item.id}
-                  className="grid min-w-0 gap-3 rounded-2xl border border-border bg-surface p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:items-start"
+                  className="grid min-w-0 gap-2.5 rounded-2xl border border-border bg-surface p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:items-start"
                 >
                   <div
                     className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
@@ -240,14 +240,14 @@ export default function MediaField({
                     </Badge>
                   </div>
 
-                  <div className="grid gap-3">
+                  <div className="grid gap-2.5">
                     <MediaCardToolbar
                       multiple={false}
                       onAddUrl={(url) => handleAddUrl(url, 0)}
                       onAddFiles={(files) => ingestFiles(files, 0)}
                     />
 
-                    <div className="flex flex-wrap items-center gap-1 sm:justify-end">
+                    <div className="flex flex-wrap items-center justify-end gap-1">
                       <Button
                         type="button"
                         variant="ghost"

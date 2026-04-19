@@ -260,7 +260,6 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
       displayName: issued.account.display_name,
       loginId: issued.account.login_id,
       setupUrl: issued.setupUrl,
-      verificationCode: issued.verificationCode,
     });
   } catch {
     redirectAdminActionError("/admin/companies", "partner_account_invalid_request");

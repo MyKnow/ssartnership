@@ -91,7 +91,6 @@ export function getPartnerPortalSetupErrorStatus(
       return 404;
     case "already_completed":
       return 409;
-    case "invalid_code":
     case "invalid_password":
     case "password_mismatch":
       return 400;

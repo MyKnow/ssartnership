@@ -37,14 +37,12 @@ export async function POST(
 
   try {
     const payload = (await request.json()) as {
-      verificationCode?: string;
       password?: string;
       confirmPassword?: string;
     };
 
     const result = await completePartnerPortalInitialSetup({
       token,
-      verificationCode: String(payload.verificationCode ?? ""),
       password: String(payload.password ?? ""),
       confirmPassword: String(payload.confirmPassword ?? ""),
     });

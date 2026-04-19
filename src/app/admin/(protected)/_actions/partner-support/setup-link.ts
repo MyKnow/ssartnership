@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { generateCode, hashCode } from "@/lib/mm-verification";
 import { SITE_URL } from "@/lib/site";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
@@ -36,15 +35,13 @@ export async function issuePartnerAccountInitialSetupLink(
   }
 
   const setupToken = randomUUID();
-  const verificationCode = generateCode();
-  const verificationCodeHash = hashCode(verificationCode);
   const now = new Date().toISOString();
 
   const { error: updateError } = await supabase
     .from("partner_accounts")
     .update({
       initial_setup_token: setupToken,
-      initial_setup_verification_code_hash: verificationCodeHash,
+      initial_setup_verification_code_hash: null,
       initial_setup_link_sent_at: null,
       must_change_password: true,
       email_verified_at: null,
@@ -61,7 +58,6 @@ export async function issuePartnerAccountInitialSetupLink(
     emailSentTo,
     setupToken,
     setupUrl: new URL(`/partner/setup/${setupToken}`, SITE_URL).toString(),
-    verificationCode,
     now,
   };
 }

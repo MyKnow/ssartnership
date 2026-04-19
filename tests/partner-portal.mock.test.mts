@@ -40,10 +40,6 @@ test("lists seeded partner portal demo setups", async () => {
     setups.map((setup) => setup.companyName),
     ["카페 해온", "어반짐 역삼"],
   );
-  assert.deepStrictEqual(
-    setups.map((setup) => setup.demoVerificationCode),
-    ["HAEON-2041", "URBAN-7782"],
-  );
 });
 
 test("returns setup context for a seeded token", async () => {
@@ -60,20 +56,17 @@ test("returns setup context for a seeded token", async () => {
   assert.equal(context?.account.loginId, "partner@cafehaeon.example");
   assert.equal(context?.company.services.length, 3);
   assert.equal(context?.isSetupComplete, false);
-  assert.equal(context?.demoVerificationCode, "HAEON-2041");
 });
 
-test("completes initial setup with a matching code and password", async () => {
+test("completes initial setup with a password only", async () => {
   const {
     completeMockPartnerPortalInitialSetup,
     getMockPartnerPortalSetupContext,
     mockPartnerPortalSetupTokens,
   } = await mockPartnerPortalModulePromise;
   const token = mockPartnerPortalSetupTokens[0].token;
-  const setup = mockPartnerPortalSetupTokens[0];
   const result = await completeMockPartnerPortalInitialSetup({
     token,
-    verificationCode: setup.demoVerificationCode ?? "",
     password: "Partner!123",
     confirmPassword: "Partner!123",
   });
@@ -88,27 +81,6 @@ test("completes initial setup with a matching code and password", async () => {
   assert.ok(updatedContext?.account.initialSetupCompletedAt);
 });
 
-test("rejects invalid verification code", async () => {
-  const {
-    completeMockPartnerPortalInitialSetup,
-    mockPartnerPortalSetupTokens,
-  } = await mockPartnerPortalModulePromise;
-  const { PartnerPortalSetupError } = await partnerPortalModulePromise;
-  try {
-    await completeMockPartnerPortalInitialSetup({
-      token: mockPartnerPortalSetupTokens[1].token,
-      verificationCode: "WRONG-CODE",
-      password: "Partner!123",
-      confirmPassword: "Partner!123",
-    });
-    assert.fail("invalid_code 오류가 발생해야 합니다.");
-  } catch (error) {
-    assert.ok(error instanceof PartnerPortalSetupError);
-    const setupError = error as InstanceType<typeof PartnerPortalSetupError>;
-    assert.equal(setupError.code, "invalid_code");
-  }
-});
-
 test("rejects password mismatch", async () => {
   const {
     completeMockPartnerPortalInitialSetup,
@@ -118,8 +90,6 @@ test("rejects password mismatch", async () => {
   try {
     await completeMockPartnerPortalInitialSetup({
       token: mockPartnerPortalSetupTokens[1].token,
-      verificationCode:
-        mockPartnerPortalSetupTokens[1].demoVerificationCode ?? "",
       password: "Partner!123",
       confirmPassword: "Partner!1234",
     });
@@ -158,7 +128,6 @@ test("authenticates a completed partner setup", async () => {
 
   await completeMockPartnerPortalInitialSetup({
     token: mockPartnerPortalSetupTokens[0].token,
-    verificationCode: mockPartnerPortalSetupTokens[0].demoVerificationCode ?? "",
     password: "Partner!123",
     confirmPassword: "Partner!123",
   });
@@ -187,7 +156,6 @@ test("resets a partner password and forces change on the next login", async () =
 
   await completeMockPartnerPortalInitialSetup({
     token,
-    verificationCode: setup.demoVerificationCode ?? "",
     password: "Partner!123",
     confirmPassword: "Partner!123",
   });

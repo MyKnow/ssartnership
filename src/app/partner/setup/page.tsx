@@ -40,9 +40,8 @@ export default async function PartnerSetupIndexPage() {
               처음 비밀번호를 설정하세요.
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
-              제휴 체결 후 관리자에게 받은 초기 설정 링크에서 이메일 코드와
-              새 비밀번호를 설정하면, 이후부터는 업체 포털로 로그인할 수
-              있습니다.
+              제휴 체결 후 관리자에게 받은 초기 설정 링크에서 새 비밀번호만
+              설정하면, 이후부터는 업체 포털로 로그인할 수 있습니다.
             </p>
             <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
               <div className="rounded-2xl border border-border bg-background/60 p-4">
@@ -52,7 +51,7 @@ export default async function PartnerSetupIndexPage() {
                 2. 초기 설정 링크 접속
               </div>
               <div className="rounded-2xl border border-border bg-background/60 p-4">
-                3. 이메일 인증 및 비밀번호 설정
+                3. 새 비밀번호 설정
               </div>
             </div>
           </div>
@@ -97,10 +96,10 @@ export default async function PartnerSetupIndexPage() {
                     </div>
                     <div className="rounded-2xl border border-border bg-background/60 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                        설정 코드
+                        초기 설정 상태
                       </p>
                       <p className="mt-2 break-all text-lg font-semibold text-foreground">
-                        {setup.demoVerificationCode ?? "미공개"}
+                        {setup.isSetupComplete ? "완료됨" : "대기 중"}
                       </p>
                     </div>
                   </div>

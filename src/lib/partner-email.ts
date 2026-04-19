@@ -81,7 +81,6 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
   displayName: string;
   loginId: string;
   setupUrl: string;
-  verificationCode: string;
 }) {
   const { smtpUser, smtpPass } = getSmtpCredentials();
   const transporter = nodemailer.createTransport({
@@ -97,7 +96,6 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
   const safeDisplayName = toHtml(input.displayName || "담당자");
   const safeLoginId = toHtml(input.loginId);
   const safeSetupUrl = escapeHtml(input.setupUrl);
-  const safeVerificationCode = toHtml(input.verificationCode);
 
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpUser}>`,
@@ -109,21 +107,19 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
       "협력사 포털 초기 설정 링크를 전송드립니다.",
       `로그인 아이디: ${input.loginId}`,
       `초기 설정 URL: ${input.setupUrl}`,
-      `이메일 인증 코드: ${input.verificationCode}`,
       "",
-      "링크로 이동해 이메일 인증 후 새 비밀번호를 설정해 주세요.",
+      "링크로 이동해 새 비밀번호를 설정해 주세요.",
     ].join("\n"),
     html: `
       <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
         <h2 style="margin: 0 0 12px;">협력사 포털 초기 설정 안내</h2>
         <p style="margin: 0 0 16px; color: #334155;">
           안녕하세요 ${safeDisplayName}님, 협력사 포털 초기 설정 링크를 전달드립니다.
-          아래 링크로 이동해 이메일 인증과 비밀번호 설정을 완료해 주세요.
+          아래 링크로 이동해 새 비밀번호 설정을 완료해 주세요.
         </p>
         <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc;">
           <p style="margin: 0 0 8px;"><strong>로그인 아이디</strong><br />${safeLoginId}</p>
           <p style="margin: 0 0 8px;"><strong>초기 설정 URL</strong><br /><a href="${safeSetupUrl}" style="color: #2563eb; word-break: break-all;">${safeSetupUrl}</a></p>
-          <p style="margin: 0;"><strong>이메일 인증 코드</strong><br />${safeVerificationCode}</p>
         </div>
         <p style="margin: 16px 0 0; color: #334155;">
           초기 설정을 마치면 해당 계정으로 협력사 포털에 로그인할 수 있습니다.

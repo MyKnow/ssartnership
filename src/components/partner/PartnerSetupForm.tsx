@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
+import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
-import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
@@ -17,47 +18,129 @@ type PartnerSetupFormProps = {
   context: PartnerPortalSetupContext;
 };
 
+async function copyToClipboard(value: string) {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.clipboard ||
+    typeof navigator.clipboard.writeText !== "function"
+  ) {
+    throw new Error("clipboard_unavailable");
+  }
+  await navigator.clipboard.writeText(value);
+}
+
+async function storePasswordCredential(input: {
+  loginId: string;
+  password: string;
+  displayName: string;
+}) {
+  const passwordCredentialCtor = (
+    globalThis as typeof globalThis & {
+      PasswordCredential?: new (init: {
+        id: string;
+        password: string;
+        name?: string;
+      }) => Credential;
+    }
+  ).PasswordCredential;
+
+  if (
+    typeof navigator === "undefined" ||
+    !("credentials" in navigator) ||
+    !passwordCredentialCtor
+  ) {
+    return;
+  }
+
+  try {
+    const credential = new passwordCredentialCtor({
+      id: input.loginId,
+      password: input.password,
+      name: input.displayName,
+    });
+    await navigator.credentials.store(credential);
+  } catch {
+    // Browsers may reject credential storage depending on policy or support.
+  }
+}
+
+function generateBrowserPassword(length = 12) {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const numbers = "0123456789";
+  const symbols = "!@#$%^&*_-+=?";
+  const all = letters + numbers + symbols;
+
+  const getRandomIndex = (max: number) => {
+    if (
+      typeof globalThis.crypto !== "undefined" &&
+      typeof globalThis.crypto.getRandomValues === "function"
+    ) {
+      const buffer = new Uint32Array(1);
+      globalThis.crypto.getRandomValues(buffer);
+      return buffer[0] % max;
+    }
+    return Math.floor(Math.random() * max);
+  };
+
+  const pick = (set: string) => set[getRandomIndex(set.length)];
+  const chars = [pick(letters), pick(numbers), pick(symbols)];
+
+  while (chars.length < length) {
+    chars.push(pick(all));
+  }
+
+  for (let index = chars.length - 1; index > 0; index -= 1) {
+    const swapIndex = getRandomIndex(index + 1);
+    [chars[index], chars[swapIndex]] = [chars[swapIndex], chars[index]];
+  }
+
+  return chars.join("");
+}
+
 export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
   const { notify } = useToast();
   const router = useRouter();
-  const [verificationCode, setVerificationCode] = useState(
-    context.demoVerificationCode ?? "",
-  );
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{
-    verificationCode?: string;
     password?: string;
     confirmPassword?: string;
   }>({});
-  const [formError, setFormError] = useState<string | null>(
-    context.isSetupComplete
-      ? "이미 초기 설정이 완료된 계정입니다."
-      : null,
-  );
+  const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const verificationCodeRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
   const isLocked = Boolean(context.account.initialSetupCompletedAt);
 
+  const handleGeneratePassword = async () => {
+    if (pending || isLocked) {
+      return;
+    }
+    const nextPassword = generateBrowserPassword(12);
+    setPassword(nextPassword);
+    setConfirmPassword(nextPassword);
+    setFieldErrors({});
+    setFormError(null);
+    try {
+      await copyToClipboard(nextPassword);
+      notify("랜덤 비밀번호를 복사했습니다.");
+    } catch {
+      notify("랜덤 비밀번호를 입력했습니다.");
+    }
+  };
+
   const handleSubmit = async () => {
     if (pending || isLocked) {
       return;
     }
-    if (!verificationCode.trim() || !password || !confirmPassword) {
+    if (!password || !confirmPassword) {
       setFieldErrors({
-        verificationCode: verificationCode.trim()
-          ? undefined
-          : "이메일 인증 코드를 입력해 주세요.",
         password: password ? undefined : "새 비밀번호를 입력해 주세요.",
         confirmPassword: confirmPassword ? undefined : "비밀번호 확인을 입력해 주세요.",
       });
       setFormError(null);
-      if (!verificationCode.trim()) {
-        focusField(verificationCodeRef);
-      } else if (!password) {
+      if (!password) {
         focusField(passwordRef);
       } else {
         focusField(confirmPasswordRef);
@@ -75,7 +158,6 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            verificationCode,
             password,
             confirmPassword,
           }),
@@ -89,12 +171,6 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
                 data.error as Parameters<typeof getPartnerPortalSetupErrorMessage>[0],
               )
             : "초기 설정에 실패했습니다.";
-        if (data.error === "invalid_code") {
-          setFieldErrors({ verificationCode: message });
-          setFormError(null);
-          focusField(verificationCodeRef);
-          return;
-        }
         if (data.error === "invalid_password") {
           setFieldErrors({ password: message });
           setFormError(null);
@@ -107,12 +183,21 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
           focusField(confirmPasswordRef);
           return;
         }
+        if (data.error === "already_completed") {
+          setFormError(message);
+          return;
+        }
         setFormError(message);
         return;
       }
 
       setFieldErrors({});
       setFormError(null);
+      await storePasswordCredential({
+        loginId: context.account.loginId,
+        password,
+        displayName: context.account.displayName,
+      });
       notify("초기 설정이 완료되었습니다.");
       router.replace("/partner/login?setup=completed");
     } finally {
@@ -122,43 +207,24 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-border bg-background/70 p-4">
-        <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
-          초기 설정
-        </p>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          이메일 인증 코드와 새 비밀번호를 입력하면, 이 계정의 포털 접근이
-          완료됩니다.
-        </p>
-      </div>
-
-      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        이메일 인증 코드
-        <Input
-          ref={verificationCodeRef}
-          value={verificationCode}
-          onChange={(event) => {
-            setVerificationCode(event.target.value);
-            setFieldErrors((prev) => ({ ...prev, verificationCode: undefined }));
-            setFormError(null);
-          }}
-          placeholder="인증 코드"
-          autoComplete="one-time-code"
-          disabled={pending}
-          aria-invalid={Boolean(fieldErrors.verificationCode) || undefined}
-          className={getFieldErrorClass(Boolean(fieldErrors.verificationCode))}
-        />
-        {fieldErrors.verificationCode ? (
-          <FormMessage variant="error">{fieldErrors.verificationCode}</FormMessage>
-        ) : null}
-      </label>
-
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-4">
         <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-          새 비밀번호
+          <span className="flex items-center justify-between gap-3">
+            <span>새 비밀번호</span>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleGeneratePassword}
+              disabled={pending || isLocked}
+            >
+              <Sparkles size={16} />
+              랜덤 생성
+            </Button>
+          </span>
           <PasswordInput
             ref={passwordRef}
             value={password}
+            autoComplete="new-password"
             onChange={(event) => {
               setPassword(event.target.value);
               setFieldErrors((prev) => ({ ...prev, password: undefined }));
@@ -173,11 +239,13 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
             <FormMessage variant="error">{fieldErrors.password}</FormMessage>
           ) : null}
         </label>
+
         <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
           비밀번호 확인
           <PasswordInput
             ref={confirmPasswordRef}
             value={confirmPassword}
+            autoComplete="new-password"
             onChange={(event) => {
               setConfirmPassword(event.target.value);
               setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
@@ -192,26 +260,28 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
             <FormMessage variant="error">{fieldErrors.confirmPassword}</FormMessage>
           ) : null}
         </label>
+
+        <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
+        {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
       </div>
 
-      <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
-      {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
-
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={pending || isLocked}
-        className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-foreground px-5 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {pending ? "설정 중" : "초기 설정 완료"}
-      </button>
-
-      {context.isSetupComplete ? (
-        <FormMessage>
-          이미 설정된 계정입니다. 필요하면 다른 데모 토큰으로 다시 테스트해
-          주세요.
-        </FormMessage>
-      ) : null}
+      <div className="rounded-2xl border border-border bg-background/60 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">설정 완료</p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            완료하면 협력사 포털 로그인 화면으로 이동합니다.
+          </p>
+        </div>
+        <Button
+          className="mt-4 w-full sm:mt-0 sm:w-auto"
+          onClick={handleSubmit}
+          disabled={pending || isLocked}
+          loading={pending}
+          loadingText="설정 중"
+        >
+          초기 설정 완료
+        </Button>
+      </div>
     </div>
   );
 }

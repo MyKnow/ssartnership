@@ -39,7 +39,7 @@ export default function TokenChipItems({
       {items.map((value, index) => (
         <div
           key={value}
-          className="flex min-w-0 items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2"
+          className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-surface px-3 py-3 sm:flex-row sm:items-center"
         >
           <div className="min-w-0 flex-1">
             {editingIndex === index ? (
@@ -66,7 +66,7 @@ export default function TokenChipItems({
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1 sm:shrink-0">
             <Button
               type="button"
               variant="ghost"
@@ -75,7 +75,7 @@ export default function TokenChipItems({
               disabled={index === 0}
               ariaLabel="위로 이동"
               title="위로 이동"
-              className="h-10 w-10 min-h-10 min-w-10"
+              className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
             >
               <ArrowUpIcon className="h-4 w-4" />
             </Button>
@@ -87,13 +87,10 @@ export default function TokenChipItems({
               disabled={index === items.length - 1}
               ariaLabel="아래로 이동"
               title="아래로 이동"
-              className="h-10 w-10 min-h-10 min-w-10"
+              className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
             >
               <ArrowDownIcon className="h-4 w-4" />
             </Button>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1">
             {editingIndex === index ? (
               <Button
                 type="button"

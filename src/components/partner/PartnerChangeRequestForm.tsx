@@ -51,7 +51,6 @@ export default function PartnerChangeRequestForm({
         />
       ) : null}
 
-      <Card padding="sm">
         <Tabs
           value={activeTab}
           onChange={setActiveTab}
@@ -68,7 +67,6 @@ export default function PartnerChangeRequestForm({
             },
           ]}
         />
-      </Card>
 
       <div hidden={activeTab !== "immediate"} className="space-y-6">
         <ImmediateChangeForm

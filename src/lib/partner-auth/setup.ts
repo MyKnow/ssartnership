@@ -5,7 +5,6 @@ import type {
 } from "../partner-portal.ts";
 import { PartnerPortalSetupError } from "../partner-portal-errors.ts";
 import { hashPassword, isValidPassword } from "../password.ts";
-import { hashCode } from "../mm-verification.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds, getSupabasePartnerPortalSetupCompany } from "./company.ts";
 import { findSupabasePartnerPortalSetupAccount } from "./accounts.ts";
@@ -18,8 +17,7 @@ export async function getSupabasePartnerPortalSetupContext(
   if (
     !account ||
     !account.is_active ||
-    !account.initial_setup_token ||
-    account.initial_setup_completed_at
+    !account.initial_setup_token
   ) {
     return null;
   }
@@ -33,7 +31,7 @@ export async function getSupabasePartnerPortalSetupContext(
     token,
     account: toPartnerPortalAccountSummary(account),
     company,
-    isSetupComplete: false,
+    isSetupComplete: Boolean(account.initial_setup_completed_at),
     isMock: false,
   };
 }
@@ -53,18 +51,6 @@ export async function completeSupabasePartnerPortalInitialSetup(
     throw new PartnerPortalSetupError(
       "already_completed",
       "이미 초기 설정이 완료되었습니다.",
-    );
-  }
-  if (!account.initial_setup_verification_code_hash) {
-    throw new PartnerPortalSetupError(
-      "not_found",
-      "초기 설정 링크를 찾을 수 없습니다.",
-    );
-  }
-  if (hashCode(input.verificationCode.trim()) !== account.initial_setup_verification_code_hash) {
-    throw new PartnerPortalSetupError(
-      "invalid_code",
-      "이메일 인증 코드가 올바르지 않습니다.",
     );
   }
 
@@ -101,7 +87,6 @@ export async function completeSupabasePartnerPortalInitialSetup(
       is_active: true,
       email_verified_at: completedAt,
       initial_setup_completed_at: completedAt,
-      initial_setup_token: null,
       initial_setup_verification_code_hash: null,
       updated_at: completedAt,
     })

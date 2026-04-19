@@ -1,7 +1,6 @@
 export type PartnerPortalSetupErrorCode =
   | "not_found"
   | "already_completed"
-  | "invalid_code"
   | "invalid_password"
   | "password_mismatch";
 
@@ -39,8 +38,6 @@ export function getPartnerPortalSetupErrorMessage(
       return "초기 설정 링크를 찾을 수 없습니다.";
     case "already_completed":
       return "이미 초기 설정이 완료되었습니다.";
-    case "invalid_code":
-      return "이메일 인증 코드가 올바르지 않습니다.";
     case "invalid_password":
       return "비밀번호는 8자 이상이며 영문, 숫자, 특수문자를 모두 포함해야 합니다.";
     case "password_mismatch":

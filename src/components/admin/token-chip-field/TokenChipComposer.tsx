@@ -34,7 +34,7 @@ export default function TokenChipComposer({
 }) {
   return (
     <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <Input
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
@@ -60,9 +60,10 @@ export default function TokenChipComposer({
           type="button"
           variant="ghost"
           onClick={onCommitDraft}
-          className="w-full sm:w-auto"
+          className="w-auto justify-self-end"
         >
           <PlusIcon className="h-4 w-4" />
+          추가
         </Button>
       </div>
       <p className="text-xs leading-5 text-muted-foreground">

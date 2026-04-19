@@ -18,7 +18,7 @@ export function ImmediateChangeForm({
   saveImmediateAction: (formData: FormData) => void | Promise<void>;
 }) {
   return (
-    <form action={saveImmediateAction} className="space-y-6 pb-24 sm:pb-28">
+    <form action={saveImmediateAction} className="space-y-5 pb-24 sm:pb-28">
       <input type="hidden" name="partnerId" value={context.partnerId} />
 
       <InlineMessage
@@ -26,20 +26,9 @@ export function ImmediateChangeForm({
         description="메인 썸네일, 추가 이미지, 예약/문의 링크, 태그는 저장 즉시 반영됩니다."
       />
 
-      <div className="grid gap-4">
-        <FormSection
-          title="메인 썸네일"
-          description="카드 목록에서 보일 1:1 이미지를 수정합니다."
-        >
-          <PartnerThumbnailField initial={context.thumbnail} className="w-full" />
-        </FormSection>
-
-        <FormSection
-          title="추가 이미지"
-          description="상세 페이지에서 보일 4:3 이미지들을 수정합니다."
-        >
-          <PartnerGalleryField initial={context.images} className="w-full" />
-        </FormSection>
+      <div className="grid gap-5">
+        <PartnerThumbnailField initial={context.thumbnail} className="w-full" />
+        <PartnerGalleryField initial={context.images} className="w-full" />
 
         <FormSection
           title="링크"

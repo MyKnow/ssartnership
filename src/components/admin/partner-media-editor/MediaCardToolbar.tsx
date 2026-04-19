@@ -25,25 +25,27 @@ export default function MediaCardToolbar({
   };
 
   return (
-    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Input
-          value={draftUrl}
-          onChange={(event) => setDraftUrl(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              submitUrl();
-            }
-          }}
-          placeholder="이미지 링크를 붙여넣으세요"
-        />
-        <div className="flex shrink-0 items-center gap-2">
+    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface px-3 py-2.5">
+      <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0">
+          <Input
+            value={draftUrl}
+            onChange={(event) => setDraftUrl(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitUrl();
+              }
+            }}
+            placeholder="이미지 링크를 붙여넣으세요"
+          />
+        </div>
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
           <Button
             type="button"
             variant="ghost"
             onClick={submitUrl}
-            className="w-full sm:w-auto"
+            className="w-auto"
           >
             <LinkIcon className="h-4 w-4" />
             추가
@@ -52,7 +54,7 @@ export default function MediaCardToolbar({
             type="button"
             variant="ghost"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full sm:w-auto"
+            className="w-auto"
           >
             <ArrowUpTrayIcon className="h-4 w-4" />
             {uploadLabel}

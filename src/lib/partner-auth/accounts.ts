@@ -42,7 +42,7 @@ export async function findSupabasePartnerPortalSetupAccount(token: string) {
   const { data: account, error } = await supabase
     .from("partner_accounts")
     .select(
-      `${ACCOUNT_SELECT},initial_setup_token,initial_setup_verification_code_hash,initial_setup_link_sent_at`,
+      `${ACCOUNT_SELECT},initial_setup_token,initial_setup_link_sent_at`,
     )
     .eq("initial_setup_token", token)
     .maybeSingle();
