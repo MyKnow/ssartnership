@@ -2,6 +2,7 @@
 
 import type { Ref } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ArrowTopRightOnSquareIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { getFieldErrorClass } from "@/components/ui/form-field-state";
 import { getPolicyHref, getPolicyKindLabel, type PolicyDocument } from "@/lib/policy-documents";
@@ -26,10 +27,13 @@ export default function PolicyAgreementField({
   inputRef,
   required = true,
 }: PolicyAgreementFieldProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const inputId = `policy-${policy.kind}-${policy.version}`;
   const effectiveDate = formatKoreanDate(policy.effective_at);
   const label = getPolicyKindLabel(policy.kind);
   const agreementLabel = label.endsWith("동의") ? label : `${label} 동의`;
+  const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
   return (
     <div className={getFieldErrorClass(
@@ -76,7 +80,7 @@ export default function PolicyAgreementField({
         </div>
       </div>
       <Link
-        href={getPolicyHref(policy.kind, policy.version)}
+        href={getPolicyHref(policy.kind, policy.version, returnTo)}
         target="_blank"
         rel="noreferrer"
         className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-surface-control text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"

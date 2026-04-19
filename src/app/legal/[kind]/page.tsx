@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import Footer from "@/components/Footer";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
+import BackButton from "@/components/ui/BackButton";
+import PolicyDocumentVersionSelect from "@/components/legal/PolicyDocumentVersionSelect";
 import PolicyDocumentView from "@/components/legal/PolicyDocumentView";
 import { getHeaderSession } from "@/lib/header-session";
 import {
   getPolicyDescription,
-  getPolicyDocumentByKind,
+  getPolicyDocumentsByKind,
   getPolicyKindLabel,
   isPolicyKind,
 } from "@/lib/policy-documents";
@@ -25,6 +27,10 @@ function parseVersion(value?: string | string[]) {
   }
   const parsed = Number.parseInt(normalized, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function isVersionInList(version: number | null, list: number[]) {
+  return typeof version === "number" && list.includes(version);
 }
 
 export async function generateMetadata({
@@ -53,7 +59,16 @@ export default async function LegalPolicyPage({
     notFound();
   }
 
-  const policy = await getPolicyDocumentByKind(kind, parseVersion(version));
+  const policies = await getPolicyDocumentsByKind(kind);
+  const requestedVersion = parseVersion(version);
+  if (policies.length === 0) {
+    notFound();
+  }
+
+  const policy =
+    isVersionInList(requestedVersion, policies.map((entry) => entry.version))
+      ? policies.find((entry) => entry.version === requestedVersion) ?? null
+      : policies[0] ?? null;
   if (!policy) {
     notFound();
   }
@@ -66,6 +81,14 @@ export default async function LegalPolicyPage({
       <main>
         <Container className="pb-16 pt-10">
           <div className="mx-auto max-w-4xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <BackButton />
+              <PolicyDocumentVersionSelect
+                kind={kind}
+                policies={policies}
+                currentVersion={policy.version}
+              />
+            </div>
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 LEGAL

@@ -1,5 +1,4 @@
 import Card from "@/components/ui/Card";
-import { formatKoreanDate } from "@/lib/datetime";
 import type { PolicyDocument } from "@/lib/policy-documents";
 
 function renderBlocks(content: string) {
@@ -60,14 +59,6 @@ export default function PolicyDocumentView({
 }) {
   return (
     <Card tone="elevated" className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="rounded-full bg-surface-muted px-3 py-1">
-          버전 v{policy.version}
-        </span>
-        <span className="rounded-full bg-surface-muted px-3 py-1">
-          시행 {formatKoreanDate(policy.effective_at)}
-        </span>
-      </div>
       <div className="space-y-5">{renderBlocks(policy.content)}</div>
     </Card>
   );

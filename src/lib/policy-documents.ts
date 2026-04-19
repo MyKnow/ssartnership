@@ -91,9 +91,21 @@ export function getPolicyDescription(kind: PolicyKind) {
   return "제휴 소식, 혜택 안내, 이벤트 등 선택적 안내 수신 동의입니다.";
 }
 
-export function getPolicyHref(kind: PolicyKind, version?: number) {
+export function getPolicyHref(
+  kind: PolicyKind,
+  version?: number,
+  returnTo?: string,
+) {
   const base = `/legal/${kind}`;
-  return typeof version === "number" ? `${base}?version=${version}` : base;
+  const searchParams = new URLSearchParams();
+  if (typeof version === "number") {
+    searchParams.set("version", String(version));
+  }
+  if (returnTo) {
+    searchParams.set("returnTo", returnTo);
+  }
+  const query = searchParams.toString();
+  return query ? `${base}?${query}` : base;
 }
 
 const POLICY_SELECT =
@@ -189,6 +201,26 @@ export async function getPolicyDocumentByKind(
   version?: number | null,
 ) {
   return queryPolicyDocumentByKind(kind, version);
+}
+
+export async function getPolicyDocumentsByKind(kind: PolicyKind) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("policy_documents")
+    .select(POLICY_SELECT)
+    .eq("kind", kind)
+    .order("version", { ascending: false });
+
+  if (error) {
+    throw wrapPolicyDocumentDbError(
+      error,
+      "정책 문서 이력을 불러오지 못했습니다.",
+    );
+  }
+
+  return (data ?? []).filter((entry): entry is PolicyDocument =>
+    isPolicyKind(String(entry.kind)),
+  );
 }
 
 export async function getMemberPolicyReviewBundle(
