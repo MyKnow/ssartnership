@@ -9,6 +9,7 @@ import {
 } from '@/lib/event-catalog';
 import { SITE_URL } from '@/lib/site';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
+import { reconcilePartnerMetricRollupsFromEventLogs } from '@/lib/partner-metric-rollups';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { getSignedUserSession } from '@/lib/user-auth';
 
@@ -194,6 +195,14 @@ export async function logProductEvent(input: ProductLogInput) {
     user_agent: input.userAgent ?? null,
     ip_address: input.ipAddress ?? null,
   });
+
+  if (input.targetType === "partner" && input.targetId) {
+    try {
+      await reconcilePartnerMetricRollupsFromEventLogs(input.targetId);
+    } catch (error) {
+      console.error("[activity-log] partner metric reconcile failed", error);
+    }
+  }
 }
 
 export async function logAdminAudit(input: AdminAuditInput) {

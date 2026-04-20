@@ -23,6 +23,7 @@ import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
+  getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -138,6 +139,11 @@ export default async function AdminPartnerDetailPage({
     }).categories,
   );
   const metrics = metricsResult.metricsByPartnerId.get(partnerId);
+  const visibilityState = getPartnerVisibilityState(
+    partner.visibility,
+    partner.period_start,
+    partner.period_end,
+  );
   const metricTimeseries = await getPartnerMetricTimeseriesSnapshot(
     partnerId,
     partner.created_at,
@@ -162,8 +168,8 @@ export default async function AdminPartnerDetailPage({
 
         <Card tone="elevated">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className={getPartnerVisibilityBadgeClass(partner.visibility)}>
-              {getPartnerVisibilityLabel(partner.visibility)}
+            <Badge className={getPartnerVisibilityBadgeClass(visibilityState)}>
+              {getPartnerVisibilityLabel(visibilityState)}
             </Badge>
             <CategoryColorBadge
               label={category?.label ?? "미분류"}

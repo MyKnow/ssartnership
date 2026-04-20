@@ -1,10 +1,17 @@
 import type { PartnerVisibility } from "@/lib/types";
+import { isWithinPeriod } from "@/lib/partner-utils";
 
 export const PARTNER_VISIBILITY_VALUES = [
   "public",
   "confidential",
   "private",
 ] as const;
+
+export type PartnerVisibilityState = PartnerVisibility | "expired";
+type PartnerPeriod = {
+  start?: string | null;
+  end?: string | null;
+};
 
 export function isPartnerVisibility(value: string): value is PartnerVisibility {
   return (PARTNER_VISIBILITY_VALUES as readonly string[]).includes(value);
@@ -17,7 +24,19 @@ export function normalizePartnerVisibility(
   return isPartnerVisibility(normalized) ? normalized : "public";
 }
 
-export function getPartnerVisibilityLabel(visibility: PartnerVisibility) {
+export function getPartnerVisibilityState(
+  visibility: PartnerVisibility,
+  periodStart?: string | null,
+  periodEnd?: string | null,
+): PartnerVisibilityState {
+  if (visibility !== "private" && !isWithinPeriod(periodStart, periodEnd)) {
+    return "expired";
+  }
+
+  return visibility;
+}
+
+export function getPartnerVisibilityLabel(visibility: PartnerVisibilityState) {
   switch (visibility) {
     case "public":
       return "공개";
@@ -25,10 +44,14 @@ export function getPartnerVisibilityLabel(visibility: PartnerVisibility) {
       return "대외비";
     case "private":
       return "비공개";
+    case "expired":
+      return "기간 만료";
   }
 }
 
-export function getPartnerVisibilityBadgeClass(visibility: PartnerVisibility) {
+export function getPartnerVisibilityBadgeClass(
+  visibility: PartnerVisibilityState,
+) {
   switch (visibility) {
     case "public":
       return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
@@ -36,13 +59,23 @@ export function getPartnerVisibilityBadgeClass(visibility: PartnerVisibility) {
       return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
     case "private":
       return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+    case "expired":
+      return "bg-rose-500/15 text-rose-700 dark:text-rose-300";
   }
 }
 
 export function canViewPartnerDetails(
   visibility: PartnerVisibility,
   authenticated: boolean,
+  period?: PartnerPeriod,
 ) {
+  if (
+    period &&
+    visibility !== "private" &&
+    !isWithinPeriod(period.start, period.end)
+  ) {
+    return false;
+  }
   if (visibility === "public") {
     return true;
   }

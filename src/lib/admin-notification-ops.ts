@@ -893,6 +893,7 @@ export async function sendAdminNotificationCampaign(
     throw new Error(context.preview.validationMessage ?? "발송 가능한 대상이 없습니다.");
   }
   if (
+    source !== "automatic" &&
     context.preview.requiresConfirmation &&
     (input.confirmationText ?? "").trim() !== context.preview.confirmationPhrase
   ) {

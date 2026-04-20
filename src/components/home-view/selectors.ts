@@ -1,7 +1,10 @@
 import type { Category, CategoryKey, Partner } from "../../lib/types.ts";
 import { getPartnerAudienceLabel, type PartnerAudienceFilter } from "../../lib/partner-audience.ts";
-import { getPartnerLockKind } from "../../lib/partner-visibility.ts";
-import { compareEndDate, isWithinPeriod } from "../../lib/partner-utils.ts";
+import {
+  getPartnerLockKind,
+  getPartnerVisibilityState,
+} from "../../lib/partner-visibility.ts";
+import { compareEndDate } from "../../lib/partner-utils.ts";
 
 export type HomePartnerSortOption = "recent" | "endingSoon";
 
@@ -12,8 +15,10 @@ const LOCK_ORDER = {
 
 export type HomePartnerViewModel = Partner & {
   _index: number;
+  _visibilityState: "public" | "confidential" | "private" | "expired";
   _lockKind: "confidential" | "private" | null;
   _isActive: boolean;
+  _isExpired: boolean;
   _search: string;
 };
 
@@ -30,24 +35,39 @@ export function normalizeHomePartners(
   partners: Partner[],
   viewerAuthenticated: boolean,
 ): HomePartnerViewModel[] {
-  return partners.map((partner, index) => ({
-    ...partner,
-    _index: index,
-    _lockKind: getPartnerLockKind(partner.visibility, viewerAuthenticated),
-    _isActive: isWithinPeriod(partner.period.start, partner.period.end),
-    _search: [
-      partner.name,
-      partner.location,
-      partner.reservationLink ?? "",
-      partner.inquiryLink ?? "",
-      partner.conditions.join(" "),
-      partner.benefits.join(" "),
-      partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
-      (partner.tags ?? []).join(" "),
-    ]
-      .join(" ")
-      .toLowerCase(),
-  }));
+  return partners.map((partner, index) => {
+    const visibilityState = getPartnerVisibilityState(
+      partner.visibility,
+      partner.period.start,
+      partner.period.end,
+    );
+
+    const lockKind =
+      visibilityState === "expired"
+        ? null
+        : getPartnerLockKind(partner.visibility, viewerAuthenticated);
+
+    return {
+      ...partner,
+      _index: index,
+      _visibilityState: visibilityState,
+      _lockKind: lockKind,
+      _isActive: visibilityState !== "expired",
+      _isExpired: visibilityState === "expired",
+      _search: [
+        partner.name,
+        partner.location,
+        partner.reservationLink ?? "",
+        partner.inquiryLink ?? "",
+        partner.conditions.join(" "),
+        partner.benefits.join(" "),
+        partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
+        (partner.tags ?? []).join(" "),
+      ]
+        .join(" ")
+        .toLowerCase(),
+    };
+  });
 }
 
 export function filterHomePartners({
@@ -76,8 +96,9 @@ export function filterHomePartners({
           partner.appliesTo.includes(appliesToFilter),
         );
 
-  const visibleFiltered = appliesFiltered.filter((partner) => !partner._lockKind);
-  const lockedFiltered = appliesFiltered.filter((partner) => partner._lockKind);
+  const activeFiltered = appliesFiltered.filter((partner) => !partner._isExpired);
+  const visibleFiltered = activeFiltered.filter((partner) => !partner._lockKind);
+  const lockedFiltered = activeFiltered.filter((partner) => partner._lockKind);
   const searchFiltered = query
     ? visibleFiltered.filter((partner) => partner._search.includes(query))
     : visibleFiltered;

@@ -8,7 +8,6 @@ import {
 } from "@/lib/push";
 import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
-import { isWithinPeriod } from "@/lib/partner-utils";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   cleanupPartnerCompanyProvision,
@@ -82,12 +81,12 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
   await logAdminAction("partner_create", {
     targetType: "partner",
     targetId: partnerId,
-      properties: {
-        name: payload.name,
-        companyId: companyProvision?.company?.id ?? null,
-        companyName: companyProvision?.company?.name ?? null,
-        categoryId: payload.categoryId,
-        location: payload.location,
+    properties: {
+      name: payload.name,
+      companyId: companyProvision?.company?.id ?? null,
+      companyName: companyProvision?.company?.name ?? null,
+      categoryId: payload.categoryId,
+      location: payload.location,
       hasMapUrl: Boolean(payload.mapUrl),
       hasReservationLink: Boolean(payload.reservationLink),
       hasInquiryLink: Boolean(payload.inquiryLink),
@@ -103,11 +102,7 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
     },
   });
 
-  if (
-    payload.visibility !== "private" &&
-    isPushConfigured() &&
-    isWithinPeriod(payload.periodStart, payload.periodEnd)
-  ) {
+  if (payload.visibility !== "private") {
     const { data: category } = await supabase
       .from("categories")
       .select("label")
@@ -130,7 +125,7 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
           audience: { scope: "all" },
           channels: {
             in_app: true,
-            push: true,
+            push: isPushConfigured(),
             mm: false,
           },
         },

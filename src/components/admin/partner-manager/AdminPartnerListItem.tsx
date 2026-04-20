@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
+  getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
 import type { AdminCategory, AdminPartner } from "@/components/admin/partner-manager/types";
 
@@ -35,14 +36,19 @@ export default function AdminPartnerListItem({
   category: AdminCategory | null;
 }) {
   const metrics = partner.metrics;
+  const visibilityState = getPartnerVisibilityState(
+    partner.visibility,
+    partner.period_start,
+    partner.period_end,
+  );
 
   return (
     <article className="grid gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="grid min-w-0 gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className={getPartnerVisibilityBadgeClass(partner.visibility)}>
-              {getPartnerVisibilityLabel(partner.visibility)}
+            <Badge className={getPartnerVisibilityBadgeClass(visibilityState)}>
+              {getPartnerVisibilityLabel(visibilityState)}
             </Badge>
             <CategoryColorBadge
               label={category?.label ?? "미분류"}

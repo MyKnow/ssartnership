@@ -23,7 +23,7 @@ export async function buildPartnerRssFeedItems(): Promise<RssFeedItem[]> {
     categories.map((category) => [category.key, category.label]),
   );
   const publicPartners = partners.filter((partner) =>
-    canViewPartnerDetails(partner.visibility, false),
+    canViewPartnerDetails(partner.visibility, false, partner.period),
   );
   const now = Date.now();
 

@@ -46,7 +46,7 @@ export async function generateMetadata({
   ]);
 
   const campusPartners = getCampusPartners(partners, campus.slug).filter((partner) =>
-    canViewPartnerDetails(partner.visibility, false),
+    canViewPartnerDetails(partner.visibility, false, partner.period),
   );
   const categoryLabels = Array.from(
     new Set(
@@ -122,7 +122,7 @@ export default async function CampusLandingPage({
     };
   });
   const publicCampusPartners = campusPartners.filter((partner) =>
-    canViewPartnerDetails(partner.visibility, false),
+    canViewPartnerDetails(partner.visibility, false, partner.period),
   );
   const categoryLabels = Array.from(
     new Set(

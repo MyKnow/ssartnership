@@ -232,6 +232,19 @@ export class SupabasePartnerRepository implements PartnerRepository {
     }
 
     const categoryKey = extractCategoryKey(row.categories) ?? "health";
+    if (
+      !canViewPartnerDetails(
+        visibility,
+        context.authenticated,
+        {
+          start: row.period_start,
+          end: row.period_end,
+        },
+      )
+    ) {
+      return null;
+    }
+
     return toVisiblePartner(row, categoryKey);
   }
 }

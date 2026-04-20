@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
+  getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
 
 type CategoryOption = {
@@ -71,6 +72,11 @@ export default function AdminPartnerEditorCard({
       categoryOptions.find((item) => item.id === partner.category_id) ?? null,
     [categoryOptions, partner.category_id],
   );
+  const visibilityState = getPartnerVisibilityState(
+    partner.visibility,
+    partner.period_start,
+    partner.period_end,
+  );
   const company = partner.company ?? null;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
   const galleryImages = partner.thumbnail
@@ -88,8 +94,8 @@ export default function AdminPartnerEditorCard({
         <div className="min-w-0">
           <p className="text-base font-semibold text-foreground">{partner.name}</p>
           <div className="mt-2 flex items-center gap-2">
-            <Badge className={getPartnerVisibilityBadgeClass(partner.visibility)}>
-              {getPartnerVisibilityLabel(partner.visibility)}
+            <Badge className={getPartnerVisibilityBadgeClass(visibilityState)}>
+              {getPartnerVisibilityLabel(visibilityState)}
             </Badge>
             <Badge className="bg-surface text-foreground">
               {category?.label ?? "미분류"}

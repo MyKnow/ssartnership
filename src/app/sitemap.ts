@@ -19,7 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       authenticated: false,
     });
     const publicPartners = partners.filter((partner) =>
-      canViewPartnerDetails(partner.visibility, false),
+      canViewPartnerDetails(partner.visibility, false, partner.period),
     );
 
     entries.push(

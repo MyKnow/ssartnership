@@ -30,8 +30,18 @@ export type PartnerMetricRollupRow = {
   metric_count: number;
 };
 
+type PartnerMetricEventLogRow = {
+  event_name: PartnerMetricEventName;
+  actor_type: string;
+  actor_id: string | null;
+  session_id: string | null;
+  created_at: string | null;
+};
+
 const PARTNER_METRIC_ROLLUP_SELECT =
   "partner_id,metric_name,metric_kind,granularity,bucket_timezone,bucket_local_start,bucket_local_date,bucket_local_dow,metric_count";
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const KST_TIMEZONE = "Asia/Seoul";
 
 function isPartnerMetricEventName(value: string): value is PartnerMetricEventName {
   return (PARTNER_METRIC_EVENT_NAMES as readonly string[]).includes(value);
@@ -146,6 +156,279 @@ export function applyPartnerMetricRollupRows(
 
 function normalizePartnerIds(partnerIds: readonly string[]) {
   return [...new Set(partnerIds.map((partnerId) => partnerId.trim()).filter(Boolean))];
+}
+
+function toKstBucketParts(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const kst = new Date(date.getTime() + KST_OFFSET_MS);
+  const year = kst.getUTCFullYear();
+  const month = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(kst.getUTCDate()).padStart(2, "0");
+  const hour = String(kst.getUTCHours()).padStart(2, "0");
+  const bucketLocalDate = `${year}-${month}-${day}`;
+  const bucketLocalStart = `${bucketLocalDate} ${hour}:00:00`;
+  const bucketLocalDow = (kst.getUTCDay() || 7) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+  return {
+    bucket_timezone: KST_TIMEZONE,
+    bucket_local_start: bucketLocalStart,
+    bucket_local_date: bucketLocalDate,
+    bucket_local_dow: bucketLocalDow,
+  };
+}
+
+function getPartnerMetricVisitorKey(
+  actorType: string,
+  actorId: string | null,
+  sessionId: string | null,
+) {
+  return (
+    sessionId?.trim() ||
+    (actorId ? `${actorType}:${actorId}` : "")
+  );
+}
+
+type PartnerMetricRollupDraftRow = {
+  partner_id: string;
+  metric_name: PartnerMetricEventName;
+  metric_kind: PartnerMetricKind;
+  granularity: PartnerMetricGranularity;
+  bucket_timezone: string;
+  bucket_local_start: string | null;
+  bucket_local_date: string | null;
+  bucket_local_dow: number | null;
+  metric_count: number;
+};
+
+function createDraftKey(row: PartnerMetricRollupDraftRow) {
+  return [
+    row.partner_id,
+    row.metric_name,
+    row.metric_kind,
+    row.granularity,
+    row.bucket_timezone,
+    row.bucket_local_start ?? "",
+    row.bucket_local_date ?? "",
+    row.bucket_local_dow ?? "",
+  ].join("|");
+}
+
+function buildRollupDraftRows(eventRows: PartnerMetricEventLogRow[], partnerId: string) {
+  const counters = new Map<string, PartnerMetricRollupDraftRow>();
+  const uvSeenByBucket = {
+    total: new Set<string>(),
+    hour: new Map<string, Set<string>>(),
+    day: new Map<string, Set<string>>(),
+    weekday: new Map<string, Set<string>>(),
+  };
+
+  const bump = (row: Omit<PartnerMetricRollupDraftRow, "metric_count">, count = 1) => {
+    const key = createDraftKey({ ...row, metric_count: 0 });
+    const current = counters.get(key);
+    if (current) {
+      current.metric_count += count;
+      return;
+    }
+    counters.set(key, { ...row, metric_count: count });
+  };
+
+  for (const event of eventRows) {
+    const bucketParts = toKstBucketParts(event.created_at ?? new Date());
+    if (!bucketParts) {
+      continue;
+    }
+
+    const pvTargets: Array<Pick<PartnerMetricRollupDraftRow, "granularity" | "bucket_local_start" | "bucket_local_date" | "bucket_local_dow">> = [
+      {
+        granularity: "total",
+        bucket_local_start: null,
+        bucket_local_date: null,
+        bucket_local_dow: null,
+      },
+      {
+        granularity: "hour",
+        bucket_local_start: bucketParts.bucket_local_start,
+        bucket_local_date: null,
+        bucket_local_dow: null,
+      },
+      {
+        granularity: "day",
+        bucket_local_start: null,
+        bucket_local_date: bucketParts.bucket_local_date,
+        bucket_local_dow: null,
+      },
+      {
+        granularity: "weekday",
+        bucket_local_start: null,
+        bucket_local_date: null,
+        bucket_local_dow: bucketParts.bucket_local_dow,
+      },
+    ];
+
+    for (const target of pvTargets) {
+      bump({
+        partner_id: partnerId,
+        metric_name: event.event_name,
+        metric_kind: "pv",
+        granularity: target.granularity,
+        bucket_timezone: KST_TIMEZONE,
+        bucket_local_start: target.bucket_local_start,
+        bucket_local_date: target.bucket_local_date,
+        bucket_local_dow: target.bucket_local_dow,
+      });
+    }
+
+    if (event.event_name !== "partner_detail_view") {
+      continue;
+    }
+
+    const visitorKey = getPartnerMetricVisitorKey(
+      event.actor_type,
+      event.actor_id,
+      event.session_id,
+    );
+    if (!visitorKey) {
+      continue;
+    }
+
+    const bucketKeys = {
+      total: "total",
+      hour: `hour:${bucketParts.bucket_local_start}`,
+      day: `day:${bucketParts.bucket_local_date}`,
+      weekday: `weekday:${bucketParts.bucket_local_dow}`,
+    } as const;
+
+    if (!uvSeenByBucket.total.has(visitorKey)) {
+      uvSeenByBucket.total.add(visitorKey);
+      bump({
+        partner_id: partnerId,
+        metric_name: event.event_name,
+        metric_kind: "uv",
+        granularity: "total",
+        bucket_timezone: KST_TIMEZONE,
+        bucket_local_start: null,
+        bucket_local_date: null,
+        bucket_local_dow: null,
+      });
+    }
+
+    for (const granularity of ["hour", "day", "weekday"] as const) {
+      const bucketKey = bucketKeys[granularity];
+      const seenByBucket = uvSeenByBucket[granularity];
+      const bucketSeen = seenByBucket.get(bucketKey) ?? new Set<string>();
+      if (bucketSeen.has(visitorKey)) {
+        continue;
+      }
+      bucketSeen.add(visitorKey);
+      seenByBucket.set(bucketKey, bucketSeen);
+
+      bump({
+        partner_id: partnerId,
+        metric_name: event.event_name,
+        metric_kind: "uv",
+        granularity,
+        bucket_timezone: KST_TIMEZONE,
+        bucket_local_start:
+          granularity === "hour" ? bucketParts.bucket_local_start : null,
+        bucket_local_date:
+          granularity === "day" ? bucketParts.bucket_local_date : null,
+        bucket_local_dow:
+          granularity === "weekday" ? bucketParts.bucket_local_dow : null,
+      });
+    }
+  }
+
+  return Array.from(counters.values());
+}
+
+async function upsertDraftRows(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  rows: PartnerMetricRollupDraftRow[],
+) {
+  const grouped = {
+    total: [] as PartnerMetricRollupDraftRow[],
+    hour: [] as PartnerMetricRollupDraftRow[],
+    day: [] as PartnerMetricRollupDraftRow[],
+    weekday: [] as PartnerMetricRollupDraftRow[],
+  };
+
+  for (const row of rows) {
+    grouped[row.granularity].push(row);
+  }
+
+  const operations = [
+    grouped.total.length
+      ? supabase
+          .from("partner_metric_rollups")
+          .upsert(grouped.total, {
+            onConflict: "partner_id,metric_name,metric_kind,bucket_timezone",
+          })
+      : Promise.resolve({ error: null }),
+    grouped.hour.length
+      ? supabase
+          .from("partner_metric_rollups")
+          .upsert(grouped.hour, {
+            onConflict:
+              "partner_id,metric_name,metric_kind,bucket_timezone,bucket_local_start",
+          })
+      : Promise.resolve({ error: null }),
+    grouped.day.length
+      ? supabase
+          .from("partner_metric_rollups")
+          .upsert(grouped.day, {
+            onConflict:
+              "partner_id,metric_name,metric_kind,bucket_timezone,bucket_local_date",
+          })
+      : Promise.resolve({ error: null }),
+    grouped.weekday.length
+      ? supabase
+          .from("partner_metric_rollups")
+          .upsert(grouped.weekday, {
+            onConflict:
+              "partner_id,metric_name,metric_kind,bucket_timezone,bucket_local_dow",
+          })
+      : Promise.resolve({ error: null }),
+  ] as const;
+
+  const results = await Promise.all(operations);
+  const error = results.find((result) => result.error);
+  if (error?.error) {
+    throw new Error(error.error.message);
+  }
+}
+
+export async function reconcilePartnerMetricRollupsFromEventLogs(
+  partnerId: string,
+) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("event_logs")
+    .select("event_name,actor_type,actor_id,session_id,created_at")
+    .eq("target_type", "partner")
+    .eq("target_id", partnerId)
+    .in("event_name", [...PARTNER_METRIC_EVENT_NAMES]);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []).filter((row): row is PartnerMetricEventLogRow => {
+    return (
+      typeof row.event_name === "string" &&
+      isPartnerMetricEventName(row.event_name) &&
+      typeof row.actor_type === "string" &&
+      (typeof row.actor_id === "string" || row.actor_id === null) &&
+      (typeof row.session_id === "string" || row.session_id === null) &&
+      (typeof row.created_at === "string" || row.created_at === null)
+    );
+  });
+
+  const draftRows = buildRollupDraftRows(rows, partnerId);
+  await upsertDraftRows(supabase, draftRows);
 }
 
 export async function fetchPartnerMetricRollupRows(
