@@ -30,7 +30,8 @@ export type PartnerMetricRollupRow = {
   metric_count: number;
 };
 
-type PartnerMetricEventLogRow = {
+export type PartnerMetricEventLogRow = {
+  target_id: string | null;
   event_name: PartnerMetricEventName;
   actor_type: string;
   actor_id: string | null;
@@ -204,6 +205,15 @@ type PartnerMetricRollupDraftRow = {
   metric_count: number;
 };
 
+export type PartnerMetricEventInput = {
+  partnerId: string;
+  eventName: PartnerMetricEventName;
+  actorType: string;
+  actorId?: string | null;
+  sessionId?: string | null;
+  createdAt?: string | Date | null;
+};
+
 function createDraftKey(row: PartnerMetricRollupDraftRow) {
   return [
     row.partner_id,
@@ -217,7 +227,10 @@ function createDraftKey(row: PartnerMetricRollupDraftRow) {
   ].join("|");
 }
 
-function buildRollupDraftRows(eventRows: PartnerMetricEventLogRow[], partnerId: string) {
+export function buildPartnerMetricRollupRowsFromEventLogs(
+  eventRows: PartnerMetricEventLogRow[],
+  partnerId: string,
+) {
   const counters = new Map<string, PartnerMetricRollupDraftRow>();
   const uvSeenByBucket = {
     total: new Set<string>(),
@@ -271,10 +284,10 @@ function buildRollupDraftRows(eventRows: PartnerMetricEventLogRow[], partnerId: 
 
     for (const target of pvTargets) {
       bump({
-        partner_id: partnerId,
-        metric_name: event.event_name,
-        metric_kind: "pv",
-        granularity: target.granularity,
+      partner_id: partnerId,
+      metric_name: event.event_name,
+      metric_kind: "pv",
+      granularity: target.granularity,
         bucket_timezone: KST_TIMEZONE,
         bucket_local_start: target.bucket_local_start,
         bucket_local_date: target.bucket_local_date,
@@ -305,10 +318,10 @@ function buildRollupDraftRows(eventRows: PartnerMetricEventLogRow[], partnerId: 
     if (!uvSeenByBucket.total.has(visitorKey)) {
       uvSeenByBucket.total.add(visitorKey);
       bump({
-        partner_id: partnerId,
-        metric_name: event.event_name,
-        metric_kind: "uv",
-        granularity: "total",
+      partner_id: partnerId,
+      metric_name: event.event_name,
+      metric_kind: "uv",
+      granularity: "total",
         bucket_timezone: KST_TIMEZONE,
         bucket_local_start: null,
         bucket_local_date: null,
@@ -343,6 +356,40 @@ function buildRollupDraftRows(eventRows: PartnerMetricEventLogRow[], partnerId: 
   }
 
   return Array.from(counters.values());
+}
+
+export async function fetchPartnerMetricEventLogRows(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  partnerIds: readonly string[],
+) {
+  const normalizedPartnerIds = normalizePartnerIds(partnerIds);
+  if (normalizedPartnerIds.length === 0) {
+    return { rows: [] as PartnerMetricEventLogRow[], errorMessage: null as string | null };
+  }
+
+  const { data, error } = await supabase
+    .from("event_logs")
+    .select("target_id,event_name,actor_type,actor_id,session_id,created_at")
+    .eq("target_type", "partner")
+    .in("target_id", normalizedPartnerIds)
+    .in("event_name", [...PARTNER_METRIC_EVENT_NAMES]);
+
+  if (error) {
+    return { rows: [], errorMessage: error.message };
+  }
+
+  const rows = (data ?? []).filter(
+    (row): row is PartnerMetricEventLogRow =>
+      typeof row.target_id === "string" &&
+      isPartnerMetricEventName(String(row.event_name)) &&
+      typeof row.event_name === "string" &&
+      typeof row.actor_type === "string" &&
+      (typeof row.actor_id === "string" || row.actor_id === null) &&
+      (typeof row.session_id === "string" || row.session_id === null) &&
+      (typeof row.created_at === "string" || row.created_at === null),
+  );
+
+  return { rows, errorMessage: null as string | null };
 }
 
 async function upsertDraftRows(
@@ -405,29 +452,35 @@ export async function reconcilePartnerMetricRollupsFromEventLogs(
   partnerId: string,
 ) {
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("event_logs")
-    .select("event_name,actor_type,actor_id,session_id,created_at")
-    .eq("target_type", "partner")
-    .eq("target_id", partnerId)
-    .in("event_name", [...PARTNER_METRIC_EVENT_NAMES]);
-
-  if (error) {
-    throw new Error(error.message);
+  const { rows, errorMessage } = await fetchPartnerMetricEventLogRows(supabase, [partnerId]);
+  if (errorMessage) {
+    throw new Error(errorMessage);
   }
 
-  const rows = (data ?? []).filter((row): row is PartnerMetricEventLogRow => {
-    return (
-      typeof row.event_name === "string" &&
-      isPartnerMetricEventName(row.event_name) &&
-      typeof row.actor_type === "string" &&
-      (typeof row.actor_id === "string" || row.actor_id === null) &&
-      (typeof row.session_id === "string" || row.session_id === null) &&
-      (typeof row.created_at === "string" || row.created_at === null)
-    );
-  });
+  const draftRows = buildPartnerMetricRollupRowsFromEventLogs(rows, partnerId);
+  await upsertDraftRows(supabase, draftRows);
+}
 
-  const draftRows = buildRollupDraftRows(rows, partnerId);
+export async function upsertPartnerMetricRollupsFromEventInput(
+  input: PartnerMetricEventInput,
+) {
+  const supabase = getSupabaseAdminClient();
+  const draftRows = buildPartnerMetricRollupRowsFromEventLogs(
+    [
+      {
+        target_id: input.partnerId,
+        event_name: input.eventName,
+        actor_type: input.actorType,
+        actor_id: input.actorId ?? null,
+        session_id: input.sessionId ?? null,
+        created_at:
+          input.createdAt instanceof Date
+            ? input.createdAt.toISOString()
+            : input.createdAt ?? new Date().toISOString(),
+      },
+    ],
+    input.partnerId,
+  );
   await upsertDraftRows(supabase, draftRows);
 }
 

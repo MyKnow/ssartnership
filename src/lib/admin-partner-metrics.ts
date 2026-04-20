@@ -2,7 +2,9 @@ import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
 import {
   applyPartnerMetricRollupRows,
+  buildPartnerMetricRollupRowsFromEventLogs,
   fetchPartnerMetricRollupRows,
+  fetchPartnerMetricEventLogRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "@/lib/partner-metric-rollups";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
@@ -75,7 +77,28 @@ export async function getAdminPartnerMetrics(
     hasPartialFailure = true;
     console.error("[admin-partner-metrics] event query failed", eventResult.errorMessage);
   } else {
-    applyPartnerMetricRollupRows(metricsByPartnerId, eventResult.rows);
+    if (eventResult.rows.length > 0) {
+      applyPartnerMetricRollupRows(metricsByPartnerId, eventResult.rows);
+    } else {
+      const fallbackResult = await fetchPartnerMetricEventLogRows(supabase, uniquePartnerIds);
+      if (fallbackResult.errorMessage) {
+        hasPartialFailure = true;
+        console.error(
+          "[admin-partner-metrics] fallback event query failed",
+          fallbackResult.errorMessage,
+        );
+      } else {
+        for (const partnerId of uniquePartnerIds) {
+          applyPartnerMetricRollupRows(
+            metricsByPartnerId,
+            buildPartnerMetricRollupRowsFromEventLogs(
+              fallbackResult.rows.filter((row) => row.target_id === partnerId),
+              partnerId,
+            ),
+          );
+        }
+      }
+    }
   }
 
   if (reviewResult.error) {

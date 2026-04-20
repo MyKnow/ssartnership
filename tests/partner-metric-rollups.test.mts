@@ -76,3 +76,60 @@ test("rollup rows are accumulated into service metrics", async () => {
   assert.equal(metrics.reservationClicks, 2);
   assert.equal(metrics.totalClicks, 5);
 });
+
+test("raw partner events can be rebuilt into rollup rows", async () => {
+  const { buildPartnerMetricRollupRowsFromEventLogs } = await partnerMetricRollupsModulePromise;
+
+  const rows = buildPartnerMetricRollupRowsFromEventLogs(
+    [
+      {
+        target_id: "partner-a",
+        event_name: "partner_detail_view",
+        actor_type: "guest",
+        actor_id: null,
+        session_id: "session-a",
+        created_at: "2026-04-19T03:20:00.000Z",
+      },
+      {
+        target_id: "partner-a",
+        event_name: "partner_detail_view",
+        actor_type: "guest",
+        actor_id: null,
+        session_id: "session-a",
+        created_at: "2026-04-19T03:21:00.000Z",
+      },
+      {
+        target_id: "partner-a",
+        event_name: "partner_card_click",
+        actor_type: "guest",
+        actor_id: null,
+        session_id: "session-a",
+        created_at: "2026-04-19T03:22:00.000Z",
+      },
+    ],
+    "partner-a",
+  );
+
+  const totalPv = rows.find(
+    (row) =>
+      row.metric_name === "partner_detail_view" &&
+      row.metric_kind === "pv" &&
+      row.granularity === "total",
+  );
+  const totalUv = rows.find(
+    (row) =>
+      row.metric_name === "partner_detail_view" &&
+      row.metric_kind === "uv" &&
+      row.granularity === "total",
+  );
+  const totalCardClick = rows.find(
+    (row) =>
+      row.metric_name === "partner_card_click" &&
+      row.metric_kind === "pv" &&
+      row.granularity === "total",
+  );
+
+  assert.equal(totalPv?.metric_count, 2);
+  assert.equal(totalUv?.metric_count, 1);
+  assert.equal(totalCardClick?.metric_count, 1);
+});

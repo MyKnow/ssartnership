@@ -1,7 +1,9 @@
 import type { PartnerPortalServiceMetrics } from "./partner-dashboard.ts";
 import {
   applyPartnerMetricRollupRows,
+  buildPartnerMetricRollupRowsFromEventLogs,
   fetchPartnerMetricRollupRows,
+  fetchPartnerMetricEventLogRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "./partner-metric-rollups.ts";
 import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store.ts";
@@ -92,7 +94,23 @@ export async function getPartnerServiceMetrics(
     });
   } else {
     const metricsByPartnerId = new Map([[partnerId, metrics]]);
-    applyPartnerMetricRollupRows(metricsByPartnerId, rollupResult.rows);
+    if (rollupResult.rows.length > 0) {
+      applyPartnerMetricRollupRows(metricsByPartnerId, rollupResult.rows);
+    } else {
+      const fallbackResult = await fetchPartnerMetricEventLogRows(supabase, [partnerId]);
+      if (fallbackResult.errorMessage) {
+        markPartialFailure();
+        console.error("[partner-service-metrics] fallback event query failed", {
+          partnerId,
+          message: fallbackResult.errorMessage,
+        });
+      } else {
+        applyPartnerMetricRollupRows(
+          metricsByPartnerId,
+          buildPartnerMetricRollupRowsFromEventLogs(fallbackResult.rows, partnerId),
+        );
+      }
+    }
   }
 
   metrics.reviewCount = reviewResult;

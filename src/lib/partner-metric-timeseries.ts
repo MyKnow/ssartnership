@@ -1,5 +1,7 @@
 import { formatKoreanDateTimeToMinute } from "./datetime.ts";
 import {
+  buildPartnerMetricRollupRowsFromEventLogs,
+  fetchPartnerMetricEventLogRows,
   type PartnerMetricRollupRow,
   fetchPartnerMetricRollupRows,
   PARTNER_METRIC_EVENT_NAMES,
@@ -232,9 +234,17 @@ export async function getPartnerMetricTimeseriesSnapshot(
     metricKinds: ["pv", "uv"],
   });
 
+  let rows = result.rows;
+  if (!result.errorMessage && result.rows.length === 0) {
+    const fallbackResult = await fetchPartnerMetricEventLogRows(supabase, [partnerId]);
+    if (!fallbackResult.errorMessage) {
+      rows = buildPartnerMetricRollupRowsFromEventLogs(fallbackResult.rows, partnerId);
+    }
+  }
+
   const snapshot = buildPartnerMetricTimeseriesSnapshot(
     partnerCreatedAt,
-    result.rows,
+    rows,
     new Date(),
   );
 

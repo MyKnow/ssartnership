@@ -9,7 +9,11 @@ import {
 } from '@/lib/event-catalog';
 import { SITE_URL } from '@/lib/site';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
-import { reconcilePartnerMetricRollupsFromEventLogs } from '@/lib/partner-metric-rollups';
+import {
+  type PartnerMetricEventName,
+  reconcilePartnerMetricRollupsFromEventLogs,
+  upsertPartnerMetricRollupsFromEventInput,
+} from '@/lib/partner-metric-rollups';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { getSignedUserSession } from '@/lib/user-auth';
 
@@ -123,9 +127,12 @@ async function insertLog(table: string, payload: Record<string, unknown>) {
     const { error } = await supabase.from(table).insert(payload);
     if (error) {
       console.error(`[activity-log] ${table} insert failed`, error.message);
+      return false;
     }
+    return true;
   } catch (error) {
     console.error(`[activity-log] ${table} insert failed`, error);
+    return false;
   }
 }
 
@@ -182,7 +189,7 @@ export async function resolveCurrentActor(): Promise<{
 }
 
 export async function logProductEvent(input: ProductLogInput) {
-  await insertLog('event_logs', {
+  const inserted = await insertLog('event_logs', {
     session_id: input.sessionId ?? null,
     actor_type: input.actorType,
     actor_id: input.actorId ?? null,
@@ -195,6 +202,23 @@ export async function logProductEvent(input: ProductLogInput) {
     user_agent: input.userAgent ?? null,
     ip_address: input.ipAddress ?? null,
   });
+
+  if (!inserted) {
+    if (input.targetType === "partner" && input.targetId) {
+      try {
+        await upsertPartnerMetricRollupsFromEventInput({
+          partnerId: input.targetId,
+          eventName: input.eventName as PartnerMetricEventName,
+          actorType: input.actorType,
+          actorId: input.actorId ?? null,
+          sessionId: input.sessionId ?? null,
+        });
+      } catch (error) {
+        console.error("[activity-log] partner metric fallback upsert failed", error);
+      }
+    }
+    return;
+  }
 
   if (input.targetType === "partner" && input.targetId) {
     try {

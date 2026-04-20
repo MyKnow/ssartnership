@@ -1,7 +1,9 @@
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 import {
   applyPartnerMetricRollupRows,
+  buildPartnerMetricRollupRowsFromEventLogs,
   fetchPartnerMetricRollupRows,
+  fetchPartnerMetricEventLogRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "./partner-metric-rollups.ts";
 import {
@@ -212,7 +214,31 @@ export async function getSupabasePartnerPortalDashboard(
       rollupResult.errorMessage,
     );
   } else {
-    applyPartnerMetricRollupRows(metricsByServiceId, rollupResult.rows);
+    if (rollupResult.rows.length > 0) {
+      applyPartnerMetricRollupRows(metricsByServiceId, rollupResult.rows);
+    } else {
+      const fallbackResult = await fetchPartnerMetricEventLogRows(
+        supabase,
+        serviceRows.map((serviceRow) => serviceRow.id),
+      );
+      if (fallbackResult.errorMessage) {
+        markPartialFailure();
+        console.error(
+          "[partner-dashboard] fallback event metric query failed",
+          fallbackResult.errorMessage,
+        );
+      } else {
+        for (const serviceRow of serviceRows) {
+          applyPartnerMetricRollupRows(
+            metricsByServiceId,
+            buildPartnerMetricRollupRowsFromEventLogs(
+              fallbackResult.rows.filter((row) => row.target_id === serviceRow.id),
+              serviceRow.id,
+            ),
+          );
+        }
+      }
+    }
   }
 
   const reviewCountResult = await Promise.all(
