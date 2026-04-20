@@ -926,7 +926,7 @@ language plpgsql
 as $$
 declare
   local_created_at timestamp without time zone;
-  visitor_key text;
+  resolved_visitor_key text;
   inserted_count integer;
 begin
   if new.target_type <> 'partner' or new.target_id is null then
@@ -1037,9 +1037,9 @@ begin
     updated_at = now();
 
   if new.event_name = 'partner_detail_view' then
-    visitor_key := partner_metric_visitor_key(new.actor_type, new.actor_id, new.session_id);
+    resolved_visitor_key := partner_metric_visitor_key(new.actor_type, new.actor_id, new.session_id);
 
-    if visitor_key is not null then
+    if resolved_visitor_key is not null then
       insert into partner_metric_unique_visitors (
         partner_id,
         metric_name,
@@ -1052,7 +1052,7 @@ begin
         new.event_name,
         'total',
         'Asia/Seoul',
-        visitor_key
+        resolved_visitor_key
       )
       on conflict (partner_id, metric_name, bucket_timezone, visitor_key)
         where granularity = 'total'
@@ -1096,7 +1096,7 @@ begin
         'hour',
         'Asia/Seoul',
         local_created_at,
-        visitor_key
+        resolved_visitor_key
       )
       on conflict (partner_id, metric_name, bucket_timezone, bucket_local_start, visitor_key)
         where granularity = 'hour'
@@ -1142,7 +1142,7 @@ begin
         'day',
         'Asia/Seoul',
         local_created_at::date,
-        visitor_key
+        resolved_visitor_key
       )
       on conflict (partner_id, metric_name, bucket_timezone, bucket_local_date, visitor_key)
         where granularity = 'day'
@@ -1188,7 +1188,7 @@ begin
         'weekday',
         'Asia/Seoul',
         extract(isodow from local_created_at)::smallint,
-        visitor_key
+        resolved_visitor_key
       )
       on conflict (partner_id, metric_name, bucket_timezone, bucket_local_dow, visitor_key)
         where granularity = 'weekday'
