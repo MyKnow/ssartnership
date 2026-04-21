@@ -684,7 +684,7 @@ export default function PromotionCarouselEditor({
           })}
         </section>
 
-        <div className="fixed bottom-5 right-5 z-40">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] left-5 z-40 md:left-auto md:right-[5.5rem]">
           <Button
             type="submit"
             variant="primary"

@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   PauseIcon,
   PlayIcon,
 } from "@heroicons/react/24/solid";
@@ -14,6 +12,10 @@ import type { PromotionSlide } from "@/lib/promotions/catalog";
 
 function isInlineImageSrc(src: string) {
   return src.startsWith("blob:") || src.startsWith("data:");
+}
+
+function isRemoteImageSrc(src: string) {
+  return /^https?:\/\//.test(src);
 }
 
 export default function PromotionCarousel({
@@ -93,14 +95,6 @@ export default function PromotionCarousel({
     return null;
   }
 
-  function scrollPrev() {
-    scrollToIndex((activeIndex - 1 + slideCount) % slideCount);
-  }
-
-  function scrollNext() {
-    scrollToIndex((activeIndex + 1) % slideCount);
-  }
-
   return (
     <section
       className={cn("relative mt-5", className)}
@@ -119,15 +113,6 @@ export default function PromotionCarousel({
       </div>
 
       <div className="relative">
-        <button
-          type="button"
-          className="absolute left-0 top-1/2 z-10 hidden h-12 w-12 -translate-x-[calc(100%+1rem)] -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-surface-control text-foreground shadow-[var(--shadow-raised)] transition hover:-translate-x-[calc(100%+1rem)] hover:-translate-y-[calc(50%+1px)] hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:inline-flex"
-          aria-label="이전 광고"
-          onClick={scrollPrev}
-        >
-          <ChevronLeftIcon className="size-6" aria-hidden="true" />
-        </button>
-
         <div
           ref={scrollerRef}
           className="flex min-w-0 snap-x snap-mandatory overflow-x-auto rounded-[var(--radius-overlay)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -155,6 +140,7 @@ export default function PromotionCarousel({
                     fill
                     sizes="(min-width: 1280px) 1084px, calc(100vw - 32px)"
                     priority={index === 0}
+                    unoptimized={isRemoteImageSrc(slide.imageSrc)}
                     className="object-cover"
                   />
                 )}
@@ -163,54 +149,48 @@ export default function PromotionCarousel({
           ))}
         </div>
 
-        <button
-          type="button"
-          className="absolute right-0 top-1/2 z-10 hidden h-12 w-12 translate-x-[calc(100%+1rem)] -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-surface-control text-foreground shadow-[var(--shadow-raised)] transition hover:translate-x-[calc(100%+1rem)] hover:-translate-y-[calc(50%+1px)] hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:inline-flex"
-          aria-label="다음 광고"
-          onClick={scrollNext}
-        >
-          <ChevronRightIcon className="size-6" aria-hidden="true" />
-        </button>
       </div>
 
-      <div className="absolute inset-x-0 bottom-3 z-10 flex items-center justify-center px-4">
-        <div className="flex items-center gap-3 rounded-full border border-white/25 bg-black/35 px-3 py-2 shadow-[var(--shadow-flat)] backdrop-blur-md">
-          <button
-            type="button"
-            className="hidden h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:inline-flex"
-            aria-label={paused ? "광고 자동 재생" : "광고 자동 재생 일시정지"}
-            onClick={() => setPaused((current) => !current)}
-          >
-            {paused ? (
-              <PlayIcon className="size-4" aria-hidden="true" />
-            ) : (
-              <PauseIcon className="size-4" aria-hidden="true" />
-            )}
-          </button>
+      {slideCount > 1 ? (
+        <div className="absolute inset-x-0 bottom-3 z-10 flex items-center justify-center px-4">
+          <div className="flex items-center gap-3 rounded-full border border-white/25 bg-black/35 px-3 py-2 shadow-[var(--shadow-flat)] backdrop-blur-md">
+            <button
+              type="button"
+              className="hidden h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:inline-flex"
+              aria-label={paused ? "광고 자동 재생" : "광고 자동 재생 일시정지"}
+              onClick={() => setPaused((current) => !current)}
+            >
+              {paused ? (
+                <PlayIcon className="size-4" aria-hidden="true" />
+              ) : (
+                <PauseIcon className="size-4" aria-hidden="true" />
+              )}
+            </button>
 
-          <div className="flex items-center gap-2">
-            {slides.map((slide, index) => (
-              <button
-                key={slide.id}
-                type="button"
-                className={cn(
-                  "h-2.5 rounded-full transition-all",
-                  activeIndex === index
-                    ? "w-7 bg-white"
-                    : "w-2.5 bg-white/45 hover:bg-white/70",
-                )}
-                aria-label={indicatorLabels[index]}
-                aria-pressed={activeIndex === index}
-                onClick={() => scrollToIndex(index)}
-              />
-            ))}
+            <div className="flex items-center gap-2">
+              {slides.map((slide, index) => (
+                <button
+                  key={slide.id}
+                  type="button"
+                  className={cn(
+                    "h-2.5 rounded-full transition-all",
+                    activeIndex === index
+                      ? "w-7 bg-white"
+                      : "w-2.5 bg-white/45 hover:bg-white/70",
+                  )}
+                  aria-label={indicatorLabels[index]}
+                  aria-pressed={activeIndex === index}
+                  onClick={() => scrollToIndex(index)}
+                />
+              ))}
+            </div>
+
+            <p className="hidden min-w-10 text-center text-xs font-semibold text-white md:block">
+              {activeIndex + 1} / {slideCount}
+            </p>
           </div>
-
-          <p className="hidden min-w-10 text-center text-xs font-semibold text-white md:block">
-            {activeIndex + 1} / {slideCount}
-          </p>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }
