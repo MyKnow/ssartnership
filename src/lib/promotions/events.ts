@@ -1,12 +1,15 @@
 import {
+  DEFAULT_PROMOTION_AUDIENCES,
   EVENT_CAMPAIGNS,
   HOME_PROMOTIONS,
   type EventCampaign,
   type EventCondition,
   type EventConditionKey,
+  type PromotionAudience,
   type PromotionSlide,
 } from "@/lib/promotions/catalog";
 import { CAMPUS_DIRECTORY } from "@/lib/campuses";
+import { getSsafyMemberLifecycle, SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PromotionEventRow = {
@@ -36,8 +39,7 @@ type PromotionSlideRow = {
   image_alt: string;
   href: string;
   is_active: boolean | null;
-  requires_login: boolean | null;
-  allowed_years: unknown;
+  audiences: unknown;
   allowed_campuses: unknown;
   created_at: string | null;
   updated_at: string | null;
@@ -56,8 +58,7 @@ export type ManagedPromotionSlide = PromotionSlide & {
   displayOrder: number;
   subtitle: string;
   isActive: boolean;
-  requiresLogin: boolean;
-  allowedYears: number[];
+  audiences: PromotionAudience[];
   allowedCampuses: string[];
   createdAt: string | null;
   updatedAt: string | null;
@@ -131,30 +132,11 @@ function mapStaticSlide(slide: PromotionSlide, index: number): ManagedPromotionS
     displayOrder: index + 1,
     subtitle: slide.description,
     isActive: true,
-    requiresLogin: slide.requiresLogin ?? false,
-    allowedYears: slide.allowedYears ?? [],
+    audiences: normalizePromotionAudiences(slide.audiences),
     allowedCampuses: slide.allowedCampuses ?? [],
     createdAt: null,
     updatedAt: null,
   };
-}
-
-function normalizeNumberArray(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map((item) => {
-      if (typeof item === "number") {
-        return item;
-      }
-      if (typeof item === "string") {
-        const parsed = Number(item.trim());
-        return Number.isFinite(parsed) ? parsed : Number.NaN;
-      }
-      return Number.NaN;
-    })
-    .filter((item): item is number => Number.isFinite(item));
 }
 
 function normalizeStringArray(value: unknown) {
@@ -164,6 +146,21 @@ function normalizeStringArray(value: unknown) {
   return value
     .map((item) => (typeof item === "string" ? item.trim() : ""))
     .filter(Boolean);
+}
+
+function normalizeAudienceArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const valid = new Set<PromotionAudience>(DEFAULT_PROMOTION_AUDIENCES);
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item): item is PromotionAudience => valid.has(item as PromotionAudience));
+}
+
+function normalizePromotionAudiences(value: unknown) {
+  const audiences = normalizeAudienceArray(value);
+  return audiences.length > 0 ? audiences : [...DEFAULT_PROMOTION_AUDIENCES];
 }
 
 function normalizeCampusValue(value: string | null | undefined) {
@@ -214,8 +211,7 @@ function mapSlideRow(row: PromotionSlideRow): ManagedPromotionSlide {
     displayOrder: row.display_order,
     subtitle: row.subtitle,
     isActive: row.is_active !== false,
-    requiresLogin: row.requires_login === true,
-    allowedYears: normalizeNumberArray(row.allowed_years),
+    audiences: normalizePromotionAudiences(row.audiences),
     allowedCampuses: normalizeStringArray(row.allowed_campuses),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -246,7 +242,7 @@ export async function listManagedPromotionSlides(options?: {
     let query = supabase
       .from("promotion_slides")
       .select(
-        "id,display_order,title,subtitle,image_src,image_alt,href,is_active,requires_login,allowed_years,allowed_campuses,created_at,updated_at",
+        "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,created_at,updated_at",
       )
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: true });
@@ -276,13 +272,16 @@ export function canViewPromotionSlide(
   slide: ManagedPromotionSlide,
   viewer: PromotionSlideViewer,
 ) {
-  if (slide.requiresLogin && !viewer.authenticated) {
+  const lifecycle = typeof viewer.year === "number" ? getSsafyMemberLifecycle(viewer.year) : null;
+  const viewerAudience: PromotionAudience = !viewer.authenticated
+    ? "guest"
+    : lifecycle?.kind === "staff" || viewer.year === SSAFY_STAFF_YEAR
+      ? "staff"
+      : lifecycle?.kind === "student"
+        ? "student"
+        : "graduate";
+  if (!slide.audiences.includes(viewerAudience)) {
     return false;
-  }
-  if (slide.allowedYears.length > 0) {
-    if (typeof viewer.year !== "number" || !slide.allowedYears.includes(viewer.year)) {
-      return false;
-    }
   }
   if (slide.allowedCampuses.length > 0) {
     const campus = normalizeCampusValue(viewer.campus);
@@ -343,8 +342,7 @@ export async function getHomePromotionSlides(
       imageSrc: slide.imageSrc,
       imageAlt: slide.imageAlt,
       href: slide.href,
-      requiresLogin: slide.requiresLogin,
-      allowedYears: slide.allowedYears,
+      audiences: slide.audiences,
       allowedCampuses: slide.allowedCampuses,
     }));
 }

@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import type { EventCondition, EventConditionKey } from "@/lib/promotions/catalog";
+import {
+  DEFAULT_PROMOTION_AUDIENCES,
+  type EventCondition,
+  type EventConditionKey,
+  type PromotionAudience,
+} from "@/lib/promotions/catalog";
 import {
   deletePromotionSlideImageUrls,
   uploadPromotionSlideImageFile,
@@ -129,29 +134,9 @@ type PromotionSlideDraftPayload = {
   imageAlt: string;
   href: string;
   isActive: boolean;
-  requiresLogin: boolean;
-  allowedYears: number[];
+  audiences: PromotionAudience[];
   allowedCampuses: string[];
 };
-
-function normalizeNumberArray(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map((item) => {
-      if (typeof item === "number") {
-        return item;
-      }
-      if (typeof item === "string") {
-        const parsed = Number(item.trim());
-        return Number.isFinite(parsed) ? parsed : Number.NaN;
-      }
-      return Number.NaN;
-    })
-    .filter((item): item is number => Number.isFinite(item) && item >= 0)
-    .map((item) => Math.floor(item));
-}
 
 function normalizeStringArray(value: unknown) {
   if (!Array.isArray(value)) {
@@ -160,6 +145,21 @@ function normalizeStringArray(value: unknown) {
   return value
     .map((item) => (typeof item === "string" ? item.trim() : ""))
     .filter(Boolean);
+}
+
+function normalizeAudienceArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const valid = new Set<PromotionAudience>(DEFAULT_PROMOTION_AUDIENCES);
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item): item is PromotionAudience => valid.has(item as PromotionAudience));
+}
+
+function normalizePromotionAudiences(value: unknown) {
+  const audiences = normalizeAudienceArray(value);
+  return audiences.length > 0 ? audiences : [...DEFAULT_PROMOTION_AUDIENCES];
 }
 
 function parsePromotionSlideDrafts(formData: FormData) {
@@ -191,8 +191,7 @@ function parsePromotionSlideDrafts(formData: FormData) {
       imageAlt: typeof record.imageAlt === "string" ? record.imageAlt.trim() : "",
       href: typeof record.href === "string" ? record.href.trim() : "",
       isActive: record.isActive === true,
-      requiresLogin: record.requiresLogin === true,
-      allowedYears: normalizeNumberArray(record.allowedYears),
+      audiences: normalizePromotionAudiences(record.audiences),
       allowedCampuses: normalizeStringArray(record.allowedCampuses),
     };
   });
@@ -478,8 +477,7 @@ export async function savePromotionSlidesAction(formData: FormData) {
     image_alt: string;
     href: string;
     is_active: boolean;
-    requires_login: boolean;
-    allowed_years: number[];
+    audiences: PromotionAudience[];
     allowed_campuses: string[];
   }> = [];
   const removedImageUrls = new Set<string>();
@@ -494,6 +492,9 @@ export async function savePromotionSlidesAction(formData: FormData) {
 
     if (!slide.title || !slide.subtitle || !slide.href || !slide.imageAlt) {
       throw new Error("광고 카드의 제목, 부제, 이미지 대체 텍스트, 연결 페이지를 모두 입력해 주세요.");
+    }
+    if (slide.audiences.length === 0) {
+      throw new Error("광고 카드의 노출 대상을 하나 이상 선택해 주세요.");
     }
     if (!isExistingSlide && !file) {
       throw new Error("새 광고 카드는 이미지를 업로드해 주세요.");
@@ -516,8 +517,7 @@ export async function savePromotionSlidesAction(formData: FormData) {
       image_alt: slide.imageAlt,
       href: slide.href,
       is_active: slide.isActive,
-      requires_login: slide.requiresLogin,
-      allowed_years: slide.allowedYears,
+      audiences: slide.audiences,
       allowed_campuses: slide.allowedCampuses,
     });
     keepIds.add(slide.id);

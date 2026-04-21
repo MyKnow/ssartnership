@@ -8,7 +8,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { CheckIcon, LockClosedIcon } from "@heroicons/react/24/solid";
+import { CheckIcon } from "@heroicons/react/24/solid";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
@@ -18,6 +18,11 @@ import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
 import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
 import { isImageFile, setInputFiles } from "@/components/admin/partner-media-editor/utils";
+import {
+  DEFAULT_PROMOTION_AUDIENCES,
+  PROMOTION_AUDIENCE_OPTIONS,
+  type PromotionAudience,
+} from "@/lib/promotions/catalog";
 import type { ManagedPromotionSlide } from "@/lib/promotions/events";
 import { cn } from "@/lib/cn";
 
@@ -31,8 +36,7 @@ type SlideDraft = {
   imageAlt: string;
   href: string;
   isActive: boolean;
-  requiresLogin: boolean;
-  allowedYears: number[];
+  audiences: PromotionAudience[];
   allowedCampuses: CampusSlug[];
   source: "database" | "catalog";
 };
@@ -65,18 +69,6 @@ function createPlaceholderImage(title: string) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg.trim())}`;
 }
 
-function parseYears(value: string) {
-  return value
-    .split(/[,\s]+/u)
-    .map((token) => Number(token.trim()))
-    .filter((item) => Number.isFinite(item) && item >= 0)
-    .map((item) => Math.floor(item));
-}
-
-function yearsToText(values: number[]) {
-  return values.join(", ");
-}
-
 function normalizeCampusSlug(value: string) {
   const direct = CAMPUS_DIRECTORY.find((item) => item.slug === value);
   if (direct) {
@@ -101,8 +93,8 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
     imageAlt: slide.imageAlt,
     href: slide.href,
     isActive: slide.isActive,
-    requiresLogin: slide.requiresLogin,
-    allowedYears: [...slide.allowedYears],
+    audiences:
+      slide.audiences.length > 0 ? [...slide.audiences] : [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses,
     source: slide.source,
   };
@@ -135,6 +127,21 @@ function SlideBadge({
       {children}
     </span>
   );
+}
+
+function getAudienceLabel(value: PromotionAudience) {
+  return PROMOTION_AUDIENCE_OPTIONS.find((item) => item.key === value)?.label ?? value;
+}
+
+function toggleAudience(
+  audiences: PromotionAudience[],
+  key: PromotionAudience,
+  checked: boolean,
+) {
+  if (checked) {
+    return audiences.includes(key) ? audiences : [...audiences, key];
+  }
+  return audiences.filter((item) => item !== key);
 }
 
 export default function PromotionCarouselEditor({
@@ -176,8 +183,7 @@ export default function PromotionCarouselEditor({
           imageSrc: slide.imageSrc,
           imageAlt: slide.imageAlt || slide.title || "광고 카드 이미지",
           href: slide.href || "#",
-          requiresLogin: slide.requiresLogin,
-          allowedYears: slide.allowedYears,
+          audiences: slide.audiences,
           allowedCampuses: slide.allowedCampuses,
         })),
     [slides],
@@ -194,8 +200,7 @@ export default function PromotionCarouselEditor({
           imageAlt: slide.imageAlt,
           href: slide.href,
           isActive: slide.isActive,
-          requiresLogin: slide.requiresLogin,
-          allowedYears: slide.allowedYears,
+          audiences: slide.audiences,
           allowedCampuses: slide.allowedCampuses,
         })),
       ),
@@ -246,8 +251,7 @@ export default function PromotionCarouselEditor({
         imageAlt: "",
         href: "",
         isActive: true,
-        requiresLogin: false,
-        allowedYears: [],
+        audiences: [...DEFAULT_PROMOTION_AUDIENCES],
         allowedCampuses: [],
         source: "database",
       },
@@ -373,7 +377,6 @@ export default function PromotionCarouselEditor({
             variant="secondary"
             onClick={addSlide}
             className="w-full sm:w-auto"
-            disabled={!canEdit}
           >
             <PlusIcon className="size-4" />
             카드 추가
@@ -383,7 +386,7 @@ export default function PromotionCarouselEditor({
         {error ? <FormMessage variant="error">{error}</FormMessage> : null}
         {!canEdit ? (
           <FormMessage variant="info">
-            현재 환경에서는 편집 가능한 광고 카드가 없습니다. 데이터베이스 슬라이드가 준비되어야 수정할 수 있습니다.
+            현재 로드된 카드가 모두 미리보기용이라 기존 카드 수정은 막혀 있습니다. 새 카드는 추가할 수 있습니다.
           </FormMessage>
         ) : null}
 
@@ -392,17 +395,18 @@ export default function PromotionCarouselEditor({
             const previewSrc = slide.imageSrc || createPlaceholderImage(slide.title);
             const editable = isEditable(slide);
             return (
-              <Card key={slide.id} tone="default" className="grid gap-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
+              <Card key={slide.id} tone="default" className="grid gap-5">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <SlideBadge>순번 {index + 1}</SlideBadge>
                       <SlideBadge active={slide.isActive}>{slide.isActive ? "활성" : "비활성"}</SlideBadge>
                       <SlideBadge muted>{editable ? "DB" : "Catalog"}</SlideBadge>
-                      {slide.requiresLogin ? <SlideBadge muted>로그인 필요</SlideBadge> : null}
-                      {slide.allowedYears.length > 0 ? (
-                        <SlideBadge muted>{slide.allowedYears.map((year) => `${year}기`).join(", ")}</SlideBadge>
-                      ) : null}
+                      {slide.audiences.map((audience) => (
+                        <SlideBadge key={audience} muted>
+                          {getAudienceLabel(audience)}
+                        </SlideBadge>
+                      ))}
                       {slide.allowedCampuses.length > 0 ? (
                         <SlideBadge muted>
                           {slide.allowedCampuses
@@ -432,7 +436,7 @@ export default function PromotionCarouselEditor({
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                  <div className="flex flex-wrap items-center gap-2 xl:justify-end">
                     <Button
                       type="button"
                       variant="ghost"
@@ -469,7 +473,7 @@ export default function PromotionCarouselEditor({
                   </div>
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
                   <div className="grid gap-3">
                     <div className="relative aspect-[21/9] overflow-hidden rounded-[var(--radius-panel)] border border-border/70 bg-surface-inset">
                       {/* eslint-disable-next-line @next/next/no-img-element -- live preview can use blob/object URLs */}
@@ -480,7 +484,7 @@ export default function PromotionCarouselEditor({
                         draggable={false}
                       />
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
                       <Button
                         type="button"
                         variant="secondary"
@@ -497,7 +501,7 @@ export default function PromotionCarouselEditor({
                         }
                         placeholder="이미지 대체 텍스트"
                         disabled={!editable}
-                        className="min-w-[14rem] flex-1"
+                        className="min-w-0"
                       />
                       <input
                         ref={(element) => registerFileInput(slide.id, element)}
@@ -514,19 +518,20 @@ export default function PromotionCarouselEditor({
                   </div>
 
                   <div className="grid gap-4 rounded-[var(--radius-panel)] border border-border/70 bg-surface-inset p-4">
-                    <div className="grid gap-2">
-                      <label className="grid gap-2 text-sm font-medium text-foreground">
-                        연결 페이지
-                        <Input
-                          value={slide.href}
-                          onChange={(event) =>
-                            updateSlide(slide.id, (current) => ({ ...current, href: event.target.value }))
-                          }
-                          placeholder="/events/signup-reward"
-                          disabled={!editable}
-                        />
-                      </label>
-                      <label className="grid gap-2 text-sm font-medium text-foreground">
+                    <label className="grid gap-2 text-sm font-medium text-foreground">
+                      연결 페이지
+                      <Input
+                        value={slide.href}
+                        onChange={(event) =>
+                          updateSlide(slide.id, (current) => ({ ...current, href: event.target.value }))
+                        }
+                        placeholder="/events/signup-reward"
+                        disabled={!editable}
+                      />
+                    </label>
+
+                    <div className="grid gap-3">
+                      <label className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-surface px-3 py-2.5 text-sm font-medium text-foreground">
                         <span className="flex items-center gap-2">
                           <CheckIcon className="size-4 text-muted-foreground" />
                           활성 여부
@@ -541,70 +546,78 @@ export default function PromotionCarouselEditor({
                           disabled={!editable}
                         />
                       </label>
-                      <label className="grid gap-2 text-sm font-medium text-foreground">
-                        <span className="flex items-center gap-2">
-                          <LockClosedIcon className="size-4 text-muted-foreground" />
-                          로그인 사용자만
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={slide.requiresLogin}
-                          onChange={(event) =>
-                            updateSlide(slide.id, (current) => ({
-                              ...current,
-                              requiresLogin: event.target.checked,
-                            }))
-                          }
-                          className="h-4 w-4 accent-primary"
-                          disabled={!editable}
-                        />
-                      </label>
                     </div>
 
-                    <div className="grid gap-3">
-                      <label className="grid gap-2 text-sm font-medium text-foreground">
-                        허용 기수
-                        <Input
-                          value={yearsToText(slide.allowedYears)}
-                          onChange={(event) =>
-                            updateSlide(slide.id, (current) => ({
-                              ...current,
-                              allowedYears: parseYears(event.target.value),
-                            }))
-                          }
-                          placeholder="예: 14, 15"
-                          disabled={!editable}
-                        />
-                      </label>
-                      <div className="grid gap-2">
-                        <p className="text-sm font-medium text-foreground">허용 캠퍼스</p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {CAMPUS_DIRECTORY.map((campus) => {
-                            const checked = slide.allowedCampuses.includes(campus.slug);
-                            return (
-                              <label
-                                key={campus.slug}
-                                className="flex items-center gap-2 rounded-[1rem] border border-border/70 bg-surface px-3 py-2 text-sm text-foreground"
-                              >
+                    <div className="grid gap-2">
+                      <div className="grid gap-1">
+                        <p className="text-sm font-medium text-foreground">노출 대상</p>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          로그인 여부와 허용 기수를 통합해 대상군별로 선택합니다.
+                        </p>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {PROMOTION_AUDIENCE_OPTIONS.map((option) => {
+                          const checked = slide.audiences.includes(option.key);
+                          return (
+                            <label
+                              key={option.key}
+                              className={cn(
+                                "grid gap-1 rounded-[1rem] border px-3 py-2 text-sm transition-colors",
+                                checked
+                                  ? "border-primary/20 bg-primary-soft/50 text-foreground"
+                                  : "border-border/70 bg-surface text-foreground",
+                              )}
+                            >
+                              <span className="flex items-center gap-2 font-medium">
                                 <input
                                   type="checkbox"
                                   checked={checked}
                                   onChange={(event) =>
                                     updateSlide(slide.id, (current) => ({
                                       ...current,
-                                      allowedCampuses: event.target.checked
-                                        ? [...current.allowedCampuses, campus.slug]
-                                        : current.allowedCampuses.filter((item) => item !== campus.slug),
+                                      audiences: toggleAudience(current.audiences, option.key, event.target.checked),
                                     }))
                                   }
                                   className="h-4 w-4 accent-primary"
                                   disabled={!editable}
                                 />
-                                {campus.label}
-                              </label>
-                            );
-                          })}
-                        </div>
+                                {option.label}
+                              </span>
+                              <span className="text-xs leading-5 text-muted-foreground">{option.description}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <p className="text-sm font-medium text-foreground">허용 캠퍼스</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {CAMPUS_DIRECTORY.map((campus) => {
+                          const checked = slide.allowedCampuses.includes(campus.slug);
+                          return (
+                            <label
+                              key={campus.slug}
+                              className="flex items-center gap-2 rounded-[1rem] border border-border/70 bg-surface px-3 py-2 text-sm text-foreground"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) =>
+                                  updateSlide(slide.id, (current) => ({
+                                    ...current,
+                                    allowedCampuses: event.target.checked
+                                      ? [...current.allowedCampuses, campus.slug]
+                                      : current.allowedCampuses.filter((item) => item !== campus.slug),
+                                  }))
+                                }
+                                className="h-4 w-4 accent-primary"
+                                disabled={!editable}
+                              />
+                              {campus.label}
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

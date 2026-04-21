@@ -1,3 +1,39 @@
+export type PromotionAudience = "guest" | "student" | "graduate" | "staff";
+
+export const PROMOTION_AUDIENCE_OPTIONS: Array<{
+  key: PromotionAudience;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "guest",
+    label: "게스트",
+    description: "로그인하지 않은 방문자",
+  },
+  {
+    key: "student",
+    label: "교육생",
+    description: "현재 기수 및 직전 기수 교육생",
+  },
+  {
+    key: "graduate",
+    label: "수료생",
+    description: "이전 기수 수료생",
+  },
+  {
+    key: "staff",
+    label: "운영진",
+    description: "운영진 계정",
+  },
+];
+
+export const DEFAULT_PROMOTION_AUDIENCES: PromotionAudience[] = [
+  "guest",
+  "student",
+  "graduate",
+  "staff",
+];
+
 export type PromotionSlide = {
   id: string;
   title: string;
@@ -5,8 +41,7 @@ export type PromotionSlide = {
   imageSrc: string;
   imageAlt: string;
   href: string;
-  requiresLogin?: boolean;
-  allowedYears?: number[];
+  audiences?: PromotionAudience[];
   allowedCampuses?: string[];
 };
 
@@ -113,8 +148,7 @@ export const HOME_PROMOTIONS: PromotionSlide[] = [
     imageSrc: "/ads/home-partnership-overview.svg",
     imageAlt: "SSAFY 제휴 혜택을 한곳에서 확인하는 광고",
     href: "/#partner-explore",
-    requiresLogin: false,
-    allowedYears: [],
+    audiences: [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses: [],
   },
   {
@@ -124,8 +158,7 @@ export const HOME_PROMOTIONS: PromotionSlide[] = [
     imageSrc: "/ads/reward-event.svg",
     imageAlt: "회원가입, 알림, 마케팅 동의, 리뷰 작성 추첨권 이벤트 광고",
     href: "/events/signup-reward",
-    requiresLogin: false,
-    allowedYears: [],
+    audiences: [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses: [],
   },
   {
@@ -135,8 +168,7 @@ export const HOME_PROMOTIONS: PromotionSlide[] = [
     imageSrc: "/ads/campus-partners.svg",
     imageAlt: "캠퍼스별 제휴 혜택 탐색 광고",
     href: "/campuses/seoul",
-    requiresLogin: false,
-    allowedYears: [],
+    audiences: [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses: [],
   },
 ];

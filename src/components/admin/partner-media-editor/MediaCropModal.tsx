@@ -12,9 +12,6 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { useToast } from "@/components/ui/Toast";
 import {
-  PARTNER_THUMBNAIL_ASPECT_RATIO,
-} from "@/lib/partner-media";
-import {
   clamp,
   createWebpFile,
 } from "@/components/admin/partner-media-editor/utils";
@@ -30,6 +27,21 @@ function formatAspectRatioLabel(aspectRatio: number) {
     return "21:9";
   }
   return aspectRatio.toFixed(2);
+}
+
+function getOutputDimensions(aspectRatio: number) {
+  if (Math.abs(aspectRatio - 1) < 0.01) {
+    return { width: 1200, height: 1200 };
+  }
+  if (Math.abs(aspectRatio - 4 / 3) < 0.01) {
+    return { width: 1600, height: 1200 };
+  }
+  if (Math.abs(aspectRatio - 21 / 9) < 0.02) {
+    return { width: 2100, height: 900 };
+  }
+
+  const width = 1600;
+  return { width, height: Math.max(1, Math.round(width / aspectRatio)) };
 }
 
 export default function MediaCropModal({
@@ -180,8 +192,7 @@ export default function MediaCropModal({
 
     try {
       const canvas = document.createElement("canvas");
-      const outputWidth = aspectRatio === PARTNER_THUMBNAIL_ASPECT_RATIO ? 1200 : 1600;
-      const outputHeight = Math.round(outputWidth / aspectRatio);
+      const { width: outputWidth, height: outputHeight } = getOutputDimensions(aspectRatio);
       canvas.width = outputWidth;
       canvas.height = outputHeight;
 
@@ -241,7 +252,7 @@ export default function MediaCropModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6">
-      <div className="my-auto grid w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] gap-4 overflow-y-auto rounded-[28px] border border-white/10 bg-surface-overlay p-4 shadow-[var(--shadow-overlay)] sm:p-5">
+      <div className="my-auto grid w-full max-w-5xl max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[28px] border border-white/10 bg-surface-overlay p-4 shadow-[var(--shadow-overlay)] sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
             <p className="text-base font-semibold text-foreground">{title}</p>
@@ -252,10 +263,10 @@ export default function MediaCropModal({
           </Button>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1.45fr)_20rem] lg:items-stretch">
           <div
             ref={frameRef}
-            className="relative min-h-[16rem] overflow-hidden rounded-[24px] border border-border bg-slate-950/90 sm:min-h-[20rem]"
+            className="relative w-full min-w-0 overflow-hidden rounded-[24px] border border-border bg-slate-950/90"
             style={{ aspectRatio }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -293,7 +304,7 @@ export default function MediaCropModal({
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_0,transparent_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%+1px),transparent_calc(50%+1px),transparent_100%),linear-gradient(0deg,transparent_0,transparent_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%+1px),transparent_calc(50%+1px),transparent_100%)]" />
           </div>
 
-          <div className="grid gap-4 rounded-[24px] border border-border bg-surface-muted p-4">
+          <div className="grid min-h-0 gap-4 rounded-[24px] border border-border bg-surface-muted p-4 lg:overflow-y-auto">
             <div className="grid gap-2">
               <p className="text-sm font-semibold text-foreground">조정 가이드</p>
               <p className="text-sm leading-6 text-muted-foreground">
