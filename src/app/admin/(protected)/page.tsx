@@ -154,10 +154,16 @@ export default async function AdminPage() {
           meta={`활성 구독 ${pushSubscriptionCount}개`}
         />
         <SummaryCard
-          href="/admin/promotions"
-          title="광고와 이벤트 관리"
-          description="홈 캐러셀 광고 카드와 이벤트 랜딩 연결 상태를 관리합니다."
-          meta="홈 캐러셀 · 이벤트"
+          href="/admin/advertisement"
+          title="홈 광고 관리"
+          description="홈 캐러셀 카드의 순서, 이미지, 문구, 연결 페이지를 관리합니다."
+          meta="홈 캐러셀 CRUD"
+        />
+        <SummaryCard
+          href="/admin/event"
+          title="이벤트 관리"
+          description="진행 중, 예정, 종료 이벤트와 랜딩 조건을 관리합니다."
+          meta="진행 · 예정 · 종료"
         />
         <SummaryCard
           href="/admin/reviews"

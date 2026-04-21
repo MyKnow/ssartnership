@@ -12,6 +12,10 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import type { PromotionSlide } from "@/lib/promotions/catalog";
 
+function isInlineImageSrc(src: string) {
+  return src.startsWith("blob:") || src.startsWith("data:");
+}
+
 export default function PromotionCarousel({
   slides,
   headingLevel = "h2",
@@ -136,14 +140,24 @@ export default function PromotionCarousel({
               aria-label={slide.title}
             >
               <div className="relative aspect-[21/9] w-full overflow-hidden rounded-[var(--radius-overlay)] border border-border/70 bg-surface-muted shadow-[var(--shadow-raised)]">
-                <Image
-                  src={slide.imageSrc}
-                  alt={slide.imageAlt}
-                  fill
-                  sizes="(min-width: 1280px) 1084px, calc(100vw - 32px)"
-                  priority={index === 0}
-                  className="object-cover"
-                />
+                {isInlineImageSrc(slide.imageSrc) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- live preview and blob URLs need plain img
+                  <img
+                    src={slide.imageSrc}
+                    alt={slide.imageAlt}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                ) : (
+                  <Image
+                    src={slide.imageSrc}
+                    alt={slide.imageAlt}
+                    fill
+                    sizes="(min-width: 1280px) 1084px, calc(100vw - 32px)"
+                    priority={index === 0}
+                    className="object-cover"
+                  />
+                )}
               </div>
             </Link>
           ))}

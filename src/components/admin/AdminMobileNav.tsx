@@ -111,9 +111,14 @@ export default function AdminMobileNav({
       active: pathname === "/admin/push",
     },
     {
-      href: "/admin/promotions",
-      label: "광고와 이벤트 관리",
-      active: pathname === "/admin/promotions",
+      href: "/admin/advertisement",
+      label: "홈 광고 관리",
+      active: pathname === "/admin/advertisement",
+    },
+    {
+      href: "/admin/event",
+      label: "이벤트 관리",
+      active: pathname === "/admin/event",
     },
     {
       href: "/admin/reviews",

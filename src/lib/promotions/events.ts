@@ -1,10 +1,12 @@
 import {
   EVENT_CAMPAIGNS,
+  HOME_PROMOTIONS,
   type EventCampaign,
   type EventCondition,
   type EventConditionKey,
   type PromotionSlide,
 } from "@/lib/promotions/catalog";
+import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PromotionEventRow = {
@@ -25,10 +27,38 @@ type PromotionEventRow = {
   updated_at: string | null;
 };
 
+type PromotionSlideRow = {
+  id: string;
+  display_order: number;
+  title: string;
+  subtitle: string;
+  image_src: string;
+  image_alt: string;
+  href: string;
+  is_active: boolean | null;
+  requires_login: boolean | null;
+  allowed_years: unknown;
+  allowed_campuses: unknown;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 export type ManagedEventCampaign = EventCampaign & {
   id: string | null;
   isActive: boolean;
   source: "database" | "catalog";
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type ManagedPromotionSlide = PromotionSlide & {
+  source: "database" | "catalog";
+  displayOrder: number;
+  subtitle: string;
+  isActive: boolean;
+  requiresLogin: boolean;
+  allowedYears: number[];
+  allowedCampuses: string[];
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -94,6 +124,63 @@ function mapStaticCampaign(campaign: EventCampaign): ManagedEventCampaign {
   };
 }
 
+function mapStaticSlide(slide: PromotionSlide, index: number): ManagedPromotionSlide {
+  return {
+    ...slide,
+    source: "catalog",
+    displayOrder: index + 1,
+    subtitle: slide.description,
+    isActive: true,
+    requiresLogin: slide.requiresLogin ?? false,
+    allowedYears: slide.allowedYears ?? [],
+    allowedCampuses: slide.allowedCampuses ?? [],
+    createdAt: null,
+    updatedAt: null,
+  };
+}
+
+function normalizeNumberArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => {
+      if (typeof item === "number") {
+        return item;
+      }
+      if (typeof item === "string") {
+        const parsed = Number(item.trim());
+        return Number.isFinite(parsed) ? parsed : Number.NaN;
+      }
+      return Number.NaN;
+    })
+    .filter((item): item is number => Number.isFinite(item));
+}
+
+function normalizeStringArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+}
+
+function normalizeCampusValue(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const bySlug = CAMPUS_DIRECTORY.find((campus) => campus.slug === trimmed);
+  if (bySlug) {
+    return bySlug.slug;
+  }
+  const byLabel = CAMPUS_DIRECTORY.find(
+    (campus) => campus.label === trimmed || campus.fullLabel === trimmed,
+  );
+  return byLabel?.slug ?? trimmed;
+}
+
 function mapRow(row: PromotionEventRow): ManagedEventCampaign {
   return {
     id: row.id,
@@ -115,12 +202,95 @@ function mapRow(row: PromotionEventRow): ManagedEventCampaign {
   };
 }
 
+function mapSlideRow(row: PromotionSlideRow): ManagedPromotionSlide {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.subtitle,
+    imageSrc: row.image_src,
+    imageAlt: row.image_alt,
+    href: row.href,
+    source: "database",
+    displayOrder: row.display_order,
+    subtitle: row.subtitle,
+    isActive: row.is_active !== false,
+    requiresLogin: row.requires_login === true,
+    allowedYears: normalizeNumberArray(row.allowed_years),
+    allowedCampuses: normalizeStringArray(row.allowed_campuses),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function canUseSupabase() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 function staticCampaigns() {
   return EVENT_CAMPAIGNS.map((campaign) => mapStaticCampaign(campaign));
+}
+
+function staticSlides() {
+  return HOME_PROMOTIONS.map((slide, index) => mapStaticSlide(slide, index));
+}
+
+export async function listManagedPromotionSlides(options?: {
+  includeInactive?: boolean;
+}): Promise<ManagedPromotionSlide[]> {
+  if (!canUseSupabase()) {
+    return staticSlides();
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    let query = supabase
+      .from("promotion_slides")
+      .select(
+        "id,display_order,title,subtitle,image_src,image_alt,href,is_active,requires_login,allowed_years,allowed_campuses,created_at,updated_at",
+      )
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (!options?.includeInactive) {
+      query = query.eq("is_active", true);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.error("[promotions] promotion_slides query failed", error.message);
+      return staticSlides();
+    }
+    const slides = ((data ?? []) as PromotionSlideRow[]).map((row) => mapSlideRow(row));
+    return slides;
+  } catch (error) {
+    console.error("[promotions] promotion_slides fallback", error);
+    return staticSlides();
+  }
+}
+
+export type PromotionSlideViewer = {
+  authenticated: boolean;
+  year?: number | null;
+  campus?: string | null;
+};
+
+export function canViewPromotionSlide(
+  slide: ManagedPromotionSlide,
+  viewer: PromotionSlideViewer,
+) {
+  if (slide.requiresLogin && !viewer.authenticated) {
+    return false;
+  }
+  if (slide.allowedYears.length > 0) {
+    if (typeof viewer.year !== "number" || !slide.allowedYears.includes(viewer.year)) {
+      return false;
+    }
+  }
+  if (slide.allowedCampuses.length > 0) {
+    const campus = normalizeCampusValue(viewer.campus);
+    if (!campus || !slide.allowedCampuses.includes(campus)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export async function listManagedEventCampaigns(options?: {
@@ -160,35 +330,21 @@ export async function getManagedEventCampaign(slug: string) {
   return campaigns.find((campaign) => campaign.slug === slug) ?? null;
 }
 
-export async function getHomePromotionSlides(): Promise<PromotionSlide[]> {
-  const overview: PromotionSlide = {
-    id: "partnership-overview",
-    title: "싸트너십 | SSAFY 제휴 혜택 플랫폼",
-    description:
-      "SSAFY 구성원을 위한 캠퍼스 주변 제휴 혜택을 카테고리별로 빠르게 찾습니다.",
-    imageSrc: "/ads/home-partnership-overview.svg",
-    imageAlt: "SSAFY 제휴 혜택을 한곳에서 확인하는 광고",
-    href: "/#partner-explore",
-  };
-  const campus: PromotionSlide = {
-    id: "campus-partners",
-    title: "캠퍼스별 제휴 탐색",
-    description: "서울 캠퍼스부터 캠퍼스별 제휴 혜택을 따로 확인합니다.",
-    imageSrc: "/ads/campus-partners.svg",
-    imageAlt: "캠퍼스별 제휴 혜택 탐색 광고",
-    href: "/campuses/seoul",
-  };
-
-  const eventSlides = (await listManagedEventCampaigns({ includeInactive: false })).map(
-    (campaign) => ({
-      id: `event-${campaign.slug}`,
-      title: campaign.title,
-      description: campaign.description,
-      imageSrc: campaign.heroImageSrc,
-      imageAlt: campaign.heroImageAlt,
-      href: `/events/${campaign.slug}`,
-    }),
-  );
-
-  return [overview, ...eventSlides, campus];
+export async function getHomePromotionSlides(
+  viewer: PromotionSlideViewer = { authenticated: false, year: null, campus: null },
+): Promise<PromotionSlide[]> {
+  const slides = await listManagedPromotionSlides({ includeInactive: false });
+  return slides
+    .filter((slide) => canViewPromotionSlide(slide, viewer))
+    .map((slide) => ({
+      id: slide.id,
+      title: slide.title,
+      description: slide.subtitle,
+      imageSrc: slide.imageSrc,
+      imageAlt: slide.imageAlt,
+      href: slide.href,
+      requiresLogin: slide.requiresLogin,
+      allowedYears: slide.allowedYears,
+      allowedCampuses: slide.allowedCampuses,
+    }));
 }

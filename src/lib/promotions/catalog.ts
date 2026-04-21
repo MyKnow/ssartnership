@@ -5,6 +5,9 @@ export type PromotionSlide = {
   imageSrc: string;
   imageAlt: string;
   href: string;
+  requiresLogin?: boolean;
+  allowedYears?: number[];
+  allowedCampuses?: string[];
 };
 
 export type EventConditionKey = "signup" | "mm" | "push" | "marketing" | "review";
@@ -110,6 +113,9 @@ export const HOME_PROMOTIONS: PromotionSlide[] = [
     imageSrc: "/ads/home-partnership-overview.svg",
     imageAlt: "SSAFY 제휴 혜택을 한곳에서 확인하는 광고",
     href: "/#partner-explore",
+    requiresLogin: false,
+    allowedYears: [],
+    allowedCampuses: [],
   },
   {
     id: "signup-reward",
@@ -118,6 +124,9 @@ export const HOME_PROMOTIONS: PromotionSlide[] = [
     imageSrc: "/ads/reward-event.svg",
     imageAlt: "회원가입, 알림, 마케팅 동의, 리뷰 작성 추첨권 이벤트 광고",
     href: "/events/signup-reward",
+    requiresLogin: false,
+    allowedYears: [],
+    allowedCampuses: [],
   },
   {
     id: "campus-partners",
@@ -126,5 +135,8 @@ export const HOME_PROMOTIONS: PromotionSlide[] = [
     imageSrc: "/ads/campus-partners.svg",
     imageAlt: "캠퍼스별 제휴 혜택 탐색 광고",
     href: "/campuses/seoul",
+    requiresLogin: false,
+    allowedYears: [],
+    allowedCampuses: [],
   },
 ];

@@ -18,6 +18,7 @@ import {
 import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const revalidate = 300;
 
@@ -61,10 +62,22 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const session = await getSignedUserSession();
-  const [headerSession, promotionSlides] = await Promise.all([
+  const [headerSession, member] = await Promise.all([
     getHeaderSession(session?.userId ?? undefined),
-    getHomePromotionSlides(),
+    session?.userId
+      ? getSupabaseAdminClient()
+          .from("members")
+          .select("year,campus")
+          .eq("id", session.userId)
+          .maybeSingle()
+          .then(({ data }) => data)
+      : Promise.resolve(null),
   ]);
+  const resolvedPromotionSlides = await getHomePromotionSlides({
+    authenticated: Boolean(session?.userId),
+    year: typeof member?.year === "number" ? member.year : null,
+    campus: typeof member?.campus === "string" ? member.campus : null,
+  });
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -105,7 +118,7 @@ export default async function Home() {
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
           />
-          <PromotionCarousel slides={promotionSlides} headingLevel="h1" className="mt-0" />
+          <PromotionCarousel slides={resolvedPromotionSlides} headingLevel="h1" className="mt-0" />
           <Suspense fallback={null}>
             <HomePushOptInBannerGate memberId={session?.userId ?? null} />
           </Suspense>
