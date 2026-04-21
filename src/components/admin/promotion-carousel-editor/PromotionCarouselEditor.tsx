@@ -33,6 +33,7 @@ type SlideDraft = {
   title: string;
   subtitle: string;
   imageSrc: string;
+  hasImageFile: boolean;
   imageAlt: string;
   href: string;
   isActive: boolean;
@@ -90,6 +91,7 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
     title: slide.title,
     subtitle: slide.subtitle,
     imageSrc: slide.imageSrc || createPlaceholderImage(slide.title),
+    hasImageFile: slide.source === "database",
     imageAlt: slide.imageAlt,
     href: slide.href,
     isActive: slide.isActive,
@@ -181,6 +183,7 @@ export default function PromotionCarouselEditor({
           title: slide.title || "광고 카드",
           description: slide.subtitle || "",
           imageSrc: slide.imageSrc,
+          hasImageFile: slide.hasImageFile,
           imageAlt: slide.imageAlt || slide.title || "광고 카드 이미지",
           href: slide.href || "#",
           audiences: slide.audiences,
@@ -197,6 +200,7 @@ export default function PromotionCarouselEditor({
           title: slide.title,
           subtitle: slide.subtitle,
           imageSrc: slide.imageSrc,
+          hasImageFile: slide.hasImageFile,
           imageAlt: slide.imageAlt,
           href: slide.href,
           isActive: slide.isActive,
@@ -207,9 +211,38 @@ export default function PromotionCarouselEditor({
     [slides],
   );
 
+  const validationErrors = useMemo(() => {
+    const issues: string[] = [];
+    slides.forEach((slide, index) => {
+      const label = `카드 ${index + 1}`;
+      if (!slide.title.trim()) {
+        issues.push(`${label}: 타이틀을 입력해 주세요.`);
+      }
+      if (!slide.subtitle.trim()) {
+        issues.push(`${label}: 부제를 입력해 주세요.`);
+      }
+      if (!slide.href.trim()) {
+        issues.push(`${label}: 연결 페이지를 입력해 주세요.`);
+      }
+      if (!slide.imageAlt.trim()) {
+        issues.push(`${label}: 이미지 대체 텍스트를 입력해 주세요.`);
+      }
+      if (slide.source === "database" && !slide.hasImageFile) {
+        issues.push(`${label}: 이미지를 업로드해 주세요.`);
+      }
+      if (slide.audiences.length === 0) {
+        issues.push(`${label}: 노출 대상을 하나 이상 선택해 주세요.`);
+      }
+    });
+    return issues;
+  }, [slides]);
+
   const editableCount = slides.filter((slide) => slide.source === "database").length;
   const canEdit = editableCount > 0;
-  const canSave = slides.length > 0 && slides.every((slide) => slide.source === "database");
+  const canSave =
+    slides.length > 0 &&
+    slides.every((slide) => slide.source === "database") &&
+    validationErrors.length === 0;
 
   function registerFileInput(id: string, element: HTMLInputElement | null) {
     fileInputRefs.current.set(id, element);
@@ -248,6 +281,7 @@ export default function PromotionCarouselEditor({
         title: "",
         subtitle: "",
         imageSrc: fallback,
+        hasImageFile: false,
         imageAlt: "",
         href: "",
         isActive: true,
@@ -318,6 +352,7 @@ export default function PromotionCarouselEditor({
           ? {
               ...slide,
               imageSrc: nextUrl,
+              hasImageFile: true,
               imageAlt: slide.imageAlt || slide.title || "광고 카드 이미지",
             }
           : slide,
@@ -326,6 +361,11 @@ export default function PromotionCarouselEditor({
     URL.revokeObjectURL(pendingCrop.sourceUrl);
     setPendingCrop(null);
     setError(null);
+  }
+
+  function handleImageUpload(id: string) {
+    setError(null);
+    fileInputRefs.current.get(id)?.click();
   }
 
   function closeCrop() {
@@ -361,7 +401,7 @@ export default function PromotionCarouselEditor({
         <PromotionCarousel slides={previewSlides} className="mt-0" />
       </Card>
 
-      <form ref={formRef} action={saveAction} className="grid gap-6" encType="multipart/form-data">
+      <form ref={formRef} action={saveAction} className="grid gap-6">
         <input type="hidden" name="slidesJson" value={serializedSlides} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -384,6 +424,12 @@ export default function PromotionCarouselEditor({
         </div>
 
         {error ? <FormMessage variant="error">{error}</FormMessage> : null}
+        {validationErrors.length > 0 ? (
+          <FormMessage variant="info">
+            저장 전 확인이 필요한 항목이 {validationErrors.length}개 있습니다. 첫 번째 항목:{" "}
+            {validationErrors[0]}
+          </FormMessage>
+        ) : null}
         {!canEdit ? (
           <FormMessage variant="info">
             현재 로드된 카드가 모두 미리보기용이라 기존 카드 수정은 막혀 있습니다. 새 카드는 추가할 수 있습니다.
@@ -394,6 +440,11 @@ export default function PromotionCarouselEditor({
           {slides.map((slide, index) => {
             const previewSrc = slide.imageSrc || createPlaceholderImage(slide.title);
             const editable = isEditable(slide);
+            const titleInvalid = !slide.title.trim();
+            const subtitleInvalid = !slide.subtitle.trim();
+            const hrefInvalid = !slide.href.trim();
+            const altInvalid = !slide.imageAlt.trim();
+            const audienceInvalid = slide.audiences.length === 0;
             return (
               <Card key={slide.id} tone="default" className="grid gap-5">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -423,6 +474,7 @@ export default function PromotionCarouselEditor({
                         }
                         placeholder="카드 타이틀"
                         disabled={!editable}
+                        className={titleInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
                       />
                       <Textarea
                         value={slide.subtitle}
@@ -432,6 +484,7 @@ export default function PromotionCarouselEditor({
                         placeholder="카드 부제"
                         rows={3}
                         disabled={!editable}
+                        className={subtitleInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
                       />
                     </div>
                   </div>
@@ -489,7 +542,7 @@ export default function PromotionCarouselEditor({
                         type="button"
                         variant="secondary"
                         disabled={!editable}
-                        onClick={() => fileInputRefs.current.get(slide.id)?.click()}
+                        onClick={() => handleImageUpload(slide.id)}
                       >
                         <PhotoIcon className="size-4" />
                         이미지 업로드
@@ -501,7 +554,7 @@ export default function PromotionCarouselEditor({
                         }
                         placeholder="이미지 대체 텍스트"
                         disabled={!editable}
-                        className="min-w-0"
+                        className={cn("min-w-0", altInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : null)}
                       />
                       <input
                         ref={(element) => registerFileInput(slide.id, element)}
@@ -527,6 +580,7 @@ export default function PromotionCarouselEditor({
                         }
                         placeholder="/events/signup-reward"
                         disabled={!editable}
+                        className={hrefInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
                       />
                     </label>
 
@@ -588,6 +642,9 @@ export default function PromotionCarouselEditor({
                           );
                         })}
                       </div>
+                      {audienceInvalid ? (
+                        <p className="text-xs font-medium text-danger">노출 대상을 하나 이상 선택해 주세요.</p>
+                      ) : null}
                     </div>
 
                     <div className="grid gap-2">
