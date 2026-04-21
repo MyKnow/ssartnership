@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import HeroSection from "@/components/HeroSection";
 import HomeContent from "@/components/HomeContent";
 import HomePushOptInBannerGate from "@/components/HomePushOptInBannerGate";
+import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
-import { HOME_COPY } from "@/lib/content";
+import { getHomePromotionSlides } from "@/lib/promotions/events";
 import {
   SITE_ALTERNATE_NAMES,
   SITE_DESCRIPTION,
@@ -18,18 +18,9 @@ import {
 import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const revalidate = 300;
-
-function renderLines(value: string) {
-  const lines = value.split("\n");
-  return lines.map((line, index) => (
-    <span key={`${line}-${index}`}>
-      {line}
-      {index < lines.length - 1 ? <br /> : null}
-    </span>
-  ));
-}
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
@@ -71,7 +62,22 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const session = await getSignedUserSession();
-  const headerSession = await getHeaderSession(session?.userId ?? undefined);
+  const [headerSession, member] = await Promise.all([
+    getHeaderSession(session?.userId ?? undefined),
+    session?.userId
+      ? getSupabaseAdminClient()
+          .from("members")
+          .select("year,campus")
+          .eq("id", session.userId)
+          .maybeSingle()
+          .then(({ data }) => data)
+      : Promise.resolve(null),
+  ]);
+  const resolvedPromotionSlides = await getHomePromotionSlides({
+    authenticated: Boolean(session?.userId),
+    year: typeof member?.year === "number" ? member.year : null,
+    campus: typeof member?.campus === "string" ? member.campus : null,
+  });
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -112,11 +118,7 @@ export default async function Home() {
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
           />
-          <HeroSection
-            eyebrow={HOME_COPY.heroEyebrow}
-            title={HOME_COPY.heroTitle}
-            description={renderLines(HOME_COPY.heroDescription)}
-          />
+          <PromotionCarousel slides={resolvedPromotionSlides} headingLevel="h1" className="mt-0" />
           <Suspense fallback={null}>
             <HomePushOptInBannerGate memberId={session?.userId ?? null} />
           </Suspense>

@@ -19,6 +19,19 @@ import {
   createWebpFile,
 } from "@/components/admin/partner-media-editor/utils";
 
+function formatAspectRatioLabel(aspectRatio: number) {
+  if (Math.abs(aspectRatio - 1) < 0.01) {
+    return "1:1";
+  }
+  if (Math.abs(aspectRatio - 4 / 3) < 0.01) {
+    return "4:3";
+  }
+  if (Math.abs(aspectRatio - 21 / 9) < 0.02) {
+    return "21:9";
+  }
+  return aspectRatio.toFixed(2);
+}
+
 export default function MediaCropModal({
   open,
   title,
@@ -275,7 +288,7 @@ export default function MediaCropModal({
 
             <div className="pointer-events-none absolute inset-0 border-2 border-white/70" />
             <div className="pointer-events-none absolute inset-x-4 top-4 rounded-full bg-black/35 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-white/80">
-              {aspectRatio === PARTNER_THUMBNAIL_ASPECT_RATIO ? "1:1 THUMBNAIL" : "4:3 GALLERY"}
+              {formatAspectRatioLabel(aspectRatio)}
             </div>
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_0,transparent_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%+1px),transparent_calc(50%+1px),transparent_100%),linear-gradient(0deg,transparent_0,transparent_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%-1px),rgba(255,255,255,0.18)_calc(50%+1px),transparent_calc(50%+1px),transparent_100%)]" />
           </div>
@@ -301,7 +314,7 @@ export default function MediaCropModal({
             </label>
             <div className="grid gap-2 text-xs text-muted-foreground">
               <p>드래그: 위치 이동</p>
-              <p>기준 비율: {aspectRatio === PARTNER_THUMBNAIL_ASPECT_RATIO ? "1:1" : "4:3"}</p>
+              <p>기준 비율: {formatAspectRatioLabel(aspectRatio)}</p>
             </div>
             {error ? <FormMessage variant="error">{error}</FormMessage> : null}
             <div className="flex flex-col gap-2">

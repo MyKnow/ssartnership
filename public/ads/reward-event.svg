@@ -1,0 +1,26 @@
+<svg width="1200" height="514" viewBox="0 0 1200 514" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="514" rx="40" fill="#172033"/>
+  <path d="M0 0H1200V514H0V0Z" fill="url(#paint0_linear)"/>
+  <circle cx="976" cy="156" r="112" fill="#FACC15" fill-opacity="0.22"/>
+  <circle cx="1054" cy="318" r="168" fill="#38BDF8" fill-opacity="0.16"/>
+  <rect x="76" y="78" width="144" height="44" rx="22" fill="#FACC15"/>
+  <text x="105" y="107" fill="#172033" font-family="Arial, sans-serif" font-size="22" font-weight="800">EVENT</text>
+  <text x="76" y="196" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="68" font-weight="800">추첨권 받고</text>
+  <text x="76" y="270" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="68" font-weight="800">혜택까지 챙기기</text>
+  <text x="78" y="334" fill="#DCE8F8" font-family="Arial, sans-serif" font-size="28" font-weight="600">회원가입, 알림 설정, 리뷰 작성으로 참여하세요.</text>
+  <g transform="translate(774 154)">
+    <rect width="286" height="224" rx="32" fill="#FFFFFF" fill-opacity="0.13" stroke="#FFFFFF" stroke-opacity="0.24"/>
+    <path d="M96 82H190V188H96V82Z" fill="#FACC15"/>
+    <path d="M74 82H212V112H74V82Z" fill="#FFE083"/>
+    <path d="M134 82H152V188H134V82Z" fill="#172033" fill-opacity="0.35"/>
+    <path d="M86 72C64 50 82 24 114 48C130 60 140 82 140 82C140 82 108 94 86 72Z" fill="#38BDF8"/>
+    <path d="M198 72C220 50 202 24 170 48C154 60 144 82 144 82C144 82 176 94 198 72Z" fill="#38BDF8"/>
+  </g>
+  <defs>
+    <linearGradient id="paint0_linear" x1="86" y1="43" x2="1130" y2="484" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8" stop-opacity="0.46"/>
+      <stop offset="0.52" stop-color="#0F172A" stop-opacity="0"/>
+      <stop offset="1" stop-color="#F97316" stop-opacity="0.26"/>
+    </linearGradient>
+  </defs>
+</svg>
