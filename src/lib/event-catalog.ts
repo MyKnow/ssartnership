@@ -56,6 +56,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_review_restore',
   'partner_review_update',
   'partner_review_delete',
+  'promotion_event_create',
+  'promotion_event_update',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

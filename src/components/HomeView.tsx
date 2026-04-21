@@ -186,23 +186,25 @@ export default function HomeView({
   return (
     <>
       <MotionReveal delay={0.04}>
-        <section className="mt-10 flex flex-col gap-6" data-nosnippet>
+        <section className="mt-10 flex flex-col gap-6">
           <SectionHeading
             eyebrow="Directory"
             title={HOME_COPY.categoryTitle}
             description={HOME_COPY.categoryDescription}
           />
-          <PartnerFilters
-            categories={categories}
-            activeCategory={activeCategory}
-            onCategoryChange={handleCategoryChange}
-            searchValue={searchValue}
-            onSearchChange={handleSearchChange}
-            appliesToFilter={appliesToFilter}
-            onAppliesToFilterChange={setAppliesToFilter}
-            sortValue={sortValue}
-            onSortChange={handleSortChange}
-          />
+          <div data-nosnippet>
+            <PartnerFilters
+              categories={categories}
+              activeCategory={activeCategory}
+              onCategoryChange={handleCategoryChange}
+              searchValue={searchValue}
+              onSearchChange={handleSearchChange}
+              appliesToFilter={appliesToFilter}
+              onAppliesToFilterChange={setAppliesToFilter}
+              sortValue={sortValue}
+              onSortChange={handleSortChange}
+            />
+          </div>
         </section>
       </MotionReveal>
 

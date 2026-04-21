@@ -25,10 +25,12 @@ export default async function HomeContent({
     };
   });
   return (
-    <HomeView
-      categories={categories}
-      partners={viewPartners}
-      viewerAuthenticated={viewerAuthenticated}
-    />
+    <section id="partner-explore" className="scroll-mt-24">
+      <HomeView
+        categories={categories}
+        partners={viewPartners}
+        viewerAuthenticated={viewerAuthenticated}
+      />
+    </section>
   );
 }
