@@ -31,6 +31,7 @@ export default function ReviewImageUploader({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const itemsRef = useRef<ReviewImageItem[]>(items);
+  const activeCropRef = useRef<PendingCrop | null>(null);
   const pendingQueueRef = useRef<File[]>([]);
   const [activeCrop, setActiveCrop] = useState<PendingCrop | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -40,13 +41,17 @@ export default function ReviewImageUploader({
   }, [items]);
 
   useEffect(() => {
+    activeCropRef.current = activeCrop;
+  }, [activeCrop]);
+
+  useEffect(() => {
     return () => {
       itemsRef.current.forEach((item) => revokeIfBlobUrl(item.url));
-      if (activeCrop) {
-        revokeIfBlobUrl(activeCrop.sourceUrl);
+      if (activeCropRef.current) {
+        revokeIfBlobUrl(activeCropRef.current.sourceUrl);
       }
     };
-  }, [activeCrop]);
+  }, []);
 
   const remainingCount = Math.max(0, 5 - items.length);
 
@@ -93,7 +98,9 @@ export default function ReviewImageUploader({
     if (activeCrop) {
       revokeIfBlobUrl(activeCrop.sourceUrl);
     }
-    onChange([...items, createReviewImageItemFromFile(file)]);
+    const nextItems = [...itemsRef.current, createReviewImageItemFromFile(file)];
+    itemsRef.current = nextItems;
+    onChange(nextItems);
     setLocalError(null);
     advanceCropQueue();
   };

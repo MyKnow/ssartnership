@@ -94,7 +94,12 @@ export default function PartnerReviewForm({
       if (!response.ok) {
         const nextFieldErrors = (data.fieldErrors ?? {}) as ReviewFieldErrors;
         setFieldErrors(nextFieldErrors);
-        setFormError(data.message ?? null);
+        setFormError(
+          data.message ??
+            (isEditMode
+              ? "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해 주세요."
+              : "리뷰 등록에 실패했습니다. 잠시 후 다시 시도해 주세요."),
+        );
 
         if (nextFieldErrors.rating) {
           focusField(ratingRef);
@@ -107,6 +112,14 @@ export default function PartnerReviewForm({
       }
 
       await onSubmitted();
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : isEditMode
+            ? "리뷰 수정에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요."
+            : "리뷰 등록에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
+      setFormError(message);
     } finally {
       setPending(false);
     }
