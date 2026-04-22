@@ -113,7 +113,14 @@ export default async function PartnerDetailPage({
     redirect("/");
   }
   if (pageData.kind === "confidential-gate") {
-    return <PartnerDetailAccessGate returnTo={pageData.returnTo} />;
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteHeader initialSession={headerSession} />
+        <main className="flex min-h-[calc(100vh-5rem)] items-center justify-center px-3 py-6 sm:px-4">
+          <PartnerDetailAccessGate returnTo={pageData.returnTo} />
+        </main>
+      </div>
+    );
   }
   const {
     partner,
