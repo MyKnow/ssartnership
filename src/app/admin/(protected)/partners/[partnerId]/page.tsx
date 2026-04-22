@@ -160,21 +160,32 @@ export default async function AdminPartnerDetailPage({
     "partner_update",
     "partner_delete",
     "partner_change_request_approve",
+    "partner_change_request_reject",
     "partner_company_create",
     "partner_company_update",
     "partner_company_delete",
   ] as const;
-  const partnerAuditLogsResult = auditTargetIds.length
-    ? await supabase
-        .from("admin_audit_logs")
-        .select("id,actor_id,action,target_type,target_id,properties,created_at")
-        .in("action", auditActions as unknown as string[])
-        .in("target_id", auditTargetIds)
-        .order("created_at", { ascending: false })
-    : { data: [], error: null };
-  const partnerAuditLogs = partnerAuditLogsResult.error
-    ? []
-    : partnerAuditLogsResult.data ?? [];
+  const partnerAuditLogsResult = await supabase
+    .from("admin_audit_logs")
+    .select("id,actor_id,action,target_type,target_id,properties,created_at")
+    .in("action", auditActions as unknown as string[])
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const partnerAuditLogs = (partnerAuditLogsResult.data ?? []).filter((log) => {
+    const properties = log.properties && typeof log.properties === "object"
+      ? (log.properties as Record<string, unknown>)
+      : null;
+    const logPartnerId =
+      typeof properties?.partnerId === "string" ? properties.partnerId : null;
+    const logCompanyId =
+      typeof properties?.companyId === "string" ? properties.companyId : null;
+
+    return (
+      auditTargetIds.includes(log.target_id ?? "") ||
+      logPartnerId === partner.id ||
+      logCompanyId === (company?.id ?? null)
+    );
+  });
   const reviewQueryString = serializeAdminReviewFilters(reviewFilters);
   const returnTo = reviewQueryString ? `${detailPath}?${reviewQueryString}` : detailPath;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
