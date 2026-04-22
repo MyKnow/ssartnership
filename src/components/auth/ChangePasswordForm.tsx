@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -24,7 +23,6 @@ export default function ChangePasswordForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
-  const router = useRouter();
   const currentRef = useRef<HTMLInputElement>(null);
   const nextRef = useRef<HTMLInputElement>(null);
 
@@ -79,8 +77,7 @@ export default function ChangePasswordForm({
       setFieldErrors({});
       setFormError(null);
       notify("비밀번호가 변경되었습니다.");
-      router.replace(sanitizeReturnTo(returnTo, "/"));
-      router.refresh();
+      window.location.replace(sanitizeReturnTo(returnTo, "/"));
     } finally {
       setPending(false);
     }

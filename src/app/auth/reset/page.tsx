@@ -26,7 +26,7 @@ export default async function ResetPasswordPage() {
               비밀번호 재설정
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              가입된 MM 아이디를 입력하면 임시 비밀번호가 발급됩니다.
+              가입된 MM 아이디로 인증번호를 발급받은 뒤 새 비밀번호를 설정합니다.
             </p>
             <ResetPasswordForm />
           </Card>

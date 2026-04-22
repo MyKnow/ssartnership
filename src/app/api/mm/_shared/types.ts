@@ -2,7 +2,12 @@ import { getRequestLogContext } from "@/lib/activity-logs";
 
 export type MmRouteContext = ReturnType<typeof getRequestLogContext>;
 
-export type MemberAuthAction = "request-code" | "verify-code" | "reset-password";
+export type MemberAuthAction =
+  | "request-code"
+  | "verify-code"
+  | "reset-password"
+  | "request-reset-code"
+  | "verify-reset-code";
 
 export type MemberAuthThrottleContext = {
   ipAddress: string | null;
@@ -27,4 +32,16 @@ export type VerifyCodeBody = {
 
 export type ResetPasswordBody = {
   username?: string;
+};
+
+export type ResetPasswordVerifyBody = {
+  username?: string;
+  code?: string;
+};
+
+export type ResetPasswordCompleteBody = {
+  username?: string;
+  code?: string;
+  nextPassword?: string;
+  nextPasswordConfirm?: string;
 };

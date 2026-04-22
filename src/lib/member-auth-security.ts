@@ -12,6 +12,8 @@ export type MemberAuthRoute =
   | "request-code"
   | "verify-code"
   | "reset-password"
+  | "request-reset-code"
+  | "verify-reset-code"
   | "change-password";
 
 type MemberAuthAttemptContext = {
@@ -24,6 +26,8 @@ const MEMBER_AUTH_ROUTES: MemberAuthRoute[] = [
   "request-code",
   "verify-code",
   "reset-password",
+  "request-reset-code",
+  "verify-reset-code",
   "change-password",
 ];
 
@@ -49,7 +53,15 @@ const MEMBER_AUTH_FAILURE_DELAY_MS: Record<
     min: 350,
     max: 700,
   },
+  "request-reset-code": {
+    min: 350,
+    max: 700,
+  },
   "verify-code": {
+    min: 350,
+    max: 700,
+  },
+  "verify-reset-code": {
     min: 350,
     max: 700,
   },

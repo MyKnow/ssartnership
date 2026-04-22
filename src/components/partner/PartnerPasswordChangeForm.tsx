@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -32,7 +31,6 @@ export default function PartnerPasswordChangeForm({
   }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const { notify } = useToast();
-  const router = useRouter();
   const currentPasswordRef = useRef<HTMLInputElement>(null);
   const nextPasswordRef = useRef<HTMLInputElement>(null);
 
@@ -102,7 +100,7 @@ export default function PartnerPasswordChangeForm({
       setFieldErrors({});
       setFormError(null);
       notify("비밀번호가 변경되었습니다.");
-      router.replace("/partner");
+      window.location.replace("/partner");
     } finally {
       setPending(false);
     }

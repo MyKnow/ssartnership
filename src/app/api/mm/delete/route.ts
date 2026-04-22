@@ -40,6 +40,10 @@ export async function POST(request: Request) {
       .from("password_reset_attempts")
       .delete()
       .eq("identifier", member.mm_user_id);
+    await supabase
+      .from("password_reset_codes")
+      .delete()
+      .eq("mm_user_id", member.mm_user_id);
   }
   if (member?.mm_username && member.mm_username !== member.mm_user_id) {
     await supabase
@@ -54,6 +58,10 @@ export async function POST(request: Request) {
       .from("password_reset_attempts")
       .delete()
       .eq("identifier", member.mm_username);
+    await supabase
+      .from("password_reset_codes")
+      .delete()
+      .eq("mm_username", member.mm_username);
   }
   const memberAuthCleanupKeys = getMemberAuthCleanupKeys([
     member?.mm_user_id,

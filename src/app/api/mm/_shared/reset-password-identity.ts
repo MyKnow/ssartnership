@@ -30,7 +30,7 @@ export async function resolveResetPasswordMember(
 ): Promise<ResetPasswordMemberResolution> {
   const supabase = getSupabaseAdminClient();
   const memberSelect =
-    "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,updated_at";
+    "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at";
   const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
   let resolvedStudentYear: number | null = null;
   let member: MemberRow | null = null;

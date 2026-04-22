@@ -1,6 +1,6 @@
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
-import { parseResetPasswordBody } from "./parsers";
+import { parseResetPasswordVerifyBody } from "./parsers";
 import {
   createMemberAuthThrottleContext,
   getMemberAuthBlockedScope,
@@ -9,36 +9,36 @@ import {
 } from "./throttle";
 import { mmOkResponse } from "./responses";
 import {
-  deliverResetPasswordCode,
-  getResetPasswordCooldownState,
-  isResetPasswordRequestBlocked,
-  recordResetPasswordRequestAttempt,
+  getLatestResetPasswordCode,
+  isResetPasswordCodeExpired,
+  isResetPasswordCodeValid,
 } from "./reset-password-code-store";
 import {
-  failResetPasswordRequest,
-  failResetPasswordRequestException,
-} from "./reset-password-request-failure";
+  failResetPasswordVerify,
+  failResetPasswordVerifyException,
+} from "./reset-password-verify-failure";
 import { resolveResetPasswordMember } from "./reset-password-identity";
 
-export const RESET_PASSWORD_RUNTIME = "nodejs";
+export const RESET_PASSWORD_VERIFY_RUNTIME = "nodejs";
 
-export async function handleResetPasswordPost(request: Request) {
+export async function handleResetPasswordVerifyPost(request: Request) {
   const context = getRequestLogContext(request);
 
   try {
-    const payload = await parseResetPasswordBody(request);
+    const payload = await parseResetPasswordVerifyBody(request);
     const username = normalizeMmUsername(String(payload.username ?? ""));
+    const code = String(payload.code ?? "").trim().toUpperCase();
     const throttleContext = createMemberAuthThrottleContext(
       context.ipAddress ?? null,
       username || null,
     );
 
     const blockedState = await getMemberAuthBlockedState(
-      "request-reset-code",
+      "verify-reset-code",
       throttleContext,
     );
     if (blockedState) {
-      return failResetPasswordRequest({
+      return failResetPasswordVerify({
         context,
         throttleContext,
         error: "blocked",
@@ -54,8 +54,8 @@ export async function handleResetPasswordPost(request: Request) {
       });
     }
 
-    if (!username) {
-      return failResetPasswordRequest({
+    if (!username || !code) {
+      return failResetPasswordVerify({
         context,
         throttleContext,
         error: "missing_fields",
@@ -65,7 +65,7 @@ export async function handleResetPasswordPost(request: Request) {
     }
 
     if (validateMmUsername(username)) {
-      return failResetPasswordRequest({
+      return failResetPasswordVerify({
         context,
         throttleContext,
         error: "invalid_username",
@@ -77,10 +77,10 @@ export async function handleResetPasswordPost(request: Request) {
 
     const resolution = await resolveResetPasswordMember(username);
     if (resolution.kind === "inaccessible") {
-      return failResetPasswordRequest({
+      return failResetPasswordVerify({
         context,
         throttleContext,
-        error: "reset_failed",
+        error: "invalid_code",
         status: 400,
         reason: "team_or_channel_inaccessible",
         identifier: username,
@@ -91,59 +91,53 @@ export async function handleResetPasswordPost(request: Request) {
     }
 
     if (resolution.kind === "not_registered") {
-      return failResetPasswordRequest({
+      return failResetPasswordVerify({
         context,
         throttleContext,
-        error: "reset_failed",
+        error: "invalid_code",
         status: 400,
         reason: "not_registered",
         identifier: username,
       });
     }
 
-    const resetBlocked = await isResetPasswordRequestBlocked(
-      resolution.member.mm_user_id,
-    );
-    if (resetBlocked) {
-      return failResetPasswordRequest({
+    const codeRow = await getLatestResetPasswordCode(resolution.member.mm_user_id);
+    if (!codeRow) {
+      return failResetPasswordVerify({
         context,
         throttleContext,
-        error: "blocked",
-        status: 429,
-        reason: "rate_limit",
-        identifier: resolution.member.mm_user_id,
-        recordFailure: false,
-        blockedDelay: true,
-        extra: {
-          blockedUntil: resetBlocked.blockedUntil,
-        },
-      });
-    }
-
-    const cooldownState = await getResetPasswordCooldownState(
-      resolution.member.mm_user_id,
-    );
-    if (cooldownState.inCooldown) {
-      return failResetPasswordRequest({
-        context,
-        throttleContext,
-        error: "cooldown",
-        status: 429,
-        reason: "cooldown",
+        error: "invalid_code",
+        status: 400,
+        reason: "missing_code",
         identifier: resolution.member.mm_user_id,
       });
     }
 
-    await deliverResetPasswordCode({
-      member: resolution.member,
-      directorySourceYears: resolution.directoryEntry?.source_years ?? [],
-      senderYearFallbacks: [resolution.resolvedStudentYear, 15, 14],
-    });
-    await recordResetPasswordRequestAttempt(resolution.member.mm_user_id);
+    if (isResetPasswordCodeExpired(codeRow)) {
+      return failResetPasswordVerify({
+        context,
+        throttleContext,
+        error: "expired",
+        status: 400,
+        reason: "expired",
+        identifier: resolution.member.mm_user_id,
+      });
+    }
+
+    if (!isResetPasswordCodeValid(code, codeRow)) {
+      return failResetPasswordVerify({
+        context,
+        throttleContext,
+        error: "invalid_code",
+        status: 400,
+        reason: "invalid_code",
+        identifier: resolution.member.mm_user_id,
+      });
+    }
 
     await logAuthSecurity({
       ...context,
-      eventName: "member_password_reset_request",
+      eventName: "member_password_reset_verify",
       status: "success",
       actorType: "guest",
       identifier: username,
@@ -154,10 +148,10 @@ export async function handleResetPasswordPost(request: Request) {
         campus: resolution.member.campus ?? null,
       },
     });
-    await recordMemberAuthSuccess("request-reset-code", throttleContext);
+    await recordMemberAuthSuccess("verify-reset-code", throttleContext);
 
-    return mmOkResponse();
+    return mmOkResponse({ ok: true, verified: true });
   } catch (error) {
-    return failResetPasswordRequestException({ context, error });
+    return failResetPasswordVerifyException({ context, error });
   }
 }

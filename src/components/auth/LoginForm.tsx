@@ -31,7 +31,7 @@ export default function LoginForm() {
     const flag = sessionStorage.getItem("reset:success");
     if (flag) {
       sessionStorage.removeItem("reset:success");
-      notify("임시 비밀번호가 발급되었습니다. 로그인해 주세요.");
+      notify("비밀번호가 재설정되었습니다. 로그인해 주세요.");
       return;
     }
     const signupFlag = sessionStorage.getItem("signup:success");
