@@ -7,9 +7,14 @@ import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
+import { sanitizeReturnTo } from "@/lib/return-to";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
-export default function ChangePasswordForm() {
+export default function ChangePasswordForm({
+  returnTo,
+}: {
+  returnTo?: string;
+}) {
   const [current, setCurrent] = useState("");
   const [nextPassword, setNextPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{
@@ -74,7 +79,8 @@ export default function ChangePasswordForm() {
       setFieldErrors({});
       setFormError(null);
       notify("비밀번호가 변경되었습니다.");
-      router.replace("/certification");
+      router.replace(sanitizeReturnTo(returnTo, "/"));
+      router.refresh();
     } finally {
       setPending(false);
     }

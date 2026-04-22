@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
     }
 
     const record = hashPassword(nextPassword);
-    await supabase
+    const { data: updatedMember, error: updateError } = await supabase
       .from("members")
       .update({
         password_hash: record.hash,
@@ -132,9 +133,37 @@ export async function POST(request: Request) {
         must_change_password: false,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", session.userId);
+      .eq("id", session.userId)
+      .select("id,must_change_password")
+      .maybeSingle();
+    if (updateError || !updatedMember?.id || updatedMember.must_change_password) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "member",
+        actorId: session.userId,
+        properties: {
+          reason: "state_update_failed",
+          message: updateError?.message ?? "update_failed",
+        },
+      });
+      await recordMemberAuthAttempt("change-password", throttleContext, false);
+      await delayMemberAuthAttempt("change-password", true);
+      return NextResponse.json(
+        {
+          error: "change_failed",
+          message: "비밀번호 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
 
     await setUserSession(session.userId, false);
+    revalidatePath("/auth/change-password");
+    revalidatePath("/auth/consent");
+    revalidatePath("/certification");
+    revalidatePath("/");
     await recordMemberAuthAttempt("change-password", throttleContext, true);
     await logAuthSecurity({
       ...context,

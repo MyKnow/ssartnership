@@ -97,6 +97,7 @@ export default function LoginForm() {
       setFormError(null);
       notify("로그인되었습니다.");
       router.replace(data.requiresConsent ? "/auth/consent" : "/");
+      router.refresh();
     } finally {
       setPending(false);
     }

@@ -7,6 +7,11 @@ import { getUserSession } from "@/lib/user-auth";
 import { getHeaderSession } from "@/lib/header-session";
 import ChangePasswordForm from "@/components/auth/ChangePasswordForm";
 import { SITE_NAME } from "@/lib/site";
+import { sanitizeReturnTo } from "@/lib/return-to";
+
+type PageProps = {
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+};
 
 export const metadata: Metadata = {
   title: `비밀번호 변경 | ${SITE_NAME}`,
@@ -16,13 +21,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ChangePasswordPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ChangePasswordPage({ searchParams }: PageProps) {
+  const { returnTo: rawReturnTo } = await searchParams;
+  const returnTo = sanitizeReturnTo(
+    Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo,
+    "",
+  );
   const session = await getUserSession();
   if (!session?.userId) {
     redirect("/auth/login");
   }
   if (session.requiresConsent) {
-    redirect("/auth/consent");
+    const consentReturnTo = returnTo
+      ? `/auth/consent?returnTo=${encodeURIComponent(returnTo)}`
+      : "/auth/consent";
+    redirect(consentReturnTo);
   }
 
   const headerSession = await getHeaderSession(session.userId);
@@ -39,7 +54,7 @@ export default async function ChangePasswordPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               보안을 위해 새로운 비밀번호로 변경해 주세요.
             </p>
-            <ChangePasswordForm />
+            <ChangePasswordForm returnTo={returnTo} />
           </Card>
         </Container>
       </main>

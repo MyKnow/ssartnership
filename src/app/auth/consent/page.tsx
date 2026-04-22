@@ -8,6 +8,7 @@ import { getHeaderSession } from "@/lib/header-session";
 import { getUserSession } from "@/lib/user-auth";
 import { getMemberPolicyReviewBundle } from "@/lib/policy-documents";
 import { SITE_NAME } from "@/lib/site";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export const metadata: Metadata = {
   title: `약관 동의 | ${SITE_NAME}`,
@@ -17,7 +18,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ConsentPage() {
+export const dynamic = "force-dynamic";
+
+type PageProps = {
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+};
+
+export default async function ConsentPage({ searchParams }: PageProps) {
+  const { returnTo: rawReturnTo } = await searchParams;
+  const returnTo = sanitizeReturnTo(
+    Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo,
+    "",
+  );
   const session = await getUserSession();
   if (!session?.userId) {
     redirect("/auth/login");
@@ -25,9 +37,12 @@ export default async function ConsentPage() {
 
   if (!session.requiresConsent) {
     if (session.mustChangePassword) {
-      redirect("/auth/change-password");
+      const changePasswordReturnTo = returnTo
+        ? `/auth/change-password?returnTo=${encodeURIComponent(returnTo)}`
+        : "/auth/change-password";
+      redirect(changePasswordReturnTo);
     }
-    redirect("/");
+    redirect(returnTo || "/");
   }
 
   const policyReview = await getMemberPolicyReviewBundle(session.userId);
@@ -48,6 +63,7 @@ export default async function ConsentPage() {
               requiredPolicies={policyReview.requiredPolicies}
               reviewPolicies={policyReview.reviewPolicies}
               mustChangePassword={Boolean(session.mustChangePassword)}
+              returnTo={returnTo}
             />
           </Card>
         </Container>

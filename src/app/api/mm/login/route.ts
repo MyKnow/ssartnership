@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
@@ -174,6 +175,10 @@ export async function POST(request: Request) {
 
     const policyStatus = await getMemberRequiredPolicyStatus(member.id);
     await setUserSession(member.id, Boolean(member.must_change_password));
+    revalidatePath("/");
+    revalidatePath("/auth/consent");
+    revalidatePath("/auth/change-password");
+    revalidatePath("/certification");
     await recordMemberAuthAttempt("login", throttleContext, true);
 
     await logAuthSecurity({

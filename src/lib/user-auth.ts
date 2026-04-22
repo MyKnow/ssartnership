@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { unstable_noStore as noStore } from "next/cache";
 import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
@@ -80,6 +81,7 @@ function verifyToken(token: string) {
 }
 
 export async function getSignedUserSession() {
+  noStore();
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) {
@@ -129,6 +131,7 @@ export async function clearUserSession() {
 }
 
 export async function getUserSession() {
+  noStore();
   const session = (await getSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
     return null;

@@ -8,6 +8,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import { focusField } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { sanitizeReturnTo } from "@/lib/return-to";
 import type {
   PolicyDocument,
   PolicyReviewItem,
@@ -18,12 +19,14 @@ type PolicyConsentFormProps = {
   requiredPolicies: RequiredPolicyMap;
   reviewPolicies: PolicyReviewItem[];
   mustChangePassword: boolean;
+  returnTo?: string;
 };
 
 export default function PolicyConsentForm({
   requiredPolicies,
   reviewPolicies,
   mustChangePassword,
+  returnTo,
 }: PolicyConsentFormProps) {
   const router = useRouter();
   const { notify } = useToast();
@@ -109,10 +112,15 @@ export default function PolicyConsentForm({
           ? `필수 약관 및 마케팅 정보 수신 동의가 ${formatKoreanDateTimeToMinute(data.marketingAgreedAt ?? data.agreedAt)}에 완료되었습니다.`
           : `필수 약관 동의가 ${formatKoreanDateTimeToMinute(data.agreedAt)}에 완료되었습니다.`,
       );
-      router.replace(
-        data.redirectTo ??
-          (mustChangePassword ? "/auth/change-password" : "/"),
-      );
+      const sanitizedReturnTo = sanitizeReturnTo(returnTo, "");
+      const nextHref = sanitizedReturnTo
+        ? mustChangePassword
+          ? `/auth/change-password?returnTo=${encodeURIComponent(sanitizedReturnTo)}`
+          : sanitizedReturnTo
+        : data.redirectTo ??
+          (mustChangePassword ? "/auth/change-password" : "/");
+      router.replace(nextHref);
+      router.refresh();
     } finally {
       setPending(false);
     }

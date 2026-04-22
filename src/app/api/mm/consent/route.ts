@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getUserSession, setUserSession } from "@/lib/user-auth";
 import {
@@ -103,6 +104,10 @@ export async function POST(request: Request) {
         privacyVersion: activePolicies.privacy.version,
       },
     });
+    revalidatePath("/");
+    revalidatePath("/auth/consent");
+    revalidatePath("/auth/change-password");
+    revalidatePath("/certification");
 
     return NextResponse.json({
       ok: true,

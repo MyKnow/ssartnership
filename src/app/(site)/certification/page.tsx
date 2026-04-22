@@ -19,6 +19,8 @@ export const metadata: Metadata = {
   },
 };
 
+export const dynamic = "force-dynamic";
+
 type CertificationMember = {
   id: string;
   mm_user_id: string;
