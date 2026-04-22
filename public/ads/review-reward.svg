@@ -1,0 +1,26 @@
+<svg width="1200" height="514" viewBox="0 0 1200 514" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="514" rx="40" fill="#101B2F"/>
+  <path d="M0 0H1200V514H0V0Z" fill="url(#paint0_radial)"/>
+  <path d="M786 108C874 82 966 100 1042 150C1118 200 1168 280 1200 378V514H696C646 468 622 414 622 352C622 238 690 132 786 108Z" fill="#28558B" fill-opacity="0.45"/>
+  <rect x="74" y="74" width="188" height="48" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="104" y="106" fill="#D9E8FF" font-family="Arial, sans-serif" font-size="22" font-weight="700">REWARD EVENT</text>
+  <text x="76" y="196" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="68" font-weight="800">리뷰 작성으로</text>
+  <text x="76" y="274" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="68" font-weight="800">추첨권을 모아보세요</text>
+  <text x="78" y="342" fill="#B8CBE4" font-family="Arial, sans-serif" font-size="38" font-weight="600">브랜드 리뷰를 남기면</text>
+  <text x="78" y="396" fill="#B8CBE4" font-family="Arial, sans-serif" font-size="38" font-weight="600">이벤트 추첨권이 쌓입니다.</text>
+  <g transform="translate(790 162)">
+    <rect width="288" height="212" rx="28" fill="#FFFFFF" fill-opacity="0.12" stroke="#FFFFFF" stroke-opacity="0.22"/>
+    <rect x="28" y="30" width="136" height="26" rx="13" fill="#6FD3FF"/>
+    <rect x="28" y="78" width="228" height="20" rx="10" fill="#FFFFFF" fill-opacity="0.8"/>
+    <rect x="28" y="116" width="196" height="20" rx="10" fill="#FFFFFF" fill-opacity="0.48"/>
+    <rect x="28" y="154" width="152" height="20" rx="10" fill="#FFFFFF" fill-opacity="0.28"/>
+    <circle cx="228" cy="54" r="18" fill="#F59E0B" fill-opacity="0.8"/>
+  </g>
+  <defs>
+    <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(198 76) rotate(30) scale(952 722)">
+      <stop stop-color="#1E40AF" stop-opacity="0.45"/>
+      <stop offset="0.48" stop-color="#1D4ED8" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

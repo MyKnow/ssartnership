@@ -162,8 +162,8 @@ export default async function AdminPage() {
         <SummaryCard
           href="/admin/event"
           title="이벤트 관리"
-          description="진행 중, 예정, 종료 이벤트와 랜딩 조건을 관리합니다."
-          meta="진행 · 예정 · 종료"
+          description="이벤트 페이지 등록과 진행 전, 진행 중, 진행 후 상태를 관리합니다."
+          meta="등록 · 진행 전 · 진행 중 · 진행 후"
         />
         <SummaryCard
           href="/admin/reviews"

@@ -6,23 +6,14 @@ import { requireAdmin } from "@/lib/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
-  type EventCondition,
-  type EventConditionKey,
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
+import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   deletePromotionSlideImageUrls,
   uploadPromotionSlideImageFile,
 } from "@/lib/promotion-slide-storage-server";
 import { logAdminAction } from "./shared-helpers";
-
-const conditionKeys: EventConditionKey[] = [
-  "signup",
-  "mm",
-  "push",
-  "marketing",
-  "review",
-];
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -57,30 +48,35 @@ function parseDateTimeLocal(value: string) {
   return date.toISOString();
 }
 
-function parseRules(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+function revalidatePromotionPaths(slug: string) {
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/advertisement");
+  revalidatePath("/admin/event");
+  revalidatePath("/admin/event/[slug]", "page");
+  revalidatePath("/admin/promotions");
+  revalidatePath("/events/[slug]", "page");
+  revalidatePath(`/events/${slug}`);
 }
 
-function parseCondition(formData: FormData, key: EventConditionKey): EventCondition {
-  const tickets = Number.parseInt(getString(formData, `condition_${key}_tickets`) || "0", 10);
-  return {
-    key,
-    title: getRequiredString(formData, `condition_${key}_title`),
-    description: getRequiredString(formData, `condition_${key}_description`),
-    tickets: Number.isFinite(tickets) ? Math.max(0, tickets) : 0,
-    ctaHref: getRequiredString(formData, `condition_${key}_ctaHref`),
-    ctaLabel: getRequiredString(formData, `condition_${key}_ctaLabel`),
-    repeatable: formData.get(`condition_${key}_repeatable`) === "on",
-  };
+function parseTargetAudiences(formData: FormData) {
+  const values = formData.getAll("targetAudiences");
+  const audiences = normalizeAudienceArray(values);
+  if (audiences.length === 0) {
+    throw new Error("이벤트 대상은 최소 1개 이상 선택해 주세요.");
+  }
+  return audiences;
 }
 
-function parsePromotionEventPayload(formData: FormData) {
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
-  if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-    throw new Error("slug는 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.");
+function parsePromotionEventRegistration(formData: FormData, slug: string) {
+  const normalizedSlug = normalizeSlug(slug);
+  if (!normalizedSlug || normalizedSlug !== slug) {
+    throw new Error("이벤트 슬러그를 확인해 주세요.");
+  }
+
+  const definition = getEventPageDefinition(slug);
+  if (!definition) {
+    throw new Error("등록 가능한 이벤트 페이지를 찾지 못했습니다.");
   }
 
   const startsAt = parseDateTimeLocal(getRequiredString(formData, "startsAt"));
@@ -91,28 +87,20 @@ function parsePromotionEventPayload(formData: FormData) {
 
   return {
     slug,
-    title: getRequiredString(formData, "title"),
-    short_title: getRequiredString(formData, "shortTitle"),
-    description: getRequiredString(formData, "description"),
-    period_label: getRequiredString(formData, "periodLabel"),
+    page_path: `/events/${slug}`,
+    target_audiences: parseTargetAudiences(formData),
     starts_at: startsAt,
     ends_at: endsAt,
-    hero_image_src: getRequiredString(formData, "heroImageSrc"),
-    hero_image_alt: getRequiredString(formData, "heroImageAlt"),
-    conditions: conditionKeys.map((key) => parseCondition(formData, key)),
-    rules: parseRules(getRequiredString(formData, "rules")),
     is_active: formData.get("isActive") === "on",
+    title: definition.title,
+    short_title: definition.shortTitle,
+    description: definition.description,
+    period_label: definition.periodLabel,
+    hero_image_src: definition.heroImageSrc,
+    hero_image_alt: definition.heroImageAlt,
+    conditions: definition.conditions,
+    rules: definition.rules,
   };
-}
-
-function revalidatePromotionPaths(slug: string) {
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/admin/advertisement");
-  revalidatePath("/admin/event");
-  revalidatePath("/admin/promotions");
-  revalidatePath("/events/[slug]", "page");
-  revalidatePath(`/events/${slug}`);
 }
 
 function parsePromotionSlidePayload(formData: FormData) {
@@ -277,8 +265,20 @@ function revalidateAdvertisementPaths() {
 
 export async function createPromotionEventAction(formData: FormData) {
   await requireAdmin();
-  const payload = parsePromotionEventPayload(formData);
+  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const payload = parsePromotionEventRegistration(formData, slug);
   const supabase = getSupabaseAdminClient();
+  const { data: existing, error: existingError } = await supabase
+    .from("promotion_events")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+  if (existing) {
+    throw new Error("이미 등록된 이벤트입니다.");
+  }
   const { error } = await supabase.from("promotion_events").insert(payload);
   if (error) {
     throw new Error(error.message);
@@ -286,17 +286,32 @@ export async function createPromotionEventAction(formData: FormData) {
   await logAdminAction("promotion_event_create", {
     targetType: "promotion_event",
     targetId: payload.slug,
-    properties: { slug: payload.slug, title: payload.title },
+    properties: {
+      slug: payload.slug,
+      pagePath: payload.page_path,
+      targetAudiences: payload.target_audiences,
+    },
   });
   revalidatePromotionPaths(payload.slug);
-  redirect("/admin/event?status=created");
+  redirect(`/admin/event/${payload.slug}?status=created`);
 }
 
 export async function updatePromotionEventAction(formData: FormData) {
   await requireAdmin();
   const id = getRequiredString(formData, "id");
-  const payload = parsePromotionEventPayload(formData);
   const supabase = getSupabaseAdminClient();
+  const { data: existing, error: existingError } = await supabase
+    .from("promotion_events")
+    .select("slug")
+    .eq("id", id)
+    .maybeSingle();
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+  if (!existing?.slug) {
+    throw new Error("이벤트를 찾지 못했습니다.");
+  }
+  const payload = parsePromotionEventRegistration(formData, existing.slug);
   const { error } = await supabase.from("promotion_events").update(payload).eq("id", id);
   if (error) {
     throw new Error(error.message);
@@ -304,10 +319,14 @@ export async function updatePromotionEventAction(formData: FormData) {
   await logAdminAction("promotion_event_update", {
     targetType: "promotion_event",
     targetId: id,
-    properties: { slug: payload.slug, title: payload.title },
+    properties: {
+      slug: payload.slug,
+      pagePath: payload.page_path,
+      targetAudiences: payload.target_audiences,
+    },
   });
   revalidatePromotionPaths(payload.slug);
-  redirect("/admin/event?status=updated");
+  redirect(`/admin/event/${payload.slug}?status=updated`);
 }
 
 export async function deletePromotionEventAction(formData: FormData) {

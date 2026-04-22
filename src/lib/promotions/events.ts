@@ -8,6 +8,9 @@ import {
   type PromotionAudience,
   type PromotionSlide,
 } from "@/lib/promotions/catalog";
+import {
+  getEventPageDefinition,
+} from "@/lib/event-pages";
 import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 import { getSsafyMemberLifecycle, SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -15,6 +18,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 type PromotionEventRow = {
   id: string;
   slug: string;
+  page_path: string | null;
+  target_audiences: unknown;
   title: string;
   short_title: string;
   description: string;
@@ -47,6 +52,8 @@ type PromotionSlideRow = {
 
 export type ManagedEventCampaign = EventCampaign & {
   id: string | null;
+  pagePath: string;
+  targetAudiences: PromotionAudience[];
   isActive: boolean;
   source: "database" | "catalog";
   createdAt: string | null;
@@ -118,6 +125,8 @@ function mapStaticCampaign(campaign: EventCampaign): ManagedEventCampaign {
   return {
     ...campaign,
     id: null,
+    pagePath: `/events/${campaign.slug}`,
+    targetAudiences: [...DEFAULT_PROMOTION_AUDIENCES],
     isActive: true,
     source: "catalog",
     createdAt: null,
@@ -179,19 +188,22 @@ function normalizeCampusValue(value: string | null | undefined) {
 }
 
 function mapRow(row: PromotionEventRow): ManagedEventCampaign {
+  const definition = getEventPageDefinition(row.slug);
   return {
     id: row.id,
     slug: row.slug,
-    title: row.title,
-    shortTitle: row.short_title,
-    description: row.description,
-    periodLabel: row.period_label,
+    title: definition?.title ?? row.title,
+    shortTitle: definition?.shortTitle ?? row.short_title,
+    description: definition?.description ?? row.description,
+    periodLabel: definition?.periodLabel ?? row.period_label,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
-    heroImageSrc: row.hero_image_src,
-    heroImageAlt: row.hero_image_alt,
-    conditions: normalizeConditions(row.conditions),
-    rules: normalizeRules(row.rules),
+    heroImageSrc: definition?.heroImageSrc ?? row.hero_image_src,
+    heroImageAlt: definition?.heroImageAlt ?? row.hero_image_alt,
+    conditions: definition?.conditions ?? normalizeConditions(row.conditions),
+    rules: definition?.rules ?? normalizeRules(row.rules),
+    pagePath: row.page_path?.trim() || `/events/${row.slug}`,
+    targetAudiences: normalizePromotionAudiences(row.target_audiences),
     isActive: row.is_active !== false,
     source: "database",
     createdAt: row.created_at,
@@ -304,7 +316,7 @@ export async function listManagedEventCampaigns(options?: {
     let query = supabase
       .from("promotion_events")
       .select(
-        "id,slug,title,short_title,description,period_label,starts_at,ends_at,hero_image_src,hero_image_alt,conditions,rules,is_active,created_at,updated_at",
+        "id,slug,page_path,target_audiences,title,short_title,description,period_label,starts_at,ends_at,hero_image_src,hero_image_alt,conditions,rules,is_active,created_at,updated_at",
       )
       .order("starts_at", { ascending: false })
       .order("created_at", { ascending: false });
@@ -325,7 +337,7 @@ export async function listManagedEventCampaigns(options?: {
 }
 
 export async function getManagedEventCampaign(slug: string) {
-  const campaigns = await listManagedEventCampaigns({ includeInactive: false });
+  const campaigns = await listManagedEventCampaigns({ includeInactive: true });
   return campaigns.find((campaign) => campaign.slug === slug) ?? null;
 }
 
