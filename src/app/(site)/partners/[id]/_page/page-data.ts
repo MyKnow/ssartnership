@@ -22,6 +22,10 @@ const getPartnerByIdCached = cache(async (id: string, authenticated: boolean) =>
   partnerRepository.getPartnerById(id, { authenticated }),
 );
 
+const getPartnerByIdRawCached = cache(async (id: string) =>
+  partnerRepository.getPartnerByIdRaw(id),
+);
+
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
     return color;
@@ -73,6 +77,7 @@ export async function getPartnerMetadataData(rawId: string) {
 type ContactDisplay = NonNullable<ReturnType<typeof getContactDisplay>>;
 
 export type PartnerDetailPageData = {
+  kind: "detail";
   partner: Partner;
   categoryLabel: string;
   isActive: boolean;
@@ -99,17 +104,31 @@ export type PartnerDetailPageData = {
   currentUserId: string | null;
 };
 
+export type PartnerDetailAccessGateData = {
+  kind: "confidential-gate";
+  returnTo: string;
+};
+
 export async function getPartnerDetailPageData(
   rawId: string,
   authenticated: boolean,
   currentUserId?: string | null,
-): Promise<PartnerDetailPageData | null> {
+): Promise<PartnerDetailPageData | PartnerDetailAccessGateData | null> {
   const [categories, partner] = await Promise.all([
     getCategoriesCached(),
     getPartnerByIdCached(rawId, authenticated),
   ]);
 
   if (!partner) {
+    if (!authenticated) {
+      const confidentialPartner = await getPartnerByIdRawCached(rawId);
+      if (confidentialPartner?.visibility === "confidential") {
+        return {
+          kind: "confidential-gate",
+          returnTo: `/partners/${encodeURIComponent(rawId)}`,
+        };
+      }
+    }
     return null;
   }
 
@@ -139,6 +158,7 @@ export async function getPartnerDetailPageData(
   const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
 
   return {
+    kind: "detail",
     partner,
     categoryLabel,
     isActive,

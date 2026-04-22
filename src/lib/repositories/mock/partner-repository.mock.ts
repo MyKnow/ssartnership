@@ -150,4 +150,8 @@ export class MockPartnerRepository implements PartnerRepository {
     }
     return partner;
   }
+
+  async getPartnerByIdRaw(id: string): Promise<Partner | null> {
+    return partners.find((item) => item.id === id) ?? null;
+  }
 }

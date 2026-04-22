@@ -27,6 +27,7 @@ export type SignupFormProps = {
   selectableYears: number[];
   signupYearsText: string;
   defaultYear: number;
+  returnTo?: string;
 };
 
 export type SignupFieldError = Partial<Record<SignupField, string>>;

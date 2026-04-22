@@ -13,6 +13,7 @@ import {
   getConfiguredSignupSsafyYearText,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export const metadata: Metadata = {
   title: `회원가입 | ${SITE_NAME}`,
@@ -22,14 +23,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+}) {
   const headerSession = await getHeaderSession();
+  const { returnTo: rawReturnTo } = await searchParams;
   let policies = null;
   let policyError: string | null = null;
   const cycleSettings = await getSsafyCycleSettings();
   const selectableYears = getConfiguredSelectableSsafyYears(cycleSettings).slice().sort((a, b) => a - b);
   const currentYear = getConfiguredCurrentSsafyYear(cycleSettings);
   const signupYearsText = getConfiguredSignupSsafyYearText(cycleSettings);
+  const returnTo = sanitizeReturnTo(
+    Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo,
+    "/",
+  );
 
   try {
     policies = await getActiveRequiredPolicies();
@@ -51,12 +61,13 @@ export default async function SignupPage() {
             {policies ? (
               <SignupForm
                 policies={policies}
-                marketingPolicy={marketingPolicy}
-                selectableYears={selectableYears}
-                signupYearsText={signupYearsText}
-                defaultYear={selectableYears[selectableYears.length - 1] ?? currentYear}
-              />
-            ) : (
+              marketingPolicy={marketingPolicy}
+              selectableYears={selectableYears}
+              signupYearsText={signupYearsText}
+              defaultYear={selectableYears[selectableYears.length - 1] ?? currentYear}
+              returnTo={returnTo}
+            />
+          ) : (
               <div className="mt-6">
                 <FormMessage variant="error">
                   {policyError ?? "약관 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."}

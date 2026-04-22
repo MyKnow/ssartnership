@@ -26,6 +26,7 @@ import {
   copyPasswordToClipboard,
   generateBrowserPassword,
 } from "@/lib/browser-password";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export function useSignupFormController({
   policies,
@@ -33,6 +34,7 @@ export function useSignupFormController({
   selectableYears,
   signupYearsText,
   defaultYear,
+  returnTo,
 }: SignupFormProps) {
   const [step, setStep] = useState<SignupStep>("auth");
   const [codeRequested, setCodeRequested] = useState(false);
@@ -55,6 +57,7 @@ export function useSignupFormController({
     () => buildSignupGuideItems(signupYearsText),
     [signupYearsText],
   );
+  const safeReturnTo = sanitizeReturnTo(returnTo, "/");
 
   const usernameRef = useRef<HTMLInputElement>(null);
   const yearGroupRef = useRef<HTMLDivElement>(null);
@@ -239,7 +242,7 @@ export function useSignupFormController({
           username: normalizeMmUsername(username),
           code,
           password,
-          autoLogin: false,
+          autoLogin: Boolean(returnTo),
           servicePolicyId: policies.service.id,
           privacyPolicyId: policies.privacy.id,
           marketingPolicyId: marketingPolicy?.id ?? null,
@@ -255,6 +258,12 @@ export function useSignupFormController({
 
       setFieldErrors({});
       setFormError(null);
+      if (returnTo) {
+        notify("회원가입이 완료되었습니다.");
+        router.replace(safeReturnTo);
+        router.refresh();
+        return;
+      }
       if (typeof window !== "undefined") {
         sessionStorage.setItem("signup:success", "1");
       }

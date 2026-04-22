@@ -8,9 +8,14 @@ import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
+import { sanitizeReturnTo } from "@/lib/return-to";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
-export default function LoginForm() {
+export default function LoginForm({
+  returnTo,
+}: {
+  returnTo?: string;
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{
@@ -96,7 +101,11 @@ export default function LoginForm() {
       setFieldErrors({});
       setFormError(null);
       notify("로그인되었습니다.");
-      router.replace(data.requiresConsent ? "/auth/consent" : "/");
+      const safeReturnTo = sanitizeReturnTo(returnTo, "/");
+      const nextHref = data.requiresConsent
+        ? `/auth/consent?returnTo=${encodeURIComponent(safeReturnTo)}`
+        : safeReturnTo;
+      router.replace(nextHref);
       router.refresh();
     } finally {
       setPending(false);

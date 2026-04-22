@@ -247,4 +247,13 @@ export class SupabasePartnerRepository implements PartnerRepository {
 
     return toVisiblePartner(row, categoryKey);
   }
+
+  async getPartnerByIdRaw(id: string): Promise<Partner | null> {
+    const row = await getPartnerRow(id);
+    if (!row) {
+      return null;
+    }
+    const categoryKey = extractCategoryKey(row.categories) ?? "health";
+    return toVisiblePartner(row, categoryKey);
+  }
 }

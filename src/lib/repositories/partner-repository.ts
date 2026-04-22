@@ -11,4 +11,5 @@ export interface PartnerRepository {
     id: string,
     context?: PartnerViewContext,
   ): Promise<Partner | null>;
+  getPartnerByIdRaw(id: string): Promise<Partner | null>;
 }

@@ -10,6 +10,7 @@ import ShareLinkButton from "@/components/ShareLinkButton";
 import { SITE_NAME } from "@/lib/site";
 import { createCanonicalAlternates } from "@/lib/seo";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
+import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
 import PartnerReviewSection from "@/components/partner-reviews/PartnerReviewSection";
 import PartnerDetailSummaryCard from "./_page/PartnerDetailSummaryCard";
@@ -110,6 +111,9 @@ export default async function PartnerDetailPage({
   );
   if (!pageData) {
     redirect("/");
+  }
+  if (pageData.kind === "confidential-gate") {
+    return <PartnerDetailAccessGate returnTo={pageData.returnTo} />;
   }
   const {
     partner,
