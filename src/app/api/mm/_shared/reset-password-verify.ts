@@ -13,6 +13,7 @@ import {
   isResetPasswordCodeExpired,
   isResetPasswordCodeValid,
 } from "./reset-password-code-store";
+import { issueResetPasswordCompletionToken } from "@/lib/reset-password-session";
 import {
   failResetPasswordVerify,
   failResetPasswordVerifyException,
@@ -135,6 +136,10 @@ export async function handleResetPasswordVerifyPost(request: Request) {
       });
     }
 
+    const completionToken = issueResetPasswordCompletionToken({
+      codeRow,
+    });
+
     await logAuthSecurity({
       ...context,
       eventName: "member_password_reset_verify",
@@ -150,7 +155,7 @@ export async function handleResetPasswordVerifyPost(request: Request) {
     });
     await recordMemberAuthSuccess("verify-reset-code", throttleContext);
 
-    return mmOkResponse({ ok: true, verified: true });
+    return mmOkResponse({ ok: true, verified: true, completionToken });
   } catch (error) {
     return failResetPasswordVerifyException({ context, error });
   }

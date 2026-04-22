@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { hashPassword, isValidPassword } from "@/lib/password";
-import { normalizeMmUsername, PASSWORD_POLICY_MESSAGE, validateMmUsername } from "@/lib/validation";
+import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 import { parseResetPasswordCompleteBody } from "./parsers";
 import {
   createMemberAuthThrottleContext,
@@ -13,15 +13,13 @@ import { mmOkResponse } from "./responses";
 import {
   clearExistingResetPasswordCodeState,
   getLatestResetPasswordCode,
-  isResetPasswordCodeExpired,
-  isResetPasswordCodeValid,
 } from "./reset-password-code-store";
 import {
   failResetPasswordComplete,
   failResetPasswordCompleteException,
 } from "./reset-password-complete-failure";
-import { resolveResetPasswordMember } from "./reset-password-identity";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { verifyResetPasswordCompletionToken } from "@/lib/reset-password-session";
 
 export const RESET_PASSWORD_COMPLETE_RUNTIME = "nodejs";
 
@@ -30,13 +28,39 @@ export async function handleResetPasswordCompletePost(request: Request) {
 
   try {
     const payload = await parseResetPasswordCompleteBody(request);
-    const username = normalizeMmUsername(String(payload.username ?? ""));
-    const code = String(payload.code ?? "").trim().toUpperCase();
+    const token = String(payload.token ?? "").trim();
     const nextPassword = String(payload.nextPassword ?? "");
     const nextPasswordConfirm = String(payload.nextPasswordConfirm ?? "");
-    const throttleContext = createMemberAuthThrottleContext(
+    let throttleContext = createMemberAuthThrottleContext(
       context.ipAddress ?? null,
-      username || null,
+      token || null,
+    );
+
+    if (!token || !nextPassword || !nextPasswordConfirm) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "missing_fields",
+        status: 400,
+        reason: "missing_fields",
+      });
+    }
+
+    const tokenPayload = verifyResetPasswordCompletionToken(token);
+    if (!tokenPayload) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "invalid_code",
+        status: 400,
+        reason: "invalid_code",
+        identifier: null,
+      });
+    }
+
+    throttleContext = createMemberAuthThrottleContext(
+      context.ipAddress ?? null,
+      tokenPayload.mmUserId,
     );
 
     const blockedState = await getMemberAuthBlockedState(
@@ -50,34 +74,13 @@ export async function handleResetPasswordCompletePost(request: Request) {
         error: "blocked",
         status: 429,
         reason: "rate_limit",
-        identifier: username || null,
+        identifier: tokenPayload.mmUserId,
         recordFailure: false,
         blockedDelay: true,
         extra: {
           scope: getMemberAuthBlockedScope(blockedState.identifier),
           blockedUntil: blockedState.blockedUntil,
         },
-      });
-    }
-
-    if (!username || !code || !nextPassword || !nextPasswordConfirm) {
-      return failResetPasswordComplete({
-        context,
-        throttleContext,
-        error: "missing_fields",
-        status: 400,
-        reason: "missing_fields",
-      });
-    }
-
-    if (validateMmUsername(username)) {
-      return failResetPasswordComplete({
-        context,
-        throttleContext,
-        error: "invalid_username",
-        status: 400,
-        reason: "invalid_username",
-        identifier: username,
       });
     }
 
@@ -88,7 +91,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
         error: "password_mismatch",
         status: 400,
         reason: "password_mismatch",
-        identifier: username,
+        identifier: tokenPayload.mmUserId,
       });
     }
 
@@ -99,38 +102,12 @@ export async function handleResetPasswordCompletePost(request: Request) {
         error: "invalid_password",
         status: 400,
         reason: "invalid_password",
-        identifier: username,
+        identifier: tokenPayload.mmUserId,
         message: PASSWORD_POLICY_MESSAGE,
       });
     }
 
-    const resolution = await resolveResetPasswordMember(username);
-    if (resolution.kind === "inaccessible") {
-      return failResetPasswordComplete({
-        context,
-        throttleContext,
-        error: "reset_failed",
-        status: 400,
-        reason: "team_or_channel_inaccessible",
-        identifier: username,
-        extra: {
-          status: resolution.status,
-        },
-      });
-    }
-
-    if (resolution.kind === "not_registered") {
-      return failResetPasswordComplete({
-        context,
-        throttleContext,
-        error: "reset_failed",
-        status: 400,
-        reason: "not_registered",
-        identifier: username,
-      });
-    }
-
-    const codeRow = await getLatestResetPasswordCode(resolution.member.mm_user_id);
+    const codeRow = await getLatestResetPasswordCode(tokenPayload.mmUserId);
     if (!codeRow) {
       return failResetPasswordComplete({
         context,
@@ -138,29 +115,34 @@ export async function handleResetPasswordCompletePost(request: Request) {
         error: "invalid_code",
         status: 400,
         reason: "missing_code",
-        identifier: resolution.member.mm_user_id,
+        identifier: tokenPayload.mmUserId,
       });
     }
 
-    if (isResetPasswordCodeExpired(codeRow)) {
-      return failResetPasswordComplete({
-        context,
-        throttleContext,
-        error: "expired",
-        status: 400,
-        reason: "expired",
-        identifier: resolution.member.mm_user_id,
-      });
-    }
-
-    if (!isResetPasswordCodeValid(code, codeRow)) {
+    if (codeRow.id !== tokenPayload.codeId) {
       return failResetPasswordComplete({
         context,
         throttleContext,
         error: "invalid_code",
         status: 400,
-        reason: "invalid_code",
-        identifier: resolution.member.mm_user_id,
+        reason: "stale_code",
+        identifier: tokenPayload.mmUserId,
+      });
+    }
+
+    const { data: memberRow, error: memberFetchError } = await getSupabaseAdminClient()
+      .from("members")
+      .select("id,mm_user_id,mm_username,year,campus")
+      .eq("mm_user_id", tokenPayload.mmUserId)
+      .maybeSingle();
+    if (memberFetchError || !memberRow) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "reset_failed",
+        status: 400,
+        reason: "not_registered",
+        identifier: tokenPayload.mmUserId,
       });
     }
 
@@ -174,7 +156,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
         must_change_password: false,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", resolution.member.id);
+      .eq("id", memberRow.id);
     if (error) {
       return failResetPasswordComplete({
         context,
@@ -182,15 +164,15 @@ export async function handleResetPasswordCompletePost(request: Request) {
         error: "reset_failed",
         status: 400,
         reason: "db_error",
-        identifier: resolution.member.mm_user_id,
+        identifier: tokenPayload.mmUserId,
       });
     }
 
-    await clearExistingResetPasswordCodeState(resolution.member.mm_user_id);
+    await clearExistingResetPasswordCodeState(tokenPayload.mmUserId);
     const { error: resetAttemptDeleteError } = await supabase
       .from("password_reset_attempts")
       .delete()
-      .eq("identifier", resolution.member.mm_user_id);
+      .eq("identifier", tokenPayload.mmUserId);
     if (resetAttemptDeleteError) {
       return failResetPasswordComplete({
         context,
@@ -198,7 +180,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
         error: "reset_failed",
         status: 400,
         reason: "db_error",
-        identifier: resolution.member.mm_user_id,
+        identifier: tokenPayload.mmUserId,
       });
     }
 
@@ -207,13 +189,13 @@ export async function handleResetPasswordCompletePost(request: Request) {
       eventName: "member_password_reset_complete",
       status: "success",
       actorType: "member",
-      actorId: resolution.member.id,
-      identifier: resolution.member.mm_user_id,
+      actorId: memberRow.id,
+      identifier: tokenPayload.mmUserId,
       properties: {
-        mmUserId: resolution.member.mm_user_id,
-        mmUsername: resolution.member.mm_username,
-        year: resolution.member.year,
-        campus: resolution.member.campus ?? null,
+        mmUserId: memberRow.mm_user_id,
+        mmUsername: memberRow.mm_username,
+        year: memberRow.year,
+        campus: memberRow.campus ?? null,
       },
     });
     await recordMemberAuthSuccess("reset-password", throttleContext);

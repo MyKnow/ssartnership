@@ -40,8 +40,7 @@ export type ResetPasswordVerifyBody = {
 };
 
 export type ResetPasswordCompleteBody = {
-  username?: string;
-  code?: string;
+  token?: string;
   nextPassword?: string;
   nextPasswordConfirm?: string;
 };

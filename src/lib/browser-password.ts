@@ -76,3 +76,13 @@ export function generateBrowserPassword(length = 12) {
 
   return chars.join("");
 }
+
+export function isBrowserPasswordValid(value: string) {
+  if (value.length < 8 || value.length > 64) {
+    return false;
+  }
+  const hasLetter = /[A-Za-z]/.test(value);
+  const hasNumber = /\d/.test(value);
+  const hasSymbol = /[^A-Za-z0-9]/.test(value);
+  return hasLetter && hasNumber && hasSymbol;
+}
