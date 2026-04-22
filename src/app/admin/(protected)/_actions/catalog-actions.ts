@@ -237,6 +237,7 @@ export async function updatePartnerCompanyAction(formData: FormData) {
         summary: companyAudit.summary,
         changedFields: companyAudit.changedFields,
         changes: companyAudit.changes,
+        fieldChanges: companyAudit.fieldChanges,
         name: nextCompany.name,
         slug: nextCompany.slug,
         description: nextCompany.description,

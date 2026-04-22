@@ -159,6 +159,7 @@ export default async function AdminPartnerDetailPage({
     "partner_create",
     "partner_update",
     "partner_delete",
+    "partner_change_request_approve",
     "partner_company_create",
     "partner_company_update",
     "partner_company_delete",

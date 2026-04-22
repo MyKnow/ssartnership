@@ -67,6 +67,11 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
       conditions: summary.requestedConditions,
       benefits: summary.requestedBenefits,
       applies_to: summary.requestedAppliesTo,
+      tags: summary.requestedTags,
+      thumbnail: summary.requestedThumbnail,
+      images: summary.requestedImages,
+      reservation_link: summary.requestedReservationLink,
+      inquiry_link: summary.requestedInquiryLink,
       period_start: summary.requestedPeriodStart,
       period_end: summary.requestedPeriodEnd,
     })

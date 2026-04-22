@@ -31,6 +31,24 @@ function getStringValue(value: unknown) {
   return trimmed ? trimmed : null;
 }
 
+type FieldChange = {
+  label: string;
+  beforeText?: string;
+  afterText?: string;
+};
+
+function getFieldChanges(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (item): item is FieldChange =>
+      Boolean(item) &&
+      typeof item === "object" &&
+      "label" in item,
+  );
+}
+
 export default function AdminPartnerChangeHistory({
   logs,
 }: {
@@ -54,6 +72,7 @@ export default function AdminPartnerChangeHistory({
             const summary = getStringValue(log.properties?.summary) ?? getLogLabel("audit", log.action);
             const changedFields = getStringArray(log.properties?.changedFields);
             const changes = getStringArray(log.properties?.changes);
+            const fieldChanges = getFieldChanges(log.properties?.fieldChanges);
             const rawProperties =
               log.properties && Object.keys(log.properties).length > 0
                 ? JSON.stringify(log.properties, null, 2)
@@ -89,6 +108,19 @@ export default function AdminPartnerChangeHistory({
                       <p key={change} className="text-sm leading-6 text-foreground">
                         {change}
                       </p>
+                    ))}
+                  </div>
+                ) : null}
+
+                {fieldChanges.length > 0 ? (
+                  <div className="grid gap-2 rounded-2xl border border-border/70 bg-surface-inset px-4 py-3">
+                    {fieldChanges.map((fieldChange) => (
+                      <div key={fieldChange.label} className="grid gap-1">
+                        <p className="text-sm font-semibold text-foreground">{fieldChange.label}</p>
+                        <p className="text-sm leading-6 text-muted-foreground">
+                          {fieldChange.beforeText ?? "없음"} → {fieldChange.afterText ?? "없음"}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 ) : null}

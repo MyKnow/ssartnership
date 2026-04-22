@@ -223,12 +223,12 @@ export async function updatePartnerAction(formData: FormData) {
       after: payload.periodEnd,
     },
     {
-      label: "이용 조건",
+      label: "이용조건",
       before: previousPartner.conditions ?? [],
       after: payload.conditions,
     },
     {
-      label: "혜택",
+      label: "이용혜택",
       before: previousPartner.benefits ?? [],
       after: payload.benefits,
     },
@@ -238,14 +238,14 @@ export async function updatePartnerAction(formData: FormData) {
       after: payload.appliesTo,
     },
     {
-      label: "대표 이미지",
+      label: "메인 썸네일",
       before: previousPartner.thumbnail ? "설정됨" : "없음",
       after: media.thumbnail ? "설정됨" : "없음",
       describeChange: (before, after) => {
         if (before === after) {
           return null;
         }
-        return `대표 이미지: ${String(before)} → ${String(after)}`;
+        return `메인 썸네일: ${String(before)} → ${String(after)}`;
       },
     },
     {
@@ -274,6 +274,7 @@ export async function updatePartnerAction(formData: FormData) {
         summary: partnerAudit.summary,
         changedFields: partnerAudit.changedFields,
         changes: partnerAudit.changes,
+        fieldChanges: partnerAudit.fieldChanges,
         companyName: nextCompanyLabel,
         categoryLabel: nextCategoryLabel,
         visibility: payload.visibility,

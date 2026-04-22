@@ -10,6 +10,13 @@ type AuditChangeSummary = {
   summary: string;
   changedFields: string[];
   changes: string[];
+  fieldChanges: Array<{
+    label: string;
+    before: unknown;
+    after: unknown;
+    beforeText: string;
+    afterText: string;
+  }>;
 };
 
 function normalizeAuditValue(value: unknown): unknown {
@@ -72,6 +79,7 @@ export function buildAuditChangeSummary(
 ): AuditChangeSummary {
   const changedFields: string[] = [];
   const changeDescriptions: string[] = [];
+  const fieldChanges: AuditChangeSummary["fieldChanges"] = [];
 
   for (const change of changes) {
     if (isAuditValueEqual(change.before, change.after)) {
@@ -79,9 +87,18 @@ export function buildAuditChangeSummary(
     }
 
     changedFields.push(change.label);
+    const beforeText = formatAuditValue(change.before, change.format);
+    const afterText = formatAuditValue(change.after, change.format);
+    fieldChanges.push({
+      label: change.label,
+      before: change.before,
+      after: change.after,
+      beforeText,
+      afterText,
+    });
     const description =
       change.describeChange?.(change.before, change.after) ??
-      `${change.label}: ${formatAuditValue(change.before, change.format)} → ${formatAuditValue(change.after, change.format)}`;
+      `${change.label}: ${beforeText} → ${afterText}`;
     if (description) {
       changeDescriptions.push(description);
     }
@@ -94,5 +111,6 @@ export function buildAuditChangeSummary(
         : `${entityLabel} 수정`,
     changedFields,
     changes: changeDescriptions,
+    fieldChanges,
   };
 }
