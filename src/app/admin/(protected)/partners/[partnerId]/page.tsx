@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPartnerReviewManager from "@/components/admin/partner-detail/AdminPartnerReviewManager";
+import AdminPartnerChangeHistory from "@/components/admin/partner-detail/AdminPartnerChangeHistory";
 import PartnerCardForm from "@/components/PartnerCardForm";
 import CategoryColorBadge from "@/components/ui/CategoryColorBadge";
 import Badge from "@/components/ui/Badge";
@@ -148,6 +149,31 @@ export default async function AdminPartnerDetailPage({
     partnerId,
     partner.created_at,
   );
+  const auditTargetIds = Array.from(
+    new Set([
+      partner.id,
+      company?.id ?? partner.company_id ?? null,
+    ].filter((value): value is string => Boolean(value))),
+  );
+  const auditActions = [
+    "partner_create",
+    "partner_update",
+    "partner_delete",
+    "partner_company_create",
+    "partner_company_update",
+    "partner_company_delete",
+  ] as const;
+  const partnerAuditLogsResult = auditTargetIds.length
+    ? await supabase
+        .from("admin_audit_logs")
+        .select("id,actor_id,action,target_type,target_id,properties,created_at")
+        .in("action", auditActions as unknown as string[])
+        .in("target_id", auditTargetIds)
+        .order("created_at", { ascending: false })
+    : { data: [], error: null };
+  const partnerAuditLogs = partnerAuditLogsResult.error
+    ? []
+    : partnerAuditLogsResult.data ?? [];
   const reviewQueryString = serializeAdminReviewFilters(reviewFilters);
   const returnTo = reviewQueryString ? `${detailPath}?${reviewQueryString}` : detailPath;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
@@ -295,6 +321,8 @@ export default async function AdminPartnerDetailPage({
             />
           </div>
         </Card>
+
+        <AdminPartnerChangeHistory logs={partnerAuditLogs} />
 
         <Card tone="elevated">
           <AdminPartnerReviewManager

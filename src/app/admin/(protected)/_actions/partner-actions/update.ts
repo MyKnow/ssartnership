@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -26,6 +27,13 @@ function getSafeAdminPartnerPath(value: FormDataEntryValue | null, fallback: str
   return fallback;
 }
 
+function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) {
+    return null;
+  }
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
 export async function updatePartnerAction(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "").trim();
@@ -42,7 +50,9 @@ export async function updatePartnerAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
-    .select("company_id,thumbnail,images")
+    .select(
+      "company_id,category_id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,company:partner_companies(id,name,slug),categories(id,label)",
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -52,6 +62,38 @@ export async function updatePartnerAction(formData: FormData) {
   if (!previousPartner) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
   }
+
+  const previousCompany = normalizeRelation<{
+    id: string;
+    name: string;
+    slug: string;
+  }>((previousPartner as { company?: unknown }).company as
+    | {
+        id: string;
+        name: string;
+        slug: string;
+      }
+    | Array<{
+        id: string;
+        name: string;
+        slug: string;
+      }>
+    | null
+    | undefined);
+  const previousCategory = normalizeRelation<{
+    id: string;
+    label: string;
+  }>((previousPartner as { categories?: unknown }).categories as
+    | {
+        id: string;
+        label: string;
+      }
+    | Array<{
+        id: string;
+        label: string;
+      }>
+    | null
+    | undefined);
 
   const companyPayload = parsePartnerCompanyPayloadOrRedirect(
     formData,
@@ -120,29 +162,124 @@ export async function updatePartnerAction(formData: FormData) {
   const removedUrls = previousUrls.filter((url) => !nextUrls.includes(url));
   await deletePartnerMediaUrls(removedUrls).catch(() => undefined);
 
-  await logAdminAction("partner_update", {
-    targetType: "partner",
-    targetId: id,
-      properties: {
-        name: payload.name,
-        companyId: nextCompanyId,
-        companyName: companyProvision?.company?.name ?? null,
-        categoryId: payload.categoryId,
-        location: payload.location,
-      hasMapUrl: Boolean(payload.mapUrl),
-      hasReservationLink: Boolean(payload.reservationLink),
-      hasInquiryLink: Boolean(payload.inquiryLink),
-      periodStart: payload.periodStart,
-      periodEnd: payload.periodEnd,
-      conditionCount: payload.conditions.length,
-      visibility: payload.visibility,
-      benefitCount: payload.benefits.length,
-      appliesTo: payload.appliesTo,
-      hasThumbnail: Boolean(media.thumbnail),
-      imageCount: media.images.length,
-      tagCount: payload.tags.length,
+  const nextCompany = companyProvision?.company ?? previousCompany;
+  const nextCategoryLabel =
+    payload.categoryId === previousPartner.category_id
+      ? previousCategory?.label ?? payload.categoryId
+      : (await supabase
+          .from("categories")
+          .select("id,label")
+          .eq("id", payload.categoryId)
+          .maybeSingle()).data?.label ?? payload.categoryId;
+  const previousCompanyLabel = previousCompany?.name ?? "없음";
+  const nextCompanyLabel = nextCompany?.name ?? "없음";
+  const partnerAudit = buildAuditChangeSummary("브랜드", [
+    {
+      label: "회사 연결",
+      before: previousCompanyLabel,
+      after: nextCompanyLabel,
     },
-  });
+    {
+      label: "브랜드명",
+      before: previousPartner.name ?? "",
+      after: payload.name,
+    },
+    {
+      label: "카테고리",
+      before: previousCategory?.label ?? payload.categoryId,
+      after: nextCategoryLabel,
+    },
+    {
+      label: "위치",
+      before: previousPartner.location ?? "",
+      after: payload.location,
+    },
+    {
+      label: "지도 링크",
+      before: previousPartner.map_url ?? null,
+      after: payload.mapUrl,
+      format: (value) => (value ? String(value) : "없음"),
+    },
+    {
+      label: "예약 링크",
+      before: previousPartner.reservation_link ?? null,
+      after: payload.reservationLink,
+      format: (value) => (value ? String(value) : "없음"),
+    },
+    {
+      label: "문의 링크",
+      before: previousPartner.inquiry_link ?? null,
+      after: payload.inquiryLink,
+      format: (value) => (value ? String(value) : "없음"),
+    },
+    {
+      label: "제휴 시작일",
+      before: previousPartner.period_start ?? null,
+      after: payload.periodStart,
+    },
+    {
+      label: "제휴 종료일",
+      before: previousPartner.period_end ?? null,
+      after: payload.periodEnd,
+    },
+    {
+      label: "이용 조건",
+      before: previousPartner.conditions ?? [],
+      after: payload.conditions,
+    },
+    {
+      label: "혜택",
+      before: previousPartner.benefits ?? [],
+      after: payload.benefits,
+    },
+    {
+      label: "노출 대상",
+      before: previousPartner.applies_to ?? [],
+      after: payload.appliesTo,
+    },
+    {
+      label: "대표 이미지",
+      before: previousPartner.thumbnail ? "설정됨" : "없음",
+      after: media.thumbnail ? "설정됨" : "없음",
+      describeChange: (before, after) => {
+        if (before === after) {
+          return null;
+        }
+        return `대표 이미지: ${String(before)} → ${String(after)}`;
+      },
+    },
+    {
+      label: "추가 이미지 수",
+      before: previousPartner.images?.length ?? 0,
+      after: media.images.length,
+      format: (value) => `${Number(value) || 0}장`,
+    },
+    {
+      label: "태그",
+      before: previousPartner.tags ?? [],
+      after: payload.tags,
+    },
+    {
+      label: "공개 상태",
+      before: previousPartner.visibility,
+      after: payload.visibility,
+    },
+  ]);
+
+  if (partnerAudit.changedFields.length > 0) {
+    await logAdminAction("partner_update", {
+      targetType: "partner",
+      targetId: id,
+      properties: {
+        summary: partnerAudit.summary,
+        changedFields: partnerAudit.changedFields,
+        changes: partnerAudit.changes,
+        companyName: nextCompanyLabel,
+        categoryLabel: nextCategoryLabel,
+        visibility: payload.visibility,
+      },
+    });
+  }
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
   redirect(redirectPath);

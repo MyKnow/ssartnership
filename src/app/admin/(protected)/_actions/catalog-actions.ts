@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
+import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import { buildPartnerCompanySlug } from "./partner-support";
 import {
   parseCategoryPayloadOrRedirect,
@@ -209,16 +210,40 @@ export async function updatePartnerCompanyAction(formData: FormData) {
     }
   }
 
-  await logAdminAction("partner_company_update", {
-    targetType: "partner_company",
-    targetId: payload.companyId,
-    properties: {
-      name: nextCompany.name,
-      slug: nextCompany.slug,
-      description: nextCompany.description,
-      isActive: nextCompany.is_active,
+  const companyAudit = buildAuditChangeSummary("협력사", [
+    {
+      label: "이름",
+      before: existingCompany.name,
+      after: nextCompany.name,
     },
-  });
+    {
+      label: "설명",
+      before: existingCompany.description ?? "",
+      after: nextCompany.description ?? "",
+    },
+    {
+      label: "활성 상태",
+      before: Boolean(existingCompany.is_active),
+      after: nextCompany.is_active,
+      format: (value) => (value ? "활성" : "비활성"),
+    },
+  ]);
+
+  if (companyAudit.changedFields.length > 0) {
+    await logAdminAction("partner_company_update", {
+      targetType: "partner_company",
+      targetId: payload.companyId,
+      properties: {
+        summary: companyAudit.summary,
+        changedFields: companyAudit.changedFields,
+        changes: companyAudit.changes,
+        name: nextCompany.name,
+        slug: nextCompany.slug,
+        description: nextCompany.description,
+        isActive: nextCompany.is_active,
+      },
+    });
+  }
 
   revalidatePartnerCompanyData();
   redirect("/admin/companies");

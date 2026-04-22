@@ -60,6 +60,7 @@ export function revalidatePartnerCompanyData() {
   revalidatePath("/admin");
   revalidatePath("/admin/companies");
   revalidatePath("/admin/partners");
+  revalidatePath("/admin/partners/[partnerId]", "page");
   revalidatePath("/partner");
   revalidatePath("/partners/[id]", "page");
   revalidatePath("/partner/services/[partnerId]", "page");
