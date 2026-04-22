@@ -99,9 +99,10 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
   ]);
 
   await logAdminAction("partner_change_request_approve", {
-    targetType: "partner_change_request",
-    targetId: request.id,
+    targetType: "partner",
+    targetId: request.partnerId,
     properties: {
+      requestId: request.id,
       summary: approvalAudit.summary,
       changedFields: approvalAudit.changedFields,
       changes: approvalAudit.changes,
@@ -132,9 +133,10 @@ export async function rejectPartnerChangeRequestAction(formData: FormData) {
   });
 
   await logAdminAction("partner_change_request_reject", {
-    targetType: "partner_change_request",
-    targetId: request.id,
+    targetType: "partner",
+    targetId: request.partnerId,
     properties: {
+      requestId: request.id,
       partnerId: request.partnerId,
       partnerName: request.partnerName,
       companyId: request.companyId,
