@@ -2,7 +2,7 @@
 
 정렬 기준: 영향 범위 × 위험도 × 구현 효과. 위에 있는 항목일수록 먼저 처리한다.
 
-최종 점검: 2026-04-10
+최종 점검: 2026-04-23
 
 1. [x] 공개 레이아웃의 세션 및 정책 조회 비용 줄이기
    대상: `src/app/(site)/layout.tsx`, `src/lib/user-auth.ts`, `src/lib/policy-documents.ts`
@@ -104,6 +104,29 @@
    대상: `src/lib/repositories/*`, `src/components/PartnerImageCarousel.tsx`, `src/components/PartnerCardForm.tsx`, `src/app/api/image/route.ts`, storage 관련 레이어
    이유: 제휴 업체 이미지를 정적 저장/서빙하면 외부 링크 의존과 로딩 변동성을 줄이고, 캐시 효율과 안정성을 높일 수 있다.
    완료: 썸네일과 갤러리를 분리하고, 로컬 업로드/드래그앤드롭/URL 입력 후 크롭한 `webp` 파일을 `partner-media` storage로 일괄 저장하도록 바꿨다.
+
+15. [ ] 리뷰/즐겨찾기/알림센터 확장
+   대상: `src/lib/reviews/**`, `src/components/review/**`, `src/components/home-view/selectors.ts`, `src/lib/partner-dashboard.ts`, `src/lib/admin-notification-ops.ts`, `src/app/admin/**`, `src/app/partner/**`, `src/components/notifications/**`
+   이유: 리뷰 반응, 브랜드 즐겨찾기, 홈 인기 정렬, 카드 메트릭, Admin/Partner 전용 알림센터를 한 흐름으로 묶어 사용성, 재방문, 운영 효율을 같이 올린다.
+   세부 단계:
+   15-1. [x] 리뷰 추천/비추천
+      대상: `src/lib/repositories/partner-review-repository.ts`, `src/app/api/partners/[id]/reviews/**`, `src/components/admin/reviews/**`
+      목표: 리뷰별 추천/비추천 1회 반응과 취소를 처리하고, 리뷰 목록/상세/관리자 화면에 집계값을 노출한다.
+   15-2. [x] 홈 정렬을 인기 많은 순으로 변경
+      대상: `src/components/home-view/selectors.ts`, `src/components/HomeView.tsx`, `src/app/(site)/page.tsx`
+      목표: 즐겨찾기·리뷰·조회수 기반 가중치 점수를 기본 정렬로 쓰고, 정렬 옵션에 `인기 많은 순`을 추가한다.
+   15-3. [x] 브랜드 즐겨찾기
+      대상: `src/lib/repositories/*`, `src/app/api/partners/[id]/favorite/**`, `src/components/partner/**`, `src/components/home-view/**`
+      목표: 회원별 브랜드 즐겨찾기/해제와 상태 동기화를 제공한다.
+   15-4. [x] 카드 메트릭 노출
+      대상: `src/lib/partner-dashboard.ts`, `src/app/(site)/partners/**`, `src/components/partner/**`
+      목표: 카드에 즐겨찾기 수, 리뷰 수, 뷰어십 수를 보여주고 홈 정렬과 같은 집계 소스를 쓴다.
+   15-5. [x] Admin 알림센터
+      대상: `src/app/admin/**`, `src/components/admin/**`, `src/lib/admin-notification-ops.ts`
+      목표: `/admin/notifications` 별도 페이지에서 발송 결과, 실패, 예약/즉시 발송, 대상자 요약을 조회한다.
+   15-6. [x] Partner 알림센터
+      대상: `src/app/partner/**`, `src/components/partner/**`, `src/lib/repositories/notification-repository.*`
+      목표: `/partner/notifications` 별도 페이지에서 공지, 운영 알림, 승인/반려, 정산/리뷰 알림을 조회한다.
 
 ## 유지 규칙
 

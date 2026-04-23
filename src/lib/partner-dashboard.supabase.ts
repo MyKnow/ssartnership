@@ -14,6 +14,7 @@ import {
   normalizePartnerPortalServiceStatus,
   sumPartnerPortalMetrics,
 } from "./partner-dashboard.ts";
+import { partnerFavoriteRepository } from "./repositories/index.ts";
 import { normalizePartnerVisibility } from "./partner-visibility.ts";
 
 type PartnerCompanyRow = {
@@ -66,6 +67,7 @@ function extractCategoryLabel(
 
 function createEmptyMetrics(): PartnerPortalServiceMetrics {
   return {
+    favoriteCount: 0,
     detailViews: 0,
     detailUv: 0,
     cardClicks: 0,
@@ -199,6 +201,16 @@ export async function getSupabasePartnerPortalDashboard(
     createEmptyMetrics(),
   ] as const);
   const metricsByServiceId = new Map(serviceMetricsEntries);
+  let favoriteCounts = new Map<string, number>();
+
+  try {
+    favoriteCounts = await partnerFavoriteRepository.getFavoriteCounts(
+      serviceRows.map((serviceRow) => serviceRow.id),
+    );
+  } catch (error) {
+    markPartialFailure();
+    console.error("[partner-dashboard] favorite metric query failed", error);
+  }
 
   const rollupResult = await fetchPartnerMetricRollupRows(supabase, {
     partnerIds: serviceRows.map((serviceRow) => serviceRow.id),
@@ -268,6 +280,14 @@ export async function getSupabasePartnerPortalDashboard(
       continue;
     }
     metrics.reviewCount = reviewCount;
+  }
+
+  for (const serviceRow of serviceRows) {
+    const metrics = metricsByServiceId.get(serviceRow.id);
+    if (!metrics) {
+      continue;
+    }
+    metrics.favoriteCount = favoriteCounts.get(serviceRow.id) ?? 0;
   }
 
   const companies = companyRows.map((row) => {

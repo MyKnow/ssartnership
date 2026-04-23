@@ -51,6 +51,11 @@ export default function PartnerServiceMetricsPanel({
             hint: "공개 상태 리뷰 수",
           },
           {
+            label: "즐겨찾기",
+            value: formatCount(metrics.favoriteCount),
+            hint: "브랜드 즐겨찾기 수",
+          },
+          {
             label: "PV",
             value: formatCount(metrics.detailViews),
             hint: "브랜드 상세 페이지 총 조회 수",

@@ -11,9 +11,10 @@ import {
   type PartnerAudienceFilter,
 } from "@/lib/partner-audience";
 
-export type PartnerSortOption = "recent" | "endingSoon";
+export type PartnerSortOption = "popular" | "recent" | "endingSoon";
 
 export const partnerSortOptions: Array<{ value: PartnerSortOption; label: string }> = [
+  { value: "popular", label: "인기 많은 순" },
   { value: "recent", label: "등록순" },
   { value: "endingSoon", label: "종료일 마감순" },
 ];
@@ -84,7 +85,7 @@ export default function PartnerFilters({
           </div>
         ) : null}
         <div className="flex flex-col gap-1 lg:w-56">
-          <span className="ui-caption">정렬 (현재 제휴 우선)</span>
+          <span className="ui-caption">정렬</span>
           <Select
             value={sortValue}
             onChange={(event) =>

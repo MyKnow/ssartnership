@@ -221,6 +221,11 @@ export default async function AdminPartnerDetailPage({
               minItemWidth="11rem"
               items={[
                 {
+                  label: "즐겨찾기",
+                  value: `${metrics?.favoriteCount ?? 0}`,
+                  hint: "저장한 회원 수",
+                },
+                {
                   label: "PV",
                   value: `${metrics?.detailViews ?? 0}`,
                   hint: "상세 페이지 조회",

@@ -8,6 +8,8 @@ import PartnerCardActions from "@/components/partner-card-view/PartnerCardAction
 import PartnerCardLockState from "@/components/partner-card-view/PartnerCardLockState";
 import PartnerCardMedia from "@/components/partner-card-view/PartnerCardMedia";
 import PartnerCardMeta from "@/components/partner-card-view/PartnerCardMeta";
+import PartnerFavoriteButton from "@/components/partner-favorites/PartnerFavoriteButton";
+import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import {
   buildPartnerCardTrackingProperties,
   createCategoryAccentStyles,
@@ -21,6 +23,9 @@ export default function PartnerCardView({
   className,
   onCategoryClick,
   viewerAuthenticated = false,
+  currentUserId,
+  isFavorited = false,
+  metrics,
 }: {
   partner: Partner;
   categoryLabel?: string;
@@ -28,6 +33,9 @@ export default function PartnerCardView({
   className?: string;
   onCategoryClick?: (categoryKey: CategoryKey) => void;
   viewerAuthenticated?: boolean;
+  currentUserId?: string | null;
+  isFavorited?: boolean;
+  metrics?: PartnerPopularityMetrics;
 }) {
   const router = useRouter();
   const { badgeStyle } = createCategoryAccentStyles(categoryColor);
@@ -129,6 +137,16 @@ export default function PartnerCardView({
             },
           })
         }
+        headerAction={
+          currentUserId ? (
+            <PartnerFavoriteButton
+              partnerId={partner.id}
+              initialFavorited={isFavorited}
+              compact
+            />
+          ) : null
+        }
+        metrics={metrics}
         media={<PartnerCardMedia thumbnailUrl={thumbnailUrl} />}
       />
       <PartnerCardActions

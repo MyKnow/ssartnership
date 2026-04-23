@@ -5,6 +5,9 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
+import PartnerCardMetrics from "@/components/partner-card-view/PartnerCardMetrics";
+import PartnerFavoriteButton from "@/components/partner-favorites/PartnerFavoriteButton";
+import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { Partner } from "@/lib/types";
 
 export default function PartnerDetailSummaryCard({
@@ -14,6 +17,9 @@ export default function PartnerDetailSummaryCard({
   chipStyle,
   thumbnailUrl,
   mapLink,
+  currentUserId,
+  isFavorited,
+  metrics,
 }: {
   partner: Partner;
   categoryLabel: string;
@@ -21,6 +27,9 @@ export default function PartnerDetailSummaryCard({
   chipStyle?: CSSProperties;
   thumbnailUrl: string;
   mapLink?: string;
+  currentUserId?: string | null;
+  isFavorited?: boolean;
+  metrics?: PartnerPortalServiceMetrics | null;
 }) {
   return (
     <Card
@@ -33,12 +42,21 @@ export default function PartnerDetailSummaryCard({
       />
       <div className="relative flex flex-col">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Badge
-            className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
-            style={badgeStyle}
-          >
-            {categoryLabel}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
+              style={badgeStyle}
+            >
+              {categoryLabel}
+            </Badge>
+            {currentUserId ? (
+              <PartnerFavoriteButton
+                partnerId={partner.id}
+                initialFavorited={Boolean(isFavorited)}
+                compact={false}
+              />
+            ) : null}
+          </div>
           <span className="text-xs font-medium text-muted-foreground">
             {partner.period.start} ~ {partner.period.end}
           </span>
@@ -94,6 +112,17 @@ export default function PartnerDetailSummaryCard({
             </TrackedAnchor>
           ) : null}
         </div>
+
+        {metrics ? (
+          <PartnerCardMetrics
+            className="mt-5"
+            items={[
+              { label: "즐겨찾기", value: metrics.favoriteCount ?? 0 },
+              { label: "리뷰", value: metrics.reviewCount ?? 0 },
+              { label: "뷰어십", value: metrics.detailViews ?? 0 },
+            ]}
+          />
+        ) : null}
 
         <div className="mt-6 grid gap-5">
           <div>

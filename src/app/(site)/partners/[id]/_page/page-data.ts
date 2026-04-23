@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 import { cache } from "react";
 import { getCachedImageUrl } from "@/lib/image-cache";
+import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
+import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
 import {
   getContactDisplay,
   getMapLink,
@@ -8,12 +10,17 @@ import {
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import type { PartnerReviewListResult, PartnerReviewSort, PartnerReviewSummary } from "@/lib/partner-reviews";
-import { partnerRepository, partnerReviewRepository } from "@/lib/repositories";
+import {
+  partnerFavoriteRepository,
+  partnerRepository,
+  partnerReviewRepository,
+} from "@/lib/repositories";
 import { buildSiteUrl } from "@/lib/seo";
 import {
   buildPartnerSeoMetadata,
   buildPartnerStructuredData,
 } from "@/lib/seo/partners";
+import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { Category, Partner } from "@/lib/types";
 
 const getCategoriesCached = cache(async () => partnerRepository.getCategories());
@@ -95,6 +102,7 @@ export type PartnerDetailPageData = {
   breadcrumbJsonLd: Record<string, unknown>;
   partnerJsonLd: Record<string, unknown>;
   carouselKey: string;
+  metrics: PartnerPortalServiceMetrics;
   reviewSummary: PartnerReviewSummary;
   initialReviews: PartnerReviewListResult["items"];
   initialReviewSort: PartnerReviewSort;
@@ -102,6 +110,7 @@ export type PartnerDetailPageData = {
   initialReviewHasMore: boolean;
   canWriteReview: boolean;
   currentUserId: string | null;
+  isFavorited: boolean;
 };
 
 export type PartnerDetailAccessGateData = {
@@ -114,9 +123,10 @@ export async function getPartnerDetailPageData(
   authenticated: boolean,
   currentUserId?: string | null,
 ): Promise<PartnerDetailPageData | PartnerDetailAccessGateData | null> {
-  const [categories, partner] = await Promise.all([
+  const [categories, partner, favoriteIds] = await Promise.all([
     getCategoriesCached(),
     getPartnerByIdCached(rawId, authenticated),
+    currentUserId ? partnerFavoriteRepository.getMemberFavoritePartnerIds(currentUserId, [rawId]) : Promise.resolve(new Set<string>()),
   ]);
 
   if (!partner) {
@@ -156,6 +166,10 @@ export async function getPartnerDetailPageData(
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
   const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
+  const partnerMetricsResult = await getAdminPartnerMetrics([rawId]);
+  const metrics =
+    partnerMetricsResult.metricsByPartnerId.get(rawId) ??
+    createEmptyPartnerServiceMetrics();
 
   return {
     kind: "detail",
@@ -204,6 +218,7 @@ export async function getPartnerDetailPageData(
       categoryLabel,
     }),
     carouselKey: `${partner.id}:${(partner.images ?? []).join("|")}`,
+    metrics,
     reviewSummary: initialReviewData.summary,
     initialReviews: initialReviewData.items,
     initialReviewSort: "latest",
@@ -211,5 +226,6 @@ export async function getPartnerDetailPageData(
     initialReviewHasMore: initialReviewData.hasMore,
     canWriteReview: Boolean(currentUserId),
     currentUserId: currentUserId ?? null,
+    isFavorited: favoriteIds.has(rawId),
   };
 }

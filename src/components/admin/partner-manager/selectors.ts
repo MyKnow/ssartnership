@@ -4,6 +4,9 @@ import {
   normalizePartnerAudience,
 } from "../../../lib/partner-audience.ts";
 import type { PartnerSortOption } from "../../PartnerFilters";
+import {
+  calculatePartnerPopularityScore,
+} from "@/lib/partner-popularity";
 import type {
   ActiveCategoryFilter,
   AdminCategory,
@@ -63,6 +66,11 @@ export function filterAndSortAdminPartners({
       _index: index,
       _categoryKey: categoryKey,
       _isActive: isWithinPeriod(partner.period_start, partner.period_end),
+      _popularityScore: calculatePartnerPopularityScore({
+        favoriteCount: partner.metrics?.favoriteCount,
+        detailViews: partner.metrics?.detailViews,
+        reviewCount: partner.metrics?.reviewCount,
+      }),
       _search: [
         partner.name,
         partner.company?.name ?? "",
@@ -98,6 +106,12 @@ export function filterAndSortAdminPartners({
   return [...searchFiltered].sort((a, b) => {
     if (a._isActive !== b._isActive) {
       return a._isActive ? -1 : 1;
+    }
+    if (sortValue === "popular") {
+      const compare = b._popularityScore - a._popularityScore;
+      if (compare !== 0) {
+        return compare;
+      }
     }
     if (sortValue === "endingSoon") {
       const compare = compareEndDate(a.period_end, b.period_end);

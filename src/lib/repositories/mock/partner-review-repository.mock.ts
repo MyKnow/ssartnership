@@ -1,11 +1,13 @@
 import {
   buildPartnerReviewSummary,
+  createEmptyPartnerReviewReactionState,
   getPartnerReviewAuthorRoleLabel,
   maskPartnerReviewAuthorName,
   matchesPartnerReviewRatingFilter,
   normalizePartnerReviewRatingFilter,
   normalizePartnerReviewSort,
   type PartnerReview,
+  type PartnerReviewReaction,
 } from "@/lib/partner-reviews";
 import { mockPreviewMembers } from "@/lib/mock/member-preview";
 import type {
@@ -15,6 +17,7 @@ import type {
   PartnerReviewModerationRecord,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
+  SetPartnerReviewReactionInput,
   SoftDeletePartnerReviewInput,
   UpdatePartnerReviewInput,
 } from "@/lib/repositories/partner-review-repository";
@@ -34,8 +37,15 @@ type MockReviewRecord = {
   updatedAt: string;
 };
 
+type MockReactionRecord = {
+  reviewId: string;
+  memberId: string;
+  reaction: PartnerReviewReaction;
+};
+
 type MockReviewStore = {
   reviews: MockReviewRecord[];
+  reactions: MockReactionRecord[];
 };
 
 const seededReviews: MockReviewRecord[] = [
@@ -77,13 +87,31 @@ function getStore() {
   if (!globalScope.__mockPartnerReviewStore) {
     globalScope.__mockPartnerReviewStore = {
       reviews: seededReviews.map((review) => ({ ...review, images: [...review.images] })),
+      reactions: [],
     };
   }
   return globalScope.__mockPartnerReviewStore;
 }
 
+function getReviewReactionState(recordId: string, currentUserId?: string | null) {
+  const reactions = getStore().reactions.filter((reaction) => reaction.reviewId === recordId);
+  const state = createEmptyPartnerReviewReactionState();
+  for (const reaction of reactions) {
+    if (reaction.reaction === "recommend") {
+      state.recommendCount += 1;
+    } else {
+      state.disrecommendCount += 1;
+    }
+    if (currentUserId && reaction.memberId === currentUserId) {
+      state.myReaction = reaction.reaction;
+    }
+  }
+  return state;
+}
+
 function mapReview(record: MockReviewRecord, currentUserId?: string | null): PartnerReview {
   const member = mockPreviewMembers.find((item) => item.id === record.memberId);
+  const reactionState = getReviewReactionState(record.id, currentUserId);
   return {
     id: record.id,
     partnerId: record.partnerId,
@@ -99,6 +127,9 @@ function mapReview(record: MockReviewRecord, currentUserId?: string | null): Par
     isMine: currentUserId === record.memberId,
     isHidden: record.hiddenAt !== null,
     hiddenAt: record.hiddenAt,
+    recommendCount: reactionState.recommendCount,
+    disrecommendCount: reactionState.disrecommendCount,
+    myReaction: reactionState.myReaction,
   };
 }
 
@@ -211,6 +242,47 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     review.deletedAt = new Date().toISOString();
     review.deletedByMemberId = input.memberId;
     review.updatedAt = review.deletedAt;
+  }
+
+  async setPartnerReviewReaction(input: SetPartnerReviewReactionInput) {
+    const review = getStore().reviews.find(
+      (item) =>
+        item.id === input.reviewId &&
+        item.deletedAt === null &&
+        item.hiddenAt === null,
+    );
+    if (!review) {
+      throw new Error("리뷰를 찾을 수 없습니다.");
+    }
+
+    const currentIndex = getStore().reactions.findIndex(
+      (reaction) =>
+        reaction.reviewId === input.reviewId && reaction.memberId === input.memberId,
+    );
+    const currentReaction = currentIndex >= 0 ? getStore().reactions[currentIndex] : null;
+
+    if (!input.reaction || currentReaction?.reaction === input.reaction) {
+      if (currentIndex >= 0) {
+        getStore().reactions.splice(currentIndex, 1);
+      }
+      return mapReview(review, input.memberId);
+    }
+
+    if (currentIndex >= 0) {
+      getStore().reactions[currentIndex] = {
+        reviewId: input.reviewId,
+        memberId: input.memberId,
+        reaction: input.reaction,
+      };
+    } else {
+      getStore().reactions.push({
+        reviewId: input.reviewId,
+        memberId: input.memberId,
+        reaction: input.reaction,
+      });
+    }
+
+    return mapReview(review, input.memberId);
   }
 
   async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {

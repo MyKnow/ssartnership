@@ -144,6 +144,7 @@ export default function PartnerServiceDetailViewContent({
                   chipStyle={visualState.chipStyle}
                   thumbnailUrl={visualState.thumbnailUrl}
                   mapLink={visualState.mapLink}
+                  metrics={serviceMetrics}
                 />
 
                 <PartnerImageCarousel

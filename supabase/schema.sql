@@ -241,6 +241,31 @@ create table if not exists partner_reviews (
   updated_at timestamp with time zone default now()
 );
 
+create table if not exists partner_review_reactions (
+  id uuid primary key default uuid_generate_v4(),
+  review_id uuid not null references partner_reviews(id) on delete cascade,
+  member_id uuid not null references members(id) on delete cascade,
+  reaction text not null,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_review_reactions_reaction_check check (reaction in ('recommend', 'disrecommend')),
+  constraint partner_review_reactions_review_id_member_id_key unique (review_id, member_id)
+);
+
+create table if not exists partner_favorites (
+  id uuid primary key default uuid_generate_v4(),
+  partner_id uuid not null references partners(id) on delete cascade,
+  member_id uuid not null references members(id) on delete cascade,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_favorites_partner_id_member_id_key unique (partner_id, member_id)
+);
+
+create index if not exists partner_favorites_partner_id_idx
+  on partner_favorites(partner_id);
+create index if not exists partner_favorites_member_id_created_at_idx
+  on partner_favorites(member_id, created_at desc);
+
 alter table partner_reviews
   drop constraint if exists partner_reviews_rating_check;
 alter table partner_reviews
@@ -1361,6 +1386,10 @@ create index if not exists partner_reviews_partner_id_rating_asc_idx
   on partner_reviews(partner_id, deleted_at, hidden_at, rating asc, created_at desc);
 create index if not exists partner_reviews_member_id_partner_id_created_at_idx
   on partner_reviews(member_id, partner_id, deleted_at, hidden_at, created_at desc);
+create index if not exists partner_review_reactions_review_id_idx
+  on partner_review_reactions(review_id, reaction);
+create index if not exists partner_review_reactions_member_id_idx
+  on partner_review_reactions(member_id, review_id);
 
 drop index if exists mm_verification_codes_email_idx;
 
@@ -1382,6 +1411,8 @@ alter table mm_verification_attempts enable row level security;
 alter table password_reset_attempts enable row level security;
 alter table partner_change_requests enable row level security;
 alter table partner_reviews enable row level security;
+alter table partner_review_reactions enable row level security;
+alter table partner_favorites enable row level security;
 alter table push_preferences enable row level security;
 alter table notifications enable row level security;
 alter table member_notifications enable row level security;
@@ -1424,6 +1455,10 @@ revoke all on table partner_change_requests from anon;
 revoke all on table partner_change_requests from authenticated;
 revoke all on table partner_reviews from anon;
 revoke all on table partner_reviews from authenticated;
+revoke all on table partner_review_reactions from anon;
+revoke all on table partner_review_reactions from authenticated;
+revoke all on table partner_favorites from anon;
+revoke all on table partner_favorites from authenticated;
 revoke all on table members from anon;
 revoke all on table members from authenticated;
 revoke all on table policy_documents from anon;

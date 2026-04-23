@@ -22,6 +22,7 @@ export default function PartnerPortalActionLinks({
   const pathname = usePathname();
   const isSetupRoute = pathname.startsWith("/partner/setup");
   const isDashboardRoute = pathname === "/partner";
+  const isNotificationsRoute = pathname === "/partner/notifications";
 
   const supportLink = (
     <Button variant="ghost" href={TECH_SUPPORT_HREF}>
@@ -51,6 +52,12 @@ export default function PartnerPortalActionLinks({
           대시보드
         </Button>
       )}
+      <Button
+        variant={isNotificationsRoute ? "soft" : "ghost"}
+        href="/partner/notifications"
+      >
+        알림센터
+      </Button>
       {isMock ? (
         <Button variant="ghost" href="/partner/setup">
           초기 설정

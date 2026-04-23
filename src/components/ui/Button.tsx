@@ -62,6 +62,7 @@ type ButtonProps = {
   loading?: boolean;
   loadingText?: string;
   ariaLabel?: string;
+  ariaPressed?: boolean;
   title?: string;
   style?: React.CSSProperties;
   form?: string;
@@ -97,6 +98,7 @@ export default function Button({
   loading,
   loadingText,
   ariaLabel,
+  ariaPressed,
   title,
   style,
   form,
@@ -137,6 +139,7 @@ export default function Button({
     const sharedProps = {
       className: classes,
       "aria-label": ariaLabel,
+      "aria-pressed": ariaPressed,
       title,
       target,
       rel: safeRel,
@@ -167,6 +170,7 @@ export default function Button({
       onClick={onClick}
       disabled={isDisabled}
       aria-label={ariaLabel}
+      aria-pressed={ariaPressed}
       title={title}
       style={style}
       form={form}

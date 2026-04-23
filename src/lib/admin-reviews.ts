@@ -1,8 +1,13 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
+  createEmptyPartnerReviewReactionState,
   getPartnerReviewAuthorRoleLabel,
   maskPartnerReviewAuthorName,
 } from "@/lib/partner-reviews";
+import {
+  aggregatePartnerReviewReactionStates,
+  type PartnerReviewReactionRow,
+} from "@/lib/partner-review-reactions";
 
 export type AdminReviewSort = "latest" | "oldest";
 export type AdminReviewStatusFilter = "all" | "visible" | "hidden";
@@ -56,6 +61,8 @@ export type AdminReviewRecord = {
   authorRoleLabel: string;
   isHidden: boolean;
   imageCount: number;
+  recommendCount: number;
+  disrecommendCount: number;
 };
 
 export type AdminReviewCounts = {
@@ -118,6 +125,8 @@ type AdminReviewRow = {
     campus: string | null;
   }[] | null;
 };
+
+type AdminReviewReactionRow = PartnerReviewReactionRow;
 
 type AdminReviewPartnerRow = {
   id: string;
@@ -217,7 +226,10 @@ export function serializeAdminReviewFilters(filters: AdminReviewFilters) {
   return params.toString();
 }
 
-function mapAdminReviewRow(row: AdminReviewRow): AdminReviewRecord {
+function mapAdminReviewRow(
+  row: AdminReviewRow,
+  reactionState = createEmptyPartnerReviewReactionState(),
+): AdminReviewRecord {
   const partner = getSingleRelation(row.partner);
   const company = getSingleRelation(partner?.company);
   const member = getSingleRelation(row.member);
@@ -249,6 +261,8 @@ function mapAdminReviewRow(row: AdminReviewRow): AdminReviewRecord {
     authorRoleLabel: getPartnerReviewAuthorRoleLabel(memberYear),
     isHidden: row.hidden_at !== null,
     imageCount: (row.images ?? []).length,
+    recommendCount: reactionState.recommendCount,
+    disrecommendCount: reactionState.disrecommendCount,
   };
 }
 
@@ -314,7 +328,29 @@ async function fetchAllAdminReviewRows(sort: AdminReviewSort) {
     offset += pageSize;
   }
 
-  return rows.map(mapAdminReviewRow);
+  const reactionStates = await fetchAdminReviewReactionStates(rows.map((row) => row.id));
+  return rows.map((row) => mapAdminReviewRow(row, reactionStates.get(row.id)));
+}
+
+async function fetchAdminReviewReactionStates(reviewIds: string[]) {
+  if (reviewIds.length === 0) {
+    return new Map<string, ReturnType<typeof createEmptyPartnerReviewReactionState>>();
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("partner_review_reactions")
+    .select("review_id,member_id,reaction")
+    .in("review_id", reviewIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return aggregatePartnerReviewReactionStates(
+    reviewIds,
+    (data ?? []) as AdminReviewReactionRow[],
+  );
 }
 
 export async function getAdminReviewCounts(): Promise<AdminReviewCounts> {

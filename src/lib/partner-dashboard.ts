@@ -12,6 +12,7 @@ export type PartnerPortalServiceStatus =
   | "rejected";
 
 export type PartnerPortalServiceMetrics = {
+  favoriteCount: number;
   detailViews: number;
   detailUv: number;
   cardClicks: number;
@@ -49,6 +50,7 @@ export interface PartnerPortalDashboardRepository {
 }
 
 const zeroMetrics = (): PartnerPortalServiceMetrics => ({
+  favoriteCount: 0,
   detailViews: 0,
   detailUv: 0,
   cardClicks: 0,
@@ -68,6 +70,7 @@ export function sumPartnerPortalMetrics(
 ): PartnerPortalServiceMetrics {
   return metricsList.reduce<PartnerPortalServiceMetrics>(
     (accumulator, metrics) => ({
+      favoriteCount: accumulator.favoriteCount + metrics.favoriteCount,
       detailViews: accumulator.detailViews + metrics.detailViews,
       detailUv: accumulator.detailUv + metrics.detailUv,
       cardClicks: accumulator.cardClicks + metrics.cardClicks,

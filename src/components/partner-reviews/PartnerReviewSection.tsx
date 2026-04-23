@@ -7,6 +7,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import Select from "@/components/ui/Select";
 import type {
   PartnerReview,
+  PartnerReviewReaction,
   PartnerReviewRatingFilter,
   PartnerReviewSort,
   PartnerReviewSummary,
@@ -58,6 +59,7 @@ export default function PartnerReviewSection({
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(null);
+  const [reactingReviewId, setReactingReviewId] = useState<string | null>(null);
 
   const includeHiddenReviews = accessMode === "partner";
 
@@ -179,6 +181,33 @@ export default function PartnerReviewSection({
       await refreshList(sort);
     } finally {
       setModeratingReviewId(null);
+    }
+  }
+
+  async function reactToReview(reviewId: string, reaction: PartnerReviewReaction | null) {
+    setReactingReviewId(reviewId);
+    setErrorMessage(null);
+    try {
+      const response = await fetch(
+        `/api/partners/${encodeURIComponent(partnerId)}/reviews/${encodeURIComponent(reviewId)}/reaction`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reaction }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setErrorMessage(data.message ?? "리뷰 반응에 실패했습니다.");
+        return;
+      }
+      startTransition(() => {
+        setReviews((current) =>
+          current.map((item) => (item.id === reviewId ? data.review : item)),
+        );
+      });
+    } finally {
+      setReactingReviewId(null);
     }
   }
 
@@ -327,13 +356,19 @@ export default function PartnerReviewSection({
                 review={review}
                 deleting={deletingReviewId === review.id}
                 moderating={moderatingReviewId === review.id}
+                reactionPending={reactingReviewId === review.id}
                 showOwnerActions={showWriteControls}
                 showHiddenContent={includeHiddenReviews}
                 showModerationActions={accessMode === "partner"}
+                showReactionActions={accessMode === "public" && canWriteReview}
                 onEdit={() => setEditingReviewId(review.id)}
                 onDelete={() => void deleteReview(review.id)}
                 onHide={() => void moderateReview(review.id, "hide")}
                 onRestore={() => void moderateReview(review.id, "restore")}
+                onReact={(reaction) => {
+                  const nextReaction = review.myReaction === reaction ? null : reaction;
+                  void reactToReview(review.id, nextReaction);
+                }}
               />
             ),
           )}

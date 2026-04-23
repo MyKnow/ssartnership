@@ -107,8 +107,13 @@ export default function AdminMobileNav({
     },
     {
       href: "/admin/push",
-      label: "푸시 알림 관리",
+      label: "알림 전송",
       active: pathname === "/admin/push",
+    },
+    {
+      href: "/admin/notifications",
+      label: "알림센터",
+      active: pathname === "/admin/notifications",
     },
     {
       href: "/admin/advertisement",

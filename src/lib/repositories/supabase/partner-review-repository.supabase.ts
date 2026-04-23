@@ -1,11 +1,16 @@
 import {
   buildPartnerReviewSummary,
+  createEmptyPartnerReviewReactionState,
   getPartnerReviewAuthorRoleLabel,
   maskPartnerReviewAuthorName,
   normalizePartnerReviewRatingFilter,
   normalizePartnerReviewSort,
   type PartnerReview,
 } from "@/lib/partner-reviews";
+import {
+  aggregatePartnerReviewReactionStates,
+  type PartnerReviewReactionRow,
+} from "@/lib/partner-review-reactions";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type {
   CreatePartnerReviewInput,
@@ -14,6 +19,7 @@ import type {
   PartnerReviewModerationRecord,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
+  SetPartnerReviewReactionInput,
   SoftDeletePartnerReviewInput,
   UpdatePartnerReviewInput,
 } from "@/lib/repositories/partner-review-repository";
@@ -138,7 +144,11 @@ async function listReviewRows(
   };
 }
 
-function mapReview(row: PartnerReviewRow, currentUserId?: string | null): PartnerReview {
+function mapReview(
+  row: PartnerReviewRow,
+  currentUserId?: string | null,
+  reactionState = createEmptyPartnerReviewReactionState(),
+): PartnerReview {
   return {
     id: row.id,
     partnerId: row.partner_id,
@@ -154,7 +164,35 @@ function mapReview(row: PartnerReviewRow, currentUserId?: string | null): Partne
     isMine: currentUserId === row.member_id,
     isHidden: row.hidden_at !== null,
     hiddenAt: row.hidden_at ?? null,
+    recommendCount: reactionState.recommendCount,
+    disrecommendCount: reactionState.disrecommendCount,
+    myReaction: reactionState.myReaction,
   };
+}
+
+async function getReviewReactionStates(
+  reviewIds: string[],
+  currentUserId?: string | null,
+) {
+  if (reviewIds.length === 0) {
+    return new Map<string, ReturnType<typeof createEmptyPartnerReviewReactionState>>();
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("partner_review_reactions")
+    .select("review_id,member_id,reaction")
+    .in("review_id", reviewIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return aggregatePartnerReviewReactionStates(
+    reviewIds,
+    (data ?? []) as PartnerReviewReactionRow[],
+    currentUserId,
+  );
 }
 
 export class SupabasePartnerReviewRepository implements PartnerReviewRepository {
@@ -189,7 +227,11 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       Boolean(context.imagesOnly),
       Boolean(context.includeHidden),
     );
-    const items = rows.map((row) => mapReview(row, context.currentUserId));
+    const reactionStates = await getReviewReactionStates(
+      rows.map((row) => row.id),
+      context.currentUserId,
+    );
+    const items = rows.map((row) => mapReview(row, context.currentUserId, reactionStates.get(row.id)));
     const summary = buildPartnerReviewSummary(
       rows
         .filter((row) => row.deleted_at === null && row.hidden_at === null)
@@ -272,6 +314,88 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     if (error) {
       throw new Error(error.message);
     }
+  }
+
+  async setPartnerReviewReaction(input: SetPartnerReviewReactionInput) {
+    const supabase = getSupabaseAdminClient();
+    const now = new Date().toISOString();
+
+    const { data: reviewRecord, error: reviewRecordError } = await supabase
+      .from("partner_reviews")
+      .select("id,partner_id,deleted_at,hidden_at")
+      .eq("id", input.reviewId)
+      .maybeSingle();
+
+    if (reviewRecordError) {
+      throw new Error(reviewRecordError.message);
+    }
+    if (!reviewRecord || reviewRecord.deleted_at || reviewRecord.hidden_at) {
+      throw new Error("리뷰를 찾을 수 없습니다.");
+    }
+
+    const { data: existingReaction, error: existingReactionError } = await supabase
+      .from("partner_review_reactions")
+      .select("id,reaction")
+      .eq("review_id", input.reviewId)
+      .eq("member_id", input.memberId)
+      .maybeSingle();
+
+    if (existingReactionError) {
+      throw new Error(existingReactionError.message);
+    }
+
+    if (!input.reaction || existingReaction?.reaction === input.reaction) {
+      if (existingReaction) {
+        const { error } = await supabase
+          .from("partner_review_reactions")
+          .delete()
+          .eq("id", existingReaction.id);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
+    } else if (existingReaction) {
+      const { error } = await supabase
+        .from("partner_review_reactions")
+        .update({
+          reaction: input.reaction,
+          updated_at: now,
+        })
+        .eq("id", existingReaction.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    } else {
+      const { error } = await supabase.from("partner_review_reactions").insert({
+        review_id: input.reviewId,
+        member_id: input.memberId,
+        reaction: input.reaction,
+        created_at: now,
+        updated_at: now,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+
+    const { data: review, error: reviewError } = await supabase
+      .from("partner_reviews")
+      .select(REVIEW_SELECT)
+      .eq("id", input.reviewId)
+      .maybeSingle();
+
+    if (reviewError) {
+      throw new Error(reviewError.message);
+    }
+    if (!review) {
+      throw new Error("리뷰를 찾을 수 없습니다.");
+    }
+
+    const reactionStates = await getReviewReactionStates([input.reviewId], input.memberId);
+    return mapReview(review as PartnerReviewRow, input.memberId, reactionStates.get(input.reviewId));
   }
 
   async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {

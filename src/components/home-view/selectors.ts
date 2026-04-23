@@ -5,8 +5,12 @@ import {
   getPartnerVisibilityState,
 } from "../../lib/partner-visibility.ts";
 import { compareEndDate } from "../../lib/partner-utils.ts";
+import {
+  calculatePartnerPopularityScore,
+  type PartnerPopularityMetrics,
+} from "@/lib/partner-popularity";
 
-export type HomePartnerSortOption = "recent" | "endingSoon";
+export type HomePartnerSortOption = "popular" | "recent" | "endingSoon";
 
 const LOCK_ORDER = {
   confidential: 0,
@@ -19,6 +23,7 @@ export type HomePartnerViewModel = Partner & {
   _lockKind: "confidential" | "private" | null;
   _isActive: boolean;
   _isExpired: boolean;
+  _popularityScore: number;
   _search: string;
 };
 
@@ -34,12 +39,16 @@ export function createHomeCategoryMap(categories: Category[]) {
 export function normalizeHomePartners(
   partners: Partner[],
   viewerAuthenticated: boolean,
+  popularityByPartnerId: Record<string, PartnerPopularityMetrics | undefined> = {},
 ): HomePartnerViewModel[] {
   return partners.map((partner, index) => {
     const visibilityState = getPartnerVisibilityState(
       partner.visibility,
       partner.period.start,
       partner.period.end,
+    );
+    const popularityScore = calculatePartnerPopularityScore(
+      popularityByPartnerId[partner.id],
     );
 
     const lockKind =
@@ -54,6 +63,7 @@ export function normalizeHomePartners(
       _lockKind: lockKind,
       _isActive: visibilityState !== "expired",
       _isExpired: visibilityState === "expired",
+      _popularityScore: popularityScore,
       _search: [
         partner.name,
         partner.location,
@@ -113,6 +123,12 @@ export function filterHomePartners({
       }
       if (a._isActive !== b._isActive) {
         return a._isActive ? -1 : 1;
+      }
+      if (sortValue === "popular") {
+        const compare = b._popularityScore - a._popularityScore;
+        if (compare !== 0) {
+          return compare;
+        }
       }
       if (sortValue === "endingSoon") {
         const compare = compareEndDate(a.period.end, b.period.end);

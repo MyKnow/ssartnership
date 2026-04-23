@@ -2,6 +2,14 @@ export type PartnerReviewSort = "latest" | "oldest" | "rating_desc" | "rating_as
 
 export type PartnerReviewRatingFilter = "all" | "1" | "2" | "3" | "4" | "5";
 
+export type PartnerReviewReaction = "recommend" | "disrecommend";
+
+export type PartnerReviewReactionState = {
+  recommendCount: number;
+  disrecommendCount: number;
+  myReaction: PartnerReviewReaction | null;
+};
+
 export type PartnerReviewSummary = {
   averageRating: number;
   totalCount: number;
@@ -23,6 +31,9 @@ export type PartnerReview = {
   isMine: boolean;
   isHidden: boolean;
   hiddenAt: string | null;
+  recommendCount: number;
+  disrecommendCount: number;
+  myReaction: PartnerReviewReaction | null;
 };
 
 export type PartnerReviewListResult = {
@@ -43,6 +54,14 @@ export function createEmptyPartnerReviewSummary(): PartnerReviewSummary {
       4: 0,
       5: 0,
     },
+  };
+}
+
+export function createEmptyPartnerReviewReactionState(): PartnerReviewReactionState {
+  return {
+    recommendCount: 0,
+    disrecommendCount: 0,
+    myReaction: null,
   };
 }
 

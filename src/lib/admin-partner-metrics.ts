@@ -9,6 +9,7 @@ import {
 } from "@/lib/partner-metric-rollups";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { partnerFavoriteRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const PARTNER_ADMIN_METRICS_WARNING_MESSAGE =
@@ -72,6 +73,16 @@ export async function getAdminPartnerMetrics(
       .in("partner_id", uniquePartnerIds)
       .is("deleted_at", null),
   ]);
+  let favoriteCounts = new Map<string, number>();
+
+  try {
+    favoriteCounts = await partnerFavoriteRepository.getFavoriteCounts(
+      uniquePartnerIds,
+    );
+  } catch (error) {
+    hasPartialFailure = true;
+    console.error("[admin-partner-metrics] favorite query failed", error);
+  }
 
   if (eventResult.errorMessage) {
     hasPartialFailure = true;
@@ -112,6 +123,14 @@ export async function getAdminPartnerMetrics(
       }
       metrics.reviewCount += 1;
     }
+  }
+
+  for (const partnerId of uniquePartnerIds) {
+    const metrics = metricsByPartnerId.get(partnerId);
+    if (!metrics) {
+      continue;
+    }
+    metrics.favoriteCount = favoriteCounts.get(partnerId) ?? 0;
   }
 
   return {

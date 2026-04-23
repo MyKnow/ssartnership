@@ -3,8 +3,10 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
+import PartnerCardMetrics from "@/components/partner-card-view/PartnerCardMetrics";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import SectionTitle from "@/components/partner/partner-service-detail-view/SectionTitle";
+import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { PartnerChangeRequestContext } from "@/lib/partner-change-requests";
 
 export default function PartnerServiceSummaryCard({
@@ -13,12 +15,14 @@ export default function PartnerServiceSummaryCard({
   chipStyle,
   thumbnailUrl,
   mapLink,
+  metrics,
 }: {
   context: PartnerChangeRequestContext;
   badgeStyle?: Record<string, string>;
   chipStyle?: Record<string, string>;
   thumbnailUrl: string;
   mapLink?: string | null;
+  metrics?: PartnerPortalServiceMetrics;
 }) {
   const categoryBadgeClass = "px-2 py-0.5 text-[10px] tracking-[0.06em]";
 
@@ -98,6 +102,17 @@ export default function PartnerServiceSummaryCard({
             </TrackedAnchor>
           ) : null}
         </div>
+
+        {metrics ? (
+          <PartnerCardMetrics
+            className="mt-5"
+            items={[
+              { label: "즐겨찾기", value: metrics.favoriteCount ?? 0 },
+              { label: "리뷰", value: metrics.reviewCount ?? 0 },
+              { label: "뷰어십", value: metrics.detailViews ?? 0 },
+            ]}
+          />
+        ) : null}
 
         <div className="mt-6 grid gap-5">
           <div>

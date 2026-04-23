@@ -73,6 +73,8 @@ export default function AdminReviewCard({
             <Badge variant="neutral">
               {review.imageCount > 0 ? `사진 ${review.imageCount}장` : "사진 없음"}
             </Badge>
+            <Badge variant="success">추천 {review.recommendCount}</Badge>
+            <Badge variant="danger">비추천 {review.disrecommendCount}</Badge>
             <span className="text-xs text-muted-foreground">
               {formatPartnerReviewDate(review.createdAt)}
             </span>

@@ -29,13 +29,16 @@ type Props = {
     audienceFilter: PushAudienceScope | "all";
     sort: SortOption;
   };
-  deletingLogId: string | null;
+  deletingLogId?: string | null;
   onUpdateFilter: (
     key: "search" | "typeFilter" | "sourceFilter" | "statusFilter" | "audienceFilter" | "sort",
     value: string,
   ) => void;
-  onLoadLog: (log: AdminNotificationOperationLog) => void;
-  onDeleteLog: (logId: string) => Promise<void>;
+  onLoadLog?: (log: AdminNotificationOperationLog) => void;
+  onDeleteLog?: (logId: string) => Promise<void>;
+  readOnly?: boolean;
+  title?: string;
+  description?: string;
 };
 
 function AutomaticSummaryStrip({
@@ -73,15 +76,18 @@ export function PushLogsSection({
   automaticSummaries,
   filteredLogs,
   filters,
+  readOnly = false,
   onDeleteLog,
   onLoadLog,
   onUpdateFilter,
+  title = "알림 운영 로그",
+  description = "최근 발송 이력을 검색하고 같은 구성을 다시 불러옵니다.",
 }: Props) {
   return (
     <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-[var(--shadow-flat)] sm:p-5">
       <SectionHeading
-        title="알림 운영 로그"
-        description="최근 발송 이력을 검색하고 같은 구성을 다시 불러옵니다."
+        title={title}
+        description={description}
       />
 
       <AutomaticSummaryStrip summaries={automaticSummaries} />
@@ -183,25 +189,27 @@ export function PushLogsSection({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                  <Button
-                    className="w-full justify-center sm:w-auto"
-                    variant="ghost"
-                    onClick={() => onLoadLog(log)}
-                  >
-                    불러오기
-                  </Button>
-                  <Button
-                    variant="danger"
-                    className="w-full justify-center sm:w-auto"
-                    onClick={() => void onDeleteLog(log.id)}
-                    loading={deletingLogId === log.id}
-                    loadingText="삭제 중"
-                    disabled={Boolean(deletingLogId && deletingLogId !== log.id)}
-                  >
-                    삭제
-                  </Button>
-                </div>
+                {!readOnly && onLoadLog && onDeleteLog ? (
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                    <Button
+                      className="w-full justify-center sm:w-auto"
+                      variant="ghost"
+                      onClick={() => onLoadLog(log)}
+                    >
+                      불러오기
+                    </Button>
+                    <Button
+                      variant="danger"
+                      className="w-full justify-center sm:w-auto"
+                      onClick={() => void onDeleteLog(log.id)}
+                      loading={deletingLogId === log.id}
+                      loadingText="삭제 중"
+                      disabled={Boolean(deletingLogId && deletingLogId !== log.id)}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </div>
           ))

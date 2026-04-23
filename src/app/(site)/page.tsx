@@ -123,7 +123,10 @@ export default async function Home() {
             <HomePushOptInBannerGate memberId={session?.userId ?? null} />
           </Suspense>
           <Suspense fallback={null}>
-            <HomeContent viewerAuthenticated={Boolean(session?.userId)} />
+            <HomeContent
+              viewerAuthenticated={Boolean(session?.userId)}
+              currentUserId={session?.userId ?? null}
+            />
           </Suspense>
         </Container>
       </main>

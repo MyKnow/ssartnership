@@ -10,6 +10,7 @@ import { listMockPartnerPortalCompanySetups } from "./store.ts";
 
 function cloneMetrics(metrics: PartnerPortalServiceMetrics) {
   return {
+    favoriteCount: metrics.favoriteCount,
     detailViews: metrics.detailViews,
     detailUv: metrics.detailUv,
     cardClicks: metrics.cardClicks,
@@ -25,6 +26,7 @@ function normalizeMetrics(
   metrics?: Partial<PartnerPortalServiceMetrics> | null,
 ): PartnerPortalServiceMetrics {
   return {
+    favoriteCount: metrics?.favoriteCount ?? 0,
     detailViews: metrics?.detailViews ?? 0,
     detailUv: metrics?.detailUv ?? 0,
     cardClicks: metrics?.cardClicks ?? 0,
@@ -39,6 +41,7 @@ function normalizeMetrics(
 function sumMetrics(records: PartnerPortalServiceMetrics[]) {
   return records.reduce<PartnerPortalServiceMetrics>(
     (accumulator, metrics) => ({
+      favoriteCount: accumulator.favoriteCount + metrics.favoriteCount,
       detailViews: accumulator.detailViews + metrics.detailViews,
       detailUv: accumulator.detailUv + metrics.detailUv,
       cardClicks: accumulator.cardClicks + metrics.cardClicks,
@@ -50,6 +53,7 @@ function sumMetrics(records: PartnerPortalServiceMetrics[]) {
       totalClicks: accumulator.totalClicks + metrics.totalClicks,
     }),
     {
+      favoriteCount: 0,
       detailViews: 0,
       detailUv: 0,
       cardClicks: 0,

@@ -99,6 +99,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           categoryLabel: "카페",
           visibility: "public",
           metrics: {
+            favoriteCount: 124,
             detailViews: 1240,
             detailUv: 782,
             cardClicks: 360,
@@ -116,6 +117,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           categoryLabel: "공간제휴",
           visibility: "public",
           metrics: {
+            favoriteCount: 63,
             detailViews: 520,
             detailUv: 338,
             cardClicks: 120,
@@ -133,6 +135,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           categoryLabel: "카페",
           visibility: "confidential",
           metrics: {
+            favoriteCount: 18,
             detailViews: 190,
             detailUv: 121,
             cardClicks: 44,
@@ -168,6 +171,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           categoryLabel: "헬스",
           visibility: "public",
           metrics: {
+            favoriteCount: 168,
             detailViews: 1560,
             detailUv: 968,
             cardClicks: 410,
@@ -185,6 +189,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           categoryLabel: "헬스",
           visibility: "confidential",
           metrics: {
+            favoriteCount: 29,
             detailViews: 240,
             detailUv: 155,
             cardClicks: 56,

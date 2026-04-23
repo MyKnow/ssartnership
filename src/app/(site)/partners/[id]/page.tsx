@@ -137,12 +137,15 @@ export default async function PartnerDetailPage({
     breadcrumbJsonLd,
     partnerJsonLd,
     carouselKey,
+    metrics,
     reviewSummary,
     initialReviews,
     initialReviewSort,
     initialReviewOffset,
     initialReviewHasMore,
     canWriteReview,
+    isFavorited,
+    currentUserId,
   } = pageData;
 
   return (
@@ -204,6 +207,9 @@ export default async function PartnerDetailPage({
                 chipStyle={chipStyle}
                 thumbnailUrl={thumbnailUrl}
                 mapLink={mapLink}
+                currentUserId={currentUserId}
+                isFavorited={isFavorited}
+                metrics={metrics}
               />
 
               <PartnerImageCarousel

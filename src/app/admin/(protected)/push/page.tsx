@@ -35,12 +35,12 @@ export default async function AdminPushPage() {
   const safeMembers = memberResult.error ? [] : memberResult.data ?? [];
 
   return (
-    <AdminShell title="통합 알림 운영" backHref="/admin" backLabel="관리 홈">
+    <AdminShell title="알림 전송" backHref="/admin" backLabel="관리 홈">
       <div className="grid gap-6">
         <ShellHeader
           eyebrow="Notifications"
-          title="통합 알림 운영"
-          description="운영 공지와 마케팅을 검토 후 발송하고, 신규 제휴와 종료 임박 자동 알림 상태까지 함께 봅니다."
+          title="알림 전송"
+          description="운영 공지와 마케팅 메시지를 작성해 발송합니다. 발송 결과와 운영 로그는 알림센터에서 확인합니다."
         />
           <div className="mt-6">
             <AdminPushManager

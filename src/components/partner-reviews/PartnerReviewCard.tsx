@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { HandThumbDownIcon as HandThumbDownIconOutline } from "@heroicons/react/24/outline";
+import { HandThumbDownIcon as HandThumbDownIconSolid } from "@heroicons/react/24/solid";
+import { HandThumbUpIcon as HandThumbUpIconOutline } from "@heroicons/react/24/outline";
+import { HandThumbUpIcon as HandThumbUpIconSolid } from "@heroicons/react/24/solid";
 import Image from "next/image";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
-import type { PartnerReview } from "@/lib/partner-reviews";
+import { cn } from "@/lib/cn";
+import type { PartnerReview, PartnerReviewReaction } from "@/lib/partner-reviews";
 import { formatPartnerReviewDate } from "./helpers";
 import PartnerReviewLightbox from "./PartnerReviewLightbox";
 import ReviewStarsInput from "./ReviewStarsInput";
@@ -16,24 +21,64 @@ export default function PartnerReviewCard({
   onDelete,
   onHide,
   onRestore,
+  onReact,
   deleting,
   moderating,
+  reactionPending,
   showOwnerActions = true,
   showHiddenContent = false,
   showModerationActions = false,
+  showReactionActions = true,
 }: {
   review: PartnerReview;
   onEdit: () => void;
   onDelete: () => void;
   onHide?: () => void;
   onRestore?: () => void;
+  onReact?: (reaction: PartnerReviewReaction) => void;
   deleting?: boolean;
   moderating?: boolean;
+  reactionPending?: boolean;
   showOwnerActions?: boolean;
   showHiddenContent?: boolean;
   showModerationActions?: boolean;
+  showReactionActions?: boolean;
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  function renderReactionButton(
+    reaction: PartnerReviewReaction,
+    label: string,
+    count: number,
+    active: boolean,
+  ) {
+    const Icon = reaction === "recommend"
+      ? active
+        ? HandThumbUpIconSolid
+        : HandThumbUpIconOutline
+      : active
+        ? HandThumbDownIconSolid
+        : HandThumbDownIconOutline;
+    return (
+      <Button
+        variant={reaction === "recommend" ? (active ? "soft" : "secondary") : active ? "danger" : "secondary"}
+        size="sm"
+        loading={reactionPending}
+        loadingText="반응 중"
+        onClick={() => onReact?.(reaction)}
+        className={cn(
+          "min-w-[7rem] justify-start",
+          reaction === "recommend" && active ? "text-primary" : null,
+        )}
+      >
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+        <span className="tabular-nums text-xs font-semibold opacity-80">
+          {count.toLocaleString()}
+        </span>
+      </Button>
+    );
+  }
 
   if (review.isHidden && !showHiddenContent) {
     return (
@@ -105,6 +150,26 @@ export default function PartnerReviewCard({
       </div>
 
       <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">{review.body}</p>
+
+      {showReactionActions && onReact ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {renderReactionButton(
+            "recommend",
+            "추천",
+            review.recommendCount,
+            review.myReaction === "recommend",
+          )}
+          {renderReactionButton(
+            "disrecommend",
+            "비추천",
+            review.disrecommendCount,
+            review.myReaction === "disrecommend",
+          )}
+          <span className="text-xs text-muted-foreground">
+            이 리뷰에 반응할 수 있습니다.
+          </span>
+        </div>
+      ) : null}
 
       {review.images.length > 0 ? (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">

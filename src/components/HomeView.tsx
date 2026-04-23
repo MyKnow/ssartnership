@@ -22,6 +22,7 @@ import { useToast } from "@/components/ui/Toast";
 import {
   type PartnerAudienceFilter,
 } from "@/lib/partner-audience";
+import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import {
   createHomeCategoryMap,
   filterHomePartners,
@@ -34,10 +35,16 @@ export default function HomeView({
   categories,
   partners,
   viewerAuthenticated,
+  currentUserId,
+  partnerPopularityById,
+  partnerFavoriteStateById,
 }: {
   categories: Category[];
   partners: Partner[];
   viewerAuthenticated: boolean;
+  currentUserId: string | null;
+  partnerPopularityById?: Record<string, PartnerPopularityMetrics | undefined>;
+  partnerFavoriteStateById?: Record<string, boolean | undefined>;
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
     "all",
@@ -61,7 +68,7 @@ export default function HomeView({
     },
   );
   const [searchValue, setSearchValue] = useState("");
-  const [sortValue, setSortValue] = useState<PartnerSortOption>("recent");
+  const [sortValue, setSortValue] = useState<PartnerSortOption>("popular");
   const deferredSearchValue = useDeferredValue(searchValue);
   const searchTimeoutRef = useRef<number | null>(null);
   const lastLoggedSearchRef = useRef("");
@@ -72,8 +79,13 @@ export default function HomeView({
   }, [categories]);
 
   const normalizedPartners = useMemo(
-    () => normalizeHomePartners(partners, viewerAuthenticated),
-    [partners, viewerAuthenticated],
+    () =>
+      normalizeHomePartners(
+        partners,
+        viewerAuthenticated,
+        partnerPopularityById ?? {},
+      ),
+    [partnerPopularityById, partners, viewerAuthenticated],
   );
 
   const filteredPartners = useMemo(() => {
@@ -234,6 +246,9 @@ export default function HomeView({
                   }
                   categoryColor={categoryMap.get(partner.category)?.color}
                   viewerAuthenticated={viewerAuthenticated}
+                  currentUserId={currentUserId}
+                  isFavorited={partnerFavoriteStateById?.[partner.id] ?? false}
+                  metrics={partnerPopularityById?.[partner.id]}
                   onCategoryClick={handleCategoryChange}
                 />
               ))}

@@ -1,7 +1,9 @@
 import type { MouseEvent } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
+import PartnerCardMetrics from "@/components/partner-card-view/PartnerCardMetrics";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
+import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import type { CategoryKey, Partner } from "@/lib/types";
 
 export default function PartnerCardMeta({
@@ -14,7 +16,9 @@ export default function PartnerCardMeta({
   onCategoryClick,
   onTitleClick,
   onMapClick,
+  headerAction,
   media,
+  metrics,
 }: {
   partner: Partner;
   categoryLabel?: string;
@@ -25,7 +29,9 @@ export default function PartnerCardMeta({
   onCategoryClick?: (categoryKey: CategoryKey) => void;
   onTitleClick: () => void;
   onMapClick: () => void;
+  headerAction?: React.ReactNode;
   media: React.ReactNode;
+  metrics?: PartnerPopularityMetrics;
 }) {
   const handleCategoryClick = onCategoryClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
@@ -71,24 +77,27 @@ export default function PartnerCardMeta({
       <div className="flex items-start gap-4">
         {media}
         <div className="grid flex-1 gap-2">
-          <div className="grid gap-1">
-            {categoryBadge}
-            <div className="flex items-center gap-2">
-              {canNavigate ? (
-                <Link
-                  href={detailHref}
-                  className="min-w-0 flex-1 text-left text-xl font-semibold leading-none text-foreground line-clamp-2 hover:underline"
-                  aria-label={`${partner.name} 상세 보기`}
-                  onClick={onTitleClick}
-                >
-                  {partner.name}
-                </Link>
-              ) : (
-                <h3 className="min-w-0 flex-1 text-xl font-semibold leading-none text-foreground line-clamp-2">
-                  {partner.name}
-                </h3>
-              )}
+          <div className="flex items-start justify-between gap-3">
+            <div className="grid gap-1">
+              {categoryBadge}
+              <div className="flex items-center gap-2">
+                {canNavigate ? (
+                  <Link
+                    href={detailHref}
+                    className="min-w-0 flex-1 text-left text-xl font-semibold leading-none text-foreground line-clamp-2 hover:underline"
+                    aria-label={`${partner.name} 상세 보기`}
+                    onClick={onTitleClick}
+                  >
+                    {partner.name}
+                  </Link>
+                ) : (
+                  <h3 className="min-w-0 flex-1 text-xl font-semibold leading-none text-foreground line-clamp-2">
+                    {partner.name}
+                  </h3>
+                )}
+              </div>
             </div>
+            {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
           </div>
           <div className="flex items-start justify-between gap-2 text-sm text-muted-foreground">
             <span className="min-w-0 flex-1 leading-snug">{partner.location}</span>
@@ -120,6 +129,16 @@ export default function PartnerCardMeta({
               </a>
             ) : null}
           </div>
+          {metrics ? (
+            <PartnerCardMetrics
+              className="mt-1"
+              items={[
+                { label: "즐겨찾기", value: metrics.favoriteCount ?? 0 },
+                { label: "리뷰", value: metrics.reviewCount ?? 0 },
+                { label: "뷰어십", value: metrics.detailViews ?? 0 },
+              ]}
+            />
+          ) : null}
         </div>
       </div>
       <div className="text-sm text-foreground">

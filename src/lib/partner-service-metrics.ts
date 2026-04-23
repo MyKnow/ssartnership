@@ -8,6 +8,7 @@ import {
 } from "./partner-metric-rollups.ts";
 import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store.ts";
 import { isPartnerPortalMock } from "./partner-portal.ts";
+import { partnerFavoriteRepository } from "./repositories/index.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 
 const PARTNER_SERVICE_METRICS_WARNING_MESSAGE =
@@ -20,6 +21,7 @@ export type PartnerServiceMetricsSnapshot = {
 
 export function createEmptyPartnerServiceMetrics(): PartnerPortalServiceMetrics {
   return {
+    favoriteCount: 0,
     detailViews: 0,
     detailUv: 0,
     cardClicks: 0,
@@ -58,6 +60,7 @@ export async function getPartnerServiceMetrics(
     hasPartialFailure = true;
   };
   const metrics = createEmptyPartnerServiceMetrics();
+  let favoriteCount = 0;
 
   const [rollupResult, reviewResult] = await Promise.all([
     fetchPartnerMetricRollupRows(supabase, {
@@ -85,6 +88,19 @@ export async function getPartnerServiceMetrics(
       return count ?? 0;
     })(),
   ]);
+
+  try {
+    const favoriteCounts = await partnerFavoriteRepository.getFavoriteCounts([
+      partnerId,
+    ]);
+    favoriteCount = favoriteCounts.get(partnerId) ?? 0;
+  } catch (error) {
+    markPartialFailure();
+    console.error("[partner-service-metrics] favorite query failed", {
+      partnerId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   if (rollupResult.errorMessage) {
     markPartialFailure();
@@ -114,6 +130,7 @@ export async function getPartnerServiceMetrics(
   }
 
   metrics.reviewCount = reviewResult;
+  metrics.favoriteCount = favoriteCount;
 
   return {
     metrics,

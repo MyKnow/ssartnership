@@ -1,5 +1,6 @@
 import type {
   PartnerReview,
+  PartnerReviewReaction,
   PartnerReviewListResult,
   PartnerReviewRatingFilter,
   PartnerReviewSort,
@@ -36,6 +37,12 @@ export type UpdatePartnerReviewInput = {
   images: string[];
 };
 
+export type SetPartnerReviewReactionInput = {
+  reviewId: string;
+  memberId: string;
+  reaction: PartnerReviewReaction | null;
+};
+
 export type SoftDeletePartnerReviewInput = {
   reviewId: string;
   memberId: string;
@@ -68,6 +75,9 @@ export interface PartnerReviewRepository {
   createPartnerReview(input: CreatePartnerReviewInput): Promise<PartnerReview>;
   updatePartnerReview(input: UpdatePartnerReviewInput): Promise<PartnerReview>;
   softDeletePartnerReview(input: SoftDeletePartnerReviewInput): Promise<void>;
+  setPartnerReviewReaction(
+    input: SetPartnerReviewReactionInput,
+  ): Promise<PartnerReview>;
   hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;
   restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;
   deletePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;

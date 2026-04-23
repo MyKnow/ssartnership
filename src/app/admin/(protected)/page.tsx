@@ -149,9 +149,15 @@ export default async function AdminPage() {
         />
         <SummaryCard
           href="/admin/push"
-          title="푸시 알림 관리"
-          description="전체 공지 발송과 자동 Web Push 알림 상태를 관리합니다."
+          title="알림 전송"
+          description="운영 공지와 마케팅 메시지를 작성해 발송합니다."
           meta={`활성 구독 ${pushSubscriptionCount}개`}
+        />
+        <SummaryCard
+          href="/admin/notifications"
+          title="알림센터"
+          description="발송 결과, 실패, 예약/즉시 발송, 대상자 요약을 확인합니다."
+          meta="발송 · 실패 · 대상 · 자동"
         />
         <SummaryCard
           href="/admin/advertisement"
