@@ -5,6 +5,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
+import PartnerFavoriteCountLabel from "@/components/partner-favorites/PartnerFavoriteCountLabel";
 import PartnerFavoriteButton from "@/components/partner-favorites/PartnerFavoriteButton";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { Partner } from "@/lib/types";
@@ -41,22 +42,28 @@ export default function PartnerDetailSummaryCard({
       />
       <div className="relative flex flex-col">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Badge
-              className={badgeStyle ? undefined : "bg-surface-muted text-foreground"}
+              className={
+                badgeStyle
+                  ? "min-h-8 px-2.5 py-1 text-[11px] font-medium tracking-[0.04em]"
+                  : "min-h-8 bg-surface-muted px-2.5 py-1 text-[11px] font-medium tracking-[0.04em] text-foreground"
+              }
               style={badgeStyle}
             >
               {categoryLabel}
             </Badge>
             {currentUserId ? (
-            <PartnerFavoriteButton
-              partnerId={partner.id}
-              initialFavorited={Boolean(isFavorited)}
-              favoriteCount={metrics?.favoriteCount}
-              compact={false}
-            />
-          ) : null}
-        </div>
+              <PartnerFavoriteButton
+                partnerId={partner.id}
+                initialFavorited={Boolean(isFavorited)}
+                favoriteCount={metrics?.favoriteCount}
+                compact={false}
+              />
+            ) : (
+              <PartnerFavoriteCountLabel favoriteCount={metrics?.favoriteCount} />
+            )}
+          </div>
           <span className="text-xs font-medium text-muted-foreground">
             {partner.period.start} ~ {partner.period.end}
           </span>

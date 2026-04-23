@@ -36,7 +36,7 @@ export default function PartnerCardMeta({
         onCategoryClick(partner.category);
       }
     : null;
-  const categoryBadgeClass = "px-2 py-0.5 text-[10px] tracking-[0.06em]";
+  const categoryBadgeClass = "min-h-8 px-2.5 py-1 text-[11px] font-medium tracking-[0.04em]";
   const categoryBadge = handleCategoryClick ? (
     <button
       type="button"
@@ -72,23 +72,23 @@ export default function PartnerCardMeta({
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-4">
         {media}
-        <div className="grid flex-1 gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {categoryBadge}
+        <div className="grid min-w-0 flex-1 gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">{categoryBadge}</div>
             {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
           </div>
           <div className="flex items-center gap-2">
             {canNavigate ? (
               <Link
                 href={detailHref}
-                className="min-w-0 flex-1 text-left text-xl font-semibold leading-none text-foreground line-clamp-2 hover:underline"
+                className="min-w-0 flex-1 text-left text-xl font-semibold leading-tight text-foreground line-clamp-2 hover:underline"
                 aria-label={`${partner.name} 상세 보기`}
                 onClick={onTitleClick}
               >
                 {partner.name}
               </Link>
             ) : (
-              <h3 className="min-w-0 flex-1 text-xl font-semibold leading-none text-foreground line-clamp-2">
+              <h3 className="min-w-0 flex-1 text-xl font-semibold leading-tight text-foreground line-clamp-2">
                 {partner.name}
               </h3>
             )}

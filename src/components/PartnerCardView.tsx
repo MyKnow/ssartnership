@@ -8,6 +8,7 @@ import PartnerCardActions from "@/components/partner-card-view/PartnerCardAction
 import PartnerCardLockState from "@/components/partner-card-view/PartnerCardLockState";
 import PartnerCardMedia from "@/components/partner-card-view/PartnerCardMedia";
 import PartnerCardMeta from "@/components/partner-card-view/PartnerCardMeta";
+import PartnerFavoriteCountLabel from "@/components/partner-favorites/PartnerFavoriteCountLabel";
 import PartnerFavoriteButton from "@/components/partner-favorites/PartnerFavoriteButton";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import {
@@ -152,7 +153,9 @@ export default function PartnerCardView({
               }
               compact
             />
-          ) : null
+          ) : (
+            <PartnerFavoriteCountLabel favoriteCount={metrics?.favoriteCount ?? undefined} />
+          )
         }
         media={<PartnerCardMedia thumbnailUrl={thumbnailUrl} />}
       />
