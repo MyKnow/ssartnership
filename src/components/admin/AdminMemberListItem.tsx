@@ -12,7 +12,10 @@ import {
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
-import type { AdminMember } from "@/components/admin/member-manager/selectors";
+import type {
+  ActivePolicyVersions,
+  AdminMember,
+} from "@/components/admin/member-manager/selectors";
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -36,6 +39,61 @@ function getConsentLabel(kind: "service" | "privacy" | "marketing") {
     case "marketing":
       return "마케팅 정보 수신";
   }
+}
+
+function getPolicyStatusTone(status: string) {
+  switch (status) {
+    case "현재 동의":
+      return "text-emerald-600 dark:text-emerald-300";
+    case "이전 버전 동의":
+      return "text-amber-600 dark:text-amber-300";
+    case "철회됨":
+      return "text-rose-600 dark:text-rose-300";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
+function getPolicyStatusBadgeClass(status: string) {
+  switch (status) {
+    case "현재 동의":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200";
+    case "이전 버전 동의":
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200";
+    case "철회됨":
+      return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200";
+    default:
+      return "border-border/70 bg-surface-inset/80 text-muted-foreground";
+  }
+}
+
+function getPolicyStateLabel(
+  kind: "service" | "privacy" | "marketing",
+  latestVersion?: number | null,
+  activeVersion?: number | null,
+  hasHistory = false,
+) {
+  if (!latestVersion) {
+    return "미동의";
+  }
+
+  if (kind === "marketing" && !hasHistory) {
+    return activeVersion && latestVersion === activeVersion
+      ? "현재 동의"
+      : activeVersion
+        ? "이전 버전 동의"
+        : "동의";
+  }
+
+  if (activeVersion && latestVersion === activeVersion) {
+    return "현재 동의";
+  }
+
+  if (activeVersion) {
+    return "이전 버전 동의";
+  }
+
+  return "동의";
 }
 
 function NotificationPreferenceItem({
@@ -63,10 +121,12 @@ function NotificationPreferenceItem({
 
 export default function AdminMemberListItem({
   member,
+  activePolicyVersions,
   updateAction,
   deleteAction,
 }: {
   member: AdminMember;
+  activePolicyVersions: ActivePolicyVersions;
   updateAction: (formData: FormData) => void | Promise<void>;
   deleteAction: (formData: FormData) => void | Promise<void>;
 }) {
@@ -86,13 +146,155 @@ export default function AdminMemberListItem({
   const updateFormId = `member-update-${member.id}`;
   const notificationPreferences = member.notification_preferences;
 
-  const consentHistory = useMemo(
-    () =>
-      [...(member.consent_history ?? [])].sort(
-        (a, b) => new Date(b.agreed_at).getTime() - new Date(a.agreed_at).getTime(),
-      ),
-    [member.consent_history],
-  );
+  const policyStateCards = useMemo(() => {
+    const policyKinds = ["service", "privacy", "marketing"] as const;
+    const historyByKind = new Map<
+      (typeof policyKinds)[number],
+      Array<{
+        agreed: boolean;
+        at: string;
+        version?: number | null;
+        title?: string | null;
+        effective_at?: string | null;
+      }>
+    >();
+
+    for (const kind of policyKinds) {
+      historyByKind.set(kind, []);
+    }
+
+    for (const consent of member.consent_history ?? []) {
+      historyByKind.get(consent.kind)?.push({
+        agreed: true,
+        at: consent.agreed_at,
+        version: consent.version,
+        title: consent.title ?? null,
+        effective_at: consent.effective_at ?? null,
+      });
+    }
+
+    for (const activity of member.consent_activity ?? []) {
+      historyByKind.get(activity.kind)?.push({
+        agreed: activity.agreed,
+        at: activity.at,
+        version: activity.version ?? null,
+        title: activity.title ?? null,
+        effective_at: activity.effective_at ?? null,
+      });
+    }
+
+    const latestByKind = new Map<
+      (typeof policyKinds)[number],
+      {
+        agreed: boolean;
+        at: string;
+        version?: number | null;
+        title?: string | null;
+        effective_at?: string | null;
+      } | null
+    >();
+
+    for (const kind of policyKinds) {
+      const latest = [...(historyByKind.get(kind) ?? [])].sort(
+        (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+      )[0] ?? null;
+      latestByKind.set(kind, latest);
+    }
+
+    return policyKinds.map((kind) => {
+      const latest = latestByKind.get(kind) ?? null;
+      const activeVersion = activePolicyVersions[kind];
+      const historyEntries = historyByKind.get(kind) ?? [];
+      const hasHistory = historyEntries.length > 0;
+      const latestAgreement =
+        [...historyEntries].filter((item) => item.agreed).sort(
+          (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+        )[0] ?? null;
+      const version = latest?.version ?? latestAgreement?.version ?? null;
+      const latestAt = latest?.at ?? null;
+      const agreedAt = latest?.agreed
+        ? latestAt
+        : kind === "marketing" && hasHistory
+          ? latestAt ?? member.marketing_policy_consented_at ?? null
+          : latestAt;
+
+      let statusLabel = "미동의";
+      let timestampLabel = "동의 시각";
+      let timestampValue = "-";
+
+      if (latest) {
+        if (kind === "marketing") {
+          if (latest.agreed) {
+            statusLabel = getPolicyStateLabel(kind, version, activeVersion, hasHistory);
+            timestampLabel = "동의 시각";
+            timestampValue = formatDateTime(agreedAt);
+          } else if (hasHistory) {
+            statusLabel = "철회됨";
+            timestampLabel = "철회 시각";
+            timestampValue = formatDateTime(latest.at);
+          } else {
+            statusLabel = "미동의";
+            timestampLabel = "확인 시각";
+            timestampValue = "-";
+          }
+        } else {
+          statusLabel = getPolicyStateLabel(kind, version, activeVersion, hasHistory);
+          timestampLabel = "동의 시각";
+          timestampValue = formatDateTime(agreedAt ?? latest.at);
+        }
+      } else if (kind === "marketing") {
+        const currentVersion = member.marketing_policy_version ?? null;
+        const currentAt = member.marketing_policy_consented_at ?? null;
+        if (currentVersion) {
+          statusLabel = getPolicyStateLabel(kind, currentVersion, activeVersion, hasHistory);
+          timestampLabel = "동의 시각";
+          timestampValue = formatDateTime(currentAt);
+        } else {
+          statusLabel = "미동의";
+          timestampLabel = "확인 시각";
+          timestampValue = "-";
+        }
+      } else {
+        const currentVersion =
+          kind === "service"
+            ? member.service_policy_version ?? null
+            : member.privacy_policy_version ?? null;
+        const currentAt =
+          kind === "service"
+            ? member.service_policy_consented_at ?? null
+            : member.privacy_policy_consented_at ?? null;
+        if (currentVersion) {
+          statusLabel = getPolicyStateLabel(kind, currentVersion, activeVersion, hasHistory);
+          timestampLabel = "동의 시각";
+          timestampValue = formatDateTime(currentAt);
+        } else {
+          statusLabel = "미동의";
+          timestampLabel = "확인 시각";
+          timestampValue = "-";
+        }
+      }
+
+      return {
+        kind,
+        label: getConsentLabel(kind),
+        statusLabel,
+        statusClass: getPolicyStatusBadgeClass(statusLabel),
+        timestampLabel,
+        timestampValue,
+        versionLabel: version ? `버전 v${version}` : null,
+      };
+    });
+  }, [
+    activePolicyVersions,
+    member.consent_activity,
+    member.consent_history,
+    member.marketing_policy_consented_at,
+    member.marketing_policy_version,
+    member.privacy_policy_consented_at,
+    member.privacy_policy_version,
+    member.service_policy_consented_at,
+    member.service_policy_version,
+  ]);
 
   const handleDeleteSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     const ok = window.confirm(
@@ -173,69 +375,34 @@ export default function AdminMemberListItem({
 
               <div className="grid gap-3 rounded-2xl border border-border bg-surface-muted/40 px-4 py-4">
                 <div className="grid gap-1">
-                  <p className="text-sm font-semibold text-foreground">동의 이력</p>
+                  <p className="text-sm font-semibold text-foreground">약관 상태</p>
                   <p className="text-sm text-muted-foreground">
-                    각 약관의 최신 동의 여부와 기록된 동의 내역을 함께 보여줍니다.
+                    각 약관의 현재 상태와 마지막 동의 또는 철회 시각을 보여줍니다.
                   </p>
                 </div>
-                {consentHistory.length === 0 ? (
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
-                      <p className="text-sm font-medium text-foreground">서비스 이용약관</p>
-                      <p className="text-sm text-muted-foreground">
-                        {member.service_policy_version ? `v${member.service_policy_version}` : "미동의"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(member.service_policy_consented_at)}
-                      </p>
-                    </div>
-                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
-                      <p className="text-sm font-medium text-foreground">개인정보 처리방침</p>
-                      <p className="text-sm text-muted-foreground">
-                        {member.privacy_policy_version ? `v${member.privacy_policy_version}` : "미동의"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(member.privacy_policy_consented_at)}
-                      </p>
-                    </div>
-                    <div className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3">
-                      <p className="text-sm font-medium text-foreground">마케팅 정보 수신</p>
-                      <p className="text-sm text-muted-foreground">
-                        {member.marketing_policy_version ? `v${member.marketing_policy_version}` : "미동의"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(member.marketing_policy_consented_at)}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    {consentHistory.map((consent, index) => (
-                      <div
-                        key={`${consent.kind}-${consent.version}-${consent.agreed_at}-${index}`}
-                        className="grid gap-1 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3 text-sm"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-medium text-foreground">
-                            {getConsentLabel(consent.kind)}
-                          </span>
-                          <span className="text-muted-foreground">v{consent.version}</span>
-                        </div>
-                        <p className="text-muted-foreground">
-                          동의 시각 {formatDateTime(consent.agreed_at)}
-                        </p>
-                        {consent.title ? (
-                          <p className="text-muted-foreground">
-                            문서 {consent.title}
-                            {consent.effective_at
-                              ? ` · 시행 ${formatDateTime(consent.effective_at)}`
-                              : ""}
-                          </p>
-                        ) : null}
+                <div className="grid gap-3 md:grid-cols-3">
+                  {policyStateCards.map((item) => (
+                    <div
+                      key={item.kind}
+                      className="grid gap-2 rounded-2xl border border-border/70 bg-surface-inset/80 px-3 py-3 text-sm shadow-raised"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-foreground">{item.label}</p>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${item.statusClass}`}
+                        >
+                          {item.statusLabel}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <p className={`text-xs font-medium ${getPolicyStatusTone(item.statusLabel)}`}>
+                        {item.timestampLabel} {item.timestampValue}
+                      </p>
+                      {item.versionLabel ? (
+                        <p className="text-xs text-muted-foreground">{item.versionLabel}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="grid gap-3 rounded-2xl border border-border bg-surface-muted/40 px-4 py-4">

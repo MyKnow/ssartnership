@@ -16,6 +16,10 @@ import {
   updateMember,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import {
+  getActiveRequiredPolicies,
+  getPolicyDocumentByKind,
+} from "@/lib/policy-documents";
 import { getPushPreferencesOrDefault } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -40,12 +44,17 @@ export default async function AdminMembersPage({
   const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const supabase = getSupabaseAdminClient();
-  const { data: members, error: membersError } = await supabase
-    .from("members")
-    .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,avatar_base64,created_at,updated_at",
-    )
-    .order("created_at", { ascending: false });
+  const [activePolicies, activeMarketingPolicy, memberQuery] = await Promise.all([
+    getActiveRequiredPolicies(),
+    getPolicyDocumentByKind("marketing").catch(() => null),
+    supabase
+      .from("members")
+      .select(
+        "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,avatar_base64,created_at,updated_at",
+      )
+      .order("created_at", { ascending: false }),
+  ]);
+  const { data: members, error: membersError } = memberQuery;
 
   const safeMembers = members ?? [];
   const memberIds = safeMembers.map((member) => member.id);
@@ -102,6 +111,30 @@ export default async function AdminMembersPage({
     consentRows = (data ?? []) as typeof consentRows;
   }
 
+  let consentActivityRows: Array<{
+    actor_id: string;
+    properties: {
+      serviceVersion?: number | null;
+      privacyVersion?: number | null;
+      marketingVersion?: number | null;
+      marketingChecked?: boolean | null;
+    } | null;
+    created_at: string;
+  }> = [];
+
+  if (memberIds.length) {
+    const { data } = await supabase
+      .from("auth_security_logs")
+      .select("actor_id,properties,created_at")
+      .eq("event_name", "member_policy_consent")
+      .eq("status", "success")
+      .eq("actor_type", "member")
+      .in("actor_id", memberIds)
+      .order("created_at", { ascending: false });
+
+    consentActivityRows = (data ?? []) as typeof consentActivityRows;
+  }
+
   const consentHistoryByMemberId = new Map<
     string,
     Array<{
@@ -128,6 +161,55 @@ export default async function AdminMembersPage({
     consentHistoryByMemberId.set(row.member_id, current);
   }
 
+  const consentActivityByMemberId = new Map<
+    string,
+    Array<{
+      kind: "service" | "privacy" | "marketing";
+      agreed: boolean;
+      at: string;
+      version?: number | null;
+      title?: string | null;
+      effective_at?: string | null;
+    }>
+  >();
+
+  for (const row of consentActivityRows) {
+    const current = consentActivityByMemberId.get(row.actor_id) ?? [];
+    const properties = row.properties ?? {};
+
+    if (typeof properties.serviceVersion === "number") {
+      current.push({
+        kind: "service",
+        agreed: true,
+        at: row.created_at,
+        version: properties.serviceVersion,
+      });
+    }
+
+    if (typeof properties.privacyVersion === "number") {
+      current.push({
+        kind: "privacy",
+        agreed: true,
+        at: row.created_at,
+        version: properties.privacyVersion,
+      });
+    }
+
+    if (
+      typeof properties.marketingChecked === "boolean" ||
+      typeof properties.marketingVersion === "number"
+    ) {
+      current.push({
+        kind: "marketing",
+        agreed: Boolean(properties.marketingChecked),
+        at: row.created_at,
+        version: properties.marketingVersion ?? null,
+      });
+    }
+
+    consentActivityByMemberId.set(row.actor_id, current);
+  }
+
   const preferenceMap = new Map(
     (preferenceRows ?? []).map((row) => [
       row.member_id,
@@ -142,6 +224,11 @@ export default async function AdminMembersPage({
       }),
     ]),
   );
+  const activePolicyVersions = {
+    service: activePolicies.service.version,
+    privacy: activePolicies.privacy.version,
+    marketing: activeMarketingPolicy?.version ?? null,
+  };
   const activeDeviceCountByMemberId = new Map<string, number>();
   for (const row of subscriptionRows ?? []) {
     activeDeviceCountByMemberId.set(
@@ -154,9 +241,14 @@ export default async function AdminMembersPage({
     ...member,
     notification_preferences: {
       ...getPushPreferencesOrDefault(preferenceMap.get(member.id)),
+      marketingEnabled: Boolean(
+        activeMarketingPolicy &&
+          member.marketing_policy_version === activeMarketingPolicy.version,
+      ),
       activeDeviceCount: activeDeviceCountByMemberId.get(member.id) ?? 0,
     },
     consent_history: consentHistoryByMemberId.get(member.id) ?? [],
+    consent_activity: consentActivityByMemberId.get(member.id) ?? [],
   }));
 
   return (
@@ -240,6 +332,7 @@ export default async function AdminMembersPage({
           <Card tone="elevated">
             <AdminMemberManager
               members={enrichedMembers}
+              activePolicyVersions={activePolicyVersions}
               updateMember={updateMember}
               deleteMember={deleteMember}
             />

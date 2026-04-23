@@ -309,4 +309,69 @@ export class SupabaseNotificationRepository implements NotificationRepository {
     }
     return true;
   }
+
+  async markAllMemberNotificationsRead(memberId: string) {
+    const supabase = getSupabaseAdminClient();
+    const now = new Date().toISOString();
+    const { data: targetRows, error: selectError } = await supabase
+      .from("member_notifications")
+      .select("id")
+      .eq("member_id", memberId)
+      .is("deleted_at", null)
+      .is("read_at", null);
+
+    if (selectError) {
+      throw new Error(selectError.message);
+    }
+
+    const ids = (targetRows ?? []).map((row) => row.id).filter((value) => Boolean(value));
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    const { error: updateError } = await supabase
+      .from("member_notifications")
+      .update({
+        read_at: now,
+        updated_at: now,
+      })
+      .in("id", ids);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+    return ids.length;
+  }
+
+  async softDeleteAllMemberNotifications(memberId: string) {
+    const supabase = getSupabaseAdminClient();
+    const now = new Date().toISOString();
+    const { data: targetRows, error: selectError } = await supabase
+      .from("member_notifications")
+      .select("id")
+      .eq("member_id", memberId)
+      .is("deleted_at", null);
+
+    if (selectError) {
+      throw new Error(selectError.message);
+    }
+
+    const ids = (targetRows ?? []).map((row) => row.id).filter((value) => Boolean(value));
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    const { error: updateError } = await supabase
+      .from("member_notifications")
+      .update({
+        deleted_at: now,
+        updated_at: now,
+      })
+      .in("id", ids);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+    return ids.length;
+  }
 }

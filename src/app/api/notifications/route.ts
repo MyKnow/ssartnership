@@ -17,14 +17,23 @@ function parsePositiveInt(value: string | null, fallback: number, max: number) {
   return Math.max(0, Math.min(max, Math.trunc(parsed)));
 }
 
-export async function GET(request: NextRequest) {
+async function requireSession(request: NextRequest) {
   if (!isSameOrigin(request)) {
-    return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+    return { response: NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 }) };
   }
 
   const session = await getSignedUserSession();
   if (!session?.userId) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+    return { response: NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 }) };
+  }
+
+  return { userId: session.userId };
+}
+
+export async function GET(request: NextRequest) {
+  const auth = await requireSession(request);
+  if ("response" in auth) {
+    return auth.response;
   }
 
   try {
@@ -34,7 +43,7 @@ export async function GET(request: NextRequest) {
       Math.min(20, parsePositiveInt(request.nextUrl.searchParams.get("limit"), 10, 20)),
     );
     const result = await notificationRepository.listMemberNotifications({
-      memberId: session.userId,
+      memberId: auth.userId,
       offset,
       limit,
     });
@@ -49,6 +58,40 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "알림을 불러오지 못했습니다.";
+    return NextResponse.json({ message }, { status: 400 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const auth = await requireSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
+  try {
+    await notificationRepository.markAllMemberNotificationsRead(auth.userId);
+    const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
+    return NextResponse.json({ ok: true, summary: { unreadCount } });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "알림을 처리하지 못했습니다.";
+    return NextResponse.json({ message }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const auth = await requireSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
+  try {
+    await notificationRepository.softDeleteAllMemberNotifications(auth.userId);
+    const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
+    return NextResponse.json({ ok: true, summary: { unreadCount } });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.";
     return NextResponse.json({ message }, { status: 400 });
   }
 }

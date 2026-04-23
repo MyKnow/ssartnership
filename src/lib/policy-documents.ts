@@ -1,5 +1,4 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { upsertMemberPushPreferences } from "@/lib/push";
 
 export const REQUIRED_POLICY_KINDS = ["service", "privacy"] as const;
 export const OPTIONAL_POLICY_KINDS = ["marketing"] as const;
@@ -367,6 +366,7 @@ export async function recordMarketingPolicyConsent(input: {
 }) {
   const supabase = getSupabaseAdminClient();
   const agreedAt = new Date().toISOString();
+  const { upsertMemberPushPreferences } = await import("@/lib/push/preferences");
 
   if (!input.agreed) {
     const [{ error }, pushPreferences] = await Promise.all([

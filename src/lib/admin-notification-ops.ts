@@ -12,6 +12,7 @@ import {
   normalizeNotificationTargetUrl,
   type NotificationChannel,
 } from "@/lib/notifications/shared";
+import { getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { getActiveSubscriptionPushPreferences } from "@/lib/push/preferences";
 import { buildNotificationPayload } from "@/lib/push/payloads";
 import { getPushEnv, isPushConfigured } from "@/lib/push/config";
@@ -301,11 +302,20 @@ function absoluteUrl(url: string) {
 }
 
 function buildMattermostMessage(input: {
+  notificationType: AdminNotificationType;
   title: string;
   body: string;
-  url: string;
+  url?: string | null;
 }) {
-  return `**${input.title.trim()}**\n${input.body.trim()}\n${absoluteUrl(input.url)}`;
+  const categoryLabel = input.notificationType === "marketing" ? "광고" : "공지";
+  const lines = [
+    `### [싸트너십/${categoryLabel}] ${input.title.trim()}`,
+    input.body.trim(),
+  ];
+  if (input.url?.trim()) {
+    lines.push(`[바로가기](${absoluteUrl(input.url)})`);
+  }
+  return lines.join("\n");
 }
 
 function normalizeSelectedChannels(channels: AdminNotificationChannelSelection) {
@@ -463,11 +473,12 @@ async function buildAudienceContext(
   const destinationUrl = normalizeNotificationTargetUrl(input.url) ?? "/notifications";
   const notificationType = input.notificationType;
   const validationMessages: string[] = [];
+  const rawUrl = input.url?.trim() ?? "";
 
   if (selectedChannels.length === 0) {
     validationMessages.push("최소 한 개 이상의 채널을 선택해 주세요.");
   }
-  if (!normalizeNotificationTargetUrl(input.url ?? "/notifications")) {
+  if (rawUrl && !normalizeNotificationTargetUrl(rawUrl)) {
     validationMessages.push("이동 URL은 내부 경로만 사용할 수 있습니다.");
   }
   if (selectedChannels.includes("push") && !isPushConfigured()) {
@@ -479,6 +490,10 @@ async function buildAudienceContext(
 
   const resolvedAudience = await resolvePushAudience(input.audience);
   const members = await listAudienceMembers(resolvedAudience);
+  const activeMarketingPolicy = await getPolicyDocumentByKind("marketing").catch(
+    () => null,
+  );
+  const activeMarketingPolicyVersion = activeMarketingPolicy?.version ?? null;
   const memberIds = members.map((member) => member.id);
   const supabase = getSupabaseAdminClient();
 
@@ -536,11 +551,16 @@ async function buildAudienceContext(
 
   for (const member of members) {
     const preference = getActiveSubscriptionPushPreferences(preferenceMap.get(member.id));
-    const typeEnabled = getTypePreferenceEnabled(notificationType, preference);
+    const hasCurrentMarketingConsent =
+      activeMarketingPolicyVersion !== null &&
+      member.marketing_policy_version === activeMarketingPolicyVersion;
+    const normalizedPreference = {
+      ...preference,
+      marketingEnabled: hasCurrentMarketingConsent,
+    };
+    const typeEnabled = getTypePreferenceEnabled(notificationType, normalizedPreference);
     const marketingAllowed =
-      notificationType !== "marketing" ||
-      (preference.marketingEnabled &&
-        Boolean(member.marketing_policy_consented_at && member.marketing_policy_version));
+      notificationType !== "marketing" || hasCurrentMarketingConsent;
 
     const activeSubscriptions = subscriptionsByMemberId.get(member.id) ?? [];
     const channelReasons: Partial<Record<NotificationChannel, AdminNotificationPreviewReasonCode>> = {};
@@ -781,9 +801,10 @@ async function sendPushCampaignDeliveries(params: {
 
 async function sendMattermostCampaignDeliveries(params: {
   notificationId: string;
+  notificationType: AdminNotificationType;
   title: string;
   body: string;
-  url: string;
+  url?: string | null;
   members: AudienceMember[];
 }) {
   if (!params.members.length) {
@@ -832,6 +853,7 @@ async function sendMattermostCampaignDeliveries(params: {
           session.token,
           channel.id,
           buildMattermostMessage({
+            notificationType: params.notificationType,
             title: params.title,
             body: params.body,
             url: params.url,
@@ -954,9 +976,10 @@ export async function sendAdminNotificationCampaign(
   if (context.selectedChannels.includes("mm")) {
     channelResults.mm = await sendMattermostCampaignDeliveries({
       notificationId: created.notification.id,
+      notificationType: input.notificationType,
       title: input.title,
       body: input.body,
-      url: context.destinationUrl,
+      url: input.url?.trim() ? normalizeNotificationTargetUrl(input.url) : null,
       members: context.members.filter((member) => context.eligibleMemberIds.mm.includes(member.id)),
     });
     channelResults.mm.skipped = context.members.length - context.eligibleMemberIds.mm.length;

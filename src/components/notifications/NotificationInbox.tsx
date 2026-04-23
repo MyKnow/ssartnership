@@ -61,14 +61,16 @@ export default function NotificationInbox({
   const [state, setState] = useState(initialState);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<"read-all" | "delete-all" | null>(null);
 
   const unreadLabel = useMemo(
     () => (state.unreadCount > 99 ? "99+" : String(state.unreadCount)),
     [state.unreadCount],
   );
+  const isBulkActionPending = pendingAction !== null;
 
   async function markAsRead(item: MemberNotificationRecord) {
-    if (pendingId || !item.isUnread) {
+    if (pendingId || pendingAction || !item.isUnread) {
       return;
     }
 
@@ -125,7 +127,7 @@ export default function NotificationInbox({
   }
 
   async function markAsReadAndOpen(item: MemberNotificationRecord) {
-    if (pendingId) {
+    if (pendingId || pendingAction) {
       return;
     }
 
@@ -164,7 +166,7 @@ export default function NotificationInbox({
   }
 
   async function deleteNotification(item: MemberNotificationRecord) {
-    if (pendingId) {
+    if (pendingId || pendingAction) {
       return;
     }
 
@@ -202,6 +204,90 @@ export default function NotificationInbox({
     }
   }
 
+  async function markAllAsRead() {
+    if (pendingId || pendingAction || state.unreadCount === 0) {
+      return;
+    }
+
+    const snapshot = state;
+    const now = new Date().toISOString();
+    setPendingAction("read-all");
+    setState((current) => ({
+      ...current,
+      unreadCount: 0,
+      items: current.items.map((row) =>
+        row.isUnread
+          ? {
+              ...row,
+              readAt: row.readAt ?? now,
+              updatedAt: now,
+              isUnread: false,
+            }
+          : row,
+      ),
+    }));
+
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+      });
+      const data = await parseNotificationResponse(response);
+      if (typeof data.summary?.unreadCount === "number") {
+        emitNotificationUnreadCount(data.summary.unreadCount);
+        setState((current) => ({
+          ...current,
+          unreadCount: data.summary?.unreadCount ?? current.unreadCount,
+        }));
+      }
+      notify("모든 알림을 읽음 처리했습니다.");
+    } catch (error) {
+      setState(snapshot);
+      notify(error instanceof Error ? error.message : "전체 읽음 처리에 실패했습니다.");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function deleteAllNotifications() {
+    if (pendingId || pendingAction || state.items.length === 0) {
+      return;
+    }
+
+    if (!window.confirm("수신함의 모든 알림을 삭제할까요?")) {
+      return;
+    }
+
+    const snapshot = state;
+    setPendingAction("delete-all");
+    setState((current) => ({
+      ...current,
+      unreadCount: 0,
+      items: [],
+      nextOffset: 0,
+      hasMore: false,
+    }));
+
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "DELETE",
+      });
+      const data = await parseNotificationResponse(response);
+      if (typeof data.summary?.unreadCount === "number") {
+        emitNotificationUnreadCount(data.summary.unreadCount);
+        setState((current) => ({
+          ...current,
+          unreadCount: data.summary?.unreadCount ?? current.unreadCount,
+        }));
+      }
+      notify("모든 알림을 삭제했습니다.");
+    } catch (error) {
+      setState(snapshot);
+      notify(error instanceof Error ? error.message : "전체 삭제에 실패했습니다.");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   async function loadMore() {
     if (loadingMore || !state.hasMore) {
       return;
@@ -232,18 +318,44 @@ export default function NotificationInbox({
       className={cn("mx-auto w-full max-w-3xl overflow-hidden", className)}
     >
       <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5 sm:py-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-base font-semibold text-foreground sm:text-lg">수신함</h2>
+          {state.items.length > 0 && state.unreadCount > 0 ? (
+            <Badge variant="danger">안 읽음 {unreadLabel}</Badge>
+          ) : null}
         </div>
-        {state.unreadCount > 0 ? (
-          <Badge variant="danger">안 읽음 {unreadLabel}</Badge>
+        {state.items.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="!h-8 !min-h-8 !min-w-0 rounded-full border-success/20 bg-success/10 px-3 text-xs font-semibold text-success shadow-[var(--shadow-raised)] hover:border-success/30 hover:bg-success/15"
+              onClick={() => {
+                void markAllAsRead();
+              }}
+              disabled={state.unreadCount === 0 || isBulkActionPending || Boolean(pendingId)}
+            >
+              전체 읽음
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="!h-8 !min-h-8 !min-w-0 rounded-full px-3 text-xs font-semibold shadow-[var(--shadow-raised)]"
+              onClick={() => {
+                void deleteAllNotifications();
+              }}
+              disabled={state.items.length === 0 || isBulkActionPending || Boolean(pendingId)}
+            >
+              전체 삭제
+            </Button>
+          </div>
         ) : null}
       </div>
 
       {state.items.length > 0 ? (
         <div className="divide-y divide-border/70">
           {state.items.map((item) => {
-            const isBusy = pendingId === item.id;
+            const isBusy = Boolean(pendingAction) || pendingId === item.id;
             return (
               <div
                 key={item.id}

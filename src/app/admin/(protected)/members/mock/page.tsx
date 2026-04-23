@@ -89,6 +89,11 @@ export default function AdminMemberMockPreviewPage() {
           />
           <AdminMemberManager
             members={mockPreviewMembers}
+            activePolicyVersions={{
+              service: 2,
+              privacy: 2,
+              marketing: 1,
+            }}
             updateMember={noopMemberAction}
             deleteMember={noopMemberAction}
           />

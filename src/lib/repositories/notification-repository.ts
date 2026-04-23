@@ -40,4 +40,6 @@ export interface NotificationRepository {
     memberId: string,
     notificationId: string,
   ): Promise<boolean>;
+  markAllMemberNotificationsRead(memberId: string): Promise<number>;
+  softDeleteAllMemberNotifications(memberId: string): Promise<number>;
 }

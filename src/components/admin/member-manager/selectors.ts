@@ -32,6 +32,14 @@ export type AdminMember = {
     title?: string | null;
     effective_at?: string | null;
   }>;
+  consent_activity?: Array<{
+    kind: "service" | "privacy" | "marketing";
+    agreed: boolean;
+    at: string;
+    version?: number | null;
+    title?: string | null;
+    effective_at?: string | null;
+  }>;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
   created_at?: string | null;
@@ -61,15 +69,24 @@ export type NormalizedMember = AdminMember & {
   _marketingEnabledStatus: NotificationPreferenceFilterOption;
 };
 
-function getConsentStatus(value?: number | null) {
-  return value ? "agreed" : "pending";
+export type ActivePolicyVersions = {
+  service: number | null;
+  privacy: number | null;
+  marketing: number | null;
+};
+
+function getConsentStatus(value?: number | null, activeVersion?: number | null) {
+  return value && activeVersion && value === activeVersion ? "agreed" : "pending";
 }
 
 function getNotificationPreferenceStatus(value?: boolean | null) {
   return value ? "enabled" : "disabled";
 }
 
-export function normalizeAdminMembers(members: AdminMember[]): NormalizedMember[] {
+export function normalizeAdminMembers(
+  members: AdminMember[],
+  activePolicyVersions?: ActivePolicyVersions,
+): NormalizedMember[] {
   return members.map((member) => {
     const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
     const displayName =
@@ -89,9 +106,18 @@ export function normalizeAdminMembers(members: AdminMember[]): NormalizedMember[
         .toLowerCase(),
       _campus: campus,
       _year: member.year ?? null,
-      _serviceConsentStatus: getConsentStatus(member.service_policy_version),
-      _privacyConsentStatus: getConsentStatus(member.privacy_policy_version),
-      _marketingConsentStatus: getConsentStatus(member.marketing_policy_version),
+      _serviceConsentStatus: getConsentStatus(
+        member.service_policy_version,
+        activePolicyVersions?.service ?? null,
+      ),
+      _privacyConsentStatus: getConsentStatus(
+        member.privacy_policy_version,
+        activePolicyVersions?.privacy ?? null,
+      ),
+      _marketingConsentStatus: getConsentStatus(
+        member.marketing_policy_version,
+        activePolicyVersions?.marketing ?? null,
+      ),
       _pushEnabledStatus: getNotificationPreferenceStatus(
         member.notification_preferences?.enabled,
       ),

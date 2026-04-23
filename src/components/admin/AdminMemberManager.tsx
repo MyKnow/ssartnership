@@ -9,6 +9,7 @@ import Select from "@/components/ui/Select";
 import AdminMemberListItem from "@/components/admin/AdminMemberListItem";
 import {
   type AdminMember,
+  type ActivePolicyVersions,
   type ConsentFilterOption,
   type MemberFilterOption,
   type MemberSortOption,
@@ -22,10 +23,12 @@ import {
 
 export default function AdminMemberManager({
   members,
+  activePolicyVersions,
   updateMember,
   deleteMember,
 }: {
   members: AdminMember[];
+  activePolicyVersions: ActivePolicyVersions;
   updateMember: (formData: FormData) => void | Promise<void>;
   deleteMember: (formData: FormData) => void | Promise<void>;
 }) {
@@ -55,7 +58,10 @@ export default function AdminMemberManager({
   const [marketingEnabledFilter, setMarketingEnabledFilter] =
     useState<NotificationPreferenceFilterOption>("all");
 
-  const normalizedMembers = useMemo(() => normalizeAdminMembers(members), [members]);
+  const normalizedMembers = useMemo(
+    () => normalizeAdminMembers(members, activePolicyVersions),
+    [activePolicyVersions, members],
+  );
   const campusOptions = useMemo(
     () => getAdminMemberCampusOptions(normalizedMembers),
     [normalizedMembers],
@@ -107,7 +113,7 @@ export default function AdminMemberManager({
     <div className="mt-6 grid min-w-0 gap-6">
       <FilterBar
         title="회원 필터"
-        description="이름, 기수, 캠퍼스, 상태 기준으로 회원 목록을 빠르게 좁힙니다."
+        description="이름, 기수, 캠퍼스, 현재 활성 버전 기준 약관 상태로 회원 목록을 빠르게 좁힙니다."
       >
         <div className="grid min-w-[14rem] flex-1 gap-1">
           <span className="ui-caption">검색</span>
@@ -170,7 +176,7 @@ export default function AdminMemberManager({
           </Select>
         </div>
         <div className="grid min-w-[10rem] gap-1">
-          <span className="ui-caption">서비스 약관</span>
+          <span className="ui-caption">서비스 이용약관</span>
           <Select
             value={serviceConsentFilter}
             onChange={(event) =>
@@ -178,12 +184,12 @@ export default function AdminMemberManager({
             }
           >
             <option value="all">전체</option>
-            <option value="agreed">동의</option>
-            <option value="pending">미동의</option>
+            <option value="agreed">현재 동의</option>
+            <option value="pending">현재 미동의</option>
           </Select>
         </div>
         <div className="grid min-w-[10rem] gap-1">
-          <span className="ui-caption">개인정보 약관</span>
+          <span className="ui-caption">개인정보 처리방침</span>
           <Select
             value={privacyConsentFilter}
             onChange={(event) =>
@@ -191,12 +197,12 @@ export default function AdminMemberManager({
             }
           >
             <option value="all">전체</option>
-            <option value="agreed">동의</option>
-            <option value="pending">미동의</option>
+            <option value="agreed">현재 동의</option>
+            <option value="pending">현재 미동의</option>
           </Select>
         </div>
         <div className="grid min-w-[10rem] gap-1">
-          <span className="ui-caption">마케팅 약관</span>
+          <span className="ui-caption">마케팅 정보 수신</span>
           <Select
             value={marketingConsentFilter}
             onChange={(event) =>
@@ -204,8 +210,8 @@ export default function AdminMemberManager({
             }
           >
             <option value="all">전체</option>
-            <option value="agreed">동의</option>
-            <option value="pending">미동의</option>
+            <option value="agreed">현재 동의</option>
+            <option value="pending">현재 미동의</option>
           </Select>
         </div>
         <div className="grid min-w-[10rem] gap-1">
@@ -297,7 +303,7 @@ export default function AdminMemberManager({
           </Select>
         </div>
         <div className="grid min-w-[10rem] gap-1">
-          <span className="ui-caption">마케팅 알림</span>
+          <span className="ui-caption">마케팅/이벤트</span>
           <Select
             value={marketingEnabledFilter}
             onChange={(event) =>
@@ -328,6 +334,7 @@ export default function AdminMemberManager({
             <AdminMemberListItem
               key={member.id}
               member={member}
+              activePolicyVersions={activePolicyVersions}
               updateAction={updateMember}
               deleteAction={deleteMember}
             />

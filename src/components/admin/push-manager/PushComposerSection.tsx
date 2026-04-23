@@ -578,7 +578,7 @@ function SendConfirmModal({
             loadingText="발송 중"
             disabled={!isConfirmationPhraseValid}
           >
-            {preview.eligibleMemberCount}명 발송하기
+            메시지 보내기
           </Button>
         </div>
       </div>
@@ -627,6 +627,7 @@ export function PushComposerSection({
   const selectedMembers = members.filter((member) =>
     composer.selectedMemberIds.includes(member.id),
   );
+  const canComposeMessage = Boolean(reviewState);
   const selectedMemberLabel =
     selectedMembers.length === 0
       ? "개인 선택"
@@ -652,7 +653,7 @@ export function PushComposerSection({
       ) : null}
 
       <form className="grid gap-4" onSubmit={onSubmit}>
-        <FilterBar title="채널" description="발송할 채널을 먼저 고릅니다.">
+        <FilterBar title="1. 채널 선택" description="발송할 채널을 먼저 고릅니다.">
           <div className="grid min-w-full gap-3 md:grid-cols-3">
             <ChannelToggle
               label="인앱"
@@ -677,7 +678,7 @@ export function PushComposerSection({
           </div>
         </FilterBar>
 
-        <FilterBar title="대상 설정" description="유형과 범위를 고른 뒤 필요한 대상만 선택합니다.">
+        <FilterBar title="2. 대상 설정" description="유형과 범위를 고른 뒤 필요한 대상만 선택합니다.">
           <div className="grid w-full gap-3">
             <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-end">
               <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground lg:w-[11rem] lg:flex-none">
@@ -770,7 +771,7 @@ export function PushComposerSection({
                   void onReview();
                 }}
               >
-                대상자 검색
+                3. 대상자 검색
               </Button>
             </div>
           </div>
@@ -784,10 +785,17 @@ export function PushComposerSection({
         ) : null}
 
         <FilterBar
-          title="메시지"
-          description="대상자가 정해진 뒤 제목, 내용, 이동 경로만 입력합니다."
+          title="4. 메시지 작성"
+          description="대상자 검색 후 제목, 내용, 이동 경로를 입력합니다."
           tone="default"
         >
+          {!canComposeMessage ? (
+            <InlineMessage
+              tone="info"
+              title="먼저 대상자 검색을 완료해 주세요."
+              description="검색 결과가 있어야 메시지를 작성하고 최종 확인으로 넘어갈 수 있습니다."
+            />
+          ) : null}
           <label className="grid min-w-[12rem] flex-1 gap-2 text-sm font-medium text-foreground">
             제목
             <Input
@@ -796,14 +804,16 @@ export function PushComposerSection({
               placeholder="알림 제목"
               maxLength={60}
               required
+              disabled={!canComposeMessage}
             />
           </label>
 
           <label className="grid min-w-[12rem] flex-1 gap-2 text-sm font-medium text-foreground">
-            가게 상세 페이지 선택
+            연결 페이지 선택(선택)
             <Select
               value={composer.selectedPartnerId}
               onChange={(event) => onPartnerChange(event.target.value)}
+              disabled={!canComposeMessage}
             >
               <option value="">직접 URL 입력</option>
               {partners.map((partner) => (
@@ -823,34 +833,36 @@ export function PushComposerSection({
               rows={4}
               maxLength={160}
               required
+              disabled={!canComposeMessage}
             />
           </label>
 
           <label className="grid min-w-full gap-2 text-sm font-medium text-foreground">
-            이동 URL
+            이동 URL(선택)
             <Input
               value={composer.url}
               onChange={(event) => onUrlChange(event.target.value)}
               placeholder="예: /partners/uuid"
+              disabled={!canComposeMessage}
             />
           </label>
         </FilterBar>
 
         <FilterBar
-          title="최종 발송"
-          description="대상 검색이 끝난 상태에서만 발송합니다."
+          title="5. 최종 확인"
+          description="대상 검색과 메시지 작성을 마친 뒤 마지막으로 확인합니다."
           tone="default"
         >
           <div className="grid gap-1 text-sm text-muted-foreground">
             {reviewState ? (
               <>
                 <p>현재 발송 가능 회원 {reviewState.preview.eligibleMemberCount}명</p>
-                <p>발송 버튼을 누르면 최종 확인 모달에서 인원을 다시 확인합니다.</p>
+                <p>버튼을 누르면 최종 확인 모달에서 인원과 내용을 다시 확인합니다.</p>
               </>
             ) : (
               <>
-                <p>먼저 발송 대상 섹션에서 대상자 검색을 완료해 주세요.</p>
-                <p>검색 결과가 없으면 발송 버튼이 비활성화됩니다.</p>
+                <p>먼저 대상자 검색을 완료해 주세요.</p>
+                <p>검색 결과가 없으면 마지막 확인 버튼이 비활성화됩니다.</p>
               </>
             )}
           </div>
@@ -862,7 +874,7 @@ export function PushComposerSection({
             className={ctaButtonClassName}
             disabled={!reviewState || !reviewState.preview.canSend}
           >
-            발송하기
+            마지막 확인
           </Button>
         </div>
         </FilterBar>

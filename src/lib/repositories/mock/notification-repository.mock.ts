@@ -223,4 +223,32 @@ export class MockNotificationRepository implements NotificationRepository {
     record.updatedAt = record.deletedAt;
     return true;
   }
+
+  async markAllMemberNotificationsRead(memberId: string) {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const record of getStore().memberNotifications) {
+      if (record.memberId !== memberId || record.deletedAt !== null || record.readAt !== null) {
+        continue;
+      }
+      record.readAt = now;
+      record.updatedAt = now;
+      count += 1;
+    }
+    return count;
+  }
+
+  async softDeleteAllMemberNotifications(memberId: string) {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const record of getStore().memberNotifications) {
+      if (record.memberId !== memberId || record.deletedAt !== null) {
+        continue;
+      }
+      record.deletedAt = now;
+      record.updatedAt = now;
+      count += 1;
+    }
+    return count;
+  }
 }
