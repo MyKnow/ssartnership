@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { upsertMemberPushPreferences } from "@/lib/push";
 
 export const REQUIRED_POLICY_KINDS = ["service", "privacy"] as const;
 export const OPTIONAL_POLICY_KINDS = ["marketing"] as const;
@@ -368,19 +369,29 @@ export async function recordMarketingPolicyConsent(input: {
   const agreedAt = new Date().toISOString();
 
   if (!input.agreed) {
-    const { error } = await supabase
-      .from("members")
-      .update({
-        marketing_policy_version: null,
-        marketing_policy_consented_at: null,
-        updated_at: agreedAt,
-      })
-      .eq("id", input.memberId);
+    const [{ error }, pushPreferences] = await Promise.all([
+      supabase
+        .from("members")
+        .update({
+          marketing_policy_version: null,
+          marketing_policy_consented_at: null,
+          updated_at: agreedAt,
+        })
+        .eq("id", input.memberId),
+      upsertMemberPushPreferences(input.memberId, { marketingEnabled: false }),
+    ]);
 
     if (error) {
       throw wrapPolicyDocumentDbError(
         error,
         "회원 마케팅 동의 정보를 갱신하지 못했습니다.",
+      );
+    }
+
+    if (!pushPreferences) {
+      throw new PolicyDocumentError(
+        "db_error",
+        "회원 마케팅 알림 설정을 갱신하지 못했습니다.",
       );
     }
 
@@ -406,19 +417,21 @@ export async function recordMarketingPolicyConsent(input: {
     },
   ];
 
-  const [{ error: consentError }, { error: updateError }] = await Promise.all([
-    supabase.from("member_policy_consents").upsert([row], {
-      onConflict: "member_id,policy_document_id",
-    }),
-    supabase
-      .from("members")
-      .update({
-        marketing_policy_version: input.activePolicy.version,
-        marketing_policy_consented_at: agreedAt,
-        updated_at: agreedAt,
-      })
-      .eq("id", input.memberId),
-  ]);
+  const [{ error: consentError }, { error: updateError }, pushPreferences] =
+    await Promise.all([
+      supabase.from("member_policy_consents").upsert([row], {
+        onConflict: "member_id,policy_document_id",
+      }),
+      supabase
+        .from("members")
+        .update({
+          marketing_policy_version: input.activePolicy.version,
+          marketing_policy_consented_at: agreedAt,
+          updated_at: agreedAt,
+        })
+        .eq("id", input.memberId),
+      upsertMemberPushPreferences(input.memberId, { marketingEnabled: true }),
+    ]);
 
   if (consentError) {
     throw wrapPolicyDocumentDbError(
@@ -430,6 +443,12 @@ export async function recordMarketingPolicyConsent(input: {
     throw wrapPolicyDocumentDbError(
       updateError,
       "회원 마케팅 동의 정보를 갱신하지 못했습니다.",
+    );
+  }
+  if (!pushPreferences) {
+    throw new PolicyDocumentError(
+      "db_error",
+      "회원 마케팅 알림 설정을 갱신하지 못했습니다.",
     );
   }
 

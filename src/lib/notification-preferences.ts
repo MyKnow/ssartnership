@@ -4,6 +4,8 @@ import {
   getMemberPushPreferences,
   upsertMemberPushPreferences,
 } from "@/lib/push";
+import { wrapPushDbError } from "@/lib/push/config";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
 
 export type NotificationPreferenceState = PushPreferenceState;
@@ -113,7 +115,28 @@ export async function getMemberNotificationPreferences(memberId: string) {
   if (useMockPreferences) {
     return getMockPreferences(memberId);
   }
-  return getMemberPushPreferences(memberId);
+  const supabase = getSupabaseAdminClient();
+  const [preferences, activeMarketingPolicy, memberResult] = await Promise.all([
+    getMemberPushPreferences(memberId),
+    getPolicyDocumentByKind("marketing").catch(() => null),
+    supabase
+      .from("members")
+      .select("marketing_policy_version")
+      .eq("id", memberId)
+      .maybeSingle(),
+  ]);
+
+  if (memberResult.error) {
+    throw wrapPushDbError(memberResult.error, "Push 설정을 불러오지 못했습니다.");
+  }
+
+  return {
+    ...preferences,
+    marketingEnabled: Boolean(
+      activeMarketingPolicy &&
+        memberResult.data?.marketing_policy_version === activeMarketingPolicy.version,
+    ),
+  };
 }
 
 export async function updateMemberNotificationPreferences(
