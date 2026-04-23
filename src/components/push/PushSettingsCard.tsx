@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -72,8 +74,18 @@ export { derivePushSettingsStatus, getPushSettingsStatusClassName } from "./push
 
 export default function PushSettingsCard(props: PushSettingsCardProps) {
   const controller = usePushSettingsController(props);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const returnTo = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
   const marketingPolicyHref = props.marketingPolicy
-    ? getPolicyHref(props.marketingPolicy.kind, props.marketingPolicy.version)
+    ? getPolicyHref(
+        props.marketingPolicy.kind,
+        props.marketingPolicy.version,
+        returnTo,
+      )
     : "/legal/marketing";
 
   return (

@@ -26,6 +26,7 @@ export default function PartnerCardView({
   currentUserId,
   isFavorited = false,
   metrics,
+  onFavoriteChange,
 }: {
   partner: Partner;
   categoryLabel?: string;
@@ -36,6 +37,7 @@ export default function PartnerCardView({
   currentUserId?: string | null;
   isFavorited?: boolean;
   metrics?: PartnerPopularityMetrics;
+  onFavoriteChange?: (partnerId: string, nextFavorited: boolean) => void;
 }) {
   const router = useRouter();
   const { badgeStyle } = createCategoryAccentStyles(categoryColor);
@@ -142,11 +144,16 @@ export default function PartnerCardView({
             <PartnerFavoriteButton
               partnerId={partner.id}
               initialFavorited={isFavorited}
+              favoriteCount={metrics?.favoriteCount ?? undefined}
+              onToggle={
+                onFavoriteChange
+                  ? (nextFavorited) => onFavoriteChange(partner.id, nextFavorited)
+                  : undefined
+              }
               compact
             />
           ) : null
         }
-        metrics={metrics}
         media={<PartnerCardMedia thumbnailUrl={thumbnailUrl} />}
       />
       <PartnerCardActions

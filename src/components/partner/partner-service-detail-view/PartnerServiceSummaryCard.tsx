@@ -3,11 +3,14 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
-import PartnerCardMetrics from "@/components/partner-card-view/PartnerCardMetrics";
+import PartnerCardMetrics, {
+  PartnerCardMetricLabel,
+} from "@/components/partner-card-view/PartnerCardMetrics";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import SectionTitle from "@/components/partner/partner-service-detail-view/SectionTitle";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { PartnerChangeRequestContext } from "@/lib/partner-change-requests";
+import { ChatBubbleLeftEllipsisIcon } from "@heroicons/react/24/outline";
 
 export default function PartnerServiceSummaryCard({
   context,
@@ -107,9 +110,15 @@ export default function PartnerServiceSummaryCard({
           <PartnerCardMetrics
             className="mt-5"
             items={[
-              { label: "즐겨찾기", value: metrics.favoriteCount ?? 0 },
-              { label: "리뷰", value: metrics.reviewCount ?? 0 },
-              { label: "뷰어십", value: metrics.detailViews ?? 0 },
+              {
+                label: (
+                  <PartnerCardMetricLabel
+                    icon={<ChatBubbleLeftEllipsisIcon className="h-3.5 w-3.5" />}
+                    label="리뷰"
+                  />
+                ),
+                value: metrics.reviewCount ?? 0,
+              },
             ]}
           />
         ) : null}

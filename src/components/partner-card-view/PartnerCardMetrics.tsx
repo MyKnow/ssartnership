@@ -6,6 +6,23 @@ export type PartnerCardMetricItem = {
   value: number;
 };
 
+export function PartnerCardMetricLabel({
+  icon,
+  label,
+}: {
+  icon: ReactNode;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 text-muted-foreground">
+      <span aria-hidden="true" className="inline-flex h-3.5 w-3.5 items-center justify-center">
+        {icon}
+      </span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
 function formatCount(value: number) {
   return value.toLocaleString("ko-KR");
 }
@@ -29,9 +46,9 @@ export default function PartnerCardMetrics({
         className,
       )}
     >
-      {items.map((item) => (
+      {items.map((item, index) => (
         <div
-          key={typeof item.label === "string" ? item.label : String(item.label)}
+          key={`${index}-${item.value}`}
           className="min-w-0 rounded-2xl border border-border/70 bg-surface-inset px-3 py-2 shadow-none"
         >
           <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">

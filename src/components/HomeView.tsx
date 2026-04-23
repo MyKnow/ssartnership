@@ -69,6 +69,9 @@ export default function HomeView({
   );
   const [searchValue, setSearchValue] = useState("");
   const [sortValue, setSortValue] = useState<PartnerSortOption>("popular");
+  const [localPopularityById, setLocalPopularityById] = useState<
+    Record<string, PartnerPopularityMetrics | undefined>
+  >(partnerPopularityById ?? {});
   const deferredSearchValue = useDeferredValue(searchValue);
   const searchTimeoutRef = useRef<number | null>(null);
   const lastLoggedSearchRef = useRef("");
@@ -83,9 +86,9 @@ export default function HomeView({
       normalizeHomePartners(
         partners,
         viewerAuthenticated,
-        partnerPopularityById ?? {},
+        localPopularityById,
       ),
-    [partnerPopularityById, partners, viewerAuthenticated],
+    [localPopularityById, partners, viewerAuthenticated],
   );
 
   const filteredPartners = useMemo(() => {
@@ -195,6 +198,26 @@ export default function HomeView({
     setSearchValue(nextValue);
   };
 
+  const handleFavoriteChange = (partnerId: string, nextFavorited: boolean) => {
+    setLocalPopularityById((current) => {
+      const currentMetrics = current[partnerId] ?? {
+        favoriteCount: 0,
+        reviewCount: 0,
+        detailViews: 0,
+      };
+      return {
+        ...current,
+        [partnerId]: {
+          ...currentMetrics,
+          favoriteCount: Math.max(
+            0,
+            (currentMetrics.favoriteCount ?? 0) + (nextFavorited ? 1 : -1),
+          ),
+        },
+      };
+    });
+  };
+
   return (
     <>
       <MotionReveal delay={0.04}>
@@ -248,8 +271,9 @@ export default function HomeView({
                   viewerAuthenticated={viewerAuthenticated}
                   currentUserId={currentUserId}
                   isFavorited={partnerFavoriteStateById?.[partner.id] ?? false}
-                  metrics={partnerPopularityById?.[partner.id]}
+                  metrics={localPopularityById?.[partner.id]}
                   onCategoryClick={handleCategoryChange}
+                  onFavoriteChange={handleFavoriteChange}
                 />
               ))}
             </div>

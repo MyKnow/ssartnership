@@ -81,8 +81,6 @@ export default function PolicyAgreementField({
       </div>
       <Link
         href={getPolicyHref(policy.kind, policy.version, returnTo)}
-        target="_blank"
-        rel="noreferrer"
         className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-surface-control text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"
         aria-label={`${getPolicyKindLabel(policy.kind)} 상세 보기`}
         title="상세 보기"
