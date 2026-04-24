@@ -11,7 +11,6 @@ import { SITE_URL } from '@/lib/site';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
 import {
   type PartnerMetricEventName,
-  reconcilePartnerMetricRollupsFromEventLogs,
   upsertPartnerMetricRollupsFromEventInput,
 } from '@/lib/partner-metric-rollups';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
@@ -214,17 +213,8 @@ export async function logProductEvent(input: ProductLogInput) {
           sessionId: input.sessionId ?? null,
         });
       } catch (error) {
-        console.error("[activity-log] partner metric fallback upsert failed", error);
+        console.error("[activity-log] partner metric fallback rpc failed", error);
       }
-    }
-    return;
-  }
-
-  if (input.targetType === "partner" && input.targetId) {
-    try {
-      await reconcilePartnerMetricRollupsFromEventLogs(input.targetId);
-    } catch (error) {
-      console.error("[activity-log] partner metric reconcile failed", error);
     }
   }
 }

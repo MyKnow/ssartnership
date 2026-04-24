@@ -392,96 +392,39 @@ export async function fetchPartnerMetricEventLogRows(
   return { rows, errorMessage: null as string | null };
 }
 
-async function upsertDraftRows(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  rows: PartnerMetricRollupDraftRow[],
+async function runPartnerMetricRpc(
+  fn: "apply_partner_metric_event" | "reconcile_partner_metric_rollups",
+  args: Record<string, unknown>,
 ) {
-  const grouped = {
-    total: [] as PartnerMetricRollupDraftRow[],
-    hour: [] as PartnerMetricRollupDraftRow[],
-    day: [] as PartnerMetricRollupDraftRow[],
-    weekday: [] as PartnerMetricRollupDraftRow[],
-  };
-
-  for (const row of rows) {
-    grouped[row.granularity].push(row);
-  }
-
-  const operations = [
-    grouped.total.length
-      ? supabase
-          .from("partner_metric_rollups")
-          .upsert(grouped.total, {
-            onConflict: "partner_id,metric_name,metric_kind,bucket_timezone",
-          })
-      : Promise.resolve({ error: null }),
-    grouped.hour.length
-      ? supabase
-          .from("partner_metric_rollups")
-          .upsert(grouped.hour, {
-            onConflict:
-              "partner_id,metric_name,metric_kind,bucket_timezone,bucket_local_start",
-          })
-      : Promise.resolve({ error: null }),
-    grouped.day.length
-      ? supabase
-          .from("partner_metric_rollups")
-          .upsert(grouped.day, {
-            onConflict:
-              "partner_id,metric_name,metric_kind,bucket_timezone,bucket_local_date",
-          })
-      : Promise.resolve({ error: null }),
-    grouped.weekday.length
-      ? supabase
-          .from("partner_metric_rollups")
-          .upsert(grouped.weekday, {
-            onConflict:
-              "partner_id,metric_name,metric_kind,bucket_timezone,bucket_local_dow",
-          })
-      : Promise.resolve({ error: null }),
-  ] as const;
-
-  const results = await Promise.all(operations);
-  const error = results.find((result) => result.error);
-  if (error?.error) {
-    throw new Error(error.error.message);
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.rpc(fn, args);
+  if (error) {
+    throw new Error(error.message);
   }
 }
 
 export async function reconcilePartnerMetricRollupsFromEventLogs(
   partnerId: string,
 ) {
-  const supabase = getSupabaseAdminClient();
-  const { rows, errorMessage } = await fetchPartnerMetricEventLogRows(supabase, [partnerId]);
-  if (errorMessage) {
-    throw new Error(errorMessage);
-  }
-
-  const draftRows = buildPartnerMetricRollupRowsFromEventLogs(rows, partnerId);
-  await upsertDraftRows(supabase, draftRows);
+  await runPartnerMetricRpc("reconcile_partner_metric_rollups", {
+    input_partner_id: partnerId,
+  });
 }
 
 export async function upsertPartnerMetricRollupsFromEventInput(
   input: PartnerMetricEventInput,
 ) {
-  const supabase = getSupabaseAdminClient();
-  const draftRows = buildPartnerMetricRollupRowsFromEventLogs(
-    [
-      {
-        target_id: input.partnerId,
-        event_name: input.eventName,
-        actor_type: input.actorType,
-        actor_id: input.actorId ?? null,
-        session_id: input.sessionId ?? null,
-        created_at:
-          input.createdAt instanceof Date
-            ? input.createdAt.toISOString()
-            : input.createdAt ?? new Date().toISOString(),
-      },
-    ],
-    input.partnerId,
-  );
-  await upsertDraftRows(supabase, draftRows);
+  await runPartnerMetricRpc("apply_partner_metric_event", {
+    input_partner_id: input.partnerId,
+    input_event_name: input.eventName,
+    input_actor_type: input.actorType,
+    input_actor_id: input.actorId ?? null,
+    input_session_id: input.sessionId ?? null,
+    input_created_at:
+      input.createdAt instanceof Date
+        ? input.createdAt.toISOString()
+        : input.createdAt ?? new Date().toISOString(),
+  });
 }
 
 export async function fetchPartnerMetricRollupRows(

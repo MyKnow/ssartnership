@@ -70,6 +70,13 @@ node --test tests/<focused-test>.test.mts
 
 Run `next build` only when the change touches build/runtime behavior broadly or the user asks for production verification.
 
+## Supabase Migration Naming
+
+- New files under `supabase/migrations/` must remain forward-only and lexicographically increasing.
+- This repo already contains future-dated prefixes, so treat the filename prefix as an ordering key, not the literal wall-clock creation time.
+- Starting after `20260501012000_partner_review_visibility.sql`, create new migrations by incrementing the `SS` portion while keeping ordering monotonic. Example: `20260501012001_*`, `20260501012002_*`, `20260501012003_*`.
+- Do not rename or edit previously applied migration files just to match real clock time.
+
 ## Git
 
 - Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `perf:`, `ci:`.
