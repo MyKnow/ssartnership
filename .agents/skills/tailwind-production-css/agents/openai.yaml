@@ -1,0 +1,7 @@
+interface:
+  display_name: "Tailwind Production CSS"
+  short_description: "Fix Tailwind v4 CSS missing in Next/Vercel builds"
+  brand_color: "#38BDF8"
+  default_prompt: "Diagnose Tailwind CSS missing or broken in a Next.js production deployment"
+policy:
+  allow_implicit_invocation: true

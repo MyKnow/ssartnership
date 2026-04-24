@@ -30,7 +30,7 @@
 - `overlay`: modal, drawer, toast
 - elevation은 shadow만이 아니라 surface 톤도 분리한다. `flat`은 기본 surface, `raised`는 약간 더 선명한 surface, `floating`과 `overlay`는 더 진한 또는 더 밀도 높은 surface를 사용해 레이어가 색으로도 읽히게 한다.
 - 다크모드 elevation은 검은 그림자만으로 구분하지 않는다. surface 명도 차이와 border 강도를 먼저 읽히게 하고, 전역 `--shadow-*` 토큰은 상단 inset highlight와 적은 수의 drop shadow만 보조로 사용한다.
-- 새 컴포넌트는 `shadow-sm/md/lg/2xl` 대신 `shadow-[var(--shadow-flat)]`, `shadow-[var(--shadow-raised)]`, `shadow-[var(--shadow-floating)]`, `shadow-[var(--shadow-overlay)]` 중 의미에 맞는 토큰을 우선 사용한다.
+- 새 컴포넌트는 `shadow-sm/md/lg/2xl` 대신 `shadow-flat`, `shadow-raised`, `shadow-floating`, `shadow-overlay` 중 의미에 맞는 토큰을 우선 사용한다.
 - 카드 내부의 단순 정보 박스는 `Surface level="inset"` 또는 `bg-surface-inset`을 사용한다. 독립 의미 단위가 아닌데 `Card`를 중첩하지 않는다.
 
 ## Radius
