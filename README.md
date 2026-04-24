@@ -393,11 +393,8 @@ npm run release -- patch
 
 `release` 스크립트는 다음을 수행합니다.
 
-- 워킹 트리 clean 상태 확인
-- `npm version` 실행
-- commit + tag 생성
-- `git push`
-- `git push --tags`
+- `main` 외 브랜치: `npm version` 실행 후 commit + push
+- `main` 브랜치: 현재 `package.json` 버전 기준 annotated tag 생성 후 push
 
 한 줄 메시지:
 
@@ -417,6 +414,13 @@ EOF
 ```
 
 구현은 [scripts/release.sh](/Users/myknow/coding/ssartnership/scripts/release.sh)에 있습니다.
+
+주의:
+
+- `main` 브랜치에서는 태그와 푸시만 수행하므로 작업 트리가 깨끗해야 합니다.
+- `main` 외 브랜치에서는 태그를 만들지 않습니다.
+- 작업 트리가 비어 있어도 `patch`, `minor`, `major`를 선택하면 버전 업데이트로 릴리즈할 수 있습니다.
+- 작업 트리가 비어 있는 상태에서 `no update`를 선택하면 종료됩니다.
 
 ## 배포
 

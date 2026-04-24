@@ -8,9 +8,15 @@ RELEASE_TYPE=""
 RUN_LIGHTHOUSE="no"
 COMMIT_MESSAGE_MODE=""
 COMMIT_MESSAGE=""
-CREATE_TAG="no"
 TAG_NAME=""
 MARKDOWN_MESSAGE_FILE=""
+
+has_git_changes() {
+  if git diff --quiet && git diff --cached --quiet; then
+    return 1
+  fi
+  return 0
+}
 
 trim_trailing_newlines() {
   local value="$1"
@@ -212,29 +218,6 @@ EOF
   done
 }
 
-prompt_tag_choice() {
-  while true; do
-    echo "태그를 붙일까요?"
-    echo "1) 붙인다"
-    echo "2) 붙이지 않는다"
-    read -r -p "> " tag_choice
-
-    case "$tag_choice" in
-      1|y|Y|yes|YES|tag)
-        CREATE_TAG="yes"
-        return
-        ;;
-      2|n|N|no|NO|skip)
-        CREATE_TAG="no"
-        return
-        ;;
-      *)
-        echo "1 또는 2를 선택하세요."
-        ;;
-    esac
-  done
-}
-
 prompt_confirm() {
   while true; do
     read -r -p "위 설정으로 진행할까요? (y/n): " confirm
@@ -263,15 +246,51 @@ if [[ -z "$CURRENT_BRANCH" ]]; then
   exit 1
 fi
 
-if git diff --quiet && git diff --cached --quiet; then
-  echo "커밋할 변경사항이 없습니다."
-  exit 1
-fi
-
 CURRENT_VERSION="$(node -p "require('./package.json').version")"
+
+if [[ "$CURRENT_BRANCH" == "main" ]]; then
+  if has_git_changes; then
+    echo "main 브랜치에서는 태그와 푸시만 수행합니다. 먼저 변경사항을 정리하거나 다른 브랜치에서 릴리즈 커밋을 만드세요."
+    exit 1
+  fi
+
+  TAG_NAME="v$CURRENT_VERSION"
+  if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+    echo "이미 존재하는 태그입니다: $TAG_NAME"
+    exit 1
+  fi
+
+  echo
+  echo "현재 브랜치: $CURRENT_BRANCH"
+  echo "현재 버전: $CURRENT_VERSION"
+  echo "동작: 태그 생성 후 푸시"
+  echo "태그: $TAG_NAME"
+  echo
+
+  if ! prompt_confirm; then
+    echo "작업을 취소했습니다."
+    exit 0
+  fi
+
+  git tag -a "$TAG_NAME" -m "$TAG_NAME"
+  git push --no-verify origin "$CURRENT_BRANCH"
+  git push --no-verify origin "$TAG_NAME"
+
+  echo
+  echo "릴리즈 완료"
+  echo "버전: $CURRENT_VERSION"
+  echo "태그: $TAG_NAME"
+  exit 0
+fi
 
 prompt_lighthouse_check
 prompt_release_type
+
+if [[ "$RELEASE_TYPE" == "none" ]] && ! has_git_changes; then
+  echo "커밋할 변경사항이 없습니다. no update 대신 patch/minor/major를 선택하거나 변경사항을 만든 뒤 다시 실행하세요."
+  exit 1
+fi
+
 prompt_commit_message_mode
 
 case "$COMMIT_MESSAGE_MODE" in
@@ -287,8 +306,6 @@ case "$COMMIT_MESSAGE_MODE" in
     ;;
 esac
 
-prompt_tag_choice
-
 LIGHTHOUSE_LABEL="건너뜀"
 if [[ "$RUN_LIGHTHOUSE" == "yes" ]]; then
   LIGHTHOUSE_LABEL="실행"
@@ -299,21 +316,13 @@ if [[ "$RELEASE_TYPE_LABEL" == "none" ]]; then
   RELEASE_TYPE_LABEL="no update"
 fi
 
-TAG_LABEL="생략"
-if [[ "$CREATE_TAG" == "yes" ]]; then
-  TAG_LABEL="생성"
-fi
-
 echo
 echo "현재 브랜치: $CURRENT_BRANCH"
 echo "현재 버전: $CURRENT_VERSION"
 echo "Lighthouse: $LIGHTHOUSE_LABEL"
 echo "버전 업데이트: $RELEASE_TYPE_LABEL"
 echo "커밋 메시지 형식: $COMMIT_MESSAGE_MODE"
-echo "태그: $TAG_LABEL"
-if [[ "$RELEASE_TYPE" == "none" && "$CREATE_TAG" == "yes" ]]; then
-  echo "안내: 현재 버전 v$CURRENT_VERSION 기준으로 태그를 생성합니다."
-fi
+echo "동작: 버전 업데이트, 커밋, 푸시"
 echo "커밋 메시지:"
 printf '%s\n' "$COMMIT_MESSAGE"
 echo
@@ -335,32 +344,17 @@ if [[ "$RELEASE_TYPE" != "none" ]]; then
   NEXT_VERSION="$(node -p "require('./package.json').version")"
 fi
 
-if [[ "$CREATE_TAG" == "yes" ]]; then
-  TAG_NAME="v$NEXT_VERSION"
-  if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-    echo "이미 존재하는 태그입니다: $TAG_NAME"
-    exit 1
-  fi
+if ! has_git_changes; then
+  echo "커밋할 변경사항이 없습니다."
+  exit 1
 fi
 
 git add -A
 git commit -m "$COMMIT_MESSAGE"
 
-if [[ "$CREATE_TAG" == "yes" ]]; then
-  git tag -a "$TAG_NAME" -m "$TAG_NAME"
-fi
-
 git push --no-verify origin "$CURRENT_BRANCH"
-
-if [[ "$CREATE_TAG" == "yes" ]]; then
-  git push --no-verify origin "$TAG_NAME"
-fi
 
 echo
 echo "릴리즈 완료"
 echo "버전: $CURRENT_VERSION -> $NEXT_VERSION"
-if [[ "$CREATE_TAG" == "yes" ]]; then
-  echo "태그: $TAG_NAME"
-else
-  echo "태그: 없음"
-fi
+echo "태그: 없음"
