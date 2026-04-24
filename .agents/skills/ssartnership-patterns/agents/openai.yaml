@@ -1,0 +1,4 @@
+interface:
+  display_name: "SSartnership Patterns"
+  short_description: "Repository-specific coding patterns, workflows, and conventions"
+  default_prompt: "Use this skill to follow the ssartnership repository established patterns for Next.js, Supabase, Tailwind, repository-pattern data access, design-system hierarchy, and validation."
