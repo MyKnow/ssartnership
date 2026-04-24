@@ -8,7 +8,6 @@ export {
 export { mergeSelectableYearSnapshotBatches } from "./mm-directory/collector";
 export {
   findMmUserDirectoryEntryByUsername,
-  findMmUserDirectoryEntryByUsernameAndYear,
   findMmUserDirectoryStaffEntryByUsername,
   findMmUserDirectoryStudentEntryByUsernameAndYear,
   syncMmUserDirectoryBySelectableYears,

@@ -1,7 +1,3 @@
-export type PartnerFavoriteRepositoryContext = {
-  memberId: string;
-};
-
 export interface PartnerFavoriteRepository {
   getFavoriteCounts(partnerIds: string[]): Promise<Map<string, number>>;
   getMemberFavoritePartnerIds(

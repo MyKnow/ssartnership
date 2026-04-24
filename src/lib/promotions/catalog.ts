@@ -75,10 +75,6 @@ export type EventCampaign = {
 
 export const EVENT_CAMPAIGNS: EventCampaign[] = listEventPageDefinitions();
 
-export function getEventCampaign(slug: string) {
-  return EVENT_CAMPAIGNS.find((campaign) => campaign.slug === slug) ?? null;
-}
-
 export const HOME_PROMOTIONS: PromotionSlide[] = [
   {
     id: "partnership-overview",

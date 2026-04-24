@@ -26,5 +26,4 @@ export {
 export { PartnerChangeRequestError } from "./partner-change-request-errors.ts";
 export {
   getPartnerChangeRequestErrorMessage,
-  getPartnerChangeRequestErrorStatus,
 } from "./partner-change-request-errors.ts";

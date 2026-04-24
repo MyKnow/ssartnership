@@ -5,7 +5,6 @@ export const OPTIONAL_POLICY_KINDS = ["marketing"] as const;
 export const POLICY_KINDS = [...REQUIRED_POLICY_KINDS, ...OPTIONAL_POLICY_KINDS] as const;
 
 export type RequiredPolicyKind = (typeof REQUIRED_POLICY_KINDS)[number];
-export type OptionalPolicyKind = (typeof OPTIONAL_POLICY_KINDS)[number];
 export type PolicyKind = (typeof POLICY_KINDS)[number];
 
 export type PolicyDocument = {
@@ -70,14 +69,6 @@ export function getPolicyKindLabel(kind: PolicyKind) {
     ? "서비스 이용약관"
     : kind === "privacy"
       ? "개인정보 수집·이용 및 처리방침"
-      : "마케팅 정보 수신 동의";
-}
-
-export function getPolicyFooterLabel(kind: PolicyKind) {
-  return kind === "service"
-    ? "서비스 이용약관"
-    : kind === "privacy"
-      ? "개인정보 처리방침"
       : "마케팅 정보 수신 동의";
 }
 

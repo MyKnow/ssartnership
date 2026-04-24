@@ -92,17 +92,7 @@ export type AuthSecurityStatus = 'success' | 'failure' | 'blocked';
 export type EventActorType = 'guest' | 'member' | 'admin' | 'system';
 
 const PRODUCT_EVENT_NAME_SET = new Set<string>(PRODUCT_EVENT_NAMES);
-const ADMIN_AUDIT_ACTION_SET = new Set<string>(ADMIN_AUDIT_ACTIONS);
-const AUTH_SECURITY_EVENT_NAME_SET = new Set<string>(AUTH_SECURITY_EVENT_NAMES);
 
 export function isProductEventName(value: string): value is ProductEventName {
   return PRODUCT_EVENT_NAME_SET.has(value);
-}
-
-export function isAdminAuditAction(value: string): value is AdminAuditAction {
-  return ADMIN_AUDIT_ACTION_SET.has(value);
-}
-
-export function isAuthSecurityEventName(value: string): value is AuthSecurityEventName {
-  return AUTH_SECURITY_EVENT_NAME_SET.has(value);
 }

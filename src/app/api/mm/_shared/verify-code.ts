@@ -33,8 +33,6 @@ import { failVerifyCode, failVerifyCodeException } from "./verify-code-failure";
 import { resolveVerifyCodeIdentity } from "./verify-code-identity";
 import { finalizeVerifiedMember } from "./verify-code-member";
 
-export const VERIFY_CODE_RUNTIME = "nodejs";
-
 export async function handleVerifyCodePost(request: Request) {
   const context = getRequestLogContext(request);
 

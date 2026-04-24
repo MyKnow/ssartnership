@@ -65,9 +65,3 @@ export async function resolveSelectableMemberByUsername(
 
   return null;
 }
-
-export async function resolveSelectableStudentByUsername(
-  username: string,
-): Promise<SelectableStudentMatch | null> {
-  return resolveSelectableMemberByUsername(username);
-}

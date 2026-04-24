@@ -99,13 +99,6 @@ export function revalidateCyclePaths() {
   revalidatePath("/certification");
 }
 
-export function redirectPartnerFormError(
-  code: string,
-  path = "/admin/partners",
-): never {
-  redirect(`${path}?error=${encodeURIComponent(code)}`);
-}
-
 export function redirectAdminActionError(path: string, code: string): never {
   redirect(`${path}?error=${encodeURIComponent(code)}`);
 }

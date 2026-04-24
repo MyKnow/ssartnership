@@ -107,19 +107,6 @@ export function normalizePartnerPortalServiceStatus(
   return "approved";
 }
 
-export function getPartnerPortalServiceStatusLabel(
-  status: PartnerPortalServiceStatus,
-) {
-  switch (status) {
-    case "pending":
-      return "승인 대기 중";
-    case "rejected":
-      return "수정 반려됨";
-    default:
-      return "승인됨";
-  }
-}
-
 export const partnerDashboardRepository: PartnerPortalDashboardRepository = {
   async getDashboard(companyIds: string[]) {
     const normalizedCompanyIds = normalizeCompanyIds(companyIds);

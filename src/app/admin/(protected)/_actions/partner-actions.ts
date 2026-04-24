@@ -1,5 +1,4 @@
 export {
-  createPartnerAction,
   createPartnerFormActionImpl,
 } from "./partner-actions/create";
 export {

@@ -30,13 +30,6 @@ export function formatKoreanDate(value: DateLike) {
   });
 }
 
-export function formatKoreanTime(value: DateLike) {
-  return formatKoreanDateTime(value, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function formatKoreanDateTimeToMinute(value: DateLike) {
   return formatKoreanDateTime(value, {
     year: "numeric",

@@ -24,11 +24,6 @@ export const typeLabels: Record<AdminNotificationType, string> = {
   expiring_partner: "종료 임박",
 };
 
-export const sourceLabels: Record<AdminNotificationOperationLog["source"], string> = {
-  manual: "수동 발송",
-  automatic: "자동 발송",
-};
-
 export const statusLabels: Record<AdminNotificationOperationLog["status"], string> = {
   pending: "대기",
   sent: "발송 완료",

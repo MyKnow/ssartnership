@@ -36,22 +36,3 @@ export function getPartnerChangeRequestErrorMessage(
       return "변경 요청 처리에 실패했습니다.";
   }
 }
-
-export function getPartnerChangeRequestErrorStatus(
-  code: PartnerChangeRequestErrorCode,
-) {
-  switch (code) {
-    case "not_found":
-      return 404;
-    case "forbidden":
-      return 403;
-    case "pending_exists":
-    case "already_resolved":
-    case "no_changes":
-      return 409;
-    case "invalid_request":
-      return 400;
-    default:
-      return 400;
-  }
-}

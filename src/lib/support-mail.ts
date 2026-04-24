@@ -73,6 +73,3 @@ export const BUG_REPORT_TEMPLATE = buildSupportMailTemplate({
     "6. 오류 메시지:",
   ],
 });
-
-export const TECH_SUPPORT_MAILTO_HREF = TECH_SUPPORT_TEMPLATE.mailtoHref;
-export const BUG_REPORT_MAILTO_HREF = BUG_REPORT_TEMPLATE.mailtoHref;

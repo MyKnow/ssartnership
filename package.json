@@ -11,9 +11,9 @@
     "sync:preview": "node scripts/supabase-sync-preview.mjs",
     "rss:refresh": "node scripts/refresh-rss.mjs",
     "perf:lighthouse": "npm run build && node scripts/lighthouse-check.mjs",
-    "test:mm-profile": "node --test tests/mm-profile-csv.test.mts",
-    "test:partner-portal": "node --test tests/partner-portal.mock.test.mts",
-    "test:ssafy-cycle": "node --test tests/ssafy-cycle-simulation.test.mts",
+    "test:mm-profile": "node --import ./tests/alias-register.mjs --test tests/mm-profile-csv.test.mts",
+    "test:partner-portal": "node --import ./tests/alias-register.mjs --test tests/partner-portal.mock.test.mts",
+    "test:ssafy-cycle": "node --import ./tests/alias-register.mjs --test tests/ssafy-cycle-simulation.test.mts",
     "release": "bash scripts/release.sh"
   },
   "dependencies": {
@@ -24,7 +24,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
-    "next": "16.1.6",
+    "next": "16.2.4",
     "next-themes": "^0.4.6",
     "nodemailer": "^8.0.3",
     "qrcode": "^1.5.4",
@@ -42,9 +42,9 @@
     "@types/web-push": "^3.6.4",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.4",
     "lighthouse": "^12.6.1",
-    "png-to-ico": "^3.0.1",
+    "postcss": "^8.5.10",
     "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5"

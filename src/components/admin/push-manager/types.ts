@@ -61,12 +61,6 @@ export type AdminPushLogFilterState = {
   sort: SortOption;
 };
 
-export type RestorableAudienceState = {
-  targetYear: number | null;
-  targetCampus: string | null;
-  targetMemberIds: string[] | null;
-};
-
 export type AdminPushReviewState = {
   preview: AdminNotificationPreview;
   lastSubmittedPayload: string;

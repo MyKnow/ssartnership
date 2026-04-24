@@ -140,13 +140,6 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
   revalidateAdminAndPublicPaths(partnerId);
 }
 
-export async function createPartnerAction(formData: FormData) {
-  await requireAdmin();
-  const record = await createPartnerRecord(formData);
-  await finalizeCreatedPartner(record);
-  redirect("/admin/partners?created=partner_created");
-}
-
 export async function createPartnerFormActionImpl(
   _prevState: PartnerCreateFormState,
   formData: FormData,

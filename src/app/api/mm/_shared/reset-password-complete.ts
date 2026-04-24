@@ -21,8 +21,6 @@ import {
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyResetPasswordCompletionToken } from "@/lib/reset-password-session";
 
-export const RESET_PASSWORD_COMPLETE_RUNTIME = "nodejs";
-
 export async function handleResetPasswordCompletePost(request: Request) {
   const context = getRequestLogContext(request);
 

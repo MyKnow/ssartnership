@@ -20,8 +20,6 @@ import {
 } from "./reset-password-verify-failure";
 import { resolveResetPasswordMember } from "./reset-password-identity";
 
-export const RESET_PASSWORD_VERIFY_RUNTIME = "nodejs";
-
 export async function handleResetPasswordVerifyPost(request: Request) {
   const context = getRequestLogContext(request);
 

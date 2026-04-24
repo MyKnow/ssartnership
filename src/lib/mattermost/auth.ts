@@ -24,13 +24,3 @@ export async function loginWithPassword(loginId: string, password: string) {
 
   return { token, user };
 }
-
-export async function getMe(token: string) {
-  const response = await mmFetch("/api/v4/users/me", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) {
-    throw new Error("MM 사용자 조회 실패");
-  }
-  return (await response.json()) as MMUser;
-}

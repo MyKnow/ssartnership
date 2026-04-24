@@ -8,8 +8,6 @@ import { wrapPushDbError } from "@/lib/push/config";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
 
-export type NotificationPreferenceState = PushPreferenceState;
-
 const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
 const hasSupabaseEnv =
   !!process.env.SUPABASE_URL &&

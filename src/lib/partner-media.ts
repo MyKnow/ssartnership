@@ -106,18 +106,6 @@ function parsePartnerMediaManifestEntries(
   return entries as PartnerMediaManifestEntry[];
 }
 
-export function buildPartnerMediaStoragePath(
-  partnerId: string,
-  role: "thumbnail" | "gallery",
-  index: number,
-  extension = "webp",
-) {
-  const safePartnerId = partnerId.trim();
-  const safeRole = role === "thumbnail" ? "thumbnail" : "gallery";
-  const suffix = `${Date.now().toString(36)}-${cryptoRandomId()}`;
-  return `partners/${safePartnerId}/${safeRole}/${index}-${suffix}.${extension}`;
-}
-
 export function extractPartnerMediaStoragePath(url: string) {
   const safeUrl = sanitizeHttpUrl(url);
   if (!safeUrl) {
@@ -148,10 +136,4 @@ export function extractPartnerMediaStoragePath(url: string) {
   } catch {
     return null;
   }
-}
-
-function cryptoRandomId() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 }

@@ -32,7 +32,6 @@ import {
 } from "./_actions/member-actions";
 import {
   approvePartnerChangeRequestAction,
-  createPartnerAction,
   createPartnerFormActionImpl,
   deletePartnerAction,
   rejectPartnerChangeRequestAction,
@@ -88,10 +87,6 @@ export async function updatePartnerCompany(formData: FormData) {
 
 export async function deletePartnerCompany(formData: FormData) {
   return deletePartnerCompanyAction(formData);
-}
-
-export async function createPartner(formData: FormData) {
-  return createPartnerAction(formData);
 }
 
 export async function createPartnerFormAction(

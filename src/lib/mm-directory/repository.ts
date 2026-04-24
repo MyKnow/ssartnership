@@ -68,13 +68,6 @@ export async function findMmUserDirectoryStudentEntryByUsernameAndYear(
   return row;
 }
 
-export async function findMmUserDirectoryEntryByUsernameAndYear(
-  username: string,
-  year: number,
-) {
-  return findMmUserDirectoryStudentEntryByUsernameAndYear(username, year);
-}
-
 export async function findMmUserDirectoryStaffEntryByUsername(
   username: string,
 ) {

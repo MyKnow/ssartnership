@@ -1,0 +1,5 @@
+{
+  "ignoreDependencies": ["lighthouse", "sharp"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreFiles": ["public/sw.js"]
+}

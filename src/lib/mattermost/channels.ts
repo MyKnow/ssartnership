@@ -1,6 +1,6 @@
 import { mmFetch, toMattermostApiError } from "./client.ts";
 import type { StudentChannelConfig } from "./types.ts";
-import { getUserById, getUserByUsername, getUserImage } from "./users.ts";
+import { getUserByUsername, getUserImage } from "./users.ts";
 
 export { getUserImage };
 
@@ -97,27 +97,6 @@ export async function listChannelMembers(
     throw toMattermostApiError(response, "MM 채널 멤버 목록 조회 실패");
   }
   return response.json() as Promise<Array<{ user_id?: string; userId?: string }>>;
-}
-
-export async function findUserInChannelByUserId(
-  token: string,
-  userId: string,
-  channelConfig: StudentChannelConfig,
-) {
-  const directUser = await getUserById(token, userId);
-  if (!directUser) {
-    return null;
-  }
-  const channel = await getChannelByName(
-    token,
-    (await getTeamByName(token, channelConfig.teamName)).id,
-    channelConfig.channelName,
-  );
-  const membership = await getChannelMember(token, channel.id, directUser.id);
-  if (!membership) {
-    return null;
-  }
-  return directUser;
 }
 
 export async function findUserInChannelByUsername(

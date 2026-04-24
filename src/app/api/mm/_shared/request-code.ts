@@ -29,8 +29,6 @@ import {
   resolveSignupTarget,
 } from "./request-code-identity";
 
-export const REQUEST_CODE_RUNTIME = "nodejs";
-
 export async function handleRequestCodePost(request: Request) {
   const context = getRequestLogContext(request);
   let year: number | null = null;

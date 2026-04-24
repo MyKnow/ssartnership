@@ -1,6 +1,5 @@
 import type {
   PartnerReview,
-  PartnerReviewSort,
 } from "@/lib/partner-reviews";
 export {
   getPartnerReviewRatingLabel,
@@ -12,19 +11,6 @@ import {
   type ReviewImageItem,
 } from "@/components/review-media/shared";
 import { formatKoreanDate } from "@/lib/datetime";
-
-export function getPartnerReviewSortLabel(sort: PartnerReviewSort) {
-  if (sort === "oldest") {
-    return "오래된 순";
-  }
-  if (sort === "rating_desc") {
-    return "높은 별점순";
-  }
-  if (sort === "rating_asc") {
-    return "낮은 별점순";
-  }
-  return "최신순";
-}
 
 export function formatPartnerReviewDate(value: string) {
   try {

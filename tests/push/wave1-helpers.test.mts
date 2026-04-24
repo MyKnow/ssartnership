@@ -31,6 +31,7 @@ test("push audience parser validates scope-specific inputs", async () => {
   assert.deepStrictEqual(parsePushAudience({ scope: "member", memberId: "member-1" }), {
     scope: "member",
     memberId: "member-1",
+    memberIds: ["member-1"],
   });
 
   assert.throws(() => parsePushAudience({ scope: "year", year: "" }), (error) => {
