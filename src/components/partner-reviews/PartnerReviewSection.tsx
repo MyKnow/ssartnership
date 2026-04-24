@@ -13,6 +13,7 @@ import type {
   PartnerReviewSort,
   PartnerReviewSummary,
 } from "@/lib/partner-reviews";
+import { applyPartnerReviewReaction } from "@/lib/partner-reviews";
 import {
   appendPartnerReviewList,
   getPartnerReviewRatingLabel,
@@ -187,8 +188,25 @@ export default function PartnerReviewSection({
   }
 
   async function reactToReview(reviewId: string, reaction: PartnerReviewReaction | null) {
+    if (reactingReviewId === reviewId) {
+      return;
+    }
+
+    const previousReview = reviews.find((item) => item.id === reviewId);
+    if (!previousReview) {
+      return;
+    }
+
     setReactingReviewId(reviewId);
     setErrorMessage(null);
+    startTransition(() => {
+      setReviews((current) =>
+        current.map((item) =>
+          item.id === reviewId ? applyPartnerReviewReaction(item, reaction) : item,
+        ),
+      );
+    });
+
     try {
       const response = await fetch(
         `/api/partners/${encodeURIComponent(partnerId)}/reviews/${encodeURIComponent(reviewId)}/reaction`,
@@ -200,6 +218,11 @@ export default function PartnerReviewSection({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        startTransition(() => {
+          setReviews((current) =>
+            current.map((item) => (item.id === reviewId ? previousReview : item)),
+          );
+        });
         setErrorMessage(data.message ?? "리뷰 반응에 실패했습니다.");
         return;
       }

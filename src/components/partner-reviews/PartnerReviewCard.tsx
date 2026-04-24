@@ -63,16 +63,16 @@ export default function PartnerReviewCard({
       <Button
         variant={reaction === "recommend" ? (active ? "soft" : "secondary") : active ? "danger" : "secondary"}
         size="sm"
-        loading={reactionPending}
-        loadingText="반응 중"
+        disabled={reactionPending}
         onClick={() => onReact?.(reaction)}
         className={cn(
-          "min-w-[7rem] justify-start",
+          "w-auto min-w-[5.5rem] justify-center px-3",
           reaction === "recommend" && active ? "text-primary" : null,
         )}
+        ariaLabel={label}
+        title={label}
       >
         <Icon className="h-4 w-4" />
-        <span>{label}</span>
         <span className="tabular-nums text-xs font-semibold opacity-80">
           {count.toLocaleString()}
         </span>
@@ -149,28 +149,6 @@ export default function PartnerReviewCard({
         ) : null}
       </div>
 
-      <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">{review.body}</p>
-
-      {showReactionActions && onReact ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {renderReactionButton(
-            "recommend",
-            "추천",
-            review.recommendCount,
-            review.myReaction === "recommend",
-          )}
-          {renderReactionButton(
-            "disrecommend",
-            "비추천",
-            review.disrecommendCount,
-            review.myReaction === "disrecommend",
-          )}
-          <span className="text-xs text-muted-foreground">
-            이 리뷰에 반응할 수 있습니다.
-          </span>
-        </div>
-      ) : null}
-
       {review.images.length > 0 ? (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {review.images.map((image, index) => (
@@ -191,6 +169,25 @@ export default function PartnerReviewCard({
               />
             </button>
           ))}
+        </div>
+      ) : null}
+
+      <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">{review.body}</p>
+
+      {showReactionActions && onReact ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {renderReactionButton(
+            "recommend",
+            "추천",
+            review.recommendCount,
+            review.myReaction === "recommend",
+          )}
+          {renderReactionButton(
+            "disrecommend",
+            "비추천",
+            review.disrecommendCount,
+            review.myReaction === "disrecommend",
+          )}
         </div>
       ) : null}
 
