@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
@@ -139,12 +138,20 @@ export default function AdminMemberListItem({
   const yearLabel = formatSsafyMemberLifecycleLabel(year);
   const staffSourceYear = member.staff_source_year ?? null;
   const campus = member.campus ?? profile.campus ?? "";
-  const avatarSrc =
-    member.avatar_base64 && member.avatar_content_type
-      ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
-      : "/avatar-default.svg";
   const updateFormId = `member-update-${member.id}`;
   const notificationPreferences = member.notification_preferences;
+  const avatarLabel = (displayName || member.mm_username || "?").trim().charAt(0).toUpperCase();
+  const hasAvatar = Boolean(member.avatar_content_type);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const avatarUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (member.updated_at) {
+      params.set("v", member.updated_at);
+    }
+
+    const query = params.toString();
+    return `/api/admin/members/${member.id}/avatar${query ? `?${query}` : ""}`;
+  }, [member.id, member.updated_at]);
 
   const policyStateCards = useMemo(() => {
     const policyKinds = ["service", "privacy", "marketing"] as const;
@@ -312,15 +319,20 @@ export default function AdminMemberListItem({
         onClick={() => setExpanded((current) => !current)}
         className="grid w-full grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-surface-muted/50"
       >
-        <div className="relative h-14 w-14 overflow-hidden rounded-2xl border border-border bg-surface-muted">
-          <Image
-            src={avatarSrc}
-            alt={`${displayName} 프로필 이미지`}
-            fill
-            sizes="56px"
-            unoptimized
-            className="object-cover"
-          />
+        <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg font-semibold text-foreground">
+          {hasAvatar && !avatarFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+              onError={() => setAvatarFailed(true)}
+            />
+          ) : (
+            <span aria-hidden="true">{avatarLabel || "?"}</span>
+          )}
         </div>
 
         <div className="grid min-w-0 gap-2">

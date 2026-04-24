@@ -106,7 +106,7 @@ export default async function AdminPartnerDetailPage({
       .eq("id", partnerId)
       .maybeSingle(),
     getAdminPartnerMetrics([partnerId]),
-    getAdminReviewPageData(reviewFilters),
+    getAdminReviewPageData(reviewFilters, { includeCounts: false }),
     supabase
       .from("partner_reviews")
       .select("id", { count: "exact", head: true })
@@ -145,10 +145,6 @@ export default async function AdminPartnerDetailPage({
     partner.period_start,
     partner.period_end,
   );
-  const metricTimeseries = await getPartnerMetricTimeseriesSnapshot(
-    partnerId,
-    partner.created_at,
-  );
   const auditTargetIds = Array.from(
     new Set([
       partner.id,
@@ -165,12 +161,19 @@ export default async function AdminPartnerDetailPage({
     "partner_company_update",
     "partner_company_delete",
   ] as const;
-  const partnerAuditLogsResult = await supabase
-    .from("admin_audit_logs")
-    .select("id,actor_id,action,target_type,target_id,properties,created_at")
-    .in("action", auditActions as unknown as string[])
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const [metricTimeseries, partnerAuditLogsResult] = await Promise.all([
+    getPartnerMetricTimeseriesSnapshot(
+      partnerId,
+      partner.created_at,
+    ),
+    supabase
+      .from("admin_audit_logs")
+      .select("id,actor_id,action,target_type,target_id,properties,created_at")
+      .in("action", auditActions as unknown as string[])
+      .in("target_type", ["partner", "partner_company", "partner_change_request"])
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
   const partnerAuditLogs = (partnerAuditLogsResult.data ?? []).filter((log) => {
     const properties = log.properties && typeof log.properties === "object"
       ? (log.properties as Record<string, unknown>)

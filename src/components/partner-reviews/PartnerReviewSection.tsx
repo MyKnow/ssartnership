@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { startTransition, useState } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -18,8 +19,9 @@ import {
   getPartnerReviewRatingOptions,
 } from "./helpers";
 import PartnerReviewCard from "./PartnerReviewCard";
-import PartnerReviewForm from "./PartnerReviewForm";
 import PartnerReviewSummaryCard from "./PartnerReviewSummaryCard";
+
+const PartnerReviewForm = dynamic(() => import("./PartnerReviewForm"));
 
 export default function PartnerReviewSection({
   partnerId,

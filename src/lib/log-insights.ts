@@ -10,6 +10,10 @@ import type {
   LogGroup,
   ProductLogRecord,
 } from './log-insights/shared';
+import {
+  EXPORT_MAX_LOG_ROWS_PER_GROUP,
+  PAGE_MAX_LOG_ROWS_PER_GROUP,
+} from './log-insights/shared';
 
 export type {
   AdminAuditLogRecord,
@@ -33,7 +37,9 @@ export { resolveLogRange } from './log-insights/range';
 export async function getAdminLogsPageData(
   options: GetAdminLogsPageDataOptions = {},
 ): Promise<AdminLogsPageData> {
-  const data = await loadAdminLogRows(options);
+  const data = await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+    maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
+  });
 
   const productLogs: ProductLogRecord[] = data.productRows.map((row) => ({
     ...row,
@@ -52,6 +58,7 @@ export async function getAdminLogsPageData(
       audit: auditLogs.length,
       security: securityLogs.length,
     },
+    truncated: data.truncated,
     chartBuckets: buildChartBuckets(
       data.range,
       productLogs,
@@ -68,7 +75,9 @@ export async function exportAdminLogsCsv(options: CsvExportOptions = {}) {
   const groups = (options.groups?.length
     ? options.groups
     : ['product', 'audit', 'security']) as LogGroup[];
-  const data = await loadAdminLogRows(options, groups);
+  const data = await loadAdminLogRows(options, groups, {
+    maxRowsPerGroup: EXPORT_MAX_LOG_ROWS_PER_GROUP,
+  });
 
   return {
     filename:

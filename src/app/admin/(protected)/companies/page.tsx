@@ -160,9 +160,7 @@ export default async function AdminCompaniesPage({
   const [partnersResult, companiesResult, accountsResult] = await Promise.all([
     supabase
       .from("partners")
-      .select(
-        "id,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active)",
-      )
+      .select("id,company_id,company:partner_companies(id)")
       .order("created_at", { ascending: false }),
     supabase
       .from("partner_companies")
@@ -190,26 +188,39 @@ export default async function AdminCompaniesPage({
     (sum, account) => sum + account.links.length,
     0,
   );
+  const brandCountByCompanyId = new Map<string, number>();
+  for (const partner of safePartners) {
+    const companyId =
+      (partner as { company_id?: string | null }).company_id ??
+      partner.company?.id ??
+      null;
+
+    if (!companyId) {
+      continue;
+    }
+
+    brandCountByCompanyId.set(companyId, (brandCountByCompanyId.get(companyId) ?? 0) + 1);
+  }
+
+  const accountIdsByCompanyId = new Map<string, Set<string>>();
+  for (const account of safeAccounts) {
+    for (const link of account.links) {
+      const companyId = link.company?.id;
+      if (!companyId) {
+        continue;
+      }
+
+      const current = accountIdsByCompanyId.get(companyId) ?? new Set<string>();
+      current.add(account.id);
+      accountIdsByCompanyId.set(companyId, current);
+    }
+  }
 
   const companyCards = safeCompanies.map((company) => {
-    const brandCount = safePartners.filter((partner) => {
-      const companyId =
-        (partner as { company_id?: string | null }).company_id ??
-        partner.company?.id ??
-        null;
-      return companyId === company.id;
-    }).length;
-
-    const accountCount = safeAccounts.filter((account) =>
-      account.links.some(
-        (link) => link.company?.id === company.id,
-      ),
-    ).length;
-
     return {
       ...company,
-      brandCount,
-      accountCount,
+      brandCount: brandCountByCompanyId.get(company.id) ?? 0,
+      accountCount: accountIdsByCompanyId.get(company.id)?.size ?? 0,
     };
   });
 

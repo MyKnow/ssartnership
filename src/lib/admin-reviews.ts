@@ -421,8 +421,12 @@ export async function getAdminReviewCounts(): Promise<AdminReviewCounts> {
 
 export async function getAdminReviewPageData(
   input: AdminReviewFilters,
+  options?: {
+    includeCounts?: boolean;
+  },
 ): Promise<AdminReviewPageData> {
   const supabase = getSupabaseAdminClient();
+  const includeCounts = options?.includeCounts ?? true;
   const [companiesResult, partnersResult, counts, reviews] = await Promise.all([
     supabase
       .from("partner_companies")
@@ -432,7 +436,13 @@ export async function getAdminReviewPageData(
       .from("partners")
       .select("id,name,company_id,company:partner_companies(id,name,slug)")
       .order("name", { ascending: true }),
-    getAdminReviewCounts(),
+    includeCounts
+      ? getAdminReviewCounts()
+      : Promise.resolve({
+          totalCount: 0,
+          visibleCount: 0,
+          hiddenCount: 0,
+        } satisfies AdminReviewCounts),
     fetchFilteredAdminReviewRows(input),
   ]);
 

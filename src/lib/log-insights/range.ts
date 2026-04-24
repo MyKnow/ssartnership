@@ -176,8 +176,14 @@ export function buildChartBuckets(
     });
   }
 
-  const increment = (value: string, group: 'product' | 'audit' | 'security') => {
-    const timestamp = new Date(value).getTime();
+  const increment = (
+    row: TimedLogRow,
+    group: 'product' | 'audit' | 'security',
+  ) => {
+    const timestamp =
+      typeof row.created_at_ms === 'number'
+        ? row.created_at_ms
+        : new Date(row.created_at).getTime();
     const rawIndex = Math.floor((timestamp - startTime) / sizeMs);
     const bucketIndex = Math.max(0, Math.min(buckets.length - 1, rawIndex));
     const bucket = buckets[bucketIndex];
@@ -188,9 +194,9 @@ export function buildChartBuckets(
     bucket.total += 1;
   };
 
-  productLogs.forEach((log) => increment(log.created_at, 'product'));
-  auditLogs.forEach((log) => increment(log.created_at, 'audit'));
-  securityLogs.forEach((log) => increment(log.created_at, 'security'));
+  productLogs.forEach((log) => increment(log, 'product'));
+  auditLogs.forEach((log) => increment(log, 'audit'));
+  securityLogs.forEach((log) => increment(log, 'security'));
 
   return buckets;
 }

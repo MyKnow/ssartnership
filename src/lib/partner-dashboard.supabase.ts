@@ -83,6 +83,23 @@ function createEmptyMetrics(): PartnerPortalServiceMetrics {
   };
 }
 
+function indexMetricEventRowsByTargetId<T extends { target_id: string | null }>(rows: T[]) {
+  const rowsByTargetId = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const targetId = row.target_id ?? "";
+    if (!targetId) {
+      continue;
+    }
+    const bucket = rowsByTargetId.get(targetId);
+    if (bucket) {
+      bucket.push(row);
+      continue;
+    }
+    rowsByTargetId.set(targetId, [row]);
+  }
+  return rowsByTargetId;
+}
+
 function normalizeSupabaseCompanyIds(companyIds: string[]) {
   return [
     ...new Set(
@@ -283,11 +300,12 @@ export async function getSupabasePartnerPortalDashboard(
           fallbackResult.errorMessage,
         );
       } else {
+        const rowsByTargetId = indexMetricEventRowsByTargetId(fallbackResult.rows);
         for (const serviceRow of serviceRows) {
           applyPartnerMetricRollupRows(
             metricsByServiceId,
             buildPartnerMetricRollupRowsFromEventLogs(
-              fallbackResult.rows.filter((row) => row.target_id === serviceRow.id),
+              rowsByTargetId.get(serviceRow.id) ?? [],
               serviceRow.id,
             ),
           );
@@ -324,9 +342,19 @@ export async function getSupabasePartnerPortalDashboard(
     metrics.favoriteCount = favoriteCounts.get(serviceRow.id) ?? 0;
   }
 
+  const servicesByCompanyId = new Map<string, PartnerServiceRow[]>();
+  for (const serviceRow of serviceRows) {
+    const companyId = serviceRow.company_id ?? "";
+    const bucket = servicesByCompanyId.get(companyId);
+    if (bucket) {
+      bucket.push(serviceRow);
+      continue;
+    }
+    servicesByCompanyId.set(companyId, [serviceRow]);
+  }
+
   const companies = companyRows.map((row) => {
-    const services = serviceRows
-      .filter((serviceRow) => serviceRow.company_id === row.id)
+    const services = (servicesByCompanyId.get(row.id) ?? [])
       .map((serviceRow) =>
         toServiceDashboard(
           serviceRow,

@@ -1,18 +1,12 @@
 import AdminNotificationCenter from "@/components/admin/notification-center/AdminNotificationCenter";
 import AdminShell from "@/components/admin/AdminShell";
 import ShellHeader from "@/components/ui/ShellHeader";
-import {
-  getAutomaticNotificationRuleSummaries,
-  getRecentAdminNotificationOperationLogs,
-} from "@/lib/admin-notification-ops";
+import { getAdminNotificationOverview } from "@/lib/admin-notification-ops";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminNotificationsPage() {
-  const [recentLogs, automaticSummaries] = await Promise.all([
-    getRecentAdminNotificationOperationLogs(100),
-    getAutomaticNotificationRuleSummaries(30),
-  ]);
+  const { recentLogs, automaticSummaries } = await getAdminNotificationOverview(100, 30);
 
   return (
     <AdminShell title="알림센터" backHref="/admin" backLabel="관리 홈">

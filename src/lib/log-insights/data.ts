@@ -11,7 +11,11 @@ import type {
   ResolvedActorMeta,
   AdminAuditLogRow,
 } from './shared';
-import { MAX_LOG_ROWS_PER_GROUP, QUERY_PAGE_SIZE, uniqueLogGroups } from './shared';
+import {
+  MEMBER_LOOKUP_CHUNK_SIZE,
+  QUERY_PAGE_SIZE,
+  uniqueLogGroups,
+} from './shared';
 import { resolveLogRange } from './range';
 
 async function queryAllRows<T>(
@@ -20,35 +24,51 @@ async function queryAllRows<T>(
   select: string,
   startIso: string,
   endIso: string,
-): Promise<T[]> {
-  const rows: T[] = [];
-  let from = 0;
+  maxRows: number,
+): Promise<{ rows: T[]; truncated: boolean }> {
+  const pageStarts = Array.from(
+    { length: Math.ceil(maxRows / QUERY_PAGE_SIZE) },
+    (_, index) => index * QUERY_PAGE_SIZE,
+  );
+  const pageResults = await Promise.all(
+    pageStarts.map(async (from) => {
+      const { data, error } = await supabase
+        .from(table)
+        .select(select)
+        .gte('created_at', startIso)
+        .lte('created_at', endIso)
+        .order('created_at', { ascending: false })
+        .range(from, from + QUERY_PAGE_SIZE - 1);
 
-  while (true) {
-    const { data, error } = await supabase
-      .from(table)
-      .select(select)
-      .gte('created_at', startIso)
-      .lte('created_at', endIso)
-      .order('created_at', { ascending: false })
-      .range(from, from + QUERY_PAGE_SIZE - 1);
-
-    if (error) {
-      console.error(`[log-insights] ${table} query failed`, error.message);
-      return rows;
-    }
-
-    const chunk = (data ?? []) as T[];
-    rows.push(...chunk);
-    if (chunk.length < QUERY_PAGE_SIZE || rows.length >= MAX_LOG_ROWS_PER_GROUP) {
-      if (rows.length > MAX_LOG_ROWS_PER_GROUP) {
-        return rows.slice(0, MAX_LOG_ROWS_PER_GROUP);
+      if (error) {
+        console.error(`[log-insights] ${table} query failed`, error.message);
+        return { rows: [] as T[], error: true };
       }
-      return rows;
-    }
 
-    from += QUERY_PAGE_SIZE;
+      return {
+        rows: (data ?? []) as T[],
+        error: false,
+      };
+    }),
+  );
+
+  const rows: T[] = [];
+  let reachedEnd = false;
+  for (const pageResult of pageResults) {
+    if (pageResult.error) {
+      continue;
+    }
+    rows.push(...pageResult.rows);
+    if (pageResult.rows.length < QUERY_PAGE_SIZE) {
+      reachedEnd = true;
+      break;
+    }
   }
+
+  return {
+    rows: rows.slice(0, maxRows),
+    truncated: !reachedEnd && rows.length >= maxRows,
+  };
 }
 
 function chunkValues<T>(values: T[], size: number) {
@@ -69,19 +89,25 @@ async function fetchMemberLookup(
   }
 
   const uniqueIds = Array.from(new Set(memberIds));
-  for (const chunk of chunkValues(uniqueIds, 200)) {
-    const { data, error } = await supabase
-      .from('members')
-      .select('id,display_name,mm_username')
-      .in('id', chunk);
+  const results = await Promise.all(
+    chunkValues(uniqueIds, MEMBER_LOOKUP_CHUNK_SIZE).map((chunk) =>
+      supabase.from('members').select('id,display_name,mm_username').in('id', chunk),
+    ),
+  );
 
-    if (error) {
-      console.error('[log-insights] members query failed', error.message);
+  for (const result of results) {
+    if (result.error) {
+      console.error('[log-insights] members query failed', result.error.message);
       continue;
     }
 
-    (data ?? []).forEach((row) => {
-      lookup.set(row.id, row as MemberLookupRecord);
+    (result.data ?? []).forEach((row) => {
+      lookup.set(row.id, {
+        ...(row as MemberLookupRecord),
+        actor_name:
+          parseSsafyProfile((row as MemberLookupRecord).display_name ?? undefined).displayName ??
+          (row as MemberLookupRecord).display_name,
+      });
     });
   }
 
@@ -110,8 +136,7 @@ export function resolveActorMeta(
 
   return {
     actor_name:
-      parseSsafyProfile(member.display_name ?? undefined).displayName ??
-      member.display_name,
+      member.actor_name,
     actor_mm_username: member.mm_username,
   };
 }
@@ -119,12 +144,15 @@ export function resolveActorMeta(
 export async function loadAdminLogRows(
   options: GetAdminLogsPageDataOptions = {},
   groups: LogGroup[] = ['product', 'audit', 'security'],
+  config: {
+    maxRowsPerGroup: number;
+  },
 ): Promise<AdminLogsLoadedData> {
   const supabase = getSupabaseAdminClient();
   const range = resolveLogRange(options);
   const selectedGroups = uniqueLogGroups(groups);
 
-  const [productRows, auditRows, securityRows] = await Promise.all([
+  const [productResult, auditResult, securityResult] = await Promise.all([
     selectedGroups.includes('product')
       ? queryAllRows<ProductLogRow>(
           supabase,
@@ -132,8 +160,9 @@ export async function loadAdminLogRows(
           'id,session_id,actor_type,actor_id,event_name,path,referrer,target_type,target_id,properties,user_agent,ip_address,created_at',
           range.start,
           range.end,
+          config.maxRowsPerGroup,
         )
-      : Promise.resolve([] as ProductLogRow[]),
+      : Promise.resolve({ rows: [] as ProductLogRow[], truncated: false }),
     selectedGroups.includes('audit')
       ? queryAllRows<AdminAuditLogRow>(
           supabase,
@@ -141,8 +170,9 @@ export async function loadAdminLogRows(
           'id,actor_id,action,path,target_type,target_id,properties,user_agent,ip_address,created_at',
           range.start,
           range.end,
+          config.maxRowsPerGroup,
         )
-      : Promise.resolve([] as AdminAuditLogRow[]),
+      : Promise.resolve({ rows: [] as AdminAuditLogRow[], truncated: false }),
     selectedGroups.includes('security')
       ? queryAllRows<AuthSecurityLogRow>(
           supabase,
@@ -150,9 +180,22 @@ export async function loadAdminLogRows(
           'id,event_name,status,actor_type,actor_id,identifier,path,properties,user_agent,ip_address,created_at',
           range.start,
           range.end,
+          config.maxRowsPerGroup,
         )
-      : Promise.resolve([] as AuthSecurityLogRow[]),
+      : Promise.resolve({ rows: [] as AuthSecurityLogRow[], truncated: false }),
   ]);
+  const productRows = productResult.rows.map((row) => ({
+    ...row,
+    created_at_ms: new Date(row.created_at).getTime(),
+  }));
+  const auditRows = auditResult.rows.map((row) => ({
+    ...row,
+    created_at_ms: new Date(row.created_at).getTime(),
+  }));
+  const securityRows = securityResult.rows.map((row) => ({
+    ...row,
+    created_at_ms: new Date(row.created_at).getTime(),
+  }));
 
   const memberIds = Array.from(
     new Set([
@@ -172,5 +215,15 @@ export async function loadAdminLogRows(
     auditRows,
     securityRows,
     memberLookup,
+    truncated: {
+      product: productResult.truncated,
+      audit: auditResult.truncated,
+      security: securityResult.truncated,
+      any:
+        productResult.truncated ||
+        auditResult.truncated ||
+        securityResult.truncated,
+      limitPerGroup: config.maxRowsPerGroup,
+    },
   };
 }

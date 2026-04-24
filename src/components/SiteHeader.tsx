@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { BellIcon } from "@heroicons/react/24/outline";
 import { BellAlertIcon } from "@heroicons/react/24/solid";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
-import UserMenu from "@/components/auth/UserMenu";
-import MobileNav from "@/components/MobileNav";
 import type { HeaderSession } from "@/lib/header-session";
 import { cn } from "@/lib/cn";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
@@ -20,6 +19,9 @@ import {
 import {
   useNotificationUnreadCount,
 } from "@/hooks/useNotificationUnreadCount";
+
+const UserMenu = dynamic(() => import("@/components/auth/UserMenu"));
+const MobileNav = dynamic(() => import("@/components/MobileNav"));
 
 export default function SiteHeader({
   suggestHref = "/suggest",

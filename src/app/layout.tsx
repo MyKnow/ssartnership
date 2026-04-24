@@ -85,7 +85,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
+        />
+      </head>
       <body className="bg-background text-foreground antialiased">
         <ThemeProvider>
           <ToastProvider>

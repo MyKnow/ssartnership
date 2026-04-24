@@ -26,6 +26,35 @@ function createMetricsMap(partnerIds: string[]) {
   );
 }
 
+function countRowsByPartnerId(rows: Array<{ partner_id?: string | null }>, partnerIds: string[]) {
+  const counts = new Map(partnerIds.map((partnerId) => [partnerId, 0]));
+  for (const row of rows) {
+    const partnerId = row.partner_id ?? "";
+    if (!counts.has(partnerId)) {
+      continue;
+    }
+    counts.set(partnerId, (counts.get(partnerId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function indexMetricEventRowsByTargetId<T extends { target_id: string | null }>(rows: T[]) {
+  const rowsByTargetId = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const targetId = row.target_id ?? "";
+    if (!targetId) {
+      continue;
+    }
+    const bucket = rowsByTargetId.get(targetId);
+    if (bucket) {
+      bucket.push(row);
+      continue;
+    }
+    rowsByTargetId.set(targetId, [row]);
+  }
+  return rowsByTargetId;
+}
+
 function getMockMetrics(partnerId: string) {
   const setup = listMockPartnerPortalSetupsInternal().find((candidate) =>
     candidate.company.services.some((service) => service.id === partnerId),
@@ -99,11 +128,12 @@ export async function getAdminPartnerMetrics(
           fallbackResult.errorMessage,
         );
       } else {
+        const rowsByTargetId = indexMetricEventRowsByTargetId(fallbackResult.rows);
         for (const partnerId of uniquePartnerIds) {
           applyPartnerMetricRollupRows(
             metricsByPartnerId,
             buildPartnerMetricRollupRowsFromEventLogs(
-              fallbackResult.rows.filter((row) => row.target_id === partnerId),
+              rowsByTargetId.get(partnerId) ?? [],
               partnerId,
             ),
           );
@@ -116,12 +146,13 @@ export async function getAdminPartnerMetrics(
     hasPartialFailure = true;
     console.error("[admin-partner-metrics] review query failed", reviewResult.error.message);
   } else {
-    for (const row of reviewResult.data ?? []) {
-      const metrics = metricsByPartnerId.get(row.partner_id ?? "");
+    const reviewCounts = countRowsByPartnerId(reviewResult.data ?? [], uniquePartnerIds);
+    for (const [partnerId, reviewCount] of reviewCounts) {
+      const metrics = metricsByPartnerId.get(partnerId);
       if (!metrics) {
         continue;
       }
-      metrics.reviewCount += 1;
+      metrics.reviewCount = reviewCount;
     }
   }
 

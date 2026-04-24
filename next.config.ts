@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 import type { RemotePattern } from "next/dist/shared/lib/image-config";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const securityHeaders = [
   {
@@ -53,8 +57,15 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  experimental: {
+    optimizePackageImports: [
+      "@heroicons/react",
+      "lucide-react",
+      "react-icons",
+    ],
+  },
   turbopack: {
-    root: process.cwd(),
+    root: projectRoot,
   },
   images: {
     formats: ["image/avif", "image/webp"],

@@ -1,11 +1,6 @@
 import { notificationRepository } from "@/lib/repositories";
-import { createDirectChannel, sendPost } from "@/lib/mattermost/channels";
-import { loginWithPassword } from "@/lib/mattermost/auth";
 import {
-  getBaseUrl,
-  getSenderCredentials,
   hasSenderCredentials,
-  listConfiguredSenderYears,
 } from "@/lib/mattermost/config";
 import {
   getNotificationChannelLabel,
@@ -14,9 +9,7 @@ import {
 } from "@/lib/notifications/shared";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { getActiveSubscriptionPushPreferences } from "@/lib/push/preferences";
-import { buildNotificationPayload } from "@/lib/push/payloads";
 import { getPushEnv, isPushConfigured } from "@/lib/push/config";
-import { createPushMessageLog, finalizePushMessageLog, logPushDelivery, markPushFailure, markPushSuccess } from "@/lib/push/logs";
 import { resolvePushAudience } from "@/lib/push/audience";
 import type {
   PushAudience,
@@ -29,7 +22,25 @@ import type {
   WebPushModule,
 } from "@/lib/push/types";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { SITE_URL } from "@/lib/site";
+import {
+  EMPTY_CHANNEL_RESULTS,
+  absoluteUrl,
+  computeOperationStatus,
+  getMattermostSenderCandidateYears,
+  getNotificationTypeLabel,
+  getPreviewReasonLabel,
+  getTypePreferenceEnabled,
+  isAdminNotificationType,
+  isMattermostConfigured,
+  mergeExclusionReasons,
+  normalizeSelectedChannels,
+  normalizeSourceYears,
+  parseLogMetadata,
+} from "@/lib/admin-notification-ops-utils";
+import {
+  sendMattermostCampaignDeliveries,
+  sendPushCampaignDeliveries,
+} from "@/lib/admin-notification-ops-delivery";
 
 export const ADMIN_NOTIFICATION_TYPES = [
   "announcement",
@@ -238,153 +249,8 @@ type PushMessageLogRow = {
 
 let webPushPromise: Promise<WebPushModule> | null = null;
 
-const EMPTY_CHANNEL_RESULTS: AdminNotificationSendResult["channelResults"] = {
-  in_app: { targeted: 0, sent: 0, failed: 0, skipped: 0 },
-  push: { targeted: 0, sent: 0, failed: 0, skipped: 0 },
-  mm: { targeted: 0, sent: 0, failed: 0, skipped: 0 },
-};
-
-function isAdminNotificationType(value: string): value is AdminNotificationType {
-  return ADMIN_NOTIFICATION_TYPES.includes(value as AdminNotificationType);
-}
-
-function getPreviewReasonLabel(code: AdminNotificationPreviewReasonCode) {
-  switch (code) {
-    case "marketing_not_consented":
-      return "마케팅 동의 없음";
-    case "push_disabled":
-      return "푸시 수신 꺼짐";
-    case "no_push_subscription":
-      return "푸시 구독 없음";
-    case "mm_disabled":
-      return "Mattermost 수신 꺼짐";
-    case "channel_unavailable":
-      return "채널 설정 미완료";
-    case "type_disabled":
-    default:
-      return "항목 수신 꺼짐";
-  }
-}
-
-function getNotificationTypeLabel(type: AdminNotificationType) {
-  switch (type) {
-    case "announcement":
-      return "운영 공지";
-    case "marketing":
-      return "마케팅/이벤트";
-    case "new_partner":
-      return "신규 제휴";
-    case "expiring_partner":
-      return "종료 임박";
-  }
-}
-
-function getTypePreferenceEnabled(
-  type: AdminNotificationType,
-  preference: PushPreferenceState,
-) {
-  switch (type) {
-    case "announcement":
-      return preference.announcementEnabled;
-    case "marketing":
-      return preference.marketingEnabled;
-    case "new_partner":
-      return preference.newPartnerEnabled;
-    case "expiring_partner":
-      return preference.expiringPartnerEnabled;
-  }
-}
-
-function absoluteUrl(url: string) {
-  return url.startsWith("http://") || url.startsWith("https://")
-    ? url
-    : new URL(url, SITE_URL).toString();
-}
-
-function buildMattermostMessage(input: {
-  notificationType: AdminNotificationType;
-  title: string;
-  body: string;
-  url?: string | null;
-}) {
-  const categoryLabel = input.notificationType === "marketing" ? "광고" : "공지";
-  const lines = [
-    `### [싸트너십/${categoryLabel}] ${input.title.trim()}`,
-    input.body.trim(),
-  ];
-  if (input.url?.trim()) {
-    lines.push(`[바로가기](${absoluteUrl(input.url)})`);
-  }
-  return lines.join("\n");
-}
-
-function normalizeSelectedChannels(channels: AdminNotificationChannelSelection) {
-  return (Object.entries(channels) as Array<[NotificationChannel, boolean]>)
-    .filter(([, selected]) => selected)
-    .map(([channel]) => channel);
-}
-
-function computeOperationStatus(
-  channelResults: AdminNotificationSendResult["channelResults"],
-) {
-  const entries = Object.values(channelResults);
-  const targeted = entries.reduce((sum, item) => sum + item.targeted, 0);
-  const sent = entries.reduce((sum, item) => sum + item.sent, 0);
-  const failed = entries.reduce((sum, item) => sum + item.failed, 0);
-
-  if (targeted === 0) {
-    return "no_target" as const;
-  }
-  if (sent === 0) {
-    return "failed" as const;
-  }
-  if (failed > 0) {
-    return "partial_failed" as const;
-  }
-  return "sent" as const;
-}
-
-function assertMattermostConfigured() {
-  getBaseUrl();
-  if (listConfiguredSenderYears().length === 0) {
-    throw new Error("Mattermost 발송용 sender 계정이 설정되지 않았습니다.");
-  }
-}
-
-function isMattermostConfigured() {
-  try {
-    assertMattermostConfigured();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function isMattermostNotificationConfigured() {
   return isMattermostConfigured();
-}
-
-function normalizeSourceYears(value: unknown): number[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return Array.from(
-    new Set(
-      value
-        .map((year) => {
-          if (typeof year === "number") {
-            return year;
-          }
-          if (typeof year === "string") {
-            const normalized = Number(year.trim());
-            return Number.isFinite(normalized) ? normalized : null;
-          }
-          return null;
-        })
-        .filter((year): year is number => Number.isFinite(year)),
-    ),
-  );
 }
 
 async function getWebPush() {
@@ -452,18 +318,6 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
       source_years: directoryEntry?.source_years ?? [],
     } satisfies AudienceMember;
   });
-}
-
-function getMattermostSenderCandidateYears(member: AudienceMember) {
-  if (!member.is_staff) {
-    return member.year > 0 ? [member.year] : [];
-  }
-
-  const years = member.source_years
-    .filter((year) => Number.isFinite(year) && year > 0)
-    .sort((a, b) => b - a);
-
-  return Array.from(new Set(years));
 }
 
 async function buildAudienceContext(
@@ -703,202 +557,6 @@ function toPushPayload(input: AdminNotificationComposerInput) {
   };
 }
 
-async function sendPushCampaignDeliveries(params: {
-  notificationId: string;
-  payload: ReturnType<typeof toPushPayload>;
-  source: AdminNotificationSource;
-  resolvedAudience: ResolvedPushAudience;
-  subscriptions: StoredSubscription[];
-}) {
-  if (!params.subscriptions.length) {
-    return { targeted: 0, sent: 0, failed: 0, skipped: 0 };
-  }
-
-  const messageLog = await createPushMessageLog({
-    payload: params.payload,
-    source: params.source,
-    audience: params.resolvedAudience,
-  });
-  const webpush = await getWebPush();
-  const serialized = buildNotificationPayload(params.payload);
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const subscription of params.subscriptions) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          expirationTime: null,
-          keys: {
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          },
-        },
-        serialized,
-      );
-      sent += 1;
-      await Promise.all([
-        markPushSuccess(subscription.id),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
-          subscriptionId: subscription.id,
-          payload: params.payload,
-          status: "sent",
-        }),
-        notificationRepository.recordNotificationDelivery({
-          notificationId: params.notificationId,
-          memberId: subscription.member_id,
-          channel: "push",
-          status: "sent",
-        }),
-      ]);
-    } catch (error) {
-      failed += 1;
-      const statusCode =
-        typeof error === "object" && error && "statusCode" in error
-          ? Number((error as { statusCode?: number }).statusCode)
-          : null;
-      const errorMessage =
-        error instanceof Error ? error.message : "푸시 알림 전송에 실패했습니다.";
-      await Promise.all([
-        markPushFailure(subscription, errorMessage, statusCode === 404 || statusCode === 410),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
-          subscriptionId: subscription.id,
-          payload: params.payload,
-          status: "failed",
-          errorMessage,
-        }),
-        notificationRepository.recordNotificationDelivery({
-          notificationId: params.notificationId,
-          memberId: subscription.member_id,
-          channel: "push",
-          status: "failed",
-          errorMessage,
-        }),
-      ]);
-    }
-  }
-
-  await finalizePushMessageLog({
-    id: messageLog.id,
-    targeted: params.subscriptions.length,
-    delivered: sent,
-    failed,
-  });
-
-  return {
-    targeted: params.subscriptions.length,
-    sent,
-    failed,
-    skipped: 0,
-  };
-}
-
-async function sendMattermostCampaignDeliveries(params: {
-  notificationId: string;
-  notificationType: AdminNotificationType;
-  title: string;
-  body: string;
-  url?: string | null;
-  members: AudienceMember[];
-}) {
-  if (!params.members.length) {
-    return { targeted: 0, sent: 0, failed: 0, skipped: 0 };
-  }
-
-  const senderSessionByYear = new Map<number, Promise<{ token: string; user: { id: string } }>>();
-  let sent = 0;
-  let failed = 0;
-
-  for (const member of params.members) {
-    const candidateYears = getMattermostSenderCandidateYears(member);
-    if (candidateYears.length === 0) {
-      failed += 1;
-      await notificationRepository.recordNotificationDelivery({
-        notificationId: params.notificationId,
-        memberId: member.id,
-        channel: "mm",
-        status: "failed",
-        errorMessage: "발송 가능한 Mattermost sender 기수를 찾지 못했습니다.",
-      });
-      continue;
-    }
-
-    let lastError: Error | null = null;
-
-    for (const year of candidateYears) {
-      if (!hasSenderCredentials(year, { allowDefaultFallback: false })) {
-        lastError = new Error(`${year}기 Mattermost sender 계정이 설정되지 않았습니다.`);
-        continue;
-      }
-
-      try {
-        let sessionPromise = senderSessionByYear.get(year);
-        if (!sessionPromise) {
-          const credentials = getSenderCredentials(year, { allowDefaultFallback: false });
-          sessionPromise = loginWithPassword(credentials.loginId, credentials.password);
-          senderSessionByYear.set(
-            year,
-            sessionPromise as Promise<{ token: string; user: { id: string } }>,
-          );
-        }
-        const session = await sessionPromise;
-        const channel = await createDirectChannel(session.token, session.user.id, member.mm_user_id);
-        await sendPost(
-          session.token,
-          channel.id,
-          buildMattermostMessage({
-            notificationType: params.notificationType,
-            title: params.title,
-            body: params.body,
-            url: params.url,
-          }),
-        );
-        sent += 1;
-        await notificationRepository.recordNotificationDelivery({
-          notificationId: params.notificationId,
-          memberId: member.id,
-          channel: "mm",
-          status: "sent",
-        });
-        lastError = null;
-        break;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error("Mattermost 발송 실패");
-      }
-    }
-
-    if (!lastError) {
-      continue;
-    }
-
-    try {
-      failed += 1;
-      await notificationRepository.recordNotificationDelivery({
-        notificationId: params.notificationId,
-        memberId: member.id,
-        channel: "mm",
-        status: "failed",
-        errorMessage: lastError.message,
-      });
-    } catch {
-      failed += 1;
-    }
-  }
-
-  return {
-    targeted: params.members.length,
-    sent,
-    failed,
-    skipped: 0,
-  };
-}
-
 export async function previewAdminNotificationCampaign(
   input: AdminNotificationComposerInput,
 ) {
@@ -969,6 +627,7 @@ export async function sendAdminNotificationCampaign(
       source,
       resolvedAudience: context.resolvedAudience,
       subscriptions: context.pushSubscriptions,
+      getWebPush,
     });
     channelResults.push.skipped = context.members.length - context.eligibleMemberIds.push.length;
   }
@@ -997,81 +656,6 @@ export async function sendAdminNotificationCampaign(
     notificationId: created.notification.id,
     preview: context.preview,
     channelResults,
-  };
-}
-
-function parseLogMetadata(
-  metadata: Record<string, unknown> | null | undefined,
-): {
-  notificationType: AdminNotificationType | null;
-  selectedChannels: NotificationChannel[];
-  source: AdminNotificationSource;
-  audience: ResolvedPushAudience["scope"];
-  audienceLabel: string;
-  audienceYear: number | null;
-  audienceCampus: string | null;
-  audienceMemberId: string | null;
-  totalAudienceCount: number;
-  previewChannels: AdminNotificationChannelPreview[];
-  channelResults: AdminNotificationSendResult["channelResults"] | null;
-  campaignStatus: AdminNotificationOperationLog["status"] | null;
-  completedAt: string | null;
-} {
-  const raw = metadata ?? {};
-  const selectedChannels = Array.isArray(raw.selectedChannels)
-    ? raw.selectedChannels.filter(
-        (value): value is NotificationChannel =>
-          value === "in_app" || value === "push" || value === "mm",
-      )
-    : ["in_app", "push"];
-  const notificationType =
-    typeof raw.notificationType === "string" && isAdminNotificationType(raw.notificationType)
-      ? raw.notificationType
-      : null;
-
-  return {
-    notificationType,
-    selectedChannels: selectedChannels as NotificationChannel[],
-    source:
-      raw.source === "manual" || raw.source === "automatic"
-        ? raw.source
-        : ("automatic" as AdminNotificationSource),
-    audience:
-      raw.audience === "all" ||
-      raw.audience === "year" ||
-      raw.audience === "campus" ||
-      raw.audience === "member"
-        ? raw.audience
-        : "all",
-    audienceLabel:
-      typeof raw.audienceLabel === "string" && raw.audienceLabel.trim()
-        ? raw.audienceLabel
-        : "전체",
-    audienceYear:
-      typeof raw.audienceYear === "number" ? raw.audienceYear : null,
-    audienceCampus:
-      typeof raw.audienceCampus === "string" ? raw.audienceCampus : null,
-    audienceMemberId:
-      typeof raw.audienceMemberId === "string" ? raw.audienceMemberId : null,
-    totalAudienceCount:
-      typeof raw.totalAudienceCount === "number" ? raw.totalAudienceCount : 0,
-    previewChannels: Array.isArray((raw.previewSummary as { channels?: unknown[] } | undefined)?.channels)
-      ? (((raw.previewSummary as { channels?: unknown[] }).channels ?? []) as AdminNotificationChannelPreview[])
-      : [],
-    channelResults:
-      typeof raw.channelResults === "object" && raw.channelResults
-        ? (raw.channelResults as AdminNotificationSendResult["channelResults"])
-        : null,
-    campaignStatus:
-      raw.campaignStatus === "pending" ||
-      raw.campaignStatus === "sent" ||
-      raw.campaignStatus === "partial_failed" ||
-      raw.campaignStatus === "failed" ||
-      raw.campaignStatus === "no_target"
-        ? (raw.campaignStatus as AdminNotificationOperationLog["status"])
-        : null,
-    completedAt:
-      typeof raw.completedAt === "string" ? raw.completedAt : null,
   };
 }
 
@@ -1108,9 +692,10 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
 
       return rows
         .map((row) => {
-          const metadata = parseLogMetadata(row.metadata);
+          const metadata = parseLogMetadata(row.metadata, ADMIN_NOTIFICATION_TYPES);
           const notificationType =
-            metadata.notificationType ?? (isAdminNotificationType(row.type) ? row.type : "announcement");
+            metadata.notificationType ??
+            (isAdminNotificationType(row.type, ADMIN_NOTIFICATION_TYPES) ? row.type : "announcement");
           const channelResults = structuredClone(EMPTY_CHANNEL_RESULTS);
           const channelDeliveries = deliveriesByNotification.get(row.id) ?? [];
 
@@ -1132,19 +717,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
                 : channelResults[channel];
           }
 
-          const exclusionReasons = metadata.previewChannels
-            .flatMap((channel) => channel.reasons)
-            .reduce<AdminNotificationPreviewReason[]>((accumulator, reason) => {
-              const existing = accumulator.find((item) => item.code === reason.code);
-              if (existing) {
-                existing.count += reason.count;
-                return accumulator;
-              }
-              accumulator.push({ ...reason });
-              return accumulator;
-            }, [])
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 3);
+          const exclusionReasons = mergeExclusionReasons(metadata.previewChannels);
 
           return {
             id: row.id,
@@ -1187,7 +760,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
 
   return ((pushLogs ?? []) as PushMessageLogRow[]).map((row) => ({
     id: row.id,
-    notificationType: isAdminNotificationType(row.type) ? row.type : "announcement",
+    notificationType: isAdminNotificationType(row.type, ADMIN_NOTIFICATION_TYPES) ? row.type : "announcement",
     source: row.source,
     selectedChannels: [],
     targetScope: row.target_scope,
@@ -1210,7 +783,12 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
 
 export async function getAutomaticNotificationRuleSummaries(limit = 30) {
   const logs = await getRecentAdminNotificationOperationLogs(limit);
+  return summarizeAutomaticNotificationRuleSummaries(logs);
+}
 
+function summarizeAutomaticNotificationRuleSummaries(
+  logs: AdminNotificationOperationLog[],
+) {
   return (["new_partner", "expiring_partner"] as const).map((notificationType) => {
     const items = logs.filter(
       (log) => log.notificationType === notificationType && log.source === "automatic",
@@ -1227,4 +805,19 @@ export async function getAutomaticNotificationRuleSummaries(limit = 30) {
         .map((item) => `${item.title} · ${item.status}`),
     } satisfies AutomaticNotificationRuleSummary;
   });
+}
+
+export async function getAdminNotificationOverview(
+  recentLogLimit = 50,
+  automaticSummaryLimit = 30,
+) {
+  const fetchLimit = Math.max(recentLogLimit, automaticSummaryLimit);
+  const logs = await getRecentAdminNotificationOperationLogs(fetchLimit);
+
+  return {
+    recentLogs: logs.slice(0, recentLogLimit),
+    automaticSummaries: summarizeAutomaticNotificationRuleSummaries(
+      logs.slice(0, automaticSummaryLimit),
+    ),
+  };
 }

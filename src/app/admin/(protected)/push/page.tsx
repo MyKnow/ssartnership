@@ -2,8 +2,7 @@ import AdminPushManager from "@/components/admin/AdminPushManager";
 import AdminShell from "@/components/admin/AdminShell";
 import ShellHeader from "@/components/ui/ShellHeader";
 import {
-  getAutomaticNotificationRuleSummaries,
-  getRecentAdminNotificationOperationLogs,
+  getAdminNotificationOverview,
   isMattermostNotificationConfigured,
 } from "@/lib/admin-notification-ops";
 import { isPushConfigured } from "@/lib/push";
@@ -17,8 +16,7 @@ export default async function AdminPushPage() {
   const [
     memberResult,
     partnerResult,
-    recentLogs,
-    automaticSummaries,
+    notificationOverview,
   ] = await Promise.all([
     supabase
       .from("members")
@@ -27,8 +25,7 @@ export default async function AdminPushPage() {
       .order("campus", { ascending: true })
       .order("display_name", { ascending: true }),
     supabase.from("partners").select("id,name").order("name", { ascending: true }),
-    getRecentAdminNotificationOperationLogs(50),
-    getAutomaticNotificationRuleSummaries(30),
+    getAdminNotificationOverview(50, 30),
   ]);
 
   const partners = partnerResult.error ? [] : partnerResult.data ?? [];
@@ -48,8 +45,8 @@ export default async function AdminPushPage() {
               mattermostConfigured={isMattermostNotificationConfigured()}
               partners={partners}
               members={safeMembers}
-              recentLogs={recentLogs}
-              automaticSummaries={automaticSummaries}
+              recentLogs={notificationOverview.recentLogs}
+              automaticSummaries={notificationOverview.automaticSummaries}
             />
           </div>
       </div>

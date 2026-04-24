@@ -1,16 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { HomeIcon } from "@heroicons/react/24/outline";
 import ThemeToggle from "@/components/ThemeToggle";
-import AdminMobileNav from "@/components/admin/AdminMobileNav";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import ScrollToTopFab from "@/components/ScrollToTopFab";
 import { SITE_NAME } from "@/lib/site";
-import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import { logout } from "@/app/admin/(protected)/actions";
 import { cn } from "@/lib/cn";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
+
+const AdminMobileNav = dynamic(() => import("@/components/admin/AdminMobileNav"));
+const AdminLogoutButton = dynamic(() => import("@/components/admin/AdminLogoutButton"));
 
 export default function AdminShell({
   title,

@@ -21,10 +21,9 @@ export async function logAdminAction(
 }
 
 export function revalidateAdminAndPublicPaths(partnerId?: string) {
+  revalidateTag("partners", "max");
   revalidatePath("/");
   revalidatePath("/admin");
-  revalidatePath("/admin/partners/[partnerId]", "page");
-  revalidatePath("/partners/[id]", "page");
   if (partnerId) {
     revalidatePath(`/admin/partners/${partnerId}`);
     revalidatePath(`/partners/${partnerId}`);
@@ -51,7 +50,6 @@ export function revalidatePartnerData() {
 export function revalidatePartnerAccountData() {
   revalidatePath("/admin");
   revalidatePath("/admin/companies");
-  revalidatePath("/admin/partners");
 }
 
 export function revalidatePartnerCompanyData() {
@@ -60,20 +58,13 @@ export function revalidatePartnerCompanyData() {
   revalidatePath("/admin");
   revalidatePath("/admin/companies");
   revalidatePath("/admin/partners");
-  revalidatePath("/admin/partners/[partnerId]", "page");
   revalidatePath("/partner");
-  revalidatePath("/partners/[id]", "page");
-  revalidatePath("/partner/services/[partnerId]", "page");
-  revalidatePath("/partner/services/[partnerId]/request", "page");
 }
 
 export function revalidateReviewPaths(partnerId?: string) {
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/reviews");
-  revalidatePath("/admin/partners/[partnerId]", "page");
-  revalidatePath("/partners/[id]", "page");
-  revalidatePath("/partner/services/[partnerId]", "page");
   if (partnerId) {
     revalidatePath(`/admin/partners/${partnerId}`);
     revalidatePath(`/partners/${partnerId}`);

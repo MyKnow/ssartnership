@@ -66,6 +66,12 @@ export default function AdminLogsManagerContent({
             </div>
           </div>
 
+          {logs.data.truncated.any ? (
+            <FormMessage variant="error">
+              조회 범위의 로그가 많아 그룹별 최근 {logs.data.truncated.limitPerGroup.toLocaleString()}건만 불러왔습니다. 더 넓은 원본은 CSV 다운로드로 확인하세요.
+            </FormMessage>
+          ) : null}
+
           {logs.activePreset === 'custom' ? (
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
               <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -168,8 +174,15 @@ export default function AdminLogsManagerContent({
         </section>
 
         <AdminLogsExplorer
-          filteredLogs={logs.filteredLogs}
+          filteredLogs={logs.visibleLogs}
+          filteredTotal={logs.filteredLogs.length}
           totalLogs={logs.totalLogs}
+          currentPage={logs.currentPage}
+          totalPages={logs.totalPages}
+          pageSize={logs.pageSize}
+          pageInputValue={logs.pageInputValue}
+          pageSizeOptions={logs.pageSizeOptions}
+          pageStart={logs.pageStart}
           searchValue={logs.searchValue}
           groupFilter={logs.groupFilter}
           nameFilter={logs.nameFilter}
@@ -184,6 +197,9 @@ export default function AdminLogsManagerContent({
           onActorFilterChange={logs.setActorFilter}
           onStatusFilterChange={logs.setStatusFilter}
           onSortFilterChange={logs.setSortFilter}
+          onPageInputChange={logs.setPageInputValue}
+          onPageSizeChange={logs.setPageSize}
+          onPageChange={logs.syncPage}
         />
       </div>
 

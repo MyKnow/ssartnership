@@ -46,18 +46,20 @@ export async function backfillMemberProfilesAction() {
       failures: result.failures.length,
     };
 
-    for (const syncResult of result.results) {
-      await logAdminAudit({
-        ...context,
-        action: "member_sync",
-        actorId,
-        targetType: "member",
-        targetId: syncResult.member.id,
-        properties: buildMemberSyncLogProperties(syncResult, {
-          source: "manual_backfill",
+    await Promise.allSettled(
+      result.results.map((syncResult) =>
+        logAdminAudit({
+          ...context,
+          action: "member_sync",
+          actorId,
+          targetType: "member",
+          targetId: syncResult.member.id,
+          properties: buildMemberSyncLogProperties(syncResult, {
+            source: "manual_backfill",
+          }),
         }),
-      });
-    }
+      ),
+    );
     status = result.failures.length > 0 ? "partial" : "success";
   } catch (error) {
     console.error("member backfill failed", error);
@@ -162,9 +164,9 @@ export async function manualAddMembersAction(
   const actorId = process.env.ADMIN_ID ?? "admin";
   const result = await provisionManualMembers(requestedYear, inputs);
 
-  for (const item of result.items) {
-    try {
-      await logAdminAudit({
+  const auditResults = await Promise.allSettled(
+    result.items.map((item) =>
+      logAdminAudit({
         ...context,
         action: "member_manual_add",
         actorId,
@@ -188,9 +190,12 @@ export async function manualAddMembersAction(
           displayName: item.displayName,
           campus: item.campus,
         },
-      });
-    } catch (error) {
-      console.error("manual member add log failed", error);
+      }),
+    ),
+  );
+  for (const auditResult of auditResults) {
+    if (auditResult.status === "rejected") {
+      console.error("manual member add log failed", auditResult.reason);
     }
   }
 

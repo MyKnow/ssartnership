@@ -50,7 +50,7 @@ export default async function AdminMembersPage({
     supabase
       .from("members")
       .select(
-        "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,avatar_base64,created_at,updated_at",
+        "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,created_at,updated_at",
       )
       .order("created_at", { ascending: false }),
   ]);
@@ -69,25 +69,6 @@ export default async function AdminMembersPage({
     marketing_enabled: boolean;
   }> = [];
   let subscriptionRows: Array<{ member_id: string }> = [];
-
-  if (memberIds.length) {
-    const [preferenceResult, subscriptionResult] = await Promise.all([
-      supabase
-        .from("push_preferences")
-        .select(
-          "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
-        )
-        .in("member_id", memberIds),
-      supabase
-        .from("push_subscriptions")
-        .select("member_id")
-        .eq("is_active", true)
-        .in("member_id", memberIds),
-    ]);
-
-    preferenceRows = (preferenceResult.data ?? []) as typeof preferenceRows;
-    subscriptionRows = (subscriptionResult.data ?? []) as typeof subscriptionRows;
-  }
   let consentRows: Array<{
     member_id: string;
     kind: "service" | "privacy" | "marketing";
@@ -98,19 +79,6 @@ export default async function AdminMembersPage({
       | Array<{ title?: string | null; effective_at?: string | null }>
       | null;
   }> = [];
-
-  if (memberIds.length) {
-    const { data } = await supabase
-      .from("member_policy_consents")
-      .select(
-        "member_id,kind,version,agreed_at,policy_documents(title,effective_at)",
-      )
-      .in("member_id", memberIds)
-      .order("agreed_at", { ascending: false });
-
-    consentRows = (data ?? []) as typeof consentRows;
-  }
-
   let consentActivityRows: Array<{
     actor_id: string;
     properties: {
@@ -123,16 +91,44 @@ export default async function AdminMembersPage({
   }> = [];
 
   if (memberIds.length) {
-    const { data } = await supabase
-      .from("auth_security_logs")
-      .select("actor_id,properties,created_at")
-      .eq("event_name", "member_policy_consent")
-      .eq("status", "success")
-      .eq("actor_type", "member")
-      .in("actor_id", memberIds)
-      .order("created_at", { ascending: false });
+    const [
+      preferenceResult,
+      subscriptionResult,
+      consentResult,
+      consentActivityResult,
+    ] = await Promise.all([
+      supabase
+        .from("push_preferences")
+        .select(
+          "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
+        )
+        .in("member_id", memberIds),
+      supabase
+        .from("push_subscriptions")
+        .select("member_id")
+        .eq("is_active", true)
+        .in("member_id", memberIds),
+      supabase
+        .from("member_policy_consents")
+        .select(
+          "member_id,kind,version,agreed_at,policy_documents(title,effective_at)",
+        )
+        .in("member_id", memberIds)
+        .order("agreed_at", { ascending: false }),
+      supabase
+        .from("auth_security_logs")
+        .select("actor_id,properties,created_at")
+        .eq("event_name", "member_policy_consent")
+        .eq("status", "success")
+        .eq("actor_type", "member")
+        .in("actor_id", memberIds)
+        .order("created_at", { ascending: false }),
+    ]);
 
-    consentActivityRows = (data ?? []) as typeof consentActivityRows;
+    preferenceRows = (preferenceResult.data ?? []) as typeof preferenceRows;
+    subscriptionRows = (subscriptionResult.data ?? []) as typeof subscriptionRows;
+    consentRows = (consentResult.data ?? []) as typeof consentRows;
+    consentActivityRows = (consentActivityResult.data ?? []) as typeof consentActivityRows;
   }
 
   const consentHistoryByMemberId = new Map<

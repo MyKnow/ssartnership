@@ -14,7 +14,14 @@ import {
 
 export function AdminLogsExplorer({
   filteredLogs,
+  filteredTotal,
   totalLogs,
+  currentPage,
+  totalPages,
+  pageSize,
+  pageInputValue,
+  pageSizeOptions,
+  pageStart,
   searchValue,
   groupFilter,
   nameFilter,
@@ -29,9 +36,19 @@ export function AdminLogsExplorer({
   onActorFilterChange,
   onStatusFilterChange,
   onSortFilterChange,
+  onPageInputChange,
+  onPageSizeChange,
+  onPageChange,
 }: {
   filteredLogs: NormalizedLog[];
+  filteredTotal: number;
   totalLogs: number;
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  pageInputValue: string;
+  pageSizeOptions: readonly number[];
+  pageStart: number;
   searchValue: string;
   groupFilter: GroupFilter;
   nameFilter: string;
@@ -46,6 +63,9 @@ export function AdminLogsExplorer({
   onActorFilterChange: (value: 'all' | string) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
   onSortFilterChange: (value: SortFilter) => void;
+  onPageInputChange: (value: string) => void;
+  onPageSizeChange: (value: number) => void;
+  onPageChange: (value: number) => void;
 }) {
   return (
     <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
@@ -55,7 +75,7 @@ export function AdminLogsExplorer({
           description="유저명, MM 아이디, IP, 경로, 속성까지 포함해 검색하고 정렬·필터링할 수 있습니다."
         />
         <Badge className="w-fit bg-surface text-muted-foreground">
-          필터 결과 {filteredLogs.length.toLocaleString()}건 / 전체{' '}
+          필터 결과 {filteredTotal.toLocaleString()}건 / 전체{' '}
           {totalLogs.toLocaleString()}건
         </Badge>
       </div>
@@ -130,6 +150,81 @@ export function AdminLogsExplorer({
             <option value="ip">IP순</option>
           </Select>
         </label>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-muted/40 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          {filteredTotal === 0
+            ? '0건'
+            : `${pageStart + 1}-${Math.min(pageStart + filteredLogs.length, filteredTotal)} / ${filteredTotal}`}
+        </p>
+        <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
+          <label className="flex items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
+            <span>페이지당</span>
+            <Select
+              value={String(pageSize)}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}건
+                </option>
+              ))}
+            </Select>
+          </label>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              이전
+            </button>
+            <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              다음
+            </button>
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 whitespace-nowrap">
+            <Input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInputValue}
+              onChange={(event) => onPageInputChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  const parsed = Number.parseInt(pageInputValue, 10);
+                  if (!Number.isNaN(parsed)) {
+                    onPageChange(parsed);
+                  }
+                }
+              }}
+              className="w-20"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const parsed = Number.parseInt(pageInputValue, 10);
+                if (!Number.isNaN(parsed)) {
+                  onPageChange(parsed);
+                }
+              }}
+              className="shrink-0 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground"
+            >
+              이동
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4">

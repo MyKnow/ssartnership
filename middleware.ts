@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin-security";
 
 const COOKIE_NAME = "user_session";
+const ADMIN_COOKIE_NAME = "admin_session";
 const PARTNER_COOKIE_NAME = "partner_session";
 
 function getSecret() {
@@ -16,6 +17,10 @@ function getSecret() {
 
 function getPartnerSecret() {
   return process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET ?? "";
+}
+
+function getAdminSecret() {
+  return process.env.ADMIN_SESSION_SECRET ?? "";
 }
 
 function splitSignedToken(token: string) {
@@ -134,6 +139,39 @@ async function verifyPartnerToken(token: string) {
   }
 }
 
+async function verifyAdminToken(token: string) {
+  const signedToken = splitSignedToken(token);
+  if (!signedToken) {
+    return null;
+  }
+  const [payload, signature] = signedToken;
+  if (!payload || !signature) {
+    return null;
+  }
+  try {
+    const expected = await hmacSha256Hex(payload, getAdminSecret());
+    if (expected !== signature) {
+      return null;
+    }
+    const parsed = JSON.parse(payload) as {
+      issuedAt?: number;
+      expiresAt?: number;
+    };
+    if (
+      typeof parsed.issuedAt !== "number" ||
+      typeof parsed.expiresAt !== "number"
+    ) {
+      return null;
+    }
+    if (parsed.issuedAt > Date.now() || parsed.expiresAt <= Date.now()) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -159,6 +197,21 @@ export async function middleware(request: NextRequest) {
           "WWW-Authenticate": 'Basic realm="Admin Area"',
         },
       });
+    }
+
+    const isAdminPage = pathname.startsWith("/admin");
+    if (isAdminPage && pathname !== "/admin/login") {
+      const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+      const adminPayload = adminToken
+        ? await verifyAdminToken(adminToken)
+        : null;
+
+      if (!adminPayload) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin/login";
+        url.searchParams.set("error", "access_denied");
+        return NextResponse.redirect(url);
+      }
     }
 
     return NextResponse.next();

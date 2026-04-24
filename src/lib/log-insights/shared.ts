@@ -13,6 +13,7 @@ export type MemberLookupRecord = {
   id: string;
   display_name: string | null;
   mm_username: string | null;
+  actor_name: string | null;
 };
 
 export type ProductLogRow = {
@@ -29,6 +30,7 @@ export type ProductLogRow = {
   user_agent: string | null;
   ip_address: string | null;
   created_at: string;
+  created_at_ms?: number;
 };
 
 export type AdminAuditLogRow = {
@@ -42,6 +44,7 @@ export type AdminAuditLogRow = {
   user_agent: string | null;
   ip_address: string | null;
   created_at: string;
+  created_at_ms?: number;
 };
 
 export type AuthSecurityLogRow = {
@@ -56,6 +59,7 @@ export type AuthSecurityLogRow = {
   user_agent: string | null;
   ip_address: string | null;
   created_at: string;
+  created_at_ms?: number;
 };
 
 export type ResolvedActorMeta = {
@@ -94,6 +98,13 @@ export type AdminLogsPageData = {
     product: number;
     audit: number;
     security: number;
+  };
+  truncated: {
+    product: boolean;
+    audit: boolean;
+    security: boolean;
+    any: boolean;
+    limitPerGroup: number;
   };
   chartBuckets: LogChartBucket[];
   productLogs: ProductLogRecord[];
@@ -138,6 +149,7 @@ export type UnifiedCsvRow = {
 
 export type TimedLogRow = {
   created_at: string;
+  created_at_ms?: number;
 };
 
 export type AdminLogsLoadedData = {
@@ -146,6 +158,13 @@ export type AdminLogsLoadedData = {
   auditRows: AdminAuditLogRow[];
   securityRows: AuthSecurityLogRow[];
   memberLookup: Map<string, MemberLookupRecord>;
+  truncated: {
+    product: boolean;
+    audit: boolean;
+    security: boolean;
+    any: boolean;
+    limitPerGroup: number;
+  };
 };
 
 export const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> = {
@@ -159,7 +178,9 @@ export const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> 
 export const DEFAULT_PRESET: LogRangePreset = '24h';
 export const QUERY_PAGE_SIZE = 1000;
 export const MAX_CUSTOM_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
-export const MAX_LOG_ROWS_PER_GROUP = 5000;
+export const PAGE_MAX_LOG_ROWS_PER_GROUP = 2000;
+export const EXPORT_MAX_LOG_ROWS_PER_GROUP = 20000;
+export const MEMBER_LOOKUP_CHUNK_SIZE = 500;
 export const ADMIN_LOGS_CSV_HEADER = [
   'group',
   'action',

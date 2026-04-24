@@ -74,10 +74,8 @@ export default async function AdminPage() {
   }
 
   const supabase = getSupabaseAdminClient();
-  const cycleSettings = await getSsafyCycleSettings();
-  const cycleOverview = getSsafyCycleOverview(cycleSettings);
-
   const [
+    cycleSettings,
     memberResult,
     companyResult,
     partnerResult,
@@ -89,6 +87,7 @@ export default async function AdminPage() {
     auditLogResult,
     securityLogResult,
   ] = await Promise.all([
+    getSsafyCycleSettings(),
     supabase.from("members").select("id", { count: "exact", head: true }),
     supabase.from("partner_companies").select("id", { count: "exact", head: true }),
     supabase.from("partners").select("id", { count: "exact", head: true }),
@@ -110,6 +109,7 @@ export default async function AdminPage() {
       .from("auth_security_logs")
       .select("id", { count: "exact", head: true }),
   ]);
+  const cycleOverview = getSsafyCycleOverview(cycleSettings);
 
   const memberCount = memberResult.error ? 0 : memberResult.count ?? 0;
   const companyCount = companyResult.error ? 0 : companyResult.count ?? 0;

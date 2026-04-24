@@ -175,7 +175,10 @@ export function* iterateAdminLogsCsvRows(
         continue;
       }
 
-      const timestamp = new Date(row.created_at).getTime();
+      const timestamp =
+        typeof row.created_at_ms === 'number'
+          ? row.created_at_ms
+          : new Date(row.created_at).getTime();
       if (
         nextIndex === -1 ||
         timestamp > nextTimestamp ||

@@ -114,155 +114,87 @@ export async function ensurePartnerCompanyRow(
     }
     const displayName = toPartnerAccountDisplayName(companyInput);
 
-    const { data: existingLink, error: linkError } = await supabase
-      .from("partner_account_companies")
-      .select("account_id,is_active")
-      .eq("company_id", company.id)
-      .order("created_at", { ascending: true })
-      .limit(1)
+    const { data: existingAccount, error: accountLookupError } = await supabase
+      .from("partner_accounts")
+      .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+      .eq("login_id", loginId)
       .maybeSingle();
 
-    if (linkError) {
-      throw new Error(linkError.message);
+    if (accountLookupError) {
+      throw new Error(accountLookupError.message);
     }
 
-    if (existingLink?.account_id) {
-      if (existingLink.is_active === false) {
-        const { error: activateLinkError } = await supabase
-          .from("partner_account_companies")
-          .update({ is_active: true })
-          .eq("account_id", existingLink.account_id)
-          .eq("company_id", company.id);
-
-        if (activateLinkError) {
-          throw new Error(activateLinkError.message);
-        }
-      }
-
-      const { data: existingAccount, error: accountError } = await supabase
+    if (existingAccount) {
+      const { data: updatedAccount, error: updateError } = await supabase
         .from("partner_accounts")
-        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
-        .eq("id", existingLink.account_id)
-        .maybeSingle();
-
-      if (accountError) {
-        throw new Error(accountError.message);
-      }
-      if (!existingAccount) {
-        throw new Error("연결된 업체 계정을 찾을 수 없습니다.");
-      }
-
-      const nextAccount = {
-        login_id: loginId,
-        display_name: displayName,
-        email: loginId,
-        is_active: true,
-      };
-
-      const hasAccountChanges =
-        nextAccount.login_id !== existingAccount.login_id ||
-        nextAccount.display_name !== existingAccount.display_name ||
-        nextAccount.email !== existingAccount.email ||
-        Boolean(existingAccount.is_active) !== true;
-
-      if (hasAccountChanges) {
-        const { data: updatedAccount, error: updateError } = await supabase
-          .from("partner_accounts")
-          .update(nextAccount)
-          .eq("id", existingAccount.id)
-          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
-          .single();
-
-        if (updateError) {
-          throw new Error(updateError.message);
-        }
-        account = normalizePartnerAccountRow(updatedAccount as PartnerAccountRow);
-      } else {
-        account = normalizePartnerAccountRow(existingAccount as PartnerAccountRow);
-      }
-    } else {
-      const { data: existingAccount, error: accountLookupError } = await supabase
-        .from("partner_accounts")
-        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
-        .eq("login_id", loginId)
-        .maybeSingle();
-
-      if (accountLookupError) {
-        throw new Error(accountLookupError.message);
-      }
-
-      if (existingAccount) {
-        const { data: updatedAccount, error: updateError } = await supabase
-          .from("partner_accounts")
-          .update({
-            display_name: displayName,
-            email: loginId,
-            is_active: true,
-          })
-          .eq("id", existingAccount.id)
-          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
-          .single();
-
-        if (updateError) {
-          throw new Error(updateError.message);
-        }
-        account = normalizePartnerAccountRow(updatedAccount as PartnerAccountRow);
-      } else {
-        const passwordRecord = hashPassword(generateTempPassword(12));
-        const { data: createdAccountRow, error: createAccountError } = await supabase
-          .from("partner_accounts")
-          .insert({
-            login_id: loginId,
-            display_name: displayName,
-            email: loginId,
-            password_hash: passwordRecord.hash,
-            password_salt: passwordRecord.salt,
-            must_change_password: true,
-            is_active: true,
-            email_verified_at: null,
-            initial_setup_completed_at: null,
-          })
-          .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
-          .single();
-
-        if (createAccountError) {
-          throw new Error(createAccountError.message);
-        }
-
-        account = normalizePartnerAccountRow(createdAccountRow as PartnerAccountRow);
-        createdAccount = true;
-        cleanupTasks.push(async () => {
-          await supabase.from("partner_accounts").delete().eq("id", account?.id ?? "");
-        });
-      }
-
-      if (!account || !company) {
-        throw new Error("회사 또는 계정 정보를 처리하지 못했습니다.");
-      }
-      const accountId = account.id;
-      const companyId = company.id;
-
-      const { error: createLinkError } = await supabase
-        .from("partner_account_companies")
-        .insert({
-          account_id: accountId,
-          company_id: companyId,
+        .update({
+          display_name: displayName,
+          email: loginId,
           is_active: true,
-        });
+        })
+        .eq("id", existingAccount.id)
+        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+        .single();
 
-      if (createLinkError) {
-        throw new Error(createLinkError.message);
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+      account = normalizePartnerAccountRow(updatedAccount as PartnerAccountRow);
+    } else {
+      const passwordRecord = hashPassword(generateTempPassword(12));
+      const { data: createdAccountRow, error: createAccountError } = await supabase
+        .from("partner_accounts")
+        .insert({
+          login_id: loginId,
+          display_name: displayName,
+          email: loginId,
+          password_hash: passwordRecord.hash,
+          password_salt: passwordRecord.salt,
+          must_change_password: true,
+          is_active: true,
+          email_verified_at: null,
+          initial_setup_completed_at: null,
+        })
+        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+        .single();
+
+      if (createAccountError) {
+        throw new Error(createAccountError.message);
       }
 
-      createdLink = true;
+      account = normalizePartnerAccountRow(createdAccountRow as PartnerAccountRow);
+      createdAccount = true;
       cleanupTasks.push(async () => {
-        await supabase
-          .from("partner_account_companies")
-          .delete()
-          .eq("account_id", accountId)
-          .eq("company_id", companyId);
+        await supabase.from("partner_accounts").delete().eq("id", account?.id ?? "");
       });
     }
+
+    if (!account || !company) {
+      throw new Error("회사 또는 계정 정보를 처리하지 못했습니다.");
+    }
+    const accountId = account.id;
+    const companyId = company.id;
+
+    const { error: createLinkError } = await supabase
+      .from("partner_account_companies")
+      .insert({
+        account_id: accountId,
+        company_id: companyId,
+        is_active: true,
+      });
+
+    if (createLinkError) {
+      throw new Error(createLinkError.message);
+    }
+
+    createdLink = true;
+    cleanupTasks.push(async () => {
+      await supabase
+        .from("partner_account_companies")
+        .delete()
+        .eq("account_id", accountId)
+        .eq("company_id", companyId);
+    });
 
     return {
       company,

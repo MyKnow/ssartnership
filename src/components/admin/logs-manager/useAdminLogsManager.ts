@@ -26,6 +26,8 @@ import type {
   LogRangePreset,
 } from '@/lib/log-insights';
 
+const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
+
 export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const { notify } = useToast();
   const [data, setData] = useState(initialData);
@@ -60,6 +62,10 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   });
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] =
+    useState<(typeof LOG_PAGE_SIZE_OPTIONS)[number]>(100);
+  const [pageInputValue, setPageInputValue] = useState('1');
 
   const unifiedLogs = useMemo<NormalizedLog[]>(() => buildUnifiedLogs(data), [data]);
   const availableNames = useMemo(
@@ -88,6 +94,13 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       unifiedLogs,
     ],
   );
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const visibleLogs = useMemo(
+    () => filteredLogs.slice(pageStart, pageStart + pageSize),
+    [filteredLogs, pageSize, pageStart],
+  );
   const totalLogs = data.counts.product + data.counts.audit + data.counts.security;
   const topProductEvents = useMemo(() => createTopProductEvents(data), [data]);
   const topAuditActions = useMemo(() => createTopAuditActions(data), [data]);
@@ -95,6 +108,17 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const topIps = useMemo(() => createTopIps(unifiedLogs), [unifiedLogs]);
   const topPaths = useMemo(() => createTopPaths(unifiedLogs), [unifiedLogs]);
   const securityStatusCounts = useMemo(() => getSecurityStatusCounts(data), [data]);
+
+  function resetPage() {
+    setPage(1);
+    setPageInputValue('1');
+  }
+
+  function syncPage(nextPage: number) {
+    const safePage = Math.min(Math.max(1, nextPage), totalPages);
+    setPage(safePage);
+    setPageInputValue(String(safePage));
+  }
 
   async function fetchLogs(params: {
     preset: LogRangePreset;
@@ -131,6 +155,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       setActivePreset(nextData.range.preset);
       setCustomStartInput(toDateTimeLocalValue(nextData.range.start));
       setCustomEndInput(toDateTimeLocalValue(nextData.range.end));
+      resetPage();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '로그 조회에 실패했습니다.');
     } finally {
@@ -274,6 +299,13 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     availableNames,
     actorOptions,
     filteredLogs,
+    visibleLogs,
+    currentPage,
+    totalPages,
+    pageSize,
+    pageInputValue,
+    pageSizeOptions: LOG_PAGE_SIZE_OPTIONS,
+    pageStart,
     totalLogs,
     topProductEvents,
     topAuditActions,
@@ -283,12 +315,40 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     securityStatusCounts,
     setCustomStartInput,
     setCustomEndInput,
-    setSearchValue,
-    setGroupFilter,
-    setNameFilter,
-    setActorFilter,
-    setStatusFilter,
-    setSortFilter,
+    setSearchValue: (value: string) => {
+      resetPage();
+      setSearchValue(value);
+    },
+    setGroupFilter: (value: GroupFilter) => {
+      resetPage();
+      setGroupFilter(value);
+    },
+    setNameFilter: (value: string) => {
+      resetPage();
+      setNameFilter(value);
+    },
+    setActorFilter: (value: 'all' | string) => {
+      resetPage();
+      setActorFilter(value);
+    },
+    setStatusFilter: (value: StatusFilter) => {
+      resetPage();
+      setStatusFilter(value);
+    },
+    setSortFilter: (value: SortFilter) => {
+      resetPage();
+      setSortFilter(value);
+    },
+    setPageInputValue,
+    setPageSize: (value: number) => {
+      const nextPageSize = LOG_PAGE_SIZE_OPTIONS.includes(
+        value as (typeof LOG_PAGE_SIZE_OPTIONS)[number],
+      )
+        ? (value as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
+        : LOG_PAGE_SIZE_OPTIONS[1];
+      setPageSize(nextPageSize);
+      resetPage();
+    },
     setExportOpen,
     setExportScope,
     setExportCustomStart,
@@ -299,5 +359,6 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     handleBucketSelect,
     handleOpenExport,
     handleExport,
+    syncPage,
   };
 }
