@@ -329,7 +329,7 @@ export default function NotificationInbox({
             <Button
               variant="secondary"
               size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full border-success/20 bg-success/10 px-3 text-xs font-semibold text-success shadow-[var(--shadow-raised)] hover:border-success/30 hover:bg-success/15"
+              className="!h-8 !min-h-8 !min-w-0 rounded-full border-success/20 bg-success/10 px-3 text-xs font-semibold text-success shadow-raised hover:border-success/30 hover:bg-success/15"
               onClick={() => {
                 void markAllAsRead();
               }}
@@ -340,7 +340,7 @@ export default function NotificationInbox({
             <Button
               variant="danger"
               size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full px-3 text-xs font-semibold shadow-[var(--shadow-raised)]"
+              className="!h-8 !min-h-8 !min-w-0 rounded-full px-3 text-xs font-semibold shadow-raised"
               onClick={() => {
                 void deleteAllNotifications();
               }}

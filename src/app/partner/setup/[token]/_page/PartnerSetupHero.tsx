@@ -9,7 +9,7 @@ export default function PartnerSetupHero({
   context: AwaitedPartnerSetupContext;
 }) {
   return (
-    <section className="rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-[var(--shadow-floating)] backdrop-blur md:p-8">
+    <section className="rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-floating backdrop-blur md:p-8">
       <div className="flex flex-wrap items-center gap-2">
         <Badge className="bg-primary/10 text-primary">초기 설정</Badge>
         <Badge

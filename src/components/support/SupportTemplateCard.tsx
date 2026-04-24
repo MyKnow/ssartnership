@@ -17,7 +17,7 @@ export default function SupportTemplateCard({
         <p className="text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
 
-      <dl className="grid gap-3 rounded-[var(--radius-card)] border border-border/70 bg-surface-muted/70 p-4 text-sm">
+      <dl className="grid gap-3 rounded-card border border-border/70 bg-surface-muted/70 p-4 text-sm">
         <div className="grid gap-1">
           <dt className="font-semibold text-muted-foreground">받는 사람</dt>
           <dd className="break-all text-foreground">{template.to}</dd>

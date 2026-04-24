@@ -3,7 +3,7 @@ import Button from "@/components/ui/Button";
 
 export default function PushOptInBanner() {
   return (
-    <section className="mt-6 rounded-[28px] border border-border bg-surface-elevated p-5 shadow-[var(--shadow-raised)]">
+    <section className="mt-6 rounded-[28px] border border-border bg-surface-elevated p-5 shadow-raised">
       <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div className="min-w-0">
           <div className="flex items-start gap-3">

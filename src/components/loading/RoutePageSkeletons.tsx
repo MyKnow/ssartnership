@@ -39,7 +39,7 @@ function TextStack({
 
 function MetricTileSkeleton() {
   return (
-    <div className="rounded-[1rem] border border-border/80 bg-surface p-4 shadow-[var(--shadow-flat)]">
+    <div className="rounded-[1rem] border border-border/80 bg-surface p-4 shadow-flat">
       <Skeleton className="h-4 w-16 rounded-lg" />
       <Skeleton className="mt-2 h-8 w-24" />
       <Skeleton className="mt-2 h-4 w-full max-w-[12rem]" />
@@ -95,7 +95,7 @@ function CenteredAuthCardSkeleton({
 
 function PartnerSetupHeroSkeleton() {
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-[var(--shadow-floating)] backdrop-blur md:p-8">
+    <section className="relative overflow-hidden rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-floating backdrop-blur md:p-8">
       <div className="relative grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
@@ -115,7 +115,7 @@ function PartnerSetupHeroSkeleton() {
             <Skeleton className="h-24 w-full rounded-2xl" />
           </div>
         </div>
-        <Card className="space-y-4 border-border/80 bg-surface-inset/90 p-5 shadow-[var(--shadow-flat)]">
+        <Card className="space-y-4 border-border/80 bg-surface-inset/90 p-5 shadow-flat">
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-2">
               <Skeleton className="h-4 w-28 rounded-lg" />
@@ -211,7 +211,7 @@ export function GlobalRouteSkeleton() {
       <main>
         <Container className="pb-16 pt-10">
           <div className="mx-auto max-w-4xl space-y-5">
-            <div className="rounded-[var(--radius-panel)] border border-border/70 bg-surface-overlay px-5 py-5 shadow-[var(--shadow-flat)] backdrop-blur-md sm:px-6 sm:py-6">
+            <div className="rounded-panel border border-border/70 bg-surface-overlay px-5 py-5 shadow-flat backdrop-blur-md sm:px-6 sm:py-6">
               <Skeleton className="h-4 w-28 rounded-lg" />
               <Skeleton className="mt-3 h-9 w-44" />
               <Skeleton className="mt-3 h-4 w-full max-w-2xl" />
@@ -277,7 +277,7 @@ export function PartnerPortalRouteSkeleton() {
             {Array.from({ length: 3 }).map((_, index) => (
               <div
                 key={index}
-                className="rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-5 shadow-[var(--shadow-flat)]"
+                className="rounded-card border border-border/80 bg-surface-overlay p-5 shadow-flat"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">

@@ -39,14 +39,14 @@ export default function SiteHeader({
     <>
       <div
         aria-hidden="true"
-        className="min-h-[calc(5rem+env(safe-area-inset-top))]"
+        className="min-safe-site-header"
         style={headerHeight ? { height: headerHeight } : undefined}
       />
       <header className="fixed inset-x-0 top-0 z-40">
         <div
           ref={headerRef}
           className={cn(
-            "border-b border-border/70 bg-surface-overlay/95 pt-[env(safe-area-inset-top)] shadow-[var(--shadow-flat)] backdrop-blur-xl transition-transform duration-300 ease-out will-change-transform",
+            "border-b border-border/70 bg-surface-overlay/95 pt-safe-top shadow-flat backdrop-blur-xl transition-transform duration-300 ease-out will-change-transform",
             hidden ? "-translate-y-full" : "translate-y-0",
           )}
         >

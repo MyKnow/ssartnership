@@ -11,10 +11,10 @@ function LoadingHeader() {
     <>
       <div
         aria-hidden="true"
-        className="min-h-[calc(5rem+env(safe-area-inset-top))]"
+        className="min-safe-site-header"
       />
       <header className="fixed inset-x-0 top-0 z-40">
-        <div className="border-b border-border bg-surface-overlay/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+        <div className="border-b border-border bg-surface-overlay/90 pt-safe-top backdrop-blur">
           <Container className="flex items-center justify-between gap-3 py-4" size="wide">
             <StaticSkeleton className="h-7 w-36 rounded-lg" />
             <div className="flex items-center gap-2">
@@ -51,7 +51,7 @@ function SectionHeadingSkeleton({
 
 function HeroSkeleton() {
   return (
-    <section className="hero-surface animate-pulse motion-reduce:animate-none rounded-3xl px-8 py-10 shadow-[var(--shadow-floating)]">
+    <section className="hero-surface animate-pulse motion-reduce:animate-none rounded-3xl px-8 py-10 shadow-floating">
       <StaticSkeleton className="h-4 w-40 rounded-lg bg-white/15 dark:bg-white/10" />
       <StaticSkeleton className="mt-4 h-10 w-full max-w-2xl rounded-xl bg-white/15 dark:bg-white/10" />
       <StaticSkeleton className="mt-4 h-4 w-full max-w-2xl rounded-lg bg-white/15 dark:bg-white/10" />
@@ -62,7 +62,7 @@ function HeroSkeleton() {
 
 function PartnerCardSkeleton() {
   return (
-    <article className="flex h-full w-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
+    <article className="flex h-full w-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-flat">
       <div className="flex gap-4">
         <StaticSkeleton className="aspect-square w-24 shrink-0 rounded-2xl" />
         <div className="min-w-0 flex-1">
@@ -84,7 +84,7 @@ function PartnerCardSkeleton() {
 
 function FilterBarSkeleton() {
   return (
-    <div className="animate-pulse motion-reduce:animate-none rounded-[28px] border border-border bg-surface-elevated p-5 shadow-[var(--shadow-raised)]">
+    <div className="animate-pulse motion-reduce:animate-none rounded-[28px] border border-border bg-surface-elevated p-5 shadow-raised">
       <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div className="flex items-start gap-3">
           <StaticSkeleton className="h-12 w-12 shrink-0 rounded-2xl" />
@@ -221,7 +221,7 @@ function CertificationFrameSkeleton() {
       <StaticSkeleton className="h-8 w-40" />
       <StaticSkeleton className="mt-2 h-4 w-full max-w-lg" />
 
-      <div className="mt-6 overflow-hidden rounded-[32px] border border-white/15 bg-gradient-to-br from-[#0b1220] via-[#0f172a] to-[#111827] p-6 text-white shadow-[var(--shadow-floating)]">
+      <div className="mt-6 overflow-hidden rounded-[32px] border border-white/15 bg-gradient-to-br from-[#0b1220] via-[#0f172a] to-[#111827] p-6 text-white shadow-floating">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1 space-y-2">
             <StaticSkeleton className="h-4 w-32 rounded-lg bg-white/10" />
@@ -268,7 +268,7 @@ function SuggestGuideSkeleton() {
       </div>
       <div className="grid gap-3">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="rounded-[var(--radius-card)] border border-border/70 bg-surface-inset/80 p-4">
+          <div key={index} className="rounded-card border border-border/70 bg-surface-inset/80 p-4">
             <StaticSkeleton className="h-5 w-20" />
             <StaticSkeleton className="mt-2 h-4 w-full" />
             <StaticSkeleton className="mt-2 h-4 w-full max-w-sm" />
@@ -288,7 +288,7 @@ export function HomePageSkeleton() {
           <div className="space-y-6">
             <HeroSkeleton />
 
-            <section className="rounded-[var(--radius-panel)] border border-border/70 bg-surface-overlay px-5 py-5 shadow-[var(--shadow-flat)] backdrop-blur-md sm:px-6 sm:py-6">
+            <section className="rounded-panel border border-border/70 bg-surface-overlay px-5 py-5 shadow-flat backdrop-blur-md sm:px-6 sm:py-6">
               <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                 <div className="flex items-start gap-3">
                   <StaticSkeleton className="h-12 w-12 shrink-0 rounded-2xl" />

@@ -16,7 +16,7 @@ export default function HeroSection({
 
   return (
     <MotionReveal>
-      <section className="hero-surface relative overflow-hidden rounded-[var(--radius-overlay)] px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+      <section className="hero-surface relative overflow-hidden rounded-overlay px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
         <div className="absolute inset-0 ui-decor-grid opacity-25" aria-hidden="true" />
         <div className="relative max-w-3xl">
           <p className="hero-eyebrow text-sm font-semibold uppercase tracking-[0.28em]">

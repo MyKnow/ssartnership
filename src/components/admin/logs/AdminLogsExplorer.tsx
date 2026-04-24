@@ -68,7 +68,7 @@ export function AdminLogsExplorer({
   onPageChange: (value: number) => void;
 }) {
   return (
-    <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
+    <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-flat">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <SectionHeading
           title="로그 탐색기"
@@ -229,7 +229,7 @@ export function AdminLogsExplorer({
 
       <div className="grid gap-4">
         {filteredLogs.length === 0 ? (
-          <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
+          <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
             <EmptyState
               title="조건에 맞는 로그가 없습니다."
               description="검색어나 범위, 필터 조건을 조정해 다시 확인해 주세요."
@@ -241,7 +241,7 @@ export function AdminLogsExplorer({
             return (
               <Card
                 key={`${log.group}-${log.id}`}
-                className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]"
+                className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">

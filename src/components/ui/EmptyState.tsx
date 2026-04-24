@@ -14,7 +14,7 @@ export default function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-panel)] border border-dashed border-border bg-surface-inset px-6 py-10 text-center shadow-none",
+        "rounded-panel border border-dashed border-border bg-surface-inset px-6 py-10 text-center shadow-none",
         className,
       )}
     >

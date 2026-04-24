@@ -73,7 +73,7 @@ export default function EventRegistrationForm({
           <Input defaultValue={pagePath} readOnly />
         </FieldLabel>
         <FieldLabel label="공개 상태">
-          <label className="flex h-11 items-center gap-2 rounded-[var(--radius-input)] border border-border bg-surface px-4 text-sm font-medium text-foreground">
+          <label className="flex h-11 items-center gap-2 rounded-input border border-border bg-surface px-4 text-sm font-medium text-foreground">
             <input
               type="checkbox"
               name="isActive"

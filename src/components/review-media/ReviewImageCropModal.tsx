@@ -228,7 +228,7 @@ export default function ReviewImageCropModal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
-      <div className="grid w-full max-w-3xl gap-4 rounded-[var(--radius-panel)] border border-white/10 bg-surface-overlay p-5 shadow-[var(--shadow-overlay)] sm:p-6">
+      <div className="grid w-full max-w-3xl gap-4 rounded-panel border border-white/10 bg-surface-overlay p-5 shadow-overlay sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
             <p className="text-base font-semibold text-foreground">사진 조정</p>

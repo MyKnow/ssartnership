@@ -734,7 +734,7 @@ export function AdminLogsSkeleton() {
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <Card className="bg-surface-elevated shadow-[var(--shadow-raised)]">
+          <Card className="bg-surface-elevated shadow-raised">
             <Skeleton className="h-8 w-32" />
             <Skeleton className="mt-2 h-4 w-full max-w-md" />
             <div className="mt-5 grid gap-3">
@@ -760,7 +760,7 @@ export function AdminLogsSkeleton() {
 
           <div className="grid gap-4">
             {Array.from({ length: 3 }).map((_, index) => (
-              <Card key={index} className="bg-surface-elevated shadow-[var(--shadow-raised)]">
+              <Card key={index} className="bg-surface-elevated shadow-raised">
                 <Skeleton className="h-7 w-32" />
                 <Skeleton className="mt-2 h-4 w-full max-w-xs" />
                 <div className="mt-4 grid gap-2">
@@ -779,7 +779,7 @@ export function AdminLogsSkeleton() {
           </div>
         </section>
 
-        <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
+        <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-flat">
           <Skeleton className="h-8 w-28" />
           <Skeleton className="h-4 w-full max-w-md" />
 
@@ -791,7 +791,7 @@ export function AdminLogsSkeleton() {
 
           <div className="grid gap-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <Card key={index} className="bg-surface-elevated shadow-[var(--shadow-raised)]">
+              <Card key={index} className="bg-surface-elevated shadow-raised">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

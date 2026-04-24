@@ -19,7 +19,7 @@ type SummaryCardProps = {
 function SummaryCard({ href, title, description, meta }: SummaryCardProps) {
   return (
     <Link href={href} className="group block">
-      <Card className="h-full transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover:shadow-[var(--shadow-raised)]">
+      <Card className="h-full transition-surface-transform duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover-shadow-raised">
         <div className="flex h-full flex-col justify-between gap-6">
           <div className="grid gap-2">
             <p className="ui-kicker">

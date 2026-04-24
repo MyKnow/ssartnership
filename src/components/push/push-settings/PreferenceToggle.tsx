@@ -24,7 +24,7 @@ export function PreferenceToggle({
         {actionHref ? (
           <Link
             href={actionHref}
-            className="inline-flex items-center rounded-full border border-border/70 bg-surface-control px-2.5 py-1 text-[11px] font-semibold leading-none text-foreground shadow-[var(--shadow-flat)] transition-[background-color,border-color,box-shadow,color] duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover:shadow-[var(--shadow-raised)]"
+            className="inline-flex items-center rounded-full border border-border/70 bg-surface-control px-2.5 py-1 text-[11px] font-semibold leading-none text-foreground shadow-flat transition-surface-emphasis duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover:text-primary hover-shadow-raised"
             aria-label={`${label} 약관 보기`}
             title="약관 보기"
           >

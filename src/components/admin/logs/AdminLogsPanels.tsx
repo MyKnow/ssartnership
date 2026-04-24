@@ -16,7 +16,7 @@ export function MetricCard({
   description: string;
 }) {
   return (
-    <Card className="h-full min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
+    <Card className="h-full min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {title}
       </p>
@@ -36,7 +36,7 @@ export function InsightListCard({
   items: Array<{ label: string; value: string }>;
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
+    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
       <SectionHeading title={title} description={description} />
       <div className="mt-4 grid gap-2">
         {items.length === 0 ? (
@@ -71,7 +71,7 @@ export function SecurityStatusCard({
   blocked: number;
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
+    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
       <SectionHeading
         title="보안 상태 분포"
         description="조회 범위 안에서 인증과 보안 이벤트가 어떤 상태로 기록됐는지 보여줍니다."
@@ -147,7 +147,7 @@ export function ActivityChart({
   const maxTotal = Math.max(...buckets.map((bucket) => bucket.total), 1);
 
   return (
-    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-[var(--shadow-raised)]">
+    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
       <SectionHeading
         title="조회 범위 활동량"
         description="막대를 누르면 해당 구간으로 바로 좁혀서 다시 조회합니다."
@@ -265,7 +265,7 @@ export function ExportDialog({
         aria-label="CSV 다운로드 닫기"
         onClick={onClose}
       />
-      <Card className="relative z-10 w-full max-w-xl overflow-hidden bg-surface-overlay shadow-[var(--shadow-overlay)]">
+      <Card className="relative z-10 w-full max-w-xl overflow-hidden bg-surface-overlay shadow-overlay">
         <SectionHeading
           title="CSV 다운로드"
           description="현재 조회 범위 또는 별도 사용자 지정 범위를 골라 로그를 CSV로 내보냅니다."

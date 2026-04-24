@@ -203,7 +203,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                               </span>
                               {device.isCurrent ? (
                                 <Badge
-                                  className="shadow-[var(--shadow-flat)]"
+                                  className="shadow-flat"
                                   style={{
                                     backgroundColor: "#213b68",
                                     borderColor: "#213b68",

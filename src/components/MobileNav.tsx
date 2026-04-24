@@ -104,7 +104,7 @@ export default function MobileNav({
                 role="dialog"
                 aria-modal="true"
                 className={cn(
-                  "fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-[var(--shadow-overlay)] transition-transform",
+                  "fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay transition-transform",
                   open ? "translate-x-0" : "translate-x-full",
                 )}
               >

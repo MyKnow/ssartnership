@@ -20,7 +20,7 @@ export default function PartnerCardLockState({
   return (
     <article
       className={cn(
-        "relative flex h-full w-full overflow-hidden rounded-[var(--radius-card)] border border-border/80 bg-surface-overlay p-5 shadow-[var(--shadow-flat)] backdrop-blur-md",
+        "relative flex h-full w-full overflow-hidden rounded-card border border-border/80 bg-surface-overlay p-5 shadow-flat backdrop-blur-md",
         className,
       )}
       aria-label={lockCopy.title}

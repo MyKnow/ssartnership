@@ -65,7 +65,7 @@ export default function ScrollToTopFab({
   return (
     <div
       className={cn(
-        "pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] right-6 z-40 transition-all duration-200 ease-out",
+        "pointer-events-none fixed bottom-safe-bottom-6 right-6 z-40 transition-all duration-200 ease-out",
         visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
       )}
     >

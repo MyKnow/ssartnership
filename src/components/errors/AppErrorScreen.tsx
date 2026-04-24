@@ -49,7 +49,7 @@ export default function AppErrorScreen({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
-      <section className="w-full max-w-xl rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-[var(--shadow-raised)] sm:p-8">
+      <section className="w-full max-w-xl rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-raised sm:p-8">
         <div className="grid gap-5">
           <div className="grid gap-2 text-center sm:text-left">
             <p className="ui-kicker">{code}</p>

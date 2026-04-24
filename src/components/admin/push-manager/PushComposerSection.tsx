@@ -144,7 +144,7 @@ function AudienceResultCard({
     <button
       type="button"
       onClick={onOpen}
-      className="grid w-full gap-4 rounded-2xl border border-primary/15 bg-primary-soft/55 px-4 py-4 text-left shadow-[var(--shadow-flat)] transition-colors hover:bg-primary-soft/70"
+      className="grid w-full gap-4 rounded-2xl border border-primary/15 bg-primary-soft/55 px-4 py-4 text-left shadow-flat transition-colors hover:bg-primary-soft/70"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1">
@@ -636,7 +636,7 @@ export function PushComposerSection({
         : `${getMemberLabel(selectedMembers[0])} 외 ${selectedMembers.length - 1}명`;
 
   return (
-    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-[var(--shadow-flat)] sm:p-5">
+    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
       <SectionHeading
         title="통합 알림 운영"
         description="대상 설정, 메시지 작성, 최종 확인 순서로만 진행합니다."

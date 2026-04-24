@@ -15,7 +15,7 @@ export function IconActionGroup({
   return (
     <div
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-surface-elevated p-1 shadow-[var(--shadow-raised)]",
+        "inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-surface-elevated p-1 shadow-raised",
         className,
       )}
       {...props}
@@ -41,7 +41,7 @@ export default function IconActionButton({
     <button
       type={type}
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-foreground transition-[background-color,color,opacity] duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-foreground transition-fade-colors duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-50",
         toneClasses[tone],
         className,
       )}

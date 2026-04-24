@@ -150,7 +150,7 @@ export default function MediaField({
                     />
                     <Badge
                       className={cn(
-                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-[var(--shadow-flat)] backdrop-blur-sm",
+                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-flat backdrop-blur-sm",
                         item.kind === "existing"
                           ? "border-border bg-surface-control/95 text-foreground"
                           : "border-primary/40 bg-primary/90 text-white dark:text-black",
@@ -230,7 +230,7 @@ export default function MediaField({
                     />
                     <Badge
                       className={cn(
-                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-[var(--shadow-flat)] backdrop-blur-sm",
+                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-flat backdrop-blur-sm",
                         item.kind === "existing"
                           ? "border-border bg-surface-control/95 text-foreground"
                           : "border-primary/40 bg-primary/90 text-white dark:text-black",

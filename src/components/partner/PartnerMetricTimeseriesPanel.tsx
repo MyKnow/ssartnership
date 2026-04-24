@@ -343,7 +343,7 @@ function MetricTimeseriesChart({
               )}px`,
             }}
           >
-            <div className="min-w-40 rounded-2xl border border-border bg-surface-elevated px-3 py-2 shadow-[var(--shadow-raised)]">
+            <div className="min-w-40 rounded-2xl border border-border bg-surface-elevated px-3 py-2 shadow-raised">
               <p className="text-xs font-semibold text-foreground">{activePoint.label}</p>
               <div className="mt-2 space-y-1 text-xs">
                 <p className="flex items-center justify-between gap-4">

@@ -28,7 +28,7 @@ export default async function PartnerSetupIndexPage() {
     <div className="bg-background">
       <Container className="pb-16 pt-10">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-8 flex flex-col gap-4 rounded-[2rem] border border-border bg-surface px-6 py-8 shadow-[var(--shadow-flat)] sm:px-8">
+          <div className="mb-8 flex flex-col gap-4 rounded-[2rem] border border-border bg-surface px-6 py-8 shadow-flat sm:px-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">
                 제휴 포털 초기 설정

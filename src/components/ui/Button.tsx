@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import Spinner from "@/components/ui/Spinner";
 
 const base =
-  "group inline-flex min-h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-[transform,background-color,border-color,color,box-shadow,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "group inline-flex min-h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-interactive duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const sizes = {
   sm: "h-10 rounded-[0.95rem] px-4 text-sm",
@@ -15,33 +15,33 @@ const sizes = {
 const variants = {
   primary: {
     enabled:
-      "border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-raised)] hover:-translate-y-px hover:bg-primary-emphasis hover:shadow-[var(--shadow-floating)]",
+      "border-transparent bg-primary text-primary-foreground shadow-raised hover:-translate-y-px hover:bg-primary-emphasis hover-shadow-floating",
     disabled:
-      "border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-raised)]",
+      "border-transparent bg-primary text-primary-foreground shadow-raised",
   },
   ghost: {
     enabled:
-      "border-border bg-surface-control text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
+      "border-border bg-surface-control text-foreground shadow-flat hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
     disabled:
-      "border-border bg-surface-control text-foreground shadow-[var(--shadow-flat)]",
+      "border-border bg-surface-control text-foreground shadow-flat",
   },
   danger: {
     enabled:
-      "border-danger/20 bg-danger/10 text-danger shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-danger/35 hover:bg-danger/12",
+      "border-danger/20 bg-danger/10 text-danger shadow-flat hover:-translate-y-px hover:border-danger/35 hover:bg-danger/12",
     disabled:
-      "border-danger/20 bg-danger/10 text-danger shadow-[var(--shadow-flat)]",
+      "border-danger/20 bg-danger/10 text-danger shadow-flat",
   },
   soft: {
     enabled:
-      "border-primary/10 bg-primary-soft text-primary shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-primary/20 hover:bg-primary-soft/90",
+      "border-primary/10 bg-primary-soft text-primary shadow-flat hover:-translate-y-px hover:border-primary/20 hover:bg-primary-soft/90",
     disabled:
-      "border-primary/10 bg-primary-soft text-primary shadow-[var(--shadow-flat)]",
+      "border-primary/10 bg-primary-soft text-primary shadow-flat",
   },
   secondary: {
     enabled:
-      "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)] hover:-translate-y-px hover:border-strong hover:bg-surface-control",
+      "border-border/70 bg-surface-muted text-foreground shadow-flat hover:-translate-y-px hover:border-strong hover:bg-surface-control",
     disabled:
-      "border-border/70 bg-surface-muted text-foreground shadow-[var(--shadow-flat)]",
+      "border-border/70 bg-surface-muted text-foreground shadow-flat",
   },
 };
 

@@ -44,7 +44,7 @@ export default function InlineMessage({
   return (
     <div
       className={cn(
-        "rounded-[1.35rem] border px-4 py-4 shadow-[var(--shadow-flat)]",
+        "rounded-[1.35rem] border px-4 py-4 shadow-flat",
         tones[tone],
         className,
       )}

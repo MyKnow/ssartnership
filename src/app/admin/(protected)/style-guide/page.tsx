@@ -47,7 +47,7 @@ export default function AdminStyleGuidePage() {
             <ResponsiveGrid minItemWidth="14rem">
               <DataPanel label="surface" title="기본 표면" description="카드/필터/폼의 기본 레이어" />
               <DataPanel label="surface-inset" title="내부 표면" description="카드 안의 행, 요약 박스, 보조 정보" />
-              <DataPanel label="surface-elevated" title="강조 표면" description="핵심 카드, CTA, 주요 섹션" className="bg-surface-elevated shadow-[var(--shadow-raised)]" />
+              <DataPanel label="surface-elevated" title="강조 표면" description="핵심 카드, CTA, 주요 섹션" className="bg-surface-elevated shadow-raised" />
               <DataPanel
                 label="status"
                 title={
@@ -60,7 +60,7 @@ export default function AdminStyleGuidePage() {
                 description="상태색은 정보 구분에만 제한적으로 사용합니다."
               />
             </ResponsiveGrid>
-            <div className="grid gap-4 rounded-[var(--radius-panel)] border border-border/70 bg-background-muted/70 p-4">
+            <div className="grid gap-4 rounded-panel border border-border/70 bg-background-muted/70 p-4">
               <div className="grid gap-1">
                 <p className="ui-kicker">Depth Ladder</p>
                 <p className="ui-body">

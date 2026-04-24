@@ -50,15 +50,15 @@ export default async function SuggestPage() {
                 </div>
 
                 <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
-                  <li className="rounded-[var(--radius-card)] border border-border/70 bg-surface-inset/80 px-4 py-3">
+                  <li className="rounded-card border border-border/70 bg-surface-inset/80 px-4 py-3">
                     <strong className="block text-foreground">혜택</strong>
                     할인율, 증정, 예약 우대처럼 사용자가 바로 이해할 수 있는 조건
                   </li>
-                  <li className="rounded-[var(--radius-card)] border border-border/70 bg-surface-inset/80 px-4 py-3">
+                  <li className="rounded-card border border-border/70 bg-surface-inset/80 px-4 py-3">
                     <strong className="block text-foreground">인증 방식</strong>
                     SSAFY 인증 화면, 기수 확인, 현장 확인 등 실제 사용 방식
                   </li>
-                  <li className="rounded-[var(--radius-card)] border border-border/70 bg-surface-inset/80 px-4 py-3">
+                  <li className="rounded-card border border-border/70 bg-surface-inset/80 px-4 py-3">
                     <strong className="block text-foreground">사용 범위</strong>
                     적용 지점, 기간, 제외 메뉴, 예약 가능 여부
                   </li>

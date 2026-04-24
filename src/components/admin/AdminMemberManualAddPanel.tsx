@@ -55,7 +55,7 @@ export default function AdminMemberManualAddPanel({
 
   return (
     <div className="grid gap-4">
-      <form action={formAction} className="grid gap-4 rounded-3xl border border-border bg-surface p-4 shadow-[var(--shadow-flat)]">
+      <form action={formAction} className="grid gap-4 rounded-3xl border border-border bg-surface p-4 shadow-flat">
         <div className="grid gap-3 lg:grid-cols-[160px_minmax(0,1fr)] lg:items-end">
           <label className="grid gap-2 text-sm font-medium text-foreground">
             대상 기수
@@ -92,7 +92,7 @@ export default function AdminMemberManualAddPanel({
       </form>
 
       {state.status !== "idle" ? (
-        <div className="grid gap-4 rounded-3xl border border-border bg-surface-elevated p-4 shadow-[var(--shadow-flat)]">
+        <div className="grid gap-4 rounded-3xl border border-border bg-surface-elevated p-4 shadow-flat">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="grid gap-1">
               <div className="flex flex-wrap items-center gap-2">

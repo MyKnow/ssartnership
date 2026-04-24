@@ -252,7 +252,7 @@ export default function MediaCropModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6">
-      <div className="my-auto grid w-full max-w-5xl max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[28px] border border-white/10 bg-surface-overlay p-4 shadow-[var(--shadow-overlay)] sm:p-5">
+      <div className="my-auto grid w-full max-w-5xl max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[28px] border border-white/10 bg-surface-overlay p-4 shadow-overlay sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
             <p className="text-base font-semibold text-foreground">{title}</p>

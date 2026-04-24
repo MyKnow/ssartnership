@@ -18,7 +18,7 @@ export default function ShellHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 rounded-[var(--radius-panel)] border border-border/70 bg-surface-elevated px-5 py-5 shadow-[var(--shadow-flat)] backdrop-blur-md sm:px-6 sm:py-6 lg:flex-row lg:items-end lg:justify-between",
+        "flex flex-col gap-4 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat backdrop-blur-md sm:px-6 sm:py-6 lg:flex-row lg:items-end lg:justify-between",
         className,
       )}
     >

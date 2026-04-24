@@ -37,7 +37,7 @@ export default function Tabs<T extends string>({
             {active ? (
               <motion.span
                 layoutId="tabs-active-pill"
-                className="absolute inset-0 rounded-[1.1rem] bg-primary shadow-[var(--shadow-raised)]"
+                className="absolute inset-0 rounded-[1.1rem] bg-primary shadow-raised"
                 transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
               />
             ) : null}

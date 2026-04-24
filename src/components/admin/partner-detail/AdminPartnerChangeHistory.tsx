@@ -148,7 +148,7 @@ export default function AdminPartnerChangeHistory({
                 : "";
 
             return (
-              <details key={log.id} className="group rounded-[var(--radius-panel)] border border-border/70 bg-surface-elevated shadow-[var(--shadow-raised)]">
+              <details key={log.id} className="group rounded-panel border border-border/70 bg-surface-elevated shadow-raised">
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 outline-none transition hover:bg-surface/50 focus-visible:bg-surface/50 [&::-webkit-details-marker]:hidden">
                   <div className="grid min-w-0 gap-3 text-left">
                     <div className="flex flex-wrap items-center gap-2">

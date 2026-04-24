@@ -191,7 +191,7 @@ export default function ResetPasswordForm() {
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-      <section className="rounded-[1.5rem] border border-border/70 bg-surface-elevated p-4 shadow-[var(--shadow-raised)]">
+      <section className="rounded-[1.5rem] border border-border/70 bg-surface-elevated p-4 shadow-raised">
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-foreground">
             인증번호 발급 및 확인
@@ -212,7 +212,7 @@ export default function ResetPasswordForm() {
                 handleUsernameChange(event.target.value);
               }}
               aria-invalid={Boolean(fieldErrors.username) || undefined}
-              className={`${getFieldErrorClass(Boolean(fieldErrors.username))} !shadow-[var(--shadow-raised)]`}
+              className={`${getFieldErrorClass(Boolean(fieldErrors.username))} shadow-raised`}
             />
             {fieldErrors.username ? (
               <FormMessage variant="error">{fieldErrors.username}</FormMessage>
@@ -225,7 +225,7 @@ export default function ResetPasswordForm() {
               loading={requestLoading}
               loadingText={codeRequested ? "재발급 중" : "인증번호 발급 중"}
               variant={codeRequested ? "secondary" : "primary"}
-              className="!shadow-[var(--shadow-raised)] hover:!shadow-[var(--shadow-floating)]"
+              className="shadow-raised hover-shadow-floating"
             >
               {codeRequested ? "인증번호 재발급" : "인증번호 발급"}
             </Button>
@@ -234,14 +234,14 @@ export default function ResetPasswordForm() {
 
         <div
           className={[
-            "grid overflow-hidden transition-[max-height,opacity,transform,margin-top] duration-300 ease-out motion-reduce:transition-none",
+            "grid overflow-hidden transition-collapse duration-300 ease-out motion-reduce:transition-none",
             codeRequested
               ? "mt-4 max-h-[22rem] translate-y-0 opacity-100"
               : "max-h-0 -translate-y-2 opacity-0 pointer-events-none",
           ].join(" ")}
           aria-hidden={!codeRequested}
         >
-          <div className="rounded-[1.5rem] border border-border/70 bg-surface-muted/90 p-4 shadow-[var(--shadow-raised)]">
+          <div className="rounded-[1.5rem] border border-border/70 bg-surface-muted/90 p-4 shadow-raised">
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground">
                 인증번호 확인
@@ -268,7 +268,7 @@ export default function ResetPasswordForm() {
                   required
                   aria-invalid={Boolean(fieldErrors.code) || undefined}
                   disabled={!codeRequested}
-                  className={`${getFieldErrorClass(Boolean(fieldErrors.code))} !shadow-[var(--shadow-raised)]`}
+                  className={`${getFieldErrorClass(Boolean(fieldErrors.code))} shadow-raised`}
                 />
                 {fieldErrors.code ? (
                   <FormMessage variant="error">{fieldErrors.code}</FormMessage>
@@ -283,7 +283,7 @@ export default function ResetPasswordForm() {
                     window.setTimeout(() => focusField(codeRef), 0);
                   }}
                   disabled={!codeRequested || pendingVerify || pendingRequest}
-                  className="!shadow-[var(--shadow-raised)] hover:!shadow-[var(--shadow-floating)]"
+                  className="shadow-raised hover-shadow-floating"
                 >
                   다시 입력
                 </Button>
@@ -293,7 +293,7 @@ export default function ResetPasswordForm() {
                   loadingText="확인 중"
                   variant="secondary"
                   disabled={!codeRequested}
-                  className="!shadow-[var(--shadow-raised)] hover:!shadow-[var(--shadow-floating)]"
+                  className="shadow-raised hover-shadow-floating"
                 >
                   인증번호 확인
                 </Button>

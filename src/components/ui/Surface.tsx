@@ -3,12 +3,12 @@ import { cn } from "@/lib/cn";
 
 const levels = {
   default:
-    "border-border bg-surface shadow-[var(--shadow-flat)] backdrop-blur-md",
+    "border-border bg-surface shadow-flat backdrop-blur-md",
   inset: "border-border/80 bg-surface-inset shadow-none",
   elevated:
-    "border-border/70 bg-surface-elevated shadow-[var(--shadow-raised)] backdrop-blur-lg",
+    "border-border/70 bg-surface-elevated shadow-raised backdrop-blur-lg",
   overlay:
-    "border-border/80 bg-surface-overlay shadow-[var(--shadow-overlay)] backdrop-blur-xl",
+    "border-border/80 bg-surface-overlay shadow-overlay backdrop-blur-xl",
 } as const;
 
 const paddings = {
@@ -33,7 +33,7 @@ export default function Surface({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-card)] border",
+        "rounded-card border",
         levels[level],
         paddings[padding],
         className,

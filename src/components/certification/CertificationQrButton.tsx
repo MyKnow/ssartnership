@@ -174,7 +174,7 @@ export default function CertificationQrButton({
                 <section
                   role="dialog"
                   aria-modal="true"
-                  className="pointer-events-auto relative w-full max-w-[22rem] overflow-hidden rounded-[32px] border border-white/15 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.9))] px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 text-white shadow-[0_24px_80px_rgba(15,23,42,0.45)] max-h-[86dvh] overflow-y-auto sm:max-w-[28rem] sm:px-5 sm:pb-5 sm:pt-5"
+                  className="pointer-events-auto relative w-full max-w-[22rem] overflow-hidden rounded-[32px] border border-white/15 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.9))] px-4 pb-safe-bottom-4 pt-3 text-white shadow-[0_24px_80px_rgba(15,23,42,0.45)] max-h-[86dvh] overflow-y-auto sm:max-w-[28rem] sm:px-5 sm:pb-5 sm:pt-5"
                 >
                   <div className="pointer-events-none absolute inset-0">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(196,181,253,0.08),transparent_30%)]" />

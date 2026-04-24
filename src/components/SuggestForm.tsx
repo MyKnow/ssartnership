@@ -351,7 +351,7 @@ export default function SuggestForm() {
         </SuggestField>
       </section>
 
-      <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-surface-muted/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-card border border-border/70 bg-surface-muted/70 p-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm leading-6 text-muted-foreground">
           제출 전 연락처와 혜택 조건을 한 번 더 확인해 주세요.
         </p>

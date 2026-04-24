@@ -56,7 +56,7 @@ export default function Modal({
             exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 12, scale: 0.99 }}
             transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             className={cn(
-              "relative flex w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-overlay)] border border-border/80 bg-surface-overlay p-4 shadow-[var(--shadow-overlay)] backdrop-blur-xl sm:p-6",
+              "relative flex w-full max-w-lg flex-col overflow-hidden rounded-overlay border border-border/80 bg-surface-overlay p-4 shadow-overlay backdrop-blur-xl sm:p-6",
               panelClassName,
             )}
           >

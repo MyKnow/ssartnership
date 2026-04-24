@@ -41,7 +41,7 @@ export default function BackButton({
         router.push(targetHref);
       }}
       ariaLabel="뒤로 가기"
-      className="w-fit border-strong bg-surface-elevated shadow-[var(--shadow-raised)] hover:bg-surface-overlay"
+      className="w-fit border-strong bg-surface-elevated shadow-raised hover:bg-surface-overlay"
     >
       <ChevronLeft size={16} />
       뒤로 가기

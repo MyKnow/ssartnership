@@ -20,7 +20,7 @@ const PasswordInput = forwardRef<
         {...props}
         type={visible ? "text" : "password"}
         className={cn(
-          "h-11 w-full rounded-[1rem] border border-border bg-surface-control px-3.5 pr-11 text-sm text-foreground shadow-[var(--shadow-flat)] transition-[border-color,background-color,box-shadow] duration-200 ease-out placeholder:text-muted-foreground",
+          "h-11 w-full rounded-[1rem] border border-border bg-surface-control px-3.5 pr-11 text-sm text-foreground shadow-flat transition-field duration-200 ease-out placeholder:text-muted-foreground",
           "focus:border-strong focus:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-primary/15",
           "disabled:cursor-not-allowed disabled:border-border/60 disabled:bg-surface-inset disabled:text-muted-foreground disabled:opacity-100",
           className,

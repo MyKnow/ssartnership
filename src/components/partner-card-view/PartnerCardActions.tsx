@@ -50,7 +50,7 @@ export default function PartnerCardActions({
             className={cn(
               "w-full justify-center",
               hasBothActions
-                ? "!border-primary/20 !bg-primary-foreground !text-primary shadow-[var(--shadow-flat)] hover:!bg-primary-soft hover:!text-primary-emphasis"
+                ? "!border-primary/20 !bg-primary-foreground !text-primary shadow-flat hover:!bg-primary-soft hover:!text-primary-emphasis"
                 : null,
             )}
             onClick={onInquiryClick}

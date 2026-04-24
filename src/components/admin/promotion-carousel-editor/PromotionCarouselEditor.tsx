@@ -528,7 +528,7 @@ export default function PromotionCarouselEditor({
 
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
                   <div className="grid gap-3">
-                    <div className="relative aspect-[21/9] overflow-hidden rounded-[var(--radius-panel)] border border-border/70 bg-surface-inset">
+                    <div className="relative aspect-[21/9] overflow-hidden rounded-panel border border-border/70 bg-surface-inset">
                       {/* eslint-disable-next-line @next/next/no-img-element -- live preview can use blob/object URLs */}
                       <img
                         src={previewSrc}
@@ -570,7 +570,7 @@ export default function PromotionCarouselEditor({
                     </p>
                   </div>
 
-                  <div className="grid gap-4 rounded-[var(--radius-panel)] border border-border/70 bg-surface-inset p-4">
+                  <div className="grid gap-4 rounded-panel border border-border/70 bg-surface-inset p-4">
                     <label className="grid gap-2 text-sm font-medium text-foreground">
                       연결 페이지
                       <Input
@@ -684,11 +684,11 @@ export default function PromotionCarouselEditor({
           })}
         </section>
 
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] left-5 z-40 md:left-auto md:right-[5.5rem]">
+        <div className="fixed bottom-safe-bottom-5 left-5 z-40 md:left-auto md:right-[5.5rem]">
           <Button
             type="submit"
             variant="primary"
-            className="rounded-full px-6 shadow-[var(--shadow-floating)]"
+            className="rounded-full px-6 shadow-floating"
             disabled={!canSave}
           >
             저장

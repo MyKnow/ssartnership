@@ -28,7 +28,7 @@ export default function AdminLogsManagerContent({
   return (
     <>
       <div className="grid min-w-0 gap-8 overflow-x-hidden">
-        <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
+        <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-flat">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeading
               title="로그 집계 뷰"

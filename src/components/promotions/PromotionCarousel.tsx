@@ -115,7 +115,7 @@ export default function PromotionCarousel({
       <div className="relative">
         <div
           ref={scrollerRef}
-          className="flex min-w-0 snap-x snap-mandatory overflow-x-auto rounded-[var(--radius-overlay)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex min-w-0 snap-x snap-mandatory overflow-x-auto rounded-overlay [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {slides.map((slide, index) => (
             <Link
@@ -124,7 +124,7 @@ export default function PromotionCarousel({
               className="block min-w-full snap-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label={slide.title}
             >
-              <div className="relative aspect-[21/9] w-full overflow-hidden rounded-[var(--radius-overlay)] border border-border/70 bg-surface-muted shadow-[var(--shadow-raised)]">
+              <div className="relative aspect-[21/9] w-full overflow-hidden rounded-overlay border border-border/70 bg-surface-muted shadow-raised">
                 {isInlineImageSrc(slide.imageSrc) ? (
                   // eslint-disable-next-line @next/next/no-img-element -- live preview and blob URLs need plain img
                   <img
@@ -153,7 +153,7 @@ export default function PromotionCarousel({
 
       {slideCount > 1 ? (
         <div className="absolute inset-x-0 bottom-3 z-10 flex items-center justify-center px-4">
-          <div className="flex items-center gap-3 rounded-full border border-white/25 bg-black/35 px-3 py-2 shadow-[var(--shadow-flat)] backdrop-blur-md">
+          <div className="flex items-center gap-3 rounded-full border border-white/25 bg-black/35 px-3 py-2 shadow-flat backdrop-blur-md">
             <button
               type="button"
               className="hidden h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:inline-flex"

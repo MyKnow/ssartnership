@@ -11,7 +11,7 @@ export default function ThemeModeButtons() {
     resolvedTheme ?? (theme === "system" ? systemTheme : theme) ?? "light";
 
   return (
-    <div className="@container min-w-0 w-full rounded-[1.4rem] border border-border/80 bg-surface-muted/90 p-1 shadow-[var(--shadow-flat)]">
+    <div className="@container min-w-0 w-full rounded-[1.4rem] border border-border/80 bg-surface-muted/90 p-1 shadow-flat">
       <div className="grid grid-cols-2">
         <button
           type="button"
@@ -26,7 +26,7 @@ export default function ThemeModeButtons() {
           {activeTheme === "light" ? (
             <motion.span
               layoutId="theme-mode-active-pill"
-              className="absolute inset-0 rounded-[1.05rem] bg-primary shadow-[var(--shadow-raised)]"
+              className="absolute inset-0 rounded-[1.05rem] bg-primary shadow-raised"
               transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             />
           ) : null}
@@ -48,7 +48,7 @@ export default function ThemeModeButtons() {
           {activeTheme === "dark" ? (
             <motion.span
               layoutId="theme-mode-active-pill"
-              className="absolute inset-0 rounded-[1.05rem] bg-primary shadow-[var(--shadow-raised)]"
+              className="absolute inset-0 rounded-[1.05rem] bg-primary shadow-raised"
               transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             />
           ) : null}

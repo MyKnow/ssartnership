@@ -95,7 +95,7 @@ function EventCard({
     ).join(" · ") ?? "전체";
 
   return (
-    <article className="grid gap-4 rounded-[var(--radius-panel)] border border-border bg-surface p-5 shadow-[var(--shadow-flat)]">
+    <article className="grid gap-4 rounded-panel border border-border bg-surface p-5 shadow-flat">
       <div className="flex flex-wrap items-center gap-2">
         <EventPill className={state.className}>{state.label}</EventPill>
         <EventPill>/{definition.slug}</EventPill>

@@ -30,6 +30,7 @@
   --hero-foreground: #f8fbff;
   --hero-muted: rgba(230, 238, 252, 0.82);
   --radius-control: 1rem;
+  --radius-input: 1rem;
   --radius-card: 1.5rem;
   --radius-panel: 1.875rem;
   --radius-overlay: 2.25rem;
@@ -272,6 +273,102 @@ body {
     border: 1px solid var(--border);
     background: var(--surface-control);
     box-shadow: var(--shadow-flat);
+  }
+
+  .rounded-input {
+    border-radius: var(--radius-input);
+  }
+
+  .rounded-card {
+    border-radius: var(--radius-card);
+  }
+
+  .rounded-panel {
+    border-radius: var(--radius-panel);
+  }
+
+  .rounded-overlay {
+    border-radius: var(--radius-overlay);
+  }
+
+  .shadow-flat {
+    box-shadow: var(--shadow-flat);
+  }
+
+  .shadow-raised {
+    box-shadow: var(--shadow-raised);
+  }
+
+  .shadow-floating {
+    box-shadow: var(--shadow-floating);
+  }
+
+  .shadow-overlay {
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .hover-shadow-flat:hover {
+    box-shadow: var(--shadow-flat);
+  }
+
+  .hover-shadow-raised:hover {
+    box-shadow: var(--shadow-raised);
+  }
+
+  .hover-shadow-floating:hover {
+    box-shadow: var(--shadow-floating);
+  }
+
+  .transition-field {
+    transition-property: border-color, background-color, box-shadow;
+  }
+
+  .transition-surface {
+    transition-property: background-color, border-color, color, box-shadow;
+  }
+
+  .transition-surface-emphasis {
+    transition-property: background-color, border-color, box-shadow, color;
+  }
+
+  .transition-surface-transform {
+    transition-property: transform, border-color, box-shadow, background-color;
+  }
+
+  .transition-interactive {
+    transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+  }
+
+  .transition-fade-colors {
+    transition-property: background-color, color, opacity;
+  }
+
+  .transition-collapse {
+    transition-property: max-height, opacity, transform, margin-top;
+  }
+
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe-bottom-4 {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+
+  .min-safe-site-header {
+    min-height: calc(5rem + env(safe-area-inset-top));
+  }
+
+  .min-safe-admin-header {
+    min-height: calc(6.5rem + env(safe-area-inset-top));
+  }
+
+  .bottom-safe-bottom-5 {
+    bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
+  }
+
+  .bottom-safe-bottom-6 {
+    bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
   }
 
   .ui-grid-cards {

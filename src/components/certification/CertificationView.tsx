@@ -167,7 +167,7 @@ export default function CertificationView({
           >
             ✕
           </button>
-          <div className="relative z-10 aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-white/5 shadow-[var(--shadow-overlay)]">
+          <div className="relative z-10 aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-white/5 shadow-overlay">
             <Image
               src={avatarSrc}
               alt="프로필 확대 이미지"
