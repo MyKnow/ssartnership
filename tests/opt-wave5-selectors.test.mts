@@ -15,7 +15,7 @@ const logsSelectorsPromise = import(
   new URL("../src/components/admin/logs/selectors.ts", import.meta.url).href,
 ) as Promise<LogsSelectorsModule>;
 
-test("home selectors keep locked cards after visible matches and respect search", async () => {
+test("home selectors apply search before splitting visible and locked cards", async () => {
   const { normalizeHomePartners, filterHomePartners } = await homeSelectorsPromise;
 
   const normalized = normalizeHomePartners(
@@ -69,11 +69,38 @@ test("home selectors keep locked cards after visible matches and respect search"
   });
 
   assert.deepStrictEqual(result.visible.map((partner) => partner.id), ["partner-public"]);
-  assert.deepStrictEqual(result.locked.map((partner) => partner.id), ["partner-private"]);
+  assert.deepStrictEqual(result.locked.map((partner) => partner.id), []);
   assert.deepStrictEqual(result.display.map((partner) => partner.id), [
     "partner-public",
+  ]);
+
+  const lockedResult = filterHomePartners({
+    partners: normalized,
+    activeCategory: "all",
+    appliesToFilter: "all",
+    searchValue: "어반짐",
+    sortValue: "recent",
+  });
+
+  assert.deepStrictEqual(lockedResult.visible.map((partner) => partner.id), []);
+  assert.deepStrictEqual(lockedResult.locked.map((partner) => partner.id), [
     "partner-private",
   ]);
+  assert.deepStrictEqual(lockedResult.display.map((partner) => partner.id), [
+    "partner-private",
+  ]);
+
+  const emptyResult = filterHomePartners({
+    partners: normalized,
+    activeCategory: "all",
+    appliesToFilter: "all",
+    searchValue: "없는제휴처",
+    sortValue: "recent",
+  });
+
+  assert.deepStrictEqual(emptyResult.visible.map((partner) => partner.id), []);
+  assert.deepStrictEqual(emptyResult.locked.map((partner) => partner.id), []);
+  assert.deepStrictEqual(emptyResult.display.map((partner) => partner.id), []);
 });
 
 test("member selectors derive campus and filter must-change users first", async () => {

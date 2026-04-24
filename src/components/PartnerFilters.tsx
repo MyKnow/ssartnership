@@ -65,6 +65,7 @@ export default function PartnerFilters({
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="업체명, 위치, 혜택, 태그, 적용 대상으로 검색"
+            data-testid="partner-search-input"
           />
         </div>
         {appliesToFilter && onAppliesToFilterChange ? (
@@ -75,6 +76,7 @@ export default function PartnerFilters({
               onChange={(event) =>
                 onAppliesToFilterChange(event.target.value as PartnerAudienceFilter)
               }
+              data-testid="partner-audience-filter"
             >
               {PARTNER_AUDIENCE_FILTER_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -91,6 +93,7 @@ export default function PartnerFilters({
             onChange={(event) =>
               onSortChange(event.target.value as PartnerSortOption)
             }
+            data-testid="partner-sort-select"
           >
             {partnerSortOptions.map((option) => (
               <option key={option.value} value={option.value}>

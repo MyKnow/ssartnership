@@ -107,11 +107,11 @@ export function filterHomePartners({
         );
 
   const activeFiltered = appliesFiltered.filter((partner) => !partner._isExpired);
-  const visibleFiltered = activeFiltered.filter((partner) => !partner._lockKind);
-  const lockedFiltered = activeFiltered.filter((partner) => partner._lockKind);
   const searchFiltered = query
-    ? visibleFiltered.filter((partner) => partner._search.includes(query))
-    : visibleFiltered;
+    ? activeFiltered.filter((partner) => partner._search.includes(query))
+    : activeFiltered;
+  const visibleFiltered = searchFiltered.filter((partner) => !partner._lockKind);
+  const lockedFiltered = searchFiltered.filter((partner) => partner._lockKind);
 
   const sortPartners = (items: typeof searchFiltered) =>
     [...items].sort((a, b) => {
@@ -139,7 +139,7 @@ export function filterHomePartners({
       return a._index - b._index;
     });
 
-  const visible = sortPartners(searchFiltered);
+  const visible = sortPartners(visibleFiltered);
   const locked = sortPartners(lockedFiltered);
 
   return {

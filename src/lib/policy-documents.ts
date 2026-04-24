@@ -102,6 +102,54 @@ export function getPolicyHref(
 const POLICY_SELECT =
   "id,kind,version,title,summary,content,is_active,effective_at,created_at,updated_at";
 
+const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
+const hasSupabaseAdminEnv = Boolean(
+  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
+const useMockPolicies = dataSource === "mock" || !hasSupabaseAdminEnv;
+
+const mockPolicyDocuments: PolicyDocument[] = [
+  {
+    id: "mock-policy-service-v1",
+    kind: "service",
+    version: 1,
+    title: "서비스 이용약관",
+    summary: "싸트너십 서비스 이용 조건을 안내합니다.",
+    content:
+      "싸트너십은 SSAFY 구성원이 제휴 혜택을 확인하고 이용할 수 있도록 정보를 제공합니다.",
+    is_active: true,
+    effective_at: "2026-01-01T00:00:00.000Z",
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "mock-policy-privacy-v1",
+    kind: "privacy",
+    version: 1,
+    title: "개인정보 처리방침",
+    summary: "회원 인증과 서비스 제공에 필요한 개인정보 처리 기준입니다.",
+    content:
+      "회원 인증, 제휴 혜택 제공, 문의 처리를 위해 필요한 최소한의 개인정보를 처리합니다.",
+    is_active: true,
+    effective_at: "2026-01-01T00:00:00.000Z",
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    id: "mock-policy-marketing-v1",
+    kind: "marketing",
+    version: 1,
+    title: "마케팅 정보 수신 동의",
+    summary: "제휴 소식과 이벤트 안내 수신 동의입니다.",
+    content:
+      "신규 제휴, 혜택 변경, 이벤트 소식을 선택적으로 안내받을 수 있습니다.",
+    is_active: true,
+    effective_at: "2026-01-01T00:00:00.000Z",
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+  },
+];
+
 function wrapPolicyDocumentDbError(
   error: { message?: string | null } | null | undefined,
   message = "정책 문서를 처리하지 못했습니다.",
@@ -113,6 +161,15 @@ function wrapPolicyDocumentDbError(
 }
 
 async function queryActiveRequiredPolicies(): Promise<RequiredPolicyMap> {
+  if (useMockPolicies) {
+    return Object.fromEntries(
+      REQUIRED_POLICY_KINDS.map((kind) => [
+        kind,
+        mockPolicyDocuments.find((policy) => policy.kind === kind)!,
+      ]),
+    ) as RequiredPolicyMap;
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("policy_documents")
@@ -162,6 +219,16 @@ async function queryPolicyDocumentByKind(
   kind: PolicyKind,
   version?: number | null,
 ) {
+  if (useMockPolicies) {
+    return (
+      mockPolicyDocuments.find(
+        (policy) =>
+          policy.kind === kind &&
+          (typeof version === "number" ? policy.version === version : policy.is_active),
+      ) ?? null
+    );
+  }
+
   const supabase = getSupabaseAdminClient();
   const query = supabase
     .from("policy_documents")
@@ -195,6 +262,12 @@ export async function getPolicyDocumentByKind(
 }
 
 export async function getPolicyDocumentsByKind(kind: PolicyKind) {
+  if (useMockPolicies) {
+    return mockPolicyDocuments
+      .filter((policy) => policy.kind === kind)
+      .sort((a, b) => b.version - a.version);
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("policy_documents")

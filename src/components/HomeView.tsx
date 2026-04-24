@@ -246,20 +246,25 @@ export default function HomeView({
       <MotionReveal delay={0.08}>
         <section className="mt-10">
           {displayPartners.length === 0 ? (
-            <EmptyState
-              title={
-                partners.length === 0
-                  ? HOME_COPY.emptyTitle
-                  : HOME_COPY.noResultsTitle
-              }
-              description={
-                partners.length === 0
-                  ? HOME_COPY.emptyDescription
-                  : HOME_COPY.noResultsDescription
-              }
-            />
+            <div data-testid="partner-no-results">
+              <EmptyState
+                title={
+                  partners.length === 0
+                    ? HOME_COPY.emptyTitle
+                    : HOME_COPY.noResultsTitle
+                }
+                description={
+                  partners.length === 0
+                    ? HOME_COPY.emptyDescription
+                    : HOME_COPY.noResultsDescription
+                }
+              />
+            </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
+            <div
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5"
+              data-testid="partner-grid"
+            >
               {displayPartners.map((partner) => (
                 <PartnerCardView
                   key={partner.id}
