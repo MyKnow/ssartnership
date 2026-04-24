@@ -4,7 +4,11 @@ export {
   findSupabasePartnerPortalSetupAccount,
 } from "./accounts.ts";
 export { authenticateSupabasePartnerPortalLogin } from "./login.ts";
-export { requestSupabasePartnerPortalPasswordReset } from "./reset.ts";
+export {
+  commitSupabasePartnerPortalPasswordReset,
+  prepareSupabasePartnerPortalPasswordReset,
+  requestSupabasePartnerPortalPasswordReset,
+} from "./reset.ts";
 export {
   completeSupabasePartnerPortalInitialSetup,
   getSupabasePartnerPortalSetupContext,

@@ -1,4 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+let adminClient: SupabaseClient | null = null;
+const publicClients = new Map<number, SupabaseClient>();
 
 function getAdminEnv() {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -27,8 +30,12 @@ function getPublicEnv() {
 }
 
 export function getSupabaseAdminClient() {
+  if (adminClient) {
+    return adminClient;
+  }
+
   const { supabaseUrl, serviceRoleKey } = getAdminEnv();
-  return createClient(supabaseUrl, serviceRoleKey, {
+  adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
     },
@@ -40,11 +47,17 @@ export function getSupabaseAdminClient() {
         }),
     },
   });
+  return adminClient;
 }
 
 export function getSupabasePublicClient(revalidateSeconds = 300) {
+  const cachedClient = publicClients.get(revalidateSeconds);
+  if (cachedClient) {
+    return cachedClient;
+  }
+
   const { supabaseUrl, key } = getPublicEnv();
-  return createClient(supabaseUrl, key, {
+  const publicClient = createClient(supabaseUrl, key, {
     auth: {
       persistSession: false,
     },
@@ -56,4 +69,6 @@ export function getSupabasePublicClient(revalidateSeconds = 300) {
         }),
     },
   });
+  publicClients.set(revalidateSeconds, publicClient);
+  return publicClient;
 }

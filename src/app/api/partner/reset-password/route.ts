@@ -18,6 +18,10 @@ import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { sendPartnerPortalTemporaryPasswordEmail } from "@/lib/partner-email";
+import {
+  commitSupabasePartnerPortalPasswordReset,
+  prepareSupabasePartnerPortalPasswordReset,
+} from "@/lib/partner-auth/supabase";
 
 export const runtime = "nodejs";
 
@@ -81,16 +85,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_email" }, { status: 400 });
     }
 
-    const result = await requestPartnerPortalPasswordReset(normalizedEmail);
-
-    if (!isPartnerPortalMock) {
-      await sendPartnerPortalTemporaryPasswordEmail({
-        to: result.emailSentTo,
-        displayName: result.account.displayName,
-        loginId: result.account.loginId,
-        temporaryPassword: result.temporaryPassword,
-      });
-    }
+    const result = isPartnerPortalMock
+      ? await requestPartnerPortalPasswordReset(normalizedEmail)
+      : await (async () => {
+          const preparedReset =
+            await prepareSupabasePartnerPortalPasswordReset(normalizedEmail);
+          await sendPartnerPortalTemporaryPasswordEmail({
+            to: preparedReset.emailSentTo,
+            displayName: preparedReset.account.displayName,
+            loginId: preparedReset.account.loginId,
+            temporaryPassword: preparedReset.temporaryPassword,
+          });
+          return commitSupabasePartnerPortalPasswordReset(preparedReset);
+        })();
 
     await recordPartnerAuthAttempt("reset-password", throttleContext, true);
     await logAuthSecurity({
@@ -113,6 +120,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof PartnerPortalPasswordResetError) {
+      const isAccountStateError =
+        error.code === "not_found" ||
+        error.code === "inactive_account" ||
+        error.code === "setup_required";
       await logAuthSecurity({
         ...context,
         eventName: "partner_password_reset",
@@ -131,6 +142,9 @@ export async function POST(request: Request) {
         false,
       ).catch(() => undefined);
       await delayPartnerAuthAttempt("reset-password");
+      if (isAccountStateError) {
+        return NextResponse.json({ ok: true });
+      }
       return NextResponse.json(
         {
           error: error.code,

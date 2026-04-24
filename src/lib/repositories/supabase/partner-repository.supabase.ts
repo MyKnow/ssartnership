@@ -256,4 +256,23 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const categoryKey = extractCategoryKey(row.categories) ?? "health";
     return toVisiblePartner(row, categoryKey);
   }
+
+  async partnerExists(id: string): Promise<boolean> {
+    if (!id) {
+      return false;
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return Boolean(data);
+  }
 }

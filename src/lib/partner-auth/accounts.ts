@@ -1,4 +1,5 @@
 import { normalizePartnerLoginId } from "../partner-utils.ts";
+import { hashOpaqueToken } from "../password.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import type { PartnerPortalAccountRow } from "./types.ts";
 
@@ -39,12 +40,13 @@ export async function findSupabasePartnerPortalAccount(
 
 export async function findSupabasePartnerPortalSetupAccount(token: string) {
   const supabase = getSupabaseAdminClient();
+  const tokenHash = hashOpaqueToken(token);
   const { data: account, error } = await supabase
     .from("partner_accounts")
     .select(
-      `${ACCOUNT_SELECT},initial_setup_token,initial_setup_link_sent_at`,
+      `${ACCOUNT_SELECT},initial_setup_token_hash,initial_setup_link_sent_at,initial_setup_expires_at`,
     )
-    .eq("initial_setup_token", token)
+    .eq("initial_setup_token_hash", tokenHash)
     .maybeSingle();
 
   if (error) {

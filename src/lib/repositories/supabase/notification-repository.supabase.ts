@@ -275,7 +275,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
 
   async markMemberNotificationRead(memberId: string, notificationId: string) {
     const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("member_notifications")
       .update({
         read_at: new Date().toISOString(),
@@ -283,18 +283,20 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       })
       .eq("member_id", memberId)
       .eq("notification_id", notificationId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       throw new Error(error.message);
     }
-    return true;
+    return Boolean(data);
   }
 
   async softDeleteMemberNotification(memberId: string, notificationId: string) {
     const supabase = getSupabaseAdminClient();
     const now = new Date().toISOString();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("member_notifications")
       .update({
         deleted_at: now,
@@ -302,76 +304,52 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       })
       .eq("member_id", memberId)
       .eq("notification_id", notificationId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       throw new Error(error.message);
     }
-    return true;
+    return Boolean(data);
   }
 
   async markAllMemberNotificationsRead(memberId: string) {
     const supabase = getSupabaseAdminClient();
     const now = new Date().toISOString();
-    const { data: targetRows, error: selectError } = await supabase
-      .from("member_notifications")
-      .select("id")
-      .eq("member_id", memberId)
-      .is("deleted_at", null)
-      .is("read_at", null);
-
-    if (selectError) {
-      throw new Error(selectError.message);
-    }
-
-    const ids = (targetRows ?? []).map((row) => row.id).filter((value) => Boolean(value));
-    if (ids.length === 0) {
-      return 0;
-    }
-
-    const { error: updateError } = await supabase
+    const { data, error } = await supabase
       .from("member_notifications")
       .update({
         read_at: now,
         updated_at: now,
       })
-      .in("id", ids);
+      .eq("member_id", memberId)
+      .is("deleted_at", null)
+      .is("read_at", null)
+      .select("id");
 
-    if (updateError) {
-      throw new Error(updateError.message);
+    if (error) {
+      throw new Error(error.message);
     }
-    return ids.length;
+    return data?.length ?? 0;
   }
 
   async softDeleteAllMemberNotifications(memberId: string) {
     const supabase = getSupabaseAdminClient();
     const now = new Date().toISOString();
-    const { data: targetRows, error: selectError } = await supabase
-      .from("member_notifications")
-      .select("id")
-      .eq("member_id", memberId)
-      .is("deleted_at", null);
-
-    if (selectError) {
-      throw new Error(selectError.message);
-    }
-
-    const ids = (targetRows ?? []).map((row) => row.id).filter((value) => Boolean(value));
-    if (ids.length === 0) {
-      return 0;
-    }
-
-    const { error: updateError } = await supabase
+    const { data, error } = await supabase
       .from("member_notifications")
       .update({
         deleted_at: now,
         updated_at: now,
       })
-      .in("id", ids);
+      .eq("member_id", memberId)
+      .is("deleted_at", null)
+      .select("id");
 
-    if (updateError) {
-      throw new Error(updateError.message);
+    if (error) {
+      throw new Error(error.message);
     }
-    return ids.length;
+    return data?.length ?? 0;
   }
 }

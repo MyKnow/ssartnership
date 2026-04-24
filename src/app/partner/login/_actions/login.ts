@@ -144,7 +144,7 @@ export async function loginAction(formData: FormData) {
         context,
         throttleContext,
         loginId,
-        errorCode: error.code,
+        errorCode: "invalid_credentials",
         reason: error.code,
       });
     }

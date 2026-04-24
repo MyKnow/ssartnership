@@ -8,6 +8,8 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 export default function AdminPartnerAccountManagerContent({
   accounts,
   companies,
+  generatedSetupUrl,
+  generatedSetupAccountId,
 }: {
   accounts: AdminPartnerAccount[];
   companies: {
@@ -15,6 +17,8 @@ export default function AdminPartnerAccountManagerContent({
     name: string;
     slug: string;
   }[];
+  generatedSetupUrl?: string | null;
+  generatedSetupAccountId?: string | null;
 }) {
   return (
     <div className="grid gap-4">
@@ -38,6 +42,9 @@ export default function AdminPartnerAccountManagerContent({
               key={account.id}
               account={account}
               companies={companies}
+              generatedSetupUrl={
+                generatedSetupAccountId === account.id ? generatedSetupUrl : null
+              }
             />
           ))}
         </>

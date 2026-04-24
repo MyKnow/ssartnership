@@ -11,7 +11,7 @@ import type {
   ResolvedActorMeta,
   AdminAuditLogRow,
 } from './shared';
-import { QUERY_PAGE_SIZE, uniqueLogGroups } from './shared';
+import { MAX_LOG_ROWS_PER_GROUP, QUERY_PAGE_SIZE, uniqueLogGroups } from './shared';
 import { resolveLogRange } from './range';
 
 async function queryAllRows<T>(
@@ -40,7 +40,10 @@ async function queryAllRows<T>(
 
     const chunk = (data ?? []) as T[];
     rows.push(...chunk);
-    if (chunk.length < QUERY_PAGE_SIZE) {
+    if (chunk.length < QUERY_PAGE_SIZE || rows.length >= MAX_LOG_ROWS_PER_GROUP) {
+      if (rows.length > MAX_LOG_ROWS_PER_GROUP) {
+        return rows.slice(0, MAX_LOG_ROWS_PER_GROUP);
+      }
       return rows;
     }
 

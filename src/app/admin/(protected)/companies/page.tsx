@@ -41,7 +41,7 @@ type PartnerAccountRowRecord = {
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
   initial_setup_link_sent_at?: string | null;
-  initial_setup_token?: string | null;
+  initial_setup_expires_at?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -58,7 +58,7 @@ type PartnerAccountRow = {
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
   initial_setup_link_sent_at?: string | null;
-  initial_setup_token?: string | null;
+  initial_setup_expires_at?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -105,7 +105,7 @@ function normalizePartnerAccount(
     email_verified_at: row.email_verified_at ?? null,
     initial_setup_completed_at: row.initial_setup_completed_at ?? null,
     initial_setup_link_sent_at: row.initial_setup_link_sent_at ?? null,
-    initial_setup_token: row.initial_setup_token ?? null,
+    initial_setup_expires_at: row.initial_setup_expires_at ?? null,
     last_login_at: row.last_login_at ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
@@ -141,11 +141,21 @@ function SummaryMetric({
 export default async function AdminCompaniesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<{
+    error?: string;
+    generatedSetupUrl?: string;
+    generatedSetupAccountId?: string;
+  }>;
 }) {
   const supabase = getSupabaseAdminClient();
   const params = (await searchParams) ?? {};
   const companyError = params.error ? adminCompaniesErrorMessages[params.error] : null;
+  const generatedSetupUrl =
+    typeof params.generatedSetupUrl === "string" ? params.generatedSetupUrl : null;
+  const generatedSetupAccountId =
+    typeof params.generatedSetupAccountId === "string"
+      ? params.generatedSetupAccountId
+      : null;
 
   const [partnersResult, companiesResult, accountsResult] = await Promise.all([
     supabase
@@ -161,7 +171,7 @@ export default async function AdminCompaniesPage({
     supabase
       .from("partner_accounts")
       .select(
-        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_token,last_login_at,created_at,updated_at,links:partner_account_companies(id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active))",
+        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at,links:partner_account_companies(id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active))",
       )
       .order("created_at", { ascending: false }),
   ]);
@@ -252,10 +262,12 @@ export default async function AdminCompaniesPage({
             title="계정 섹션"
             description="협력사 담당 계정을 만들고, 연결 상태를 간단하게 조정합니다."
           />
-          <AdminPartnerAccountManager
-            accounts={safeAccounts}
-            companies={safeCompanies}
-          />
+        <AdminPartnerAccountManager
+          accounts={safeAccounts}
+          companies={safeCompanies}
+          generatedSetupUrl={generatedSetupUrl}
+          generatedSetupAccountId={generatedSetupAccountId}
+        />
         </section>
       </section>
     </AdminShell>

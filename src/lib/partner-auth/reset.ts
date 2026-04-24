@@ -8,9 +8,13 @@ import {
 } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
-export async function requestSupabasePartnerPortalPasswordReset(
+type PreparedPartnerPortalPasswordReset = PartnerPortalPasswordResetResult & {
+  passwordRecord: ReturnType<typeof hashPassword>;
+};
+
+export async function prepareSupabasePartnerPortalPasswordReset(
   email: string,
-): Promise<PartnerPortalPasswordResetResult> {
+): Promise<PreparedPartnerPortalPasswordReset> {
   const account = await findSupabasePartnerPortalAccount(
     normalizeSupabasePartnerLoginId(email),
   );
@@ -35,18 +39,30 @@ export async function requestSupabasePartnerPortalPasswordReset(
 
   const temporaryPassword = generateTempPassword(12);
   const passwordRecord = hashPassword(temporaryPassword);
+
+  return {
+    account: toPartnerPortalAccountSummary(account),
+    passwordRecord,
+    temporaryPassword,
+    emailSentTo: account.email ?? account.login_id,
+  };
+}
+
+export async function commitSupabasePartnerPortalPasswordReset(
+  reset: PreparedPartnerPortalPasswordReset,
+): Promise<PartnerPortalPasswordResetResult> {
   const emailVerifiedAt = new Date().toISOString();
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase
     .from("partner_accounts")
     .update({
-      password_hash: passwordRecord.hash,
-      password_salt: passwordRecord.salt,
+      password_hash: reset.passwordRecord.hash,
+      password_salt: reset.passwordRecord.salt,
       must_change_password: true,
       email_verified_at: emailVerifiedAt,
       updated_at: emailVerifiedAt,
     })
-    .eq("id", account.id);
+    .eq("id", reset.account.id);
 
   if (error) {
     throw new PartnerPortalPasswordResetError(
@@ -57,13 +73,25 @@ export async function requestSupabasePartnerPortalPasswordReset(
 
   return {
     account: toPartnerPortalAccountSummary({
-      ...account,
-      password_hash: passwordRecord.hash,
-      password_salt: passwordRecord.salt,
+      id: reset.account.id,
+      login_id: reset.account.loginId,
+      display_name: reset.account.displayName,
+      email: reset.account.email,
+      password_hash: reset.passwordRecord.hash,
+      password_salt: reset.passwordRecord.salt,
       must_change_password: true,
       email_verified_at: emailVerifiedAt,
+      initial_setup_completed_at: reset.account.initialSetupCompletedAt,
+      is_active: reset.account.isActive,
     }),
-    temporaryPassword,
-    emailSentTo: account.email ?? account.login_id,
+    temporaryPassword: reset.temporaryPassword,
+    emailSentTo: reset.emailSentTo,
   };
+}
+
+export async function requestSupabasePartnerPortalPasswordReset(
+  email: string,
+): Promise<PartnerPortalPasswordResetResult> {
+  const reset = await prepareSupabasePartnerPortalPasswordReset(email);
+  return commitSupabasePartnerPortalPasswordReset(reset);
 }

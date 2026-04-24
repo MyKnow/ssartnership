@@ -12,4 +12,5 @@ export interface PartnerRepository {
     context?: PartnerViewContext,
   ): Promise<Partner | null>;
   getPartnerByIdRaw(id: string): Promise<Partner | null>;
+  partnerExists(id: string): Promise<boolean>;
 }

@@ -41,7 +41,7 @@ export async function getLatestVerificationCode(mmUserId: string) {
   const supabase = getSupabaseAdminClient();
   const { data } = await supabase
     .from("mm_verification_codes")
-    .select("*")
+    .select("code_hash,expires_at,year")
     .eq("mm_user_id", mmUserId)
     .order("created_at", { ascending: false })
     .limit(1)

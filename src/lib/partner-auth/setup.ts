@@ -17,7 +17,10 @@ export async function getSupabasePartnerPortalSetupContext(
   if (
     !account ||
     !account.is_active ||
-    !account.initial_setup_token
+    !account.initial_setup_token_hash ||
+    !account.initial_setup_expires_at ||
+    new Date(account.initial_setup_expires_at).getTime() <= Date.now() ||
+    account.initial_setup_completed_at
   ) {
     return null;
   }
@@ -41,7 +44,16 @@ export async function completeSupabasePartnerPortalInitialSetup(
 ): Promise<PartnerPortalSetupResult> {
   const account = await findSupabasePartnerPortalSetupAccount(input.token);
 
-  if (!account || !account.initial_setup_token) {
+  if (!account || !account.initial_setup_token_hash) {
+    throw new PartnerPortalSetupError(
+      "not_found",
+      "초기 설정 링크를 찾을 수 없습니다.",
+    );
+  }
+  if (
+    !account.initial_setup_expires_at ||
+    new Date(account.initial_setup_expires_at).getTime() <= Date.now()
+  ) {
     throw new PartnerPortalSetupError(
       "not_found",
       "초기 설정 링크를 찾을 수 없습니다.",
@@ -87,7 +99,9 @@ export async function completeSupabasePartnerPortalInitialSetup(
       is_active: true,
       email_verified_at: completedAt,
       initial_setup_completed_at: completedAt,
+      initial_setup_token_hash: null,
       initial_setup_verification_code_hash: null,
+      initial_setup_expires_at: null,
       updated_at: completedAt,
     })
     .eq("id", account.id);

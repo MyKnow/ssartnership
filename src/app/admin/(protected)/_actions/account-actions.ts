@@ -144,14 +144,15 @@ export async function createPartnerAccountAction(formData: FormData) {
       is_active: payload.isActive,
       email_verified_at: null,
       initial_setup_completed_at: null,
-      initial_setup_token: null,
+      initial_setup_token_hash: null,
       initial_setup_verification_code_hash: null,
       initial_setup_link_sent_at: null,
+      initial_setup_expires_at: null,
       created_at: now,
       updated_at: now,
     })
     .select(
-      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_token,initial_setup_verification_code_hash,initial_setup_link_sent_at",
+      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_token_hash,initial_setup_verification_code_hash,initial_setup_link_sent_at,initial_setup_expires_at",
     )
     .single();
 
@@ -232,11 +233,14 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
       displayName: issued.account.display_name,
       emailSentTo: issued.emailSentTo,
       setupLinkGeneratedAt: issued.now,
+      setupLinkExpiresAt: issued.expiresAt,
     },
   });
 
   revalidatePartnerAccountData();
-  redirect("/admin/companies");
+  redirect(
+    `/admin/companies?generatedSetupAccountId=${encodeURIComponent(issued.account.id)}&generatedSetupUrl=${encodeURIComponent(issued.setupUrl)}`,
+  );
 }
 
 export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData) {
@@ -285,6 +289,7 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
       displayName: issued.account.display_name,
       emailSentTo: issued.emailSentTo,
       setupLinkSentAt: issued.now,
+      setupLinkExpiresAt: issued.expiresAt,
     },
   });
 

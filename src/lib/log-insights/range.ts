@@ -5,7 +5,7 @@ import type {
   ResolvedLogRange,
   TimedLogRow,
 } from './shared';
-import { DEFAULT_PRESET, RANGE_PRESET_MS } from './shared';
+import { DEFAULT_PRESET, MAX_CUSTOM_RANGE_MS, RANGE_PRESET_MS } from './shared';
 import {
   formatKoreanDate,
   formatKoreanDateTime,
@@ -132,6 +132,9 @@ export function resolveLogRange(
   }
   if (start.getTime() === end.getTime()) {
     end = new Date(end.getTime() + 60 * 1000);
+  }
+  if (end.getTime() - start.getTime() > MAX_CUSTOM_RANGE_MS) {
+    start = new Date(end.getTime() - MAX_CUSTOM_RANGE_MS);
   }
 
   const durationMs = end.getTime() - start.getTime();

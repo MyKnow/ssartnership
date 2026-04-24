@@ -52,13 +52,10 @@ export function getPartnerPortalLoginErrorMessage(
 ) {
   switch (code) {
     case "invalid_credentials":
-      return "이메일 또는 비밀번호가 올바르지 않습니다.";
     case "inactive_account":
-      return "비활성화된 계정입니다. 관리자에게 문의해 주세요.";
     case "setup_required":
-      return "초기 설정이 필요합니다. 받은 링크로 먼저 비밀번호를 설정해 주세요.";
     case "not_linked":
-      return "해당 계정에 연결된 업체가 없습니다. 관리자에게 문의해 주세요.";
+      return "이메일 또는 비밀번호가 올바르지 않습니다.";
     default:
       return "로그인에 실패했습니다.";
   }
@@ -69,12 +66,10 @@ export function getPartnerPortalLoginErrorStatus(
 ) {
   switch (code) {
     case "invalid_credentials":
-      return 401;
     case "inactive_account":
-      return 403;
     case "setup_required":
     case "not_linked":
-      return 409;
+      return 401;
     default:
       return 400;
   }

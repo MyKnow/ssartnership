@@ -6,16 +6,19 @@ import {
   sendPartnerAccountInitialSetupUrl,
 } from "@/app/admin/(protected)/actions";
 import {
-  buildPartnerInitialSetupUrl,
   formatPartnerAccountDateTime,
 } from "@/components/admin/partner-account-manager/helpers";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
 export default function PartnerAccountHeader({
   account,
+  generatedSetupUrl,
 }: {
   account: AdminPartnerAccount;
+  generatedSetupUrl?: string | null;
 }) {
+  const hasActiveSetupLink = Boolean(account.initial_setup_expires_at);
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
       <div className="min-w-0 space-y-3">
@@ -33,14 +36,14 @@ export default function PartnerAccountHeader({
             variant={
               account.initial_setup_completed_at
                 ? "success"
-                : account.initial_setup_token
+                : hasActiveSetupLink
                   ? "primary"
                   : "neutral"
             }
           >
             {account.initial_setup_completed_at
               ? "초기 설정 완료"
-              : account.initial_setup_token
+              : hasActiveSetupLink
                 ? account.initial_setup_link_sent_at
                   ? "초기설정 URL 전송됨"
                   : "초기설정 URL 준비됨"
@@ -73,17 +76,14 @@ export default function PartnerAccountHeader({
                 variant="ghost"
                 className="w-full sm:w-auto"
               >
-                {account.initial_setup_token ? "초기설정 URL 재생성" : "초기설정 URL 생성"}
+                {hasActiveSetupLink ? "초기설정 URL 재생성" : "초기설정 URL 생성"}
               </SubmitButton>
             </form>
           ) : null}
 
-          {account.initial_setup_token ? (
+          {generatedSetupUrl ? (
             <PartnerInitialSetupUrlCopyButton
-              setupUrl={buildPartnerInitialSetupUrl(
-                account.initial_setup_token,
-                process.env.NEXT_PUBLIC_SITE_URL,
-              )}
+              setupUrl={generatedSetupUrl}
             />
           ) : null}
 

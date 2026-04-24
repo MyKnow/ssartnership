@@ -89,10 +89,10 @@ export default async function AdminPage() {
     auditLogResult,
     securityLogResult,
   ] = await Promise.all([
-    supabase.from("members").select("*", { count: "exact", head: true }),
+    supabase.from("members").select("id", { count: "exact", head: true }),
     supabase.from("partner_companies").select("id", { count: "exact", head: true }),
-    supabase.from("partners").select("*", { count: "exact", head: true }),
-    supabase.from("categories").select("*", { count: "exact", head: true }),
+    supabase.from("partners").select("id", { count: "exact", head: true }),
+    supabase.from("categories").select("id", { count: "exact", head: true }),
     supabase.from("partner_accounts").select("id", { count: "exact", head: true }),
     supabase
       .from("partner_reviews")

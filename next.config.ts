@@ -53,6 +53,9 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  turbopack: {
+    root: process.cwd(),
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: supabaseRemotePattern ? [supabaseRemotePattern] : undefined,

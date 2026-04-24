@@ -47,3 +47,11 @@ export function generateTempPassword(length = 12) {
   }
   return chars.join("");
 }
+
+export function hashOpaqueToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+export function generateOpaqueToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString("hex");
+}

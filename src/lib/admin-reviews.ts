@@ -79,6 +79,8 @@ export type AdminReviewPageData = {
   filters: AdminReviewFilters;
 };
 
+const ADMIN_REVIEW_RESULT_LIMIT = 200;
+
 type AdminReviewRow = {
   id: string;
   partner_id: string;
@@ -145,6 +147,12 @@ type AdminReviewPartnerRow = {
       }[]
     | null;
 };
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
 
 function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) {
@@ -302,31 +310,63 @@ function applyAdminReviewFilters(
   });
 }
 
-async function fetchAllAdminReviewRows(sort: AdminReviewSort) {
+async function fetchFilteredAdminReviewRows(filters: AdminReviewFilters) {
   const supabase = getSupabaseAdminClient();
-  const rows: AdminReviewRow[] = [];
-  const pageSize = 100;
-  let offset = 0;
+  let partnerIdsByCompany: string[] | null = null;
 
-  while (true) {
-    const { data, error } = await supabase
-      .from("partner_reviews")
-      .select(REVIEW_SELECT)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: sort === "oldest" })
-      .range(offset, offset + pageSize - 1);
+  if (filters.companyId) {
+    const { data: partners, error: partnersError } = await supabase
+      .from("partners")
+      .select("id")
+      .eq("company_id", filters.companyId);
 
-    if (error) {
-      throw new Error(error.message);
+    if (partnersError) {
+      throw new Error(partnersError.message);
     }
 
-    const pageRows = (data ?? []) as unknown as AdminReviewRow[];
-    rows.push(...pageRows);
-    if (pageRows.length < pageSize) {
-      break;
+    partnerIdsByCompany = (partners ?? []).map((partner) => partner.id);
+    if (partnerIdsByCompany.length === 0) {
+      return [];
     }
-    offset += pageSize;
   }
+
+  let query = supabase
+    .from("partner_reviews")
+    .select(REVIEW_SELECT)
+    .is("deleted_at", null);
+
+  if (filters.status === "visible") {
+    query = query.is("hidden_at", null);
+  } else if (filters.status === "hidden") {
+    query = query.not("hidden_at", "is", null);
+  }
+
+  if (filters.partnerId) {
+    if (!isUuid(filters.partnerId)) {
+      return [];
+    }
+    query = query.eq("partner_id", filters.partnerId);
+  } else if (partnerIdsByCompany) {
+    query = query.in("partner_id", partnerIdsByCompany);
+  }
+
+  if (filters.rating !== "all") {
+    query = query.eq("rating", Number(filters.rating));
+  }
+
+  if (filters.imagesOnly) {
+    query = query.not("images", "eq", "{}");
+  }
+
+  const { data, error } = await query
+    .order("created_at", { ascending: filters.sort === "oldest" })
+    .limit(ADMIN_REVIEW_RESULT_LIMIT);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as unknown as AdminReviewRow[];
 
   const reactionStates = await fetchAdminReviewReactionStates(rows.map((row) => row.id));
   return rows.map((row) => mapAdminReviewRow(row, reactionStates.get(row.id)));
@@ -393,7 +433,7 @@ export async function getAdminReviewPageData(
       .select("id,name,company_id,company:partner_companies(id,name,slug)")
       .order("name", { ascending: true }),
     getAdminReviewCounts(),
-    fetchAllAdminReviewRows(input.sort),
+    fetchFilteredAdminReviewRows(input),
   ]);
 
   const companies = (companiesResult.data ?? []) as AdminReviewCompanyOption[];

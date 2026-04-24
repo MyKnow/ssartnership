@@ -43,6 +43,10 @@ type PartnerChangeRequestRow = {
   updated_at?: string | null;
 };
 
+type PartnerReviewCountRow = {
+  partner_id?: string | null;
+};
+
 const PARTNER_DASHBOARD_WARNING_MESSAGE =
   "일부 통계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
 
@@ -116,6 +120,45 @@ function toCompanyDashboard(
     description: row.description ?? null,
     services,
     totals: sumPartnerPortalMetrics(services.map((service) => service.metrics)),
+  };
+}
+
+async function fetchReviewCountsByServiceId(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  serviceIds: string[],
+) {
+  const counts = new Map(serviceIds.map((serviceId) => [serviceId, 0]));
+  if (serviceIds.length === 0) {
+    return {
+      counts,
+      errorMessage: null,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("partner_reviews")
+    .select("partner_id")
+    .in("partner_id", serviceIds)
+    .is("deleted_at", null);
+
+  if (error) {
+    return {
+      counts,
+      errorMessage: error.message,
+    };
+  }
+
+  for (const row of (data ?? []) as PartnerReviewCountRow[]) {
+    const partnerId = row.partner_id ?? "";
+    if (!counts.has(partnerId)) {
+      continue;
+    }
+    counts.set(partnerId, (counts.get(partnerId) ?? 0) + 1);
+  }
+
+  return {
+    counts,
+    errorMessage: null,
   };
 }
 
@@ -253,28 +296,19 @@ export async function getSupabasePartnerPortalDashboard(
     }
   }
 
-  const reviewCountResult = await Promise.all(
-    serviceRows.map(async (row) => {
-      const { count, error } = await supabase
-        .from("partner_reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", row.id)
-        .is("deleted_at", null);
-
-      if (error) {
-        markPartialFailure();
-        console.error("[partner-dashboard] review metric query failed", {
-          partnerId: row.id,
-          message: error.message,
-        });
-        return [row.id, 0] as const;
-      }
-
-      return [row.id, count ?? 0] as const;
-    }),
+  const reviewCountResult = await fetchReviewCountsByServiceId(
+    supabase,
+    serviceRows.map((serviceRow) => serviceRow.id),
   );
+  if (reviewCountResult.errorMessage) {
+    markPartialFailure();
+    console.error(
+      "[partner-dashboard] review metric query failed",
+      reviewCountResult.errorMessage,
+    );
+  }
 
-  for (const [partnerId, reviewCount] of reviewCountResult) {
+  for (const [partnerId, reviewCount] of reviewCountResult.counts) {
     const metrics = metricsByServiceId.get(partnerId);
     if (!metrics) {
       continue;

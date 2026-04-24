@@ -7,6 +7,7 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 export default function PartnerAccountCard({
   account,
   companies,
+  generatedSetupUrl,
 }: {
   account: AdminPartnerAccount;
   companies: {
@@ -14,12 +15,13 @@ export default function PartnerAccountCard({
     name: string;
     slug: string;
   }[];
+  generatedSetupUrl?: string | null;
 }) {
   const accountFormId = `partner-account-form-${account.id}`;
 
   return (
     <Card padding="md" className="grid gap-5">
-      <PartnerAccountHeader account={account} />
+      <PartnerAccountHeader account={account} generatedSetupUrl={generatedSetupUrl} />
 
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <PartnerAccountForm account={account} formId={accountFormId} />

@@ -31,8 +31,8 @@ export async function POST(
     );
   }
 
-  const partner = await partnerRepository.getPartnerByIdRaw(partnerId);
-  if (!partner) {
+  const exists = await partnerRepository.partnerExists(partnerId);
+  if (!exists) {
     return NextResponse.json(
       { message: "유효한 브랜드를 찾을 수 없습니다." },
       { status: 404 },
