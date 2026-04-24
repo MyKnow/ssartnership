@@ -1,0 +1,6 @@
+interface:
+  display_name: "Async UI Actions"
+  short_description: "Optimistic updates and lazy async mutations for interactive UI"
+  default_prompt: "Implement or refactor a client-side async action using optimistic UI, item-scoped pending state, rollback on failure, and non-blocking feedback."
+policy:
+  allow_implicit_invocation: true

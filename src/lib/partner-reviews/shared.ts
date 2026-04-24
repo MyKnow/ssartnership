@@ -36,6 +36,27 @@ export type PartnerReview = {
   myReaction: PartnerReviewReaction | null;
 };
 
+export function applyPartnerReviewReaction(
+  review: PartnerReview,
+  nextReaction: PartnerReviewReaction | null,
+): PartnerReview {
+  const recommendCount =
+    review.recommendCount
+    - (review.myReaction === "recommend" ? 1 : 0)
+    + (nextReaction === "recommend" ? 1 : 0);
+  const disrecommendCount =
+    review.disrecommendCount
+    - (review.myReaction === "disrecommend" ? 1 : 0)
+    + (nextReaction === "disrecommend" ? 1 : 0);
+
+  return {
+    ...review,
+    recommendCount: Math.max(0, recommendCount),
+    disrecommendCount: Math.max(0, disrecommendCount),
+    myReaction: nextReaction,
+  };
+}
+
 export type PartnerReviewListResult = {
   summary: PartnerReviewSummary;
   items: PartnerReview[];

@@ -63,8 +63,7 @@ export default function PartnerReviewCard({
       <Button
         variant={reaction === "recommend" ? (active ? "soft" : "secondary") : active ? "danger" : "secondary"}
         size="sm"
-        loading={reactionPending}
-        loadingText="반응 중"
+        disabled={reactionPending}
         onClick={() => onReact?.(reaction)}
         className={cn(
           "min-w-[7rem] justify-start",

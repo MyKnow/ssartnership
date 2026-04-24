@@ -8,6 +8,7 @@ export type {
   PartnerReviewSummary,
 } from "./partner-reviews/shared";
 export {
+  applyPartnerReviewReaction,
   buildPartnerReviewSummary,
   createEmptyPartnerReviewReactionState,
   createEmptyPartnerReviewSummary,
