@@ -38,6 +38,22 @@ Before applying any migration:
 
 ## PostgreSQL Patterns
 
+## Supabase CLI Patterns
+
+When applying local migrations to a preview database manually, start with:
+
+```bash
+supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes
+```
+
+If Supabase reports `Found local migration files to be inserted before the last migration on remote database`, rerun with `--include-all` only after confirming the listed migrations should be applied to that database. For the preview-sync CI workflow, validate migration filenames first and then use:
+
+```bash
+supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
+```
+
+Supabase migration files must match the `<timestamp>_name.sql` pattern. Files such as `20260409.sql` are skipped because they do not include a descriptive suffix.
+
 ### Adding a Column Safely
 
 ```sql

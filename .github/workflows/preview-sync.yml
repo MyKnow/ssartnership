@@ -44,6 +44,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Supabase migrations
+        run: npm run validate:migrations
+
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
@@ -53,4 +56,4 @@ jobs:
         run: npm run sync:preview
 
       - name: Apply preview migrations
-        run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes
+        run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all

@@ -15,6 +15,7 @@
     "test:mm-profile": "node --import ./tests/alias-register.mjs --test tests/mm-profile-csv.test.mts",
     "test:partner-portal": "node --import ./tests/alias-register.mjs --test tests/partner-portal.mock.test.mts",
     "test:ssafy-cycle": "node --import ./tests/alias-register.mjs --test tests/ssafy-cycle-simulation.test.mts",
+    "validate:migrations": "node scripts/validate-supabase-migrations.mjs",
     "release": "bash scripts/release.sh"
   },
   "dependencies": {
