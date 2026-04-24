@@ -31,10 +31,17 @@ Tailwind v4 uses automatic source detection. In Next/Turbopack/Vercel, productio
 In `src/app/globals.css`, prefer an explicit source root:
 
 ```css
-@import "tailwindcss" source("..");
+@import "tailwindcss";
+@source "..";
 ```
 
 For this project, `globals.css` lives in `src/app`, so `source("..")` points to `src`. This makes Tailwind scan `src/app`, `src/components`, `src/lib`, and related app source reliably.
+
+The inline import form also works in Tailwind builds, but can trigger editor CSS diagnostics such as `semi-colon expected`:
+
+```css
+@import "tailwindcss" source("..");
+```
 
 Avoid this incorrect form here:
 
