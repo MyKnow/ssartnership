@@ -20,7 +20,11 @@ function getPartnerSecret() {
 }
 
 function getAdminSecret() {
-  return process.env.ADMIN_SESSION_SECRET ?? "";
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    return null;
+  }
+  return secret;
 }
 
 function splitSignedToken(token: string) {
@@ -140,6 +144,10 @@ async function verifyPartnerToken(token: string) {
 }
 
 async function verifyAdminToken(token: string) {
+  const secret = getAdminSecret();
+  if (!secret) {
+    return null;
+  }
   const signedToken = splitSignedToken(token);
   if (!signedToken) {
     return null;
@@ -149,7 +157,7 @@ async function verifyAdminToken(token: string) {
     return null;
   }
   try {
-    const expected = await hmacSha256Hex(payload, getAdminSecret());
+    const expected = await hmacSha256Hex(payload, secret);
     if (expected !== signature) {
       return null;
     }

@@ -26,6 +26,46 @@ type AudienceMember = {
   year: number;
 };
 
+type ChannelDeliveryResult = {
+  targeted: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  bookkeepingErrors: string[];
+};
+
+function toErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function createBookkeepingWarning(
+  channel: "push" | "mm",
+  memberId: string,
+  message: string,
+) {
+  return `[admin-notification-ops] ${channel} bookkeeping failed for member ${memberId}: ${message}`;
+}
+
+async function runBookkeepingTasks(
+  tasks: Array<Promise<void>>,
+  channel: "push" | "mm",
+  memberId: string,
+  bookkeepingErrors: string[],
+) {
+  const results = await Promise.allSettled(tasks);
+  for (const result of results) {
+    if (result.status === "rejected") {
+      const warning = createBookkeepingWarning(
+        channel,
+        memberId,
+        toErrorMessage(result.reason, "알 수 없는 후처리 오류"),
+      );
+      bookkeepingErrors.push(warning);
+      console.error(warning);
+    }
+  }
+}
+
 export async function sendPushCampaignDeliveries(params: {
   notificationId: string;
   payload: {
@@ -39,9 +79,9 @@ export async function sendPushCampaignDeliveries(params: {
   resolvedAudience: ResolvedPushAudience;
   subscriptions: StoredSubscription[];
   getWebPush: () => Promise<WebPushModule>;
-}) {
+}): Promise<ChannelDeliveryResult> {
   if (!params.subscriptions.length) {
-    return { targeted: 0, sent: 0, failed: 0, skipped: 0 };
+    return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
   const messageLog = await createPushMessageLog({
@@ -54,6 +94,7 @@ export async function sendPushCampaignDeliveries(params: {
 
   let sent = 0;
   let failed = 0;
+  const bookkeepingErrors: string[] = [];
 
   for (const subscription of params.subscriptions) {
     try {
@@ -69,7 +110,7 @@ export async function sendPushCampaignDeliveries(params: {
         serialized,
       );
       sent += 1;
-      await Promise.all([
+      await runBookkeepingTasks([
         markPushSuccess(subscription.id),
         logPushDelivery({
           messageLogId: messageLog.id,
@@ -84,7 +125,7 @@ export async function sendPushCampaignDeliveries(params: {
           channel: "push",
           status: "sent",
         }),
-      ]);
+      ], "push", subscription.member_id, bookkeepingErrors);
     } catch (error) {
       failed += 1;
       const statusCode =
@@ -93,7 +134,7 @@ export async function sendPushCampaignDeliveries(params: {
           : null;
       const errorMessage =
         error instanceof Error ? error.message : "푸시 알림 전송에 실패했습니다.";
-      await Promise.all([
+      await runBookkeepingTasks([
         markPushFailure(subscription, errorMessage, statusCode === 404 || statusCode === 410),
         logPushDelivery({
           messageLogId: messageLog.id,
@@ -110,7 +151,7 @@ export async function sendPushCampaignDeliveries(params: {
           status: "failed",
           errorMessage,
         }),
-      ]);
+      ], "push", subscription.member_id, bookkeepingErrors);
     }
   }
 
@@ -126,6 +167,7 @@ export async function sendPushCampaignDeliveries(params: {
     sent,
     failed,
     skipped: 0,
+    bookkeepingErrors,
   };
 }
 
@@ -136,26 +178,34 @@ export async function sendMattermostCampaignDeliveries(params: {
   body: string;
   url?: string | null;
   members: AudienceMember[];
-}) {
+}): Promise<ChannelDeliveryResult> {
   if (!params.members.length) {
-    return { targeted: 0, sent: 0, failed: 0, skipped: 0 };
+    return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
   const senderSessionByYear = new Map<number, Promise<{ token: string; user: { id: string } }>>();
   let sent = 0;
   let failed = 0;
+  const bookkeepingErrors: string[] = [];
 
   for (const member of params.members) {
     const candidateYears = getMattermostSenderCandidateYears(member);
     if (candidateYears.length === 0) {
       failed += 1;
-      await notificationRepository.recordNotificationDelivery({
-        notificationId: params.notificationId,
-        memberId: member.id,
-        channel: "mm",
-        status: "failed",
-        errorMessage: "발송 가능한 Mattermost sender 기수를 찾지 못했습니다.",
-      });
+      await runBookkeepingTasks(
+        [
+          notificationRepository.recordNotificationDelivery({
+            notificationId: params.notificationId,
+            memberId: member.id,
+            channel: "mm",
+            status: "failed",
+            errorMessage: "발송 가능한 Mattermost sender 기수를 찾지 못했습니다.",
+          }),
+        ],
+        "mm",
+        member.id,
+        bookkeepingErrors,
+      );
       continue;
     }
 
@@ -167,6 +217,7 @@ export async function sendMattermostCampaignDeliveries(params: {
         continue;
       }
 
+      let sendSucceeded = false;
       try {
         let sessionPromise = senderSessionByYear.get(year);
         if (!sessionPromise) {
@@ -189,36 +240,52 @@ export async function sendMattermostCampaignDeliveries(params: {
             url: params.url,
           }),
         );
-        sent += 1;
-        await notificationRepository.recordNotificationDelivery({
-          notificationId: params.notificationId,
-          memberId: member.id,
-          channel: "mm",
-          status: "sent",
-        });
-        lastError = null;
-        break;
+        sendSucceeded = true;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error("Mattermost 발송 실패");
       }
+
+      if (!sendSucceeded) {
+        continue;
+      }
+
+      sent += 1;
+      await runBookkeepingTasks(
+        [
+          notificationRepository.recordNotificationDelivery({
+            notificationId: params.notificationId,
+            memberId: member.id,
+            channel: "mm",
+            status: "sent",
+          }),
+        ],
+        "mm",
+        member.id,
+        bookkeepingErrors,
+      );
+      lastError = null;
+      break;
     }
 
     if (!lastError) {
       continue;
     }
 
-    try {
-      failed += 1;
-      await notificationRepository.recordNotificationDelivery({
-        notificationId: params.notificationId,
-        memberId: member.id,
-        channel: "mm",
-        status: "failed",
-        errorMessage: lastError.message,
-      });
-    } catch {
-      failed += 1;
-    }
+    failed += 1;
+    await runBookkeepingTasks(
+      [
+        notificationRepository.recordNotificationDelivery({
+          notificationId: params.notificationId,
+          memberId: member.id,
+          channel: "mm",
+          status: "failed",
+          errorMessage: lastError.message,
+        }),
+      ],
+      "mm",
+      member.id,
+      bookkeepingErrors,
+    );
   }
 
   return {
@@ -226,5 +293,6 @@ export async function sendMattermostCampaignDeliveries(params: {
     sent,
     failed,
     skipped: 0,
+    bookkeepingErrors,
   };
 }

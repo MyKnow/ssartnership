@@ -125,6 +125,7 @@ export type AdminNotificationSendResult = {
       skipped: number;
     }
   >;
+  warnings: string[];
 };
 
 export type AdminNotificationOperationLog = {
@@ -207,6 +208,7 @@ type NotificationCampaignMetadata = {
     channels: AdminNotificationChannelPreview[];
   };
   channelResults?: AdminNotificationSendResult["channelResults"];
+  warnings?: string[];
   campaignStatus?: AdminNotificationOperationLog["status"];
   completedAt?: string | null;
 };
@@ -611,6 +613,7 @@ export async function sendAdminNotificationCampaign(
   });
 
   const channelResults: AdminNotificationSendResult["channelResults"] = structuredClone(EMPTY_CHANNEL_RESULTS);
+  const warnings: string[] = [];
   if (context.selectedChannels.includes("in_app")) {
     channelResults.in_app = {
       targeted: context.eligibleMemberIds.in_app.length,
@@ -621,7 +624,7 @@ export async function sendAdminNotificationCampaign(
   }
 
   if (context.selectedChannels.includes("push")) {
-    channelResults.push = await sendPushCampaignDeliveries({
+    const pushResult = await sendPushCampaignDeliveries({
       notificationId: created.notification.id,
       payload: toPushPayload(input),
       source,
@@ -629,11 +632,18 @@ export async function sendAdminNotificationCampaign(
       subscriptions: context.pushSubscriptions,
       getWebPush,
     });
+    channelResults.push = {
+      targeted: pushResult.targeted,
+      sent: pushResult.sent,
+      failed: pushResult.failed,
+      skipped: pushResult.skipped,
+    };
+    warnings.push(...pushResult.bookkeepingErrors);
     channelResults.push.skipped = context.members.length - context.eligibleMemberIds.push.length;
   }
 
   if (context.selectedChannels.includes("mm")) {
-    channelResults.mm = await sendMattermostCampaignDeliveries({
+    const mmResult = await sendMattermostCampaignDeliveries({
       notificationId: created.notification.id,
       notificationType: input.notificationType,
       title: input.title,
@@ -641,21 +651,41 @@ export async function sendAdminNotificationCampaign(
       url: input.url?.trim() ? normalizeNotificationTargetUrl(input.url) : null,
       members: context.members.filter((member) => context.eligibleMemberIds.mm.includes(member.id)),
     });
+    channelResults.mm = {
+      targeted: mmResult.targeted,
+      sent: mmResult.sent,
+      failed: mmResult.failed,
+      skipped: mmResult.skipped,
+    };
+    warnings.push(...mmResult.bookkeepingErrors);
     channelResults.mm.skipped = context.members.length - context.eligibleMemberIds.mm.length;
   }
 
   const completedMetadata = {
     ...metadata,
+    warnings,
     channelResults,
     campaignStatus: computeOperationStatus(channelResults),
     completedAt: new Date().toISOString(),
   } satisfies NotificationCampaignMetadata;
-  await notificationRepository.updateNotificationMetadata(created.notification.id, completedMetadata);
+  try {
+    await notificationRepository.updateNotificationMetadata(
+      created.notification.id,
+      completedMetadata,
+    );
+  } catch (error) {
+    const warning = `[admin-notification-ops] final metadata update failed for notification ${
+      created.notification.id
+    }: ${error instanceof Error ? error.message : "알 수 없는 후처리 오류"}`;
+    warnings.push(warning);
+    console.error(warning);
+  }
 
   return {
     notificationId: created.notification.id,
     preview: context.preview,
     channelResults,
+    warnings,
   };
 }
 
