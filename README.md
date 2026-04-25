@@ -195,7 +195,7 @@ npm run ci:local
 
 - 스키마 변경은 항상 `supabase/migrations`에 먼저 기록합니다.
 - `main`으로 merge하기 전에 migration이 누락되지 않았는지 확인합니다.
-- `main`을 제외한 브랜치 push 시 GitHub Actions가 production 데이터를 preview로 미러링한 뒤 migration을 적용합니다.
+- `dev` 브랜치 push 시 GitHub Actions가 production 데이터를 preview로 미러링한 뒤 migration을 적용합니다.
 - Lighthouse 성능 체크는 release 스크립트에서만 실행합니다.
 - 이 워크플로를 위해 GitHub Secrets에 다음 값을 넣습니다.
   - `SUPABASE_PRODUCTION_DB_URL`

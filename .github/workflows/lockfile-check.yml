@@ -23,7 +23,7 @@ jobs:
         run: |
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           git diff --exit-code -- package-lock.json || {
-            echo "::error::package-lock.json is not canonical for Linux/amd64. Run 'npm run check:lockfile:linux' and commit the updated package-lock.json."
+            echo "::error::package-lock.json is not canonical for Linux/amd64. Run 'npm run check:lockfile' and commit the updated package-lock.json."
             exit 1
           }
 
