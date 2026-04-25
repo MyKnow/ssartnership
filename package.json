@@ -1,10 +1,12 @@
 {
   "name": "ssartnership",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "next dev --webpack",
+    "check:lockfile": "node scripts/check-lockfile-sync.mjs",
+    "prebuild": "npm run check:lockfile",
     "build": "next build",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",

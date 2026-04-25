@@ -1,0 +1,37 @@
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import PartnerImageCarousel from "./PartnerImageCarousel";
+
+const demoImageA = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720">
+    <rect width="960" height="720" fill="#dbeafe"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#1d4ed8" font-size="56" font-family="sans-serif">Image A</text>
+  </svg>`,
+)}`;
+
+const demoImageB = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720">
+    <rect width="960" height="720" fill="#e0f2fe"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#0f766e" font-size="56" font-family="sans-serif">Image B</text>
+  </svg>`,
+)}`;
+
+const meta = {
+  title: "Domains/PartnerImageCarousel",
+  component: PartnerImageCarousel,
+  args: {
+    name: "역삼 캠퍼스 샐러드 바",
+    images: [],
+  },
+} satisfies Meta<typeof PartnerImageCarousel>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const Empty: Story = {};
+
+export const WithImages: Story = {
+  args: {
+    images: [demoImageA, demoImageB, demoImageA],
+  },
+};

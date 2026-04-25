@@ -49,13 +49,52 @@ npm run test-storybook:watch
 - [src/components/ui/Button.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Button.stories.tsx)
 - [src/components/ui/Badge.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Badge.stories.tsx)
 - [src/components/ui/Card.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Card.stories.tsx)
+- [src/components/ui/Modal.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Modal.stories.tsx)
 - [src/components/ui/Input.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Input.stories.tsx)
+- [src/components/ui/Textarea.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Textarea.stories.tsx)
+- [src/components/ui/PasswordInput.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/PasswordInput.stories.tsx)
 - [src/components/ui/Select.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Select.stories.tsx)
 - [src/components/ui/Tabs.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Tabs.stories.tsx)
+- [src/components/ui/EmptyState.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/EmptyState.stories.tsx)
+- [src/components/ui/SubmitButton.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/SubmitButton.stories.tsx)
 
-### Domains
+### Public / Domain
 
+- [src/components/HeroSection.stories.tsx](/Users/myknow/coding/ssartnership/src/components/HeroSection.stories.tsx)
+- [src/components/SiteHeader.stories.tsx](/Users/myknow/coding/ssartnership/src/components/SiteHeader.stories.tsx)
+- [src/components/PartnerCardView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/PartnerCardView.stories.tsx)
+- [src/components/PartnerImageCarousel.stories.tsx](/Users/myknow/coding/ssartnership/src/components/PartnerImageCarousel.stories.tsx)
 - [src/components/partner-reviews/PartnerReviewCard.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewCard.stories.tsx)
+- [src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx)
+- [src/components/partner-reviews/PartnerReviewForm.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewForm.stories.tsx)
+- [src/components/partner-favorites/PartnerFavoriteButton.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-favorites/PartnerFavoriteButton.stories.tsx)
+
+### Auth
+
+- [src/components/auth/LoginForm.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/LoginForm.stories.tsx)
+- [src/components/auth/SignupForm.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/SignupForm.stories.tsx)
+- [src/components/auth/ResetPasswordForm.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/ResetPasswordForm.stories.tsx)
+- [src/components/auth/signup-form/SignupActions.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/signup-form/SignupActions.stories.tsx)
+- [src/components/auth/signup-form/SignupVerificationField.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/signup-form/SignupVerificationField.stories.tsx)
+- [src/components/auth/signup-form/SignupPoliciesSection.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/signup-form/SignupPoliciesSection.stories.tsx)
+- [src/components/auth/signup-form/SignupPasswordFields.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/signup-form/SignupPasswordFields.stories.tsx)
+
+### Admin
+
+- [src/components/admin/AdminLogoutButton.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminLogoutButton.stories.tsx)
+- [src/components/admin/AdminMobileNav.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminMobileNav.stories.tsx)
+- [src/components/admin/AdminShell.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShell.stories.tsx)
+- [src/components/admin/AdminPartnerManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPartnerManager.stories.tsx)
+- [src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx)
+- [src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx)
+- [src/components/admin/AdminReviewManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminReviewManager.stories.tsx)
+- [src/components/admin/review-manager/AdminReviewFilters.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewFilters.stories.tsx)
+- [src/components/admin/review-manager/AdminReviewCardView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewCardView.stories.tsx)
+- [src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx)
+- [src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx)
+- [src/components/admin/logs/AdminLogsExplorer.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/logs/AdminLogsExplorer.stories.tsx)
+- [src/components/admin/AdminPushManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPushManager.stories.tsx)
+- [src/components/admin/AdminLogsManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminLogsManager.stories.tsx)
 
 ## 검증 현황
 
@@ -67,23 +106,30 @@ npm run test-storybook:watch
 
 ### 현재 자동 테스트 결과
 
-- `8` files passed
-- `19` tests passed
-- `1` story skipped
+- `41` files passed
+- `99` tests passed
+- skipped 없음
 
-## known limitation
+## 현재 상태
 
-`next/image`가 포함된 일부 스토리는 현재 Vitest browser mode에서 충돌할 수 있습니다.
+`next/image`가 포함된 스토리도 현재 Vitest browser mode에서 자동 검증됩니다.
 
 현재 대응:
 
-- [src/components/partner-reviews/PartnerReviewCard.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewCard.stories.tsx)의 `WithImages` 스토리에 `manual-image` 태그 적용
-- [vitest.config.ts](/Users/myknow/coding/ssartnership/vitest.config.ts)에서 `manual-image` 태그는 Storybook Vitest 자동 실행 시 skip
+- [.storybook/vitest.setup.tsx](/Users/myknow/coding/ssartnership/.storybook/vitest.setup.tsx)에서 `next/image`를 Storybook Vitest용 `img` mock으로 대체
+- 이미지 포함 스토리도 `npm run test-storybook`에 포함
+- `manual-image`, `manual-server` 태그는 더 이상 사용하지 않음
 
 즉:
 
-- 일반 스토리 smoke test는 자동 검증
-- 이미지 포함 스토리는 Storybook UI에서 수동 확인
+- 일반 스토리와 이미지 포함 스토리 모두 자동 smoke test로 검증
+- 수동 확인은 시각 품질 점검이 필요할 때만 추가로 수행
+
+서버 액션 결합 문제는 해결했습니다.
+
+- [src/components/admin/AdminShell.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShell.tsx)는 [AdminShellView.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShellView.tsx) wrapper 구조로 분리
+- [src/components/admin/AdminReviewManager.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminReviewManager.tsx)는 [AdminReviewManagerView.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminReviewManagerView.tsx), [AdminReviewCardView.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewCardView.tsx) 구조로 분리
+- 따라서 `manual-server` 태그는 더 이상 사용하지 않음
 
 ## 운영 기준
 
@@ -96,49 +142,15 @@ npm run test-storybook:watch
 
 ### 테스트 태그 사용
 
-- 기본 자동 검증 대상: 일반 스토리
-- 수동 확인 전용 스토리: `tags: ["manual-image"]`
+- 기본 자동 검증 대상: 전체 스토리
+- 예외 태그는 현재 없음
 
-## 우선순위 높은 미포함 컴포넌트
+## 현재 미포함 컴포넌트 방향
 
-### 1차
-
-- [src/components/ui/Modal.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Modal.tsx)
-- [src/components/ui/Textarea.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Textarea.tsx)
-- [src/components/ui/PasswordInput.tsx](/Users/myknow/coding/ssartnership/src/components/ui/PasswordInput.tsx)
-- [src/components/ui/EmptyState.tsx](/Users/myknow/coding/ssartnership/src/components/ui/EmptyState.tsx)
-- [src/components/ui/SubmitButton.tsx](/Users/myknow/coding/ssartnership/src/components/ui/SubmitButton.tsx)
-
-### 2차
-
-- [src/components/HeroSection.tsx](/Users/myknow/coding/ssartnership/src/components/HeroSection.tsx)
-- [src/components/SiteHeader.tsx](/Users/myknow/coding/ssartnership/src/components/SiteHeader.tsx)
-- [src/components/PartnerCardView.tsx](/Users/myknow/coding/ssartnership/src/components/PartnerCardView.tsx)
-- [src/components/PartnerImageCarousel.tsx](/Users/myknow/coding/ssartnership/src/components/PartnerImageCarousel.tsx)
-
-### 3차
-
-- [src/components/partner-reviews/PartnerReviewSummaryCard.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewSummaryCard.tsx)
-- [src/components/partner-reviews/PartnerReviewForm.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewForm.tsx)
-- [src/components/partner-favorites/PartnerFavoriteButton.tsx](/Users/myknow/coding/ssartnership/src/components/partner-favorites/PartnerFavoriteButton.tsx)
-
-### 4차
-
-- [src/components/auth/LoginForm.tsx](/Users/myknow/coding/ssartnership/src/components/auth/LoginForm.tsx)
-- [src/components/auth/SignupForm.tsx](/Users/myknow/coding/ssartnership/src/components/auth/SignupForm.tsx)
-- [src/components/auth/ResetPasswordForm.tsx](/Users/myknow/coding/ssartnership/src/components/auth/ResetPasswordForm.tsx)
-
-### 5차
-
-- [src/components/admin/AdminShell.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShell.tsx)
-- [src/components/admin/AdminPartnerManager.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPartnerManager.tsx)
-- [src/components/admin/AdminReviewManager.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminReviewManager.tsx)
-- [src/components/admin/AdminPushManager.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPushManager.tsx)
-- [src/components/admin/AdminLogsManager.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminLogsManager.tsx)
+현재 `storybook.md`에 우선순위로 적어두었던 1차~5차 대상은 모두 스토리 추가가 끝났습니다.
 
 ## 다음 권장 작업
 
-1. 1차 UI primitive 스토리 추가
-2. 공개 페이지 핵심 표면 스토리 추가
-3. 관리자 화면은 전체 manager보다 하위 카드/필터/리스트 단위부터 분해해서 스토리 작성
-4. `next/image` 충돌은 별도 mock 전략 또는 Storybook/Vitest 조합 업스트림 변경 확인 후 재정리
+1. 인증/관리자 화면을 `form section`, `row`, `dialog`, `empty/loading/error` 단위로 계속 확장
+2. 추가된 하위 스토리에 `play` 기반 interaction test를 더 넓게 적용
+3. 필요 시 visual regression 기준을 별도 도입

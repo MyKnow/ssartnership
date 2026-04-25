@@ -42,6 +42,9 @@ const preview: Preview = {
     },
     nextjs: {
       appDirectory: true,
+      image: {
+        unoptimized: true,
+      },
     },
     backgrounds: {
       disable: true,

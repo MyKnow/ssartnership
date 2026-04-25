@@ -10,6 +10,16 @@ const dirname =
     : path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  optimizeDeps: {
+    include: [
+      "@supabase/supabase-js",
+      "storybook/test",
+      "next/cache",
+      "next/headers",
+      "nodemailer",
+      "web-push",
+    ],
+  },
   test: {
     projects: [
       {
@@ -17,13 +27,11 @@ export default defineConfig({
         plugins: [
           storybookTest({
             configDir: path.join(dirname, ".storybook"),
-            tags: {
-              skip: ["manual-image"],
-            },
           }),
         ],
         test: {
           name: "storybook",
+          setupFiles: [path.join(dirname, ".storybook", "vitest.setup.tsx")],
           browser: {
             enabled: true,
             headless: true,

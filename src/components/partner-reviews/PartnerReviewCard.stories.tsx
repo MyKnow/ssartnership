@@ -80,7 +80,6 @@ export const HiddenForAdmin: Story = {
 };
 
 export const WithImages: Story = {
-  tags: ["manual-image"],
   args: {
     review: {
       ...baseReview,
