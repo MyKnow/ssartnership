@@ -384,9 +384,37 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 npm run dev
 npm run lint
 npm run build
+npm run storybook
+npm run build-storybook
+npm run test-storybook
 npm run start
 npm run test:mm-profile
 npm run release -- patch
+```
+
+### Storybook
+
+공용 UI primitives와 실제 도메인 컴포넌트를 함께 검증할 수 있도록 Storybook을 구성했습니다.
+
+```bash
+npm run storybook
+```
+
+- 기본 포트는 `6006`
+- light/dark toolbar 지원
+- Tailwind v4 글로벌 스타일과 App Router 문맥을 함께 로드
+- 현재 포함 스토리: `Button`, `Badge`, `Card`, `Input`, `Select`, `Tabs`, `PartnerReviewCard`
+
+정적 산출물이 필요하면 아래를 사용합니다.
+
+```bash
+npm run build-storybook
+```
+
+스토리 기반 컴포넌트 테스트는 아래로 실행합니다.
+
+```bash
+npm run test-storybook
 ```
 
 ### release 스크립트
