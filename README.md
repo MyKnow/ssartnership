@@ -131,6 +131,20 @@ npm run dev
 http://localhost:3000
 ```
 
+## CI 사전 점검
+
+GitHub Actions와 동일한 Linux/amd64 lockfile 해석 차이로 `npm ci`가 깨질 수 있습니다. 특히 macOS에서 의존성을 갱신했으면 아래 순서로 먼저 확인합니다.
+
+```bash
+npm run check:lockfile
+npm run ci:local
+```
+
+- `check:lockfile`: Docker 기반 Linux/amd64 기준 lockfile canonical 여부 확인
+- `ci:local`: `npm ci`, lint, build, Storybook test까지 한 번에 검증
+
+`check:lockfile`은 Docker Desktop이 실행 중이어야 합니다.
+
 ## 환경 변수
 
 `.env.example`를 기준으로 `.env`를 구성합니다.
