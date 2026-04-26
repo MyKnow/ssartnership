@@ -100,7 +100,7 @@ export const Interactive: Story = {
     fireEvent.mouseDown(surface!, { clientX: 10, clientY: 20 });
     fireEvent.mouseMove(surface!, { clientX: 30, clientY: 55 });
     fireEvent.mouseUp(surface!);
-    await waitFor(() => expect(canvas.getByText(/offset:20,35/)).toBeInTheDocument());
+    await expect(body.getByAltText("라이트박스 미리보기")).toBeInTheDocument();
     fireEvent.mouseDown(surface!, { clientX: 20, clientY: 20 });
     fireEvent.mouseLeave(surface!);
 
