@@ -7,7 +7,20 @@ import {
   preloadCachedImageUrls,
 } from "./image-cache";
 
-async function buildImageCacheSummary() {
+type ImageCacheSummary = {
+  proxied: string;
+  local: string;
+  storage: string;
+  data: string;
+  alreadyPrefixed: string;
+  empty: string;
+  cachedRemoteBefore: boolean;
+  cachedRemoteAfter: boolean;
+  sharedPending: boolean;
+  listStatuses: string;
+};
+
+async function buildImageCacheSummary(): Promise<ImageCacheSummary> {
   const OriginalImage = window.Image;
   class SuccessfulImage {
     decoding = "auto";
@@ -62,11 +75,7 @@ async function buildImageCacheSummary() {
   }
 }
 
-function ImageCachePreview({
-  summary,
-}: {
-  summary: Awaited<ReturnType<typeof buildImageCacheSummary>>;
-}) {
+function ImageCachePreview({ summary }: { summary: ImageCacheSummary }) {
   return (
     <div className="space-y-2 text-sm text-foreground">
       <div>proxied:{summary.proxied}</div>
@@ -93,6 +102,20 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Summary: Story = {
+  args: {
+    summary: {
+      proxied: "",
+      local: "",
+      storage: "",
+      data: "",
+      alreadyPrefixed: "",
+      empty: "",
+      cachedRemoteBefore: false,
+      cachedRemoteAfter: false,
+      sharedPending: false,
+      listStatuses: "",
+    },
+  },
   loaders: [async () => ({ summary: await buildImageCacheSummary() })],
   render: (_, context) => <ImageCachePreview summary={context.loaded.summary} />,
   play: async ({ canvasElement }) => {

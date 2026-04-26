@@ -7,7 +7,18 @@ import {
   storePasswordCredential,
 } from "./browser-password";
 
-async function buildBrowserPasswordSummary() {
+type BrowserPasswordSummary = {
+  clipboardCalls: string[];
+  storedCredentials: Credential[];
+  credentialInit: { id: string; password: string; name?: string } | null;
+  generated: string;
+  validGood: boolean;
+  validShort: boolean;
+  validNoSymbol: boolean;
+  unavailableError: string;
+};
+
+async function buildBrowserPasswordSummary(): Promise<BrowserPasswordSummary> {
   const originalNavigator = globalThis.navigator;
   const originalCrypto = globalThis.crypto;
   const clipboardCalls: string[] = [];
@@ -98,7 +109,7 @@ async function buildBrowserPasswordSummary() {
   }
 }
 
-function BrowserPasswordPreview({ summary }: { summary: Awaited<ReturnType<typeof buildBrowserPasswordSummary>> }) {
+function BrowserPasswordPreview({ summary }: { summary: BrowserPasswordSummary }) {
   return (
     <div className="space-y-2 text-sm text-foreground">
       <div>clipboard:{summary.clipboardCalls.join(",")}</div>
@@ -126,6 +137,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Summary: Story = {
+  args: {
+    summary: {
+      clipboardCalls: [],
+      storedCredentials: [],
+      credentialInit: null,
+      generated: "",
+      validGood: false,
+      validShort: false,
+      validNoSymbol: false,
+      unavailableError: "",
+    },
+  },
   loaders: [async () => ({ summary: await buildBrowserPasswordSummary() })],
   render: (_, context) => <BrowserPasswordPreview summary={context.loaded.summary} />,
   play: async ({ canvasElement }) => {

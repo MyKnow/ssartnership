@@ -44,9 +44,9 @@ function PartnerReviewHelpersPreview() {
       <div>formatted-invalid:{formatPartnerReviewDate("not-a-date")}</div>
       <div>rating-label:{getPartnerReviewRatingLabel("5")}</div>
       <div>rating-options:{getPartnerReviewRatingOptions().length}</div>
-      <div>form-rating:{formData.get("rating")}</div>
-      <div>form-title:{formData.get("title")}</div>
-      <div>form-body:{formData.get("body")}</div>
+      <div>form-rating:{String(formData.get("rating"))}</div>
+      <div>form-title:{String(formData.get("title"))}</div>
+      <div>form-body:{String(formData.get("body"))}</div>
       <div>form-manifest:{String(formData.get("imagesManifest"))}</div>
       <div>form-file-count:{formData.getAll("imageFiles").length}</div>
       <div>form-file-name:{(formData.getAll("imageFiles")[0] as File)?.name ?? "none"}</div>

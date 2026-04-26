@@ -157,7 +157,7 @@ const logsData: AdminLogsPageData = {
       id: "security-3",
       event_name: "signup_verify",
       status: "blocked",
-      actor_type: null,
+      actor_type: "guest",
       actor_id: null,
       actor_name: null,
       actor_mm_username: null,
