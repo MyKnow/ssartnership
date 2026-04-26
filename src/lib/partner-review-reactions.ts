@@ -21,18 +21,18 @@ export function aggregatePartnerReviewReactionStates(
   }
 
   for (const row of rows) {
-    const state = states.get(row.review_id) ?? createEmptyPartnerReviewReactionState();
-    if (row.reaction === "recommend") {
-      state.recommendCount += 1;
-    } else {
-      state.disrecommendCount += 1;
+    const state = states.get(row.review_id);
+    if (!state) {
+      continue;
     }
-    if (currentUserId && row.member_id === currentUserId) {
-      state.myReaction = row.reaction;
-    }
-    states.set(row.review_id, state);
+    states.set(row.review_id, {
+      recommendCount: state.recommendCount + (row.reaction === "recommend" ? 1 : 0),
+      disrecommendCount: state.disrecommendCount + (row.reaction === "disrecommend" ? 1 : 0),
+      myReaction: currentUserId && row.member_id === currentUserId
+        ? row.reaction
+        : state.myReaction,
+    });
   }
 
   return states;
 }
-

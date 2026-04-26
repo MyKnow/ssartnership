@@ -10,6 +10,11 @@ const dirname =
     : path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.join(dirname, "src"),
+    },
+  },
   optimizeDeps: {
     include: [
       "@supabase/supabase-js",
@@ -22,6 +27,14 @@ export default defineConfig({
   },
   test: {
     projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          environment: "node",
+          include: [path.join(dirname, "tests", "unit", "**", "*.test.ts")],
+        },
+      },
       {
         extends: true,
         plugins: [

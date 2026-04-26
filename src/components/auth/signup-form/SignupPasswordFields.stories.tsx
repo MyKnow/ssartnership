@@ -69,9 +69,15 @@ export const Default: Story = {
   args: {},
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByPlaceholderText("영문/숫자/특수문자 포함 8자 이상"), "Valid!123");
+    await userEvent.type(canvas.getByPlaceholderText("다시 입력해 주세요"), "Valid!123");
+    await expect(canvas.getByPlaceholderText("영문/숫자/특수문자 포함 8자 이상")).toHaveValue("Valid!123");
+    await expect(canvas.getByPlaceholderText("다시 입력해 주세요")).toHaveValue("Valid!123");
     await userEvent.click(canvas.getByText("랜덤 생성"));
     await expect(canvas.getByPlaceholderText("영문/숫자/특수문자 포함 8자 이상")).toHaveValue("Demo!2345");
     await expect(canvas.getByPlaceholderText("다시 입력해 주세요")).toHaveValue("Demo!2345");
+    await userEvent.click(canvas.getAllByRole("button", { name: "비밀번호 보기" })[0]);
+    await expect(canvas.getByRole("button", { name: "비밀번호 숨기기" })).toBeInTheDocument();
   },
 };
 
@@ -79,5 +85,19 @@ export const WithErrors: Story = {
   args: {
     passwordError: "비밀번호 정책을 만족하지 않습니다.",
     passwordConfirmError: "비밀번호가 일치하지 않습니다.",
+  },
+};
+
+export const Pending: Story = {
+  args: {
+    pending: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const generateButton = canvas.getByText("랜덤 생성").closest("button");
+    await expect(generateButton).not.toBeNull();
+    await expect(generateButton!).toBeDisabled();
+    await expect(canvas.getByPlaceholderText("영문/숫자/특수문자 포함 8자 이상")).toBeDisabled();
+    await expect(canvas.getByPlaceholderText("다시 입력해 주세요")).toBeDisabled();
   },
 };

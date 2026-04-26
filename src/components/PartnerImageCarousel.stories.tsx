@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import PartnerImageCarousel from "./PartnerImageCarousel";
 
 const demoImageA = `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -33,5 +34,27 @@ export const Empty: Story = {};
 export const WithImages: Story = {
   args: {
     images: [demoImageA, demoImageB, demoImageA],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await userEvent.click(await canvas.findByRole("button", { name: "이미지 2" }));
+    await userEvent.click(
+      await canvas.findByRole("button", {
+        name: "역삼 캠퍼스 샐러드 바 이미지 크게 보기",
+      }),
+    );
+
+    await expect(await body.findByRole("button", { name: "닫기" })).toBeInTheDocument();
+    await userEvent.click(body.getByRole("button", { name: "다음 사진" }));
+    await userEvent.click(body.getByRole("button", { name: "이전 사진" }));
+
+    await waitFor(() => {
+      expect(body.getAllByAltText("역삼 캠퍼스 샐러드 바").length).toBeGreaterThan(1);
+    });
+    await userEvent.dblClick(body.getAllByAltText("역삼 캠퍼스 샐러드 바")[1]!);
+    await userEvent.click(body.getByRole("button", { name: "닫기" }));
+    await expect(body.queryByRole("button", { name: "닫기" })).not.toBeInTheDocument();
   },
 };

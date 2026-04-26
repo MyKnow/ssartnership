@@ -27,6 +27,7 @@ function PreviewTheme({
 }
 
 const preview: Preview = {
+  tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
     controls: {
@@ -47,7 +48,7 @@ const preview: Preview = {
       },
     },
     backgrounds: {
-      disable: true,
+      disabled: true,
     },
   },
   globalTypes: {

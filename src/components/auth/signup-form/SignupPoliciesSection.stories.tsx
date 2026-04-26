@@ -120,11 +120,13 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const [serviceCheckbox, privacyCheckbox] = canvas.getAllByRole("checkbox");
+    const [serviceCheckbox, privacyCheckbox, marketingCheckbox] = canvas.getAllByRole("checkbox");
     await userEvent.click(serviceCheckbox);
     await userEvent.click(privacyCheckbox!);
+    await userEvent.click(marketingCheckbox!);
     await expect(serviceCheckbox).toBeChecked();
     await expect(privacyCheckbox!).toBeChecked();
+    await expect(marketingCheckbox!).toBeChecked();
   },
 };
 
@@ -137,5 +139,17 @@ export const WithValidationError: Story = {
 export const WithoutMarketingPolicy: Story = {
   args: {
     marketingPolicy: null,
+  },
+};
+
+export const Pending: Story = {
+  args: {
+    pending: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const checkbox of canvas.getAllByRole("checkbox")) {
+      await expect(checkbox).toBeDisabled();
+    }
   },
 };

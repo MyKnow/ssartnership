@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, fn, userEvent, within } from "storybook/test";
 import type { PartnerReview } from "@/lib/partner-reviews";
 import PartnerReviewCard from "./PartnerReviewCard";
 
@@ -43,9 +44,9 @@ const meta = {
   component: PartnerReviewCard,
   args: {
     review: baseReview,
-    onEdit: () => {},
-    onDelete: () => {},
-    onReact: () => {},
+    onEdit: fn(),
+    onDelete: fn(),
+    onReact: fn(),
     showOwnerActions: false,
   },
 } satisfies Meta<typeof PartnerReviewCard>;
@@ -63,6 +64,13 @@ export const Recommended: Story = {
       myReaction: "recommend",
     },
   },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "추천" }));
+    await userEvent.click(canvas.getByRole("button", { name: "비추천" }));
+    await expect(args.onReact).toHaveBeenCalledWith("recommend");
+    await expect(args.onReact).toHaveBeenCalledWith("disrecommend");
+  },
 };
 
 export const HiddenForAdmin: Story = {
@@ -74,8 +82,13 @@ export const HiddenForAdmin: Story = {
     },
     showHiddenContent: true,
     showModerationActions: true,
-    onHide: () => {},
-    onRestore: () => {},
+    onHide: fn(),
+    onRestore: fn(),
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "공개" }));
+    await expect(args.onRestore).toHaveBeenCalled();
   },
 };
 
@@ -85,5 +98,30 @@ export const WithImages: Story = {
       ...baseReview,
       images: [demoImage, demoImage],
     },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "리뷰 사진 1 크게 보기" }));
+    await expect(await within(document.body).findByRole("button", { name: "닫기" })).toBeInTheDocument();
+    await userEvent.click(within(document.body).getByRole("button", { name: "다음 사진" }));
+    await userEvent.click(within(document.body).getByRole("button", { name: "닫기" }));
+    await expect(within(document.body).queryByRole("button", { name: "닫기" })).not.toBeInTheDocument();
+  },
+};
+
+export const MineWithOwnerActions: Story = {
+  args: {
+    review: {
+      ...baseReview,
+      isMine: true,
+    },
+    showOwnerActions: true,
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "수정" }));
+    await userEvent.click(canvas.getByRole("button", { name: "삭제" }));
+    await expect(args.onEdit).toHaveBeenCalled();
+    await expect(args.onDelete).toHaveBeenCalled();
   },
 };

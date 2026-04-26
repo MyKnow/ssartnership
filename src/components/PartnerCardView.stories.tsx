@@ -1,6 +1,7 @@
 "use client";
 
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, fn, userEvent, within } from "storybook/test";
 import PartnerCardView from "./PartnerCardView";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { Partner } from "@/lib/types";
@@ -64,7 +65,7 @@ const meta = {
       reviewCount: 18,
       detailViews: 420,
     },
-    onCategoryClick: () => {},
+    onCategoryClick: fn(),
   },
 } satisfies Meta<typeof PartnerCardViewStory>;
 
@@ -73,6 +74,55 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const PublicCard: Story = {};
+
+export const InteractivePublicCard: Story = {
+  play: async ({ canvasElement, args }) => {
+    window.fetch = async () => Response.json({ ok: true });
+    const canvas = within(canvasElement);
+
+    const detailLinks = canvas.getAllByRole("link", { name: "역삼 캠퍼스 샐러드 바 상세 보기" });
+    await expect(detailLinks[detailLinks.length - 1]!).toHaveAttribute(
+      "href",
+      "/partners/partner-1",
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "식음료 필터 적용" }));
+    await expect(args.onCategoryClick).toHaveBeenCalledWith("food");
+
+    await expect(canvas.getByRole("link", { name: "지도 보기" })).toHaveAttribute(
+      "href",
+      "https://maps.example.com/partner-1",
+    );
+    await expect(canvas.getByRole("link", { name: "예약하기" })).toHaveAttribute(
+      "href",
+      "https://booking.example.com/partner-1",
+    );
+    await expect(canvas.getByRole("link", { name: "문의하기" })).toHaveAttribute(
+      "href",
+      "https://pf.kakao.com/example",
+    );
+    const titleLink = detailLinks[detailLinks.length - 1]!;
+    const mapLink = canvas.getByRole("link", { name: "지도 보기" });
+    const reservationLink = canvas.getByRole("link", { name: "예약하기" });
+    const inquiryLink = canvas.getByRole("link", { name: "문의하기" });
+    [titleLink, mapLink, reservationLink, inquiryLink].forEach((link) => {
+      link.addEventListener("click", (event) => event.preventDefault(), {
+        once: true,
+      });
+    });
+    await userEvent.click(titleLink);
+    await userEvent.click(mapLink);
+    await userEvent.click(reservationLink);
+    await userEvent.click(inquiryLink);
+
+    const card = canvas.getAllByRole("link", {
+      name: "역삼 캠퍼스 샐러드 바 상세 보기",
+    })[0]!;
+    await userEvent.click(card);
+    card.focus();
+    await userEvent.keyboard("{Enter}");
+    await userEvent.keyboard(" ");
+  },
+};
 
 export const LockedCard: Story = {
   args: {
@@ -89,6 +139,16 @@ export const Favoritable: Story = {
     currentUserId: "member-1",
     isFavorited: true,
   },
+  play: async ({ canvasElement }) => {
+    window.fetch = async () =>
+      Response.json({
+        favorite: false,
+        count: 127,
+      });
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "즐겨찾기 해제" }));
+    await expect(await canvas.findByRole("button", { name: "즐겨찾기" })).toBeInTheDocument();
+  },
 };
 
 export const WithThumbnail: Story = {
@@ -98,5 +158,51 @@ export const WithThumbnail: Story = {
       thumbnail: demoImage,
       images: [demoImage],
     },
+  },
+};
+
+export const InactivePeriod: Story = {
+  args: {
+    partner: {
+      ...basePartner,
+      period: {
+        start: "2025-01-01",
+        end: "2025-12-31",
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다."),
+    ).toBeInTheDocument();
+    await expect(canvas.queryByRole("link", { name: "예약하기" })).not.toBeInTheDocument();
+  },
+};
+
+export const ConfidentialGuestCard: Story = {
+  args: {
+    partner: {
+      ...basePartner,
+      visibility: "confidential",
+    },
+    viewerAuthenticated: false,
+  },
+};
+
+export const WithoutDetailHref: Story = {
+  args: {
+    partner: {
+      ...basePartner,
+      id: "",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const card = canvas.getByTestId("partner-card");
+    await userEvent.click(card);
+    card.focus();
+    await userEvent.keyboard("{Enter}");
+    await expect(card).not.toHaveAttribute("role", "link");
   },
 };
