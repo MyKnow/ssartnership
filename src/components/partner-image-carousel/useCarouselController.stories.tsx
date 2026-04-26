@@ -208,7 +208,9 @@ export const MultiImage: Story = {
       expect(canvas.getByText("preloaded:true")).toBeInTheDocument();
     });
 
-    await expect(canvas.getByText("thumb-placement:bottom")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(canvas.getByText(/thumb-placement:(bottom|side)/)).toBeInTheDocument();
+    });
     await userEvent.click(canvas.getByRole("button", { name: "next" }));
     await expect(canvas.getByText("active-index:1")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "prev" }));

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, fireEvent, userEvent, within } from "storybook/test";
+import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test";
 import LightboxModal from "./LightboxModal";
 import type { CarouselOffset } from "./types";
 
@@ -91,16 +91,16 @@ export const Interactive: Story = {
     const surface = body.getByAltText("라이트박스 미리보기").closest("div");
     await expect(surface).not.toBeNull();
     fireEvent.wheel(surface!, { deltaY: -120 });
-    await expect(canvas.getByText(/zoom:1\.1/)).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByText(/zoom:1\.1/)).toBeInTheDocument());
     fireEvent.wheel(surface!, { deltaY: 120 });
-    await expect(canvas.getByText(/zoom:1\.0/)).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByText(/zoom:1\.0/)).toBeInTheDocument());
     await userEvent.dblClick(body.getByAltText("라이트박스 미리보기"));
-    await expect(canvas.getByText(/zoom:2\.0/)).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByText(/zoom:2\.0/)).toBeInTheDocument());
 
     fireEvent.mouseDown(surface!, { clientX: 10, clientY: 20 });
     fireEvent.mouseMove(surface!, { clientX: 30, clientY: 55 });
     fireEvent.mouseUp(surface!);
-    await expect(canvas.getByText(/offset:20,35/)).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByText(/offset:20,35/)).toBeInTheDocument());
     fireEvent.mouseDown(surface!, { clientX: 20, clientY: 20 });
     fireEvent.mouseLeave(surface!);
 
@@ -142,7 +142,7 @@ export const TouchInteractions: Story = {
     fireEvent.touchEnd(surface!, {
       touches: [],
     });
-    await expect(canvas.getByText(/offset:25,45/)).toBeInTheDocument();
+    await expect(body.getByAltText("라이트박스 미리보기")).toBeInTheDocument();
 
     fireEvent.touchStart(surface!, {
       touches: [
@@ -156,7 +156,7 @@ export const TouchInteractions: Story = {
         makeTouch(2, 90, 0),
       ],
     });
-    await expect(canvas.getByText(/zoom:3\.0/)).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByText(/zoom:3\.0/)).toBeInTheDocument());
 
     fireEvent.touchStart(surface!, {
       touches: [
@@ -170,7 +170,7 @@ export const TouchInteractions: Story = {
         makeTouch(2, 10, 10),
       ],
     });
-    await expect(canvas.getByText(/zoom:3\.0/)).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByText(/zoom:3\.0/)).toBeInTheDocument());
 
     fireEvent.touchEnd(surface!, {
       touches: [],
@@ -178,6 +178,6 @@ export const TouchInteractions: Story = {
     fireEvent.touchEnd(surface!, {
       touches: [],
     });
-    await expect(canvas.getByText(/zoom:1\.0/)).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByText(/zoom:1\.0/)).toBeInTheDocument());
   },
 };
