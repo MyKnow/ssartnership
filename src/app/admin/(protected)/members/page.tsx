@@ -206,7 +206,7 @@ export default async function AdminMembersPage({
   let memberQuery = supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,created_at,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,avatar_base64,created_at,updated_at",
       { count: "exact" },
     );
 

@@ -1,5 +1,6 @@
 export {
   MmMemberSyncError,
+  getMemberSyncCandidateYears,
   type MemberRow,
   type MemberSyncBatchResult,
   type MemberSyncField,
@@ -7,7 +8,10 @@ export {
   type MemberSyncSnapshot,
   type MmMemberSyncErrorCode,
 } from "./mm-member-sync/shared";
-export { fetchMemberSnapshotByUserId } from "./mm-member-sync/snapshot";
+export {
+  fetchMemberSnapshotByUserId,
+  resolveMemberSnapshotForYears,
+} from "./mm-member-sync/snapshot";
 export {
   buildMemberSyncLogProperties,
   syncMemberById,

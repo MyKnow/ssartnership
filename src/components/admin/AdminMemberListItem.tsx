@@ -144,6 +144,10 @@ export default function AdminMemberListItem({
   const hasAvatar = Boolean(member.avatar_content_type);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const avatarUrl = useMemo(() => {
+    if (member.avatar_content_type && member.avatar_base64) {
+      return `data:${member.avatar_content_type};base64,${member.avatar_base64}`;
+    }
+
     const params = new URLSearchParams();
     if (member.updated_at) {
       params.set("v", member.updated_at);
@@ -151,7 +155,7 @@ export default function AdminMemberListItem({
 
     const query = params.toString();
     return `/api/admin/members/${member.id}/avatar${query ? `?${query}` : ""}`;
-  }, [member.id, member.updated_at]);
+  }, [member.avatar_base64, member.avatar_content_type, member.id, member.updated_at]);
 
   const policyStateCards = useMemo(() => {
     const policyKinds = ["service", "privacy", "marketing"] as const;
