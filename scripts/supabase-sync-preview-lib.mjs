@@ -38,6 +38,17 @@ function quoteIdentifier(value) {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+const DEFAULT_EXCLUDED_COPY_COLUMNS_BY_TABLE = new Map([
+  [
+    "members",
+    new Set([
+      "avatar_base64",
+      "password_hash",
+      "password_salt",
+    ]),
+  ],
+]);
+
 export function parseCopyStatement(line) {
   const match = line.match(/^COPY\s+(.+?)\s+\((.+)\)\s+FROM\s+stdin;$/);
   if (!match) {
@@ -63,7 +74,11 @@ export function buildCopyStatement(schema, table, columns) {
     .join(", ")}) FROM stdin;`;
 }
 
-export function sanitizeDumpSqlForPreview(sql, previewColumnsByTable) {
+export function sanitizeDumpSqlForPreview(
+  sql,
+  previewColumnsByTable,
+  excludedColumnsByTable = DEFAULT_EXCLUDED_COPY_COLUMNS_BY_TABLE,
+) {
   const lines = sql.split("\n");
   const output = [];
   let changed = false;
@@ -83,9 +98,10 @@ export function sanitizeDumpSqlForPreview(sql, previewColumnsByTable) {
       continue;
     }
 
+    const excludedColumns = excludedColumnsByTable.get(copyStatement.table) ?? new Set();
     const keptIndexes = copyStatement.columns
       .map((column, columnIndex) =>
-        previewColumns.has(column) ? columnIndex : -1,
+        previewColumns.has(column) && !excludedColumns.has(column) ? columnIndex : -1,
       )
       .filter((columnIndex) => columnIndex >= 0);
 

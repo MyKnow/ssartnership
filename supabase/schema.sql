@@ -1429,10 +1429,17 @@ create index if not exists notification_deliveries_member_id_idx
   on notification_deliveries(member_id);
 create index if not exists notification_deliveries_created_at_idx
   on notification_deliveries(created_at desc);
+create index if not exists members_year_created_at_idx
+  on members(year desc, created_at desc);
+create index if not exists members_created_at_idx
+  on members(created_at desc);
 create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
 create index if not exists event_logs_event_name_idx on event_logs(event_name);
 create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
 create index if not exists event_logs_target_idx on event_logs(target_type, target_id);
+create index if not exists event_logs_partner_metric_idx
+  on event_logs(target_type, target_id, event_name, created_at)
+  where target_id is not null;
 create index if not exists event_logs_path_idx on event_logs(path);
 create index if not exists event_logs_session_id_idx on event_logs(session_id);
 create unique index if not exists partner_metric_rollups_total_unique_idx

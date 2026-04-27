@@ -55,3 +55,44 @@ test("sanitizeDumpSqlForPreview leaves aligned copy blocks unchanged", async () 
   assert.equal(sanitized.changed, false);
   assert.equal(sanitized.sql, sourceSql);
 });
+
+test("sanitizeDumpSqlForPreview strips heavy and sensitive member columns", async () => {
+  const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
+
+  const sourceSql = [
+    "COPY public.members (id, mm_username, display_name, avatar_content_type, avatar_base64, password_hash, password_salt, created_at) FROM stdin;",
+    "member-1\tssafy15\t김싸피\timage/png\tBASE64_DATA\thash\tsalt\t2026-04-27T00:00:00.000Z",
+    "\\.",
+  ].join("\n");
+
+  const previewColumnsByTable = new Map([
+    [
+      "members",
+      new Set([
+        "id",
+        "mm_username",
+        "display_name",
+        "avatar_content_type",
+        "avatar_base64",
+        "password_hash",
+        "password_salt",
+        "created_at",
+      ]),
+    ],
+  ]);
+
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(
+    sanitized.sql,
+    [
+      'COPY "public"."members" ("id", "mm_username", "display_name", "avatar_content_type", "created_at") FROM stdin;',
+      "member-1\tssafy15\t김싸피\timage/png\t2026-04-27T00:00:00.000Z",
+      "\\.",
+    ].join("\n"),
+  );
+  assert.equal(sanitized.sql.includes("BASE64_DATA"), false);
+  assert.equal(sanitized.sql.includes("hash"), false);
+  assert.equal(sanitized.sql.includes("salt"), false);
+});
