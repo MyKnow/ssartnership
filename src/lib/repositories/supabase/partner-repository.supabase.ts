@@ -7,7 +7,7 @@ import type {
   PartnerViewContext,
 } from "@/lib/repositories/partner-repository";
 import { unstable_cache } from "next/cache";
-import { getSupabaseAdminClient, getSupabasePublicClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   canViewPartnerDetails,
   normalizePartnerVisibility,
@@ -18,6 +18,7 @@ type PartnerRow = {
   name: string;
   category_id: string;
   created_at: string;
+  updated_at?: string | null;
   location: string;
   thumbnail?: string | null;
   map_url?: string | null;
@@ -41,6 +42,17 @@ type CategoryRow = {
   color?: string | null;
 };
 
+type PublicCacheScope = "partners" | "categories";
+
+type PublicCacheVersionRow = {
+  scope: string;
+  version: number | string | null;
+  updated_at: string | null;
+};
+
+const PARTNER_SELECT_COLUMNS =
+  "id,name,category_id,created_at,updated_at,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)";
+
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
 }
@@ -58,9 +70,37 @@ function extractCategoryKey(categories: PartnerRow["categories"]) {
   return undefined;
 }
 
+async function getPublicCacheVersionKey(scopes: PublicCacheScope[]) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("public_cache_versions")
+    .select("scope,version,updated_at")
+    .in("scope", scopes);
+
+  if (error) {
+    console.error(
+      "[partner-repository] public cache version lookup failed",
+      error.message,
+    );
+    return scopes.map((scope) => `${scope}:legacy`).join("|");
+  }
+
+  const rowsByScope = new Map(
+    ((data ?? []) as PublicCacheVersionRow[]).map((row) => [row.scope, row]),
+  );
+
+  return scopes
+    .map((scope) => {
+      const row = rowsByScope.get(scope);
+      return `${scope}:${row?.version ?? "0"}:${row?.updated_at ?? "missing"}`;
+    })
+    .join("|");
+}
+
 const getCachedCategories = unstable_cache(
-  async (): Promise<CategoryRow[]> => {
-    const supabase = getSupabasePublicClient();
+  async (versionKey: string): Promise<CategoryRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("categories")
       .select("key,label,description,color")
@@ -72,21 +112,20 @@ const getCachedCategories = unstable_cache(
 
     return (data ?? []) as CategoryRow[];
   },
-  ["partner-repository", "categories"],
+  ["partner-repository", "categories", "versioned"],
   {
-    revalidate: 300,
+    revalidate: false,
     tags: ["categories"],
   },
 );
 
 const getCachedPartnerRows = unstable_cache(
-  async (): Promise<PartnerRow[]> => {
+  async (versionKey: string): Promise<PartnerRow[]> => {
+    void versionKey;
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("partners")
-      .select(
-        "id,name,category_id,created_at,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
-      )
+      .select(PARTNER_SELECT_COLUMNS)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -95,15 +134,16 @@ const getCachedPartnerRows = unstable_cache(
 
     return (data ?? []) as PartnerRow[];
   },
-  ["partner-repository", "partners"],
+  ["partner-repository", "partners", "versioned"],
   {
-    revalidate: 300,
+    revalidate: false,
     tags: ["partners"],
   },
 );
 
 const getCachedPartnerRowById = unstable_cache(
-  async (id: string): Promise<PartnerRow | null> => {
+  async (id: string, versionKey: string): Promise<PartnerRow | null> => {
+    void versionKey;
     if (!id) {
       return null;
     }
@@ -111,9 +151,7 @@ const getCachedPartnerRowById = unstable_cache(
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("partners")
-      .select(
-        "id,name,category_id,created_at,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)",
-      )
+      .select(PARTNER_SELECT_COLUMNS)
       .eq("id", id)
       .maybeSingle();
 
@@ -126,9 +164,9 @@ const getCachedPartnerRowById = unstable_cache(
 
     return data as PartnerRow;
   },
-  ["partner-repository", "partner-by-id"],
+  ["partner-repository", "partner-by-id", "versioned"],
   {
-    revalidate: 300,
+    revalidate: false,
     tags: ["partners"],
   },
 );
@@ -193,12 +231,14 @@ function mapPartnerForList(
 }
 
 async function getPartnerRow(id: string) {
-  return getCachedPartnerRowById(id);
+  const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+  return getCachedPartnerRowById(id, versionKey);
 }
 
 export class SupabasePartnerRepository implements PartnerRepository {
   async getCategories(): Promise<Category[]> {
-    const data = await getCachedCategories();
+    const versionKey = await getPublicCacheVersionKey(["categories"]);
+    const data = await getCachedCategories(versionKey);
     return data.map((item) => ({
       key: item.key ?? "",
       label: item.label ?? "",
@@ -210,7 +250,8 @@ export class SupabasePartnerRepository implements PartnerRepository {
   async getPartners(
     context: PartnerViewContext = { authenticated: false },
   ): Promise<Partner[]> {
-    const rows = await getCachedPartnerRows();
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const rows = await getCachedPartnerRows(versionKey);
     return rows.map((item) => mapPartnerForList(item, context));
   }
 

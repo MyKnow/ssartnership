@@ -10,10 +10,24 @@ create table if not exists categories (
   label text not null,
   description text,
   color text,
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 alter table categories add column if not exists color text;
+alter table categories add column if not exists updated_at timestamp with time zone default now();
+
+create table if not exists public_cache_versions (
+  scope text primary key,
+  version bigint not null default 1,
+  updated_at timestamp with time zone not null default now()
+);
+
+insert into public_cache_versions (scope, version, updated_at)
+values
+  ('partners', 1, now()),
+  ('categories', 1, now())
+on conflict (scope) do nothing;
 
 create table if not exists partner_companies (
   id uuid primary key default uuid_generate_v4(),
@@ -43,7 +57,8 @@ create table if not exists partners (
   thumbnail text,
   images text[] not null default '{}',
   tags text[] not null default '{}',
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 alter table partners add column if not exists visibility text not null default 'public';
@@ -80,7 +95,90 @@ alter table partners add column if not exists conditions text[] not null default
 alter table partners add column if not exists images text[] not null default '{}';
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;
+alter table partners add column if not exists updated_at timestamp with time zone default now();
 alter table partners drop column if exists contact;
+
+update partners
+set updated_at = coalesce(updated_at, created_at, now())
+where updated_at is null;
+
+update categories
+set updated_at = coalesce(updated_at, created_at, now())
+where updated_at is null;
+
+create or replace function set_partnership_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function bump_public_cache_version(cache_scope text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public_cache_versions (scope, version, updated_at)
+  values (cache_scope, 1, now())
+  on conflict (scope) do update
+    set version = public_cache_versions.version + 1,
+        updated_at = excluded.updated_at;
+end;
+$$;
+
+create or replace function bump_partners_public_cache_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform bump_public_cache_version('partners');
+  return coalesce(new, old);
+end;
+$$;
+
+create or replace function bump_categories_public_cache_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform bump_public_cache_version('categories');
+  perform bump_public_cache_version('partners');
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists partners_set_partnership_updated_at on partners;
+create trigger partners_set_partnership_updated_at
+  before update on partners
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists categories_set_partnership_updated_at on categories;
+create trigger categories_set_partnership_updated_at
+  before update on categories
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partners_bump_public_cache_version on partners;
+create trigger partners_bump_public_cache_version
+  after insert or update or delete on partners
+  for each row
+  execute function bump_partners_public_cache_version();
+
+drop trigger if exists categories_bump_public_cache_version on categories;
+create trigger categories_bump_public_cache_version
+  after insert or update or delete on categories
+  for each row
+  execute function bump_categories_public_cache_version();
 
 create table if not exists partner_accounts (
   id uuid primary key default uuid_generate_v4(),
@@ -1391,6 +1489,8 @@ create table if not exists auth_security_logs (
 
 create index if not exists partners_category_id_idx on partners(category_id);
 create index if not exists partners_company_id_idx on partners(company_id);
+create index if not exists partners_updated_at_idx on partners(updated_at desc);
+create index if not exists categories_updated_at_idx on categories(updated_at desc);
 create index if not exists partner_companies_name_idx on partner_companies(name);
 create index if not exists admin_login_attempts_identifier_idx on admin_login_attempts(identifier);
 create index if not exists suggestion_attempts_identifier_idx on suggestion_attempts(identifier);
@@ -1506,6 +1606,7 @@ create index if not exists partner_review_reactions_member_id_idx
 drop index if exists mm_verification_codes_email_idx;
 
 alter table categories enable row level security;
+alter table public_cache_versions enable row level security;
 alter table partner_companies enable row level security;
 alter table partners enable row level security;
 alter table partner_accounts enable row level security;
@@ -1555,6 +1656,8 @@ revoke all on table suggestion_attempts from anon;
 revoke all on table suggestion_attempts from authenticated;
 revoke all on table member_auth_attempts from anon;
 revoke all on table member_auth_attempts from authenticated;
+revoke all on table public_cache_versions from anon;
+revoke all on table public_cache_versions from authenticated;
 revoke all on table partner_companies from anon;
 revoke all on table partner_companies from authenticated;
 revoke all on table partner_accounts from anon;
