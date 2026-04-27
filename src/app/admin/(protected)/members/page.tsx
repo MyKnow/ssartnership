@@ -22,6 +22,13 @@ import {
 } from "@/lib/policy-documents";
 import { getPushPreferencesOrDefault } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import type {
+  ConsentFilterOption,
+  MemberFilterOption,
+  MemberSortOption,
+  NotificationPreferenceFilterOption,
+  YearFilterOption,
+} from "@/components/admin/member-manager/selectors";
 
 export const dynamic = "force-dynamic";
 
@@ -29,34 +36,253 @@ const adminMembersErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
 
+const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100, 500] as const;
+const DEFAULT_MEMBER_PAGE_SIZE = 50;
+
+type AdminMemberSearchParams = {
+  backfill?: string;
+  checked?: string;
+  updated?: string;
+  skipped?: string;
+  failures?: string;
+  error?: string;
+  q?: string;
+  sort?: string;
+  status?: string;
+  year?: string;
+  campus?: string;
+  serviceConsent?: string;
+  privacyConsent?: string;
+  marketingConsent?: string;
+  pushEnabled?: string;
+  announcementEnabled?: string;
+  newPartnerEnabled?: string;
+  expiringPartnerEnabled?: string;
+  reviewEnabled?: string;
+  mmEnabled?: string;
+  marketingEnabled?: string;
+  page?: string;
+  pageSize?: string;
+};
+
+function getOne(params: AdminMemberSearchParams, key: keyof AdminMemberSearchParams) {
+  const value = params[key];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parsePage(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function parsePageSize(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return MEMBER_PAGE_SIZE_OPTIONS.includes(parsed as (typeof MEMBER_PAGE_SIZE_OPTIONS)[number])
+    ? (parsed as (typeof MEMBER_PAGE_SIZE_OPTIONS)[number])
+    : DEFAULT_MEMBER_PAGE_SIZE;
+}
+
+function parseSort(value: string | undefined): MemberSortOption {
+  return value === "updated" || value === "name" ? value : "recent";
+}
+
+function parseMemberStatus(value: string | undefined): MemberFilterOption {
+  return value === "normal" || value === "mustChangePassword" ? value : "all";
+}
+
+function parseConsentFilter(value: string | undefined): ConsentFilterOption {
+  return value === "agreed" || value === "pending" ? value : "all";
+}
+
+function parseNotificationFilter(value: string | undefined): NotificationPreferenceFilterOption {
+  return value === "enabled" || value === "disabled" ? value : "all";
+}
+
+function parseYearFilter(value: string | undefined): YearFilterOption {
+  return value && /^\d+$/.test(value) ? (value as YearFilterOption) : "all";
+}
+
+function toInList(ids: string[]) {
+  return `(${ids.join(",")})`;
+}
+
+async function getPreferenceFilteredMemberIds(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  filters: Array<{
+    column: string;
+    value: NotificationPreferenceFilterOption;
+    defaultEnabled: boolean;
+  }>,
+) {
+  const activeFilters = filters.filter((filter) => filter.value !== "all");
+  if (!activeFilters.length) {
+    return null;
+  }
+
+  const excludedIds = new Set<string>();
+  let includedIds: Set<string> | null = null;
+
+  for (const filter of activeFilters) {
+    if (filter.value === "enabled" && !filter.defaultEnabled) {
+      const { data } = await supabase
+        .from("push_preferences")
+        .select("member_id")
+        .eq(filter.column, true);
+      const ids = new Set<string>((data ?? []).map((row) => row.member_id as string));
+      includedIds = includedIds
+        ? new Set<string>(Array.from(includedIds as Set<string>).filter((id) => ids.has(id)))
+        : ids;
+      continue;
+    }
+
+    if (filter.value === "disabled" && filter.defaultEnabled) {
+      const { data } = await supabase
+        .from("push_preferences")
+        .select("member_id")
+        .eq(filter.column, false);
+      const ids = new Set<string>((data ?? []).map((row) => row.member_id as string));
+      includedIds = includedIds
+        ? new Set<string>(Array.from(includedIds as Set<string>).filter((id) => ids.has(id)))
+        : ids;
+      continue;
+    }
+
+    const excludedValue = filter.value === "disabled";
+    const { data } = await supabase
+      .from("push_preferences")
+      .select("member_id")
+      .eq(filter.column, excludedValue);
+    (data ?? []).forEach((row) => excludedIds.add(row.member_id as string));
+  }
+
+  return {
+    included: includedIds ? [...includedIds] : null,
+    excluded: [...excludedIds],
+  };
+}
+
 export default async function AdminMembersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{
-    backfill?: string;
-    checked?: string;
-    updated?: string;
-    skipped?: string;
-    failures?: string;
-    error?: string;
-  }>;
+  searchParams?: Promise<AdminMemberSearchParams>;
 }) {
   const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
+  const page = parsePage(getOne(params, "page"));
+  const pageSize = parsePageSize(getOne(params, "pageSize"));
+  const filters = {
+    searchValue: getOne(params, "q")?.trim() ?? "",
+    sortValue: parseSort(getOne(params, "sort")),
+    filterValue: parseMemberStatus(getOne(params, "status")),
+    yearFilter: parseYearFilter(getOne(params, "year")),
+    campusFilter: getOne(params, "campus")?.trim() || "all",
+    serviceConsentFilter: parseConsentFilter(getOne(params, "serviceConsent")),
+    privacyConsentFilter: parseConsentFilter(getOne(params, "privacyConsent")),
+    marketingConsentFilter: parseConsentFilter(getOne(params, "marketingConsent")),
+    pushEnabledFilter: parseNotificationFilter(getOne(params, "pushEnabled")),
+    announcementEnabledFilter: parseNotificationFilter(getOne(params, "announcementEnabled")),
+    newPartnerEnabledFilter: parseNotificationFilter(getOne(params, "newPartnerEnabled")),
+    expiringPartnerEnabledFilter: parseNotificationFilter(getOne(params, "expiringPartnerEnabled")),
+    reviewEnabledFilter: parseNotificationFilter(getOne(params, "reviewEnabled")),
+    mmEnabledFilter: parseNotificationFilter(getOne(params, "mmEnabled")),
+    marketingEnabledFilter: parseNotificationFilter(getOne(params, "marketingEnabled")),
+  };
   const supabase = getSupabaseAdminClient();
-  const [activePolicies, activeMarketingPolicy, memberQuery] = await Promise.all([
+  const [activePolicies, activeMarketingPolicy, optionsResult, preferenceFilter] = await Promise.all([
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing").catch(() => null),
-    supabase
-      .from("members")
-      .select(
-        "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,created_at,updated_at",
-      )
-      .order("created_at", { ascending: false }),
+    supabase.from("members").select("year,campus"),
+    getPreferenceFilteredMemberIds(supabase, [
+      { column: "enabled", value: filters.pushEnabledFilter, defaultEnabled: false },
+      { column: "announcement_enabled", value: filters.announcementEnabledFilter, defaultEnabled: true },
+      { column: "new_partner_enabled", value: filters.newPartnerEnabledFilter, defaultEnabled: true },
+      { column: "expiring_partner_enabled", value: filters.expiringPartnerEnabledFilter, defaultEnabled: true },
+      { column: "review_enabled", value: filters.reviewEnabledFilter, defaultEnabled: true },
+      { column: "mm_enabled", value: filters.mmEnabledFilter, defaultEnabled: true },
+      { column: "marketing_enabled", value: filters.marketingEnabledFilter, defaultEnabled: false },
+    ]),
   ]);
-  const { data: members, error: membersError } = memberQuery;
 
+  let memberQuery = supabase
+    .from("members")
+    .select(
+      "id,mm_user_id,mm_username,display_name,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,created_at,updated_at",
+      { count: "exact" },
+    );
+
+  if (filters.searchValue) {
+    const escaped = filters.searchValue.replaceAll("%", "\\%").replaceAll("_", "\\_");
+    memberQuery = memberQuery.or(
+      `mm_username.ilike.%${escaped}%,mm_user_id.ilike.%${escaped}%,display_name.ilike.%${escaped}%`,
+    );
+  }
+  if (filters.yearFilter !== "all") {
+    memberQuery = memberQuery.eq("year", Number(filters.yearFilter));
+  }
+  if (filters.campusFilter !== "all") {
+    memberQuery = memberQuery.eq("campus", filters.campusFilter);
+  }
+  if (filters.filterValue === "mustChangePassword") {
+    memberQuery = memberQuery.eq("must_change_password", true);
+  } else if (filters.filterValue === "normal") {
+    memberQuery = memberQuery.eq("must_change_password", false);
+  }
+  if (filters.serviceConsentFilter === "agreed") {
+    memberQuery = memberQuery.eq("service_policy_version", activePolicies.service.version);
+  } else if (filters.serviceConsentFilter === "pending") {
+    memberQuery = memberQuery.not("service_policy_version", "eq", activePolicies.service.version);
+  }
+  if (filters.privacyConsentFilter === "agreed") {
+    memberQuery = memberQuery.eq("privacy_policy_version", activePolicies.privacy.version);
+  } else if (filters.privacyConsentFilter === "pending") {
+    memberQuery = memberQuery.not("privacy_policy_version", "eq", activePolicies.privacy.version);
+  }
+  if (activeMarketingPolicy && filters.marketingConsentFilter === "agreed") {
+    memberQuery = memberQuery.eq("marketing_policy_version", activeMarketingPolicy.version);
+  } else if (activeMarketingPolicy && filters.marketingConsentFilter === "pending") {
+    memberQuery = memberQuery.not("marketing_policy_version", "eq", activeMarketingPolicy.version);
+  }
+  if (preferenceFilter?.included) {
+    if (preferenceFilter.included.length === 0) {
+      memberQuery = memberQuery.in("id", ["00000000-0000-0000-0000-000000000000"]);
+    } else {
+      memberQuery = memberQuery.in("id", preferenceFilter.included);
+    }
+  }
+  if (preferenceFilter?.excluded.length) {
+    memberQuery = memberQuery.not("id", "in", toInList(preferenceFilter.excluded));
+  }
+
+  if (filters.sortValue === "name") {
+    memberQuery = memberQuery.order("display_name", { ascending: true });
+  } else if (filters.sortValue === "updated") {
+    memberQuery = memberQuery.order("updated_at", { ascending: false });
+  } else {
+    memberQuery = memberQuery.order("created_at", { ascending: false });
+  }
+  const from = (page - 1) * pageSize;
+  const memberResult = await memberQuery.range(from, from + pageSize - 1);
+
+  const { data: members, error: membersError, count } = memberResult;
   const safeMembers = members ?? [];
+  const totalCount = count ?? safeMembers.length;
+  const optionRows = optionsResult.data ?? [];
+  const options = {
+    campuses: Array.from(
+      new Set(
+        optionRows
+          .map((row) => (typeof row.campus === "string" ? row.campus.trim() : ""))
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "ko")),
+    years: Array.from(
+      new Set(
+        optionRows
+          .map((row) => row.year)
+          .filter((year): year is number => typeof year === "number"),
+      ),
+    ).sort((a, b) => b - a),
+  };
   const memberIds = safeMembers.map((member) => member.id);
   let preferenceRows: Array<{
     member_id: string;
@@ -327,8 +553,34 @@ export default async function AdminMembersPage({
         ) : (
           <Card tone="elevated">
             <AdminMemberManager
+              key={[
+                page,
+                pageSize,
+                filters.searchValue,
+                filters.sortValue,
+                filters.filterValue,
+                filters.yearFilter,
+                filters.campusFilter,
+                filters.serviceConsentFilter,
+                filters.privacyConsentFilter,
+                filters.marketingConsentFilter,
+                filters.pushEnabledFilter,
+                filters.announcementEnabledFilter,
+                filters.newPartnerEnabledFilter,
+                filters.expiringPartnerEnabledFilter,
+                filters.reviewEnabledFilter,
+                filters.mmEnabledFilter,
+                filters.marketingEnabledFilter,
+              ].join(":")}
               members={enrichedMembers}
               activePolicyVersions={activePolicyVersions}
+              pagination={{
+                totalCount,
+                page,
+                pageSize,
+              }}
+              filters={filters}
+              options={options}
               updateMember={updateMember}
               deleteMember={deleteMember}
             />

@@ -175,7 +175,7 @@ export default function AdminLogsManagerContent({
 
         <AdminLogsExplorer
           filteredLogs={logs.visibleLogs}
-          filteredTotal={logs.filteredLogs.length}
+          filteredTotal={logs.filteredTotal}
           totalLogs={logs.totalLogs}
           currentPage={logs.currentPage}
           totalPages={logs.totalPages}

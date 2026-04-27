@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterBar from "@/components/ui/FilterBar";
@@ -15,9 +16,6 @@ import {
   type MemberSortOption,
   type NotificationPreferenceFilterOption,
   type YearFilterOption,
-  filterAdminMembers,
-  getAdminMemberCampusOptions,
-  getAdminMemberYearOptions,
   normalizeAdminMembers,
 } from "@/components/admin/member-manager/selectors";
 
@@ -26,107 +24,81 @@ const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100, 500] as const;
 export default function AdminMemberManager({
   members,
   activePolicyVersions,
+  pagination,
+  filters,
+  options,
   updateMember,
   deleteMember,
 }: {
   members: AdminMember[];
   activePolicyVersions: ActivePolicyVersions;
+  pagination: {
+    totalCount: number;
+    page: number;
+    pageSize: (typeof MEMBER_PAGE_SIZE_OPTIONS)[number];
+  };
+  filters: {
+    searchValue: string;
+    sortValue: MemberSortOption;
+    filterValue: MemberFilterOption;
+    yearFilter: YearFilterOption;
+    campusFilter: string;
+    serviceConsentFilter: ConsentFilterOption;
+    privacyConsentFilter: ConsentFilterOption;
+    marketingConsentFilter: ConsentFilterOption;
+    pushEnabledFilter: NotificationPreferenceFilterOption;
+    announcementEnabledFilter: NotificationPreferenceFilterOption;
+    newPartnerEnabledFilter: NotificationPreferenceFilterOption;
+    expiringPartnerEnabledFilter: NotificationPreferenceFilterOption;
+    reviewEnabledFilter: NotificationPreferenceFilterOption;
+    mmEnabledFilter: NotificationPreferenceFilterOption;
+    marketingEnabledFilter: NotificationPreferenceFilterOption;
+  };
+  options: {
+    campuses: string[];
+    years: number[];
+  };
   updateMember: (formData: FormData) => void | Promise<void>;
   deleteMember: (formData: FormData) => void | Promise<void>;
 }) {
-  const [searchValue, setSearchValue] = useState("");
-  const [sortValue, setSortValue] = useState<MemberSortOption>("recent");
-  const [filterValue, setFilterValue] = useState<MemberFilterOption>("all");
-  const [yearFilter, setYearFilter] = useState<YearFilterOption>("all");
-  const [campusFilter, setCampusFilter] = useState("all");
-  const [serviceConsentFilter, setServiceConsentFilter] =
-    useState<ConsentFilterOption>("all");
-  const [privacyConsentFilter, setPrivacyConsentFilter] =
-    useState<ConsentFilterOption>("all");
-  const [marketingConsentFilter, setMarketingConsentFilter] =
-    useState<ConsentFilterOption>("all");
-  const [pushEnabledFilter, setPushEnabledFilter] =
-    useState<NotificationPreferenceFilterOption>("all");
-  const [announcementEnabledFilter, setAnnouncementEnabledFilter] =
-    useState<NotificationPreferenceFilterOption>("all");
-  const [newPartnerEnabledFilter, setNewPartnerEnabledFilter] =
-    useState<NotificationPreferenceFilterOption>("all");
-  const [expiringPartnerEnabledFilter, setExpiringPartnerEnabledFilter] =
-    useState<NotificationPreferenceFilterOption>("all");
-  const [reviewEnabledFilter, setReviewEnabledFilter] =
-    useState<NotificationPreferenceFilterOption>("all");
-  const [mmEnabledFilter, setMmEnabledFilter] =
-    useState<NotificationPreferenceFilterOption>("all");
-  const [marketingEnabledFilter, setMarketingEnabledFilter] =
-    useState<NotificationPreferenceFilterOption>("all");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] =
-    useState<(typeof MEMBER_PAGE_SIZE_OPTIONS)[number]>(50);
-  const [pageInputValue, setPageInputValue] = useState("1");
-  const resetPage = () => setPage(1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const [pageInputValue, setPageInputValue] = useState(String(pagination.page));
+  const [searchInputValue, setSearchInputValue] = useState(filters.searchValue);
 
   const normalizedMembers = useMemo(
     () => normalizeAdminMembers(members, activePolicyVersions),
     [activePolicyVersions, members],
   );
-  const campusOptions = useMemo(
-    () => getAdminMemberCampusOptions(normalizedMembers),
-    [normalizedMembers],
-  );
-  const yearOptions = useMemo(
-    () => getAdminMemberYearOptions(normalizedMembers),
-    [normalizedMembers],
-  );
+  const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
+  const currentPage = Math.min(pagination.page, totalPages);
+  const pageStart = (currentPage - 1) * pagination.pageSize;
 
-  const filteredMembers = useMemo(() => {
-    return filterAdminMembers({
-      members: normalizedMembers,
-      searchValue,
-      sortValue,
-      filterValue,
-      yearFilter,
-      campusFilter,
-      serviceConsentFilter,
-      privacyConsentFilter,
-      marketingConsentFilter,
-      pushEnabledFilter,
-      announcementEnabledFilter,
-      newPartnerEnabledFilter,
-      expiringPartnerEnabledFilter,
-      reviewEnabledFilter,
-      mmEnabledFilter,
-      marketingEnabledFilter,
+  const updateQuery = (updates: Record<string, string | number | null>) => {
+    const next = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === "" || value === "all") {
+        next.delete(key);
+      } else {
+        next.set(key, String(value));
+      }
     });
-  }, [
-    announcementEnabledFilter,
-    campusFilter,
-    filterValue,
-    expiringPartnerEnabledFilter,
-    marketingConsentFilter,
-    marketingEnabledFilter,
-    mmEnabledFilter,
-    newPartnerEnabledFilter,
-    normalizedMembers,
-    privacyConsentFilter,
-    pushEnabledFilter,
-    reviewEnabledFilter,
-    searchValue,
-    serviceConsentFilter,
-    sortValue,
-    yearFilter,
-  ]);
-  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = (currentPage - 1) * pageSize;
-  const visibleMembers = useMemo(
-    () => filteredMembers.slice(pageStart, pageStart + pageSize),
-    [filteredMembers, pageSize, pageStart],
-  );
+    startTransition(() => {
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    });
+  };
+
+  const updateFilter = (key: string, value: string | number) => {
+    setPageInputValue("1");
+    updateQuery({ [key]: value, page: null });
+  };
 
   const syncPage = (nextPage: number) => {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
-    setPage(safePage);
     setPageInputValue(String(safePage));
+    updateQuery({ page: safePage });
   };
 
   return (
@@ -138,11 +110,10 @@ export default function AdminMemberManager({
         <div className="grid min-w-[14rem] flex-1 gap-1">
           <span className="ui-caption">검색</span>
           <Input
-            value={searchValue}
+            value={searchInputValue}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setSearchValue(event.target.value);
+              setSearchInputValue(event.target.value);
+              updateFilter("q", event.target.value);
             }}
             placeholder="이름, MM 아이디로 검색"
           />
@@ -150,15 +121,13 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">기수</span>
           <Select
-            value={yearFilter}
+            value={filters.yearFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setYearFilter(event.target.value as YearFilterOption);
+              updateFilter("year", event.target.value);
             }}
           >
             <option value="all">전체 기수</option>
-            {yearOptions.map((year) => (
+            {options.years.map((year) => (
               <option key={year} value={String(year)}>
                 {formatSsafyYearLabel(year)}
               </option>
@@ -168,11 +137,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">정렬</span>
           <Select
-            value={sortValue}
+            value={filters.sortValue}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setSortValue(event.target.value as MemberSortOption);
+              updateFilter("sort", event.target.value);
             }}
           >
             <option value="recent">등록순</option>
@@ -183,11 +150,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">상태</span>
           <Select
-            value={filterValue}
+            value={filters.filterValue}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setFilterValue(event.target.value as MemberFilterOption);
+              updateFilter("status", event.target.value);
             }}
           >
             <option value="all">전체 상태</option>
@@ -198,15 +163,13 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">캠퍼스</span>
           <Select
-            value={campusFilter}
+            value={filters.campusFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setCampusFilter(event.target.value);
+              updateFilter("campus", event.target.value);
             }}
           >
             <option value="all">전체 캠퍼스</option>
-            {campusOptions.map((campus) => (
+            {options.campuses.map((campus) => (
               <option key={campus} value={campus}>
                 {campus}
               </option>
@@ -216,11 +179,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">서비스 이용약관</span>
           <Select
-            value={serviceConsentFilter}
+            value={filters.serviceConsentFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setServiceConsentFilter(event.target.value as ConsentFilterOption);
+              updateFilter("serviceConsent", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -231,11 +192,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">개인정보 처리방침</span>
           <Select
-            value={privacyConsentFilter}
+            value={filters.privacyConsentFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setPrivacyConsentFilter(event.target.value as ConsentFilterOption);
+              updateFilter("privacyConsent", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -246,11 +205,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">마케팅 정보 수신</span>
           <Select
-            value={marketingConsentFilter}
+            value={filters.marketingConsentFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setMarketingConsentFilter(event.target.value as ConsentFilterOption);
+              updateFilter("marketingConsent", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -261,13 +218,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">푸시 채널</span>
           <Select
-            value={pushEnabledFilter}
+            value={filters.pushEnabledFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setPushEnabledFilter(
-                event.target.value as NotificationPreferenceFilterOption,
-              );
+              updateFilter("pushEnabled", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -278,13 +231,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">운영 공지</span>
           <Select
-            value={announcementEnabledFilter}
+            value={filters.announcementEnabledFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setAnnouncementEnabledFilter(
-                event.target.value as NotificationPreferenceFilterOption,
-              );
+              updateFilter("announcementEnabled", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -295,13 +244,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">신규 제휴</span>
           <Select
-            value={newPartnerEnabledFilter}
+            value={filters.newPartnerEnabledFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setNewPartnerEnabledFilter(
-                event.target.value as NotificationPreferenceFilterOption,
-              );
+              updateFilter("newPartnerEnabled", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -312,13 +257,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">종료 임박</span>
           <Select
-            value={expiringPartnerEnabledFilter}
+            value={filters.expiringPartnerEnabledFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setExpiringPartnerEnabledFilter(
-                event.target.value as NotificationPreferenceFilterOption,
-              );
+              updateFilter("expiringPartnerEnabled", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -329,13 +270,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">리뷰 알림</span>
           <Select
-            value={reviewEnabledFilter}
+            value={filters.reviewEnabledFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setReviewEnabledFilter(
-                event.target.value as NotificationPreferenceFilterOption,
-              );
+              updateFilter("reviewEnabled", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -346,13 +283,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">Mattermost</span>
           <Select
-            value={mmEnabledFilter}
+            value={filters.mmEnabledFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setMmEnabledFilter(
-                event.target.value as NotificationPreferenceFilterOption,
-              );
+              updateFilter("mmEnabled", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -363,13 +296,9 @@ export default function AdminMemberManager({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">마케팅/이벤트</span>
           <Select
-            value={marketingEnabledFilter}
+            value={filters.marketingEnabledFilter}
             onChange={(event) => {
-              resetPage();
-              setPageInputValue("1");
-              setMarketingEnabledFilter(
-                event.target.value as NotificationPreferenceFilterOption,
-              );
+              updateFilter("marketingEnabled", event.target.value);
             }}
           >
             <option value="all">전체</option>
@@ -380,10 +309,11 @@ export default function AdminMemberManager({
       </FilterBar>
 
       <p className="text-sm text-muted-foreground">
-        총 {members.length}명 중 {filteredMembers.length}명 검색됨
+        조건에 맞는 회원 {pagination.totalCount.toLocaleString()}명
+        {isPending ? " · 갱신 중" : ""}
       </p>
 
-      {filteredMembers.length === 0 ? (
+      {normalizedMembers.length === 0 ? (
         <EmptyState
           title="조건에 맞는 회원이 없습니다."
           description="검색어나 상태 필터를 조정해 다시 확인해 주세요."
@@ -392,20 +322,19 @@ export default function AdminMemberManager({
         <div className="grid min-w-0 gap-4">
           <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-muted/40 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <p>
-              {pageStart + 1}-{Math.min(pageStart + visibleMembers.length, filteredMembers.length)} /{" "}
-              {filteredMembers.length}
+              {pageStart + 1}-{Math.min(pageStart + normalizedMembers.length, pagination.totalCount)} /{" "}
+              {pagination.totalCount}
             </p>
             <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
               <label className="flex items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
                 <span>페이지당</span>
                 <Select
-                  value={String(pageSize)}
+                  value={String(pagination.pageSize)}
                   onChange={(event) => {
                     const nextPageSize = Number(event.target.value) as
                       | (typeof MEMBER_PAGE_SIZE_OPTIONS)[number];
-                    setPageSize(nextPageSize);
-                    setPage(1);
                     setPageInputValue("1");
+                    updateQuery({ pageSize: nextPageSize, page: null });
                   }}
                 >
                   {MEMBER_PAGE_SIZE_OPTIONS.map((option) => (
@@ -471,7 +400,7 @@ export default function AdminMemberManager({
           </div>
 
           <div className="grid min-w-0 gap-3">
-          {visibleMembers.map((member) => (
+          {normalizedMembers.map((member) => (
             <AdminMemberListItem
               key={member.id}
               member={member}

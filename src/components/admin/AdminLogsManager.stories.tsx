@@ -169,6 +169,26 @@ const logsData: AdminLogsPageData = {
       created_at: "2026-04-24T00:20:00.000Z",
     },
   ],
+  list: {
+    productLogs: [],
+    auditLogs: [],
+    securityLogs: [],
+    total: 7,
+    page: 1,
+    pageSize: 100,
+  },
+};
+
+logsData.list = {
+  productLogs: logsData.productLogs,
+  auditLogs: logsData.auditLogs,
+  securityLogs: logsData.securityLogs,
+  total:
+    logsData.productLogs.length +
+    logsData.auditLogs.length +
+    logsData.securityLogs.length,
+  page: 1,
+  pageSize: 100,
 };
 
 function installLogsFetchMock() {

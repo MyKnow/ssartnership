@@ -9,7 +9,6 @@ import {
   createTopIps,
   createTopPaths,
   createTopProductEvents,
-  filterAndSortLogs,
   getActorOptions,
   getAvailableLogNames,
   getSecurityStatusCounts,
@@ -62,45 +61,30 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   });
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] =
-    useState<(typeof LOG_PAGE_SIZE_OPTIONS)[number]>(100);
-  const [pageInputValue, setPageInputValue] = useState('1');
+  const [pageSize, setPageSizeState] =
+    useState<(typeof LOG_PAGE_SIZE_OPTIONS)[number]>(initialData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number]);
+  const [pageInputValue, setPageInputValue] = useState(String(initialData.list.page));
 
   const unifiedLogs = useMemo<NormalizedLog[]>(() => buildUnifiedLogs(data), [data]);
+  const visibleLogs = useMemo<NormalizedLog[]>(
+    () =>
+      buildUnifiedLogs({
+        ...data,
+        productLogs: data.list.productLogs,
+        auditLogs: data.list.auditLogs,
+        securityLogs: data.list.securityLogs,
+      }),
+    [data],
+  );
   const availableNames = useMemo(
     () => getAvailableLogNames(unifiedLogs, groupFilter),
     [groupFilter, unifiedLogs],
   );
   const actorOptions = useMemo(() => getActorOptions(unifiedLogs), [unifiedLogs]);
-  const filteredLogs = useMemo(
-    () =>
-      filterAndSortLogs({
-        unifiedLogs,
-        searchValue,
-        groupFilter,
-        nameFilter,
-        actorFilter,
-        statusFilter,
-        sortFilter,
-      }),
-    [
-      actorFilter,
-      groupFilter,
-      nameFilter,
-      searchValue,
-      sortFilter,
-      statusFilter,
-      unifiedLogs,
-    ],
-  );
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
+  const filteredLogs = visibleLogs;
+  const totalPages = Math.max(1, Math.ceil(data.list.total / pageSize));
+  const currentPage = Math.min(data.list.page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
-  const visibleLogs = useMemo(
-    () => filteredLogs.slice(pageStart, pageStart + pageSize),
-    [filteredLogs, pageSize, pageStart],
-  );
   const totalLogs = data.counts.product + data.counts.audit + data.counts.security;
   const topProductEvents = useMemo(() => createTopProductEvents(data), [data]);
   const topAuditActions = useMemo(() => createTopAuditActions(data), [data]);
@@ -109,21 +93,24 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const topPaths = useMemo(() => createTopPaths(unifiedLogs), [unifiedLogs]);
   const securityStatusCounts = useMemo(() => getSecurityStatusCounts(data), [data]);
 
-  function resetPage() {
-    setPage(1);
-    setPageInputValue('1');
-  }
-
   function syncPage(nextPage: number) {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
-    setPage(safePage);
     setPageInputValue(String(safePage));
+    void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, page: safePage });
   }
 
   async function fetchLogs(params: {
     preset: LogRangePreset;
     start?: string;
     end?: string;
+    page?: number;
+    pageSize?: number;
+    searchValue?: string;
+    groupFilter?: GroupFilter;
+    nameFilter?: string;
+    actorFilter?: 'all' | string;
+    statusFilter?: StatusFilter;
+    sortFilter?: SortFilter;
   }) {
     setIsLoading(true);
     setErrorMessage(null);
@@ -136,6 +123,32 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       }
       if (params.end) {
         searchParams.set('end', params.end);
+      }
+      searchParams.set('page', String(params.page ?? 1));
+      searchParams.set('pageSize', String(params.pageSize ?? pageSize));
+      const nextSearchValue = params.searchValue ?? searchValue;
+      const nextGroupFilter = params.groupFilter ?? groupFilter;
+      const nextNameFilter = params.nameFilter ?? nameFilter;
+      const nextActorFilter = params.actorFilter ?? actorFilter;
+      const nextStatusFilter = params.statusFilter ?? statusFilter;
+      const nextSortFilter = params.sortFilter ?? sortFilter;
+      if (nextSearchValue.trim()) {
+        searchParams.set('search', nextSearchValue.trim());
+      }
+      if (nextGroupFilter !== 'all') {
+        searchParams.set('group', nextGroupFilter);
+      }
+      if (nextNameFilter !== 'all') {
+        searchParams.set('name', nextNameFilter);
+      }
+      if (nextActorFilter !== 'all') {
+        searchParams.set('actor', nextActorFilter);
+      }
+      if (nextStatusFilter !== 'all') {
+        searchParams.set('status', nextStatusFilter);
+      }
+      if (nextSortFilter !== 'newest') {
+        searchParams.set('sort', nextSortFilter);
       }
 
       const response = await fetch(`/api/admin/logs?${searchParams.toString()}`, {
@@ -155,7 +168,14 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       setActivePreset(nextData.range.preset);
       setCustomStartInput(toDateTimeLocalValue(nextData.range.start));
       setCustomEndInput(toDateTimeLocalValue(nextData.range.end));
-      resetPage();
+      setPageSizeState(
+        LOG_PAGE_SIZE_OPTIONS.includes(
+          nextData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number],
+        )
+          ? (nextData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
+          : LOG_PAGE_SIZE_OPTIONS[1],
+      );
+      setPageInputValue(String(nextData.list.page));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '로그 조회에 실패했습니다.');
     } finally {
@@ -299,6 +319,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     availableNames,
     actorOptions,
     filteredLogs,
+    filteredTotal: data.list.total,
     visibleLogs,
     currentPage,
     totalPages,
@@ -316,28 +337,28 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     setCustomStartInput,
     setCustomEndInput,
     setSearchValue: (value: string) => {
-      resetPage();
       setSearchValue(value);
+      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, searchValue: value });
     },
     setGroupFilter: (value: GroupFilter) => {
-      resetPage();
       setGroupFilter(value);
+      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, groupFilter: value });
     },
     setNameFilter: (value: string) => {
-      resetPage();
       setNameFilter(value);
+      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, nameFilter: value });
     },
     setActorFilter: (value: 'all' | string) => {
-      resetPage();
       setActorFilter(value);
+      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, actorFilter: value });
     },
     setStatusFilter: (value: StatusFilter) => {
-      resetPage();
       setStatusFilter(value);
+      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, statusFilter: value });
     },
     setSortFilter: (value: SortFilter) => {
-      resetPage();
       setSortFilter(value);
+      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, sortFilter: value });
     },
     setPageInputValue,
     setPageSize: (value: number) => {
@@ -346,8 +367,9 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       )
         ? (value as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
         : LOG_PAGE_SIZE_OPTIONS[1];
-      setPageSize(nextPageSize);
-      resetPage();
+      setPageSizeState(nextPageSize);
+      setPageInputValue('1');
+      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, pageSize: nextPageSize });
     },
     setExportOpen,
     setExportScope,

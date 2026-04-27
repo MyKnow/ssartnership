@@ -94,6 +94,44 @@ export default function AdminMemberMockPreviewPage() {
               privacy: 2,
               marketing: 1,
             }}
+            pagination={{
+              totalCount: mockPreviewMembers.length,
+              page: 1,
+              pageSize: 50,
+            }}
+            filters={{
+              searchValue: "",
+              sortValue: "recent",
+              filterValue: "all",
+              yearFilter: "all",
+              campusFilter: "all",
+              serviceConsentFilter: "all",
+              privacyConsentFilter: "all",
+              marketingConsentFilter: "all",
+              pushEnabledFilter: "all",
+              announcementEnabledFilter: "all",
+              newPartnerEnabledFilter: "all",
+              expiringPartnerEnabledFilter: "all",
+              reviewEnabledFilter: "all",
+              mmEnabledFilter: "all",
+              marketingEnabledFilter: "all",
+            }}
+            options={{
+              campuses: Array.from(
+                new Set(
+                  mockPreviewMembers
+                    .map((member) => member.campus)
+                    .filter((campus): campus is string => Boolean(campus)),
+                ),
+              ),
+              years: Array.from(
+                new Set(
+                  mockPreviewMembers
+                    .map((member) => member.year)
+                    .filter((year): year is number => typeof year === "number"),
+                ),
+              ).sort((a, b) => b - a),
+            }}
             updateMember={noopMemberAction}
             deleteMember={noopMemberAction}
           />

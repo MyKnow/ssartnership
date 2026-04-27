@@ -1,6 +1,10 @@
 import { createAdminLogsCsvStream } from './log-insights/csv';
 import { loadAdminLogRows, resolveActorMeta } from './log-insights/data';
 import { buildChartBuckets } from './log-insights/range';
+import {
+  buildUnifiedLogs,
+  filterAndSortLogs,
+} from '@/components/admin/logs/selectors';
 import type {
   AdminAuditLogRow,
   AdminLogsPageData,
@@ -34,6 +38,20 @@ export type {
 export { iterateAdminLogsCsvRows } from './log-insights/csv';
 export { resolveLogRange } from './log-insights/range';
 
+const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
+
+function parsePage(value: string | number | null | undefined) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function parsePageSize(value: string | number | null | undefined) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
+  return LOG_PAGE_SIZE_OPTIONS.includes(parsed as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
+    ? parsed
+    : 100;
+}
+
 export async function getAdminLogsPageData(
   options: GetAdminLogsPageDataOptions = {},
 ): Promise<AdminLogsPageData> {
@@ -50,6 +68,52 @@ export async function getAdminLogsPageData(
     ...row,
     ...resolveActorMeta(row.actor_type, row.actor_id, data.memberLookup),
   }));
+  const page = parsePage(options.page);
+  const pageSize = parsePageSize(options.pageSize);
+  const allLogsPageData = {
+    range: data.range,
+    counts: {
+      product: productLogs.length,
+      audit: auditLogs.length,
+      security: securityLogs.length,
+    },
+    truncated: data.truncated,
+    chartBuckets: [],
+    productLogs,
+    auditLogs,
+    securityLogs,
+    list: {
+      productLogs: [],
+      auditLogs: [],
+      securityLogs: [],
+      total: 0,
+      page,
+      pageSize,
+    },
+  } satisfies AdminLogsPageData;
+  const filteredList = filterAndSortLogs({
+    unifiedLogs: buildUnifiedLogs(allLogsPageData),
+    searchValue: options.search ?? '',
+    groupFilter:
+      options.group === 'product' || options.group === 'audit' || options.group === 'security'
+        ? options.group
+        : 'all',
+    nameFilter: options.name || 'all',
+    actorFilter: options.actor || 'all',
+    statusFilter:
+      options.status === 'success' || options.status === 'failure' || options.status === 'blocked'
+        ? options.status
+        : 'all',
+    sortFilter:
+      options.sort === 'oldest' || options.sort === 'actor' || options.sort === 'ip'
+        ? options.sort
+        : 'newest',
+  });
+  const pageStart = (page - 1) * pageSize;
+  const pageItems = filteredList.slice(pageStart, pageStart + pageSize);
+  const productIds = new Set(pageItems.filter((log) => log.group === 'product').map((log) => log.id));
+  const auditIds = new Set(pageItems.filter((log) => log.group === 'audit').map((log) => log.id));
+  const securityIds = new Set(pageItems.filter((log) => log.group === 'security').map((log) => log.id));
 
   return {
     range: data.range,
@@ -68,6 +132,14 @@ export async function getAdminLogsPageData(
     productLogs,
     auditLogs,
     securityLogs,
+    list: {
+      productLogs: productLogs.filter((log) => productIds.has(log.id)),
+      auditLogs: auditLogs.filter((log) => auditIds.has(log.id)),
+      securityLogs: securityLogs.filter((log) => securityIds.has(log.id)),
+      total: filteredList.length,
+      page,
+      pageSize,
+    },
   };
 }
 

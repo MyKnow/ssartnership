@@ -15,6 +15,14 @@ export async function GET(request: NextRequest) {
     preset: searchParams.get('preset'),
     start: searchParams.get('start'),
     end: searchParams.get('end'),
+    page: searchParams.get('page'),
+    pageSize: searchParams.get('pageSize'),
+    search: searchParams.get('search'),
+    group: searchParams.get('group'),
+    name: searchParams.get('name'),
+    actor: searchParams.get('actor'),
+    status: searchParams.get('status'),
+    sort: searchParams.get('sort'),
   });
 
   return NextResponse.json(data);

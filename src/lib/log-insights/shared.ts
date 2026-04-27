@@ -110,12 +110,28 @@ export type AdminLogsPageData = {
   productLogs: ProductLogRecord[];
   auditLogs: AdminAuditLogRecord[];
   securityLogs: AuthSecurityLogRecord[];
+  list: {
+    productLogs: ProductLogRecord[];
+    auditLogs: AdminAuditLogRecord[];
+    securityLogs: AuthSecurityLogRecord[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
 };
 
 export type GetAdminLogsPageDataOptions = {
   preset?: string | null;
   start?: string | null;
   end?: string | null;
+  page?: string | number | null;
+  pageSize?: string | number | null;
+  search?: string | null;
+  group?: string | null;
+  name?: string | null;
+  actor?: string | null;
+  status?: string | null;
+  sort?: string | null;
 };
 
 export type CsvExportOptions = {
