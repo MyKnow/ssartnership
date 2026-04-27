@@ -33,7 +33,15 @@
 
 ## Post-change Measurement
 
-Actual post-change production measurements must be collected from Supabase SQL Editor after the migration is applied and the same traffic scenario is replayed.
+Measured on 2026-04-27 after resetting `pg_stat_statements` and replaying the agreed scenario.
+
+The top queries after reset were Supabase Dashboard metadata/introspection queries, not application traffic:
+
+- Function metadata query: `468.334ms`, source `dashboard`.
+- Available extensions query: `447.802ms`.
+- Table/column metadata query: `127.727ms`.
+
+These are dashboard inspection costs and are not optimized by application code or public schema indexes.
 
 Run this query after the scenario:
 
@@ -71,12 +79,26 @@ Then run the same scenario:
 
 | Area | Before Mean | After Mean | Improvement |
 |---|---:|---:|---:|
-| Timezone lookup | 810.952ms | TBD | TBD |
-| Members heavy query | 582.945ms | TBD | TBD |
-| Members pagination/count | 515.557ms | TBD | TBD |
-| Members year sort | 724.906ms | TBD | TBD |
-| Event logs rollup | 1066.613ms | TBD | TBD |
-| Unique visitor rollup | 569.087ms | TBD | TBD |
+| Timezone lookup | 810.952ms | Not observed | Removed from measured app workload |
+| Members heavy query | 582.945ms | Not observed | Removed from measured app workload |
+| Members pagination/count | 515.557ms | 5.635ms | 98.91% faster |
+| Members year sort | 724.906ms | Not observed | No matching post-change query in replay |
+| Event logs rollup | 1066.613ms | 9.964ms | 99.07% faster |
+| Unique visitor rollup | 569.087ms | 9.964ms | 98.25% faster against combined metric rollup query |
+
+## Post-change Observations
+
+| Area | Query / Pattern | Calls | Total Time | Mean Time | Max Time | Notes |
+|---|---:|---:|---:|---:|---:|---|
+| Dashboard | Function metadata introspection | 1 | 468.334ms | 468.334ms | 468.334ms | Supabase Dashboard, not app traffic |
+| Dashboard | Available extensions metadata | 1 | 447.802ms | 447.802ms | 447.802ms | Supabase Dashboard, not app traffic |
+| Dashboard | Table/column metadata introspection | 1 | 127.727ms | 127.727ms | 127.727ms | Supabase Dashboard, not app traffic |
+| Event Logs | Insert event_logs | 28 | 497.450ms | 17.766ms | 113.086ms | Write path; includes trigger work |
+| Members | Admin members explicit-column list ordered by created_at | 5 | 28.175ms | 5.635ms | 18.745ms | No `avatar_base64`, `password_hash`, or `password_salt` |
+| Metrics | partner_metric_rollups combined query | 6 | 59.781ms | 9.964ms | 45.641ms | Rollup table path, no raw `event_logs` scan observed |
+| Metrics | partner_metric_rollups filtered by granularity | 18 | 35.945ms | 1.997ms | 7.610ms | Rollup table path |
+| Timezone | `pg_timezone_names` | 0 | 0ms | Not observed | Not observed | No matching query after replay |
+| Members | Heavy members COPY/select with sensitive columns | 0 | 0ms | Not observed | Not observed | No matching query after replay |
 
 ## Change Impact Summary
 
@@ -85,3 +107,4 @@ Then run the same scenario:
 - `members_created_at_idx` targets admin list queries ordered by newest members.
 - `event_logs_partner_metric_idx` targets partner metric rollups that filter by partner target, metric event name, and event time.
 - The timezone issue is documented as an observed database statistic without a matching app-level `pg_timezone_names` call in this codebase. If it persists after deployment, inspect database extensions, dashboard tooling, or external clients.
+- The remaining event log cost is now primarily the `event_logs` insert path. Because partner metric rollups are maintained by an insert trigger, this cost includes write-time rollup work rather than the old read-time raw log aggregation.

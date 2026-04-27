@@ -295,6 +295,9 @@ export function canViewPromotionSlide(
   if (!slide.audiences.includes(viewerAudience)) {
     return false;
   }
+  if (viewerAudience === "guest") {
+    return true;
+  }
   if (slide.allowedCampuses.length > 0) {
     const campus = normalizeCampusValue(viewer.campus);
     if (!campus || !slide.allowedCampuses.includes(campus)) {
