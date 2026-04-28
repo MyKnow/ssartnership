@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { shouldUseDbPagedAdminLogList } from "@/lib/log-insights";
 
-test("shouldUseDbPagedAdminLogList allows single-group newest queries without search filters", () => {
+test("shouldUseDbPagedAdminLogList allows newest queries including all-group and search filters", () => {
   assert.equal(
     shouldUseDbPagedAdminLogList(
       {
@@ -12,6 +12,22 @@ test("shouldUseDbPagedAdminLogList allows single-group newest queries without se
         search: "",
         name: "all",
         actor: "all",
+        status: "all",
+      },
+      1,
+      100,
+    ),
+    true,
+  );
+
+  assert.equal(
+    shouldUseDbPagedAdminLogList(
+      {
+        group: "all",
+        sort: "newest",
+        search: "kim",
+        name: "search_execute",
+        actor: "member",
         status: "all",
       },
       1,
@@ -34,12 +50,12 @@ test("shouldUseDbPagedAdminLogList allows single-group newest queries without se
   );
 });
 
-test("shouldUseDbPagedAdminLogList rejects all-group or unsupported filter combinations", () => {
+test("shouldUseDbPagedAdminLogList rejects non-newest sort combinations", () => {
   assert.equal(
     shouldUseDbPagedAdminLogList(
       {
         group: "all",
-        sort: "newest",
+        sort: "oldest",
       },
       1,
       100,
@@ -52,32 +68,6 @@ test("shouldUseDbPagedAdminLogList rejects all-group or unsupported filter combi
       {
         group: "audit",
         sort: "actor",
-      },
-      1,
-      100,
-    ),
-    false,
-  );
-
-  assert.equal(
-    shouldUseDbPagedAdminLogList(
-      {
-        group: "product",
-        sort: "newest",
-        search: "kim",
-      },
-      1,
-      100,
-    ),
-    false,
-  );
-
-  assert.equal(
-    shouldUseDbPagedAdminLogList(
-      {
-        group: "audit",
-        sort: "newest",
-        status: "success",
       },
       1,
       100,

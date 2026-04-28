@@ -30,7 +30,10 @@
 - `wave-9-planning`: done
 - `wave-9-implementation`: done
 - `wave-9-verification`: done
-- `wave-10-planning`: pending
+- `wave-10-planning`: done
+- `wave-10-implementation`: done
+- `wave-10-verification`: done
+- `wave-11-planning`: pending
 
 ## Objective
 
@@ -106,6 +109,7 @@ These are not part of wave 1 because they need production measurements and trigg
 - Keep favorite/review counts on aggregate RPCs for now, and consolidate remaining direct review count paths behind helper functions instead of introducing persisted counters prematurely.
 - Collapse admin overview summary counts into a single RPC instead of issuing repeated `count exact` PostgREST queries from the page loader.
 - Use DB-side current-page loading for simple single-group admin log exploration cases instead of reading the whole range into memory first.
+- Push newest-first admin log list filtering for `all-group`, `search`, `name`, `actor`, and `status` through a single DB RPC instead of broad in-memory fallback reads.
 
 ### Deferred
 
@@ -165,6 +169,10 @@ These are not part of wave 1 because they need production measurements and trigg
 - Added a DB-paged single-group list path for product, audit, and security logs when the request uses newest ordering without search/name/actor filters.
 - Kept `all`-group and richer filter combinations on the existing in-memory fallback path to avoid widening the query rewrite scope in one wave.
 - Added strategy tests for the new admin log loading predicate and reran focused eslint, focused tests, and production build.
+- Started wave 10 planning for newest-first admin log filtering. Current issue: `all-group`, `search`, `name`, and `actor` combinations still fall back to broad range reads even though the UI only needs one page of rows.
+- Added `20260501012009_admin_logs_page_rpc.sql` with `get_admin_logs_page(...)` to page newest-first log rows across product, audit, and security logs inside Postgres.
+- Reworked the admin log loader so newest-first requests use the DB RPC for all-group and filter-heavy list queries, while `oldest/actor/ip` sorts still stay on the existing fallback path.
+- Synced `supabase/schema.sql`, updated loading-strategy tests, and reran migration validation, focused eslint, focused tests, and production build.
 
 ## Verification
 
@@ -191,6 +199,10 @@ npm run validate:migrations
 npx eslint src/lib/partner-counts.ts 'src/app/admin/(protected)/page.tsx' tests/partner-counts.test.mts
 node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts tests/partner-counts-visibility.test.mts tests/partner-setup-fallback.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
 npm run build
+npx eslint src/lib/log-insights.ts src/lib/log-insights/data.ts tests/admin-log-loading-strategy.test.mts
+node --import ./tests/alias-register.mjs --test tests/admin-log-loading-strategy.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
+npm run build
+npm run validate:migrations
 npx eslint src/lib/log-insights.ts src/lib/log-insights/data.ts tests/admin-log-loading-strategy.test.mts
 node --import ./tests/alias-register.mjs --test tests/admin-log-loading-strategy.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
 npm run build
@@ -225,6 +237,10 @@ Results:
 - wave 9 focused node tests: 8 passed, 0 failed
 - wave 9 focused eslint: passed
 - wave 9 production build: passed
+- wave 10 migration validation: passed
+- wave 10 focused node tests: 8 passed, 0 failed
+- wave 10 focused eslint: passed
+- wave 10 production build: passed
 
 After migration deployment, re-measure:
 

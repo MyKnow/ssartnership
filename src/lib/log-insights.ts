@@ -1,6 +1,7 @@
 import { createAdminLogsCsvStream } from './log-insights/csv';
 import {
   loadAdminLogListPage,
+  loadAdminLogNormalizedPage,
   loadAdminLogRows,
   loadAdminLogSummaryRows,
   resolveActorMeta,
@@ -82,28 +83,16 @@ function shouldUseSplitAdminLogLoading(options: GetAdminLogsPageDataOptions, pag
 
 export function shouldUseDbPagedAdminLogList(
   options: GetAdminLogsPageDataOptions,
-  page: number,
-  pageSize: number,
+  _page: number,
+  _pageSize: number,
 ) {
-  const group =
-    options.group === 'product' || options.group === 'audit' || options.group === 'security'
-      ? options.group
-      : 'all';
+  void _page;
+  void _pageSize;
   const sort = options.sort ?? 'newest';
-  const hasUnsupportedFilter =
-    Boolean(options.search?.trim()) ||
-    Boolean(options.name && options.name !== 'all') ||
-    Boolean(options.actor && options.actor !== 'all');
-
-  if (hasUnsupportedFilter || sort !== 'newest' || group === 'all') {
+  if (sort !== 'newest') {
     return false;
   }
-
-  if (group !== 'security' && options.status && options.status !== 'all') {
-    return false;
-  }
-
-  return page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
+  return true;
 }
 
 export async function getAdminLogsPageData(
@@ -119,12 +108,19 @@ export async function getAdminLogsPageData(
         maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
       });
   const listSourceData = useDbPagedList
-    ? await loadAdminLogListPage(options, {
-        group: options.group as LogGroup,
-        page,
-        pageSize,
-        status: options.status,
-      })
+    ? (
+      options.group === 'product' || options.group === 'audit' || options.group === 'security'
+        ? await loadAdminLogListPage(options, {
+            group: options.group as LogGroup,
+            page,
+            pageSize,
+            status: options.status,
+          })
+        : await loadAdminLogNormalizedPage(options, {
+            page,
+            pageSize,
+          })
+    )
     : useSplitLoading
       ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
           maxRowsPerGroup: page * pageSize,

@@ -237,6 +237,140 @@ export async function loadAdminLogSummaryRows(
   });
 }
 
+type AdminLogPageRpcRow = {
+  group_name: LogGroup;
+  id: string;
+  name: string;
+  status: string | null;
+  actor_type: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  actor_mm_username: string | null;
+  identifier: string | null;
+  ip_address: string | null;
+  path: string | null;
+  referrer: string | null;
+  target_type: string | null;
+  target_id: string | null;
+  properties: Record<string, unknown> | null;
+  created_at: string;
+  total_count: number | string | null;
+};
+
+function parseRpcCount(value: number | string | null | undefined) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+export async function loadAdminLogNormalizedPage(
+  options: GetAdminLogsPageDataOptions,
+  config: {
+    page: number;
+    pageSize: number;
+  },
+) {
+  const supabase = getSupabaseAdminClient();
+  const range = resolveLogRange(options);
+  const { data, error } = await supabase.rpc('get_admin_logs_page', {
+    input_start: range.start,
+    input_end: range.end,
+    input_page: config.page,
+    input_page_size: config.pageSize,
+    input_group: options.group ?? 'all',
+    input_search: options.search ?? '',
+    input_name: options.name ?? 'all',
+    input_actor: options.actor ?? 'all',
+    input_status: options.status ?? 'all',
+  });
+
+  if (error) {
+    console.error('[log-insights] admin logs page rpc failed', error.message);
+    return {
+      range,
+      productRows: [] as ProductLogRow[],
+      auditRows: [] as AdminAuditLogRow[],
+      securityRows: [] as AuthSecurityLogRow[],
+      memberLookup: new Map<string, MemberLookupRecord>(),
+      total: 0,
+    };
+  }
+
+  const rows = (data ?? []) as AdminLogPageRpcRow[];
+  const memberLookup = new Map<string, MemberLookupRecord>();
+  for (const row of rows) {
+    if (row.actor_type !== 'member' || !row.actor_id) {
+      continue;
+    }
+    memberLookup.set(row.actor_id, {
+      id: row.actor_id,
+      display_name: row.actor_name,
+      mm_username: row.actor_mm_username,
+      actor_name: row.actor_name,
+    });
+  }
+  const productRows = rows
+    .filter((row) => row.group_name === 'product')
+    .map((row) => ({
+      id: row.id,
+      session_id: null,
+      actor_type: (row.actor_type ?? 'guest') as ProductLogRow['actor_type'],
+      actor_id: row.actor_id,
+      event_name: row.name,
+      path: row.path,
+      referrer: row.referrer,
+      target_type: row.target_type,
+      target_id: row.target_id,
+      properties: row.properties,
+      ip_address: row.ip_address,
+      created_at: row.created_at,
+      created_at_ms: new Date(row.created_at).getTime(),
+    })) as ProductLogRow[];
+  const auditRows = rows
+    .filter((row) => row.group_name === 'audit')
+    .map((row) => ({
+      id: row.id,
+      actor_id: row.actor_id,
+      action: row.name,
+      path: row.path,
+      target_type: row.target_type,
+      target_id: row.target_id,
+      properties: row.properties,
+      ip_address: row.ip_address,
+      created_at: row.created_at,
+      created_at_ms: new Date(row.created_at).getTime(),
+    })) as AdminAuditLogRow[];
+  const securityRows = rows
+    .filter((row) => row.group_name === 'security')
+    .map((row) => ({
+      id: row.id,
+      event_name: row.name,
+      status: row.status ?? 'failure',
+      actor_type: (row.actor_type ?? 'guest') as AuthSecurityLogRow['actor_type'],
+      actor_id: row.actor_id,
+      identifier: row.identifier,
+      path: row.path,
+      properties: row.properties,
+      ip_address: row.ip_address,
+      created_at: row.created_at,
+      created_at_ms: new Date(row.created_at).getTime(),
+    })) as AuthSecurityLogRow[];
+
+  return {
+    range,
+    productRows,
+    auditRows,
+    securityRows,
+    memberLookup,
+    total: parseRpcCount(rows[0]?.total_count),
+  };
+}
+
 export async function loadAdminLogListPage(
   options: GetAdminLogsPageDataOptions,
   config: {
