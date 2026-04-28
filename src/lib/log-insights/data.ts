@@ -138,7 +138,7 @@ export async function loadAdminLogRows(
       ? queryAllRows<ProductLogRow>(
           supabase,
           'event_logs',
-          'id,session_id,actor_type,actor_id,event_name,path,referrer,target_type,target_id,properties,user_agent,ip_address,created_at',
+          'id,session_id,actor_type,actor_id,event_name,path,referrer,target_type,target_id,properties,ip_address,created_at',
           range.start,
           range.end,
           config.maxRowsPerGroup,
@@ -148,7 +148,7 @@ export async function loadAdminLogRows(
       ? queryAllRows<AdminAuditLogRow>(
           supabase,
           'admin_audit_logs',
-          'id,actor_id,action,path,target_type,target_id,properties,user_agent,ip_address,created_at',
+          'id,actor_id,action,path,target_type,target_id,properties,ip_address,created_at',
           range.start,
           range.end,
           config.maxRowsPerGroup,
@@ -158,7 +158,7 @@ export async function loadAdminLogRows(
       ? queryAllRows<AuthSecurityLogRow>(
           supabase,
           'auth_security_logs',
-          'id,event_name,status,actor_type,actor_id,identifier,path,properties,user_agent,ip_address,created_at',
+          'id,event_name,status,actor_type,actor_id,identifier,path,properties,ip_address,created_at',
           range.start,
           range.end,
           config.maxRowsPerGroup,

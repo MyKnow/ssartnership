@@ -12,7 +12,10 @@
 - `wave-3-planning`: done
 - `wave-3-implementation`: done
 - `wave-3-verification`: done
-- `wave-4-planning`: pending
+- `wave-4-planning`: done
+- `wave-4-implementation`: done
+- `wave-4-verification`: done
+- `wave-5-planning`: pending
 
 ## Objective
 
@@ -82,6 +85,7 @@ These are not part of wave 1 because they need production measurements and trigg
   - admin review status/rating/date scans
 - Move favorite/review counts from application-side row scans to DB-side aggregate RPCs.
 - Change admin logs page/export loaders to stop querying once a short page is reached instead of prefetching every possible offset up to the configured cap.
+- Remove unused `user_agent` fields from admin logs page/export query payloads.
 
 ### Deferred
 
@@ -116,6 +120,9 @@ These are not part of wave 1 because they need production measurements and trigg
 - Started wave 3 planning for admin logs query pagination. Current issue: page/export loaders precompute every page offset up to the configured ceiling and query them all even when later pages are empty.
 - Added `collectPagedRows` for admin log loading so page/export stops after the first short page instead of firing all theoretical offsets in advance.
 - Added dedicated pagination tests for the new admin log paging helper and reran focused verification plus production build.
+- Started wave 4 planning for admin logs payload slimming. Current observation: `user_agent` is still selected across product/audit/security log loaders but is not consumed by logs page UI or CSV export.
+- Removed `user_agent` from admin logs page/export row types and Supabase selects, then synced the Storybook fixture to the slimmer payload shape.
+- Reran focused eslint, focused tests, and production build after the payload change.
 
 ## Verification
 
@@ -130,6 +137,7 @@ npx eslint src/lib/partner-counts.ts src/lib/repositories/supabase/partner-favor
 node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
 npx eslint src/lib/log-insights/data.ts src/lib/log-insights/paging.ts tests/log-insights-paging.test.mts
 node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
+npx eslint src/lib/log-insights/data.ts src/lib/log-insights/shared.ts src/components/admin/AdminLogsManager.stories.tsx
 ```
 
 Results:
@@ -142,6 +150,8 @@ Results:
 - wave 2 focused eslint: passed
 - wave 3 focused node tests: 10 passed, 0 failed
 - wave 3 focused eslint: passed
+- wave 4 focused eslint: passed
+- wave 4 production build: passed
 
 After migration deployment, re-measure:
 

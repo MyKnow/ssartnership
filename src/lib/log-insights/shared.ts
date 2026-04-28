@@ -27,7 +27,6 @@ export type ProductLogRow = {
   target_type: string | null;
   target_id: string | null;
   properties: Record<string, unknown> | null;
-  user_agent: string | null;
   ip_address: string | null;
   created_at: string;
   created_at_ms?: number;
@@ -41,7 +40,6 @@ export type AdminAuditLogRow = {
   target_type: string | null;
   target_id: string | null;
   properties: Record<string, unknown> | null;
-  user_agent: string | null;
   ip_address: string | null;
   created_at: string;
   created_at_ms?: number;
@@ -56,7 +54,6 @@ export type AuthSecurityLogRow = {
   identifier: string | null;
   path: string | null;
   properties: Record<string, unknown> | null;
-  user_agent: string | null;
   ip_address: string | null;
   created_at: string;
   created_at_ms?: number;
