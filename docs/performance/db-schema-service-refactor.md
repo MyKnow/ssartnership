@@ -15,7 +15,10 @@
 - `wave-4-planning`: done
 - `wave-4-implementation`: done
 - `wave-4-verification`: done
-- `wave-5-planning`: pending
+- `wave-5-planning`: done
+- `wave-5-implementation`: done
+- `wave-5-verification`: done
+- `wave-6-planning`: pending
 
 ## Objective
 
@@ -86,6 +89,7 @@ These are not part of wave 1 because they need production measurements and trigg
 - Move favorite/review counts from application-side row scans to DB-side aggregate RPCs.
 - Change admin logs page/export loaders to stop querying once a short page is reached instead of prefetching every possible offset up to the configured cap.
 - Remove unused `user_agent` fields from admin logs page/export query payloads.
+- Reshape `/api/admin/logs` responses so full-range summary/filter metadata is precomputed on the server while the client receives only the current page log rows.
 
 ### Deferred
 
@@ -123,6 +127,10 @@ These are not part of wave 1 because they need production measurements and trigg
 - Started wave 4 planning for admin logs payload slimming. Current observation: `user_agent` is still selected across product/audit/security log loaders but is not consumed by logs page UI or CSV export.
 - Removed `user_agent` from admin logs page/export row types and Supabase selects, then synced the Storybook fixture to the slimmer payload shape.
 - Reran focused eslint, focused tests, and production build after the payload change.
+- Started wave 5 planning for admin logs response shaping. Current issue: `/api/admin/logs` still returns full-range product/audit/security arrays even though the client only needs precomputed summaries plus the current page rows.
+- Reworked `AdminLogsPageData` so summary cards, filter metadata, and chart inputs are precomputed server-side while only paged list rows are sent to the client.
+- Updated admin logs selectors and manager state to derive visible explorer rows from `data.list.*` only.
+- Synced the admin logs Storybook fixture to the new response shape and reran focused eslint, focused tests, and production build.
 
 ## Verification
 
@@ -138,6 +146,8 @@ node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts te
 npx eslint src/lib/log-insights/data.ts src/lib/log-insights/paging.ts tests/log-insights-paging.test.mts
 node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
 npx eslint src/lib/log-insights/data.ts src/lib/log-insights/shared.ts src/components/admin/AdminLogsManager.stories.tsx
+npx eslint src/lib/log-insights.ts src/lib/log-insights/shared.ts src/components/admin/logs/selectors.ts src/components/admin/logs-manager/useAdminLogsManager.ts src/components/admin/AdminLogsManager.stories.tsx
+node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
 ```
 
 Results:
@@ -152,6 +162,9 @@ Results:
 - wave 3 focused eslint: passed
 - wave 4 focused eslint: passed
 - wave 4 production build: passed
+- wave 5 focused node tests: 10 passed, 0 failed
+- wave 5 focused eslint: passed
+- wave 5 production build: passed
 
 After migration deployment, re-measure:
 

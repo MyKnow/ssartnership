@@ -3,11 +3,21 @@ import { loadAdminLogRows, resolveActorMeta } from './log-insights/data';
 import { buildChartBuckets } from './log-insights/range';
 import {
   buildUnifiedLogs,
+  createTopActors,
+  createTopAuditActions,
+  createTopIps,
+  createTopPaths,
+  createTopProductEvents,
+  getActorOptions,
+  getAvailableLogNames,
+  getSecurityStatusCounts,
   filterAndSortLogs,
 } from '@/components/admin/logs/selectors';
 import type {
   AdminAuditLogRow,
+  AdminLogsFilterMeta,
   AdminLogsPageData,
+  AdminLogsSummary,
   AuthSecurityLogRecord,
   CsvExportOptions,
   GetAdminLogsPageDataOptions,
@@ -23,6 +33,7 @@ export type {
   AdminAuditLogRecord,
   AdminLogsLoadedData,
   AdminLogsPageData,
+  AdminLogsRecordCollections,
   AdminSupabaseClient,
   AuthSecurityLogRecord,
   AuthSecurityLogRow,
@@ -70,29 +81,31 @@ export async function getAdminLogsPageData(
   }));
   const page = parsePage(options.page);
   const pageSize = parsePageSize(options.pageSize);
-  const allLogsPageData = {
-    range: data.range,
-    counts: {
-      product: productLogs.length,
-      audit: auditLogs.length,
-      security: securityLogs.length,
-    },
-    truncated: data.truncated,
-    chartBuckets: [],
+  const fullRecords = {
     productLogs,
     auditLogs,
     securityLogs,
-    list: {
-      productLogs: [],
-      auditLogs: [],
-      securityLogs: [],
-      total: 0,
-      page,
-      pageSize,
-    },
-  } satisfies AdminLogsPageData;
+  };
+  const unifiedLogs = buildUnifiedLogs(fullRecords);
+  const filters: AdminLogsFilterMeta = {
+    availableNames: getAvailableLogNames(
+      unifiedLogs,
+      options.group === 'product' || options.group === 'audit' || options.group === 'security'
+        ? options.group
+        : 'all',
+    ),
+    actorOptions: getActorOptions(unifiedLogs),
+  };
+  const summary: AdminLogsSummary = {
+    topProductEvents: createTopProductEvents(fullRecords),
+    topAuditActions: createTopAuditActions(fullRecords),
+    topActors: createTopActors(unifiedLogs),
+    topIps: createTopIps(unifiedLogs),
+    topPaths: createTopPaths(unifiedLogs),
+    securityStatusCounts: getSecurityStatusCounts(fullRecords),
+  };
   const filteredList = filterAndSortLogs({
-    unifiedLogs: buildUnifiedLogs(allLogsPageData),
+    unifiedLogs,
     searchValue: options.search ?? '',
     groupFilter:
       options.group === 'product' || options.group === 'audit' || options.group === 'security'
@@ -129,9 +142,8 @@ export async function getAdminLogsPageData(
       auditLogs,
       securityLogs,
     ),
-    productLogs,
-    auditLogs,
-    securityLogs,
+    filters,
+    summary,
     list: {
       productLogs: productLogs.filter((log) => productIds.has(log.id)),
       auditLogs: auditLogs.filter((log) => auditIds.has(log.id)),

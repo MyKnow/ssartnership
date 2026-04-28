@@ -1,8 +1,8 @@
-import type { AdminLogsPageData } from "@/lib/log-insights";
+import type { AdminLogsRecordCollections } from "@/lib/log-insights";
 import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from "./types";
 import { getActorSearchLabel, getLogLabel, stringifyForSearch } from "./utils.ts";
 
-export function buildUnifiedLogs(data: AdminLogsPageData): NormalizedLog[] {
+export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLog[] {
   const normalizedProduct = data.productLogs.map((log) => {
     const actorSearchLabel = getActorSearchLabel({
       actorType: log.actor_type,
@@ -216,7 +216,7 @@ function buildTopList(entries: Array<[string, number]>) {
     .map(([label, value]) => ({ label, value: `${value}건` }));
 }
 
-export function createTopProductEvents(data: AdminLogsPageData) {
+export function createTopProductEvents(data: AdminLogsRecordCollections) {
   const counts = new Map<string, number>();
   data.productLogs.forEach((log) => {
     const key = String(log.event_name);
@@ -230,7 +230,7 @@ export function createTopProductEvents(data: AdminLogsPageData) {
   );
 }
 
-export function createTopAuditActions(data: AdminLogsPageData) {
+export function createTopAuditActions(data: AdminLogsRecordCollections) {
   const counts = new Map<string, number>();
   data.auditLogs.forEach((log) => {
     const key = String(log.action);
@@ -278,7 +278,7 @@ export function createTopPaths(unifiedLogs: NormalizedLog[]) {
   return buildTopList(Array.from(counts.entries()));
 }
 
-export function getSecurityStatusCounts(data: AdminLogsPageData) {
+export function getSecurityStatusCounts(data: AdminLogsRecordCollections) {
   return {
     success: data.securityLogs.filter((log) => log.status === "success").length,
     failure: data.securityLogs.filter((log) => log.status === "failure").length,

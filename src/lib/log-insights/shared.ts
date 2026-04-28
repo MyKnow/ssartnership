@@ -89,6 +89,37 @@ export type LogChartBucket = {
   total: number;
 };
 
+export type InsightListItem = {
+  label: string;
+  value: string;
+};
+
+export type SecurityStatusCounts = {
+  success: number;
+  failure: number;
+  blocked: number;
+};
+
+export type AdminLogsFilterMeta = {
+  availableNames: Array<{ value: string; label: string }>;
+  actorOptions: string[];
+};
+
+export type AdminLogsSummary = {
+  topProductEvents: InsightListItem[];
+  topAuditActions: InsightListItem[];
+  topActors: InsightListItem[];
+  topIps: InsightListItem[];
+  topPaths: InsightListItem[];
+  securityStatusCounts: SecurityStatusCounts;
+};
+
+export type AdminLogsRecordCollections = {
+  productLogs: ProductLogRecord[];
+  auditLogs: AdminAuditLogRecord[];
+  securityLogs: AuthSecurityLogRecord[];
+};
+
 export type AdminLogsPageData = {
   range: ResolvedLogRange;
   counts: {
@@ -104,9 +135,8 @@ export type AdminLogsPageData = {
     limitPerGroup: number;
   };
   chartBuckets: LogChartBucket[];
-  productLogs: ProductLogRecord[];
-  auditLogs: AdminAuditLogRecord[];
-  securityLogs: AuthSecurityLogRecord[];
+  filters: AdminLogsFilterMeta;
+  summary: AdminLogsSummary;
   list: {
     productLogs: ProductLogRecord[];
     auditLogs: AdminAuditLogRecord[];

@@ -4,14 +4,6 @@ import { useMemo, useState } from 'react';
 import { useToast } from '@/components/ui/Toast';
 import {
   buildUnifiedLogs,
-  createTopActors,
-  createTopAuditActions,
-  createTopIps,
-  createTopPaths,
-  createTopProductEvents,
-  getActorOptions,
-  getAvailableLogNames,
-  getSecurityStatusCounts,
 } from '@/components/admin/logs/selectors';
 import {
   toDateTimeLocalValue,
@@ -65,33 +57,28 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     useState<(typeof LOG_PAGE_SIZE_OPTIONS)[number]>(initialData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number]);
   const [pageInputValue, setPageInputValue] = useState(String(initialData.list.page));
 
-  const unifiedLogs = useMemo<NormalizedLog[]>(() => buildUnifiedLogs(data), [data]);
   const visibleLogs = useMemo<NormalizedLog[]>(
     () =>
       buildUnifiedLogs({
-        ...data,
         productLogs: data.list.productLogs,
         auditLogs: data.list.auditLogs,
         securityLogs: data.list.securityLogs,
       }),
     [data],
   );
-  const availableNames = useMemo(
-    () => getAvailableLogNames(unifiedLogs, groupFilter),
-    [groupFilter, unifiedLogs],
-  );
-  const actorOptions = useMemo(() => getActorOptions(unifiedLogs), [unifiedLogs]);
+  const availableNames = data.filters.availableNames;
+  const actorOptions = data.filters.actorOptions;
   const filteredLogs = visibleLogs;
   const totalPages = Math.max(1, Math.ceil(data.list.total / pageSize));
   const currentPage = Math.min(data.list.page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
   const totalLogs = data.counts.product + data.counts.audit + data.counts.security;
-  const topProductEvents = useMemo(() => createTopProductEvents(data), [data]);
-  const topAuditActions = useMemo(() => createTopAuditActions(data), [data]);
-  const topActors = useMemo(() => createTopActors(unifiedLogs), [unifiedLogs]);
-  const topIps = useMemo(() => createTopIps(unifiedLogs), [unifiedLogs]);
-  const topPaths = useMemo(() => createTopPaths(unifiedLogs), [unifiedLogs]);
-  const securityStatusCounts = useMemo(() => getSecurityStatusCounts(data), [data]);
+  const topProductEvents = data.summary.topProductEvents;
+  const topAuditActions = data.summary.topAuditActions;
+  const topActors = data.summary.topActors;
+  const topIps = data.summary.topIps;
+  const topPaths = data.summary.topPaths;
+  const securityStatusCounts = data.summary.securityStatusCounts;
 
   function syncPage(nextPage: number) {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
@@ -315,7 +302,6 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     exportGroups,
     isExporting,
     errorMessage,
-    unifiedLogs,
     availableNames,
     actorOptions,
     filteredLogs,
