@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { isAdminSession } from "@/lib/auth";
+import { getAdminSession, isAdminSession } from "@/lib/auth";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { logAdminAction, revalidateReviewPaths } from "./shared-helpers";
@@ -23,7 +23,11 @@ export async function hidePartnerReviewAction(formData: FormData) {
     redirectAdminActionError(returnTo, "review_invalid_request");
   }
 
-  const hidden = await partnerReviewRepository.hidePartnerReview(reviewId);
+  const adminSession = await getAdminSession();
+  const hidden = await partnerReviewRepository.hidePartnerReview(reviewId, {
+    actorType: "admin",
+    adminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? "admin",
+  });
   if (!hidden) {
     redirectAdminActionError(returnTo, "review_not_found");
   }
@@ -51,7 +55,11 @@ export async function restorePartnerReviewAction(formData: FormData) {
     redirectAdminActionError(returnTo, "review_invalid_request");
   }
 
-  const restored = await partnerReviewRepository.restorePartnerReview(reviewId);
+  const adminSession = await getAdminSession();
+  const restored = await partnerReviewRepository.restorePartnerReview(reviewId, {
+    actorType: "admin",
+    adminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? "admin",
+  });
   if (!restored) {
     redirectAdminActionError(returnTo, "review_not_found");
   }

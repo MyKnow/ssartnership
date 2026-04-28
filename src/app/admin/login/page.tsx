@@ -142,13 +142,13 @@ async function loginAction(formData: FormData) {
   ]);
 
   if (ok) {
-    await setAdminSession();
+    await setAdminSession(normalizedId);
     await logAuthSecurity({
       ...context,
       eventName: "admin_login",
       status: "success",
       actorType: "admin",
-      actorId: process.env.ADMIN_ID ?? "admin",
+      actorId: normalizedId,
       identifier: normalizedId,
     });
     redirect("/admin");

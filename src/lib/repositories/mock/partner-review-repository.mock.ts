@@ -17,6 +17,7 @@ import type {
   PartnerReviewModerationRecord,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
+  ReviewModerationActor,
   SetPartnerReviewReactionInput,
   SoftDeletePartnerReviewInput,
   UpdatePartnerReviewInput,
@@ -33,6 +34,8 @@ type MockReviewRecord = {
   deletedAt: string | null;
   deletedByMemberId: string | null;
   hiddenAt: string | null;
+  hiddenByAdminId?: string | null;
+  hiddenByPartnerAccountId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -285,7 +288,10 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     return mapReview(review, input.memberId);
   }
 
-  async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+  async hidePartnerReview(
+    reviewId: string,
+    actor: ReviewModerationActor,
+  ): Promise<HidePartnerReviewResult | null> {
     const review = getStore().reviews.find(
       (item) => item.id === reviewId && item.deletedAt === null && item.hiddenAt === null,
     );
@@ -294,13 +300,20 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     }
     review.hiddenAt = new Date().toISOString();
     review.updatedAt = review.hiddenAt;
+    review.hiddenByAdminId = actor.actorType === "admin" ? actor.adminId : null;
+    review.hiddenByPartnerAccountId =
+      actor.actorType === "partner" ? actor.partnerAccountId : null;
     return {
       reviewId: review.id,
       partnerId: review.partnerId,
     };
   }
 
-  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+  async restorePartnerReview(
+    reviewId: string,
+    actor: ReviewModerationActor,
+  ): Promise<HidePartnerReviewResult | null> {
+    void actor;
     const review = getStore().reviews.find(
       (item) => item.id === reviewId && item.deletedAt === null && item.hiddenAt !== null,
     );
@@ -309,6 +322,8 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     }
     review.hiddenAt = null;
     review.updatedAt = new Date().toISOString();
+    review.hiddenByAdminId = null;
+    review.hiddenByPartnerAccountId = null;
     return {
       reviewId: review.id,
       partnerId: review.partnerId,

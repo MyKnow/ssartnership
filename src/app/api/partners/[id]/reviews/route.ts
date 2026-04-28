@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { deleteReviewMediaUrls } from "@/lib/review-media-storage";
 import {
@@ -92,6 +93,19 @@ export async function POST(
       images: media.images,
     });
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
+    await logProductEvent({
+      ...getRequestLogContext(request),
+      actorType: "member",
+      actorId: session.userId,
+      eventName: "partner_review_create",
+      targetType: "partner_review",
+      targetId: review.id,
+      properties: {
+        partnerId: id,
+        rating: parsed.rating,
+        imageCount: media.images.length,
+      },
+    });
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);

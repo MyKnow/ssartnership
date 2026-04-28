@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { isAdminSession } from '@/lib/auth';
+import { getAdminSession } from '@/lib/auth';
 import {
   type AdminAuditAction,
   type AuthSecurityEventName,
@@ -174,10 +174,11 @@ export async function resolveCurrentActor(): Promise<{
     };
   }
 
-  if (await isAdminSession()) {
+  const adminSession = await getAdminSession();
+  if (adminSession) {
     return {
       actorType: 'admin',
-      actorId: process.env.ADMIN_ID ?? 'admin',
+      actorId: adminSession.adminId,
     };
   }
 
@@ -220,8 +221,9 @@ export async function logProductEvent(input: ProductLogInput) {
 }
 
 export async function logAdminAudit(input: AdminAuditInput) {
+  const adminSession = await getAdminSession();
   await insertLog('admin_audit_logs', {
-    actor_id: input.actorId ?? process.env.ADMIN_ID ?? 'admin',
+    actor_id: input.actorId ?? adminSession?.adminId ?? process.env.ADMIN_ID ?? 'admin',
     action: input.action,
     path: input.path ?? null,
     target_type: input.targetType ?? null,

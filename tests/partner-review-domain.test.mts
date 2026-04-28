@@ -198,7 +198,10 @@ describe("mock partner review repository", () => {
     const { MockPartnerReviewRepository } = await mockPartnerReviewRepositoryPromise;
     const repository = new MockPartnerReviewRepository();
 
-    const hidden = await repository.hidePartnerReview("mock-review-1");
+    const hidden = await repository.hidePartnerReview("mock-review-1", {
+      actorType: "partner",
+      partnerAccountId: "mock-partner-account-1",
+    });
     assert.deepEqual(hidden, {
       reviewId: "mock-review-1",
       partnerId: "health-001",
@@ -215,7 +218,10 @@ describe("mock partner review repository", () => {
     const moderationRecord = await repository.getPartnerReviewModerationRecord("mock-review-1");
     assert.notEqual(moderationRecord?.hiddenAt, null);
 
-    const restored = await repository.restorePartnerReview("mock-review-1");
+    const restored = await repository.restorePartnerReview("mock-review-1", {
+      actorType: "partner",
+      partnerAccountId: "mock-partner-account-1",
+    });
     assert.deepEqual(restored, {
       reviewId: "mock-review-1",
       partnerId: "health-001",

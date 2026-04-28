@@ -11,6 +11,12 @@ const COOKIE_NAME = "admin_session";
 const SESSION_TTL_DAYS = 7;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
+type AdminSessionPayload = {
+  issuedAt: number;
+  expiresAt: number;
+  adminId: string;
+};
+
 function getSecret() {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) {
@@ -30,37 +36,47 @@ function signPayload(payload: string) {
   return `${payload}.${signature}`;
 }
 
-function verifyToken(token: string) {
+function parseAdminSessionToken(token: string): AdminSessionPayload | null {
   const signedToken = splitSignedToken(token);
   if (!signedToken) {
-    return false;
+    return null;
   }
   const [payload, signature] = signedToken;
   if (!payload || !signature) {
-    return false;
+    return null;
   }
   if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
-    return false;
+    return null;
   }
   try {
-    const parsed = JSON.parse(payload) as { issuedAt?: number; expiresAt?: number };
+    const parsed = JSON.parse(payload) as Partial<AdminSessionPayload>;
     if (
       typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number"
+      typeof parsed.expiresAt !== "number" ||
+      typeof parsed.adminId !== "string" ||
+      parsed.adminId.length === 0
     ) {
-      return false;
+      return null;
     }
-    return parsed.expiresAt > Date.now() && parsed.issuedAt <= Date.now();
+    if (!(parsed.expiresAt > Date.now() && parsed.issuedAt <= Date.now())) {
+      return null;
+    }
+    return {
+      issuedAt: parsed.issuedAt,
+      expiresAt: parsed.expiresAt,
+      adminId: parsed.adminId,
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function setAdminSession() {
+export async function setAdminSession(adminId: string) {
   const now = Date.now();
   const payload = JSON.stringify({
     issuedAt: now,
     expiresAt: now + SESSION_TTL_MS,
+    adminId,
   });
   const token = signPayload(payload);
   const cookieStore = await cookies();
@@ -79,15 +95,23 @@ export async function clearAdminSession() {
 }
 
 export async function isAdminSession() {
+  return (await getAdminSession()) !== null;
+}
+
+export async function getAdminSession(): Promise<{
+  adminId: string;
+  issuedAt: number;
+  expiresAt: number;
+} | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) {
-    return false;
+    return null;
   }
   try {
-    return verifyToken(token);
+    return parseAdminSessionToken(token);
   } catch {
-    return false;
+    return null;
   }
 }
 

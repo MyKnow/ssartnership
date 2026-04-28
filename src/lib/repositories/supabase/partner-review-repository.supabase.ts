@@ -19,6 +19,7 @@ import type {
   PartnerReviewModerationRecord,
   PartnerReviewOwnedRecord,
   PartnerReviewRepository,
+  ReviewModerationActor,
   SetPartnerReviewReactionInput,
   SoftDeletePartnerReviewInput,
   UpdatePartnerReviewInput,
@@ -398,13 +399,19 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     return mapReview(review as PartnerReviewRow, input.memberId, reactionStates.get(input.reviewId));
   }
 
-  async hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+  async hidePartnerReview(
+    reviewId: string,
+    actor: ReviewModerationActor,
+  ): Promise<HidePartnerReviewResult | null> {
     const supabase = getSupabaseAdminClient();
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from("partner_reviews")
       .update({
         hidden_at: now,
+        hidden_by_admin_id: actor.actorType === "admin" ? actor.adminId : null,
+        hidden_by_partner_account_id:
+          actor.actorType === "partner" ? actor.partnerAccountId : null,
         updated_at: now,
       })
       .eq("id", reviewId)
@@ -426,13 +433,19 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     };
   }
 
-  async restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null> {
+  async restorePartnerReview(
+    reviewId: string,
+    actor: ReviewModerationActor,
+  ): Promise<HidePartnerReviewResult | null> {
+    void actor;
     const supabase = getSupabaseAdminClient();
     const now = new Date().toISOString();
     const { data, error } = await supabase
       .from("partner_reviews")
       .update({
         hidden_at: null,
+        hidden_by_admin_id: null,
+        hidden_by_partner_account_id: null,
         updated_at: now,
       })
       .eq("id", reviewId)

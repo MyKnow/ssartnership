@@ -19,6 +19,11 @@ export const PRODUCT_EVENT_NAMES = [
   'certification_view',
   'certification_qr_open',
   'certification_qr_verify',
+  'partner_review_create',
+  'partner_review_update',
+  'partner_review_delete',
+  'partner_review_recommend',
+  'partner_review_disrecommend',
 ] as const;
 
 export type ProductEventName = (typeof PRODUCT_EVENT_NAMES)[number];

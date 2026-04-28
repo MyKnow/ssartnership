@@ -53,6 +53,16 @@ export type HidePartnerReviewResult = {
   partnerId: string;
 };
 
+export type ReviewModerationActor =
+  | {
+      actorType: "admin";
+      adminId: string;
+    }
+  | {
+      actorType: "partner";
+      partnerAccountId: string;
+    };
+
 export type PartnerReviewModerationRecord = {
   id: string;
   partnerId: string;
@@ -78,8 +88,14 @@ export interface PartnerReviewRepository {
   setPartnerReviewReaction(
     input: SetPartnerReviewReactionInput,
   ): Promise<PartnerReview>;
-  hidePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;
-  restorePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;
+  hidePartnerReview(
+    reviewId: string,
+    actor: ReviewModerationActor,
+  ): Promise<HidePartnerReviewResult | null>;
+  restorePartnerReview(
+    reviewId: string,
+    actor: ReviewModerationActor,
+  ): Promise<HidePartnerReviewResult | null>;
   deletePartnerReview(reviewId: string): Promise<HidePartnerReviewResult | null>;
   getPartnerReviewModerationRecord(
     reviewId: string,

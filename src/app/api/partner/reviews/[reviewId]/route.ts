@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import { getPartnerSession } from "@/lib/partner-session";
 import { partnerReviewRepository } from "@/lib/repositories";
@@ -47,8 +48,14 @@ export async function PATCH(
 
   const result =
     action === "hide"
-      ? await partnerReviewRepository.hidePartnerReview(reviewId)
-      : await partnerReviewRepository.restorePartnerReview(reviewId);
+      ? await partnerReviewRepository.hidePartnerReview(reviewId, {
+          actorType: "partner",
+          partnerAccountId: session.accountId,
+        })
+      : await partnerReviewRepository.restorePartnerReview(reviewId, {
+          actorType: "partner",
+          partnerAccountId: session.accountId,
+        });
 
   if (!result) {
     return NextResponse.json(
@@ -58,5 +65,18 @@ export async function PATCH(
   }
 
   revalidatePartnerReviewPaths(result.partnerId);
+  await logAdminAudit({
+    ...getRequestLogContext(request),
+    actorId: session.accountId,
+    action: action === "hide" ? "partner_review_hide" : "partner_review_restore",
+    targetType: "partner_review",
+    targetId: reviewId,
+    properties: {
+      partnerId: result.partnerId,
+      companyIds: session.companyIds,
+      actorLoginId: session.loginId,
+      actorDisplayName: session.displayName,
+    },
+  });
   return NextResponse.json({ ok: true });
 }

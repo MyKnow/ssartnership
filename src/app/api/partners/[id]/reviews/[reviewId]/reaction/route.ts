@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { ensureVisibleReviewPartner, getReviewMemberSession } from "../../_shared";
 
@@ -54,6 +55,24 @@ export async function PATCH(
       memberId: session.userId,
       reaction,
     });
+    if (reaction) {
+      await logProductEvent({
+        ...getRequestLogContext(request),
+        actorType: "member",
+        actorId: session.userId,
+        eventName:
+          reaction === "recommend"
+            ? "partner_review_recommend"
+            : "partner_review_disrecommend",
+        targetType: "partner_review",
+        targetId: reviewId,
+        properties: {
+          partnerId: id,
+          reaction,
+          resultingMyReaction: review.myReaction,
+        },
+      });
+    }
     return NextResponse.json({ ok: true, review });
   } catch (error) {
     const message =
