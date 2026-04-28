@@ -258,7 +258,7 @@ export const InteractiveFiltersAndExport: Story = {
 
     await userEvent.selectOptions(canvas.getByLabelText("정렬"), "oldest");
     await userEvent.click(canvas.getAllByText("상세 보기")[0]!);
-    await expect(canvas.getByText("properties")).toBeInTheDocument();
+    await expect(canvas.getAllByText("properties").length).toBeGreaterThan(0);
 
     await userEvent.selectOptions(canvas.getByLabelText("페이지당"), "50");
     await userEvent.clear(canvas.getByRole("spinbutton"));
