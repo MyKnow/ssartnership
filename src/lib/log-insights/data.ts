@@ -14,6 +14,7 @@ import type {
 import {
   MEMBER_LOOKUP_CHUNK_SIZE,
   QUERY_PAGE_SIZE,
+  SUMMARY_MAX_LOG_ROWS_PER_GROUP,
   uniqueLogGroups,
 } from './shared';
 import { resolveLogRange } from './range';
@@ -127,18 +128,22 @@ export async function loadAdminLogRows(
   groups: LogGroup[] = ['product', 'audit', 'security'],
   config: {
     maxRowsPerGroup: number;
+    shape?: 'full' | 'summary';
   },
 ): Promise<AdminLogsLoadedData> {
   const supabase = getSupabaseAdminClient();
   const range = resolveLogRange(options);
   const selectedGroups = uniqueLogGroups(groups);
+  const shape = config.shape ?? 'full';
 
   const [productResult, auditResult, securityResult] = await Promise.all([
     selectedGroups.includes('product')
       ? queryAllRows<ProductLogRow>(
           supabase,
           'event_logs',
-          'id,session_id,actor_type,actor_id,event_name,path,referrer,target_type,target_id,properties,ip_address,created_at',
+          shape === 'summary'
+            ? 'id,actor_type,actor_id,event_name,path,ip_address,created_at'
+            : 'id,session_id,actor_type,actor_id,event_name,path,referrer,target_type,target_id,properties,ip_address,created_at',
           range.start,
           range.end,
           config.maxRowsPerGroup,
@@ -148,7 +153,9 @@ export async function loadAdminLogRows(
       ? queryAllRows<AdminAuditLogRow>(
           supabase,
           'admin_audit_logs',
-          'id,actor_id,action,path,target_type,target_id,properties,ip_address,created_at',
+          shape === 'summary'
+            ? 'id,actor_id,action,path,ip_address,created_at'
+            : 'id,actor_id,action,path,target_type,target_id,properties,ip_address,created_at',
           range.start,
           range.end,
           config.maxRowsPerGroup,
@@ -158,7 +165,9 @@ export async function loadAdminLogRows(
       ? queryAllRows<AuthSecurityLogRow>(
           supabase,
           'auth_security_logs',
-          'id,event_name,status,actor_type,actor_id,identifier,path,properties,ip_address,created_at',
+          shape === 'summary'
+            ? 'id,event_name,status,actor_type,actor_id,identifier,path,ip_address,created_at'
+            : 'id,event_name,status,actor_type,actor_id,identifier,path,properties,ip_address,created_at',
           range.start,
           range.end,
           config.maxRowsPerGroup,
@@ -167,14 +176,23 @@ export async function loadAdminLogRows(
   ]);
   const productRows = productResult.rows.map((row) => ({
     ...row,
+    session_id: row.session_id ?? null,
+    referrer: row.referrer ?? null,
+    target_type: row.target_type ?? null,
+    target_id: row.target_id ?? null,
+    properties: row.properties ?? null,
     created_at_ms: new Date(row.created_at).getTime(),
   }));
   const auditRows = auditResult.rows.map((row) => ({
     ...row,
+    target_type: row.target_type ?? null,
+    target_id: row.target_id ?? null,
+    properties: row.properties ?? null,
     created_at_ms: new Date(row.created_at).getTime(),
   }));
   const securityRows = securityResult.rows.map((row) => ({
     ...row,
+    properties: row.properties ?? null,
     created_at_ms: new Date(row.created_at).getTime(),
   }));
 
@@ -207,4 +225,14 @@ export async function loadAdminLogRows(
       limitPerGroup: config.maxRowsPerGroup,
     },
   };
+}
+
+export async function loadAdminLogSummaryRows(
+  options: GetAdminLogsPageDataOptions = {},
+  groups: LogGroup[] = ['product', 'audit', 'security'],
+) {
+  return loadAdminLogRows(options, groups, {
+    maxRowsPerGroup: SUMMARY_MAX_LOG_ROWS_PER_GROUP,
+    shape: 'summary',
+  });
 }

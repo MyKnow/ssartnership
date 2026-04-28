@@ -1,5 +1,9 @@
 import { createAdminLogsCsvStream } from './log-insights/csv';
-import { loadAdminLogRows, resolveActorMeta } from './log-insights/data';
+import {
+  loadAdminLogRows,
+  loadAdminLogSummaryRows,
+  resolveActorMeta,
+} from './log-insights/data';
 import { buildChartBuckets } from './log-insights/range';
 import {
   buildUnifiedLogs,
@@ -27,7 +31,7 @@ import type {
 import {
   EXPORT_MAX_LOG_ROWS_PER_GROUP,
   PAGE_MAX_LOG_ROWS_PER_GROUP,
-} from './log-insights/shared';
+  } from './log-insights/shared';
 
 export type {
   AdminAuditLogRecord,
@@ -63,24 +67,53 @@ function parsePageSize(value: string | number | null | undefined) {
     : 100;
 }
 
+function shouldUseSplitAdminLogLoading(options: GetAdminLogsPageDataOptions, page: number, pageSize: number) {
+  const hasComplexFilter =
+    Boolean(options.search?.trim()) ||
+    Boolean(options.group && options.group !== 'all') ||
+    Boolean(options.name && options.name !== 'all') ||
+    Boolean(options.actor && options.actor !== 'all') ||
+    Boolean(options.status && options.status !== 'all');
+
+  const sort = options.sort ?? 'newest';
+  return !hasComplexFilter && sort === 'newest' && page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
+}
+
 export async function getAdminLogsPageData(
   options: GetAdminLogsPageDataOptions = {},
 ): Promise<AdminLogsPageData> {
-  const data = await loadAdminLogRows(options, ['product', 'audit', 'security'], {
-    maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
-  });
-
-  const productLogs: ProductLogRecord[] = data.productRows.map((row) => ({
-    ...row,
-    ...resolveActorMeta(row.actor_type, row.actor_id, data.memberLookup),
-  }));
-  const auditLogs: AdminAuditLogRow[] = data.auditRows;
-  const securityLogs: AuthSecurityLogRecord[] = data.securityRows.map((row) => ({
-    ...row,
-    ...resolveActorMeta(row.actor_type, row.actor_id, data.memberLookup),
-  }));
   const page = parsePage(options.page);
   const pageSize = parsePageSize(options.pageSize);
+  const useSplitLoading = shouldUseSplitAdminLogLoading(options, page, pageSize);
+  const summaryData = useSplitLoading
+    ? await loadAdminLogSummaryRows(options, ['product', 'audit', 'security'])
+    : await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+        maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
+      });
+  const listSourceData = useSplitLoading
+    ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+        maxRowsPerGroup: page * pageSize,
+      })
+    : summaryData;
+
+  const productLogs: ProductLogRecord[] = summaryData.productRows.map((row) => ({
+    ...row,
+    ...resolveActorMeta(row.actor_type, row.actor_id, summaryData.memberLookup),
+  }));
+  const auditLogs: AdminAuditLogRow[] = summaryData.auditRows;
+  const securityLogs: AuthSecurityLogRecord[] = summaryData.securityRows.map((row) => ({
+    ...row,
+    ...resolveActorMeta(row.actor_type, row.actor_id, summaryData.memberLookup),
+  }));
+  const listProductLogs: ProductLogRecord[] = listSourceData.productRows.map((row) => ({
+    ...row,
+    ...resolveActorMeta(row.actor_type, row.actor_id, listSourceData.memberLookup),
+  }));
+  const listAuditLogs: AdminAuditLogRow[] = listSourceData.auditRows;
+  const listSecurityLogs: AuthSecurityLogRecord[] = listSourceData.securityRows.map((row) => ({
+    ...row,
+    ...resolveActorMeta(row.actor_type, row.actor_id, listSourceData.memberLookup),
+  }));
   const fullRecords = {
     productLogs,
     auditLogs,
@@ -105,7 +138,13 @@ export async function getAdminLogsPageData(
     securityStatusCounts: getSecurityStatusCounts(fullRecords),
   };
   const filteredList = filterAndSortLogs({
-    unifiedLogs,
+    unifiedLogs: useSplitLoading
+      ? buildUnifiedLogs({
+          productLogs: listProductLogs,
+          auditLogs: listAuditLogs,
+          securityLogs: listSecurityLogs,
+        })
+      : unifiedLogs,
     searchValue: options.search ?? '',
     groupFilter:
       options.group === 'product' || options.group === 'audit' || options.group === 'security'
@@ -122,6 +161,8 @@ export async function getAdminLogsPageData(
         ? options.sort
         : 'newest',
   });
+  const unfilteredTotal = productLogs.length + auditLogs.length + securityLogs.length;
+  const effectiveFilteredTotal = useSplitLoading ? unfilteredTotal : filteredList.length;
   const pageStart = (page - 1) * pageSize;
   const pageItems = filteredList.slice(pageStart, pageStart + pageSize);
   const productIds = new Set(pageItems.filter((log) => log.group === 'product').map((log) => log.id));
@@ -129,15 +170,15 @@ export async function getAdminLogsPageData(
   const securityIds = new Set(pageItems.filter((log) => log.group === 'security').map((log) => log.id));
 
   return {
-    range: data.range,
+    range: summaryData.range,
     counts: {
       product: productLogs.length,
       audit: auditLogs.length,
       security: securityLogs.length,
     },
-    truncated: data.truncated,
+    truncated: summaryData.truncated,
     chartBuckets: buildChartBuckets(
-      data.range,
+      summaryData.range,
       productLogs,
       auditLogs,
       securityLogs,
@@ -145,10 +186,10 @@ export async function getAdminLogsPageData(
     filters,
     summary,
     list: {
-      productLogs: productLogs.filter((log) => productIds.has(log.id)),
-      auditLogs: auditLogs.filter((log) => auditIds.has(log.id)),
-      securityLogs: securityLogs.filter((log) => securityIds.has(log.id)),
-      total: filteredList.length,
+      productLogs: listProductLogs.filter((log) => productIds.has(log.id)),
+      auditLogs: listAuditLogs.filter((log) => auditIds.has(log.id)),
+      securityLogs: listSecurityLogs.filter((log) => securityIds.has(log.id)),
+      total: effectiveFilteredTotal,
       page,
       pageSize,
     },

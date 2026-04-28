@@ -18,7 +18,10 @@
 - `wave-5-planning`: done
 - `wave-5-implementation`: done
 - `wave-5-verification`: done
-- `wave-6-planning`: pending
+- `wave-6-planning`: done
+- `wave-6-implementation`: done
+- `wave-6-verification`: done
+- `wave-7-planning`: pending
 
 ## Objective
 
@@ -90,6 +93,7 @@ These are not part of wave 1 because they need production measurements and trigg
 - Change admin logs page/export loaders to stop querying once a short page is reached instead of prefetching every possible offset up to the configured cap.
 - Remove unused `user_agent` fields from admin logs page/export query payloads.
 - Reshape `/api/admin/logs` responses so full-range summary/filter metadata is precomputed on the server while the client receives only the current page log rows.
+- Split default admin logs loading so full-range summary queries use thinner selects while the current page list still loads full row detail.
 
 ### Deferred
 
@@ -131,6 +135,9 @@ These are not part of wave 1 because they need production measurements and trigg
 - Reworked `AdminLogsPageData` so summary cards, filter metadata, and chart inputs are precomputed server-side while only paged list rows are sent to the client.
 - Updated admin logs selectors and manager state to derive visible explorer rows from `data.list.*` only.
 - Synced the admin logs Storybook fixture to the new response shape and reran focused eslint, focused tests, and production build.
+- Implemented split loading for the default admin logs view: summary rows now use thinner selects, while the current page list loads full detail only for the needed window.
+- Kept complex search/filter/sort cases on the existing fallback path so behavior stays unchanged while the default path gets lighter.
+- Reran focused eslint, focused tests, and production build after the split-loading change.
 
 ## Verification
 
@@ -147,6 +154,8 @@ npx eslint src/lib/log-insights/data.ts src/lib/log-insights/paging.ts tests/log
 node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
 npx eslint src/lib/log-insights/data.ts src/lib/log-insights/shared.ts src/components/admin/AdminLogsManager.stories.tsx
 npx eslint src/lib/log-insights.ts src/lib/log-insights/shared.ts src/components/admin/logs/selectors.ts src/components/admin/logs-manager/useAdminLogsManager.ts src/components/admin/AdminLogsManager.stories.tsx
+node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
+npx eslint src/lib/log-insights.ts src/lib/log-insights/data.ts src/lib/log-insights/shared.ts src/components/admin/logs-manager/useAdminLogsManager.ts src/components/admin/logs/selectors.ts src/components/admin/AdminLogsManager.stories.tsx
 node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
 ```
 
@@ -165,6 +174,9 @@ Results:
 - wave 5 focused node tests: 10 passed, 0 failed
 - wave 5 focused eslint: passed
 - wave 5 production build: passed
+- wave 6 focused node tests: 10 passed, 0 failed
+- wave 6 focused eslint: passed
+- wave 6 production build: passed
 
 After migration deployment, re-measure:
 
