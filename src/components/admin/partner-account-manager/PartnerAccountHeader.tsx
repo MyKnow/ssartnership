@@ -17,7 +17,7 @@ export default function PartnerAccountHeader({
   account: AdminPartnerAccount;
   generatedSetupUrl?: string | null;
 }) {
-  const hasActiveSetupLink = Boolean(account.initial_setup_expires_at);
+  const hasActiveSetupLink = Boolean(account.initial_setup_link_sent_at);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">

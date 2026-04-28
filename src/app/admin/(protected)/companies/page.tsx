@@ -50,7 +50,6 @@ type PartnerAccountRowRecord = {
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
   initial_setup_link_sent_at?: string | null;
-  initial_setup_expires_at?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -67,7 +66,6 @@ type PartnerAccountRow = {
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
   initial_setup_link_sent_at?: string | null;
-  initial_setup_expires_at?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -114,7 +112,6 @@ function normalizePartnerAccount(
     email_verified_at: row.email_verified_at ?? null,
     initial_setup_completed_at: row.initial_setup_completed_at ?? null,
     initial_setup_link_sent_at: row.initial_setup_link_sent_at ?? null,
-    initial_setup_expires_at: row.initial_setup_expires_at ?? null,
     last_login_at: row.last_login_at ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
@@ -179,7 +176,7 @@ export default async function AdminCompaniesPage({
     supabase
       .from("partner_accounts")
       .select(
-        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at",
+        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,last_login_at,created_at,updated_at",
       )
       .order("created_at", { ascending: false }),
     supabase
