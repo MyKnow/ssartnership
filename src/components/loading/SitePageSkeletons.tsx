@@ -326,6 +326,33 @@ export function HomePageSkeleton() {
   );
 }
 
+export function HomePartnerExploreSkeleton() {
+  return (
+    <section
+      id="partner-explore"
+      className="scroll-mt-24"
+      aria-label="제휴 탐색 로딩"
+    >
+      <section className="mt-10 flex flex-col gap-6">
+        <SectionHeadingSkeleton
+          eyebrowWidth="w-16"
+          titleWidth="w-40"
+          descriptionWidth="max-w-md"
+        />
+        <FilterBarSkeleton />
+      </section>
+
+      <section className="mt-10">
+        <div className="grid justify-items-center gap-x-4 gap-y-6 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <PartnerCardSkeleton key={index} />
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
 export function AuthPageSkeleton() {
   return <AuthLoginPageSkeleton />;
 }

@@ -12,6 +12,117 @@ import { getSupabaseAdminClient } from "../supabase/server.ts";
 
 const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+type PartnerSetupCompletionCommonPayload = {
+  password_hash: string;
+  password_salt: string;
+  must_change_password: boolean;
+  is_active: boolean;
+  email_verified_at: string;
+  initial_setup_completed_at: string;
+  initial_setup_verification_code_hash: null;
+  updated_at: string;
+};
+
+type PartnerSetupCompletionPayloadCandidate = {
+  label: string;
+  payload: ReturnType<typeof buildPartnerSetupCompletionPayload>;
+};
+
+function buildPartnerSetupCompletionPayload(
+  commonPayload: PartnerSetupCompletionCommonPayload,
+  options: {
+    supportsPlainToken: boolean;
+    supportsHash: boolean;
+    supportsExpiry: boolean;
+  },
+) {
+  return {
+    ...commonPayload,
+    ...(options.supportsPlainToken ? { initial_setup_token: null } : {}),
+    ...(options.supportsHash ? { initial_setup_token_hash: null } : {}),
+    ...(options.supportsExpiry ? { initial_setup_expires_at: null } : {}),
+  };
+}
+
+function isMissingSchemaColumn(errorMessage: string, columnName: string) {
+  return errorMessage.includes(`'${columnName}'`);
+}
+
+export function resolvePartnerSetupCompletionFallbackPayload(
+  commonPayload: PartnerSetupCompletionCommonPayload,
+  errorMessage: string,
+) {
+  return buildPartnerSetupCompletionPayload(commonPayload, {
+    supportsPlainToken: !isMissingSchemaColumn(errorMessage, "initial_setup_token"),
+    supportsHash: !isMissingSchemaColumn(errorMessage, "initial_setup_token_hash"),
+    supportsExpiry: !isMissingSchemaColumn(errorMessage, "initial_setup_expires_at"),
+  });
+}
+
+function isMissingPartnerSetupSchemaColumnError(errorMessage: string) {
+  return (
+    isMissingSchemaColumn(errorMessage, "initial_setup_token") ||
+    isMissingSchemaColumn(errorMessage, "initial_setup_token_hash") ||
+    isMissingSchemaColumn(errorMessage, "initial_setup_expires_at")
+  );
+}
+
+function buildPartnerSetupCompletionPayloadCandidates(
+  commonPayload: PartnerSetupCompletionCommonPayload,
+  account: {
+    initial_setup_token?: string | null;
+    initial_setup_token_hash?: string | null;
+    initial_setup_expires_at?: string | null;
+  },
+) : PartnerSetupCompletionPayloadCandidate[] {
+  const supportsPlainToken = "initial_setup_token" in account;
+  const supportsHash = "initial_setup_token_hash" in account;
+  const supportsExpiry = "initial_setup_expires_at" in account;
+
+  return [
+    {
+      label: "detected",
+      payload: buildPartnerSetupCompletionPayload(commonPayload, {
+        supportsPlainToken,
+        supportsHash,
+        supportsExpiry,
+      }),
+    },
+    {
+      label: "no-expiry",
+      payload: buildPartnerSetupCompletionPayload(commonPayload, {
+        supportsPlainToken,
+        supportsHash,
+        supportsExpiry: false,
+      }),
+    },
+    {
+      label: "no-hash",
+      payload: buildPartnerSetupCompletionPayload(commonPayload, {
+        supportsPlainToken,
+        supportsHash: false,
+        supportsExpiry,
+      }),
+    },
+    {
+      label: "legacy",
+      payload: buildPartnerSetupCompletionPayload(commonPayload, {
+        supportsPlainToken: false,
+        supportsHash: false,
+        supportsExpiry: false,
+      }),
+    },
+  ];
+}
+
+function maskPartnerSetupToken(token: string) {
+  if (token.length <= 12) {
+    return token;
+  }
+
+  return `${token.slice(0, 6)}...${token.slice(-6)}`;
+}
+
 function resolveSetupExpiry(account: {
   initial_setup_expires_at?: string | null;
   initial_setup_link_sent_at?: string | null;
@@ -122,32 +233,42 @@ export async function completeSupabasePartnerPortalInitialSetup(
     is_active: true,
     email_verified_at: completedAt,
     initial_setup_completed_at: completedAt,
-    initial_setup_token: null,
-    initial_setup_token_hash: null,
     initial_setup_verification_code_hash: null,
     updated_at: completedAt,
   };
-  const attempt = await supabase
-    .from("partner_accounts")
-    .update({
-      ...basePayload,
-      initial_setup_expires_at: null,
-    })
-    .eq("id", account.id);
+  const payloadCandidates = buildPartnerSetupCompletionPayloadCandidates(basePayload, account);
+  let lastSchemaError: Error | null = null;
 
-  if (attempt.error && !attempt.error.message.includes("initial_setup_expires_at")) {
-    throw attempt.error;
-  }
-
-  if (attempt.error) {
-    const fallback = await supabase
+  for (const candidate of payloadCandidates) {
+    const attempt = await supabase
       .from("partner_accounts")
-      .update(basePayload)
+      .update(candidate.payload)
       .eq("id", account.id);
 
-    if (fallback.error) {
-      throw fallback.error;
+    if (!attempt.error) {
+      lastSchemaError = null;
+      break;
     }
+
+    console.error("[partner-setup] completion update failed", {
+      accountId: account.id,
+      token: maskPartnerSetupToken(input.token),
+      candidate: candidate.label,
+      errorMessage: attempt.error.message,
+      errorCode: "code" in attempt.error ? attempt.error.code : undefined,
+      errorDetails: "details" in attempt.error ? attempt.error.details : undefined,
+      errorHint: "hint" in attempt.error ? attempt.error.hint : undefined,
+    });
+
+    if (!isMissingPartnerSetupSchemaColumnError(attempt.error.message)) {
+      throw attempt.error;
+    }
+
+    lastSchemaError = attempt.error;
+  }
+
+  if (lastSchemaError) {
+    throw lastSchemaError;
   }
 
   return {

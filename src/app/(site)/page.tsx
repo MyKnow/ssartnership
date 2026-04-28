@@ -5,6 +5,7 @@ import HomePushOptInBannerGate from "@/components/HomePushOptInBannerGate";
 import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
+import { HomePartnerExploreSkeleton } from "@/components/loading/SitePageSkeletons";
 import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
 import { getHomePromotionSlides } from "@/lib/promotions/events";
 import {
@@ -122,7 +123,7 @@ export default async function Home() {
           <Suspense fallback={null}>
             <HomePushOptInBannerGate memberId={session?.userId ?? null} />
           </Suspense>
-          <Suspense fallback={null}>
+          <Suspense fallback={<HomePartnerExploreSkeleton />}>
             <HomeContent
               viewerAuthenticated={Boolean(session?.userId)}
               currentUserId={session?.userId ?? null}
