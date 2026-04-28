@@ -21,6 +21,11 @@ type SignedReviewUpload = {
   publicUrl: string;
 };
 
+type SignedReviewUploadHeaders = {
+  apikey?: string;
+  Authorization?: string;
+};
+
 export function formatPartnerReviewDate(value: string) {
   try {
     return formatKoreanDate(value);
@@ -90,6 +95,7 @@ export async function uploadReviewImagesDirectly(input: {
   if (!signResponse.ok) {
     throw new Error(signData.message ?? "리뷰 사진 업로드 URL 발급에 실패했습니다.");
   }
+  const uploadHeaders = (signData.uploadHeaders ?? {}) as SignedReviewUploadHeaders;
 
   const uploads = new Map<string, SignedReviewUpload>(
     ((signData.uploads ?? []) as SignedReviewUpload[]).map((upload) => [
@@ -109,7 +115,10 @@ export async function uploadReviewImagesDirectly(input: {
       body.append("", item.file);
       const uploadResponse = await fetch(upload.signedUrl, {
         method: "PUT",
-        headers: { "x-upsert": "false" },
+        headers: {
+          ...uploadHeaders,
+          "x-upsert": "false",
+        },
         body,
       });
       if (!uploadResponse.ok) {
@@ -129,7 +138,11 @@ export async function uploadReviewImagesDirectly(input: {
     (result): result is PromiseRejectedResult => result.status === "rejected",
   );
   if (failedUpload) {
-    await cleanupDirectUploadedReviewImages(input.partnerId, uploaded.map((item) => item.publicUrl));
+    await cleanupDirectUploadedReviewImages({
+      partnerId: input.partnerId,
+      reviewId: input.reviewId,
+      urls: uploaded.map((item) => item.publicUrl),
+    });
     throw failedUpload.reason instanceof Error
       ? failedUpload.reason
       : new Error("리뷰 사진 업로드에 실패했습니다.");
@@ -150,17 +163,24 @@ export async function uploadReviewImagesDirectly(input: {
   };
 }
 
-async function cleanupDirectUploadedReviewImages(partnerId: string, urls: string[]) {
-  if (urls.length === 0) {
+async function cleanupDirectUploadedReviewImages(input: {
+  partnerId: string;
+  reviewId: string;
+  urls: string[];
+}) {
+  if (input.urls.length === 0) {
     return;
   }
 
   await fetch(
-    `/api/partners/${encodeURIComponent(partnerId)}/reviews/uploads/cleanup`,
+    `/api/partners/${encodeURIComponent(input.partnerId)}/reviews/uploads/cleanup`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls }),
+      body: JSON.stringify({
+        reviewId: input.reviewId,
+        urls: input.urls,
+      }),
     },
   ).catch(() => undefined);
 }

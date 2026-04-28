@@ -4,6 +4,18 @@ import { extractReviewMediaStoragePath, REVIEW_MEDIA_BUCKET } from "@/lib/review
 
 export const REVIEW_MEDIA_CACHE_CONTROL_SECONDS = "31536000";
 
+export function getSignedReviewMediaUploadHeaders() {
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    throw new Error("SUPABASE_ANON_KEY 환경 변수가 필요합니다.");
+  }
+
+  return {
+    apikey: anonKey,
+    Authorization: `Bearer ${anonKey}`,
+  };
+}
+
 export function buildReviewMediaStoragePath(
   partnerId: string,
   reviewId: string,

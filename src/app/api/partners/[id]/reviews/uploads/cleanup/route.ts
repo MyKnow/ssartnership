@@ -4,15 +4,24 @@ import { deleteReviewMediaUrls } from "@/lib/review-media-storage";
 import {
   ensureVisibleReviewPartner,
   getReviewMemberSession,
+  parseRequestedReviewId,
 } from "../../_shared";
 
 export const runtime = "nodejs";
 
-function parseUrls(value: unknown, partnerId: string) {
+function parseReviewId(value: unknown) {
+  const formData = new FormData();
+  if (typeof value === "string") {
+    formData.set("reviewId", value);
+  }
+  return parseRequestedReviewId(formData);
+}
+
+function parseUrls(value: unknown, partnerId: string, reviewId: string) {
   if (!Array.isArray(value)) {
     return [];
   }
-  const expectedPrefix = `reviews/${partnerId.trim()}/`;
+  const expectedPrefix = `reviews/${partnerId.trim()}/${reviewId.trim()}/`;
   return value.filter((item): item is string => {
     if (typeof item !== "string" || item.length === 0) {
       return false;
@@ -41,7 +50,12 @@ export async function POST(
   }
 
   const body = await request.json().catch(() => null);
-  const urls = parseUrls((body as { urls?: unknown } | null)?.urls, id);
+  const reviewId = parseReviewId((body as { reviewId?: unknown } | null)?.reviewId);
+  if (!reviewId) {
+    return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 400 });
+  }
+
+  const urls = parseUrls((body as { urls?: unknown } | null)?.urls, id, reviewId);
   if (urls.length === 0) {
     return NextResponse.json({ ok: true });
   }

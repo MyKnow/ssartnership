@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createSignedReviewMediaUpload } from "@/lib/review-media-storage";
+import {
+  createSignedReviewMediaUpload,
+  getSignedReviewMediaUploadHeaders,
+} from "@/lib/review-media-storage";
 import {
   ensureVisibleReviewPartner,
   getReviewMemberSession,
@@ -91,6 +94,7 @@ export async function POST(
   }
 
   try {
+    const uploadHeaders = getSignedReviewMediaUploadHeaders();
     const uploads = await Promise.all(
       files.map(async (file, index) => ({
         clientId: file.clientId,
@@ -98,7 +102,7 @@ export async function POST(
       })),
     );
 
-    return NextResponse.json({ ok: true, uploads });
+    return NextResponse.json({ ok: true, uploads, uploadHeaders });
   } catch (error) {
     const message =
       error instanceof Error && error.message
