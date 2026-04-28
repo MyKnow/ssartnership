@@ -196,10 +196,6 @@ export default function ResetPasswordForm() {
           <h2 className="text-sm font-semibold text-foreground">
             인증번호 발급 및 확인
           </h2>
-          <p className="text-sm text-muted-foreground">
-            가입된 MM 아이디로 인증번호를 발급받고, 확인이 끝나면 새 비밀번호
-            설정 페이지로 이동합니다.
-          </p>
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
@@ -246,9 +242,6 @@ export default function ResetPasswordForm() {
               <h3 className="text-sm font-semibold text-foreground">
                 인증번호 확인
               </h3>
-              <p className="text-sm text-muted-foreground">
-                방금 받은 인증번호를 입력해 새 비밀번호 설정으로 이동합니다.
-              </p>
             </div>
 
             <div className="mt-4 flex flex-col gap-3">
