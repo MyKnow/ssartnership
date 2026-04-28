@@ -21,7 +21,10 @@
 - `wave-6-planning`: done
 - `wave-6-implementation`: done
 - `wave-6-verification`: done
-- `wave-7-planning`: pending
+- `wave-7-planning`: done
+- `wave-7-implementation`: done
+- `wave-7-verification`: done
+- `wave-8-planning`: pending
 
 ## Objective
 
@@ -94,6 +97,7 @@ These are not part of wave 1 because they need production measurements and trigg
 - Remove unused `user_agent` fields from admin logs page/export query payloads.
 - Reshape `/api/admin/logs` responses so full-range summary/filter metadata is precomputed on the server while the client receives only the current page log rows.
 - Split default admin logs loading so full-range summary queries use thinner selects while the current page list still loads full row detail.
+- Keep favorite/review counts on aggregate RPCs for now, and consolidate remaining direct review count paths behind helper functions instead of introducing persisted counters prematurely.
 
 ### Deferred
 
@@ -138,6 +142,12 @@ These are not part of wave 1 because they need production measurements and trigg
 - Implemented split loading for the default admin logs view: summary rows now use thinner selects, while the current page list loads full detail only for the needed window.
 - Kept complex search/filter/sort cases on the existing fallback path so behavior stays unchanged while the default path gets lighter.
 - Reran focused eslint, focused tests, and production build after the split-loading change.
+- Started wave 7 planning for remaining review count paths. Decision: do not introduce persisted counters yet; first consolidate remaining direct count queries behind RPC helpers and add a member-based review count index.
+- Added `20260501012007_review_count_helpers.sql` with admin review count, partner review visibility count, and member review count range helpers.
+- Added `partner_reviews_member_id_deleted_hidden_created_at_idx` to support member-range review counting without a persisted counter table.
+- Replaced remaining direct review count queries in event rewards, admin review counts, admin home, and admin partner detail with shared helper calls.
+- Kept persisted counters deferred because current read shapes are still bounded and the write-side consistency cost is not yet justified.
+- Reran migration validation, focused eslint, focused tests, and production build.
 
 ## Verification
 
@@ -157,6 +167,9 @@ npx eslint src/lib/log-insights.ts src/lib/log-insights/shared.ts src/components
 node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
 npx eslint src/lib/log-insights.ts src/lib/log-insights/data.ts src/lib/log-insights/shared.ts src/components/admin/logs-manager/useAdminLogsManager.ts src/components/admin/logs/selectors.ts src/components/admin/AdminLogsManager.stories.tsx
 node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
+npm run validate:migrations
+npx eslint src/lib/partner-counts.ts src/lib/promotions/event-rewards.ts src/lib/admin-reviews.ts 'src/app/admin/(protected)/page.tsx' 'src/app/admin/(protected)/partners/[partnerId]/page.tsx' tests/partner-counts-visibility.test.mts
+node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts tests/partner-counts-visibility.test.mts tests/partner-setup-fallback.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
 ```
 
 Results:
@@ -174,6 +187,10 @@ Results:
 - wave 5 focused node tests: 10 passed, 0 failed
 - wave 5 focused eslint: passed
 - wave 5 production build: passed
+- wave 7 migration validation: passed
+- wave 7 focused node tests: 12 passed, 0 failed
+- wave 7 focused eslint: passed
+- wave 7 production build: passed
 - wave 6 focused node tests: 10 passed, 0 failed
 - wave 6 focused eslint: passed
 - wave 6 production build: passed

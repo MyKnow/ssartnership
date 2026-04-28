@@ -20,6 +20,7 @@ import {
   parseAdminReviewFilters,
   serializeAdminReviewFilters,
 } from "@/lib/admin-reviews";
+import { fetchPartnerReviewVisibilityCounts } from "@/lib/partner-counts";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import {
   getPartnerVisibilityBadgeClass,
@@ -86,9 +87,7 @@ export default async function AdminPartnerDetailPage({
     partnerResult,
     metricsResult,
     reviewData,
-    totalReviewResult,
-    visibleReviewResult,
-    hiddenReviewResult,
+    reviewCountResult,
   ] = await Promise.all([
     supabase
       .from("categories")
@@ -107,23 +106,7 @@ export default async function AdminPartnerDetailPage({
       .maybeSingle(),
     getAdminPartnerMetrics([partnerId]),
     getAdminReviewPageData(reviewFilters, { includeCounts: false }),
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("partner_id", partnerId)
-      .is("deleted_at", null),
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("partner_id", partnerId)
-      .is("deleted_at", null)
-      .is("hidden_at", null),
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("partner_id", partnerId)
-      .is("deleted_at", null)
-      .not("hidden_at", "is", null),
+    fetchPartnerReviewVisibilityCounts(supabase, partnerId),
   ]);
 
   if (!partnerResult.data) {
@@ -195,6 +178,9 @@ export default async function AdminPartnerDetailPage({
   const galleryImages = partner.thumbnail
     ? partner.images ?? []
     : (partner.images ?? []).slice(1);
+  const totalReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.totalCount;
+  const visibleReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.visibleCount;
+  const hiddenReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.hiddenCount;
 
   return (
     <AdminShell title={partner.name} backHref="/admin/partners" backLabel="브랜드 관리">
@@ -348,9 +334,9 @@ export default async function AdminPartnerDetailPage({
           <AdminPartnerReviewManager
             reviews={reviewData.reviews}
             counts={{
-              totalCount: totalReviewResult.error ? 0 : totalReviewResult.count ?? 0,
-              visibleCount: visibleReviewResult.error ? 0 : visibleReviewResult.count ?? 0,
-              hiddenCount: hiddenReviewResult.error ? 0 : hiddenReviewResult.count ?? 0,
+              totalCount: totalReviewCount,
+              visibleCount: visibleReviewCount,
+              hiddenCount: hiddenReviewCount,
             }}
             filters={reviewFilters}
             basePath={detailPath}

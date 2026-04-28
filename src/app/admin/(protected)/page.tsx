@@ -6,6 +6,7 @@ import {
   getSsafyCycleOverview,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
+import { fetchAdminReviewCounts } from "@/lib/partner-counts";
 
 export const dynamic = "force-dynamic";
 
@@ -93,10 +94,7 @@ export default async function AdminPage() {
     supabase.from("partners").select("id", { count: "exact", head: true }),
     supabase.from("categories").select("id", { count: "exact", head: true }),
     supabase.from("partner_accounts").select("id", { count: "exact", head: true }),
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null),
+    fetchAdminReviewCounts(supabase),
     supabase
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
@@ -116,7 +114,7 @@ export default async function AdminPage() {
   const partnerCount = partnerResult.error ? 0 : partnerResult.count ?? 0;
   const categoryCount = categoryResult.error ? 0 : categoryResult.count ?? 0;
   const accountCount = accountResult.error ? 0 : accountResult.count ?? 0;
-  const reviewCount = reviewResult.error ? 0 : reviewResult.count ?? 0;
+  const reviewCount = reviewResult.errorMessage ? 0 : reviewResult.counts.totalCount;
   const pushSubscriptionCount = pushResult.error ? 0 : pushResult.count ?? 0;
   const productLogCount = productLogResult.error ? 0 : productLogResult.count ?? 0;
   const auditLogCount = auditLogResult.error ? 0 : auditLogResult.count ?? 0;

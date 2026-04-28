@@ -1,4 +1,5 @@
 import { getMemberNotificationPreferences } from "@/lib/notification-preferences";
+import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog";
 
@@ -47,21 +48,19 @@ async function getMemberRewardSnapshot(
   const [memberResult, preferences, reviewResult] = await Promise.all([
     supabase.from("members").select("created_at").eq("id", memberId).maybeSingle(),
     getMemberNotificationPreferences(memberId).catch(() => null),
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("member_id", memberId)
-      .is("deleted_at", null)
-      .is("hidden_at", null)
-      .gte("created_at", campaign.startsAt)
-      .lte("created_at", campaign.endsAt),
+    fetchMemberVisibleReviewCountInRange(
+      supabase,
+      memberId,
+      campaign.startsAt,
+      campaign.endsAt,
+    ),
   ]);
 
   return {
     createdAt:
       typeof memberResult.data?.created_at === "string" ? memberResult.data.created_at : null,
     preferences,
-    reviewCount: reviewResult.count ?? 0,
+    reviewCount: reviewResult.count,
   };
 }
 

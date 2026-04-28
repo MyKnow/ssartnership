@@ -10,6 +10,18 @@ type PartnerReviewCountRpcRow = {
   review_count: number | string | null;
 };
 
+type ReviewVisibilityCountRpcRow = {
+  total_count: number | string | null;
+  visible_count: number | string | null;
+  hidden_count: number | string | null;
+};
+
+export type ReviewVisibilityCounts = {
+  totalCount: number;
+  visibleCount: number;
+  hiddenCount: number;
+};
+
 function normalizePartnerIds(partnerIds: readonly string[]) {
   return [...new Set(partnerIds.map((value) => value.trim()).filter(Boolean))];
 }
@@ -23,6 +35,16 @@ function parseCount(value: number | string | null | undefined) {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+}
+
+export function toReviewVisibilityCounts(
+  row?: ReviewVisibilityCountRpcRow | null,
+): ReviewVisibilityCounts {
+  return {
+    totalCount: parseCount(row?.total_count),
+    visibleCount: parseCount(row?.visible_count),
+    hiddenCount: parseCount(row?.hidden_count),
+  };
 }
 
 export function toPartnerCountMap(
@@ -103,6 +125,84 @@ export async function fetchPartnerReviewCounts(
 
   return {
     counts: toPartnerCountMap(normalizedPartnerIds, rows),
+    errorMessage: null as string | null,
+  };
+}
+
+export async function fetchAdminReviewCounts(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+) {
+  const { data, error } = await supabase.rpc("get_admin_review_counts");
+
+  if (error) {
+    return {
+      counts: toReviewVisibilityCounts(),
+      errorMessage: error.message,
+    };
+  }
+
+  return {
+    counts: toReviewVisibilityCounts(((data ?? [])[0] as ReviewVisibilityCountRpcRow | undefined) ?? null),
+    errorMessage: null as string | null,
+  };
+}
+
+export async function fetchPartnerReviewVisibilityCounts(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  partnerId: string,
+) {
+  if (!partnerId.trim()) {
+    return {
+      counts: toReviewVisibilityCounts(),
+      errorMessage: null as string | null,
+    };
+  }
+
+  const { data, error } = await supabase.rpc("get_partner_review_visibility_counts", {
+    input_partner_id: partnerId,
+  });
+
+  if (error) {
+    return {
+      counts: toReviewVisibilityCounts(),
+      errorMessage: error.message,
+    };
+  }
+
+  return {
+    counts: toReviewVisibilityCounts(((data ?? [])[0] as ReviewVisibilityCountRpcRow | undefined) ?? null),
+    errorMessage: null as string | null,
+  };
+}
+
+export async function fetchMemberVisibleReviewCountInRange(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  memberId: string,
+  startIso: string,
+  endIso: string,
+) {
+  if (!memberId.trim()) {
+    return {
+      count: 0,
+      errorMessage: null as string | null,
+    };
+  }
+
+  const { data, error } = await supabase.rpc("get_member_visible_review_count_in_range", {
+    input_member_id: memberId,
+    input_start: startIso,
+    input_end: endIso,
+  });
+
+  if (error) {
+    return {
+      count: 0,
+      errorMessage: error.message,
+    };
+  }
+
+  return {
+    count: parseCount(data),
     errorMessage: null as string | null,
   };
 }

@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { fetchAdminReviewCounts } from "@/lib/partner-counts";
 import {
   createEmptyPartnerReviewReactionState,
   getPartnerReviewAuthorRoleLabel,
@@ -395,27 +396,19 @@ async function fetchAdminReviewReactionStates(reviewIds: string[]) {
 
 export async function getAdminReviewCounts(): Promise<AdminReviewCounts> {
   const supabase = getSupabaseAdminClient();
-  const [totalResult, visibleResult, hiddenResult] = await Promise.all([
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null),
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .is("hidden_at", null),
-    supabase
-      .from("partner_reviews")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .not("hidden_at", "is", null),
-  ]);
+  const result = await fetchAdminReviewCounts(supabase);
+  if (result.errorMessage) {
+    return {
+      totalCount: 0,
+      visibleCount: 0,
+      hiddenCount: 0,
+    };
+  }
 
   return {
-    totalCount: totalResult.error ? 0 : totalResult.count ?? 0,
-    visibleCount: visibleResult.error ? 0 : visibleResult.count ?? 0,
-    hiddenCount: hiddenResult.error ? 0 : hiddenResult.count ?? 0,
+    totalCount: result.counts.totalCount,
+    visibleCount: result.counts.visibleCount,
+    hiddenCount: result.counts.hiddenCount,
   };
 }
 
