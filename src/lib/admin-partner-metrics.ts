@@ -11,6 +11,7 @@ import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/s
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { partnerFavoriteRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { fetchPartnerReviewCounts } from "@/lib/partner-counts";
 
 const PARTNER_ADMIN_METRICS_WARNING_MESSAGE =
   "일부 브랜드 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
@@ -24,18 +25,6 @@ function createMetricsMap(partnerIds: string[]) {
   return new Map(
     partnerIds.map((partnerId) => [partnerId, createEmptyPartnerServiceMetrics()]),
   );
-}
-
-function countRowsByPartnerId(rows: Array<{ partner_id?: string | null }>, partnerIds: string[]) {
-  const counts = new Map(partnerIds.map((partnerId) => [partnerId, 0]));
-  for (const row of rows) {
-    const partnerId = row.partner_id ?? "";
-    if (!counts.has(partnerId)) {
-      continue;
-    }
-    counts.set(partnerId, (counts.get(partnerId) ?? 0) + 1);
-  }
-  return counts;
 }
 
 function indexMetricEventRowsByTargetId<T extends { target_id: string | null }>(rows: T[]) {
@@ -89,18 +78,14 @@ export async function getAdminPartnerMetrics(
   const metricsByPartnerId = createMetricsMap(uniquePartnerIds);
   let hasPartialFailure = false;
 
-  const [eventResult, reviewResult] = await Promise.all([
+  const [eventResult, reviewCountResult] = await Promise.all([
     fetchPartnerMetricRollupRows(supabase, {
       partnerIds: uniquePartnerIds,
       metricNames: PARTNER_METRIC_EVENT_NAMES,
       metricKinds: ["pv", "uv"],
       granularity: "total",
     }),
-    supabase
-      .from("partner_reviews")
-      .select("partner_id")
-      .in("partner_id", uniquePartnerIds)
-      .is("deleted_at", null),
+    fetchPartnerReviewCounts(supabase, uniquePartnerIds),
   ]);
   let favoriteCounts = new Map<string, number>();
 
@@ -142,12 +127,11 @@ export async function getAdminPartnerMetrics(
     }
   }
 
-  if (reviewResult.error) {
+  if (reviewCountResult.errorMessage) {
     hasPartialFailure = true;
-    console.error("[admin-partner-metrics] review query failed", reviewResult.error.message);
+    console.error("[admin-partner-metrics] review query failed", reviewCountResult.errorMessage);
   } else {
-    const reviewCounts = countRowsByPartnerId(reviewResult.data ?? [], uniquePartnerIds);
-    for (const [partnerId, reviewCount] of reviewCounts) {
+    for (const [partnerId, reviewCount] of reviewCountResult.counts) {
       const metrics = metricsByPartnerId.get(partnerId);
       if (!metrics) {
         continue;

@@ -10,7 +10,6 @@ const commonPayload = {
   is_active: true,
   email_verified_at: "2026-04-28T00:00:00.000Z",
   initial_setup_completed_at: "2026-04-28T00:00:00.000Z",
-  initial_setup_verification_code_hash: null,
   updated_at: "2026-04-28T00:00:00.000Z",
 };
 

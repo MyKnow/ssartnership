@@ -41,7 +41,6 @@ export type AdminMember = {
     effective_at?: string | null;
   }>;
   avatar_content_type?: string | null;
-  avatar_base64?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

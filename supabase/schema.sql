@@ -190,7 +190,6 @@ create table if not exists partner_accounts (
   email_verified_at timestamp with time zone,
   initial_setup_completed_at timestamp with time zone,
   initial_setup_token_hash text,
-  initial_setup_verification_code_hash text,
   initial_setup_link_sent_at timestamp with time zone,
   initial_setup_expires_at timestamp with time zone,
   must_change_password boolean not null default true,
@@ -1029,6 +1028,61 @@ create table if not exists partner_metric_unique_visitors (
 comment on table partner_metric_unique_visitors is
   'Unique visitor buckets for partner detail UV rollups. Raw event_logs remain the source of truth.';
 
+create or replace function public.get_partner_favorite_counts(input_partner_ids uuid[])
+returns table (
+  partner_id uuid,
+  favorite_count bigint
+)
+language sql
+stable
+set search_path = public
+as $$
+  with requested as (
+    select unnest(coalesce(input_partner_ids, '{}'::uuid[])) as partner_id
+  ),
+  aggregated as (
+    select
+      partner_favorites.partner_id,
+      count(*)::bigint as favorite_count
+    from public.partner_favorites
+    where partner_favorites.partner_id = any(coalesce(input_partner_ids, '{}'::uuid[]))
+    group by partner_favorites.partner_id
+  )
+  select
+    requested.partner_id,
+    coalesce(aggregated.favorite_count, 0)::bigint as favorite_count
+  from requested
+  left join aggregated using (partner_id);
+$$;
+
+create or replace function public.get_partner_review_counts(input_partner_ids uuid[])
+returns table (
+  partner_id uuid,
+  review_count bigint
+)
+language sql
+stable
+set search_path = public
+as $$
+  with requested as (
+    select unnest(coalesce(input_partner_ids, '{}'::uuid[])) as partner_id
+  ),
+  aggregated as (
+    select
+      partner_reviews.partner_id,
+      count(*)::bigint as review_count
+    from public.partner_reviews
+    where partner_reviews.partner_id = any(coalesce(input_partner_ids, '{}'::uuid[]))
+      and partner_reviews.deleted_at is null
+    group by partner_reviews.partner_id
+  )
+  select
+    requested.partner_id,
+    coalesce(aggregated.review_count, 0)::bigint as review_count
+  from requested
+  left join aggregated using (partner_id);
+$$;
+
 create or replace function partner_metric_visitor_key(
   actor_type text,
   actor_id text,
@@ -1533,6 +1587,12 @@ create index if not exists members_year_created_at_idx
   on members(year desc, created_at desc);
 create index if not exists members_created_at_idx
   on members(created_at desc);
+create index if not exists members_display_name_idx
+  on members(display_name);
+create index if not exists members_year_campus_display_name_idx
+  on members(year, campus, display_name);
+create index if not exists members_campus_display_name_idx
+  on members(campus, display_name);
 create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
 create index if not exists event_logs_event_name_idx on event_logs(event_name);
 create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
@@ -1588,8 +1648,14 @@ create index if not exists auth_security_logs_event_name_idx on auth_security_lo
 create index if not exists auth_security_logs_status_idx on auth_security_logs(status);
 create index if not exists auth_security_logs_actor_id_idx on auth_security_logs(actor_id);
 create index if not exists auth_security_logs_identifier_idx on auth_security_logs(identifier);
+create index if not exists auth_security_logs_member_policy_consent_idx
+  on auth_security_logs(actor_type, event_name, status, actor_id, created_at desc)
+  where actor_id is not null;
 create index if not exists member_policy_consents_member_id_idx on member_policy_consents(member_id);
 create index if not exists member_policy_consents_policy_document_id_idx on member_policy_consents(policy_document_id);
+create index if not exists push_subscriptions_active_member_idx
+  on push_subscriptions(member_id)
+  where is_active = true;
 create index if not exists partner_reviews_partner_id_created_at_idx
   on partner_reviews(partner_id, deleted_at, hidden_at, created_at desc);
 create index if not exists partner_reviews_partner_id_rating_desc_idx
@@ -1598,6 +1664,15 @@ create index if not exists partner_reviews_partner_id_rating_asc_idx
   on partner_reviews(partner_id, deleted_at, hidden_at, rating asc, created_at desc);
 create index if not exists partner_reviews_member_id_partner_id_created_at_idx
   on partner_reviews(member_id, partner_id, deleted_at, hidden_at, created_at desc);
+create index if not exists partner_reviews_admin_created_at_idx
+  on partner_reviews(created_at desc)
+  where deleted_at is null;
+create index if not exists partner_reviews_admin_hidden_created_at_idx
+  on partner_reviews(hidden_at, created_at desc)
+  where deleted_at is null;
+create index if not exists partner_reviews_admin_rating_created_at_idx
+  on partner_reviews(rating, created_at desc)
+  where deleted_at is null;
 create index if not exists partner_review_reactions_review_id_idx
   on partner_review_reactions(review_id, reaction);
 create index if not exists partner_review_reactions_member_id_idx

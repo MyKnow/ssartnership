@@ -19,7 +19,6 @@ type PartnerSetupCompletionCommonPayload = {
   is_active: boolean;
   email_verified_at: string;
   initial_setup_completed_at: string;
-  initial_setup_verification_code_hash: null;
   updated_at: string;
 };
 
@@ -233,7 +232,6 @@ export async function completeSupabasePartnerPortalInitialSetup(
     is_active: true,
     email_verified_at: completedAt,
     initial_setup_completed_at: completedAt,
-    initial_setup_verification_code_hash: null,
     updated_at: completedAt,
   };
   const payloadCandidates = buildPartnerSetupCompletionPayloadCandidates(basePayload, account);

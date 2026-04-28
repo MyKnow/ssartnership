@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { fetchPartnerFavoriteCounts } from "@/lib/partner-counts";
 import type { PartnerFavoriteRepository } from "@/lib/repositories/partner-favorite-repository";
 
 type PartnerFavoriteRow = {
@@ -20,24 +21,12 @@ export class SupabasePartnerFavoriteRepository
     }
 
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from("partner_favorites")
-      .select("partner_id")
-      .in("partner_id", normalizedPartnerIds);
-
-    if (error) {
-      throw new Error(error.message);
+    const result = await fetchPartnerFavoriteCounts(supabase, normalizedPartnerIds);
+    if (result.errorMessage) {
+      throw new Error(result.errorMessage);
     }
 
-    const counts = new Map<string, number>();
-    for (const partnerId of normalizedPartnerIds) {
-      counts.set(partnerId, 0);
-    }
-    for (const row of (data ?? []) as PartnerFavoriteRow[]) {
-      counts.set(row.partner_id, (counts.get(row.partner_id) ?? 0) + 1);
-    }
-
-    return counts;
+    return result.counts;
   }
 
   async getMemberFavoritePartnerIds(

@@ -10,6 +10,7 @@ import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store
 import { isPartnerPortalMock } from "./partner-portal.ts";
 import { partnerFavoriteRepository } from "./repositories/index.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
+import { fetchPartnerReviewCounts } from "./partner-counts.ts";
 
 const PARTNER_SERVICE_METRICS_WARNING_MESSAGE =
   "일부 브랜드 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
@@ -69,24 +70,7 @@ export async function getPartnerServiceMetrics(
       metricKinds: ["pv", "uv"],
       granularity: "total",
     }),
-    (async () => {
-      const { count, error } = await supabase
-        .from("partner_reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", partnerId)
-        .is("deleted_at", null);
-
-      if (error) {
-        markPartialFailure();
-        console.error("[partner-service-metrics] review query failed", {
-          partnerId,
-          message: error.message,
-        });
-        return 0;
-      }
-
-      return count ?? 0;
-    })(),
+    fetchPartnerReviewCounts(supabase, [partnerId]),
   ]);
 
   try {
@@ -129,7 +113,15 @@ export async function getPartnerServiceMetrics(
     }
   }
 
-  metrics.reviewCount = reviewResult;
+  if (reviewResult.errorMessage) {
+    markPartialFailure();
+    console.error("[partner-service-metrics] review query failed", {
+      partnerId,
+      message: reviewResult.errorMessage,
+    });
+  }
+
+  metrics.reviewCount = reviewResult.counts.get(partnerId) ?? 0;
   metrics.favoriteCount = favoriteCount;
 
   return {

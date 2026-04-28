@@ -16,7 +16,6 @@ async function updateInitialSetupState(
   const expiresAt = new Date(Date.now() + INITIAL_SETUP_TTL_MS).toISOString();
   const basePayload = {
     initial_setup_token_hash: setupTokenHash,
-    initial_setup_verification_code_hash: null,
     initial_setup_link_sent_at: null,
     must_change_password: true,
     email_verified_at: null,
@@ -44,7 +43,6 @@ async function updateInitialSetupState(
 
   const plainPayload = {
     initial_setup_token: setupToken,
-    initial_setup_verification_code_hash: null,
     initial_setup_link_sent_at: null,
     must_change_password: true,
     email_verified_at: null,

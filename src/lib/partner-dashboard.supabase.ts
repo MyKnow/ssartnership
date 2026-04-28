@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "./supabase/server.ts";
+import { fetchPartnerReviewCounts } from "./partner-counts.ts";
 import {
   applyPartnerMetricRollupRows,
   buildPartnerMetricRollupRowsFromEventLogs,
@@ -41,10 +42,6 @@ type PartnerChangeRequestRow = {
   partner_id: string;
   status?: string | null;
   updated_at?: string | null;
-};
-
-type PartnerReviewCountRow = {
-  partner_id?: string | null;
 };
 
 const PARTNER_DASHBOARD_WARNING_MESSAGE =
@@ -137,45 +134,6 @@ function toCompanyDashboard(
     description: row.description ?? null,
     services,
     totals: sumPartnerPortalMetrics(services.map((service) => service.metrics)),
-  };
-}
-
-async function fetchReviewCountsByServiceId(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  serviceIds: string[],
-) {
-  const counts = new Map(serviceIds.map((serviceId) => [serviceId, 0]));
-  if (serviceIds.length === 0) {
-    return {
-      counts,
-      errorMessage: null,
-    };
-  }
-
-  const { data, error } = await supabase
-    .from("partner_reviews")
-    .select("partner_id")
-    .in("partner_id", serviceIds)
-    .is("deleted_at", null);
-
-  if (error) {
-    return {
-      counts,
-      errorMessage: error.message,
-    };
-  }
-
-  for (const row of (data ?? []) as PartnerReviewCountRow[]) {
-    const partnerId = row.partner_id ?? "";
-    if (!counts.has(partnerId)) {
-      continue;
-    }
-    counts.set(partnerId, (counts.get(partnerId) ?? 0) + 1);
-  }
-
-  return {
-    counts,
-    errorMessage: null,
   };
 }
 
@@ -314,7 +272,7 @@ export async function getSupabasePartnerPortalDashboard(
     }
   }
 
-  const reviewCountResult = await fetchReviewCountsByServiceId(
+  const reviewCountResult = await fetchPartnerReviewCounts(
     supabase,
     serviceRows.map((serviceRow) => serviceRow.id),
   );
