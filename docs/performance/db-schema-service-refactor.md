@@ -27,7 +27,10 @@
 - `wave-8-planning`: done
 - `wave-8-implementation`: done
 - `wave-8-verification`: done
-- `wave-9-planning`: pending
+- `wave-9-planning`: done
+- `wave-9-implementation`: done
+- `wave-9-verification`: done
+- `wave-10-planning`: pending
 
 ## Objective
 
@@ -102,6 +105,7 @@ These are not part of wave 1 because they need production measurements and trigg
 - Split default admin logs loading so full-range summary queries use thinner selects while the current page list still loads full row detail.
 - Keep favorite/review counts on aggregate RPCs for now, and consolidate remaining direct review count paths behind helper functions instead of introducing persisted counters prematurely.
 - Collapse admin overview summary counts into a single RPC instead of issuing repeated `count exact` PostgREST queries from the page loader.
+- Use DB-side current-page loading for simple single-group admin log exploration cases instead of reading the whole range into memory first.
 
 ### Deferred
 
@@ -157,6 +161,10 @@ These are not part of wave 1 because they need production measurements and trigg
 - Reworked the admin home page to consume the shared dashboard count helper instead of issuing multiple direct head-count queries.
 - Added unit coverage for admin dashboard count normalization and synced `supabase/schema.sql` with the new RPC.
 - Reran migration validation, focused eslint, focused tests, and production build.
+- Started wave 9 planning for admin logs DB-side pagination. Current issue: grouped admin log views still fall back to broad range reads even when the request only needs one group's newest rows.
+- Added a DB-paged single-group list path for product, audit, and security logs when the request uses newest ordering without search/name/actor filters.
+- Kept `all`-group and richer filter combinations on the existing in-memory fallback path to avoid widening the query rewrite scope in one wave.
+- Added strategy tests for the new admin log loading predicate and reran focused eslint, focused tests, and production build.
 
 ## Verification
 
@@ -182,6 +190,9 @@ node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts te
 npm run validate:migrations
 npx eslint src/lib/partner-counts.ts 'src/app/admin/(protected)/page.tsx' tests/partner-counts.test.mts
 node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts tests/partner-counts-visibility.test.mts tests/partner-setup-fallback.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
+npm run build
+npx eslint src/lib/log-insights.ts src/lib/log-insights/data.ts tests/admin-log-loading-strategy.test.mts
+node --import ./tests/alias-register.mjs --test tests/admin-log-loading-strategy.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
 npm run build
 ```
 
@@ -211,6 +222,9 @@ Results:
 - wave 8 focused node tests: 12 passed, 0 failed
 - wave 8 focused eslint: passed
 - wave 8 production build: passed
+- wave 9 focused node tests: 8 passed, 0 failed
+- wave 9 focused eslint: passed
+- wave 9 production build: passed
 
 After migration deployment, re-measure:
 

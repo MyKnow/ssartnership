@@ -1,5 +1,6 @@
 import { createAdminLogsCsvStream } from './log-insights/csv';
 import {
+  loadAdminLogListPage,
   loadAdminLogRows,
   loadAdminLogSummaryRows,
   resolveActorMeta,
@@ -79,22 +80,56 @@ function shouldUseSplitAdminLogLoading(options: GetAdminLogsPageDataOptions, pag
   return !hasComplexFilter && sort === 'newest' && page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
 }
 
+export function shouldUseDbPagedAdminLogList(
+  options: GetAdminLogsPageDataOptions,
+  page: number,
+  pageSize: number,
+) {
+  const group =
+    options.group === 'product' || options.group === 'audit' || options.group === 'security'
+      ? options.group
+      : 'all';
+  const sort = options.sort ?? 'newest';
+  const hasUnsupportedFilter =
+    Boolean(options.search?.trim()) ||
+    Boolean(options.name && options.name !== 'all') ||
+    Boolean(options.actor && options.actor !== 'all');
+
+  if (hasUnsupportedFilter || sort !== 'newest' || group === 'all') {
+    return false;
+  }
+
+  if (group !== 'security' && options.status && options.status !== 'all') {
+    return false;
+  }
+
+  return page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
+}
+
 export async function getAdminLogsPageData(
   options: GetAdminLogsPageDataOptions = {},
 ): Promise<AdminLogsPageData> {
   const page = parsePage(options.page);
   const pageSize = parsePageSize(options.pageSize);
   const useSplitLoading = shouldUseSplitAdminLogLoading(options, page, pageSize);
+  const useDbPagedList = shouldUseDbPagedAdminLogList(options, page, pageSize);
   const summaryData = useSplitLoading
     ? await loadAdminLogSummaryRows(options, ['product', 'audit', 'security'])
     : await loadAdminLogRows(options, ['product', 'audit', 'security'], {
         maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
       });
-  const listSourceData = useSplitLoading
-    ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
-        maxRowsPerGroup: page * pageSize,
+  const listSourceData = useDbPagedList
+    ? await loadAdminLogListPage(options, {
+        group: options.group as LogGroup,
+        page,
+        pageSize,
+        status: options.status,
       })
-    : summaryData;
+    : useSplitLoading
+      ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+          maxRowsPerGroup: page * pageSize,
+        })
+      : summaryData;
 
   const productLogs: ProductLogRecord[] = summaryData.productRows.map((row) => ({
     ...row,
@@ -138,7 +173,13 @@ export async function getAdminLogsPageData(
     securityStatusCounts: getSecurityStatusCounts(fullRecords),
   };
   const filteredList = filterAndSortLogs({
-    unifiedLogs: useSplitLoading
+    unifiedLogs: useDbPagedList
+      ? buildUnifiedLogs({
+          productLogs: listProductLogs,
+          auditLogs: listAuditLogs,
+          securityLogs: listSecurityLogs,
+        })
+      : useSplitLoading
       ? buildUnifiedLogs({
           productLogs: listProductLogs,
           auditLogs: listAuditLogs,
@@ -162,9 +203,13 @@ export async function getAdminLogsPageData(
         : 'newest',
   });
   const unfilteredTotal = productLogs.length + auditLogs.length + securityLogs.length;
-  const effectiveFilteredTotal = useSplitLoading ? unfilteredTotal : filteredList.length;
+  const effectiveFilteredTotal = useDbPagedList
+    ? ('total' in listSourceData ? listSourceData.total : filteredList.length)
+    : useSplitLoading
+      ? unfilteredTotal
+      : filteredList.length;
   const pageStart = (page - 1) * pageSize;
-  const pageItems = filteredList.slice(pageStart, pageStart + pageSize);
+  const pageItems = useDbPagedList ? filteredList : filteredList.slice(pageStart, pageStart + pageSize);
   const productIds = new Set(pageItems.filter((log) => log.group === 'product').map((log) => log.id));
   const auditIds = new Set(pageItems.filter((log) => log.group === 'audit').map((log) => log.id));
   const securityIds = new Set(pageItems.filter((log) => log.group === 'security').map((log) => log.id));
