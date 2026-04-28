@@ -257,7 +257,7 @@ export const InteractiveFiltersAndExport: Story = {
     await expect(canvas.getByText("MM 아이디: @ssafy-fail")).toBeInTheDocument();
 
     await userEvent.selectOptions(canvas.getByLabelText("정렬"), "oldest");
-    await userEvent.click(canvas.getByText("상세 보기"));
+    await userEvent.click(canvas.getAllByText("상세 보기")[0]!);
     await expect(canvas.getByText("properties")).toBeInTheDocument();
 
     await userEvent.selectOptions(canvas.getByLabelText("페이지당"), "50");
