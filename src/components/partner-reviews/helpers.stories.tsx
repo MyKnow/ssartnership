@@ -22,6 +22,7 @@ function PartnerReviewHelpersPreview() {
     file,
   };
   const formData = buildReviewFormData({
+    reviewId: "00000000-0000-4000-8000-000000000001",
     rating: 5,
     title: "좋아요",
     body: "재방문 의사 있습니다.",

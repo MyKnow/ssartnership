@@ -6,8 +6,10 @@ import {
   ensurePartnerReviewModerationAccess,
   ensureVisibleReviewPartner,
   getReviewMemberSession,
+  parseDirectUploadedReviewUrls,
   parseReviewFormFields,
   parseReviewListParams,
+  parseRequestedReviewId,
   resolveReviewMediaPayload,
 } from "./_shared";
 
@@ -73,12 +75,13 @@ export async function POST(
     );
   }
 
-  const reviewId = randomUUID();
+  const reviewId = parseRequestedReviewId(formData) ?? randomUUID();
+  const directUploadedUrls = parseDirectUploadedReviewUrls(formData, id, reviewId);
   let uploadedUrls: string[] = [];
 
   try {
     const media = await resolveReviewMediaPayload(formData, id, reviewId);
-    uploadedUrls = media.uploadedUrls;
+    uploadedUrls = [...directUploadedUrls, ...media.uploadedUrls];
     const review = await partnerReviewRepository.createPartnerReview({
       reviewId,
       partnerId: id,

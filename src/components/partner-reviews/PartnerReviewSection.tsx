@@ -66,6 +66,42 @@ export default function PartnerReviewSection({
 
   const includeHiddenReviews = accessMode === "partner";
 
+  function showSubmittedReview(result: {
+    review: PartnerReview;
+    summary: PartnerReviewSummary;
+  }) {
+    startTransition(() => {
+      setSummary(result.summary);
+      setSort("latest");
+      setRating("all");
+      setOnlyWithImages(false);
+      setReviews((current) => {
+        const nextReviews = [
+          result.review,
+          ...current.filter((item) => item.id !== result.review.id),
+        ].sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+        );
+        return nextReviews.slice(0, 10);
+      });
+      setNextOffset((currentOffset) => Math.min(Math.max(currentOffset, 1), 10));
+      setHasMore(result.summary.totalCount > 10);
+    });
+  }
+
+  function showUpdatedReview(result: {
+    review: PartnerReview;
+    summary: PartnerReviewSummary;
+  }) {
+    startTransition(() => {
+      setSummary(result.summary);
+      setReviews((current) =>
+        current.map((item) => (item.id === result.review.id ? result.review : item)),
+      );
+    });
+  }
+
   function buildListUrl(
     nextSort: PartnerReviewSort,
     nextRating: PartnerReviewRatingFilter,
@@ -97,7 +133,9 @@ export default function PartnerReviewSection({
     setPending(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(buildListUrl(nextSort, nextRating, nextOnlyWithImages));
+      const response = await fetch(buildListUrl(nextSort, nextRating, nextOnlyWithImages), {
+        cache: "no-store",
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setErrorMessage(data.message ?? "리뷰를 불러오지 못했습니다.");
@@ -124,7 +162,9 @@ export default function PartnerReviewSection({
     setPending(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(buildListUrl(sort, rating, onlyWithImages, nextOffset));
+      const response = await fetch(buildListUrl(sort, rating, onlyWithImages, nextOffset), {
+        cache: "no-store",
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setErrorMessage(data.message ?? "리뷰를 더 불러오지 못했습니다.");
@@ -281,9 +321,9 @@ export default function PartnerReviewSection({
         <PartnerReviewForm
           partnerId={partnerId}
           onCancel={() => setComposerOpen(false)}
-          onSubmitted={async () => {
+          onSubmitted={(result) => {
             setComposerOpen(false);
-            await refreshList(sort);
+            showSubmittedReview(result);
           }}
         />
       ) : null}
@@ -370,9 +410,9 @@ export default function PartnerReviewSection({
                 partnerId={partnerId}
                 review={review}
                 onCancel={() => setEditingReviewId(null)}
-                onSubmitted={async () => {
+                onSubmitted={(result) => {
                   setEditingReviewId(null);
-                  await refreshList(sort);
+                  showUpdatedReview(result);
                 }}
               />
             ) : (

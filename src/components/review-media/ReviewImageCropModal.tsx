@@ -14,6 +14,9 @@ import FormMessage from "@/components/ui/FormMessage";
 import { REVIEW_IMAGE_ASPECT_RATIO } from "@/lib/review-media";
 import { clamp, createWebpFile } from "@/components/review-media/shared";
 
+const REVIEW_IMAGE_OUTPUT_SIZE = 900;
+const REVIEW_IMAGE_OUTPUT_QUALITY = 0.68;
+
 export default function ReviewImageCropModal({
   open,
   sourceUrl,
@@ -168,8 +171,8 @@ export default function ReviewImageCropModal({
 
     try {
       const canvas = document.createElement("canvas");
-      canvas.width = 1200;
-      canvas.height = 1200;
+      canvas.width = REVIEW_IMAGE_OUTPUT_SIZE;
+      canvas.height = REVIEW_IMAGE_OUTPUT_SIZE;
 
       const ctx = canvas.getContext("2d");
       if (!ctx) {
@@ -194,8 +197,8 @@ export default function ReviewImageCropModal({
         sourceHeight,
         0,
         0,
-        1200,
-        1200,
+        REVIEW_IMAGE_OUTPUT_SIZE,
+        REVIEW_IMAGE_OUTPUT_SIZE,
       );
 
       const blob = await new Promise<Blob>((resolve, reject) => {
@@ -205,7 +208,7 @@ export default function ReviewImageCropModal({
             return;
           }
           resolve(nextBlob);
-        }, "image/webp", 0.78);
+        }, "image/webp", REVIEW_IMAGE_OUTPUT_QUALITY);
       });
 
       onApply(createWebpFile(blob, outputName));

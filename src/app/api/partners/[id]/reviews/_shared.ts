@@ -5,14 +5,21 @@ import {
 import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import { getPartnerSession } from "@/lib/partner-session";
 import { partnerRepository } from "@/lib/repositories";
-import { parseReviewMediaManifest } from "@/lib/review-media";
-import { uploadReviewMediaFile } from "@/lib/review-media-storage";
+import {
+  extractReviewMediaStoragePath,
+  parseReviewMediaManifest,
+  REVIEW_MEDIA_BUCKET,
+} from "@/lib/review-media";
+import { deleteReviewMediaUrls, uploadReviewMediaFile } from "@/lib/review-media-storage";
 import {
   normalizeReviewDraftInput,
   validateReviewDraftInput,
   type ReviewFieldErrors,
 } from "@/lib/review-validation";
 import { getUserSession } from "@/lib/user-auth";
+
+const REVIEW_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function getReviewMemberSession() {
   return getUserSession();
@@ -104,6 +111,42 @@ export function parseReviewFormFields(formData: FormData):
   };
 }
 
+export function parseRequestedReviewId(formData: FormData) {
+  const raw = String(formData.get("reviewId") ?? "").trim();
+  return REVIEW_ID_PATTERN.test(raw) ? raw : null;
+}
+
+export function parseDirectUploadedReviewUrls(
+  formData: FormData,
+  partnerId: string,
+  reviewId: string,
+) {
+  const raw = String(formData.get("directUploadedImageUrls") ?? "").trim();
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    const expectedPrefix = `reviews/${partnerId.trim()}/${reviewId.trim()}/`;
+    return parsed.filter((item): item is string => {
+      if (typeof item !== "string" || item.length === 0) {
+        return false;
+      }
+      const storagePath = extractReviewMediaStoragePath(item);
+      return (
+        storagePath?.bucket === REVIEW_MEDIA_BUCKET &&
+        storagePath.path.startsWith(expectedPrefix)
+      );
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function resolveReviewMediaPayload(
   formData: FormData,
   partnerId: string,
@@ -125,10 +168,13 @@ export async function resolveReviewMediaPayload(
   }
 
   const images: string[] = [];
-  const uploadedUrls: string[] = [];
+  const uploadTasks: Array<{
+    imageIndex: number;
+    file: File;
+  }> = [];
   let fileIndex = 0;
 
-  for (const [index, entry] of entries.entries()) {
+  for (const entry of entries) {
     if (entry.kind === "existing") {
       images.push(entry.url);
       continue;
@@ -142,9 +188,34 @@ export async function resolveReviewMediaPayload(
       throw new Error("이미지 파일만 업로드할 수 있습니다.");
     }
 
-    const uploadedUrl = await uploadReviewMediaFile(partnerId, reviewId, nextFile, index);
-    images.push(uploadedUrl);
-    uploadedUrls.push(uploadedUrl);
+    images.push("");
+    uploadTasks.push({
+      imageIndex: images.length - 1,
+      file: nextFile,
+    });
+  }
+
+  const uploadResults = await Promise.allSettled(
+    uploadTasks.map((task) =>
+      uploadReviewMediaFile(partnerId, reviewId, task.file, task.imageIndex),
+    ),
+  );
+  const uploadedUrls = uploadResults.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : [],
+  );
+  const failedUpload = uploadResults.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+
+  if (failedUpload) {
+    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    throw failedUpload.reason instanceof Error
+      ? failedUpload.reason
+      : new Error("리뷰 사진 업로드에 실패했습니다.");
+  }
+
+  for (const [index, task] of uploadTasks.entries()) {
+    images[task.imageIndex] = uploadedUrls[index] ?? "";
   }
 
   return {

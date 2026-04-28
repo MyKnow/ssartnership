@@ -4,6 +4,7 @@ import { deleteReviewMediaUrls } from "@/lib/review-media-storage";
 import {
   ensureVisibleReviewPartner,
   getReviewMemberSession,
+  parseDirectUploadedReviewUrls,
   parseReviewFormFields,
   resolveReviewMediaPayload,
 } from "../_shared";
@@ -54,11 +55,12 @@ export async function PATCH(
     );
   }
 
+  const directUploadedUrls = parseDirectUploadedReviewUrls(formData, id, reviewId);
   let uploadedUrls: string[] = [];
 
   try {
     const media = await resolveReviewMediaPayload(formData, id, reviewId);
-    uploadedUrls = media.uploadedUrls;
+    uploadedUrls = [...directUploadedUrls, ...media.uploadedUrls];
     const review = await partnerReviewRepository.updatePartnerReview({
       reviewId,
       memberId: session.userId,

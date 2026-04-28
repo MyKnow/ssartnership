@@ -7,13 +7,13 @@ import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
-import type { PartnerReview } from "@/lib/partner-reviews";
+import type { PartnerReview, PartnerReviewSummary } from "@/lib/partner-reviews";
 import {
   normalizeReviewDraftInput,
   validateReviewDraftInput,
   type ReviewFieldErrors,
 } from "@/lib/review-validation";
-import { buildReviewFormData } from "./helpers";
+import { buildReviewFormData, uploadReviewImagesDirectly } from "./helpers";
 import ReviewStarsInput from "./ReviewStarsInput";
 import ReviewImageUploader from "@/components/review-media/ReviewImageUploader";
 import {
@@ -30,7 +30,10 @@ export default function PartnerReviewForm({
   partnerId: string;
   review?: PartnerReview;
   onCancel: () => void;
-  onSubmitted: () => Promise<void> | void;
+  onSubmitted: (result: {
+    review: PartnerReview;
+    summary: PartnerReviewSummary;
+  }) => Promise<void> | void;
 }) {
   const [rating, setRating] = useState(review?.rating ?? 5);
   const [title, setTitle] = useState(review?.title ?? "");
@@ -75,6 +78,12 @@ export default function PartnerReviewForm({
     setFormError(null);
 
     try {
+      const reviewId = review?.id ?? crypto.randomUUID();
+      const media = await uploadReviewImagesDirectly({
+        partnerId,
+        reviewId,
+        items,
+      });
       const response = await fetch(
         isEditMode
           ? `/api/partners/${encodeURIComponent(partnerId)}/reviews/${encodeURIComponent(review!.id)}`
@@ -85,7 +94,9 @@ export default function PartnerReviewForm({
             rating: normalized.rating,
             title: normalized.title,
             body: normalized.body,
-            items,
+            items: media.items,
+            reviewId,
+            directUploadedImageUrls: media.uploadedUrls,
           }),
         },
       );
@@ -111,7 +122,10 @@ export default function PartnerReviewForm({
         return;
       }
 
-      await onSubmitted();
+      await onSubmitted({
+        review: data.review as PartnerReview,
+        summary: data.summary as PartnerReviewSummary,
+      });
     } catch (error) {
       const message =
         error instanceof Error && error.message
