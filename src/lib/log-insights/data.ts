@@ -17,6 +17,7 @@ import {
   uniqueLogGroups,
 } from './shared';
 import { resolveLogRange } from './range';
+import { collectPagedRows } from './paging';
 
 async function queryAllRows<T>(
   supabase: AdminSupabaseClient,
@@ -26,19 +27,16 @@ async function queryAllRows<T>(
   endIso: string,
   maxRows: number,
 ): Promise<{ rows: T[]; truncated: boolean }> {
-  const pageStarts = Array.from(
-    { length: Math.ceil(maxRows / QUERY_PAGE_SIZE) },
-    (_, index) => index * QUERY_PAGE_SIZE,
-  );
-  const pageResults = await Promise.all(
-    pageStarts.map(async (from) => {
+  return collectPagedRows<T>(
+    maxRows,
+    async (from, to) => {
       const { data, error } = await supabase
         .from(table)
         .select(select)
         .gte('created_at', startIso)
         .lte('created_at', endIso)
         .order('created_at', { ascending: false })
-        .range(from, from + QUERY_PAGE_SIZE - 1);
+        .range(from, to);
 
       if (error) {
         console.error(`[log-insights] ${table} query failed`, error.message);
@@ -49,26 +47,9 @@ async function queryAllRows<T>(
         rows: (data ?? []) as T[],
         error: false,
       };
-    }),
+    },
+    QUERY_PAGE_SIZE,
   );
-
-  const rows: T[] = [];
-  let reachedEnd = false;
-  for (const pageResult of pageResults) {
-    if (pageResult.error) {
-      continue;
-    }
-    rows.push(...pageResult.rows);
-    if (pageResult.rows.length < QUERY_PAGE_SIZE) {
-      reachedEnd = true;
-      break;
-    }
-  }
-
-  return {
-    rows: rows.slice(0, maxRows),
-    truncated: !reachedEnd && rows.length >= maxRows,
-  };
 }
 
 function chunkValues<T>(values: T[], size: number) {

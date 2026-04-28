@@ -80,5 +80,13 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 ## Git
 
 - Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `perf:`, `ci:`.
+- Write the commit description in Korean. Example: `perf: 관리자 로그 페이지네이션 쿼리 최적화`
+- When a commit includes many changes, add a short Korean bullet list in the commit body. Example:
+  ```text
+  feat: A 기능 구현
+
+  - A 기능 의존성 개선
+  - A 기능의 B 변수 수정
+  ```
 - Do not revert user changes.
 - Review `git diff` before staging or committing.

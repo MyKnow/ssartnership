@@ -9,7 +9,10 @@
 - `wave-2-planning`: done
 - `wave-2-implementation`: done
 - `wave-2-verification`: done
-- `wave-3-planning`: pending
+- `wave-3-planning`: done
+- `wave-3-implementation`: done
+- `wave-3-verification`: done
+- `wave-4-planning`: pending
 
 ## Objective
 
@@ -78,6 +81,7 @@ These are not part of wave 1 because they need production measurements and trigg
   - active push subscription lookups
   - admin review status/rating/date scans
 - Move favorite/review counts from application-side row scans to DB-side aggregate RPCs.
+- Change admin logs page/export loaders to stop querying once a short page is reached instead of prefetching every possible offset up to the configured cap.
 
 ### Deferred
 
@@ -109,6 +113,9 @@ These are not part of wave 1 because they need production measurements and trigg
 - Rewired favorite counts in the Supabase favorite repository to use the aggregate RPC instead of fetching raw favorite rows.
 - Rewired review counts in partner dashboard, admin partner metrics, and partner service metrics to use the aggregate RPC instead of fetching raw review rows.
 - Added unit coverage for count-map normalization and reran focused verification plus production build.
+- Started wave 3 planning for admin logs query pagination. Current issue: page/export loaders precompute every page offset up to the configured ceiling and query them all even when later pages are empty.
+- Added `collectPagedRows` for admin log loading so page/export stops after the first short page instead of firing all theoretical offsets in advance.
+- Added dedicated pagination tests for the new admin log paging helper and reran focused verification plus production build.
 
 ## Verification
 
@@ -121,6 +128,8 @@ node --import ./tests/alias-register.mjs --test tests/partner-setup-fallback.tes
 npm run build
 npx eslint src/lib/partner-counts.ts src/lib/repositories/supabase/partner-favorite-repository.supabase.ts src/lib/partner-dashboard.supabase.ts src/lib/admin-partner-metrics.ts src/lib/partner-service-metrics.ts tests/partner-counts.test.mts
 node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
+npx eslint src/lib/log-insights/data.ts src/lib/log-insights/paging.ts tests/log-insights-paging.test.mts
+node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.mts tests/partner-counts.test.mts tests/partner-setup-fallback.test.mts tests/opt-wave5-selectors.test.mts
 ```
 
 Results:
@@ -131,6 +140,8 @@ Results:
 - `npm run build`: passed
 - wave 2 focused node tests: 7 passed, 0 failed
 - wave 2 focused eslint: passed
+- wave 3 focused node tests: 10 passed, 0 failed
+- wave 3 focused eslint: passed
 
 After migration deployment, re-measure:
 
