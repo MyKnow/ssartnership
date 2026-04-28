@@ -10,16 +10,43 @@ import { getSupabasePartnerPortalCompanyIds, getSupabasePartnerPortalSetupCompan
 import { findSupabasePartnerPortalSetupAccount } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
+const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function resolveSetupExpiry(account: {
+  initial_setup_expires_at?: string | null;
+  initial_setup_link_sent_at?: string | null;
+  updated_at?: string | null;
+}) {
+  if (account.initial_setup_expires_at) {
+    return account.initial_setup_expires_at;
+  }
+
+  const fallbackBase = account.initial_setup_link_sent_at ?? account.updated_at ?? null;
+  if (!fallbackBase) {
+    return null;
+  }
+
+  return new Date(new Date(fallbackBase).getTime() + INITIAL_SETUP_TTL_MS).toISOString();
+}
+
+function hasSetupToken(account: {
+  initial_setup_token?: string | null;
+  initial_setup_token_hash?: string | null;
+}) {
+  return Boolean(account.initial_setup_token_hash || account.initial_setup_token);
+}
+
 export async function getSupabasePartnerPortalSetupContext(
   token: string,
 ): Promise<PartnerPortalSetupContext | null> {
   const account = await findSupabasePartnerPortalSetupAccount(token);
+  const expiresAt = account ? resolveSetupExpiry(account) : null;
   if (
     !account ||
     !account.is_active ||
-    !account.initial_setup_token_hash ||
-    !account.initial_setup_expires_at ||
-    new Date(account.initial_setup_expires_at).getTime() <= Date.now() ||
+    !hasSetupToken(account) ||
+    !expiresAt ||
+    new Date(expiresAt).getTime() <= Date.now() ||
     account.initial_setup_completed_at
   ) {
     return null;
@@ -43,17 +70,15 @@ export async function completeSupabasePartnerPortalInitialSetup(
   input: PartnerPortalSetupInput,
 ): Promise<PartnerPortalSetupResult> {
   const account = await findSupabasePartnerPortalSetupAccount(input.token);
+  const expiresAt = account ? resolveSetupExpiry(account) : null;
 
-  if (!account || !account.initial_setup_token_hash) {
+  if (!account || !hasSetupToken(account)) {
     throw new PartnerPortalSetupError(
       "not_found",
       "초기 설정 링크를 찾을 수 없습니다.",
     );
   }
-  if (
-    !account.initial_setup_expires_at ||
-    new Date(account.initial_setup_expires_at).getTime() <= Date.now()
-  ) {
+  if (!expiresAt || new Date(expiresAt).getTime() <= Date.now()) {
     throw new PartnerPortalSetupError(
       "not_found",
       "초기 설정 링크를 찾을 수 없습니다.",
@@ -90,24 +115,39 @@ export async function completeSupabasePartnerPortalInitialSetup(
       "연결된 협력사를 찾을 수 없습니다.",
     );
   }
-  const { error } = await supabase
+  const basePayload = {
+    password_hash: passwordRecord.hash,
+    password_salt: passwordRecord.salt,
+    must_change_password: false,
+    is_active: true,
+    email_verified_at: completedAt,
+    initial_setup_completed_at: completedAt,
+    initial_setup_token: null,
+    initial_setup_token_hash: null,
+    initial_setup_verification_code_hash: null,
+    updated_at: completedAt,
+  };
+  const attempt = await supabase
     .from("partner_accounts")
     .update({
-      password_hash: passwordRecord.hash,
-      password_salt: passwordRecord.salt,
-      must_change_password: false,
-      is_active: true,
-      email_verified_at: completedAt,
-      initial_setup_completed_at: completedAt,
-      initial_setup_token_hash: null,
-      initial_setup_verification_code_hash: null,
+      ...basePayload,
       initial_setup_expires_at: null,
-      updated_at: completedAt,
     })
     .eq("id", account.id);
 
-  if (error) {
-    throw error;
+  if (attempt.error && !attempt.error.message.includes("initial_setup_expires_at")) {
+    throw attempt.error;
+  }
+
+  if (attempt.error) {
+    const fallback = await supabase
+      .from("partner_accounts")
+      .update(basePayload)
+      .eq("id", account.id);
+
+    if (fallback.error) {
+      throw fallback.error;
+    }
   }
 
   return {

@@ -41,19 +41,70 @@ export async function findSupabasePartnerPortalAccount(
 export async function findSupabasePartnerPortalSetupAccount(token: string) {
   const supabase = getSupabaseAdminClient();
   const tokenHash = hashOpaqueToken(token);
-  const { data: account, error } = await supabase
+  const { data: accountWithHashAndExpiry, error: hashAndExpiryError } = await supabase
     .from("partner_accounts")
     .select(
-      `${ACCOUNT_SELECT},initial_setup_token_hash,initial_setup_link_sent_at,initial_setup_expires_at`,
+      `${ACCOUNT_SELECT},initial_setup_token_hash,initial_setup_link_sent_at,initial_setup_expires_at,updated_at`,
     )
     .eq("initial_setup_token_hash", tokenHash)
     .maybeSingle();
 
-  if (error) {
-    throw error;
+  if (!hashAndExpiryError) {
+    return (accountWithHashAndExpiry as PartnerPortalAccountRow | null) ?? null;
   }
 
-  return (account as PartnerPortalAccountRow | null) ?? null;
+  if (
+    !hashAndExpiryError.message.includes("initial_setup_expires_at") &&
+    !hashAndExpiryError.message.includes("initial_setup_token_hash")
+  ) {
+    throw hashAndExpiryError;
+  }
+
+  const { data: accountWithHash, error: hashError } = await supabase
+    .from("partner_accounts")
+    .select(
+      `${ACCOUNT_SELECT},initial_setup_token_hash,initial_setup_link_sent_at,updated_at`,
+    )
+    .eq("initial_setup_token_hash", tokenHash)
+    .maybeSingle();
+
+  if (!hashError) {
+    return (accountWithHash as PartnerPortalAccountRow | null) ?? null;
+  }
+
+  if (!hashError.message.includes("initial_setup_token_hash")) {
+    throw hashError;
+  }
+
+  const { data: accountWithPlainAndExpiry, error: plainAndExpiryError } = await supabase
+    .from("partner_accounts")
+    .select(
+      `${ACCOUNT_SELECT},initial_setup_token,initial_setup_link_sent_at,initial_setup_expires_at,updated_at`,
+    )
+    .eq("initial_setup_token", token)
+    .maybeSingle();
+
+  if (!plainAndExpiryError) {
+    return (accountWithPlainAndExpiry as PartnerPortalAccountRow | null) ?? null;
+  }
+
+  if (!plainAndExpiryError.message.includes("initial_setup_expires_at")) {
+    throw plainAndExpiryError;
+  }
+
+  const { data: accountWithPlain, error: plainError } = await supabase
+    .from("partner_accounts")
+    .select(
+      `${ACCOUNT_SELECT},initial_setup_token,initial_setup_link_sent_at,updated_at`,
+    )
+    .eq("initial_setup_token", token)
+    .maybeSingle();
+
+  if (plainError) {
+    throw plainError;
+  }
+
+  return (accountWithPlain as PartnerPortalAccountRow | null) ?? null;
 }
 
 export async function getSupabasePartnerPortalAccountById(accountId: string) {
