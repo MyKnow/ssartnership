@@ -26,9 +26,18 @@ type PartnerCompanyRow = {
 
 type PartnerAccountCompanyLinkRow = {
   id: string;
+  account_id: string;
   is_active?: boolean | null;
   created_at?: string | null;
   company?: PartnerCompanyRow | null;
+};
+
+type PartnerAccountCompanyLinkRowRecord = {
+  id: string;
+  account_id: string;
+  is_active?: boolean | null;
+  created_at?: string | null;
+  company?: unknown;
 };
 
 type PartnerAccountRowRecord = {
@@ -111,6 +120,7 @@ function normalizePartnerAccount(
     updated_at: row.updated_at ?? null,
     links: links.map((link) => ({
       id: link.id,
+      account_id: link.account_id,
       is_active: link.is_active ?? null,
       created_at: link.created_at ?? null,
       company: normalizePartnerCompany(link.company),
@@ -157,7 +167,7 @@ export default async function AdminCompaniesPage({
       ? params.generatedSetupAccountId
       : null;
 
-  const [partnersResult, companiesResult, accountsResult] = await Promise.all([
+  const [partnersResult, companiesResult, accountsResult, accountLinksResult] = await Promise.all([
     supabase
       .from("partners")
       .select("id,company_id,company:partner_companies(id)")
@@ -169,18 +179,56 @@ export default async function AdminCompaniesPage({
     supabase
       .from("partner_accounts")
       .select(
-        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at,links:partner_account_companies(id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active))",
+        "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at",
+      )
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("partner_account_companies")
+      .select(
+        "id,account_id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active)",
       )
       .order("created_at", { ascending: false }),
   ]);
+
+  if (partnersResult.error) {
+    throw new Error(`partner load failed: ${partnersResult.error.message}`);
+  }
+  if (companiesResult.error) {
+    throw new Error(`company load failed: ${companiesResult.error.message}`);
+  }
+  if (accountsResult.error) {
+    throw new Error(`partner account load failed: ${accountsResult.error.message}`);
+  }
+  if (accountLinksResult.error) {
+    throw new Error(`partner account link load failed: ${accountLinksResult.error.message}`);
+  }
 
   const safePartners = (partnersResult.data ?? []).map((partner) => ({
     ...partner,
     company: normalizePartnerCompany((partner as { company?: unknown }).company),
   }));
   const safeCompanies = companiesResult.data ?? [];
+  const accountLinksByAccountId = new Map<string, PartnerAccountCompanyLinkRow[]>();
+  for (const rawLink of accountLinksResult.data ?? []) {
+    const link = rawLink as PartnerAccountCompanyLinkRowRecord;
+    const links = accountLinksByAccountId.get(link.account_id) ?? [];
+    links.push({
+      id: link.id,
+      account_id: link.account_id,
+      is_active: link.is_active ?? null,
+      created_at: link.created_at ?? null,
+      company: normalizePartnerCompany(link.company),
+    });
+    accountLinksByAccountId.set(link.account_id, links);
+  }
+
   const safeAccounts = (accountsResult.data ?? [])
-    .map((account) => normalizePartnerAccount(account))
+    .map((account) =>
+      normalizePartnerAccount({
+        ...account,
+        links: accountLinksByAccountId.get((account as { id: string }).id) ?? [],
+      }),
+    )
     .filter((account): account is PartnerAccountRow => Boolean(account));
   const activeCompanyCount = safeCompanies.filter((company) => company.is_active !== false).length;
   const activeAccountCount = safeAccounts.filter((account) => account.is_active !== false).length;
