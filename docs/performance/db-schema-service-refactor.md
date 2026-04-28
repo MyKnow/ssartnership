@@ -24,7 +24,10 @@
 - `wave-7-planning`: done
 - `wave-7-implementation`: done
 - `wave-7-verification`: done
-- `wave-8-planning`: pending
+- `wave-8-planning`: done
+- `wave-8-implementation`: done
+- `wave-8-verification`: done
+- `wave-9-planning`: pending
 
 ## Objective
 
@@ -98,6 +101,7 @@ These are not part of wave 1 because they need production measurements and trigg
 - Reshape `/api/admin/logs` responses so full-range summary/filter metadata is precomputed on the server while the client receives only the current page log rows.
 - Split default admin logs loading so full-range summary queries use thinner selects while the current page list still loads full row detail.
 - Keep favorite/review counts on aggregate RPCs for now, and consolidate remaining direct review count paths behind helper functions instead of introducing persisted counters prematurely.
+- Collapse admin overview summary counts into a single RPC instead of issuing repeated `count exact` PostgREST queries from the page loader.
 
 ### Deferred
 
@@ -112,7 +116,7 @@ These are not part of wave 1 because they need production measurements and trigg
 1. Evaluate whether favorite/review aggregate RPCs are sufficient or whether persisted counters are still justified.
 2. Move admin logs and audit views further toward DB-side filtering and pagination.
 3. Reconcile remaining `schema.sql` drift against applied migrations and live environments.
-4. Re-measure admin members, admin reviews, and push-related queries after migration deployment.
+4. Re-measure admin members, admin reviews, admin dashboard, and push-related queries after migration deployment.
 
 ## Work Log
 
@@ -148,6 +152,11 @@ These are not part of wave 1 because they need production measurements and trigg
 - Replaced remaining direct review count queries in event rewards, admin review counts, admin home, and admin partner detail with shared helper calls.
 - Kept persisted counters deferred because current read shapes are still bounded and the write-side consistency cost is not yet justified.
 - Reran migration validation, focused eslint, focused tests, and production build.
+- Started wave 8 planning for admin overview summary counts. Current issue: the admin home still fires repeated `count exact` PostgREST queries across members, companies, partners, categories, accounts, push subscriptions, and log tables.
+- Added `20260501012008_admin_dashboard_counts.sql` with `get_admin_dashboard_counts()` so the admin overview can fetch summary counts through one RPC.
+- Reworked the admin home page to consume the shared dashboard count helper instead of issuing multiple direct head-count queries.
+- Added unit coverage for admin dashboard count normalization and synced `supabase/schema.sql` with the new RPC.
+- Reran migration validation, focused eslint, focused tests, and production build.
 
 ## Verification
 
@@ -170,6 +179,10 @@ node --import ./tests/alias-register.mjs --test tests/log-insights-paging.test.m
 npm run validate:migrations
 npx eslint src/lib/partner-counts.ts src/lib/promotions/event-rewards.ts src/lib/admin-reviews.ts 'src/app/admin/(protected)/page.tsx' 'src/app/admin/(protected)/partners/[partnerId]/page.tsx' tests/partner-counts-visibility.test.mts
 node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts tests/partner-counts-visibility.test.mts tests/partner-setup-fallback.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
+npm run validate:migrations
+npx eslint src/lib/partner-counts.ts 'src/app/admin/(protected)/page.tsx' tests/partner-counts.test.mts
+node --import ./tests/alias-register.mjs --test tests/partner-counts.test.mts tests/partner-counts-visibility.test.mts tests/partner-setup-fallback.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
+npm run build
 ```
 
 Results:
@@ -194,6 +207,10 @@ Results:
 - wave 6 focused node tests: 10 passed, 0 failed
 - wave 6 focused eslint: passed
 - wave 6 production build: passed
+- wave 8 migration validation: passed
+- wave 8 focused node tests: 12 passed, 0 failed
+- wave 8 focused eslint: passed
+- wave 8 production build: passed
 
 After migration deployment, re-measure:
 

@@ -16,10 +16,36 @@ type ReviewVisibilityCountRpcRow = {
   hidden_count: number | string | null;
 };
 
+type AdminDashboardCountRpcRow = {
+  member_count: number | string | null;
+  company_count: number | string | null;
+  partner_count: number | string | null;
+  category_count: number | string | null;
+  account_count: number | string | null;
+  review_count: number | string | null;
+  active_push_subscription_count: number | string | null;
+  product_log_count: number | string | null;
+  audit_log_count: number | string | null;
+  security_log_count: number | string | null;
+};
+
 export type ReviewVisibilityCounts = {
   totalCount: number;
   visibleCount: number;
   hiddenCount: number;
+};
+
+export type AdminDashboardCounts = {
+  memberCount: number;
+  companyCount: number;
+  partnerCount: number;
+  categoryCount: number;
+  accountCount: number;
+  reviewCount: number;
+  activePushSubscriptionCount: number;
+  productLogCount: number;
+  auditLogCount: number;
+  securityLogCount: number;
 };
 
 function normalizePartnerIds(partnerIds: readonly string[]) {
@@ -44,6 +70,23 @@ export function toReviewVisibilityCounts(
     totalCount: parseCount(row?.total_count),
     visibleCount: parseCount(row?.visible_count),
     hiddenCount: parseCount(row?.hidden_count),
+  };
+}
+
+export function toAdminDashboardCounts(
+  row?: AdminDashboardCountRpcRow | null,
+): AdminDashboardCounts {
+  return {
+    memberCount: parseCount(row?.member_count),
+    companyCount: parseCount(row?.company_count),
+    partnerCount: parseCount(row?.partner_count),
+    categoryCount: parseCount(row?.category_count),
+    accountCount: parseCount(row?.account_count),
+    reviewCount: parseCount(row?.review_count),
+    activePushSubscriptionCount: parseCount(row?.active_push_subscription_count),
+    productLogCount: parseCount(row?.product_log_count),
+    auditLogCount: parseCount(row?.audit_log_count),
+    securityLogCount: parseCount(row?.security_log_count),
   };
 }
 
@@ -203,6 +246,24 @@ export async function fetchMemberVisibleReviewCountInRange(
 
   return {
     count: parseCount(data),
+    errorMessage: null as string | null,
+  };
+}
+
+export async function fetchAdminDashboardCounts(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+) {
+  const { data, error } = await supabase.rpc("get_admin_dashboard_counts");
+
+  if (error) {
+    return {
+      counts: toAdminDashboardCounts(),
+      errorMessage: error.message,
+    };
+  }
+
+  return {
+    counts: toAdminDashboardCounts(((data ?? [])[0] as AdminDashboardCountRpcRow | undefined) ?? null),
     errorMessage: null as string | null,
   };
 }

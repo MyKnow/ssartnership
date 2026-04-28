@@ -6,7 +6,7 @@ import {
   getSsafyCycleOverview,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
-import { fetchAdminReviewCounts } from "@/lib/partner-counts";
+import { fetchAdminDashboardCounts } from "@/lib/partner-counts";
 
 export const dynamic = "force-dynamic";
 
@@ -75,50 +75,37 @@ export default async function AdminPage() {
   }
 
   const supabase = getSupabaseAdminClient();
-  const [
-    cycleSettings,
-    memberResult,
-    companyResult,
-    partnerResult,
-    categoryResult,
-    accountResult,
-    reviewResult,
-    pushResult,
-    productLogResult,
-    auditLogResult,
-    securityLogResult,
-  ] = await Promise.all([
+  const [cycleSettings, dashboardCountResult] = await Promise.all([
     getSsafyCycleSettings(),
-    supabase.from("members").select("id", { count: "exact", head: true }),
-    supabase.from("partner_companies").select("id", { count: "exact", head: true }),
-    supabase.from("partners").select("id", { count: "exact", head: true }),
-    supabase.from("categories").select("id", { count: "exact", head: true }),
-    supabase.from("partner_accounts").select("id", { count: "exact", head: true }),
-    fetchAdminReviewCounts(supabase),
-    supabase
-      .from("push_subscriptions")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
-    supabase.from("event_logs").select("id", { count: "exact", head: true }),
-    supabase
-      .from("admin_audit_logs")
-      .select("id", { count: "exact", head: true }),
-    supabase
-      .from("auth_security_logs")
-      .select("id", { count: "exact", head: true }),
+    fetchAdminDashboardCounts(supabase),
   ]);
   const cycleOverview = getSsafyCycleOverview(cycleSettings);
 
-  const memberCount = memberResult.error ? 0 : memberResult.count ?? 0;
-  const companyCount = companyResult.error ? 0 : companyResult.count ?? 0;
-  const partnerCount = partnerResult.error ? 0 : partnerResult.count ?? 0;
-  const categoryCount = categoryResult.error ? 0 : categoryResult.count ?? 0;
-  const accountCount = accountResult.error ? 0 : accountResult.count ?? 0;
-  const reviewCount = reviewResult.errorMessage ? 0 : reviewResult.counts.totalCount;
-  const pushSubscriptionCount = pushResult.error ? 0 : pushResult.count ?? 0;
-  const productLogCount = productLogResult.error ? 0 : productLogResult.count ?? 0;
-  const auditLogCount = auditLogResult.error ? 0 : auditLogResult.count ?? 0;
-  const securityLogCount = securityLogResult.error ? 0 : securityLogResult.count ?? 0;
+  const dashboardCounts = dashboardCountResult.errorMessage
+    ? {
+        memberCount: 0,
+        companyCount: 0,
+        partnerCount: 0,
+        categoryCount: 0,
+        accountCount: 0,
+        reviewCount: 0,
+        activePushSubscriptionCount: 0,
+        productLogCount: 0,
+        auditLogCount: 0,
+        securityLogCount: 0,
+      }
+    : dashboardCountResult.counts;
+
+  const memberCount = dashboardCounts.memberCount;
+  const companyCount = dashboardCounts.companyCount;
+  const partnerCount = dashboardCounts.partnerCount;
+  const categoryCount = dashboardCounts.categoryCount;
+  const accountCount = dashboardCounts.accountCount;
+  const reviewCount = dashboardCounts.reviewCount;
+  const pushSubscriptionCount = dashboardCounts.activePushSubscriptionCount;
+  const productLogCount = dashboardCounts.productLogCount;
+  const auditLogCount = dashboardCounts.auditLogCount;
+  const securityLogCount = dashboardCounts.securityLogCount;
   const totalLogCount = productLogCount + auditLogCount + securityLogCount;
   const cycleMeta = cycleSettings.manualCurrentYear
     ? `${cycleOverview.currentYear}기 · 조기 시작`
