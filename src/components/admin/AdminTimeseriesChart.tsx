@@ -173,54 +173,9 @@ export default function AdminTimeseriesChart({
               <LineChart
                 data={chartData}
                 margin={{ top: 10, right: 12, bottom: 10, left: 0 }}
-                onMouseMove={(state) => {
-                  const activeTooltipIndex = state.activeTooltipIndex;
-                  const nextRow =
-                    typeof activeTooltipIndex === "number"
-                      ? chartData[activeTooltipIndex] ?? null
-                      : null;
-                  setHoveredKey(typeof nextRow?.key === "string" ? nextRow.key : null);
-                  const nextCoordinate = state.activeCoordinate;
-                  if (
-                    typeof nextRow?.key === "string" &&
-                    nextCoordinate &&
-                    typeof nextCoordinate.x === "number" &&
-                    typeof nextCoordinate.y === "number"
-                  ) {
-                    setHoveredBubble({
-                      key: nextRow.key,
-                      x: nextCoordinate.x,
-                      y: nextCoordinate.y,
-                    });
-                  } else {
-                    setHoveredBubble(null);
-                  }
-                }}
                 onMouseLeave={() => {
                   setHoveredKey(null);
                   setHoveredBubble(null);
-                }}
-                onClick={(state) => {
-                  const activeTooltipIndex = state.activeTooltipIndex;
-                  const nextRow =
-                    typeof activeTooltipIndex === "number"
-                      ? chartData[activeTooltipIndex] ?? null
-                      : null;
-                  if (typeof nextRow?.key === "string") {
-                    setSelectedKey(nextRow.key);
-                    const nextCoordinate = state.activeCoordinate;
-                    if (
-                      nextCoordinate &&
-                      typeof nextCoordinate.x === "number" &&
-                      typeof nextCoordinate.y === "number"
-                    ) {
-                      setSelectedBubble({
-                        key: nextRow.key,
-                        x: nextCoordinate.x,
-                        y: nextCoordinate.y,
-                      });
-                    }
-                  }
                 }}
               >
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3 7" className="text-border/70" />
@@ -253,13 +208,43 @@ export default function AdminTimeseriesChart({
                           return null;
                         }
                         const active = payload?.key === activeKey;
+                        const pointKey = typeof payload?.key === "string" ? payload.key : null;
+                        if (!pointKey) {
+                          return null;
+                        }
                         return (
-                          <circle
-                            cx={cx}
-                            cy={cy}
-                            r={active ? 5 : 3.5}
-                            fill={dotFill}
-                          />
+                          <g
+                            onMouseEnter={() => {
+                              setHoveredKey(pointKey);
+                              setHoveredBubble({
+                                key: pointKey,
+                                x: cx,
+                                y: cy,
+                              });
+                            }}
+                            onClick={() => {
+                              setSelectedKey(pointKey);
+                              setSelectedBubble({
+                                key: pointKey,
+                                x: cx,
+                                y: cy,
+                              });
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={12}
+                              fill="transparent"
+                            />
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={active ? 5 : 3.5}
+                              fill={dotFill}
+                            />
+                          </g>
                         );
                       }}
                       activeDot={{ r: 5, fill: dotFill }}
