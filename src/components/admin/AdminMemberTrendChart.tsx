@@ -197,8 +197,8 @@ export default function AdminMemberTrendChart({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const buckets = useMemo(() => buildBuckets(createdAts, granularity), [createdAts, granularity]);
   const width = Math.max(buckets.length * 72, 480);
-  const height = 176;
-  const padding = { top: 18, right: 16, bottom: 36, left: 38 };
+  const height = 128;
+  const padding = { top: 10, right: 12, bottom: 28, left: 32 };
   const plotWidth = Math.max(width - padding.left - padding.right, 1);
   const plotHeight = Math.max(height - padding.top - padding.bottom, 1);
   const maxValue = Math.max(...buckets.map((bucket) => bucket.count), 1);
@@ -256,7 +256,7 @@ export default function AdminMemberTrendChart({
       ) : null}
 
       <div
-        className="-mx-1 mt-4 overflow-x-auto pb-2"
+        className="-mx-1 mt-3 overflow-x-auto pb-1"
         onMouseLeave={() => setActiveIndex(null)}
       >
         <div className="min-w-max px-1">
@@ -282,9 +282,9 @@ export default function AdminMemberTrendChart({
                   />
                   <text
                     x={padding.left - 8}
-                    y={y + 4}
+                    y={y + 3}
                     textAnchor="end"
-                    className="fill-muted-foreground text-[9px] font-medium"
+                    className="fill-muted-foreground text-[8px] font-medium"
                   >
                     {value}
                   </text>
@@ -292,7 +292,7 @@ export default function AdminMemberTrendChart({
               );
             })}
 
-            <path d={buildPath(points)} fill="none" stroke="currentColor" strokeWidth="3" className="text-primary" />
+            <path d={buildPath(points)} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-primary" />
 
             {points.map((point, index) => {
               const active = activePoint?.key === point.key;
@@ -301,14 +301,14 @@ export default function AdminMemberTrendChart({
                   <circle
                     cx={point.x}
                     cy={point.y}
-                    r={active ? 6 : 4.5}
+                    r={active ? 5 : 3.5}
                     className={active ? "fill-primary" : "fill-primary/75"}
                   />
                   <text
                     x={point.x}
-                    y={height - 12}
+                    y={height - 10}
                     textAnchor="middle"
-                    className="fill-muted-foreground text-[9px] font-medium"
+                    className="fill-muted-foreground text-[8px] font-medium"
                   >
                     {point.label}
                   </text>
