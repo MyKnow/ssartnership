@@ -114,39 +114,16 @@ export default function AdminTimeseriesChart({
 
   return (
     <>
-      {activeSummary ? (
-        <div className="mt-4 grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-4 sm:h-[5.5rem] sm:grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))]">
-          <div className="sm:h-12 sm:overflow-hidden">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              구간
-            </p>
-            <p className="mt-1 truncate text-sm font-semibold text-foreground" title={activeSummary.rangeLabel}>
-              {activeSummary.rangeLabel}
-            </p>
-          </div>
-          {activeSummary.items.map((item) => (
-            <div key={`${activeSummary.rangeLabel}-${item.label}`} className="sm:h-12 sm:overflow-hidden">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {item.label}
-              </p>
-              <p className={`mt-1 text-sm font-semibold ${item.valueClassName ?? "text-foreground"}`}>
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible pb-4 pt-8">
+      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible pb-8 pt-12">
         <div className="px-1" style={{ minWidth: `${chartWidth}px` }}>
           <div
-            className="relative z-20 h-[11rem] overflow-visible sm:h-[9.5rem] lg:h-[8.5rem]"
+            className="relative z-20 h-[12.5rem] overflow-visible sm:h-[10.5rem] lg:h-[9rem]"
             role="img"
             aria-label={ariaLabel}
           >
             {activeSummary && activeBubble ? (
               <div
-                className="pointer-events-none absolute z-50 w-56 -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
+                className="pointer-events-none absolute z-50 w-56 -translate-x-1/2 -translate-y-[calc(100%+1rem)] rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
                 style={{
                   left: `clamp(5.5rem, ${activeBubble.x}px, calc(100% - 5.5rem))`,
                   top: `${Math.max(activeBubble.y - 4, 28)}px`,
@@ -172,10 +149,55 @@ export default function AdminTimeseriesChart({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
-                margin={{ top: 10, right: 12, bottom: 10, left: 0 }}
+                margin={{ top: 14, right: 18, bottom: 16, left: 0 }}
+                onMouseMove={(state) => {
+                  const activeTooltipIndex = state.activeTooltipIndex;
+                  const nextRow =
+                    typeof activeTooltipIndex === "number"
+                      ? chartData[activeTooltipIndex] ?? null
+                      : null;
+                  const nextCoordinate = state.activeCoordinate;
+                  if (
+                    typeof nextRow?.key === "string" &&
+                    nextCoordinate &&
+                    typeof nextCoordinate.x === "number" &&
+                    typeof nextCoordinate.y === "number"
+                  ) {
+                    setHoveredKey(nextRow.key);
+                    setHoveredBubble({
+                      key: nextRow.key,
+                      x: nextCoordinate.x,
+                      y: nextCoordinate.y,
+                    });
+                  } else {
+                    setHoveredKey(null);
+                    setHoveredBubble(null);
+                  }
+                }}
                 onMouseLeave={() => {
                   setHoveredKey(null);
                   setHoveredBubble(null);
+                }}
+                onClick={(state) => {
+                  const activeTooltipIndex = state.activeTooltipIndex;
+                  const nextRow =
+                    typeof activeTooltipIndex === "number"
+                      ? chartData[activeTooltipIndex] ?? null
+                      : null;
+                  const nextCoordinate = state.activeCoordinate;
+                  if (
+                    typeof nextRow?.key === "string" &&
+                    nextCoordinate &&
+                    typeof nextCoordinate.x === "number" &&
+                    typeof nextCoordinate.y === "number"
+                  ) {
+                    setSelectedKey(nextRow.key);
+                    setSelectedBubble({
+                      key: nextRow.key,
+                      x: nextCoordinate.x,
+                      y: nextCoordinate.y,
+                    });
+                  }
                 }}
               >
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3 7" className="text-border/70" />
@@ -208,43 +230,13 @@ export default function AdminTimeseriesChart({
                           return null;
                         }
                         const active = payload?.key === activeKey;
-                        const pointKey = typeof payload?.key === "string" ? payload.key : null;
-                        if (!pointKey) {
-                          return null;
-                        }
                         return (
-                          <g
-                            onMouseEnter={() => {
-                              setHoveredKey(pointKey);
-                              setHoveredBubble({
-                                key: pointKey,
-                                x: cx,
-                                y: cy,
-                              });
-                            }}
-                            onClick={() => {
-                              setSelectedKey(pointKey);
-                              setSelectedBubble({
-                                key: pointKey,
-                                x: cx,
-                                y: cy,
-                              });
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <circle
-                              cx={cx}
-                              cy={cy}
-                              r={12}
-                              fill="transparent"
-                            />
-                            <circle
-                              cx={cx}
-                              cy={cy}
-                              r={active ? 5 : 3.5}
-                              fill={dotFill}
-                            />
-                          </g>
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={active ? 5 : 3.5}
+                            fill={dotFill}
+                          />
                         );
                       }}
                       activeDot={{ r: 5, fill: dotFill }}
