@@ -120,7 +120,7 @@ export default function AdminTimeseriesChart({
         <div className="min-w-max px-1">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-auto min-w-full"
+            className="block min-w-full h-[11rem] sm:h-[9.5rem] lg:h-[8.5rem]"
             role="img"
             aria-label={ariaLabel}
           >
