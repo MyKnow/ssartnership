@@ -598,30 +598,36 @@ as $$
       filtered_logs.*,
       count(*) over () as total_count
     from filtered_logs
+  ),
+  paged_logs as (
+    select
+      counted_logs.*,
+      row_number() over (order by counted_logs.created_at desc, counted_logs.id desc) as row_num
+    from counted_logs
   )
   select
-    counted_logs.group_name,
-    counted_logs.id,
-    counted_logs.name,
-    counted_logs.status,
-    counted_logs.actor_type,
-    counted_logs.actor_id,
-    counted_logs.actor_name,
-    counted_logs.actor_mm_username,
-    counted_logs.identifier,
-    counted_logs.ip_address,
-    counted_logs.path,
-    counted_logs.referrer,
-    counted_logs.target_type,
-    counted_logs.target_id,
-    counted_logs.properties,
-    counted_logs.created_at,
-    counted_logs.total_count
-  from counted_logs
+    paged_logs.group_name,
+    paged_logs.id,
+    paged_logs.name,
+    paged_logs.status,
+    paged_logs.actor_type,
+    paged_logs.actor_id,
+    paged_logs.actor_name,
+    paged_logs.actor_mm_username,
+    paged_logs.identifier,
+    paged_logs.ip_address,
+    paged_logs.path,
+    paged_logs.referrer,
+    paged_logs.target_type,
+    paged_logs.target_id,
+    paged_logs.properties,
+    paged_logs.created_at,
+    paged_logs.total_count
+  from paged_logs
   cross join params
-  order by counted_logs.created_at desc
-  offset ((params.page - 1) * params.page_size)
-  limit params.page_size;
+  where paged_logs.row_num > ((params.page - 1) * params.page_size)
+    and paged_logs.row_num <= (params.page * params.page_size)
+  order by paged_logs.created_at desc, paged_logs.id desc;
 $$;
 
 create or replace function public.get_partner_review_visibility_counts(input_partner_id uuid)

@@ -173,6 +173,10 @@ These are not part of wave 1 because they need production measurements and trigg
 - Added `20260501012009_admin_logs_page_rpc.sql` with `get_admin_logs_page(...)` to page newest-first log rows across product, audit, and security logs inside Postgres.
 - Reworked the admin log loader so newest-first requests use the DB RPC for all-group and filter-heavy list queries, while `oldest/actor/ip` sorts still stay on the existing fallback path.
 - Synced `supabase/schema.sql`, updated loading-strategy tests, and reran migration validation, focused eslint, focused tests, and production build.
+- Post-migration audit found that `get_admin_logs_page(...)` used variable-driven `OFFSET/LIMIT`, which fails in PostgreSQL `language sql` functions with `SQLSTATE 42P10`.
+- Replaced the RPC pagination step with `row_number()` windowing plus row-range filtering so `supabase db push` can apply the migration cleanly.
+- Rechecked the recent RPC migrations (`20260501012006` through `20260501012009`) for the same SQL-function constraint. No additional variable `OFFSET/LIMIT` usage remains.
+- Remaining follow-up risk: `get_admin_logs_page(...)` still builds a merged `search_text` over product/audit/security logs before applying `like` filters, so search-heavy paths may still be the next optimization target after the migration lands.
 
 ## Verification
 
@@ -205,6 +209,8 @@ npm run build
 npm run validate:migrations
 npx eslint src/lib/log-insights.ts src/lib/log-insights/data.ts tests/admin-log-loading-strategy.test.mts
 node --import ./tests/alias-register.mjs --test tests/admin-log-loading-strategy.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
+npm run build
+npm run validate:migrations
 npm run build
 ```
 
@@ -241,6 +247,7 @@ Results:
 - wave 10 focused node tests: 8 passed, 0 failed
 - wave 10 focused eslint: passed
 - wave 10 production build: passed
+- post-wave RPC migration audit: checked `20260501012006` to `20260501012009` for SQL-function pagination issues, fixed `20260501012009`, and reran migration validation plus production build successfully
 
 After migration deployment, re-measure:
 
