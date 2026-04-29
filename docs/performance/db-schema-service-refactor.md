@@ -294,3 +294,26 @@ where query ilike '%members%'
 order by total_exec_time desc
 limit 30;
 ```
+
+## Post-deployment Measurement
+
+Measurement source: preview DB after applying migrations through `20260501012009_admin_logs_page_rpc.sql` and replaying the admin members / push / reviews scenarios.
+
+| Area | Query / Pattern | Calls | Total Time | Mean Time | Max Time | Notes |
+|---|---:|---:|---:|---:|---:|---|
+| Members | `UPDATE members SET avatar_base64 ...` | 100 | 357.758ms | 3.578ms | 16.163ms | Avatar writes, not part of the original heavy list-read baseline |
+| Security | `auth_security_logs created_at DESC LIMIT/OFFSET` | 16 | 12.384ms | 0.774ms | 2.240ms | Admin logs/security range reads are now sub-millisecond on average |
+| Members | `SELECT member by id` including `avatar_base64` | 100 | 5.833ms | 0.058ms | 1.274ms | Per-member detail/avatar follow-up reads remain cheap |
+| Members | `members ORDER BY created_at DESC` with count | 3 | 2.316ms | 0.772ms | 1.224ms | Formerly one of the expensive members list paths |
+| Members | `SELECT year, campus FROM members` | 3 | 1.278ms | 0.426ms | 0.441ms | Filter metadata query remains cheap |
+| Members | `SELECT member policy flags by id` | 6 | 0.901ms | 0.150ms | 0.731ms | Detail-side policy read |
+| Members | `SELECT display_name, mm_username WHERE id = ANY (...)` | 16 | 0.599ms | 0.037ms | 0.040ms | Joined actor lookups |
+| Security | `auth_security_logs event/status/actor_id query` | 3 | 0.243ms | 0.081ms | 0.100ms | Targeted security lookups remain cheap |
+| Push | `push_subscriptions member_id WHERE is_active = true` | 3 | 0.079ms | 0.026ms | 0.031ms | Push-page subscription membership check |
+
+### Comparison Notes
+
+- The previously expensive members list path is now measuring at `0.772ms mean` in this replay, down from the earlier `~515ms to ~725ms` class queries captured before the refactor.
+- The `auth_security_logs` range query is now `0.774ms mean`, which is far below the earlier broad admin-log fallback behavior that used to read whole ranges into the app.
+- The replay sample does **not** include a `partner_reviews` query in the returned `pg_stat_statements` slice, so the admin reviews scenario either hit lighter RPC/count paths or did not produce a top-30 review query during this run.
+- The most expensive query in this measurement set is now `members.avatar_base64` update traffic, which is a write path and outside the original list/pagination optimization target.
