@@ -1,6 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 export type AdminTimeseriesSeries = {
   key: string;
@@ -26,19 +35,44 @@ export type AdminTimeseriesSummary = {
   }>;
 };
 
-type ComputedChartPoint = AdminTimeseriesPoint & {
-  x: number;
-} & Record<`${string}Y`, number>;
+type ChartRow = {
+  key: string;
+  label: string;
+  rangeLabel: string;
+} & Record<string, string | number>;
 
-function buildPath(points: ComputedChartPoint[], key: `${string}Y`) {
-  return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point[key]}`).join(" ");
+const COLOR_BY_LINE_CLASS: Record<string, string> = {
+  "text-primary": "var(--color-primary)",
+  "text-foreground/35": "color-mix(in srgb, var(--color-foreground) 35%, transparent)",
+  "text-sky-500": "#0ea5e9",
+  "text-violet-500": "#8b5cf6",
+  "text-amber-500": "#f59e0b",
+};
+
+const COLOR_BY_DOT_CLASS: Record<string, string> = {
+  "fill-primary": "var(--color-primary)",
+  "fill-foreground/25": "color-mix(in srgb, var(--color-foreground) 25%, transparent)",
+  "fill-sky-500": "#0ea5e9",
+  "fill-violet-500": "#8b5cf6",
+  "fill-amber-500": "#f59e0b",
+};
+
+function resolveLineColor(className: string) {
+  return COLOR_BY_LINE_CLASS[className] ?? "var(--color-primary)";
+}
+
+function resolveDotColor(className: string) {
+  return COLOR_BY_DOT_CLASS[className] ?? "var(--color-primary)";
+}
+
+function TimeseriesTooltip() {
+  return null;
 }
 
 export default function AdminTimeseriesChart({
   points,
   series,
   ariaLabel,
-  height = 128,
   minWidth = 480,
   widthPerPoint = 72,
   renderSummary,
@@ -46,44 +80,33 @@ export default function AdminTimeseriesChart({
   points: AdminTimeseriesPoint[];
   series: AdminTimeseriesSeries[];
   ariaLabel: string;
-  height?: number;
   minWidth?: number;
   widthPerPoint?: number;
   renderSummary: (point: AdminTimeseriesPoint) => AdminTimeseriesSummary;
 }) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  const width = Math.max(points.length * widthPerPoint, minWidth);
-  const padding = { top: 10, right: 12, bottom: 28, left: 32 };
-  const plotWidth = Math.max(width - padding.left - padding.right, 1);
-  const plotHeight = Math.max(height - padding.top - padding.bottom, 1);
-  const maxValue = Math.max(
-    ...points.flatMap((point) => series.map((entry) => point.values[entry.key] ?? 0)),
-    1,
-  );
-  const stepX = points.length > 1 ? plotWidth / (points.length - 1) : 0;
-  const chartPoints = useMemo(
+  const chartWidth = Math.max(points.length * widthPerPoint, minWidth);
+  const chartData = useMemo<ChartRow[]>(
     () =>
-      points.map<ComputedChartPoint>((point, index) => {
-        const next: ComputedChartPoint = {
-          ...point,
-          x: padding.left + stepX * index,
-        };
-
-        for (const entry of series) {
-          next[`${entry.key}Y`] = padding.top + plotHeight * (1 - (point.values[entry.key] ?? 0) / maxValue);
-        }
-
-        return next;
-      }),
-    [maxValue, padding.left, padding.top, plotHeight, points, series, stepX],
+      points.map((point) => ({
+        key: point.key,
+        label: point.label,
+        rangeLabel: point.rangeLabel,
+        ...point.values,
+      })),
+    [points],
+  );
+  const pointByKey = useMemo(
+    () =>
+      new Map(points.map((point) => [point.key, point])),
+    [points],
   );
 
-  const activePoint =
-    chartPoints[hoveredIndex ?? selectedIndex ?? chartPoints.length - 1] ?? null;
+  const activeKey = hoveredKey ?? selectedKey ?? points[points.length - 1]?.key ?? null;
+  const activePoint = activeKey ? pointByKey.get(activeKey) ?? null : null;
   const activeSummary = activePoint ? renderSummary(activePoint) : null;
-  const interactionWidth = points.length > 1 ? Math.max(stepX, 44) : 72;
 
   return (
     <>
@@ -93,10 +116,7 @@ export default function AdminTimeseriesChart({
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               구간
             </p>
-            <p
-              className="mt-1 truncate text-sm font-semibold text-foreground"
-              title={activeSummary.rangeLabel}
-            >
+            <p className="mt-1 truncate text-sm font-semibold text-foreground" title={activeSummary.rangeLabel}>
               {activeSummary.rangeLabel}
             </p>
           </div>
@@ -113,89 +133,80 @@ export default function AdminTimeseriesChart({
         </div>
       ) : null}
 
-      <div
-        className="-mx-1 mt-3 overflow-x-auto pb-1"
-        onMouseLeave={() => setHoveredIndex(null)}
-      >
-        <div className="min-w-max px-1">
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="block min-w-full h-[11rem] sm:h-[9.5rem] lg:h-[8.5rem]"
-            role="img"
-            aria-label={ariaLabel}
-          >
-            {Array.from({ length: 4 }, (_, index) => {
-              const y = padding.top + plotHeight * (index / 3);
-              const value = Math.round(maxValue * (1 - index / 3));
-              return (
-                <g key={`grid-${index}`} className="text-border/70">
-                  <line
-                    x1={padding.left}
-                    x2={width - padding.right}
-                    y1={y}
-                    y2={y}
-                    stroke="currentColor"
-                    strokeOpacity={index === 3 ? 0.2 : 0.08}
-                    strokeDasharray={index === 3 ? "0" : "3 7"}
-                  />
-                  <text
-                    x={padding.left - 8}
-                    y={y + 3}
-                    textAnchor="end"
-                    className="fill-muted-foreground text-[8px] font-medium"
-                  >
-                    {value}
-                  </text>
-                </g>
-              );
-            })}
-
-            {series.map((entry) => (
-              <path
-                key={`line-${entry.key}`}
-                d={buildPath(chartPoints, `${entry.key}Y`)}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={entry.strokeWidth ?? 2.5}
-                className={entry.lineClassName}
-              />
-            ))}
-
-            {chartPoints.map((point, index) => {
-              const active = activePoint?.key === point.key;
-              return (
-                <g key={point.key}>
-                  {series.map((entry) => (
-                    <circle
-                      key={`${point.key}-${entry.key}`}
-                      cx={point.x}
-                      cy={point[`${entry.key}Y`]}
-                      r={active ? 5 : 3.5}
-                      className={entry.dotClassName}
+      <div className="-mx-1 mt-3 overflow-x-auto pb-1">
+        <div className="px-1" style={{ minWidth: `${chartWidth}px` }}>
+          <div className="h-[11rem] sm:h-[9.5rem] lg:h-[8.5rem]" role="img" aria-label={ariaLabel}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={chartData}
+                margin={{ top: 10, right: 12, bottom: 10, left: 0 }}
+                onMouseMove={(state) => {
+                  const activeTooltipIndex = state.activeTooltipIndex;
+                  const nextRow =
+                    typeof activeTooltipIndex === "number"
+                      ? chartData[activeTooltipIndex] ?? null
+                      : null;
+                  setHoveredKey(typeof nextRow?.key === "string" ? nextRow.key : null);
+                }}
+                onMouseLeave={() => setHoveredKey(null)}
+                onClick={(state) => {
+                  const activeTooltipIndex = state.activeTooltipIndex;
+                  const nextRow =
+                    typeof activeTooltipIndex === "number"
+                      ? chartData[activeTooltipIndex] ?? null
+                      : null;
+                  if (typeof nextRow?.key === "string") {
+                    setSelectedKey(nextRow.key);
+                  }
+                }}
+              >
+                <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3 7" className="text-border/70" />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false}
+                  tickLine={false}
+                  tickMargin={8}
+                  className="text-[8px] font-medium text-muted-foreground"
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tickMargin={8}
+                  width={30}
+                  className="text-[8px] font-medium text-muted-foreground"
+                />
+                <Tooltip content={<TimeseriesTooltip />} cursor={{ stroke: "currentColor", strokeOpacity: 0.08 }} />
+                {series.map((entry) => {
+                  const stroke = resolveLineColor(entry.lineClassName);
+                  const dotFill = resolveDotColor(entry.dotClassName);
+                  return (
+                    <Line
+                      key={entry.key}
+                      type="monotone"
+                      dataKey={entry.key}
+                      stroke={stroke}
+                      strokeWidth={entry.strokeWidth ?? 2.5}
+                      dot={({ cx, cy, payload }) => {
+                        if (typeof cx !== "number" || typeof cy !== "number") {
+                          return null;
+                        }
+                        const active = payload?.key === activeKey;
+                        return (
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={active ? 5 : 3.5}
+                            fill={dotFill}
+                          />
+                        );
+                      }}
+                      activeDot={{ r: 5, fill: dotFill }}
                     />
-                  ))}
-                  <text
-                    x={point.x}
-                    y={height - 10}
-                    textAnchor="middle"
-                    className="fill-muted-foreground text-[8px] font-medium"
-                  >
-                    {point.label}
-                  </text>
-                  <rect
-                    x={point.x - interactionWidth / 2}
-                    y={padding.top}
-                    width={interactionWidth}
-                    height={plotHeight + 6}
-                    fill="transparent"
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredIndex(index)}
-                    onClick={() => setSelectedIndex(index)}
-                  />
-                </g>
-              );
-            })}
-          </svg>
+                  );
+                })}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </>
