@@ -59,7 +59,7 @@ export default function PartnerFilters({
         onChange={onCategoryChange}
       />
       <FilterBar tone="default" className="border-border/70 bg-surface">
-        <div className="flex flex-1 flex-col gap-1 lg:min-w-[20rem]">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 lg:min-w-[18rem]">
           <span className="ui-caption">검색</span>
           <Input
             value={searchValue}
@@ -69,7 +69,7 @@ export default function PartnerFilters({
           />
         </div>
         {appliesToFilter && onAppliesToFilterChange ? (
-          <div className="flex flex-col gap-1 lg:w-44">
+          <div className="flex min-w-0 flex-col gap-1 lg:w-40">
             <span className="ui-caption">적용 대상</span>
             <Select
               value={appliesToFilter}
@@ -86,7 +86,7 @@ export default function PartnerFilters({
             </Select>
           </div>
         ) : null}
-        <div className="flex flex-col gap-1 lg:w-56">
+        <div className="flex min-w-0 flex-col gap-1 lg:w-48">
           <span className="ui-caption">정렬</span>
           <Select
             value={sortValue}

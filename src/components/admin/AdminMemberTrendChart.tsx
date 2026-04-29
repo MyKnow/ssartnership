@@ -216,13 +216,13 @@ export default function AdminMemberTrendChart({
   const buckets = useMemo(() => buildBuckets(createdAts, granularity), [createdAts, granularity]);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="grid gap-3 xl:grid-cols-[18rem_minmax(0,1fr)]">
       <Card tone="elevated" className="hidden min-w-0 overflow-hidden xl:block xl:self-start">
         <SectionHeading
           title="시계열 해상도"
           description="원하는 범위 단위로 유입 변화를 확인합니다."
         />
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-3">
           {GRANULARITY_OPTIONS.map((option) => {
             const active = option.value === granularity;
             return (
@@ -253,7 +253,7 @@ export default function AdminMemberTrendChart({
       </Card>
 
       <Card tone="elevated" className="min-w-0 overflow-visible">
-        <div className="grid gap-4">
+        <div className="grid gap-2">
           <SectionHeading
             title="회원 유입 추이"
             description="현재 필터 기준 회원 생성 이력을 일·주·월·연 단위로 확인합니다."

@@ -63,6 +63,9 @@ command = "npx"
 args = ["-y", "@playwright/mcp@latest", "--extension"]
 startup_timeout_sec = 30
 
+[mcp_servers.playwright.tools.browser_navigate]
+approval_mode = "approve"
+
 [mcp_servers.sequential-thinking]
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-sequential-thinking"]

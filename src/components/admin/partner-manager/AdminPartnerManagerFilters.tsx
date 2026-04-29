@@ -59,7 +59,7 @@ export default function AdminPartnerManagerFilters({
         }
         tone="elevated"
       >
-        <div className="grid gap-1 lg:w-56">
+        <div className="grid min-w-0 gap-1 lg:w-56">
           <span className="ui-caption">노출 상태</span>
           <Select
             value={visibilityFilter}

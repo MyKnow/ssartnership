@@ -56,11 +56,20 @@ type ChartInteractionState = {
 };
 
 const CHART_MARGIN = {
-  top: 28,
-  right: 40,
-  bottom: 28,
-  left: 40,
+  top: 12,
+  right: 20,
+  bottom: 12,
+  left: 20,
 };
+
+const BUBBLE_WIDTH = 224;
+const BUBBLE_EDGE_PADDING = 12;
+const BUBBLE_HORIZONTAL_SHIFT = 48;
+const BUBBLE_PIVOT_RATIO = 0.46;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
 const COLOR_BY_LINE_CLASS: Record<string, string> = {
   "text-primary": "var(--color-primary)",
@@ -138,6 +147,10 @@ export default function AdminTimeseriesChart({
     key: string;
     coordinate?: { x: number; y: number };
   } | null>(null);
+  const clearInteraction = () => {
+    setHoveredInteraction(null);
+    setSelectedInteraction(null);
+  };
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
 
   const chartWidth = Math.max(points.length * widthPerPoint, minWidth);
@@ -164,10 +177,9 @@ export default function AdminTimeseriesChart({
     );
     const nextMin = flattenedValues.length > 0 ? Math.min(...flattenedValues) : 0;
     const nextMax = flattenedValues.length > 0 ? Math.max(...flattenedValues) : 1;
-    const spread = Math.max((nextMax - nextMin) * 0.2, 3);
     return {
-      min: nextMin - spread,
-      max: nextMax + spread,
+      min: nextMin,
+      max: nextMax,
     };
   }, [chartData, series]);
 
@@ -219,37 +231,60 @@ export default function AdminTimeseriesChart({
     const domainSpan = Math.max(valueRange.max - valueRange.min, 1);
     const fallbackY = CHART_MARGIN.top + fallbackInnerHeight * (1 - (anchorValue - valueRange.min) / domainSpan);
     const x = activeInteraction?.coordinate?.x ?? fallbackX;
-    const y = activeInteraction?.coordinate?.y ?? fallbackY;
+    const y = fallbackY;
     const placement = y > chartBounds.height / 2 ? "above" : "below";
+    const pivotX = chartBounds.width * BUBBLE_PIVOT_RATIO;
+    const directionBias = pivotX > 0 ? (pivotX - x) / pivotX : 0;
+    const desiredLeft = x - BUBBLE_WIDTH / 2 + directionBias * BUBBLE_HORIZONTAL_SHIFT;
+    const bubbleLeft = clamp(
+      desiredLeft,
+      BUBBLE_EDGE_PADDING,
+      Math.max(chartBounds.width - BUBBLE_WIDTH - BUBBLE_EDGE_PADDING, BUBBLE_EDGE_PADDING),
+    );
+    const arrowLeft = clamp(x - bubbleLeft, 16, BUBBLE_WIDTH - 16);
 
     return {
       key: activeKey,
       x,
       y,
       placement,
+      bubbleLeft,
+      arrowLeft,
     };
-  }, [activeInteraction?.coordinate?.x, activeInteraction?.coordinate?.y, activeKey, chartBounds.height, chartBounds.width, chartData, series, valueRange.max, valueRange.min]);
+  }, [
+    activeInteraction?.coordinate?.x,
+    activeKey,
+    chartBounds.height,
+    chartBounds.width,
+    chartData,
+    series,
+    valueRange.max,
+    valueRange.min,
+  ]);
 
   return (
     <>
-      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible px-3 pb-8 pt-10 sm:px-4 sm:pb-10 sm:pt-12">
-        <div className="px-3 sm:px-4" style={{ minWidth: `${chartWidth}px` }}>
+      <div className="-mx-1 mt-0 overflow-x-auto overflow-y-visible px-2 pb-2 pt-0 sm:px-3 sm:pb-3 sm:pt-0">
+        <div className="px-1 sm:px-2" style={{ minWidth: `${chartWidth}px` }}>
           <div
             ref={chartSurfaceRef}
-            className="relative z-20 h-[20rem] overflow-visible px-2 py-2 sm:h-[18rem] sm:px-3 sm:py-3 lg:h-[16rem] lg:px-4 lg:py-4"
+            className="relative z-20 h-[17rem] overflow-visible px-1 py-0 sm:h-[15rem] sm:px-2 sm:py-0 lg:h-[14rem] lg:px-3 lg:py-1"
             role="img"
             aria-label={ariaLabel}
+            tabIndex={0}
+            onBlur={clearInteraction}
+            onMouseLeave={clearInteraction}
           >
             {activeSummary && activeBubble ? (
               <div
-                className="pointer-events-none absolute z-[80] w-56 -translate-x-1/2 rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
+                className="pointer-events-none absolute z-[80] w-56 rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
                 style={{
-                  left: `${activeBubble.x}px`,
+                  left: `${activeBubble.bubbleLeft}px`,
                   top: `${activeBubble.y}px`,
                   transform:
                     activeBubble.placement === "above"
-                      ? "translate(-50%, calc(-100% - 1.5rem))"
-                      : "translate(-50%, 1.25rem)",
+                      ? "translateY(calc(-100% - 0.75rem))"
+                      : "translateY(0.75rem)",
                 }}
               >
                 <p className="truncate text-xs font-semibold text-foreground" title={activeSummary.rangeLabel}>
@@ -266,20 +301,22 @@ export default function AdminTimeseriesChart({
                   ))}
                 </div>
                 <span
-                  className="absolute left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-border bg-surface"
+                  className="absolute h-3 w-3 -translate-x-1/2 rotate-45 border-border bg-surface"
                   style={
                     activeBubble.placement === "above"
                       ? {
                           top: "100%",
+                          left: `${activeBubble.arrowLeft}px`,
                           transform: "translate(-50%, -50%) rotate(45deg)",
                           borderBottomWidth: "1px",
                           borderRightWidth: "1px",
                         }
                       : {
-                          bottom: "100%",
-                          transform: "translate(-50%, 50%) rotate(45deg)",
+                          top: "0.75rem",
+                          left: `${activeBubble.arrowLeft}px`,
+                          transform: "translate(-50%, -50%) rotate(45deg)",
                           borderTopWidth: "1px",
-                          borderLeftWidth: "1px",
+                          borderRightWidth: "1px",
                         }
                   }
                 />
@@ -324,13 +361,13 @@ export default function AdminTimeseriesChart({
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3 7" className="text-border/70" />
                 <XAxis
                   dataKey="label"
-                  axisLine={false}
+                  axisLine={{ stroke: "currentColor", strokeOpacity: 0.38, strokeWidth: 2 }}
                   tickLine={false}
                   tickMargin={8}
                   className="text-[8px] font-medium text-muted-foreground"
                 />
                 <YAxis
-                  axisLine={false}
+                  axisLine={{ stroke: "currentColor", strokeOpacity: 0.38, strokeWidth: 2 }}
                   tickLine={false}
                   tickMargin={8}
                   width={30}
