@@ -1,9 +1,7 @@
 import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
-import AdminMemberTrendChart, {
-  type AdminMemberTrendPoint,
-} from "@/components/admin/AdminMemberTrendChart";
+import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
@@ -122,34 +120,6 @@ function formatAdminMemberSummaryDate(value?: string | null) {
   }
 
   return formatKoreanDateTimeToMinute(parsed);
-}
-
-function buildMemberTrendPoints(rows: Array<{ created_at: string | null }>) {
-  const buckets = new Map<string, number>();
-
-  for (const row of rows) {
-    if (!row.created_at) {
-      continue;
-    }
-
-    const parsed = new Date(row.created_at);
-    if (Number.isNaN(parsed.getTime())) {
-      continue;
-    }
-
-    const label = `${String(parsed.getFullYear()).slice(2)}.${String(parsed.getMonth() + 1).padStart(2, "0")}`;
-    buckets.set(label, (buckets.get(label) ?? 0) + 1);
-  }
-
-  let cumulative = 0;
-  return Array.from(buckets.entries()).map<AdminMemberTrendPoint>(([label, value]) => {
-    cumulative += value;
-    return {
-      label,
-      value,
-      cumulative,
-    };
-  });
 }
 
 async function getPreferenceFilteredMemberIds(
@@ -360,7 +330,9 @@ export default async function AdminMembersPage({
   const { data: members, error: membersError, count } = memberResult;
   const safeMembers = members ?? [];
   const totalCount = count ?? safeMembers.length;
-  const trendPoints = buildMemberTrendPoints(memberTrendResult.data ?? []);
+  const memberTrendCreatedAts = (memberTrendResult.data ?? [])
+    .map((row) => row.created_at)
+    .filter((value): value is string => Boolean(value));
   const optionRows = optionsResult.data ?? [];
   const options = {
     campuses: Array.from(
@@ -622,7 +594,9 @@ export default async function AdminMembersPage({
           ]}
           minItemWidth="13rem"
         />
-        {trendPoints.length > 0 ? <AdminMemberTrendChart points={trendPoints} /> : null}
+        {memberTrendCreatedAts.length > 0 ? (
+          <AdminMemberTrendChart createdAts={memberTrendCreatedAts} />
+        ) : null}
         {membersError ? (
           <FormMessage variant="error">
             회원 목록을 불러오지 못했습니다. {membersError.message}
