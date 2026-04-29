@@ -102,10 +102,11 @@ export default function AdminMemberManager({
   };
 
   return (
-    <div className="mt-6 grid min-w-0 gap-6">
+    <div className="grid min-w-0 gap-6">
       <FilterBar
         title="회원 필터"
         description="이름, 기수, 캠퍼스, 현재 활성 버전 기준 약관 상태로 회원 목록을 빠르게 좁힙니다."
+        tone="elevated"
       >
         <div className="grid min-w-[14rem] flex-1 gap-1">
           <span className="ui-caption">검색</span>

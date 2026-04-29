@@ -18,7 +18,7 @@ export default function ShellHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat backdrop-blur-md sm:px-6 sm:py-6 lg:flex-row lg:items-end lg:justify-between",
+        "flex flex-col gap-4 rounded-panel border border-border/70 bg-surface-elevated/95 px-5 py-5 shadow-flat sm:px-6 sm:py-6 lg:flex-row lg:items-end lg:justify-between",
         className,
       )}
     >
@@ -30,9 +30,11 @@ export default function ShellHeader({
         className="min-w-0"
       />
       {typeof description !== "string" && description ? (
-        <div className="ui-body max-w-3xl">{description}</div>
+        <div className="ui-body max-w-3xl rounded-2xl border border-border/70 bg-surface px-4 py-3">
+          {description}
+        </div>
       ) : null}
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">{actions}</div> : null}
     </div>
   );
 }

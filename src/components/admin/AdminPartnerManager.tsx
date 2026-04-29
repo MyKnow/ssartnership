@@ -56,9 +56,35 @@ export default function AdminPartnerManager({
       }),
     [activeCategory, categoryKeyById, partners, searchValue, sortValue, visibilityFilter],
   );
+  const publicCount = filteredPartners.filter((partner) => partner.visibility === "public").length;
+  const confidentialCount = filteredPartners.filter((partner) => partner.visibility === "confidential").length;
+  const privateCount = filteredPartners.filter((partner) => partner.visibility === "private").length;
 
   return (
-    <div className="mt-6 grid gap-6">
+    <div className="grid gap-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-border/70 bg-surface-muted/60 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">필터 결과</p>
+          <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{filteredPartners.length.toLocaleString()}개</p>
+          <p className="mt-1 text-sm text-muted-foreground">현재 검색/카테고리/정렬 기준 결과</p>
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-surface-muted/60 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">공개</p>
+          <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{publicCount.toLocaleString()}개</p>
+          <p className="mt-1 text-sm text-muted-foreground">사용자 화면 노출 상태</p>
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-surface-muted/60 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">대외비</p>
+          <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{confidentialCount.toLocaleString()}개</p>
+          <p className="mt-1 text-sm text-muted-foreground">운영 확인용 비공개 상태</p>
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-surface-muted/60 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">비공개</p>
+          <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">{privateCount.toLocaleString()}개</p>
+          <p className="mt-1 text-sm text-muted-foreground">완전 비노출 상태</p>
+        </div>
+      </div>
+
       <AdminPartnerManagerFilters
         categoryOptions={categoryOptions.map((category) => ({
           key: category.key,

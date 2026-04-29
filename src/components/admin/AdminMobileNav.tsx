@@ -3,10 +3,15 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { SITE_NAME } from "@/lib/site";
+import {
+  ADMIN_NAV_GROUPS,
+  isAdminNavActive,
+} from "@/components/admin/admin-navigation";
 
 function DrawerSection({
   title,
@@ -33,10 +38,12 @@ function DrawerSection({
 function NavButton({
   href,
   label,
+  description,
   active,
 }: {
   href: string;
   label: string;
+  description: string;
   active: boolean;
 }) {
   return (
@@ -48,7 +55,12 @@ function NavButton({
         active ? "border-primary" : null,
       )}
     >
-      {label}
+      <span className="grid justify-items-start gap-0.5 text-left">
+        <span>{label}</span>
+        <span className={cn("text-xs font-medium", active ? "text-primary-foreground/80" : "text-muted-foreground")}>
+          {description}
+        </span>
+      </span>
     </Button>
   );
 }
@@ -87,65 +99,6 @@ export default function AdminMobileNav({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
-
-  const navItems = [
-    { href: "/admin", label: "관리 홈", active: pathname === "/admin" },
-    {
-      href: "/admin/members",
-      label: "회원 관리",
-      active: pathname === "/admin/members",
-    },
-    {
-      href: "/admin/companies",
-      label: "협력사 관리",
-      active: pathname === "/admin/companies",
-    },
-    {
-      href: "/admin/partners",
-      label: "브랜드 관리",
-      active: pathname === "/admin/partners",
-    },
-    {
-      href: "/admin/push",
-      label: "알림 전송",
-      active: pathname === "/admin/push",
-    },
-    {
-      href: "/admin/notifications",
-      label: "알림센터",
-      active: pathname === "/admin/notifications",
-    },
-    {
-      href: "/admin/advertisement",
-      label: "홈 광고 관리",
-      active: pathname === "/admin/advertisement",
-    },
-    {
-      href: "/admin/event",
-      label: "이벤트 관리",
-      active: pathname === "/admin/event",
-    },
-    {
-      href: "/admin/reviews",
-      label: "리뷰 관리",
-      active: pathname === "/admin/reviews",
-    },
-    {
-      href: "/admin/logs",
-      label: "로그 조회",
-      active: pathname === "/admin/logs",
-    },
-    {
-      href: "/admin/cycle",
-      label: "기수 관리",
-      active: pathname === "/admin/cycle",
-    },
-    {
-      href: "/admin/style-guide",
-      label: "UI 스타일 가이드",
-      active: pathname === "/admin/style-guide",
-    },
-  ];
 
   return (
     <>
@@ -188,18 +141,20 @@ export default function AdminMobileNav({
                 className="fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay"
               >
                 <div className="flex h-full flex-col bg-surface-overlay">
-                  <div className="border-b border-border px-6 pb-5 pt-6">
+                  <div className="border-b border-border px-5 pb-4 pt-5">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                          Admin Menu
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Admin Workspace
                         </p>
-                        <p className="mt-2 text-lg font-semibold text-foreground">
+                        <p className="mt-1.5 text-base font-semibold text-foreground">
                           {SITE_NAME}
                         </p>
-                        <p className="mt-1 text-sm font-medium text-foreground">
+                        <div className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-foreground">
+                          <span>관리 홈</span>
+                          <ChevronRightIcon className="h-3.5 w-3.5 text-muted-foreground" />
                           {title}
-                        </p>
+                        </div>
                         {description ? (
                           <p className="mt-1 text-sm text-muted-foreground">
                             {description}
@@ -230,23 +185,27 @@ export default function AdminMobileNav({
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto px-6 py-5">
+                  <div className="flex-1 overflow-y-auto px-5 py-5">
                     <div className="flex flex-col gap-4">
-                      <DrawerSection
-                        title="관리 이동"
-                        description="작업할 영역으로 바로 이동합니다."
-                      >
-                        <div className="grid gap-2">
-                          {navItems.map((item) => (
-                            <NavButton
-                              key={item.href}
-                              href={item.href}
-                              label={item.label}
-                              active={item.active}
-                            />
-                          ))}
-                        </div>
-                      </DrawerSection>
+                      {ADMIN_NAV_GROUPS.map((group) => (
+                        <DrawerSection
+                          key={group.label}
+                          title={group.label}
+                          description="작업할 영역으로 바로 이동합니다."
+                        >
+                          <div className="grid gap-2">
+                            {group.items.map((item) => (
+                              <NavButton
+                                key={item.href}
+                                href={item.href}
+                                label={item.label}
+                                description={item.description}
+                                active={isAdminNavActive(pathname, item.href)}
+                              />
+                            ))}
+                          </div>
+                        </DrawerSection>
+                      ))}
 
                       <DrawerSection
                         title="바로가기"

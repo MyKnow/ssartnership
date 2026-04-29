@@ -9,6 +9,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import SubmitButton from "@/components/ui/SubmitButton";
 import SectionHeading from "@/components/ui/SectionHeading";
+import StatsRow from "@/components/ui/StatsRow";
 import {
   backfillMemberProfiles,
   deleteMember,
@@ -29,6 +30,7 @@ import type {
   NotificationPreferenceFilterOption,
   YearFilterOption,
 } from "@/components/admin/member-manager/selectors";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +106,19 @@ function parseYearFilter(value: string | undefined): YearFilterOption {
 
 function toInList(ids: string[]) {
   return `(${ids.join(",")})`;
+}
+
+function formatAdminMemberSummaryDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "-";
+  }
+
+  return formatKoreanDateTimeToMinute(parsed);
 }
 
 async function getPreferenceFilteredMemberIds(
@@ -472,6 +487,27 @@ export default async function AdminMembersPage({
     consent_history: consentHistoryByMemberId.get(member.id) ?? [],
     consent_activity: consentActivityByMemberId.get(member.id) ?? [],
   }));
+  const mustChangePasswordCount = enrichedMembers.filter((member) => member.must_change_password).length;
+  const pendingPolicyCount = enrichedMembers.filter((member) => {
+    const servicePending = member.service_policy_version !== activePolicyVersions.service;
+    const privacyPending = member.privacy_policy_version !== activePolicyVersions.privacy;
+    const marketingPending = activePolicyVersions.marketing
+      ? member.marketing_policy_version !== activePolicyVersions.marketing
+      : false;
+
+    return servicePending || privacyPending || marketingPending;
+  }).length;
+  const latestUpdatedAt = enrichedMembers.reduce<string | null>((latest, member) => {
+    if (!member.updated_at) {
+      return latest;
+    }
+    if (!latest) {
+      return member.updated_at;
+    }
+    return new Date(member.updated_at).getTime() > new Date(latest).getTime()
+      ? member.updated_at
+      : latest;
+  }, null);
 
   return (
     <AdminShell
@@ -484,22 +520,8 @@ export default async function AdminMembersPage({
           eyebrow="Members"
           title="회원 계정 관리"
           description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
-        />
-        {membersError ? (
-          <FormMessage variant="error">
-            회원 목록을 불러오지 못했습니다. {membersError.message}
-          </FormMessage>
-        ) : null}
-        {memberError ? (
-          <FormMessage variant="error">{memberError}</FormMessage>
-        ) : null}
-        <Card tone="elevated">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <SectionHeading
-              title="회원 관리"
-              description="회원의 표시 정보와 비밀번호 변경 강제 여부를 관리할 수 있습니다."
-            />
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="ghost" href="/admin/members/mock">
                 Mock 미리보기
               </Button>
@@ -509,83 +531,121 @@ export default async function AdminMembersPage({
                 </SubmitButton>
               </form>
             </div>
-          </div>
-
-          {params.backfill ? (
-            <InlineMessage
-              className="mt-6"
-              tone={
-                params.backfill === "partial"
-                  ? "warning"
-                  : params.backfill === "error"
-                    ? "danger"
-                    : "success"
-              }
-              title={
-                params.backfill === "partial"
-                  ? "백필이 일부만 완료되었습니다."
-                  : params.backfill === "error"
-                    ? "백필 중 오류가 발생했습니다."
-                    : "백필이 완료되었습니다."
-              }
-              description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
-            />
-          ) : null}
-        </Card>
-
-        <Card tone="elevated">
-          <SectionHeading
-            title="유저 수동 추가"
-            description="MM 아이디를 입력하면 해당 기수에서 찾아 임시 비밀번호를 전송하고, 비밀번호 변경이 필요하도록 저장합니다. 운영진은 15기에서 먼저 찾고 없으면 14기에서 찾습니다."
+          }
+        />
+        <StatsRow
+          items={[
+            { label: "전체 회원", value: `${totalCount.toLocaleString()}명`, hint: "현재 필터 기준 결과 수" },
+            { label: "현재 페이지", value: `${safeMembers.length.toLocaleString()}명`, hint: `${page} / ${Math.max(1, Math.ceil(totalCount / pageSize))} 페이지` },
+            { label: "비밀번호 변경 필요", value: `${mustChangePasswordCount.toLocaleString()}명`, hint: "현재 페이지 기준" },
+            { label: "정책 확인 필요", value: `${pendingPolicyCount.toLocaleString()}명`, hint: `최근 갱신 ${formatAdminMemberSummaryDate(latestUpdatedAt)}` },
+          ]}
+          minItemWidth="13rem"
+        />
+        {membersError ? (
+          <FormMessage variant="error">
+            회원 목록을 불러오지 못했습니다. {membersError.message}
+          </FormMessage>
+        ) : null}
+        {memberError ? (
+          <FormMessage variant="error">{memberError}</FormMessage>
+        ) : null}
+        {params.backfill ? (
+          <InlineMessage
+            tone={
+              params.backfill === "partial"
+                ? "warning"
+                : params.backfill === "error"
+                  ? "danger"
+                  : "success"
+            }
+            title={
+              params.backfill === "partial"
+                ? "백필이 일부만 완료되었습니다."
+                : params.backfill === "error"
+                  ? "백필 중 오류가 발생했습니다."
+                  : "백필이 완료되었습니다."
+            }
+            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
           />
-          <div className="mt-6">
-            <AdminMemberManualAddPanel action={manualAddMembers} />
-          </div>
-        </Card>
+        ) : null}
 
-        {safeMembers.length === 0 ? (
-          <Card tone="elevated">
-            <EmptyState
-              title="등록된 회원이 없습니다."
-              description="회원가입이 완료된 교육생이 생기면 이곳에서 관리할 수 있습니다."
-            />
-          </Card>
-        ) : (
-          <Card tone="elevated">
-            <AdminMemberManager
-              key={[
-                page,
-                pageSize,
-                filters.searchValue,
-                filters.sortValue,
-                filters.filterValue,
-                filters.yearFilter,
-                filters.campusFilter,
-                filters.serviceConsentFilter,
-                filters.privacyConsentFilter,
-                filters.marketingConsentFilter,
-                filters.pushEnabledFilter,
-                filters.announcementEnabledFilter,
-                filters.newPartnerEnabledFilter,
-                filters.expiringPartnerEnabledFilter,
-                filters.reviewEnabledFilter,
-                filters.mmEnabledFilter,
-                filters.marketingEnabledFilter,
-              ].join(":")}
-              members={enrichedMembers}
-              activePolicyVersions={activePolicyVersions}
-              pagination={{
-                totalCount,
-                page,
-                pageSize,
-              }}
-              filters={filters}
-              options={options}
-              updateMember={updateMember}
-              deleteMember={deleteMember}
-            />
-          </Card>
-        )}
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
+          <div className="grid gap-6">
+            {safeMembers.length === 0 ? (
+              <Card tone="elevated">
+                <EmptyState
+                  title="등록된 회원이 없습니다."
+                  description="회원가입이 완료된 교육생이 생기면 이곳에서 관리할 수 있습니다."
+                />
+              </Card>
+            ) : (
+              <Card tone="elevated">
+                <SectionHeading
+                  title="회원 목록"
+                  description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
+                />
+                <div className="mt-6">
+                  <AdminMemberManager
+                    key={[
+                      page,
+                      pageSize,
+                      filters.searchValue,
+                      filters.sortValue,
+                      filters.filterValue,
+                      filters.yearFilter,
+                      filters.campusFilter,
+                      filters.serviceConsentFilter,
+                      filters.privacyConsentFilter,
+                      filters.marketingConsentFilter,
+                      filters.pushEnabledFilter,
+                      filters.announcementEnabledFilter,
+                      filters.newPartnerEnabledFilter,
+                      filters.expiringPartnerEnabledFilter,
+                      filters.reviewEnabledFilter,
+                      filters.mmEnabledFilter,
+                      filters.marketingEnabledFilter,
+                    ].join(":")}
+                    members={enrichedMembers}
+                    activePolicyVersions={activePolicyVersions}
+                    pagination={{
+                      totalCount,
+                      page,
+                      pageSize,
+                    }}
+                    filters={filters}
+                    options={options}
+                    updateMember={updateMember}
+                    deleteMember={deleteMember}
+                  />
+                </div>
+              </Card>
+            )}
+          </div>
+
+          <div className="grid gap-6">
+            <Card tone="elevated">
+              <SectionHeading
+                title="수동 추가"
+                description="MM 아이디를 입력해 계정을 생성하고 비밀번호 변경 필요 상태로 저장합니다."
+              />
+              <div className="mt-6">
+                <AdminMemberManualAddPanel action={manualAddMembers} />
+              </div>
+            </Card>
+
+            <Card tone="elevated">
+              <SectionHeading
+                title="운영 메모"
+                description="15기 우선 조회 후 없으면 14기에서 다시 찾습니다."
+              />
+              <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
+                <p>정책 동의 상태와 알림 설정은 현재 페이지 결과에서 즉시 확인할 수 있습니다.</p>
+                <p>대량 정비 전에는 Mock 미리보기에서 카드 표현을 먼저 확인하는 흐름을 권장합니다.</p>
+              </div>
+            </Card>
+          </div>
+        </div>
       </div>
     </AdminShell>
   );

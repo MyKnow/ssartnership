@@ -25,6 +25,7 @@ export default function AdminReviewFilters({
       <FilterBar
         title="리뷰 필터"
         description="필요한 조건만 선택하세요."
+        tone="elevated"
         trailing={
           <Button href="/admin/reviews" variant="secondary">
             초기화

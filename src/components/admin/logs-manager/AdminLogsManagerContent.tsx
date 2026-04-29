@@ -27,8 +27,8 @@ export default function AdminLogsManagerContent({
 
   return (
     <>
-      <div className="grid min-w-0 gap-8 overflow-x-hidden">
-        <section className="grid gap-4 rounded-3xl border border-border bg-surface p-5 shadow-flat">
+      <div className="grid min-w-0 gap-6 overflow-x-hidden">
+        <section className="grid gap-4 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat sm:px-6 sm:py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeading
               title="로그 집계 뷰"
@@ -127,7 +127,7 @@ export default function AdminLogsManagerContent({
           />
         </section>
 
-        <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.95fr)]">
+        <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.92fr)]">
           <div className="min-w-0">
             <ActivityChart
               buckets={logs.data.chartBuckets}

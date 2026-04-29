@@ -57,6 +57,7 @@ export default function AdminPartnerManagerFilters({
             브랜드 추가
           </Button>
         }
+        tone="elevated"
       >
         <div className="grid gap-1 lg:w-56">
           <span className="ui-caption">노출 상태</span>
