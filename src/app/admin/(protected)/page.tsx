@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  BellIcon,
   BuildingOffice2Icon,
   ChartBarSquareIcon,
   ClockIcon,
@@ -174,17 +173,10 @@ export default async function AdminPage() {
         },
         {
           href: "/admin/push",
-          title: "알림 전송",
-          description: "운영 공지와 마케팅 알림을 대상 세그먼트 기준으로 발송합니다.",
+          title: "알림 운영",
+          description: "발송 결과 확인과 공지/마케팅 전송을 같은 워크스페이스에서 처리합니다.",
           meta: `구독 ${dashboardCounts.activePushSubscriptionCount.toLocaleString()}개`,
           icon: MegaphoneIcon,
-        },
-        {
-          href: "/admin/notifications",
-          title: "알림센터",
-          description: "발송 결과, 실패, 자동 알림 요약을 한곳에서 확인합니다.",
-          meta: "운영 모니터링",
-          icon: BellIcon,
         },
         {
           href: "/admin/advertisement",

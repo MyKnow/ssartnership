@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
@@ -71,6 +72,56 @@ export function AdminLogsExplorer({
     filteredTotal === 0
       ? '0건'
       : `${pageStart + 1}-${Math.min(pageStart + filteredLogs.length, filteredTotal)} / ${filteredTotal}`;
+
+  function renderActorLink(log: NormalizedLog) {
+    if (log.actorType !== 'member' || !log.actorId) {
+      if (log.actorMmUsername) {
+        return <span className="max-w-full break-all">MM 아이디: @{log.actorMmUsername}</span>;
+      }
+      if (log.actorName) {
+        return <span className="max-w-full break-all">이름: {log.actorName}</span>;
+      }
+      return null;
+    }
+
+    const href = `/admin/members/${log.actorId}`;
+    const label = log.actorName ?? (log.actorMmUsername ? `@${log.actorMmUsername}` : log.actorId);
+    return (
+      <span className="max-w-full break-all">
+        사용자:{' '}
+        <Link
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          prefetch={false}
+          className="font-medium text-primary hover:underline"
+        >
+          {label}
+        </Link>
+      </span>
+    );
+  }
+
+  function renderPartnerLink(log: NormalizedLog) {
+    if (!log.partnerId || !log.partnerName) {
+      return null;
+    }
+
+    return (
+      <span className="max-w-full break-all">
+        브랜드:{' '}
+        <Link
+          href={`/admin/partners/${log.partnerId}`}
+          target="_blank"
+          rel="noreferrer"
+          prefetch={false}
+          className="font-medium text-primary hover:underline"
+        >
+          {log.partnerName}
+        </Link>
+      </span>
+    );
+  }
 
   return (
     <section className="grid gap-5 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat sm:px-6 sm:py-6">
@@ -297,14 +348,7 @@ export function AdminLogsExplorer({
                       {log.actorType ? (
                         <span className="max-w-full break-all">주체: {log.actorType}</span>
                       ) : null}
-                      {log.actorMmUsername ? (
-                        <span className="max-w-full break-all">
-                          MM 아이디: @{log.actorMmUsername}
-                        </span>
-                      ) : null}
-                      {log.actorName ? (
-                        <span className="max-w-full break-all">이름: {log.actorName}</span>
-                      ) : null}
+                      {renderActorLink(log)}
                       {log.identifier && !log.actorMmUsername ? (
                         <span className="max-w-full break-all">입력 ID: {log.identifier}</span>
                       ) : null}
@@ -323,6 +367,7 @@ export function AdminLogsExplorer({
                       {log.targetId ? (
                         <span className="max-w-full break-all">대상 ID: {log.targetId}</span>
                       ) : null}
+                      {renderPartnerLink(log)}
                     </div>
                   </div>
 
@@ -367,8 +412,20 @@ export function AdminLogsExplorer({
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>주체</span>
-                        <span className="max-w-full break-all font-medium text-foreground">
-                          {log.actorSearchLabel}
+                        <span className="max-w-full break-all text-right font-medium text-foreground">
+                          {log.actorType === 'member' && log.actorId ? (
+                            <Link
+                              href={`/admin/members/${log.actorId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              prefetch={false}
+                              className="text-primary hover:underline"
+                            >
+                              {log.actorSearchLabel}
+                            </Link>
+                          ) : (
+                            log.actorSearchLabel
+                          )}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
@@ -393,6 +450,24 @@ export function AdminLogsExplorer({
                         <span>대상 ID</span>
                         <span className="max-w-full break-all font-medium text-foreground">
                           {log.targetId ?? '-'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>브랜드</span>
+                        <span className="max-w-full break-all text-right font-medium text-foreground">
+                          {log.partnerId && log.partnerName ? (
+                            <Link
+                              href={`/admin/partners/${log.partnerId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              prefetch={false}
+                              className="text-primary hover:underline"
+                            >
+                              {log.partnerName}
+                            </Link>
+                          ) : (
+                            '-'
+                          )}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">

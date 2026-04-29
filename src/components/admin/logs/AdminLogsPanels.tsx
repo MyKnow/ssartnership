@@ -144,13 +144,32 @@ export function ActivityChart({
   loading: boolean;
   onSelectBucket: (bucket: LogChartBucket) => void;
 }) {
-  const maxTotal = Math.max(...buckets.map((bucket) => bucket.total), 1);
+  const width = Math.max(buckets.length * 84, 420);
+  const height = 260;
+  const padding = { top: 20, right: 20, bottom: 56, left: 44 };
+  const plotWidth = Math.max(width - padding.left - padding.right, 1);
+  const plotHeight = Math.max(height - padding.top - padding.bottom, 1);
+  const maxValue = Math.max(...buckets.map((bucket) => bucket.total), 1);
+  const stepX = buckets.length > 1 ? plotWidth / (buckets.length - 1) : 0;
+  const chartPoints = buckets.map((bucket, index) => {
+    const x = padding.left + stepX * index;
+    return {
+      bucket,
+      x,
+      productY: padding.top + plotHeight * (1 - bucket.product / maxValue),
+      auditY: padding.top + plotHeight * (1 - bucket.audit / maxValue),
+      securityY: padding.top + plotHeight * (1 - bucket.security / maxValue),
+      totalY: padding.top + plotHeight * (1 - bucket.total / maxValue),
+    };
+  });
+  const buildPath = (key: 'productY' | 'auditY' | 'securityY' | 'totalY') =>
+    chartPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point[key]}`).join(' ');
 
   return (
     <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
       <SectionHeading
         title="조회 범위 활동량"
-        description="막대를 누르면 해당 구간으로 바로 좁혀서 다시 조회합니다."
+        description="점이나 구간 라벨을 누르면 해당 시간대로 바로 좁혀서 다시 조회합니다."
       />
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -166,60 +185,82 @@ export function ActivityChart({
       </div>
 
       <div className="-mx-1 mt-5 overflow-x-auto pb-2">
-        <div className="flex min-w-max items-end gap-2 px-1 sm:gap-3">
-          {buckets.map((bucket) => {
-            const totalHeight =
-              bucket.total === 0 ? 6 : Math.max(16, (bucket.total / maxTotal) * 160);
-            const productHeight =
-              bucket.total === 0 ? 0 : (bucket.product / bucket.total) * totalHeight;
-            const auditHeight =
-              bucket.total === 0 ? 0 : (bucket.audit / bucket.total) * totalHeight;
-            const securityHeight =
-              bucket.total === 0 ? 0 : (bucket.security / bucket.total) * totalHeight;
+        <div className="min-w-max px-1">
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="block h-auto min-w-full"
+            role="img"
+            aria-label="조회 범위 활동량 선형 차트"
+          >
+            {Array.from({ length: 4 }, (_, index) => {
+              const y = padding.top + plotHeight * (index / 3);
+              const value = Math.round(maxValue * (1 - index / 3));
+              return (
+                <g key={`grid-${index}`} className="text-border/70">
+                  <line
+                    x1={padding.left}
+                    x2={width - padding.right}
+                    y1={y}
+                    y2={y}
+                    stroke="currentColor"
+                    strokeOpacity={index === 3 ? 0.2 : 0.08}
+                    strokeDasharray={index === 3 ? '0' : '3 7'}
+                  />
+                  <text
+                    x={padding.left - 10}
+                    y={y + 4}
+                    textAnchor="end"
+                    className="fill-muted-foreground text-[10px] font-medium"
+                  >
+                    {value}
+                  </text>
+                </g>
+              );
+            })}
 
-            return (
+            <path d={buildPath('totalY')} fill="none" stroke="currentColor" strokeWidth="3" className="text-foreground/35" />
+            <path d={buildPath('productY')} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-sky-500" />
+            <path d={buildPath('auditY')} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-violet-500" />
+            <path d={buildPath('securityY')} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-500" />
+
+            {chartPoints.map((point) => (
+              <g key={point.bucket.key}>
+                <circle cx={point.x} cy={point.productY} r="4" className="fill-sky-500" />
+                <circle cx={point.x} cy={point.auditY} r="4" className="fill-violet-500" />
+                <circle cx={point.x} cy={point.securityY} r="4" className="fill-amber-500" />
+                <circle cx={point.x} cy={point.totalY} r="5" className="fill-foreground/25" />
+                <text
+                  x={point.x}
+                  y={height - 18}
+                  textAnchor="middle"
+                  className="fill-muted-foreground text-[10px] font-medium"
+                >
+                  {point.bucket.label}
+                </text>
+              </g>
+            ))}
+          </svg>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+            {buckets.map((bucket) => (
               <button
                 key={bucket.key}
                 type="button"
                 disabled={loading}
-                className="group flex w-14 shrink-0 flex-col items-center gap-1.5 text-center disabled:cursor-not-allowed disabled:opacity-60 sm:w-16 md:w-[4.5rem]"
+                className="rounded-2xl border border-border bg-surface-inset px-3 py-3 text-left transition hover:border-strong disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => onSelectBucket(bucket)}
                 title={bucket.rangeLabel}
               >
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  {bucket.total}
-                </span>
-                <div className="flex h-40 w-full items-end rounded-[1.4rem] border border-border bg-surface-inset px-2 py-2 transition group-hover:border-strong sm:h-44 md:h-52 sm:px-2.5 sm:py-2.5 md:px-3 md:py-3">
-                  <div
-                    className="flex w-full flex-col justify-end overflow-hidden rounded-2xl bg-surface-muted"
-                    style={{ height: `${totalHeight}px` }}
-                  >
-                    {securityHeight > 0 ? (
-                      <div
-                        className="w-full bg-amber-500/75"
-                        style={{ height: `${securityHeight}px` }}
-                      />
-                    ) : null}
-                    {auditHeight > 0 ? (
-                      <div
-                        className="w-full bg-violet-500/75"
-                        style={{ height: `${auditHeight}px` }}
-                      />
-                    ) : null}
-                    {productHeight > 0 ? (
-                      <div
-                        className="w-full bg-sky-500/75"
-                        style={{ height: `${productHeight}px` }}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-                <span className="text-[10px] leading-4 text-muted-foreground sm:text-[11px]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   {bucket.label}
-                </span>
+                </p>
+                <p className="mt-2 text-lg font-semibold text-foreground">
+                  {bucket.total.toLocaleString()}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{bucket.rangeLabel}</p>
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
       </div>
     </Card>

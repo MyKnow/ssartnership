@@ -172,7 +172,8 @@ function parseBooleanParam(value: string | string[] | undefined) {
 
 function parseQueryParam(value: string | string[] | undefined) {
   const input = Array.isArray(value) ? value[0] : value;
-  return typeof input === "string" ? input.trim() : "";
+  const normalized = typeof input === "string" ? input.trim() : "";
+  return normalized === "all" ? "" : normalized;
 }
 
 export function normalizeAdminReviewSort(value: string | null | undefined): AdminReviewSort {
@@ -316,6 +317,9 @@ async function fetchFilteredAdminReviewRows(filters: AdminReviewFilters) {
   let partnerIdsByCompany: string[] | null = null;
 
   if (filters.companyId) {
+    if (!isUuid(filters.companyId)) {
+      return [];
+    }
     const { data: partners, error: partnersError } = await supabase
       .from("partners")
       .select("id")

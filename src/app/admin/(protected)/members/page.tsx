@@ -1,6 +1,9 @@
 import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
+import AdminMemberTrendChart, {
+  type AdminMemberTrendPoint,
+} from "@/components/admin/AdminMemberTrendChart";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
@@ -119,6 +122,34 @@ function formatAdminMemberSummaryDate(value?: string | null) {
   }
 
   return formatKoreanDateTimeToMinute(parsed);
+}
+
+function buildMemberTrendPoints(rows: Array<{ created_at: string | null }>) {
+  const buckets = new Map<string, number>();
+
+  for (const row of rows) {
+    if (!row.created_at) {
+      continue;
+    }
+
+    const parsed = new Date(row.created_at);
+    if (Number.isNaN(parsed.getTime())) {
+      continue;
+    }
+
+    const label = `${String(parsed.getFullYear()).slice(2)}.${String(parsed.getMonth() + 1).padStart(2, "0")}`;
+    buckets.set(label, (buckets.get(label) ?? 0) + 1);
+  }
+
+  let cumulative = 0;
+  return Array.from(buckets.entries()).map<AdminMemberTrendPoint>(([label, value]) => {
+    cumulative += value;
+    return {
+      label,
+      value,
+      cumulative,
+    };
+  });
 }
 
 async function getPreferenceFilteredMemberIds(
@@ -275,12 +306,61 @@ export default async function AdminMembersPage({
   } else {
     memberQuery = memberQuery.order("created_at", { ascending: false });
   }
+
+  let memberTrendQuery = supabase.from("members").select("created_at").order("created_at", { ascending: true });
+  if (filters.searchValue) {
+    const escaped = filters.searchValue.replaceAll("%", "\\%").replaceAll("_", "\\_");
+    memberTrendQuery = memberTrendQuery.or(
+      `mm_username.ilike.%${escaped}%,mm_user_id.ilike.%${escaped}%,display_name.ilike.%${escaped}%`,
+    );
+  }
+  if (filters.yearFilter !== "all") {
+    memberTrendQuery = memberTrendQuery.eq("year", Number(filters.yearFilter));
+  }
+  if (filters.campusFilter !== "all") {
+    memberTrendQuery = memberTrendQuery.eq("campus", filters.campusFilter);
+  }
+  if (filters.filterValue === "mustChangePassword") {
+    memberTrendQuery = memberTrendQuery.eq("must_change_password", true);
+  } else if (filters.filterValue === "normal") {
+    memberTrendQuery = memberTrendQuery.eq("must_change_password", false);
+  }
+  if (filters.serviceConsentFilter === "agreed") {
+    memberTrendQuery = memberTrendQuery.eq("service_policy_version", activePolicies.service.version);
+  } else if (filters.serviceConsentFilter === "pending") {
+    memberTrendQuery = memberTrendQuery.not("service_policy_version", "eq", activePolicies.service.version);
+  }
+  if (filters.privacyConsentFilter === "agreed") {
+    memberTrendQuery = memberTrendQuery.eq("privacy_policy_version", activePolicies.privacy.version);
+  } else if (filters.privacyConsentFilter === "pending") {
+    memberTrendQuery = memberTrendQuery.not("privacy_policy_version", "eq", activePolicies.privacy.version);
+  }
+  if (activeMarketingPolicy && filters.marketingConsentFilter === "agreed") {
+    memberTrendQuery = memberTrendQuery.eq("marketing_policy_version", activeMarketingPolicy.version);
+  } else if (activeMarketingPolicy && filters.marketingConsentFilter === "pending") {
+    memberTrendQuery = memberTrendQuery.not("marketing_policy_version", "eq", activeMarketingPolicy.version);
+  }
+  if (preferenceFilter?.included) {
+    if (preferenceFilter.included.length === 0) {
+      memberTrendQuery = memberTrendQuery.in("id", ["00000000-0000-0000-0000-000000000000"]);
+    } else {
+      memberTrendQuery = memberTrendQuery.in("id", preferenceFilter.included);
+    }
+  }
+  if (preferenceFilter?.excluded.length) {
+    memberTrendQuery = memberTrendQuery.not("id", "in", toInList(preferenceFilter.excluded));
+  }
+
   const from = (page - 1) * pageSize;
-  const memberResult = await memberQuery.range(from, from + pageSize - 1);
+  const [memberResult, memberTrendResult] = await Promise.all([
+    memberQuery.range(from, from + pageSize - 1),
+    memberTrendQuery,
+  ]);
 
   const { data: members, error: membersError, count } = memberResult;
   const safeMembers = members ?? [];
   const totalCount = count ?? safeMembers.length;
+  const trendPoints = buildMemberTrendPoints(memberTrendResult.data ?? []);
   const optionRows = optionsResult.data ?? [];
   const options = {
     campuses: Array.from(
@@ -542,6 +622,7 @@ export default async function AdminMembersPage({
           ]}
           minItemWidth="13rem"
         />
+        {trendPoints.length > 0 ? <AdminMemberTrendChart points={trendPoints} /> : null}
         {membersError ? (
           <FormMessage variant="error">
             회원 목록을 불러오지 못했습니다. {membersError.message}

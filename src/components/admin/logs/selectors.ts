@@ -28,6 +28,8 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
       referrer: log.referrer ?? null,
       targetType: log.target_type ?? null,
       targetId: log.target_id ?? null,
+      partnerId: log.target_type === "partner" ? log.target_id ?? null : null,
+      partnerName: log.partner_name ?? null,
       properties: log.properties ?? null,
       createdAt: log.created_at,
       actorSearchLabel,
@@ -43,6 +45,7 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
         log.referrer,
         log.target_type,
         log.target_id,
+        log.partner_name,
         stringifyForSearch(log.properties ?? null),
       ]
         .filter(Boolean)
@@ -69,6 +72,8 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
       referrer: null,
       targetType: log.target_type ?? null,
       targetId: log.target_id ?? null,
+      partnerId: log.target_type === "partner" ? log.target_id ?? null : null,
+      partnerName: log.partner_name ?? null,
       properties: log.properties ?? null,
       createdAt: log.created_at,
       actorSearchLabel,
@@ -79,6 +84,7 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
         log.path,
         log.target_type,
         log.target_id,
+        log.partner_name,
         stringifyForSearch(log.properties ?? null),
       ]
         .filter(Boolean)
@@ -112,6 +118,8 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
       referrer: null,
       targetType: null,
       targetId: null,
+      partnerId: null,
+      partnerName: null,
       properties: log.properties ?? null,
       createdAt: log.created_at,
       actorSearchLabel,

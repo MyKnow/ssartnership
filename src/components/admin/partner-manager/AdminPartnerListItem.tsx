@@ -43,7 +43,7 @@ export default function AdminPartnerListItem({
   );
 
   return (
-    <article className="grid gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
+    <article className="grid min-w-0 gap-4 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="grid min-w-0 gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -79,7 +79,7 @@ export default function AdminPartnerListItem({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7">
         <MetricPill label="즐겨찾기" value={metrics?.favoriteCount ?? 0} />
         <MetricPill label="PV" value={metrics?.detailViews ?? 0} />
         <MetricPill label="UV" value={metrics?.detailUv ?? 0} />

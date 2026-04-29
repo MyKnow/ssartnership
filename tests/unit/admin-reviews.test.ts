@@ -56,6 +56,21 @@ function createSupabaseMock({
   };
 }) {
   return {
+    rpc(fn: string) {
+      if (fn === "get_admin_review_counts") {
+        return Promise.resolve({
+          data: [
+            {
+              total_count: counts.total,
+              visible_count: counts.visible,
+              hidden_count: counts.hidden,
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: [], error: null });
+    },
     from(table: string) {
       const state: QueryState = {
         table,
@@ -230,6 +245,18 @@ describe("admin review helpers", () => {
     expect(adminReviews.serializeAdminReviewFilters(filters)).toBe("companyId=company-2");
   });
 
+  test('treats "all" company and partner filters as empty values', async () => {
+    const adminReviews = await import("../../src/lib/admin-reviews");
+    const filters = adminReviews.parseAdminReviewFilters({
+      companyId: "all",
+      partnerId: "all",
+    });
+
+    expect(filters.companyId).toBe("");
+    expect(filters.partnerId).toBe("");
+    expect(adminReviews.serializeAdminReviewFilters(filters)).toBe("");
+  });
+
   test("getAdminReviewPageData maps relations, reactions, and applies client filtering", async () => {
     aggregatePartnerReviewReactionStates.mockReturnValue(
       new Map([
@@ -272,8 +299,12 @@ describe("admin review helpers", () => {
             partner: {
               id: "partner-1",
               name: "분식랩",
-              company_id: "company-1",
-              company: { id: "company-1", name: "분식컴퍼니", slug: "bunsik" },
+              company_id: "11111111-2222-4333-8444-555555555555",
+              company: {
+                id: "11111111-2222-4333-8444-555555555555",
+                name: "분식컴퍼니",
+                slug: "bunsik",
+              },
             },
             member: {
               id: "member-1",
@@ -390,21 +421,29 @@ describe("admin review helpers", () => {
     getSupabaseAdminClient.mockReturnValue(
       createSupabaseMock({
         companies: [
-          { id: "company-1", name: "분식컴퍼니", slug: "bunsik" },
-          { id: "company-2", name: "카페컴퍼니", slug: "cafe" },
+          { id: "11111111-2222-4333-8444-555555555555", name: "분식컴퍼니", slug: "bunsik" },
+          { id: "22222222-3333-4444-8555-666666666666", name: "카페컴퍼니", slug: "cafe" },
         ],
         partners: [
           {
             id: "11111111-1111-4111-8111-111111111111",
             name: "분식랩",
-            company_id: "company-1",
-            company: { id: "company-1", name: "분식컴퍼니", slug: "bunsik" },
+            company_id: "11111111-2222-4333-8444-555555555555",
+            company: {
+              id: "11111111-2222-4333-8444-555555555555",
+              name: "분식컴퍼니",
+              slug: "bunsik",
+            },
           },
           {
             id: "22222222-2222-4222-8222-222222222222",
             name: "카페랩",
-            company_id: "company-2",
-            company: { id: "company-2", name: "카페컴퍼니", slug: "cafe" },
+            company_id: "22222222-3333-4444-8555-666666666666",
+            company: {
+              id: "22222222-3333-4444-8555-666666666666",
+              name: "카페컴퍼니",
+              slug: "cafe",
+            },
           },
         ],
         reviews: [
@@ -424,8 +463,12 @@ describe("admin review helpers", () => {
             partner: {
               id: "11111111-1111-4111-8111-111111111111",
               name: "분식랩",
-              company_id: "company-1",
-              company: { id: "company-1", name: "분식컴퍼니", slug: "bunsik" },
+              company_id: "11111111-2222-4333-8444-555555555555",
+              company: {
+                id: "11111111-2222-4333-8444-555555555555",
+                name: "분식컴퍼니",
+                slug: "bunsik",
+              },
             },
             member: {
               id: "member-1",
@@ -451,8 +494,12 @@ describe("admin review helpers", () => {
             partner: {
               id: "11111111-1111-4111-8111-111111111111",
               name: "분식랩",
-              company_id: "company-1",
-              company: { id: "company-1", name: "분식컴퍼니", slug: "bunsik" },
+              company_id: "11111111-2222-4333-8444-555555555555",
+              company: {
+                id: "11111111-2222-4333-8444-555555555555",
+                name: "분식컴퍼니",
+                slug: "bunsik",
+              },
             },
             member: {
               id: "member-2",
@@ -478,8 +525,12 @@ describe("admin review helpers", () => {
             partner: {
               id: "22222222-2222-4222-8222-222222222222",
               name: "카페랩",
-              company_id: "company-2",
-              company: { id: "company-2", name: "카페컴퍼니", slug: "cafe" },
+              company_id: "22222222-3333-4444-8555-666666666666",
+              company: {
+                id: "22222222-3333-4444-8555-666666666666",
+                name: "카페컴퍼니",
+                slug: "cafe",
+              },
             },
             member: {
               id: "member-3",
@@ -505,8 +556,12 @@ describe("admin review helpers", () => {
             partner: {
               id: "11111111-1111-4111-8111-111111111111",
               name: "분식랩",
-              company_id: "company-1",
-              company: { id: "company-1", name: "분식컴퍼니", slug: "bunsik" },
+              company_id: "11111111-2222-4333-8444-555555555555",
+              company: {
+                id: "11111111-2222-4333-8444-555555555555",
+                name: "분식컴퍼니",
+                slug: "bunsik",
+              },
             },
             member: {
               id: "member-4",
@@ -525,7 +580,7 @@ describe("admin review helpers", () => {
       {
         sort: "latest",
         status: "visible",
-        companyId: "company-1",
+        companyId: "11111111-2222-4333-8444-555555555555",
         partnerId: "",
         rating: "4",
         imagesOnly: false,
@@ -538,7 +593,7 @@ describe("admin review helpers", () => {
     expect(result.reviews[0]).toEqual(
       expect.objectContaining({
         id: "review-visible-match",
-        companyId: "company-1",
+        companyId: "11111111-2222-4333-8444-555555555555",
         rating: 4,
         isHidden: false,
         memberUsername: "match15",
@@ -676,6 +731,9 @@ describe("admin review helpers", () => {
 
   test("getAdminReviewCounts tolerates query errors", async () => {
     getSupabaseAdminClient.mockReturnValue({
+      rpc() {
+        return Promise.resolve({ data: null, error: new Error("boom") });
+      },
       from() {
         return {
           select() {

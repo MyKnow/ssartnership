@@ -1,9 +1,7 @@
 import AdminShell from "@/components/admin/AdminShell";
-import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
-import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
+import AdminCompanyWorkspace from "@/components/admin/AdminCompanyWorkspace";
 import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
-import SectionHeading from "@/components/ui/SectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -270,30 +268,12 @@ export default async function AdminCompaniesPage({
           minItemWidth="13rem"
         />
 
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(340px,0.72fr)] 2xl:items-start">
-          <section className="grid gap-4">
-            <SectionHeading
-              eyebrow="Companies"
-              title="협력사 운영"
-              description="협력사 기본 정보, 연결 브랜드 수, 삭제/수정 작업을 한 영역에서 관리합니다."
-            />
-            <AdminCompanyManager companies={companyCards} accounts={safeAccounts} />
-          </section>
-
-          <section className="grid gap-4 2xl:sticky 2xl:top-24">
-            <SectionHeading
-              eyebrow="Accounts"
-              title="협력사 계정"
-              description="담당 계정 생성, 초기 설정 링크 발급, 연결 조정을 같은 패널에서 처리합니다."
-            />
-            <AdminPartnerAccountManager
-              accounts={safeAccounts}
-              companies={safeCompanies}
-              generatedSetupUrl={generatedSetupUrl}
-              generatedSetupAccountId={generatedSetupAccountId}
-            />
-          </section>
-        </div>
+        <AdminCompanyWorkspace
+          companies={companyCards}
+          accounts={safeAccounts}
+          generatedSetupUrl={generatedSetupUrl}
+          generatedSetupAccountId={generatedSetupAccountId}
+        />
       </section>
     </AdminShell>
   );

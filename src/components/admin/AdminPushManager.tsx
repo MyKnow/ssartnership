@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AdminNotificationCenter from "@/components/admin/notification-center/AdminNotificationCenter";
 import Tabs from "@/components/ui/Tabs";
 import { getMemberLabel } from "./push-manager/constants";
 import { PushComposerSection } from "./push-manager/PushComposerSection";
@@ -24,9 +25,14 @@ export {
   filterPushLogs,
 } from "./push-manager/selectors";
 
-type AdminPushTab = "logs" | "send";
+export type AdminPushTab = "center" | "logs" | "send";
 
 const adminPushTabOptions = [
+  {
+    value: "center",
+    label: "알림센터",
+    description: "발송 현황과 실패 로그를 확인합니다.",
+  },
   {
     value: "logs",
     label: "로그 조회",
@@ -50,6 +56,7 @@ export default function AdminPushManager({
   partners,
   recentLogs,
   automaticSummaries,
+  initialTab = "center",
 }: AdminPushManagerProps) {
   const controller = useAdminPushManager({
     pushConfigured,
@@ -57,13 +64,19 @@ export default function AdminPushManager({
     partners,
     recentLogs,
   });
-  const [activeTab, setActiveTab] = useState<AdminPushTab>("logs");
+  const [activeTab, setActiveTab] = useState<AdminPushTab>(initialTab);
 
   return (
     <div className="grid min-w-0 gap-8 overflow-x-hidden">
       <Tabs value={activeTab} onChange={setActiveTab} options={adminPushTabOptions} />
 
-      {activeTab === "logs" ? (
+      {activeTab === "center" ? (
+        <AdminNotificationCenter
+          automaticSummaries={automaticSummaries}
+          recentLogs={recentLogs}
+          onMoveToSend={() => setActiveTab("send")}
+        />
+      ) : activeTab === "logs" ? (
         <PushLogsSection
           automaticSummaries={automaticSummaries}
           filteredLogs={controller.filteredLogs}

@@ -64,9 +64,16 @@ export type ResolvedActorMeta = {
   actor_mm_username: string | null;
 };
 
-export type ProductLogRecord = ProductLogRow & ResolvedActorMeta;
-export type AdminAuditLogRecord = AdminAuditLogRow;
-export type AuthSecurityLogRecord = AuthSecurityLogRow & ResolvedActorMeta;
+export type ResolvedPartnerMeta = {
+  partner_name: string | null;
+};
+
+export type ProductLogRecord = ProductLogRow & ResolvedActorMeta & ResolvedPartnerMeta;
+export type AdminAuditLogRecord = AdminAuditLogRow & ResolvedPartnerMeta;
+export type AuthSecurityLogRecord = AuthSecurityLogRow &
+  ResolvedActorMeta & {
+    partner_name: null;
+  };
 
 export type ResolvedLogRange = {
   preset: LogRangePreset;
@@ -132,7 +139,7 @@ export type AdminLogsPageData = {
     audit: boolean;
     security: boolean;
     any: boolean;
-    limitPerGroup: number;
+    limitPerGroup: number | null;
   };
   chartBuckets: LogChartBucket[];
   filters: AdminLogsFilterMeta;
@@ -201,12 +208,13 @@ export type AdminLogsLoadedData = {
   auditRows: AdminAuditLogRow[];
   securityRows: AuthSecurityLogRow[];
   memberLookup: Map<string, MemberLookupRecord>;
+  partnerLookup: Map<string, string>;
   truncated: {
     product: boolean;
     audit: boolean;
     security: boolean;
     any: boolean;
-    limitPerGroup: number;
+    limitPerGroup: number | null;
   };
 };
 
@@ -221,10 +229,10 @@ export const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> 
 export const DEFAULT_PRESET: LogRangePreset = '24h';
 export const QUERY_PAGE_SIZE = 1000;
 export const MAX_CUSTOM_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
-export const PAGE_MAX_LOG_ROWS_PER_GROUP = 2000;
+export const PAGE_MAX_LOG_ROWS_PER_GROUP: number | null = null;
 export const EXPORT_MAX_LOG_ROWS_PER_GROUP = 20000;
 export const MEMBER_LOOKUP_CHUNK_SIZE = 500;
-export const SUMMARY_MAX_LOG_ROWS_PER_GROUP = 2000;
+export const SUMMARY_MAX_LOG_ROWS_PER_GROUP: number | null = null;
 export const ADMIN_LOGS_CSV_HEADER = [
   'group',
   'action',

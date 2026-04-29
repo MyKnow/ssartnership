@@ -26,6 +26,7 @@ export type AdminPushManagerProps = {
   partners: PartnerOption[];
   members: MemberOption[];
   recentLogs: AdminNotificationOperationLog[];
+  initialTab?: "center" | "logs" | "send";
   automaticSummaries: Array<{
     notificationType: Extract<AdminNotificationType, "new_partner" | "expiring_partner">;
     label: string;

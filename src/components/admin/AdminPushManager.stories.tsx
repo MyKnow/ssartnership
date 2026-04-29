@@ -7,6 +7,7 @@ import AdminPushManager from "./AdminPushManager";
 const pushProps: AdminPushManagerProps = {
   pushConfigured: true,
   mattermostConfigured: true,
+  initialTab: "logs",
   partners: [
     { id: "partner-1", name: "역삼 분식랩" },
     { id: "partner-2", name: "카페 루프 역삼점" },

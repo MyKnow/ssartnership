@@ -1,12 +1,10 @@
 import type { ComponentType, SVGProps } from "react";
 import {
-  BellIcon,
   BuildingOffice2Icon,
   ChartBarSquareIcon,
   ClockIcon,
   HomeIcon,
   MegaphoneIcon,
-  PaintBrushIcon,
   QueueListIcon,
   StarIcon,
   TagIcon,
@@ -85,15 +83,9 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       {
         href: "/admin/push",
-        label: "알림 전송",
-        description: "공지와 마케팅 발송",
+        label: "알림 운영",
+        description: "발송과 운영 로그 확인",
         icon: MegaphoneIcon,
-      },
-      {
-        href: "/admin/notifications",
-        label: "알림센터",
-        description: "발송 현황과 실패 로그",
-        icon: BellIcon,
       },
       {
         href: "/admin/advertisement",
@@ -117,12 +109,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "기수 관리",
         description: "현재 기수 계산 기준",
         icon: UserGroupIcon,
-      },
-      {
-        href: "/admin/style-guide",
-        label: "UI 스타일 가이드",
-        description: "관리자 UI 토큰 확인",
-        icon: PaintBrushIcon,
       },
     ],
   },

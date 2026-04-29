@@ -1,7 +1,7 @@
 export const DEFAULT_QUERY_PAGE_SIZE = 1000;
 
 export async function collectPagedRows<T>(
-  maxRows: number,
+  maxRows: number | null,
   fetchPage: (from: number, to: number) => Promise<{
     rows: T[];
     error: boolean;
@@ -11,9 +11,10 @@ export async function collectPagedRows<T>(
   const rows: T[] = [];
   let nextFrom = 0;
   let reachedEnd = false;
+  const capped = typeof maxRows === 'number' && Number.isFinite(maxRows);
 
-  while (rows.length < maxRows) {
-    const to = Math.min(nextFrom + pageSize - 1, maxRows - 1);
+  while (!capped || rows.length < (maxRows as number)) {
+    const to = capped ? Math.min(nextFrom + pageSize - 1, (maxRows as number) - 1) : nextFrom + pageSize - 1;
     const pageResult = await fetchPage(nextFrom, to);
     if (pageResult.error) {
       break;
@@ -29,7 +30,7 @@ export async function collectPagedRows<T>(
   }
 
   return {
-    rows: rows.slice(0, maxRows),
-    truncated: !reachedEnd && rows.length >= maxRows,
+    rows: capped ? rows.slice(0, maxRows as number) : rows,
+    truncated: capped ? !reachedEnd && rows.length >= (maxRows as number) : false,
   };
 }

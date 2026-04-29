@@ -13,8 +13,17 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPushPage() {
+export default async function AdminPushPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
   const supabase = getSupabaseAdminClient();
+  const params = (await searchParams) ?? {};
+  const initialTab =
+    params.tab === "send" || params.tab === "logs" || params.tab === "center"
+      ? params.tab
+      : "center";
 
   const [
     memberResult,
@@ -37,12 +46,12 @@ export default async function AdminPushPage() {
   const automaticSummaryCount = notificationOverview.automaticSummaries.length;
 
   return (
-    <AdminShell title="알림 전송" backHref="/admin" backLabel="관리 홈">
+    <AdminShell title="알림 운영" backHref="/admin" backLabel="관리 홈">
       <div className="grid gap-6">
         <ShellHeader
           eyebrow="Notifications"
-          title="알림 전송"
-          description="운영 공지와 마케팅 메시지를 작성해 발송합니다. 발송 결과와 운영 로그는 알림센터에서 확인합니다."
+          title="알림 운영"
+          description="발송 결과 확인과 즉시 전송을 같은 작업 영역에서 처리합니다."
         />
         <StatsRow
           items={[
@@ -65,6 +74,7 @@ export default async function AdminPushPage() {
               partners={partners}
               members={safeMembers}
               recentLogs={notificationOverview.recentLogs}
+              initialTab={initialTab}
               automaticSummaries={notificationOverview.automaticSummaries}
             />
           </section>
@@ -96,7 +106,7 @@ export default async function AdminPushPage() {
               />
               <div className="grid gap-2 text-sm text-muted-foreground">
                 <p>대상 범위를 좁힌 뒤 리뷰 단계에서 수신 인원을 확인합니다.</p>
-                <p>실패/부분 실패 로그 추적은 알림센터에서 이어서 확인합니다.</p>
+                <p>실패/부분 실패 로그 추적도 같은 화면의 알림센터 탭에서 이어서 확인합니다.</p>
               </div>
             </Card>
           </div>

@@ -26,7 +26,7 @@ async function queryAllRows<T>(
   select: string,
   startIso: string,
   endIso: string,
-  maxRows: number,
+  maxRows: number | null,
 ): Promise<{ rows: T[]; truncated: boolean }> {
   return collectPagedRows<T>(
     maxRows,
@@ -96,6 +96,63 @@ async function fetchMemberLookup(
   return lookup;
 }
 
+async function fetchPartnerLookup(
+  supabase: AdminSupabaseClient,
+  partnerIds: string[],
+) {
+  const lookup = new Map<string, string>();
+  if (!partnerIds.length) {
+    return lookup;
+  }
+
+  const uniqueIds = Array.from(new Set(partnerIds));
+  const results = await Promise.all(
+    chunkValues(uniqueIds, MEMBER_LOOKUP_CHUNK_SIZE).map((chunk) =>
+      supabase.from('partners').select('id,name').in('id', chunk),
+    ),
+  );
+
+  for (const result of results) {
+    if (result.error) {
+      console.error('[log-insights] partners query failed', result.error.message);
+      continue;
+    }
+
+    (result.data ?? []).forEach((row) => {
+      lookup.set(row.id, row.name ?? '');
+    });
+  }
+
+  return lookup;
+}
+
+function extractPartnerIdFromProperties(properties: Record<string, unknown> | null | undefined) {
+  if (!properties || typeof properties.partnerId !== 'string') {
+    return null;
+  }
+  return properties.partnerId;
+}
+
+function extractPartnerTargetIds(
+  productRows: ProductLogRow[],
+  auditRows: AdminAuditLogRow[],
+) {
+  return Array.from(
+    new Set([
+      ...productRows
+        .map((row) =>
+          row.target_type === 'partner' ? row.target_id : extractPartnerIdFromProperties(row.properties),
+        )
+        .filter((value): value is string => Boolean(value)),
+      ...auditRows
+        .map((row) =>
+          row.target_type === 'partner' ? row.target_id : extractPartnerIdFromProperties(row.properties),
+        )
+        .filter((value): value is string => Boolean(value)),
+    ]),
+  );
+}
+
 export function resolveActorMeta(
   actorType: string,
   actorId: string | null,
@@ -127,7 +184,7 @@ export async function loadAdminLogRows(
   options: GetAdminLogsPageDataOptions = {},
   groups: LogGroup[] = ['product', 'audit', 'security'],
   config: {
-    maxRowsPerGroup: number;
+    maxRowsPerGroup: number | null;
     shape?: 'full' | 'summary';
   },
 ): Promise<AdminLogsLoadedData> {
@@ -207,6 +264,10 @@ export async function loadAdminLogRows(
     ]),
   );
   const memberLookup = await fetchMemberLookup(supabase, memberIds);
+  const partnerLookup = await fetchPartnerLookup(
+    supabase,
+    extractPartnerTargetIds(productRows, auditRows),
+  );
 
   return {
     range,
@@ -214,6 +275,7 @@ export async function loadAdminLogRows(
     auditRows,
     securityRows,
     memberLookup,
+    partnerLookup,
     truncated: {
       product: productResult.truncated,
       audit: auditResult.truncated,
@@ -297,6 +359,7 @@ export async function loadAdminLogNormalizedPage(
       auditRows: [] as AdminAuditLogRow[],
       securityRows: [] as AuthSecurityLogRow[],
       memberLookup: new Map<string, MemberLookupRecord>(),
+      partnerLookup: new Map<string, string>(),
       total: 0,
     };
   }
@@ -360,6 +423,10 @@ export async function loadAdminLogNormalizedPage(
       created_at: row.created_at,
       created_at_ms: new Date(row.created_at).getTime(),
     })) as AuthSecurityLogRow[];
+  const partnerLookup = await fetchPartnerLookup(
+    supabase,
+    extractPartnerTargetIds(productRows, auditRows),
+  );
 
   return {
     range,
@@ -367,6 +434,7 @@ export async function loadAdminLogNormalizedPage(
     auditRows,
     securityRows,
     memberLookup,
+    partnerLookup,
     total: parseRpcCount(rows[0]?.total_count),
   };
 }
@@ -405,6 +473,7 @@ export async function loadAdminLogListPage(
         auditRows: [] as AdminAuditLogRow[],
         securityRows: [] as AuthSecurityLogRow[],
         memberLookup: new Map<string, MemberLookupRecord>(),
+        partnerLookup: new Map<string, string>(),
         total: 0,
       };
     }
@@ -431,6 +500,10 @@ export async function loadAdminLogListPage(
       auditRows: [] as AdminAuditLogRow[],
       securityRows: [] as AuthSecurityLogRow[],
       memberLookup,
+      partnerLookup: await fetchPartnerLookup(
+        supabase,
+        extractPartnerTargetIds(productRows, []),
+      ),
       total: count ?? 0,
     };
   }
@@ -455,6 +528,7 @@ export async function loadAdminLogListPage(
         auditRows: [] as AdminAuditLogRow[],
         securityRows: [] as AuthSecurityLogRow[],
         memberLookup: new Map<string, MemberLookupRecord>(),
+        partnerLookup: new Map<string, string>(),
         total: 0,
       };
     }
@@ -473,6 +547,10 @@ export async function loadAdminLogListPage(
       auditRows,
       securityRows: [] as AuthSecurityLogRow[],
       memberLookup: new Map<string, MemberLookupRecord>(),
+      partnerLookup: await fetchPartnerLookup(
+        supabase,
+        extractPartnerTargetIds([], auditRows),
+      ),
       total: count ?? 0,
     };
   }
@@ -502,6 +580,7 @@ export async function loadAdminLogListPage(
       auditRows: [] as AdminAuditLogRow[],
       securityRows: [] as AuthSecurityLogRow[],
       memberLookup: new Map<string, MemberLookupRecord>(),
+      partnerLookup: new Map<string, string>(),
       total: 0,
     };
   }
@@ -524,6 +603,7 @@ export async function loadAdminLogListPage(
     auditRows: [] as AdminAuditLogRow[],
     securityRows,
     memberLookup,
+    partnerLookup: new Map<string, string>(),
     total: count ?? 0,
   };
 }

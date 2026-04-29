@@ -79,5 +79,4 @@ export const adminProtectedRoutes: RedirectRoute[] = [
   { path: "/admin/promotions", expectedPath: "/admin/login" },
   { path: "/admin/push", expectedPath: "/admin/login" },
   { path: "/admin/reviews", expectedPath: "/admin/login" },
-  { path: "/admin/style-guide", expectedPath: "/admin/login" },
 ];

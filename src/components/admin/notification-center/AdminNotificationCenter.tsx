@@ -10,6 +10,9 @@ import type { PushAudienceScope } from "@/lib/push";
 import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
 
 type Props = Pick<AdminPushManagerProps, "automaticSummaries" | "recentLogs">;
+type NotificationCenterProps = Props & {
+  onMoveToSend?: () => void;
+};
 
 type CenterFilterState = {
   search: string;
@@ -101,7 +104,8 @@ function MetricCard({
 export default function AdminNotificationCenter({
   automaticSummaries,
   recentLogs,
-}: Props) {
+  onMoveToSend,
+}: NotificationCenterProps) {
   const [filters, setFilters] = useState(initialFilters);
   const filteredLogs = useMemo(
     () =>
@@ -174,9 +178,15 @@ export default function AdminNotificationCenter({
       />
 
       <div className="flex justify-end">
-        <Button href="/admin/push" variant="secondary">
-          알림 전송으로 이동
-        </Button>
+        {onMoveToSend ? (
+          <Button type="button" variant="secondary" onClick={onMoveToSend}>
+            알림 전송으로 이동
+          </Button>
+        ) : (
+          <Button href="/admin/push?tab=send" variant="secondary">
+            알림 전송으로 이동
+          </Button>
+        )}
       </div>
     </div>
   );

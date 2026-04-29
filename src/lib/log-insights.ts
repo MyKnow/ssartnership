@@ -20,7 +20,7 @@ import {
   filterAndSortLogs,
 } from '@/components/admin/logs/selectors';
 import type {
-  AdminAuditLogRow,
+  AdminAuditLogRecord,
   AdminLogsFilterMeta,
   AdminLogsPageData,
   AdminLogsSummary,
@@ -33,7 +33,7 @@ import type {
 import {
   EXPORT_MAX_LOG_ROWS_PER_GROUP,
   PAGE_MAX_LOG_ROWS_PER_GROUP,
-  } from './log-insights/shared';
+} from './log-insights/shared';
 
 export type {
   AdminAuditLogRecord,
@@ -78,7 +78,24 @@ function shouldUseSplitAdminLogLoading(options: GetAdminLogsPageDataOptions, pag
     Boolean(options.status && options.status !== 'all');
 
   const sort = options.sort ?? 'newest';
-  return !hasComplexFilter && sort === 'newest' && page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
+  if (hasComplexFilter || sort !== 'newest') {
+    return false;
+  }
+  return PAGE_MAX_LOG_ROWS_PER_GROUP === null
+    ? true
+    : page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
+}
+
+function resolvePartnerName(
+  targetType: string | null,
+  targetId: string | null,
+  properties: Record<string, unknown> | null,
+  lookup: Map<string, string>,
+) {
+  if (targetType === 'partner' && targetId) {
+    return lookup.get(targetId) ?? (typeof properties?.partnerName === 'string' ? properties.partnerName : null);
+  }
+  return typeof properties?.partnerName === 'string' ? properties.partnerName : null;
 }
 
 export function shouldUseDbPagedAdminLogList(
@@ -130,20 +147,50 @@ export async function getAdminLogsPageData(
   const productLogs: ProductLogRecord[] = summaryData.productRows.map((row) => ({
     ...row,
     ...resolveActorMeta(row.actor_type, row.actor_id, summaryData.memberLookup),
+    partner_name: resolvePartnerName(
+      row.target_type,
+      row.target_id,
+      row.properties,
+      summaryData.partnerLookup,
+    ),
   }));
-  const auditLogs: AdminAuditLogRow[] = summaryData.auditRows;
+  const auditLogs: AdminAuditLogRecord[] = summaryData.auditRows.map((row) => ({
+    ...row,
+    partner_name: resolvePartnerName(
+      row.target_type,
+      row.target_id,
+      row.properties,
+      summaryData.partnerLookup,
+    ),
+  }));
   const securityLogs: AuthSecurityLogRecord[] = summaryData.securityRows.map((row) => ({
     ...row,
     ...resolveActorMeta(row.actor_type, row.actor_id, summaryData.memberLookup),
+    partner_name: null,
   }));
   const listProductLogs: ProductLogRecord[] = listSourceData.productRows.map((row) => ({
     ...row,
     ...resolveActorMeta(row.actor_type, row.actor_id, listSourceData.memberLookup),
+    partner_name: resolvePartnerName(
+      row.target_type,
+      row.target_id,
+      row.properties,
+      listSourceData.partnerLookup,
+    ),
   }));
-  const listAuditLogs: AdminAuditLogRow[] = listSourceData.auditRows;
+  const listAuditLogs: AdminAuditLogRecord[] = listSourceData.auditRows.map((row) => ({
+    ...row,
+    partner_name: resolvePartnerName(
+      row.target_type,
+      row.target_id,
+      row.properties,
+      listSourceData.partnerLookup,
+    ),
+  }));
   const listSecurityLogs: AuthSecurityLogRecord[] = listSourceData.securityRows.map((row) => ({
     ...row,
     ...resolveActorMeta(row.actor_type, row.actor_id, listSourceData.memberLookup),
+    partner_name: null,
   }));
   const fullRecords = {
     productLogs,

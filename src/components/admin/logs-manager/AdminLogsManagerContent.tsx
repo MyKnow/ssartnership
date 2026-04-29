@@ -66,7 +66,7 @@ export default function AdminLogsManagerContent({
             </div>
           </div>
 
-          {logs.data.truncated.any ? (
+          {logs.data.truncated.any && logs.data.truncated.limitPerGroup !== null ? (
             <FormMessage variant="error">
               조회 범위의 로그가 많아 그룹별 최근 {logs.data.truncated.limitPerGroup.toLocaleString()}건만 불러왔습니다. 더 넓은 원본은 CSV 다운로드로 확인하세요.
             </FormMessage>

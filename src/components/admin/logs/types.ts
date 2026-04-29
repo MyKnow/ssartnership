@@ -16,6 +16,8 @@ export type NormalizedLog = {
   referrer: string | null;
   targetType: string | null;
   targetId: string | null;
+  partnerId: string | null;
+  partnerName: string | null;
   properties: Record<string, unknown> | null;
   createdAt: string;
   actorSearchLabel: string;
