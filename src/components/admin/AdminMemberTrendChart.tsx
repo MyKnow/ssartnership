@@ -5,6 +5,7 @@ import AdminTimeseriesChart from "@/components/admin/AdminTimeseriesChart";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Tabs from "@/components/ui/Tabs";
+import { cn } from "@/lib/cn";
 
 type MemberTrendGranularity = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -194,55 +195,94 @@ export default function AdminMemberTrendChart({
   const buckets = useMemo(() => buildBuckets(createdAts, granularity), [createdAts, granularity]);
 
   return (
-    <Card tone="elevated" className="min-w-0 overflow-hidden">
-      <div className="grid gap-4">
+    <div className="grid gap-4 xl:grid-cols-[14rem_minmax(0,1fr)]">
+      <Card tone="elevated" className="hidden min-w-0 overflow-hidden xl:block xl:self-start">
         <SectionHeading
-          title="회원 유입 추이"
-          description="현재 필터 기준 회원 생성 이력을 일·주·월·연 단위로 확인합니다."
+          title="시계열 해상도"
+          description="원하는 범위 단위로 유입 변화를 확인합니다."
         />
-        <Tabs
-          value={granularity}
-          onChange={(value) => {
-            setGranularity(value);
-          }}
-          options={GRANULARITY_OPTIONS}
-          className="xl:grid-cols-4"
+        <div className="mt-4 grid gap-2">
+          {GRANULARITY_OPTIONS.map((option) => {
+            const active = option.value === granularity;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setGranularity(option.value)}
+                className={cn(
+                  "rounded-2xl border px-4 py-3 text-left transition",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground shadow-raised"
+                    : "border-border bg-surface-inset text-foreground hover:border-strong",
+                )}
+              >
+                <span className="block text-sm font-semibold">{option.label}</span>
+                <span
+                  className={cn(
+                    "mt-1 block text-xs",
+                    active ? "text-primary-foreground/80" : "text-muted-foreground",
+                  )}
+                >
+                  {option.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card tone="elevated" className="min-w-0 overflow-hidden">
+        <div className="grid gap-4">
+          <SectionHeading
+            title="회원 유입 추이"
+            description="현재 필터 기준 회원 생성 이력을 일·주·월·연 단위로 확인합니다."
+          />
+          <div className="xl:hidden">
+            <Tabs
+              value={granularity}
+              onChange={(value) => {
+                setGranularity(value);
+              }}
+              options={GRANULARITY_OPTIONS}
+              className="xl:grid-cols-4"
+            />
+          </div>
+        </div>
+        <AdminTimeseriesChart
+          points={buckets.map((bucket) => ({
+            key: bucket.key,
+            label: bucket.label,
+            rangeLabel: bucket.rangeLabel,
+            values: {
+              members: bucket.count,
+              cumulative: bucket.cumulative,
+            },
+          }))}
+          series={[
+            {
+              key: "members",
+              label: "회원 유입",
+              lineClassName: "text-primary",
+              dotClassName: "fill-primary",
+            },
+          ]}
+          ariaLabel="회원 유입 추이 차트"
+          renderSummary={(point) => ({
+            rangeLabel: point.rangeLabel,
+            items: [
+              {
+                label: "변화량",
+                value: `+${(point.values.members ?? 0).toLocaleString()}명`,
+                valueClassName: "text-primary",
+              },
+              {
+                label: "누적",
+                value: `${(point.values.cumulative ?? 0).toLocaleString()}명`,
+              },
+            ],
+          })}
         />
-      </div>
-      <AdminTimeseriesChart
-        points={buckets.map((bucket) => ({
-          key: bucket.key,
-          label: bucket.label,
-          rangeLabel: bucket.rangeLabel,
-          values: {
-            members: bucket.count,
-            cumulative: bucket.cumulative,
-          },
-        }))}
-        series={[
-          {
-            key: "members",
-            label: "회원 유입",
-            lineClassName: "text-primary",
-            dotClassName: "fill-primary",
-          },
-        ]}
-        ariaLabel="회원 유입 추이 차트"
-        renderSummary={(point) => ({
-          rangeLabel: point.rangeLabel,
-          items: [
-            {
-              label: "변화량",
-              value: `+${(point.values.members ?? 0).toLocaleString()}명`,
-              valueClassName: "text-primary",
-            },
-            {
-              label: "누적",
-              value: `${(point.values.cumulative ?? 0).toLocaleString()}명`,
-            },
-          ],
-        })}
-      />
-    </Card>
+      </Card>
+    </div>
   );
 }
