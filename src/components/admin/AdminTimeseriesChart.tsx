@@ -88,15 +88,20 @@ export default function AdminTimeseriesChart({
   return (
     <>
       {activeSummary ? (
-        <div className="mt-4 grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-4 sm:grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))]">
-          <div>
+        <div className="mt-4 grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-4 sm:min-h-[5.5rem] sm:grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))]">
+          <div className="min-h-12">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               구간
             </p>
-            <p className="mt-1 text-sm font-semibold text-foreground">{activeSummary.rangeLabel}</p>
+            <p
+              className="mt-1 truncate text-sm font-semibold text-foreground"
+              title={activeSummary.rangeLabel}
+            >
+              {activeSummary.rangeLabel}
+            </p>
           </div>
           {activeSummary.items.map((item) => (
-            <div key={`${activeSummary.rangeLabel}-${item.label}`}>
+            <div key={`${activeSummary.rangeLabel}-${item.label}`} className="min-h-12">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {item.label}
               </p>
