@@ -22,7 +22,7 @@ export type AdminTimeseriesPoint = {
   key: string;
   label: string;
   rangeLabel: string;
-  values: Record<string, number>;
+  values: Record<string, string | number>;
 };
 
 export type AdminTimeseriesSummary = {
@@ -137,16 +137,16 @@ export default function AdminTimeseriesChart({
         </div>
       ) : null}
 
-      <div className="-mx-1 mt-3 overflow-x-auto pb-1">
+      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible pb-4 pt-8">
         <div className="px-1" style={{ minWidth: `${chartWidth}px` }}>
           <div
-            className="relative h-[11rem] sm:h-[9.5rem] lg:h-[8.5rem]"
+            className="relative z-20 h-[11rem] overflow-visible sm:h-[9.5rem] lg:h-[8.5rem]"
             role="img"
             aria-label={ariaLabel}
           >
             {activeSummary && activeBubble ? (
               <div
-                className="pointer-events-none absolute z-10 w-44 -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] rounded-2xl border border-border bg-surface px-3 py-3 shadow-raised"
+                className="pointer-events-none absolute z-50 w-56 -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
                 style={{
                   left: `clamp(5.5rem, ${activeBubble.x}px, calc(100% - 5.5rem))`,
                   top: `${Math.max(activeBubble.y - 4, 28)}px`,

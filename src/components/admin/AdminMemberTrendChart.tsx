@@ -13,6 +13,8 @@ type MemberTrendBucket = {
   key: string;
   label: string;
   rangeLabel: string;
+  rangeStartLabel: string;
+  rangeEndLabel: string;
   count: number;
   cumulative: number;
 };
@@ -31,6 +33,12 @@ const GRANULARITY_OPTIONS: ReadonlyArray<{
 function formatRangeLabel(date: Date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(
     date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function formatRangeDateTimeLabel(date: Date) {
+  return `${formatRangeLabel(date)} ${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
   ).padStart(2, "0")}`;
 }
 
@@ -85,17 +93,23 @@ function buildBuckets(createdAts: string[], granularity: MemberTrendGranularity)
     key: string;
     label: string;
     rangeLabel: string;
+    rangeStartLabel: string;
+    rangeEndLabel: string;
   }> = [];
 
   if (granularity === "daily") {
     const start = addDays(today, -6);
     for (let index = 0; index < 7; index += 1) {
       const bucketStart = addDays(start, index);
+      const bucketEnd = new Date(bucketStart);
+      bucketEnd.setHours(23, 59, 59, 999);
       const key = bucketStart.toISOString();
       buckets.push({
         key,
         label: `${bucketStart.getMonth() + 1}/${bucketStart.getDate()}`,
         rangeLabel: formatRangeLabel(bucketStart),
+        rangeStartLabel: formatRangeDateTimeLabel(bucketStart),
+        rangeEndLabel: formatRangeDateTimeLabel(bucketEnd),
       });
     }
 
@@ -118,6 +132,8 @@ function buildBuckets(createdAts: string[], granularity: MemberTrendGranularity)
         key,
         label: `${bucketStart.getMonth() + 1}/${bucketStart.getDate()}`,
         rangeLabel: `${formatRangeLabel(bucketStart)} ~ ${formatRangeLabel(bucketEnd)}`,
+        rangeStartLabel: formatRangeDateTimeLabel(bucketStart),
+        rangeEndLabel: formatRangeDateTimeLabel(new Date(bucketEnd.getFullYear(), bucketEnd.getMonth(), bucketEnd.getDate(), 23, 59, 59, 999)),
       });
     }
 
@@ -134,11 +150,14 @@ function buildBuckets(createdAts: string[], granularity: MemberTrendGranularity)
     const start = addMonths(latestMonth, -11);
     for (let index = 0; index < 12; index += 1) {
       const bucketStart = addMonths(start, index);
+      const bucketEnd = new Date(bucketStart.getFullYear(), bucketStart.getMonth() + 1, 0, 23, 59, 59, 999);
       const key = bucketStart.toISOString();
       buckets.push({
         key,
         label: `${String(bucketStart.getFullYear()).slice(2)}.${String(bucketStart.getMonth() + 1).padStart(2, "0")}`,
         rangeLabel: `${bucketStart.getFullYear()}년 ${bucketStart.getMonth() + 1}월`,
+        rangeStartLabel: formatRangeDateTimeLabel(bucketStart),
+        rangeEndLabel: formatRangeDateTimeLabel(bucketEnd),
       });
     }
 
@@ -164,6 +183,8 @@ function buildBuckets(createdAts: string[], granularity: MemberTrendGranularity)
         key,
         label: `${cursor.getFullYear()}`,
         rangeLabel: `${cursor.getFullYear()}년`,
+        rangeStartLabel: formatRangeDateTimeLabel(cursor),
+        rangeEndLabel: formatRangeDateTimeLabel(new Date(cursor.getFullYear(), 11, 31, 23, 59, 59, 999)),
       });
     }
 
@@ -231,7 +252,7 @@ export default function AdminMemberTrendChart({
         </div>
       </Card>
 
-      <Card tone="elevated" className="min-w-0 overflow-hidden">
+      <Card tone="elevated" className="min-w-0 overflow-visible">
         <div className="grid gap-4">
           <SectionHeading
             title="회원 유입 추이"
@@ -256,6 +277,8 @@ export default function AdminMemberTrendChart({
             values: {
               members: bucket.count,
               cumulative: bucket.cumulative,
+              rangeStartLabel: bucket.rangeStartLabel,
+              rangeEndLabel: bucket.rangeEndLabel,
             },
           }))}
           series={[
@@ -276,8 +299,12 @@ export default function AdminMemberTrendChart({
                 valueClassName: "text-primary",
               },
               {
-                label: "누적",
-                value: `${(point.values.cumulative ?? 0).toLocaleString()}명`,
+                label: "시작",
+                value: String(point.values.rangeStartLabel ?? "-"),
+              },
+              {
+                label: "종료",
+                value: String(point.values.rangeEndLabel ?? "-"),
               },
             ],
           })}

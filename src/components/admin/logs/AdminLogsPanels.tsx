@@ -37,7 +37,7 @@ export function InsightListCard({
   items: Array<{ label: string; value: string }>;
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
+    <Card className="min-w-0 overflow-visible bg-surface-elevated shadow-raised">
       <SectionHeading title={title} description={description} />
       <div className="mt-4 grid gap-2">
         {items.length === 0 ? (
