@@ -125,6 +125,7 @@ export default function CertificationCardFrame({
                 src={avatarSrc}
                 alt={avatarAlt}
                 fill
+                loading="eager"
                 sizes="(max-width: 640px) 116px, (max-width: 1024px) 156px, 168px"
                 unoptimized
                 className="object-cover"
@@ -135,6 +136,7 @@ export default function CertificationCardFrame({
               src={avatarSrc}
               alt={avatarAlt}
               fill
+              loading="eager"
               sizes="(max-width: 640px) 116px, (max-width: 1024px) 156px, 168px"
               unoptimized
               className="object-cover"
