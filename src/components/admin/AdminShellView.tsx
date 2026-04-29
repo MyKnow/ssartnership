@@ -105,7 +105,7 @@ export default function AdminShellView({
               hidden ? "-translate-y-full" : "translate-y-0",
             )}
           >
-            <Container className="flex items-center justify-between gap-3 py-3" size="wide">
+            <Container className="flex items-center justify-between gap-3 py-3" size="dashboard">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Admin Workspace
@@ -137,7 +137,7 @@ export default function AdminShellView({
         </header>
 
         <main>
-          <Container className="pb-16 pt-8" size="wide">
+          <Container className="pb-16 pt-8" size="dashboard">
             {children}
           </Container>
         </main>
@@ -171,7 +171,7 @@ export default function AdminShellView({
 
         <div className="min-w-0">
           <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-xl">
-            <Container className="flex min-h-[4.75rem] items-center justify-between gap-4 py-4" size="wide">
+            <Container className="flex min-h-[4.75rem] items-center justify-between gap-4 py-4" size="dashboard">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1 text-xs font-medium text-muted-foreground">
                   <Link href="/admin" className="hover:text-foreground">
@@ -208,7 +208,7 @@ export default function AdminShellView({
           </header>
 
           <main>
-            <Container className="pb-16 pt-8" size="wide">
+            <Container className="pb-16 pt-8" size="dashboard">
               {children}
             </Container>
           </main>
