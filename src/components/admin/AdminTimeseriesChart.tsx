@@ -41,6 +41,20 @@ type ChartRow = {
   rangeLabel: string;
 } & Record<string, string | number>;
 
+type ChartInteractionState = {
+  activeTooltipIndex?: number;
+  activeLabel?: string | number;
+  activePayload?: Array<{
+    payload?: {
+      key?: string;
+    };
+  }>;
+  activeCoordinate?: {
+    x?: number;
+    y?: number;
+  };
+};
+
 const CHART_MARGIN = {
   top: 28,
   right: 40,
@@ -76,6 +90,30 @@ function HiddenTooltip() {
   return null;
 }
 
+function resolveInteractionKey(state: ChartInteractionState, chartData: ChartRow[]) {
+  const payloadKey = state.activePayload?.[0]?.payload?.key;
+  if (typeof payloadKey === "string") {
+    return payloadKey;
+  }
+
+  if (typeof state.activeTooltipIndex === "number") {
+    const indexedRow = chartData[state.activeTooltipIndex];
+    if (typeof indexedRow?.key === "string") {
+      return indexedRow.key;
+    }
+  }
+
+  if (typeof state.activeLabel === "string" || typeof state.activeLabel === "number") {
+    const nextLabel = String(state.activeLabel);
+    const labelRow = chartData.find((row) => row.label === nextLabel);
+    if (labelRow) {
+      return labelRow.key;
+    }
+  }
+
+  return null;
+}
+
 export default function AdminTimeseriesChart({
   points,
   series,
@@ -92,8 +130,14 @@ export default function AdminTimeseriesChart({
   renderSummary: (point: AdminTimeseriesPoint) => AdminTimeseriesSummary;
 }) {
   const chartSurfaceRef = useRef<HTMLDivElement | null>(null);
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [hoveredInteraction, setHoveredInteraction] = useState<{
+    key: string;
+    coordinate?: { x: number; y: number };
+  } | null>(null);
+  const [selectedInteraction, setSelectedInteraction] = useState<{
+    key: string;
+    coordinate?: { x: number; y: number };
+  } | null>(null);
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
 
   const chartWidth = Math.max(points.length * widthPerPoint, minWidth);
@@ -127,7 +171,8 @@ export default function AdminTimeseriesChart({
     };
   }, [chartData, series]);
 
-  const activeKey = hoveredKey ?? selectedKey ?? points[points.length - 1]?.key ?? null;
+  const activeInteraction = hoveredInteraction ?? selectedInteraction ?? null;
+  const activeKey = activeInteraction?.key ?? null;
   const activePoint = activeKey ? pointByKey.get(activeKey) ?? null : null;
   const activeSummary = activePoint ? renderSummary(activePoint) : null;
 
@@ -161,18 +206,20 @@ export default function AdminTimeseriesChart({
       return null;
     }
 
-    const innerWidth = Math.max(chartBounds.width - CHART_MARGIN.left - CHART_MARGIN.right, 1);
-    const innerHeight = Math.max(chartBounds.height - CHART_MARGIN.top - CHART_MARGIN.bottom, 1);
-    const x =
+    const fallbackInnerWidth = Math.max(chartBounds.width - CHART_MARGIN.left - CHART_MARGIN.right, 1);
+    const fallbackInnerHeight = Math.max(chartBounds.height - CHART_MARGIN.top - CHART_MARGIN.bottom, 1);
+    const fallbackX =
       chartData.length <= 1
-        ? CHART_MARGIN.left + innerWidth / 2
-        : CHART_MARGIN.left + (innerWidth * rowIndex) / (chartData.length - 1);
+        ? CHART_MARGIN.left + fallbackInnerWidth / 2
+        : CHART_MARGIN.left + (fallbackInnerWidth * rowIndex) / (chartData.length - 1);
     const pointValues = series
       .map((entry) => Number(chartData[rowIndex]?.[entry.key]))
       .filter((value) => Number.isFinite(value));
     const anchorValue = pointValues.length > 0 ? Math.max(...pointValues) : 0;
     const domainSpan = Math.max(valueRange.max - valueRange.min, 1);
-    const y = CHART_MARGIN.top + innerHeight * (1 - (anchorValue - valueRange.min) / domainSpan);
+    const fallbackY = CHART_MARGIN.top + fallbackInnerHeight * (1 - (anchorValue - valueRange.min) / domainSpan);
+    const x = activeInteraction?.coordinate?.x ?? fallbackX;
+    const y = activeInteraction?.coordinate?.y ?? fallbackY;
     const placement = y > chartBounds.height / 2 ? "above" : "below";
 
     return {
@@ -181,7 +228,7 @@ export default function AdminTimeseriesChart({
       y,
       placement,
     };
-  }, [activeKey, chartBounds.height, chartBounds.width, chartData, series, valueRange.max, valueRange.min]);
+  }, [activeInteraction?.coordinate?.x, activeInteraction?.coordinate?.y, activeKey, chartBounds.height, chartBounds.width, chartData, series, valueRange.max, valueRange.min]);
 
   return (
     <>
@@ -197,7 +244,7 @@ export default function AdminTimeseriesChart({
               <div
                 className="pointer-events-none absolute z-[80] w-56 -translate-x-1/2 rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
                 style={{
-                  left: `clamp(7rem, ${activeBubble.x}px, calc(100% - 7rem))`,
+                  left: `${activeBubble.x}px`,
                   top: `${activeBubble.y}px`,
                   transform:
                     activeBubble.placement === "above"
@@ -244,28 +291,33 @@ export default function AdminTimeseriesChart({
                 data={chartData}
                 margin={CHART_MARGIN}
                 onMouseMove={(state) => {
-                  const activeTooltipIndex = state.activeTooltipIndex;
-                  const nextRow =
-                    typeof activeTooltipIndex === "number"
-                      ? chartData[activeTooltipIndex] ?? null
-                      : null;
-                  if (typeof nextRow?.key === "string") {
-                    setHoveredKey(nextRow.key);
-                  } else {
-                    setHoveredKey(null);
+                  const nextKey = resolveInteractionKey(state as ChartInteractionState, chartData);
+                  if (!nextKey) {
+                    setHoveredInteraction(null);
+                    return;
                   }
+
+                  setHoveredInteraction({
+                    key: nextKey,
+                    coordinate:
+                      typeof state.activeCoordinate?.x === "number" && typeof state.activeCoordinate?.y === "number"
+                        ? { x: state.activeCoordinate.x, y: state.activeCoordinate.y }
+                        : undefined,
+                  });
                 }}
                 onMouseLeave={() => {
-                  setHoveredKey(null);
+                  setHoveredInteraction(null);
                 }}
                 onClick={(state) => {
-                  const activeTooltipIndex = state.activeTooltipIndex;
-                  const nextRow =
-                    typeof activeTooltipIndex === "number"
-                      ? chartData[activeTooltipIndex] ?? null
-                      : null;
-                  if (typeof nextRow?.key === "string") {
-                    setSelectedKey(nextRow.key);
+                  const nextKey = resolveInteractionKey(state as ChartInteractionState, chartData);
+                  if (typeof nextKey === "string") {
+                    setSelectedInteraction({
+                      key: nextKey,
+                      coordinate:
+                        typeof state.activeCoordinate?.x === "number" && typeof state.activeCoordinate?.y === "number"
+                          ? { x: state.activeCoordinate.x, y: state.activeCoordinate.y }
+                          : undefined,
+                    });
                   }
                 }}
               >
