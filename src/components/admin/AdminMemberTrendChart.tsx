@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import AdminTimeseriesChart from "@/components/admin/AdminTimeseriesChart";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Tabs from "@/components/ui/Tabs";
@@ -184,31 +185,13 @@ function buildBuckets(createdAts: string[], granularity: MemberTrendGranularity)
   });
 }
 
-function buildPath(points: Array<{ x: number; y: number }>) {
-  return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
-}
-
 export default function AdminMemberTrendChart({
   createdAts,
 }: {
   createdAts: string[];
 }) {
   const [granularity, setGranularity] = useState<MemberTrendGranularity>("daily");
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const buckets = useMemo(() => buildBuckets(createdAts, granularity), [createdAts, granularity]);
-  const width = Math.max(buckets.length * 72, 480);
-  const height = 128;
-  const padding = { top: 10, right: 12, bottom: 28, left: 32 };
-  const plotWidth = Math.max(width - padding.left - padding.right, 1);
-  const plotHeight = Math.max(height - padding.top - padding.bottom, 1);
-  const maxValue = Math.max(...buckets.map((bucket) => bucket.count), 1);
-  const stepX = buckets.length > 1 ? plotWidth / (buckets.length - 1) : 0;
-  const points = buckets.map((bucket, index) => ({
-    ...bucket,
-    x: padding.left + stepX * index,
-    y: padding.top + plotHeight * (1 - bucket.count / maxValue),
-  }));
-  const activePoint = activeIndex === null ? points[points.length - 1] ?? null : points[activeIndex] ?? null;
 
   return (
     <Card tone="elevated" className="min-w-0 overflow-hidden">
@@ -221,112 +204,45 @@ export default function AdminMemberTrendChart({
           value={granularity}
           onChange={(value) => {
             setGranularity(value);
-            setActiveIndex(null);
           }}
           options={GRANULARITY_OPTIONS}
           className="xl:grid-cols-4"
         />
       </div>
-
-      {activePoint ? (
-        <div className="mt-4 grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-4 sm:grid-cols-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              구간
-            </p>
-            <p className="mt-1 text-sm font-semibold text-foreground">{activePoint.rangeLabel}</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              변화량
-            </p>
-            <p className="mt-1 text-sm font-semibold text-primary">
-              +{activePoint.count.toLocaleString()}명
-            </p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              누적
-            </p>
-            <p className="mt-1 text-sm font-semibold text-foreground">
-              {activePoint.cumulative.toLocaleString()}명
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      <div
-        className="-mx-1 mt-3 overflow-x-auto pb-1"
-        onMouseLeave={() => setActiveIndex(null)}
-      >
-        <div className="min-w-max px-1">
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="block h-auto min-w-full"
-            role="img"
-            aria-label="회원 유입 추이 차트"
-          >
-            {Array.from({ length: 4 }, (_, index) => {
-              const y = padding.top + plotHeight * (index / 3);
-              const value = Math.round(maxValue * (1 - index / 3));
-              return (
-                <g key={`grid-${index}`} className="text-border/70">
-                  <line
-                    x1={padding.left}
-                    x2={width - padding.right}
-                    y1={y}
-                    y2={y}
-                    stroke="currentColor"
-                    strokeOpacity={index === 3 ? 0.2 : 0.08}
-                    strokeDasharray={index === 3 ? "0" : "3 7"}
-                  />
-                  <text
-                    x={padding.left - 8}
-                    y={y + 3}
-                    textAnchor="end"
-                    className="fill-muted-foreground text-[8px] font-medium"
-                  >
-                    {value}
-                  </text>
-                </g>
-              );
-            })}
-
-            <path d={buildPath(points)} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-primary" />
-
-            {points.map((point, index) => {
-              const active = activePoint?.key === point.key;
-              return (
-                <g key={point.key}>
-                  <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r={active ? 5 : 3.5}
-                    className={active ? "fill-primary" : "fill-primary/75"}
-                  />
-                  <text
-                    x={point.x}
-                    y={height - 10}
-                    textAnchor="middle"
-                    className="fill-muted-foreground text-[8px] font-medium"
-                  >
-                    {point.label}
-                  </text>
-                  <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r="14"
-                    fill="transparent"
-                    className="cursor-pointer"
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => setActiveIndex(index)}
-                  />
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-      </div>
+      <AdminTimeseriesChart
+        points={buckets.map((bucket) => ({
+          key: bucket.key,
+          label: bucket.label,
+          rangeLabel: bucket.rangeLabel,
+          values: {
+            members: bucket.count,
+            cumulative: bucket.cumulative,
+          },
+        }))}
+        series={[
+          {
+            key: "members",
+            label: "회원 유입",
+            lineClassName: "text-primary",
+            dotClassName: "fill-primary",
+          },
+        ]}
+        ariaLabel="회원 유입 추이 차트"
+        renderSummary={(point) => ({
+          rangeLabel: point.rangeLabel,
+          items: [
+            {
+              label: "변화량",
+              value: `+${(point.values.members ?? 0).toLocaleString()}명`,
+              valueClassName: "text-primary",
+            },
+            {
+              label: "누적",
+              value: `${(point.values.cumulative ?? 0).toLocaleString()}명`,
+            },
+          ],
+        })}
+      />
     </Card>
   );
 }

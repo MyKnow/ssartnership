@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import AdminTimeseriesChart from '@/components/admin/AdminTimeseriesChart';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -144,27 +145,6 @@ export function ActivityChart({
   loading: boolean;
   onSelectBucket: (bucket: LogChartBucket) => void;
 }) {
-  const width = Math.max(buckets.length * 84, 420);
-  const height = 260;
-  const padding = { top: 20, right: 20, bottom: 56, left: 44 };
-  const plotWidth = Math.max(width - padding.left - padding.right, 1);
-  const plotHeight = Math.max(height - padding.top - padding.bottom, 1);
-  const maxValue = Math.max(...buckets.map((bucket) => bucket.total), 1);
-  const stepX = buckets.length > 1 ? plotWidth / (buckets.length - 1) : 0;
-  const chartPoints = buckets.map((bucket, index) => {
-    const x = padding.left + stepX * index;
-    return {
-      bucket,
-      x,
-      productY: padding.top + plotHeight * (1 - bucket.product / maxValue),
-      auditY: padding.top + plotHeight * (1 - bucket.audit / maxValue),
-      securityY: padding.top + plotHeight * (1 - bucket.security / maxValue),
-      totalY: padding.top + plotHeight * (1 - bucket.total / maxValue),
-    };
-  });
-  const buildPath = (key: 'productY' | 'auditY' | 'securityY' | 'totalY') =>
-    chartPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point[key]}`).join(' ');
-
   return (
     <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
       <SectionHeading
@@ -184,84 +164,91 @@ export function ActivityChart({
         </Badge>
       </div>
 
-      <div className="-mx-1 mt-5 overflow-x-auto pb-2">
-        <div className="min-w-max px-1">
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="block h-auto min-w-full"
-            role="img"
-            aria-label="조회 범위 활동량 선형 차트"
+      <AdminTimeseriesChart
+        points={buckets.map((bucket) => ({
+          key: bucket.key,
+          label: bucket.label,
+          rangeLabel: bucket.rangeLabel,
+          values: {
+            total: bucket.total,
+            product: bucket.product,
+            audit: bucket.audit,
+            security: bucket.security,
+          },
+        }))}
+        series={[
+          {
+            key: 'total',
+            label: '전체',
+            lineClassName: 'text-foreground/35',
+            dotClassName: 'fill-foreground/25',
+            strokeWidth: 3,
+          },
+          {
+            key: 'product',
+            label: '사용자 이벤트',
+            lineClassName: 'text-sky-500',
+            dotClassName: 'fill-sky-500',
+          },
+          {
+            key: 'audit',
+            label: '관리자 감사',
+            lineClassName: 'text-violet-500',
+            dotClassName: 'fill-violet-500',
+          },
+          {
+            key: 'security',
+            label: '인증·보안',
+            lineClassName: 'text-amber-500',
+            dotClassName: 'fill-amber-500',
+          },
+        ]}
+        ariaLabel="조회 범위 활동량 선형 차트"
+        renderSummary={(point) => ({
+          rangeLabel: point.rangeLabel,
+          items: [
+            {
+              label: '전체',
+              value: `${(point.values.total ?? 0).toLocaleString()}건`,
+            },
+            {
+              label: '사용자 이벤트',
+              value: `${(point.values.product ?? 0).toLocaleString()}건`,
+              valueClassName: 'text-sky-700 dark:text-sky-300',
+            },
+            {
+              label: '관리자 감사',
+              value: `${(point.values.audit ?? 0).toLocaleString()}건`,
+              valueClassName: 'text-violet-700 dark:text-violet-300',
+            },
+            {
+              label: '인증·보안',
+              value: `${(point.values.security ?? 0).toLocaleString()}건`,
+              valueClassName: 'text-amber-700 dark:text-amber-300',
+            },
+          ],
+        })}
+      />
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        {buckets.map((bucket) => (
+          <button
+            key={bucket.key}
+            type="button"
+            disabled={loading}
+            className="rounded-2xl border border-border bg-surface-inset px-3 py-3 text-left transition hover:border-strong disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => onSelectBucket(bucket)}
+            title={bucket.rangeLabel}
           >
-            {Array.from({ length: 4 }, (_, index) => {
-              const y = padding.top + plotHeight * (index / 3);
-              const value = Math.round(maxValue * (1 - index / 3));
-              return (
-                <g key={`grid-${index}`} className="text-border/70">
-                  <line
-                    x1={padding.left}
-                    x2={width - padding.right}
-                    y1={y}
-                    y2={y}
-                    stroke="currentColor"
-                    strokeOpacity={index === 3 ? 0.2 : 0.08}
-                    strokeDasharray={index === 3 ? '0' : '3 7'}
-                  />
-                  <text
-                    x={padding.left - 10}
-                    y={y + 4}
-                    textAnchor="end"
-                    className="fill-muted-foreground text-[10px] font-medium"
-                  >
-                    {value}
-                  </text>
-                </g>
-              );
-            })}
-
-            <path d={buildPath('totalY')} fill="none" stroke="currentColor" strokeWidth="3" className="text-foreground/35" />
-            <path d={buildPath('productY')} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-sky-500" />
-            <path d={buildPath('auditY')} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-violet-500" />
-            <path d={buildPath('securityY')} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-500" />
-
-            {chartPoints.map((point) => (
-              <g key={point.bucket.key}>
-                <circle cx={point.x} cy={point.productY} r="4" className="fill-sky-500" />
-                <circle cx={point.x} cy={point.auditY} r="4" className="fill-violet-500" />
-                <circle cx={point.x} cy={point.securityY} r="4" className="fill-amber-500" />
-                <circle cx={point.x} cy={point.totalY} r="5" className="fill-foreground/25" />
-                <text
-                  x={point.x}
-                  y={height - 18}
-                  textAnchor="middle"
-                  className="fill-muted-foreground text-[10px] font-medium"
-                >
-                  {point.bucket.label}
-                </text>
-              </g>
-            ))}
-          </svg>
-
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            {buckets.map((bucket) => (
-              <button
-                key={bucket.key}
-                type="button"
-                disabled={loading}
-                className="rounded-2xl border border-border bg-surface-inset px-3 py-3 text-left transition hover:border-strong disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={() => onSelectBucket(bucket)}
-                title={bucket.rangeLabel}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  {bucket.label}
-                </p>
-                <p className="mt-2 text-lg font-semibold text-foreground">
-                  {bucket.total.toLocaleString()}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">{bucket.rangeLabel}</p>
-              </button>
-            ))}
-          </div>
-        </div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {bucket.label}
+            </p>
+            <p className="mt-2 text-lg font-semibold text-foreground">
+              {bucket.total.toLocaleString()}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{bucket.rangeLabel}</p>
+          </button>
+        ))}
       </div>
     </Card>
   );
