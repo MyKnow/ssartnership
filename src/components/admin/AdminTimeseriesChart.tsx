@@ -6,6 +6,7 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -68,6 +69,10 @@ function resolveLineColor(className: string) {
 
 function resolveDotColor(className: string) {
   return COLOR_BY_DOT_CLASS[className] ?? "var(--color-primary)";
+}
+
+function HiddenTooltip() {
+  return null;
 }
 
 export default function AdminTimeseriesChart({
@@ -214,6 +219,12 @@ export default function AdminTimeseriesChart({
                   tickMargin={8}
                   width={30}
                   className="text-[8px] font-medium text-muted-foreground"
+                />
+                <Tooltip
+                  content={<HiddenTooltip />}
+                  cursor={{ stroke: "currentColor", strokeOpacity: 0.08 }}
+                  wrapperStyle={{ display: "none" }}
+                  isAnimationActive={false}
                 />
                 {series.map((entry) => {
                   const stroke = resolveLineColor(entry.lineClassName);
