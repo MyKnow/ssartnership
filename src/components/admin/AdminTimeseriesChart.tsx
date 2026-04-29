@@ -41,13 +41,6 @@ type ChartRow = {
   rangeLabel: string;
 } & Record<string, string | number>;
 
-type ActiveBubbleState = {
-  key: string;
-  x: number;
-  y: number;
-  placement: "above" | "below";
-};
-
 const CHART_MARGIN = {
   top: 28,
   right: 40,
@@ -101,8 +94,6 @@ export default function AdminTimeseriesChart({
   const chartSurfaceRef = useRef<HTMLDivElement | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [hoveredBubble, setHoveredBubble] = useState<ActiveBubbleState | null>(null);
-  const [selectedBubble, setSelectedBubble] = useState<ActiveBubbleState | null>(null);
   const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
 
   const chartWidth = Math.max(points.length * widthPerPoint, minWidth);
@@ -121,19 +112,24 @@ export default function AdminTimeseriesChart({
       new Map(points.map((point) => [point.key, point])),
     [points],
   );
-  const valueMax = useMemo(() => {
+  const valueRange = useMemo(() => {
     const flattenedValues = chartData.flatMap((row) =>
       series
         .map((entry) => Number(row[entry.key]))
         .filter((value) => Number.isFinite(value)),
     );
-    return Math.max(...flattenedValues, 0, 1);
+    const nextMin = flattenedValues.length > 0 ? Math.min(...flattenedValues) : 0;
+    const nextMax = flattenedValues.length > 0 ? Math.max(...flattenedValues) : 1;
+    const spread = Math.max((nextMax - nextMin) * 0.2, 3);
+    return {
+      min: nextMin - spread,
+      max: nextMax + spread,
+    };
   }, [chartData, series]);
 
   const activeKey = hoveredKey ?? selectedKey ?? points[points.length - 1]?.key ?? null;
   const activePoint = activeKey ? pointByKey.get(activeKey) ?? null : null;
   const activeSummary = activePoint ? renderSummary(activePoint) : null;
-  const activeBubble = hoveredBubble ?? selectedBubble;
 
   useEffect(() => {
     const element = chartSurfaceRef.current;
@@ -149,16 +145,18 @@ export default function AdminTimeseriesChart({
     };
 
     updateBounds();
-    const observer = new ResizeObserver(updateBounds);
-    observer.observe(element);
+    window.addEventListener("resize", updateBounds);
 
     return () => {
-      observer.disconnect();
+      window.removeEventListener("resize", updateBounds);
     };
   }, []);
 
-  const buildBubbleState = (rowKey: string): ActiveBubbleState | null => {
-    const rowIndex = chartData.findIndex((row) => row.key === rowKey);
+  const activeBubble = useMemo(() => {
+    if (!activeKey) {
+      return null;
+    }
+    const rowIndex = chartData.findIndex((row) => row.key === activeKey);
     if (rowIndex < 0 || chartBounds.width <= 0 || chartBounds.height <= 0) {
       return null;
     }
@@ -173,16 +171,17 @@ export default function AdminTimeseriesChart({
       .map((entry) => Number(chartData[rowIndex]?.[entry.key]))
       .filter((value) => Number.isFinite(value));
     const anchorValue = pointValues.length > 0 ? Math.max(...pointValues) : 0;
-    const y = CHART_MARGIN.top + innerHeight * (1 - anchorValue / valueMax);
+    const domainSpan = Math.max(valueRange.max - valueRange.min, 1);
+    const y = CHART_MARGIN.top + innerHeight * (1 - (anchorValue - valueRange.min) / domainSpan);
     const placement = y > chartBounds.height / 2 ? "above" : "below";
 
     return {
-      key: rowKey,
+      key: activeKey,
       x,
       y,
       placement,
     };
-  };
+  }, [activeKey, chartBounds.height, chartBounds.width, chartData, series, valueRange.max, valueRange.min]);
 
   return (
     <>
@@ -252,15 +251,12 @@ export default function AdminTimeseriesChart({
                       : null;
                   if (typeof nextRow?.key === "string") {
                     setHoveredKey(nextRow.key);
-                    setHoveredBubble(buildBubbleState(nextRow.key));
                   } else {
                     setHoveredKey(null);
-                    setHoveredBubble(null);
                   }
                 }}
                 onMouseLeave={() => {
                   setHoveredKey(null);
-                  setHoveredBubble(null);
                 }}
                 onClick={(state) => {
                   const activeTooltipIndex = state.activeTooltipIndex;
@@ -270,7 +266,6 @@ export default function AdminTimeseriesChart({
                       : null;
                   if (typeof nextRow?.key === "string") {
                     setSelectedKey(nextRow.key);
-                    setSelectedBubble(buildBubbleState(nextRow.key));
                   }
                 }}
               >
@@ -287,6 +282,7 @@ export default function AdminTimeseriesChart({
                   tickLine={false}
                   tickMargin={8}
                   width={30}
+                  domain={[valueRange.min, valueRange.max]}
                   className="text-[8px] font-medium text-muted-foreground"
                 />
                 <Tooltip
