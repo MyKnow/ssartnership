@@ -3,6 +3,10 @@ import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
 import type { AdminSupabaseClient } from "../shared-types";
+import {
+  buildPartnerSetupIssuePayload,
+  resolvePartnerSetupSchemaCapabilitiesFromError,
+} from "@/lib/partner-auth/setup-schema";
 
 const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -15,42 +19,48 @@ async function updateInitialSetupState(
 ) {
   const expiresAt = new Date(Date.now() + INITIAL_SETUP_TTL_MS).toISOString();
   const basePayload = {
-    initial_setup_token_hash: setupTokenHash,
     initial_setup_link_sent_at: null,
     must_change_password: true,
     email_verified_at: null,
     updated_at: now,
   };
 
+  const primaryPayload = buildPartnerSetupIssuePayload(
+    basePayload,
+    { setupToken, setupTokenHash, expiresAt },
+    {
+      supportsPlainToken: false,
+      supportsHash: true,
+      supportsExpiry: true,
+    },
+  );
+
   const withExpires = await supabase
     .from("partner_accounts")
-    .update({
-      ...basePayload,
-      initial_setup_expires_at: expiresAt,
-    })
+    .update(primaryPayload)
     .eq("id", accountId);
 
   if (!withExpires.error) {
     return { expiresAt };
   }
 
-  const supportsExpiry = !withExpires.error.message.includes("initial_setup_expires_at");
-  const supportsHash = !withExpires.error.message.includes("initial_setup_token_hash");
+  const fallbackCapabilities = resolvePartnerSetupSchemaCapabilitiesFromError(
+    withExpires.error.message,
+  );
 
-  if (supportsExpiry && supportsHash) {
+  if (fallbackCapabilities.supportsExpiry && fallbackCapabilities.supportsHash) {
     throw new Error(withExpires.error.message);
   }
 
-  const plainPayload = {
-    initial_setup_token: setupToken,
-    initial_setup_link_sent_at: null,
-    must_change_password: true,
-    email_verified_at: null,
-    updated_at: now,
-  };
-
-  const fallbackPayload = supportsHash ? basePayload : plainPayload;
-  const fallback = await supabase.from("partner_accounts").update(fallbackPayload).eq("id", accountId);
+  const fallbackPayload = buildPartnerSetupIssuePayload(
+    basePayload,
+    { setupToken, setupTokenHash, expiresAt },
+    fallbackCapabilities,
+  );
+  const fallback = await supabase
+    .from("partner_accounts")
+    .update(fallbackPayload)
+    .eq("id", accountId);
 
   if (fallback.error) {
     throw new Error(fallback.error.message);

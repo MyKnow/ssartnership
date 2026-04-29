@@ -33,7 +33,10 @@
 - `wave-10-planning`: done
 - `wave-10-implementation`: done
 - `wave-10-verification`: done
-- `wave-11-planning`: pending
+- `wave-11-planning`: done
+- `wave-11-implementation`: done
+- `wave-11-verification`: done
+- `wave-12-planning`: pending
 
 ## Objective
 
@@ -110,6 +113,7 @@ These are not part of wave 1 because they need production measurements and trigg
 - Collapse admin overview summary counts into a single RPC instead of issuing repeated `count exact` PostgREST queries from the page loader.
 - Use DB-side current-page loading for simple single-group admin log exploration cases instead of reading the whole range into memory first.
 - Push newest-first admin log list filtering for `all-group`, `search`, `name`, `actor`, and `status` through a single DB RPC instead of broad in-memory fallback reads.
+- Isolate partner account legacy setup-schema compatibility behind shared helpers so `schema.sql` and live-env drift is localized instead of scattered across auth flows.
 
 ### Deferred
 
@@ -173,6 +177,10 @@ These are not part of wave 1 because they need production measurements and trigg
 - Added `20260501012009_admin_logs_page_rpc.sql` with `get_admin_logs_page(...)` to page newest-first log rows across product, audit, and security logs inside Postgres.
 - Reworked the admin log loader so newest-first requests use the DB RPC for all-group and filter-heavy list queries, while `oldest/actor/ip` sorts still stay on the existing fallback path.
 - Synced `supabase/schema.sql`, updated loading-strategy tests, and reran migration validation, focused eslint, focused tests, and production build.
+- Started wave 11 planning for partner-account schema drift isolation. Current issue: legacy `initial_setup_token` compatibility is spread across account lookup, setup completion, and admin setup-link issuance.
+- Added shared partner setup schema helpers for capability detection, select building, completion payload construction, and initial setup issue payload construction.
+- Rewired partner setup lookup, completion, and admin setup-link issuance to consume the shared compatibility helper instead of duplicating schema fallback logic.
+- Added focused tests for schema capability detection and payload generation, then reran focused eslint, focused tests, and production build.
 
 ## Verification
 
@@ -205,6 +213,9 @@ npm run build
 npm run validate:migrations
 npx eslint src/lib/log-insights.ts src/lib/log-insights/data.ts tests/admin-log-loading-strategy.test.mts
 node --import ./tests/alias-register.mjs --test tests/admin-log-loading-strategy.test.mts tests/log-insights-paging.test.mts tests/opt-wave5-selectors.test.mts
+npm run build
+npx eslint src/lib/partner-auth/setup-schema.ts src/lib/partner-auth/accounts.ts src/lib/partner-auth/setup.ts 'src/app/admin/(protected)/_actions/partner-support/setup-link.ts' tests/partner-setup-fallback.test.mts
+node --import ./tests/alias-register.mjs --test tests/partner-setup-fallback.test.mts tests/partner-counts.test.mts tests/partner-counts-visibility.test.mts
 npm run build
 ```
 
@@ -241,6 +252,9 @@ Results:
 - wave 10 focused node tests: 8 passed, 0 failed
 - wave 10 focused eslint: passed
 - wave 10 production build: passed
+- wave 11 focused node tests: 10 passed, 0 failed
+- wave 11 focused eslint: passed
+- wave 11 production build: passed
 
 After migration deployment, re-measure:
 

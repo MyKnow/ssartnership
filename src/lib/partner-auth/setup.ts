@@ -9,6 +9,12 @@ import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds, getSupabasePartnerPortalSetupCompany } from "./company.ts";
 import { findSupabasePartnerPortalSetupAccount } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
+import {
+  buildPartnerSetupCompletionPayload,
+  hasMissingPartnerSetupSchemaColumnError,
+  resolvePartnerSetupSchemaCapabilitiesFromAccount,
+  resolvePartnerSetupSchemaCapabilitiesFromError,
+} from "./setup-schema.ts";
 
 const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -27,42 +33,13 @@ type PartnerSetupCompletionPayloadCandidate = {
   payload: ReturnType<typeof buildPartnerSetupCompletionPayload>;
 };
 
-function buildPartnerSetupCompletionPayload(
-  commonPayload: PartnerSetupCompletionCommonPayload,
-  options: {
-    supportsPlainToken: boolean;
-    supportsHash: boolean;
-    supportsExpiry: boolean;
-  },
-) {
-  return {
-    ...commonPayload,
-    ...(options.supportsPlainToken ? { initial_setup_token: null } : {}),
-    ...(options.supportsHash ? { initial_setup_token_hash: null } : {}),
-    ...(options.supportsExpiry ? { initial_setup_expires_at: null } : {}),
-  };
-}
-
-function isMissingSchemaColumn(errorMessage: string, columnName: string) {
-  return errorMessage.includes(`'${columnName}'`);
-}
-
 export function resolvePartnerSetupCompletionFallbackPayload(
   commonPayload: PartnerSetupCompletionCommonPayload,
   errorMessage: string,
 ) {
-  return buildPartnerSetupCompletionPayload(commonPayload, {
-    supportsPlainToken: !isMissingSchemaColumn(errorMessage, "initial_setup_token"),
-    supportsHash: !isMissingSchemaColumn(errorMessage, "initial_setup_token_hash"),
-    supportsExpiry: !isMissingSchemaColumn(errorMessage, "initial_setup_expires_at"),
-  });
-}
-
-function isMissingPartnerSetupSchemaColumnError(errorMessage: string) {
-  return (
-    isMissingSchemaColumn(errorMessage, "initial_setup_token") ||
-    isMissingSchemaColumn(errorMessage, "initial_setup_token_hash") ||
-    isMissingSchemaColumn(errorMessage, "initial_setup_expires_at")
+  return buildPartnerSetupCompletionPayload(
+    commonPayload,
+    resolvePartnerSetupSchemaCapabilitiesFromError(errorMessage),
   );
 }
 
@@ -74,33 +51,27 @@ function buildPartnerSetupCompletionPayloadCandidates(
     initial_setup_expires_at?: string | null;
   },
 ) : PartnerSetupCompletionPayloadCandidate[] {
-  const supportsPlainToken = "initial_setup_token" in account;
-  const supportsHash = "initial_setup_token_hash" in account;
-  const supportsExpiry = "initial_setup_expires_at" in account;
+  const detectedCapabilities = resolvePartnerSetupSchemaCapabilitiesFromAccount(account);
 
   return [
     {
       label: "detected",
-      payload: buildPartnerSetupCompletionPayload(commonPayload, {
-        supportsPlainToken,
-        supportsHash,
-        supportsExpiry,
-      }),
+      payload: buildPartnerSetupCompletionPayload(commonPayload, detectedCapabilities),
     },
     {
       label: "no-expiry",
       payload: buildPartnerSetupCompletionPayload(commonPayload, {
-        supportsPlainToken,
-        supportsHash,
+        supportsPlainToken: detectedCapabilities.supportsPlainToken,
+        supportsHash: detectedCapabilities.supportsHash,
         supportsExpiry: false,
       }),
     },
     {
       label: "no-hash",
       payload: buildPartnerSetupCompletionPayload(commonPayload, {
-        supportsPlainToken,
+        supportsPlainToken: detectedCapabilities.supportsPlainToken,
         supportsHash: false,
-        supportsExpiry,
+        supportsExpiry: detectedCapabilities.supportsExpiry,
       }),
     },
     {
@@ -258,7 +229,7 @@ export async function completeSupabasePartnerPortalInitialSetup(
       errorHint: "hint" in attempt.error ? attempt.error.hint : undefined,
     });
 
-    if (!isMissingPartnerSetupSchemaColumnError(attempt.error.message)) {
+    if (!hasMissingPartnerSetupSchemaColumnError(attempt.error.message)) {
       throw attempt.error;
     }
 
