@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -45,6 +45,14 @@ type ActiveBubbleState = {
   key: string;
   x: number;
   y: number;
+  placement: "above" | "below";
+};
+
+const CHART_MARGIN = {
+  top: 28,
+  right: 40,
+  bottom: 28,
+  left: 40,
 };
 
 const COLOR_BY_LINE_CLASS: Record<string, string> = {
@@ -90,10 +98,12 @@ export default function AdminTimeseriesChart({
   widthPerPoint?: number;
   renderSummary: (point: AdminTimeseriesPoint) => AdminTimeseriesSummary;
 }) {
+  const chartSurfaceRef = useRef<HTMLDivElement | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [hoveredBubble, setHoveredBubble] = useState<ActiveBubbleState | null>(null);
   const [selectedBubble, setSelectedBubble] = useState<ActiveBubbleState | null>(null);
+  const [chartBounds, setChartBounds] = useState({ width: 0, height: 0 });
 
   const chartWidth = Math.max(points.length * widthPerPoint, minWidth);
   const chartData = useMemo<ChartRow[]>(
@@ -111,27 +121,89 @@ export default function AdminTimeseriesChart({
       new Map(points.map((point) => [point.key, point])),
     [points],
   );
+  const valueMax = useMemo(() => {
+    const flattenedValues = chartData.flatMap((row) =>
+      series
+        .map((entry) => Number(row[entry.key]))
+        .filter((value) => Number.isFinite(value)),
+    );
+    return Math.max(...flattenedValues, 0, 1);
+  }, [chartData, series]);
 
   const activeKey = hoveredKey ?? selectedKey ?? points[points.length - 1]?.key ?? null;
   const activePoint = activeKey ? pointByKey.get(activeKey) ?? null : null;
   const activeSummary = activePoint ? renderSummary(activePoint) : null;
   const activeBubble = hoveredBubble ?? selectedBubble;
 
+  useEffect(() => {
+    const element = chartSurfaceRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateBounds = () => {
+      setChartBounds({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
+    };
+
+    updateBounds();
+    const observer = new ResizeObserver(updateBounds);
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  const buildBubbleState = (rowKey: string): ActiveBubbleState | null => {
+    const rowIndex = chartData.findIndex((row) => row.key === rowKey);
+    if (rowIndex < 0 || chartBounds.width <= 0 || chartBounds.height <= 0) {
+      return null;
+    }
+
+    const innerWidth = Math.max(chartBounds.width - CHART_MARGIN.left - CHART_MARGIN.right, 1);
+    const innerHeight = Math.max(chartBounds.height - CHART_MARGIN.top - CHART_MARGIN.bottom, 1);
+    const x =
+      chartData.length <= 1
+        ? CHART_MARGIN.left + innerWidth / 2
+        : CHART_MARGIN.left + (innerWidth * rowIndex) / (chartData.length - 1);
+    const pointValues = series
+      .map((entry) => Number(chartData[rowIndex]?.[entry.key]))
+      .filter((value) => Number.isFinite(value));
+    const anchorValue = pointValues.length > 0 ? Math.max(...pointValues) : 0;
+    const y = CHART_MARGIN.top + innerHeight * (1 - anchorValue / valueMax);
+    const placement = y > chartBounds.height / 2 ? "above" : "below";
+
+    return {
+      key: rowKey,
+      x,
+      y,
+      placement,
+    };
+  };
+
   return (
     <>
-      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible pb-8 pt-12">
-        <div className="px-1" style={{ minWidth: `${chartWidth}px` }}>
+      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible px-4 pb-20 pt-20 sm:px-6 sm:pb-24 sm:pt-24">
+        <div className="px-3 sm:px-4" style={{ minWidth: `${chartWidth}px` }}>
           <div
-            className="relative z-20 h-[12.5rem] overflow-visible sm:h-[10.5rem] lg:h-[9rem]"
+            ref={chartSurfaceRef}
+            className="relative z-20 h-[15rem] overflow-visible px-4 py-4 sm:h-[13rem] sm:px-6 sm:py-5 lg:h-[11rem] lg:px-7 lg:py-6"
             role="img"
             aria-label={ariaLabel}
           >
             {activeSummary && activeBubble ? (
               <div
-                className="pointer-events-none absolute z-50 w-56 -translate-x-1/2 -translate-y-[calc(100%+1rem)] rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
+                className="pointer-events-none absolute z-[80] w-56 -translate-x-1/2 rounded-2xl border border-border bg-surface px-3 py-3 shadow-overlay"
                 style={{
-                  left: `clamp(5.5rem, ${activeBubble.x}px, calc(100% - 5.5rem))`,
-                  top: `${Math.max(activeBubble.y - 4, 28)}px`,
+                  left: `clamp(7rem, ${activeBubble.x}px, calc(100% - 7rem))`,
+                  top: `${activeBubble.y}px`,
+                  transform:
+                    activeBubble.placement === "above"
+                      ? "translate(-50%, calc(-100% - 1.5rem))"
+                      : "translate(-50%, 1.25rem)",
                 }}
               >
                 <p className="truncate text-xs font-semibold text-foreground" title={activeSummary.rangeLabel}>
@@ -147,33 +219,40 @@ export default function AdminTimeseriesChart({
                     </div>
                   ))}
                 </div>
-                <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-border bg-surface" />
+                <span
+                  className="absolute left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-border bg-surface"
+                  style={
+                    activeBubble.placement === "above"
+                      ? {
+                          top: "100%",
+                          transform: "translate(-50%, -50%) rotate(45deg)",
+                          borderBottomWidth: "1px",
+                          borderRightWidth: "1px",
+                        }
+                      : {
+                          bottom: "100%",
+                          transform: "translate(-50%, 50%) rotate(45deg)",
+                          borderTopWidth: "1px",
+                          borderLeftWidth: "1px",
+                        }
+                  }
+                />
               </div>
             ) : null}
 
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
-                margin={{ top: 14, right: 18, bottom: 16, left: 0 }}
+                margin={CHART_MARGIN}
                 onMouseMove={(state) => {
                   const activeTooltipIndex = state.activeTooltipIndex;
                   const nextRow =
                     typeof activeTooltipIndex === "number"
                       ? chartData[activeTooltipIndex] ?? null
                       : null;
-                  const nextCoordinate = state.activeCoordinate;
-                  if (
-                    typeof nextRow?.key === "string" &&
-                    nextCoordinate &&
-                    typeof nextCoordinate.x === "number" &&
-                    typeof nextCoordinate.y === "number"
-                  ) {
+                  if (typeof nextRow?.key === "string") {
                     setHoveredKey(nextRow.key);
-                    setHoveredBubble({
-                      key: nextRow.key,
-                      x: nextCoordinate.x,
-                      y: nextCoordinate.y,
-                    });
+                    setHoveredBubble(buildBubbleState(nextRow.key));
                   } else {
                     setHoveredKey(null);
                     setHoveredBubble(null);
@@ -189,19 +268,9 @@ export default function AdminTimeseriesChart({
                     typeof activeTooltipIndex === "number"
                       ? chartData[activeTooltipIndex] ?? null
                       : null;
-                  const nextCoordinate = state.activeCoordinate;
-                  if (
-                    typeof nextRow?.key === "string" &&
-                    nextCoordinate &&
-                    typeof nextCoordinate.x === "number" &&
-                    typeof nextCoordinate.y === "number"
-                  ) {
+                  if (typeof nextRow?.key === "string") {
                     setSelectedKey(nextRow.key);
-                    setSelectedBubble({
-                      key: nextRow.key,
-                      x: nextCoordinate.x,
-                      y: nextCoordinate.y,
-                    });
+                    setSelectedBubble(buildBubbleState(nextRow.key));
                   }
                 }}
               >
