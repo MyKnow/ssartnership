@@ -3,6 +3,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
+import StatsRow from "@/components/ui/StatsRow";
 import { listEventPageDefinitions } from "@/lib/event-pages";
 import { PROMOTION_AUDIENCE_OPTIONS } from "@/lib/promotions/catalog";
 import { listManagedEventCampaigns, type ManagedEventCampaign } from "@/lib/promotions/events";
@@ -178,6 +179,7 @@ export default async function AdminEventPage({
       }),
     }),
   );
+  const countsByBucket = new Map(sections.map((section) => [section.bucket, section.items.length]));
 
   return (
     <AdminShell title="이벤트 관리" backHref="/admin" backLabel="관리 홈">
@@ -186,6 +188,15 @@ export default async function AdminEventPage({
           eyebrow="Events"
           title="이벤트 관리"
           description="코드로 만든 이벤트 페이지를 등록하고, 공개 전·중·후 상태와 노출 대상을 확인합니다."
+        />
+        <StatsRow
+          items={[
+            { label: "진행 전", value: `${countsByBucket.get("진행 전") ?? 0}개`, hint: "오픈 대기" },
+            { label: "진행 중", value: `${countsByBucket.get("진행 중") ?? 0}개`, hint: "현재 노출 중" },
+            { label: "진행 후", value: `${countsByBucket.get("진행 후") ?? 0}개`, hint: "종료 후 보관" },
+            { label: "미등록/비활성", value: `${(countsByBucket.get("등록 필요") ?? 0) + (countsByBucket.get("비활성") ?? 0)}개`, hint: "등록 필요 + 비활성" },
+          ]}
+          minItemWidth="13rem"
         />
         {statusMessage(params.status) ? (
           <FormMessage variant="info">{statusMessage(params.status)}</FormMessage>

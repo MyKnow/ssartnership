@@ -6,6 +6,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import ShellHeader from "@/components/ui/ShellHeader";
 import SectionHeading from "@/components/ui/SectionHeading";
+import StatsRow from "@/components/ui/StatsRow";
 import SubmitButton from "@/components/ui/SubmitButton";
 import {
   earlyStartSsafyCycle,
@@ -63,7 +64,15 @@ export default async function AdminCyclePage({
           title="기수 계산 기준 관리"
           description="기수 전환 기준과 조기 시작 상태를 확인하고 복구합니다."
         />
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <StatsRow
+          items={[
+            { label: "현재 기수", value: `${currentYearLabel}`, hint: `${currentSemester}학기 기준` },
+            { label: "자동/수동", value: overrideActive ? "수동" : "자동", hint: overrideActive ? "조기 시작 적용 중" : "날짜 기준 계산" },
+            { label: "교육생 범위", value: `${studentLabels.join(" · ")}`, hint: "현재 활성 교육생 구간" },
+          ]}
+          minItemWidth="13rem"
+        />
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)] 2xl:items-start">
           <Card tone="elevated" className="grid gap-5">
             <SectionHeading
               title="현재 기준과 예정 작업"
@@ -131,7 +140,7 @@ export default async function AdminCyclePage({
             </div>
           </Card>
 
-          <Card tone="elevated" className="grid gap-5">
+          <Card tone="elevated" className="grid gap-5 2xl:sticky 2xl:top-24">
             <SectionHeading
               title="기준값 수정"
               description="기준 기수와 시작 시점을 조정하고, 조기 시작 또는 복구를 실행합니다."

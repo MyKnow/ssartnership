@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
+import StatsRow from "@/components/ui/StatsRow";
 import {
   createPromotionEventAction,
   deletePromotionEventAction,
@@ -114,6 +115,14 @@ export default async function AdminEventDetailPage({
           title={registration ? definition.title : "이벤트 운영 등록"}
           description="공개 이벤트 본문은 코드에서 만들고, 이 화면에서는 공개 링크와 노출 대상, 기간만 관리합니다."
         />
+        <StatsRow
+          items={[
+            { label: "상태", value: state.label, hint: registration ? "운영 등록 기준" : "아직 미등록" },
+            { label: "대상", value: `${targetLabel}`, hint: "현재 노출 대상" },
+            { label: "규칙", value: `${definition.conditions.length}개`, hint: "보상 조건 수" },
+          ]}
+          minItemWidth="13rem"
+        />
         {message ? (
           <FormMessage variant="info">{message}</FormMessage>
         ) : null}
@@ -169,56 +178,58 @@ export default async function AdminEventDetailPage({
           </FormMessage>
         ) : null}
 
-        <Card tone="elevated" className="grid gap-5">
-          <div>
-            <p className="ui-kicker">Registration</p>
-            <h3 className="mt-2 text-xl font-semibold text-foreground">
-              {registration ? "운영 등록 수정" : "운영 등록"}
-            </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              공개 링크와 대상, 이벤트 기간만 관리합니다.
-            </p>
-          </div>
-          <EventRegistrationForm
-            definition={definition}
-            registration={registration}
-            action={isRegistered ? updatePromotionEventAction : createPromotionEventAction}
-            submitLabel={isRegistered ? "이벤트 수정" : "이벤트 등록"}
-          />
-          {isRegistered && registration ? (
-            <form action={deletePromotionEventAction} className="flex justify-end">
-              <input type="hidden" name="id" value={registration.id ?? ""} />
-              <input type="hidden" name="slug" value={registration.slug} />
-              <Button type="submit" variant="danger">
-                이벤트 삭제
-              </Button>
-            </form>
-          ) : null}
-        </Card>
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">
+          <Card tone="elevated" className="grid gap-5">
+            <div>
+              <p className="ui-kicker">Registration</p>
+              <h3 className="mt-2 text-xl font-semibold text-foreground">
+                {registration ? "운영 등록 수정" : "운영 등록"}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                공개 링크와 대상, 이벤트 기간만 관리합니다.
+              </p>
+            </div>
+            <EventRegistrationForm
+              definition={definition}
+              registration={registration}
+              action={isRegistered ? updatePromotionEventAction : createPromotionEventAction}
+              submitLabel={isRegistered ? "이벤트 수정" : "이벤트 등록"}
+            />
+            {isRegistered && registration ? (
+              <form action={deletePromotionEventAction} className="flex justify-end">
+                <input type="hidden" name="id" value={registration.id ?? ""} />
+                <input type="hidden" name="slug" value={registration.slug} />
+                <Button type="submit" variant="danger">
+                  이벤트 삭제
+                </Button>
+              </form>
+            ) : null}
+          </Card>
 
-        <Card tone="muted" className="grid gap-4">
-          <div>
-            <h3 className="text-base font-semibold text-foreground">코드 정의 미리보기</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              본문, 조건, 보상 로직은 코드에 고정되어 있습니다.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {definition.conditions.map((condition) => (
-              <span
-                key={condition.key}
-                className="rounded-full border border-border/70 bg-surface px-2.5 py-1 text-xs font-semibold text-muted-foreground"
-              >
-                {condition.title} · {condition.tickets}장
-              </span>
-            ))}
-          </div>
-          <ul className="space-y-2 text-sm leading-6 text-muted-foreground">
-            {definition.rules.map((rule) => (
-              <li key={rule}>- {rule}</li>
-            ))}
-          </ul>
-        </Card>
+          <Card tone="muted" className="grid gap-4 2xl:sticky 2xl:top-24">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">코드 정의 미리보기</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                본문, 조건, 보상 로직은 코드에 고정되어 있습니다.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {definition.conditions.map((condition) => (
+                <span
+                  key={condition.key}
+                  className="rounded-full border border-border/70 bg-surface px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+                >
+                  {condition.title} · {condition.tickets}장
+                </span>
+              ))}
+            </div>
+            <ul className="space-y-2 text-sm leading-6 text-muted-foreground">
+              {definition.rules.map((rule) => (
+                <li key={rule}>- {rule}</li>
+              ))}
+            </ul>
+          </Card>
+        </div>
       </div>
     </AdminShell>
   );
