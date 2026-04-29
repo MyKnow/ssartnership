@@ -10,7 +10,7 @@ import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store
 import { isPartnerPortalMock } from "./partner-portal.ts";
 import { partnerFavoriteRepository } from "./repositories/index.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
-import { fetchPartnerReviewCounts } from "./partner-counts.ts";
+import { fetchPartnerEngagementCounts } from "./partner-counts.ts";
 
 const PARTNER_SERVICE_METRICS_WARNING_MESSAGE =
   "일부 브랜드 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
@@ -61,30 +61,19 @@ export async function getPartnerServiceMetrics(
     hasPartialFailure = true;
   };
   const metrics = createEmptyPartnerServiceMetrics();
-  let favoriteCount = 0;
-
-  const [rollupResult, reviewResult] = await Promise.all([
+  const [rollupResult, engagementCounts] = await Promise.all([
     fetchPartnerMetricRollupRows(supabase, {
       partnerIds: [partnerId],
       metricNames: PARTNER_METRIC_EVENT_NAMES,
       metricKinds: ["pv", "uv"],
       granularity: "total",
     }),
-    fetchPartnerReviewCounts(supabase, [partnerId]),
+    fetchPartnerEngagementCounts(
+      supabase,
+      [partnerId],
+      (partnerIds) => partnerFavoriteRepository.getFavoriteCounts(partnerIds),
+    ),
   ]);
-
-  try {
-    const favoriteCounts = await partnerFavoriteRepository.getFavoriteCounts([
-      partnerId,
-    ]);
-    favoriteCount = favoriteCounts.get(partnerId) ?? 0;
-  } catch (error) {
-    markPartialFailure();
-    console.error("[partner-service-metrics] favorite query failed", {
-      partnerId,
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
 
   if (rollupResult.errorMessage) {
     markPartialFailure();
@@ -113,16 +102,24 @@ export async function getPartnerServiceMetrics(
     }
   }
 
-  if (reviewResult.errorMessage) {
+  if (engagementCounts.reviewErrorMessage) {
     markPartialFailure();
     console.error("[partner-service-metrics] review query failed", {
       partnerId,
-      message: reviewResult.errorMessage,
+      message: engagementCounts.reviewErrorMessage,
     });
   }
 
-  metrics.reviewCount = reviewResult.counts.get(partnerId) ?? 0;
-  metrics.favoriteCount = favoriteCount;
+  if (engagementCounts.favoriteErrorMessage) {
+    markPartialFailure();
+    console.error("[partner-service-metrics] favorite query failed", {
+      partnerId,
+      message: engagementCounts.favoriteErrorMessage,
+    });
+  }
+
+  metrics.reviewCount = engagementCounts.reviewCounts.get(partnerId) ?? 0;
+  metrics.favoriteCount = engagementCounts.favoriteCounts.get(partnerId) ?? 0;
 
   return {
     metrics,

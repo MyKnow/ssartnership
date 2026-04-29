@@ -1,5 +1,5 @@
 import { getSupabaseAdminClient } from "./supabase/server.ts";
-import { fetchPartnerReviewCounts } from "./partner-counts.ts";
+import { fetchPartnerEngagementCounts } from "./partner-counts.ts";
 import {
   applyPartnerMetricRollupRows,
   buildPartnerMetricRollupRowsFromEventLogs,
@@ -219,15 +219,15 @@ export async function getSupabasePartnerPortalDashboard(
     createEmptyMetrics(),
   ] as const);
   const metricsByServiceId = new Map(serviceMetricsEntries);
-  let favoriteCounts = new Map<string, number>();
+  const engagementCounts = await fetchPartnerEngagementCounts(
+    supabase,
+    serviceRows.map((serviceRow) => serviceRow.id),
+    (partnerIds) => partnerFavoriteRepository.getFavoriteCounts(partnerIds),
+  );
 
-  try {
-    favoriteCounts = await partnerFavoriteRepository.getFavoriteCounts(
-      serviceRows.map((serviceRow) => serviceRow.id),
-    );
-  } catch (error) {
+  if (engagementCounts.favoriteErrorMessage) {
     markPartialFailure();
-    console.error("[partner-dashboard] favorite metric query failed", error);
+    console.error("[partner-dashboard] favorite metric query failed", engagementCounts.favoriteErrorMessage);
   }
 
   const rollupResult = await fetchPartnerMetricRollupRows(supabase, {
@@ -236,6 +236,22 @@ export async function getSupabasePartnerPortalDashboard(
     metricKinds: ["pv", "uv"],
     granularity: "total",
   });
+
+  if (engagementCounts.reviewErrorMessage) {
+    markPartialFailure();
+    console.error(
+      "[partner-dashboard] review metric query failed",
+      engagementCounts.reviewErrorMessage,
+    );
+  } else {
+    for (const [partnerId, reviewCount] of engagementCounts.reviewCounts) {
+      const metrics = metricsByServiceId.get(partnerId);
+      if (!metrics) {
+        continue;
+      }
+      metrics.reviewCount = reviewCount;
+    }
+  }
 
   if (rollupResult.errorMessage) {
     markPartialFailure();
@@ -272,32 +288,12 @@ export async function getSupabasePartnerPortalDashboard(
     }
   }
 
-  const reviewCountResult = await fetchPartnerReviewCounts(
-    supabase,
-    serviceRows.map((serviceRow) => serviceRow.id),
-  );
-  if (reviewCountResult.errorMessage) {
-    markPartialFailure();
-    console.error(
-      "[partner-dashboard] review metric query failed",
-      reviewCountResult.errorMessage,
-    );
-  }
-
-  for (const [partnerId, reviewCount] of reviewCountResult.counts) {
-    const metrics = metricsByServiceId.get(partnerId);
-    if (!metrics) {
-      continue;
-    }
-    metrics.reviewCount = reviewCount;
-  }
-
   for (const serviceRow of serviceRows) {
     const metrics = metricsByServiceId.get(serviceRow.id);
     if (!metrics) {
       continue;
     }
-    metrics.favoriteCount = favoriteCounts.get(serviceRow.id) ?? 0;
+    metrics.favoriteCount = engagementCounts.favoriteCounts.get(serviceRow.id) ?? 0;
   }
 
   const servicesByCompanyId = new Map<string, PartnerServiceRow[]>();
