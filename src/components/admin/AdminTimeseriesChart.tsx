@@ -186,11 +186,11 @@ export default function AdminTimeseriesChart({
 
   return (
     <>
-      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible px-4 pb-20 pt-20 sm:px-6 sm:pb-24 sm:pt-24">
+      <div className="-mx-1 mt-3 overflow-x-auto overflow-y-visible px-3 pb-8 pt-10 sm:px-4 sm:pb-10 sm:pt-12">
         <div className="px-3 sm:px-4" style={{ minWidth: `${chartWidth}px` }}>
           <div
             ref={chartSurfaceRef}
-            className="relative z-20 h-[15rem] overflow-visible px-4 py-4 sm:h-[13rem] sm:px-6 sm:py-5 lg:h-[11rem] lg:px-7 lg:py-6"
+            className="relative z-20 h-[20rem] overflow-visible px-2 py-2 sm:h-[18rem] sm:px-3 sm:py-3 lg:h-[16rem] lg:px-4 lg:py-4"
             role="img"
             aria-label={ariaLabel}
           >
