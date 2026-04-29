@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { toAdminDashboardCounts, toPartnerCountMap } from "@/lib/partner-counts";
+import {
+  fetchPartnerEngagementCounts,
+  toAdminDashboardCounts,
+  toPartnerCountMap,
+} from "@/lib/partner-counts";
 
 test("toPartnerCountMap normalizes string counts and preserves missing ids as zero", () => {
   const counts = toPartnerCountMap(
@@ -56,4 +60,49 @@ test("toAdminDashboardCounts normalizes nullable and string RPC values", () => {
     auditLogCount: 0,
     securityLogCount: 7,
   });
+});
+
+test("fetchPartnerEngagementCounts merges favorite and review maps", async () => {
+  const result = await fetchPartnerEngagementCounts(
+    {
+      rpc: async () => ({
+        data: [
+          { partner_id: "partner-a", review_count: "4" },
+          { partner_id: "partner-b", review_count: 2 },
+        ],
+        error: null,
+      }),
+    } as never,
+    ["partner-a", "partner-b"],
+    async () => new Map([
+      ["partner-a", 7],
+      ["partner-b", 1],
+    ]),
+  );
+
+  assert.equal(result.favoriteErrorMessage, null);
+  assert.equal(result.reviewErrorMessage, null);
+  assert.equal(result.favoriteCounts.get("partner-a"), 7);
+  assert.equal(result.favoriteCounts.get("partner-b"), 1);
+  assert.equal(result.reviewCounts.get("partner-a"), 4);
+  assert.equal(result.reviewCounts.get("partner-b"), 2);
+});
+
+test("fetchPartnerEngagementCounts degrades to zero maps on loader failures", async () => {
+  const result = await fetchPartnerEngagementCounts(
+    {
+      rpc: async () => {
+        throw new Error("review failed");
+      },
+    } as never,
+    ["partner-a"],
+    async () => {
+      throw new Error("favorite failed");
+    },
+  );
+
+  assert.equal(result.favoriteErrorMessage, "favorite failed");
+  assert.equal(result.reviewErrorMessage, "review failed");
+  assert.equal(result.favoriteCounts.get("partner-a"), 0);
+  assert.equal(result.reviewCounts.get("partner-a"), 0);
 });

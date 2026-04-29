@@ -11,7 +11,7 @@ import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/s
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { partnerFavoriteRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { fetchPartnerReviewCounts } from "@/lib/partner-counts";
+import { fetchPartnerEngagementCounts } from "@/lib/partner-counts";
 
 const PARTNER_ADMIN_METRICS_WARNING_MESSAGE =
   "일부 브랜드 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
@@ -78,25 +78,19 @@ export async function getAdminPartnerMetrics(
   const metricsByPartnerId = createMetricsMap(uniquePartnerIds);
   let hasPartialFailure = false;
 
-  const [eventResult, reviewCountResult] = await Promise.all([
+  const [eventResult, engagementCounts] = await Promise.all([
     fetchPartnerMetricRollupRows(supabase, {
       partnerIds: uniquePartnerIds,
       metricNames: PARTNER_METRIC_EVENT_NAMES,
       metricKinds: ["pv", "uv"],
       granularity: "total",
     }),
-    fetchPartnerReviewCounts(supabase, uniquePartnerIds),
-  ]);
-  let favoriteCounts = new Map<string, number>();
-
-  try {
-    favoriteCounts = await partnerFavoriteRepository.getFavoriteCounts(
+    fetchPartnerEngagementCounts(
+      supabase,
       uniquePartnerIds,
-    );
-  } catch (error) {
-    hasPartialFailure = true;
-    console.error("[admin-partner-metrics] favorite query failed", error);
-  }
+      (partnerIds) => partnerFavoriteRepository.getFavoriteCounts(partnerIds),
+    ),
+  ]);
 
   if (eventResult.errorMessage) {
     hasPartialFailure = true;
@@ -127,11 +121,11 @@ export async function getAdminPartnerMetrics(
     }
   }
 
-  if (reviewCountResult.errorMessage) {
+  if (engagementCounts.reviewErrorMessage) {
     hasPartialFailure = true;
-    console.error("[admin-partner-metrics] review query failed", reviewCountResult.errorMessage);
+    console.error("[admin-partner-metrics] review query failed", engagementCounts.reviewErrorMessage);
   } else {
-    for (const [partnerId, reviewCount] of reviewCountResult.counts) {
+    for (const [partnerId, reviewCount] of engagementCounts.reviewCounts) {
       const metrics = metricsByPartnerId.get(partnerId);
       if (!metrics) {
         continue;
@@ -140,12 +134,17 @@ export async function getAdminPartnerMetrics(
     }
   }
 
+  if (engagementCounts.favoriteErrorMessage) {
+    hasPartialFailure = true;
+    console.error("[admin-partner-metrics] favorite query failed", engagementCounts.favoriteErrorMessage);
+  }
+
   for (const partnerId of uniquePartnerIds) {
     const metrics = metricsByPartnerId.get(partnerId);
     if (!metrics) {
       continue;
     }
-    metrics.favoriteCount = favoriteCounts.get(partnerId) ?? 0;
+    metrics.favoriteCount = engagementCounts.favoriteCounts.get(partnerId) ?? 0;
   }
 
   return {

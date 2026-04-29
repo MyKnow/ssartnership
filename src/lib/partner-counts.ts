@@ -48,6 +48,13 @@ export type AdminDashboardCounts = {
   securityLogCount: number;
 };
 
+export type PartnerEngagementCounts = {
+  favoriteCounts: Map<string, number>;
+  reviewCounts: Map<string, number>;
+  favoriteErrorMessage: string | null;
+  reviewErrorMessage: string | null;
+};
+
 function normalizePartnerIds(partnerIds: readonly string[]) {
   return [...new Set(partnerIds.map((value) => value.trim()).filter(Boolean))];
 }
@@ -169,6 +176,56 @@ export async function fetchPartnerReviewCounts(
   return {
     counts: toPartnerCountMap(normalizedPartnerIds, rows),
     errorMessage: null as string | null,
+  };
+}
+
+export async function fetchPartnerEngagementCounts(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  partnerIds: readonly string[],
+  favoriteCountLoader: (partnerIds: string[]) => Promise<Map<string, number>>,
+): Promise<PartnerEngagementCounts> {
+  const normalizedPartnerIds = normalizePartnerIds(partnerIds);
+  if (normalizedPartnerIds.length === 0) {
+    return {
+      favoriteCounts: new Map<string, number>(),
+      reviewCounts: new Map<string, number>(),
+      favoriteErrorMessage: null,
+      reviewErrorMessage: null,
+    };
+  }
+
+  const [favoriteResult, reviewResult] = await Promise.allSettled([
+    favoriteCountLoader(normalizedPartnerIds),
+    fetchPartnerReviewCounts(supabase, normalizedPartnerIds),
+  ]);
+
+  const favoriteCounts =
+    favoriteResult.status === "fulfilled"
+      ? favoriteResult.value
+      : new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0]));
+  const favoriteErrorMessage =
+    favoriteResult.status === "fulfilled"
+      ? null
+      : favoriteResult.reason instanceof Error
+        ? favoriteResult.reason.message
+        : String(favoriteResult.reason);
+
+  const reviewCounts =
+    reviewResult.status === "fulfilled"
+      ? reviewResult.value.counts
+      : new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0]));
+  const reviewErrorMessage =
+    reviewResult.status === "fulfilled"
+      ? reviewResult.value.errorMessage
+      : reviewResult.reason instanceof Error
+        ? reviewResult.reason.message
+        : String(reviewResult.reason);
+
+  return {
+    favoriteCounts,
+    reviewCounts,
+    favoriteErrorMessage,
+    reviewErrorMessage,
   };
 }
 
