@@ -12,12 +12,14 @@ import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import { ADMIN_COPY } from "@/lib/content";
 import { cn } from "@/lib/cn";
-import { type Action } from "react";
 import type { AdminCategory, AdminPartner } from "@/components/admin/partner-manager/types";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { buildPartnerChangeRequestDiffItems } from "@/components/partner-change-request-ui/buildDiffItems";
 import { DiffCard } from "@/components/partner-change-request-ui/DiffPrimitives";
+import type { AdminPartnerMetricsResult } from "@/lib/admin-partner-metrics";
+
+type FormAction = (formData: FormData) => void | Promise<void>;
 
 function FieldGroup({
   label,
@@ -116,8 +118,8 @@ function PartnerChangeRequestQueueSection({
   rejectAction,
 }: {
   requests: PartnerChangeRequestSummary[];
-  approveAction: Action;
-  rejectAction: Action;
+  approveAction: FormAction;
+  rejectAction: FormAction;
 }) {
   return (
     <Card className="space-y-6 min-w-0">
@@ -154,9 +156,9 @@ function CategoryManagerSection({
   deleteCategoryAction,
 }: {
   categories: AdminCategory[];
-  createCategoryAction: Action;
-  updateCategoryAction: Action;
-  deleteCategoryAction: Action;
+  createCategoryAction: FormAction;
+  updateCategoryAction: FormAction;
+  deleteCategoryAction: FormAction;
 }) {
   return (
     <Card tone="elevated" className="min-w-0">
@@ -299,14 +301,14 @@ export default function AdminPartnerWorkspace({
   partners: AdminPartner[];
   changeRequests: PartnerChangeRequestSummary[];
   partnerMetrics: {
-    warningMessage: string | null;
-    metricsByPartnerId: Map<string, AdminPartner["metrics"]>;
+    warningMessage?: AdminPartnerMetricsResult["warningMessage"];
+    metricsByPartnerId: AdminPartnerMetricsResult["metricsByPartnerId"];
   };
-  approveAction: Action;
-  rejectAction: Action;
-  createCategoryAction: Action;
-  updateCategoryAction: Action;
-  deleteCategoryAction: Action;
+  approveAction: FormAction;
+  rejectAction: FormAction;
+  createCategoryAction: FormAction;
+  updateCategoryAction: FormAction;
+  deleteCategoryAction: FormAction;
 }) {
   const [activeTab, setActiveTab] = useState<"brand" | "category">("brand");
   const safePartners = partners.map((partner) => ({
