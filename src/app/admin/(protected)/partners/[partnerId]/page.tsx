@@ -270,65 +270,69 @@ export default async function AdminPartnerDetailPage({
 
         <PartnerMetricTimeseriesPanel data={metricTimeseries} />
 
-        <Card tone="elevated">
-          <SectionHeading
-            title="브랜드 수정"
-            description="리스트 화면이 아니라 상세 편집 화면에서 브랜드 정보를 수정합니다."
-          />
-          <div className="mt-6">
-            <PartnerCardForm
-              mode="edit"
-              partner={{
-                id: partner.id,
-                name: partner.name ?? "",
-                visibility: partner.visibility,
-                location: partner.location ?? "",
-                mapUrl: partner.map_url ?? "",
-                reservationLink: partner.reservation_link ?? "",
-                inquiryLink: partner.inquiry_link ?? "",
-                period: {
-                  start: partner.period_start ?? "",
-                  end: partner.period_end ?? "",
-                },
-                conditions: partner.conditions ?? [],
-                benefits: partner.benefits ?? [],
-                appliesTo: partner.applies_to ?? [],
-                thumbnail,
-                images: galleryImages,
-                tags: partner.tags ?? [],
-                company: company
-                  ? {
-                      id: company.id,
-                      name: company.name,
-                      description: company.description ?? "",
-                      contactName: "",
-                      contactEmail: "",
-                      contactPhone: "",
-                    }
-                  : null,
-              }}
-              categoryOptions={(categoriesResult.data ?? []).map((item) => ({
-                id: item.id,
-                label: item.label,
-              }))}
-              companyOptions={(companiesResult.data ?? []).map((item) => ({
-                id: item.id,
-                name: item.name,
-                slug: item.slug,
-              }))}
-              categoryId={partner.category_id}
-              formAction={updatePartner}
-              deleteAction={deletePartner}
-              submitLabel="브랜드 저장"
-              hiddenFields={[
-                { name: "updateRedirectTo", value: detailPath },
-                { name: "deleteRedirectTo", value: "/admin/partners" },
-              ]}
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">
+          <Card tone="elevated">
+            <SectionHeading
+              title="브랜드 수정"
+              description="리스트 화면이 아니라 상세 편집 화면에서 브랜드 정보를 수정합니다."
             />
-          </div>
-        </Card>
+            <div className="mt-6">
+              <PartnerCardForm
+                mode="edit"
+                partner={{
+                  id: partner.id,
+                  name: partner.name ?? "",
+                  visibility: partner.visibility,
+                  location: partner.location ?? "",
+                  mapUrl: partner.map_url ?? "",
+                  reservationLink: partner.reservation_link ?? "",
+                  inquiryLink: partner.inquiry_link ?? "",
+                  period: {
+                    start: partner.period_start ?? "",
+                    end: partner.period_end ?? "",
+                  },
+                  conditions: partner.conditions ?? [],
+                  benefits: partner.benefits ?? [],
+                  appliesTo: partner.applies_to ?? [],
+                  thumbnail,
+                  images: galleryImages,
+                  tags: partner.tags ?? [],
+                  company: company
+                    ? {
+                        id: company.id,
+                        name: company.name,
+                        description: company.description ?? "",
+                        contactName: "",
+                        contactEmail: "",
+                        contactPhone: "",
+                      }
+                    : null,
+                }}
+                categoryOptions={(categoriesResult.data ?? []).map((item) => ({
+                  id: item.id,
+                  label: item.label,
+                }))}
+                companyOptions={(companiesResult.data ?? []).map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  slug: item.slug,
+                }))}
+                categoryId={partner.category_id}
+                formAction={updatePartner}
+                deleteAction={deletePartner}
+                submitLabel="브랜드 저장"
+                hiddenFields={[
+                  { name: "updateRedirectTo", value: detailPath },
+                  { name: "deleteRedirectTo", value: "/admin/partners" },
+                ]}
+              />
+            </div>
+          </Card>
 
-        <AdminPartnerChangeHistory logs={partnerAuditLogs} />
+          <div className="2xl:sticky 2xl:top-24">
+            <AdminPartnerChangeHistory logs={partnerAuditLogs} />
+          </div>
+        </div>
 
         <Card tone="elevated">
           <AdminPartnerReviewManager
