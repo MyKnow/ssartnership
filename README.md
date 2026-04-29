@@ -140,10 +140,10 @@ npm run check:lockfile
 npm run ci:local
 ```
 
-- `check:lockfile`: Docker 기반 Linux/amd64 기준 lockfile canonical 여부 확인
+- `check:lockfile`: Docker가 있으면 Linux/amd64 기준 lockfile canonical 여부 확인, 없으면 로컬 lockfile 재생성 후 비교
 - `ci:local`: `npm ci`, lint, build, Storybook test까지 한 번에 검증
 
-`check:lockfile`은 Docker Desktop이 실행 중이어야 합니다.
+`check:lockfile`은 Docker Desktop이 있으면 Linux/amd64 기준으로 검증하고, 없으면 로컬 환경에서 package-lock을 다시 생성해 비교합니다.
 
 ## 환경 변수
 
