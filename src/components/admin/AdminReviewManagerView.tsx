@@ -41,8 +41,8 @@ export default function AdminReviewManagerView({
 
       {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.6fr)] xl:items-start">
-        <div className="grid gap-6 xl:sticky xl:top-24">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.9fr)] 2xl:items-start">
+        <div className="grid gap-6 2xl:sticky 2xl:top-24">
           <div className="grid gap-4">
             <SectionHeading
               title="리뷰 필터"

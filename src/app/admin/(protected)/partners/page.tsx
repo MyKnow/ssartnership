@@ -145,7 +145,7 @@ export default async function AdminPartnersPage({
         {partnerFormError ? (
           <FormMessage variant="error">{partnerFormError}</FormMessage>
         ) : null}
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]">
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(360px,0.72fr)] 2xl:items-start">
           <Card tone="elevated">
             <SectionHeading
               title="브랜드 관리"
@@ -167,7 +167,7 @@ export default async function AdminPartnersPage({
             </div>
           </Card>
 
-          <div className="grid gap-6">
+          <div className="grid gap-6 2xl:sticky 2xl:top-24">
             <PartnerChangeRequestQueue
               requests={changeRequests}
               approveAction={approvePartnerChangeRequest}

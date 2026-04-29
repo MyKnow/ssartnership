@@ -570,7 +570,7 @@ export default async function AdminMembersPage({
           />
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.72fr)] 2xl:items-start">
           <div className="grid gap-6">
             {safeMembers.length === 0 ? (
               <Card tone="elevated">
@@ -623,7 +623,7 @@ export default async function AdminMembersPage({
             )}
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-6 2xl:sticky 2xl:top-24">
             <Card tone="elevated">
               <SectionHeading
                 title="수동 추가"

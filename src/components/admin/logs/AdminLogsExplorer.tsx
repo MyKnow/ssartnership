@@ -85,8 +85,8 @@ export function AdminLogsExplorer({
         </Badge>
       </div>
 
-      <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(320px,0.92fr)_minmax(0,1.55fr)] 2xl:items-start">
-        <Card tone="muted" padding="md" className="grid gap-4 2xl:sticky 2xl:top-24">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.9fr)] xl:items-start">
+        <Card tone="muted" padding="md" className="grid gap-4 xl:sticky xl:top-24">
           <div className="grid gap-1">
             <p className="ui-kicker">탐색 필터</p>
             <h3 className="text-lg font-semibold text-foreground">검색과 정렬</h3>
@@ -95,8 +95,8 @@ export function AdminLogsExplorer({
             </p>
           </div>
 
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-            <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2 2xl:col-span-1">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2 xl:col-span-1">
               검색
               <Input
                 value={searchValue}
