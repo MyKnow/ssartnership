@@ -48,7 +48,6 @@
     0 18px 44px rgba(11, 18, 32, 0.16);
   --grid-max: 76rem;
   --grid-wide: 88rem;
-  --grid-dashboard: 104rem;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
