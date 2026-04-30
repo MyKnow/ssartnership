@@ -1,6 +1,10 @@
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { parseSsafyProfile } from '@/lib/mm-profile';
 import type {
+  AdminLogsAggregateBucket,
+  AdminLogsAggregateCountItem,
+  AdminLogsAggregateData,
+  AdminLogsAggregateName,
   AdminLogsLoadedData,
   AdminSupabaseClient,
   AuthSecurityLogRow,
@@ -17,7 +21,7 @@ import {
   SUMMARY_MAX_LOG_ROWS_PER_GROUP,
   uniqueLogGroups,
 } from './shared';
-import { resolveLogRange } from './range';
+import { getBucketSizeMs, resolveLogRange } from './range';
 import { collectPagedRows } from './paging';
 
 async function queryAllRows<T>(
@@ -297,6 +301,135 @@ export async function loadAdminLogSummaryRows(
     maxRowsPerGroup: SUMMARY_MAX_LOG_ROWS_PER_GROUP,
     shape: 'summary',
   });
+}
+
+type AdminLogsSummaryRpcPayload = {
+  counts?: Partial<Record<LogGroup, number | string | null>>;
+  securityStatusCounts?: {
+    success?: number | string | null;
+    failure?: number | string | null;
+    blocked?: number | string | null;
+  };
+  buckets?: Array<Partial<Record<keyof AdminLogsAggregateBucket, string | number | null>>>;
+  availableNames?: Array<Partial<AdminLogsAggregateName>>;
+  actorOptions?: Array<string | null>;
+  topProductEvents?: Array<Partial<AdminLogsAggregateCountItem>>;
+  topAuditActions?: Array<Partial<AdminLogsAggregateCountItem>>;
+  topActors?: Array<Partial<AdminLogsAggregateCountItem>>;
+  topIps?: Array<Partial<AdminLogsAggregateCountItem>>;
+  topPaths?: Array<Partial<AdminLogsAggregateCountItem>>;
+};
+
+function parseAggregateNumber(value: number | string | null | undefined) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function normalizeAggregateItems(
+  items: Array<Partial<AdminLogsAggregateCountItem>> | undefined,
+) {
+  return (items ?? [])
+    .map((item) => ({
+      name: typeof item.name === 'string' ? item.name : undefined,
+      label: typeof item.label === 'string' ? item.label : undefined,
+      count: parseAggregateNumber(item.count),
+    }))
+    .filter((item) => item.name || item.label);
+}
+
+export async function loadAdminLogSummaryAggregates(
+  options: GetAdminLogsPageDataOptions = {},
+): Promise<{
+  range: ReturnType<typeof resolveLogRange>;
+  aggregate: AdminLogsAggregateData;
+  unavailable: boolean;
+}> {
+  const supabase = getSupabaseAdminClient();
+  const range = resolveLogRange(options);
+  const { sizeMs } = getBucketSizeMs(range.durationMs);
+  const { data, error } = await supabase.rpc('get_admin_logs_summary', {
+    input_start: range.start,
+    input_end: range.end,
+    input_bucket_ms: sizeMs,
+  });
+
+  if (error) {
+    const missingFunction =
+      error.message.includes('Could not find the function') ||
+      error.message.includes('get_admin_logs_summary');
+    if (!missingFunction) {
+      console.error('[log-insights] admin logs summary rpc failed', error.message);
+    }
+    return {
+      range,
+      unavailable: true,
+      aggregate: {
+        counts: { product: 0, audit: 0, security: 0 },
+        securityStatusCounts: { success: 0, failure: 0, blocked: 0 },
+        buckets: [],
+        availableNames: [],
+        actorOptions: [],
+        topProductEvents: [],
+        topAuditActions: [],
+        topActors: [],
+        topIps: [],
+        topPaths: [],
+      },
+    };
+  }
+
+  const payload = (data ?? {}) as AdminLogsSummaryRpcPayload;
+  return {
+    range,
+    unavailable: false,
+    aggregate: {
+      counts: {
+        product: parseAggregateNumber(payload.counts?.product),
+        audit: parseAggregateNumber(payload.counts?.audit),
+        security: parseAggregateNumber(payload.counts?.security),
+      },
+      securityStatusCounts: {
+        success: parseAggregateNumber(payload.securityStatusCounts?.success),
+        failure: parseAggregateNumber(payload.securityStatusCounts?.failure),
+        blocked: parseAggregateNumber(payload.securityStatusCounts?.blocked),
+      },
+      buckets: (payload.buckets ?? [])
+        .map((bucket) => ({
+          start: typeof bucket.start === 'string' ? bucket.start : '',
+          end: typeof bucket.end === 'string' ? bucket.end : '',
+          product: parseAggregateNumber(bucket.product),
+          audit: parseAggregateNumber(bucket.audit),
+          security: parseAggregateNumber(bucket.security),
+          total: parseAggregateNumber(bucket.total),
+        }))
+        .filter((bucket) => bucket.start && bucket.end),
+      availableNames: (payload.availableNames ?? [])
+        .map((item) => ({
+          group: item.group,
+          name: item.name,
+        }))
+        .filter(
+          (item): item is AdminLogsAggregateName =>
+            (item.group === 'product' || item.group === 'audit' || item.group === 'security') &&
+            typeof item.name === 'string' &&
+            item.name.length > 0,
+        ),
+      actorOptions: Array.from(
+        new Set((payload.actorOptions ?? []).filter((value): value is string => Boolean(value))),
+      ).sort((a, b) => a.localeCompare(b, 'ko-KR')),
+      topProductEvents: normalizeAggregateItems(payload.topProductEvents),
+      topAuditActions: normalizeAggregateItems(payload.topAuditActions),
+      topActors: normalizeAggregateItems(payload.topActors),
+      topIps: normalizeAggregateItems(payload.topIps),
+      topPaths: normalizeAggregateItems(payload.topPaths),
+    },
+  };
 }
 
 type AdminLogPageRpcRow = {

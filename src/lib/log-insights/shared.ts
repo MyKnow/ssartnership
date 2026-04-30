@@ -121,6 +121,43 @@ export type AdminLogsSummary = {
   securityStatusCounts: SecurityStatusCounts;
 };
 
+export type AdminLogsAggregateName = {
+  group: LogGroup;
+  name: string;
+};
+
+export type AdminLogsAggregateCountItem = {
+  name?: string;
+  label?: string;
+  count: number;
+};
+
+export type AdminLogsAggregateBucket = {
+  start: string;
+  end: string;
+  product: number;
+  audit: number;
+  security: number;
+  total: number;
+};
+
+export type AdminLogsAggregateData = {
+  counts: {
+    product: number;
+    audit: number;
+    security: number;
+  };
+  securityStatusCounts: SecurityStatusCounts;
+  buckets: AdminLogsAggregateBucket[];
+  availableNames: AdminLogsAggregateName[];
+  actorOptions: string[];
+  topProductEvents: AdminLogsAggregateCountItem[];
+  topAuditActions: AdminLogsAggregateCountItem[];
+  topActors: AdminLogsAggregateCountItem[];
+  topIps: AdminLogsAggregateCountItem[];
+  topPaths: AdminLogsAggregateCountItem[];
+};
+
 export type AdminLogsRecordCollections = {
   productLogs: ProductLogRecord[];
   auditLogs: AdminAuditLogRecord[];

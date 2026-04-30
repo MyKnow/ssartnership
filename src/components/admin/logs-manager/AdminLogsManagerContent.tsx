@@ -27,7 +27,7 @@ export default function AdminLogsManagerContent({
 
   return (
     <>
-      <div className="grid min-w-0 gap-6 overflow-x-hidden">
+      <div className="grid min-w-0 gap-6 overflow-x-clip">
         <section className="grid gap-4 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat sm:px-6 sm:py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeading

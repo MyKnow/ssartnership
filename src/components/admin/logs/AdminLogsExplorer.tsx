@@ -124,20 +124,13 @@ export function AdminLogsExplorer({
   }
 
   return (
-    <section className="grid gap-5 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat sm:px-6 sm:py-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <SectionHeading
-          title="로그 탐색기"
-          description="유저명, MM 아이디, IP, 경로, 속성까지 포함해 검색하고 정렬·필터링할 수 있습니다."
-        />
-        <Badge className="w-fit bg-surface text-muted-foreground">
-          필터 결과 {filteredTotal.toLocaleString()}건 / 전체{' '}
-          {totalLogs.toLocaleString()}건
-        </Badge>
-      </div>
-
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.9fr)] xl:items-start">
-        <Card tone="muted" padding="md" className="grid gap-4 xl:sticky xl:top-24">
+    <section className="grid gap-5">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:items-start">
+        <Card
+          tone="muted"
+          padding="md"
+          className="order-1 grid gap-4 xl:sticky xl:top-24 xl:order-2"
+        >
           <div className="grid gap-1">
             <p className="ui-kicker">탐색 필터</p>
             <h3 className="text-lg font-semibold text-foreground">검색과 정렬</h3>
@@ -219,24 +212,13 @@ export function AdminLogsExplorer({
           </div>
 
           <div className="grid gap-3 rounded-2xl border border-border/70 bg-surface px-4 py-4 text-sm text-muted-foreground">
-            <div className="flex items-center justify-between gap-3">
-              <span>현재 범위</span>
-              <span className="font-semibold text-foreground">{rangeLabel}</span>
+            <div className="grid gap-1">
+              <p className="ui-kicker">페이지</p>
+              <h3 className="text-base font-semibold text-foreground">목록 이동</h3>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>페이지</span>
-              <span className="font-semibold text-foreground">
-                {currentPage} / {totalPages}
-              </span>
-            </div>
-          </div>
-        </Card>
-
-        <div className="grid gap-4">
-          <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-muted/40 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <p>{rangeLabel}</p>
-            <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
-              <label className="flex items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
+            <div className="grid gap-3">
+              <label className="grid gap-2 text-sm font-medium text-foreground">
                 <span>페이지당</span>
                 <Select
                   value={String(pageSize)}
@@ -302,6 +284,19 @@ export function AdminLogsExplorer({
                 </button>
               </div>
             </div>
+          </div>
+        </Card>
+
+        <div className="order-2 grid gap-4 xl:order-1">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <SectionHeading
+              title="로그 탐색기"
+              description="유저명, MM 아이디, IP, 경로, 속성까지 포함해 검색하고 정렬·필터링할 수 있습니다."
+            />
+            <Badge className="w-fit bg-surface text-muted-foreground">
+              필터 결과 {filteredTotal.toLocaleString()}건 / 전체{' '}
+              {totalLogs.toLocaleString()}건
+            </Badge>
           </div>
 
           <div className="grid gap-4">

@@ -3,10 +3,11 @@ import {
   loadAdminLogListPage,
   loadAdminLogNormalizedPage,
   loadAdminLogRows,
+  loadAdminLogSummaryAggregates,
   loadAdminLogSummaryRows,
   resolveActorMeta,
 } from './log-insights/data';
-import { buildChartBuckets } from './log-insights/range';
+import { buildChartBuckets, formatRangeDateTime } from './log-insights/range';
 import {
   buildUnifiedLogs,
   createTopActors,
@@ -19,8 +20,11 @@ import {
   getSecurityStatusCounts,
   filterAndSortLogs,
 } from '@/components/admin/logs/selectors';
+import { getLogLabel } from '@/components/admin/logs/utils';
 import type {
+  AdminLogsAggregateData,
   AdminAuditLogRecord,
+  AdminLogsLoadedData,
   AdminLogsFilterMeta,
   AdminLogsPageData,
   AdminLogsSummary,
@@ -29,6 +33,7 @@ import type {
   GetAdminLogsPageDataOptions,
   LogGroup,
   ProductLogRecord,
+  ResolvedLogRange,
 } from './log-insights/shared';
 import {
   EXPORT_MAX_LOG_ROWS_PER_GROUP,
@@ -98,52 +103,99 @@ function resolvePartnerName(
   return typeof properties?.partnerName === 'string' ? properties.partnerName : null;
 }
 
-export function shouldUseDbPagedAdminLogList(
-  options: GetAdminLogsPageDataOptions,
-  _page: number,
-  _pageSize: number,
-) {
-  void _page;
-  void _pageSize;
-  const sort = options.sort ?? 'newest';
-  if (sort !== 'newest') {
-    return false;
-  }
-  return true;
+function formatCountValue(count: number) {
+  return `${count.toLocaleString()}건`;
 }
 
-export async function getAdminLogsPageData(
-  options: GetAdminLogsPageDataOptions = {},
-): Promise<AdminLogsPageData> {
-  const page = parsePage(options.page);
-  const pageSize = parsePageSize(options.pageSize);
-  const useSplitLoading = shouldUseSplitAdminLogLoading(options, page, pageSize);
-  const useDbPagedList = shouldUseDbPagedAdminLogList(options, page, pageSize);
-  const summaryData = useSplitLoading
-    ? await loadAdminLogSummaryRows(options, ['product', 'audit', 'security'])
-    : await loadAdminLogRows(options, ['product', 'audit', 'security'], {
-        maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
-      });
-  const listSourceData = useDbPagedList
-    ? (
-      options.group === 'product' || options.group === 'audit' || options.group === 'security'
-        ? await loadAdminLogListPage(options, {
-            group: options.group as LogGroup,
-            page,
-            pageSize,
-            status: options.status,
-          })
-        : await loadAdminLogNormalizedPage(options, {
-            page,
-            pageSize,
-          })
-    )
-    : useSplitLoading
-      ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
-          maxRowsPerGroup: page * pageSize,
-        })
-      : summaryData;
+function buildAggregateTopNamedItems(
+  group: LogGroup,
+  items: AdminLogsAggregateData['topProductEvents'],
+) {
+  return items
+    .slice(0, 5)
+    .map((item) => ({
+      label: getLogLabel(group, item.name ?? ''),
+      value: formatCountValue(item.count),
+    }));
+}
 
+function buildAggregateTopLabelItems(items: AdminLogsAggregateData['topActors']) {
+  return items
+    .slice(0, 5)
+    .map((item) => ({
+      label: item.label ?? item.name ?? '알 수 없음',
+      value: formatCountValue(item.count),
+    }));
+}
+
+function buildAggregateChartBuckets(
+  range: ResolvedLogRange,
+  aggregate: AdminLogsAggregateData,
+) {
+  return aggregate.buckets.map((bucket) => {
+    const start = new Date(bucket.start);
+    const end = new Date(bucket.end);
+    return {
+      key: bucket.start,
+      label: formatRangeDateTime(start),
+      rangeLabel: `${formatRangeDateTime(start)} ~ ${formatRangeDateTime(end)}`,
+      start: bucket.start,
+      end: bucket.end,
+      product: bucket.product,
+      audit: bucket.audit,
+      security: bucket.security,
+      total: bucket.total,
+    };
+  });
+}
+
+function buildAggregateFilters(
+  aggregate: AdminLogsAggregateData,
+  groupFilter: LogGroup | 'all',
+): AdminLogsFilterMeta {
+  const availableNames = aggregate.availableNames
+    .filter((item) => groupFilter === 'all' || item.group === groupFilter)
+    .map((item) => ({
+      value: item.name,
+      label: getLogLabel(item.group, item.name),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ko-KR'));
+
+  return {
+    availableNames,
+    actorOptions: aggregate.actorOptions,
+  };
+}
+
+function canUseMergedNewestList(options: GetAdminLogsPageDataOptions) {
+  return (
+    !options.search?.trim() &&
+    (!options.group || options.group === 'all') &&
+    (!options.name || options.name === 'all') &&
+    (!options.actor || options.actor === 'all') &&
+    (!options.status || options.status === 'all') &&
+    (!options.sort || options.sort === 'newest')
+  );
+}
+
+function buildAdminLogsPageDataFromRows({
+  options,
+  page,
+  pageSize,
+  summaryData,
+  listSourceData,
+  useDbPagedList,
+  useSplitLoading,
+}: {
+  options: GetAdminLogsPageDataOptions;
+  page: number;
+  pageSize: number;
+  summaryData: AdminLogsLoadedData;
+  listSourceData: Omit<AdminLogsLoadedData, 'truncated'> &
+    Partial<Pick<AdminLogsLoadedData, 'truncated'> & { total: number }>;
+  useDbPagedList: boolean;
+  useSplitLoading: boolean;
+}): AdminLogsPageData {
   const productLogs: ProductLogRecord[] = summaryData.productRows.map((row) => ({
     ...row,
     ...resolveActorMeta(row.actor_type, row.actor_id, summaryData.memberLookup),
@@ -247,7 +299,7 @@ export async function getAdminLogsPageData(
   });
   const unfilteredTotal = productLogs.length + auditLogs.length + securityLogs.length;
   const effectiveFilteredTotal = useDbPagedList
-    ? ('total' in listSourceData ? listSourceData.total : filteredList.length)
+    ? (typeof listSourceData.total === 'number' ? listSourceData.total : filteredList.length)
     : useSplitLoading
       ? unfilteredTotal
       : filteredList.length;
@@ -282,6 +334,190 @@ export async function getAdminLogsPageData(
       pageSize,
     },
   };
+}
+
+export function shouldUseDbPagedAdminLogList(
+  options: GetAdminLogsPageDataOptions,
+  _page: number,
+  _pageSize: number,
+) {
+  void _page;
+  void _pageSize;
+  const sort = options.sort ?? 'newest';
+  if (sort !== 'newest') {
+    return false;
+  }
+  return true;
+}
+
+export async function getAdminLogsPageData(
+  options: GetAdminLogsPageDataOptions = {},
+): Promise<AdminLogsPageData> {
+  const page = parsePage(options.page);
+  const pageSize = parsePageSize(options.pageSize);
+  const useSplitLoading = shouldUseSplitAdminLogLoading(options, page, pageSize);
+  const useDbPagedList = shouldUseDbPagedAdminLogList(options, page, pageSize);
+
+  if (useDbPagedList) {
+    const useMergedNewestList = canUseMergedNewestList(options);
+    const [summaryAggregateData, listSourceData] = await Promise.all([
+      loadAdminLogSummaryAggregates(options),
+      useMergedNewestList
+        ? loadAdminLogRows(options, ['product', 'audit', 'security'], {
+            maxRowsPerGroup: page * pageSize,
+          })
+        : options.group === 'product' || options.group === 'audit' || options.group === 'security'
+        ? loadAdminLogListPage(options, {
+            group: options.group as LogGroup,
+            page,
+            pageSize,
+            status: options.status,
+          })
+        : loadAdminLogNormalizedPage(options, {
+            page,
+            pageSize,
+        }),
+    ]);
+    if (summaryAggregateData.unavailable) {
+      const fallbackData = await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+        maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
+      });
+      return buildAdminLogsPageDataFromRows({
+        options,
+        page,
+        pageSize,
+        summaryData: fallbackData,
+        listSourceData: fallbackData,
+        useDbPagedList: false,
+        useSplitLoading: false,
+      });
+    }
+    const { range, aggregate } = summaryAggregateData;
+    const listProductLogs: ProductLogRecord[] = listSourceData.productRows.map((row) => ({
+      ...row,
+      ...resolveActorMeta(row.actor_type, row.actor_id, listSourceData.memberLookup),
+      partner_name: resolvePartnerName(
+        row.target_type,
+        row.target_id,
+        row.properties,
+        listSourceData.partnerLookup,
+      ),
+    }));
+    const listAuditLogs: AdminAuditLogRecord[] = listSourceData.auditRows.map((row) => ({
+      ...row,
+      partner_name: resolvePartnerName(
+        row.target_type,
+        row.target_id,
+        row.properties,
+        listSourceData.partnerLookup,
+      ),
+    }));
+    const listSecurityLogs: AuthSecurityLogRecord[] = listSourceData.securityRows.map((row) => ({
+      ...row,
+      ...resolveActorMeta(row.actor_type, row.actor_id, listSourceData.memberLookup),
+      partner_name: null,
+    }));
+    const filteredList = filterAndSortLogs({
+      unifiedLogs: buildUnifiedLogs({
+        productLogs: listProductLogs,
+        auditLogs: listAuditLogs,
+        securityLogs: listSecurityLogs,
+      }),
+      searchValue: options.search ?? '',
+      groupFilter:
+        options.group === 'product' || options.group === 'audit' || options.group === 'security'
+          ? options.group
+          : 'all',
+      nameFilter: options.name || 'all',
+      actorFilter: options.actor || 'all',
+      statusFilter:
+        options.status === 'success' || options.status === 'failure' || options.status === 'blocked'
+          ? options.status
+          : 'all',
+      sortFilter: 'newest',
+    });
+    const pageItems = useMergedNewestList
+      ? filteredList.slice((page - 1) * pageSize, page * pageSize)
+      : filteredList;
+    const productIds = new Set(pageItems.filter((log) => log.group === 'product').map((log) => log.id));
+    const auditIds = new Set(pageItems.filter((log) => log.group === 'audit').map((log) => log.id));
+    const securityIds = new Set(pageItems.filter((log) => log.group === 'security').map((log) => log.id));
+    const listTotal = useMergedNewestList
+      ? aggregate.counts.product + aggregate.counts.audit + aggregate.counts.security
+      : 'total' in listSourceData
+        ? listSourceData.total
+        : filteredList.length;
+
+    return {
+      range,
+      counts: aggregate.counts,
+      truncated: {
+        product: false,
+        audit: false,
+        security: false,
+        any: false,
+        limitPerGroup: null,
+      },
+      chartBuckets: buildAggregateChartBuckets(range, aggregate),
+      filters: buildAggregateFilters(
+        aggregate,
+        options.group === 'product' || options.group === 'audit' || options.group === 'security'
+          ? options.group
+          : 'all',
+      ),
+      summary: {
+        topProductEvents: buildAggregateTopNamedItems('product', aggregate.topProductEvents),
+        topAuditActions: buildAggregateTopNamedItems('audit', aggregate.topAuditActions),
+        topActors: buildAggregateTopLabelItems(aggregate.topActors),
+        topIps: buildAggregateTopLabelItems(aggregate.topIps),
+        topPaths: buildAggregateTopLabelItems(aggregate.topPaths),
+        securityStatusCounts: aggregate.securityStatusCounts,
+      },
+      list: {
+        productLogs: listProductLogs.filter((log) => productIds.has(log.id)),
+        auditLogs: listAuditLogs.filter((log) => auditIds.has(log.id)),
+        securityLogs: listSecurityLogs.filter((log) => securityIds.has(log.id)),
+        total: listTotal,
+        page,
+        pageSize,
+      },
+    };
+  }
+
+  const summaryData = useSplitLoading
+    ? await loadAdminLogSummaryRows(options, ['product', 'audit', 'security'])
+    : await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+        maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
+      });
+  const listSourceData = useDbPagedList
+    ? (
+      options.group === 'product' || options.group === 'audit' || options.group === 'security'
+        ? await loadAdminLogListPage(options, {
+            group: options.group as LogGroup,
+            page,
+            pageSize,
+            status: options.status,
+          })
+        : await loadAdminLogNormalizedPage(options, {
+            page,
+            pageSize,
+          })
+    )
+    : useSplitLoading
+      ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+          maxRowsPerGroup: page * pageSize,
+        })
+      : summaryData;
+
+  return buildAdminLogsPageDataFromRows({
+    options,
+    page,
+    pageSize,
+    summaryData,
+    listSourceData,
+    useDbPagedList,
+    useSplitLoading,
+  });
 }
 
 export async function exportAdminLogsCsv(options: CsvExportOptions = {}) {
