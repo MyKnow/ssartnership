@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
+import { useState } from "react";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Tabs from "@/components/ui/Tabs";
+import TimeseriesLineChart from "@/components/ui/TimeseriesLineChart";
 import type {
-  PartnerMetricTimeseriesPoint,
   PartnerMetricTimeseriesSnapshot,
   PartnerMetricTimeseriesGranularity,
 } from "@/lib/partner-metric-timeseries";
@@ -76,307 +75,6 @@ function formatCount(value: number) {
   return value.toLocaleString("ko-KR");
 }
 
-function getAxisLabel(value: number) {
-  return formatAverage(value);
-}
-
-function getChartHeight() {
-  return 320;
-}
-
-function buildLinePath(
-  points: Array<{
-    x: number;
-    y: number;
-  }>,
-) {
-  return points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
-}
-
-function getPointCoordinates(
-  points: PartnerMetricTimeseriesPoint[],
-  width: number,
-  height: number,
-) {
-  const padding = {
-    top: 24,
-    right: 24,
-    bottom: 48,
-    left: 52,
-  };
-  const plotWidth = Math.max(width - padding.left - padding.right, 1);
-  const plotHeight = Math.max(height - padding.top - padding.bottom, 1);
-  const maxValue = Math.max(
-    ...points.map((point) => Math.max(point.pv, point.uv, point.cta)),
-    1,
-  );
-  const stepX = points.length > 1 ? plotWidth / (points.length - 1) : 0;
-
-  return {
-    padding,
-    plotWidth,
-    plotHeight,
-    maxValue,
-    points: points.map((point, index) => ({
-      ...point,
-      x: padding.left + stepX * index,
-      yPv: padding.top + plotHeight * (1 - point.pv / maxValue),
-      yUv: padding.top + plotHeight * (1 - point.uv / maxValue),
-      yCta: padding.top + plotHeight * (1 - point.cta / maxValue),
-    })),
-  };
-}
-
-function useElementWidth(ref: RefObject<HTMLDivElement | null>) {
-  const [width, setWidth] = useState(0);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) {
-      return;
-    }
-
-    const updateWidth = () => {
-      setWidth(element.clientWidth);
-    };
-
-    updateWidth();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const observer = new ResizeObserver(() => {
-      updateWidth();
-    });
-
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [ref]);
-
-  return width;
-}
-
-function MetricTimeseriesChart({
-  series,
-}: {
-  series: PartnerMetricTimeseriesSnapshot["hour"] | PartnerMetricTimeseriesSnapshot["weekday"];
-}) {
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const measuredWidth = useElementWidth(wrapperRef);
-  const width = Math.max(measuredWidth, 320);
-  const height = getChartHeight();
-  const coords = useMemo(
-    () => getPointCoordinates(series.points, width, height),
-    [series.points, width, height],
-  );
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const activePoint = activeIndex === null ? null : coords.points[activeIndex] ?? null;
-  const pvPath = useMemo(
-    () =>
-      buildLinePath(
-        coords.points.map((point) => ({
-          x: point.x,
-          y: point.yPv,
-        })),
-      ),
-    [coords.points],
-  );
-  const uvPath = useMemo(
-    () =>
-      buildLinePath(
-        coords.points.map((point) => ({
-          x: point.x,
-          y: point.yUv,
-        })),
-      ),
-    [coords.points],
-  );
-  const ctaPath = useMemo(
-    () =>
-      buildLinePath(
-        coords.points.map((point) => ({
-          x: point.x,
-          y: point.yCta,
-        })),
-      ),
-    [coords.points],
-  );
-
-  const paths = {
-    pv: pvPath,
-    uv: uvPath,
-    cta: ctaPath,
-  } as const;
-
-  return (
-    <div
-      ref={wrapperRef}
-      className="relative w-full overflow-hidden"
-      onMouseLeave={() => setActiveIndex(null)}
-    >
-      <div className="relative w-full">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="block h-auto w-full"
-          role="img"
-          aria-label={`${series.granularity === "hour" ? "시간별" : "요일별"} 평균 PV, UV, CTA 차트`}
-        >
-          {Array.from({ length: 4 }, (_, index) => {
-            const tickValue = (coords.maxValue * index) / 3;
-            const y = coords.padding.top + coords.plotHeight * (1 - index / 3);
-            return (
-              <g key={`grid-${index}`} className="text-border/70">
-                <line
-                  x1={coords.padding.left}
-                  x2={width - coords.padding.right}
-                  y1={y}
-                  y2={y}
-                  stroke="currentColor"
-                  strokeOpacity={index === 0 ? 0.2 : 0.08}
-                  strokeDasharray={index === 0 ? "0" : "3 7"}
-                />
-                <text
-                  x={coords.padding.left - 10}
-                  y={y + 4}
-                  textAnchor="end"
-                  className="fill-muted-foreground text-[10px] font-medium"
-                >
-                  {getAxisLabel(tickValue)}
-                </text>
-              </g>
-            );
-          })}
-
-          {SERIES_CONFIG.map((series) => (
-            <g key={series.key} className={series.lineClassName}>
-              <path
-                d={paths[series.key]}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </g>
-          ))}
-
-          {coords.points.map((point, index) => {
-            const previousX = index === 0 ? coords.padding.left : coords.points[index - 1]?.x ?? point.x;
-            const nextX =
-              index === coords.points.length - 1
-                ? width - coords.padding.right
-                : coords.points[index + 1]?.x ?? point.x;
-            const left = index === 0 ? coords.padding.left : (previousX + point.x) / 2;
-            const right =
-              index === coords.points.length - 1
-                ? width - coords.padding.right
-                : (point.x + nextX) / 2;
-
-            return (
-              <g key={point.label}>
-                <rect
-                  x={left}
-                  y={coords.padding.top}
-                  width={Math.max(right - left, 0)}
-                  height={coords.plotHeight}
-                  fill="transparent"
-                  onMouseEnter={() => setActiveIndex(index)}
-                />
-
-                {SERIES_CONFIG.map((series) => {
-                  const yKey =
-                    series.key === "pv"
-                      ? "yPv"
-                      : series.key === "uv"
-                        ? "yUv"
-                        : "yCta";
-                  const y = point[yKey];
-
-                  return (
-                    <circle
-                      key={series.key}
-                      cx={point.x}
-                      cy={y}
-                      r={activeIndex === index ? 5 : 3.5}
-                      fill="currentColor"
-                      className={series.circleClassName}
-                      onMouseEnter={() => setActiveIndex(index)}
-                    />
-                  );
-                })}
-                {series.granularity === "weekday" ||
-                width >= 960 ||
-                (width >= 720 && index % 2 === 0) ||
-                (width >= 520 && index % 3 === 0) ||
-                index % 4 === 0 ? (
-                  <text
-                    x={point.x}
-                    y={height - 18}
-                    textAnchor="middle"
-                    className="fill-muted-foreground text-[10px] font-medium"
-                  >
-                    {point.label}
-                  </text>
-                ) : null}
-              </g>
-            );
-          })}
-        </svg>
-
-        {activePoint ? (
-          <div
-            className="pointer-events-none absolute z-10"
-            style={{
-              left: `${Math.min(
-                Math.max(activePoint.x + 12, 8),
-                width - 190,
-              )}px`,
-              top: `${Math.min(
-                Math.max(Math.min(activePoint.yPv, activePoint.yUv, activePoint.yCta) - 18, 8),
-                180,
-              )}px`,
-            }}
-          >
-            <div className="min-w-40 rounded-2xl border border-border bg-surface-elevated px-3 py-2 shadow-raised">
-              <p className="text-xs font-semibold text-foreground">{activePoint.label}</p>
-              <div className="mt-2 space-y-1 text-xs">
-                <p className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-primary">PV 평균</span>
-                  <span className="font-semibold text-foreground">
-                    {formatAverage(activePoint.pv)}
-                  </span>
-                </p>
-                <p className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-warning">UV 평균</span>
-                  <span className="font-semibold text-foreground">
-                    {formatAverage(activePoint.uv)}
-                  </span>
-                </p>
-                <p className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-success">CTA 평균</span>
-                  <span className="font-semibold text-foreground">
-                    {formatAverage(activePoint.cta)}
-                  </span>
-                </p>
-                <p className="flex items-center justify-between gap-4 text-muted-foreground">
-                  <span>표본</span>
-                  <span>{formatCount(activePoint.denominator)}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 export default function PartnerMetricTimeseriesPanel({
   data,
   warningMessage,
@@ -427,7 +125,49 @@ export default function PartnerMetricTimeseriesPanel({
               </span>
             ))}
           </div>
-          <MetricTimeseriesChart series={currentSeries} />
+          <TimeseriesLineChart
+            points={currentSeries.points.map((point) => ({
+              key: point.label,
+              label: point.label,
+              values: {
+                pv: point.pv,
+                uv: point.uv,
+                cta: point.cta,
+                denominator: point.denominator,
+              },
+            }))}
+            series={SERIES_CONFIG.map((series) => ({
+              key: series.key,
+              label: series.label,
+              lineClassName: series.lineClassName,
+              circleClassName: series.circleClassName,
+            }))}
+            ariaLabel={`${currentSeries.granularity === "hour" ? "시간별" : "요일별"} 평균 PV, UV, CTA 차트`}
+            renderTooltip={(point) => ({
+              title: point.label,
+              items: [
+                {
+                  label: "PV 평균",
+                  value: formatAverage(Number(point.values.pv ?? 0)),
+                  valueClassName: "font-medium text-primary",
+                },
+                {
+                  label: "UV 평균",
+                  value: formatAverage(Number(point.values.uv ?? 0)),
+                  valueClassName: "font-medium text-warning",
+                },
+                {
+                  label: "CTA 평균",
+                  value: formatAverage(Number(point.values.cta ?? 0)),
+                  valueClassName: "font-medium text-success",
+                },
+                {
+                  label: "표본",
+                  value: formatCount(Number(point.values.denominator ?? 0)),
+                },
+              ],
+            })}
+          />
         </div>
       ) : (
         <EmptyState
