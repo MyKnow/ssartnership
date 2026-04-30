@@ -47,10 +47,11 @@ if (dockerResult.status !== 0 || dockerResult.error) {
     process.exit(dockerResult.status ?? 1);
   }
   console.warn("");
-  console.warn("[lockfile-linux-check] Docker is unavailable, falling back to local lockfile verification.");
+  console.warn("[lockfile-linux-check] Docker is unavailable, falling back to npm@10 lockfile verification.");
   execFileSync(
-    "npm",
+    "npx",
     [
+      "npm@10",
       "install",
       "--package-lock-only",
       "--ignore-scripts",

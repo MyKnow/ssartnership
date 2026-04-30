@@ -173,7 +173,7 @@ function CompanyHeader({
   showKicker: boolean;
 }) {
   return (
-    <Card tone="default" padding="md" className="space-y-5">
+    <Card tone="default" padding="md" className="space-y-5 xl:sticky xl:top-24">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           {showKicker ? <p className="ui-kicker">선택된 협력사</p> : null}
@@ -194,7 +194,7 @@ function CompanyHeader({
         </Badge>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
         <ServiceMetric label="브랜드 수" value={company.services.length} />
         <ServiceMetric label="즐겨찾기" value={company.totals.favoriteCount} />
         <ServiceMetric label="리뷰 수" value={company.totals.reviewCount} />
@@ -258,8 +258,8 @@ export default function PartnerDashboardView({
 
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto max-w-6xl space-y-6">
+      <Container size="wide" className="pb-16 pt-6 lg:pt-8">
+        <div className="space-y-6">
           <MotionReveal>
             <ShellHeader
               eyebrow="Partner Portal"
@@ -308,7 +308,7 @@ export default function PartnerDashboardView({
 
               {activeCompany ? (
                 <MotionReveal delay={showCompanyTabs ? 0.11 : 0.08}>
-                  <div className="grid gap-3">
+                  <div className="grid min-w-0 gap-5 xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
                     <CompanyHeader
                       company={activeCompany}
                       showKicker={showCompanyTabs}

@@ -11,7 +11,7 @@ export default async function PartnerPortalHeader() {
 
   return (
     <header className="border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl">
-      <Container className="flex flex-wrap items-center justify-between gap-3 py-4">
+      <Container size="wide" className="flex flex-wrap items-center justify-between gap-3 py-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Link
             href="/partner"

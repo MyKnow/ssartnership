@@ -149,15 +149,15 @@ export default function PartnerNotificationCenter({
         ]}
       />
 
-      <Card tone="default" padding="md" className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[20rem_minmax(0,1fr)] xl:items-start">
+        <Card tone="default" padding="md" className="space-y-4 xl:sticky xl:top-24">
           <div className="space-y-1">
             <p className="ui-kicker">필터</p>
             <p className="ui-body">
               변경 요청, 리뷰, 운영 알림을 나눠서 볼 수 있습니다.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
             {filterOptions.map((option) => {
               const active = filter === option.value;
 
@@ -169,34 +169,35 @@ export default function PartnerNotificationCenter({
                   size="sm"
                   ariaPressed={active}
                   onClick={() => setFilter(option.value)}
+                  className="justify-start"
                 >
                   {option.label}
                 </Button>
               );
             })}
           </div>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="primary">{data.summary.companyCount}개 협력사</Badge>
-          <Badge variant="neutral">{data.summary.serviceCount}개 브랜드</Badge>
-          <Badge variant="neutral">{visibleItems.length}건 표시</Badge>
-        </div>
-      </Card>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="primary">{data.summary.companyCount}개 협력사</Badge>
+            <Badge variant="neutral">{data.summary.serviceCount}개 브랜드</Badge>
+            <Badge variant="neutral">{visibleItems.length}건 표시</Badge>
+          </div>
+        </Card>
 
-      {visibleItems.length === 0 ? (
-        <EmptyState
-          title="표시할 알림이 없습니다."
-          description="다른 필터를 선택하거나 잠시 후 다시 확인해 주세요."
-          action={<Button href="/partner" variant="secondary">대시보드로 이동</Button>}
-        />
-      ) : (
-        <div className="grid min-w-0 gap-3">
-          {visibleItems.map((item) => (
-            <NotificationCard key={item.id} item={item} />
-          ))}
-        </div>
-      )}
+        {visibleItems.length === 0 ? (
+          <EmptyState
+            title="표시할 알림이 없습니다."
+            description="다른 필터를 선택하거나 잠시 후 다시 확인해 주세요."
+            action={<Button href="/partner" variant="secondary">대시보드로 이동</Button>}
+          />
+        ) : (
+          <div className="grid min-w-0 gap-3">
+            {visibleItems.map((item) => (
+              <NotificationCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

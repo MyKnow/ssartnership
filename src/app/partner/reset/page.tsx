@@ -25,8 +25,18 @@ export default async function PartnerPasswordResetPage() {
 
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto max-w-2xl">
+      <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.7fr)_minmax(28rem,0.5fr)] xl:items-start">
+          <Card tone="default" className="space-y-4 p-6 sm:p-8">
+            <Badge className="bg-primary/10 text-primary">계정 복구</Badge>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              담당자 계정으로 다시 접속하세요.
+            </h1>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              임시 비밀번호를 받은 뒤에는 보안을 위해 첫 로그인에서 새 비밀번호
+              설정을 완료해야 합니다.
+            </p>
+          </Card>
           <Card className="space-y-6 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">제휴 포털</Badge>

@@ -13,7 +13,7 @@ export default async function PartnerPortalFooter() {
 
   return (
     <footer className="border-t border-border/70 bg-surface-overlay/92 py-6 backdrop-blur-xl">
-      <Container className="flex flex-col gap-4 text-sm text-muted-foreground">
+      <Container size="wide" className="flex flex-col gap-4 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Link
             href="/partner"

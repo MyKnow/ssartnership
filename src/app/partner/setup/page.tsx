@@ -26,8 +26,8 @@ export default async function PartnerSetupIndexPage() {
 
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto max-w-5xl">
+      <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+        <div className="space-y-6">
           <div className="mb-8 flex flex-col gap-4 rounded-[2rem] border border-border bg-surface px-6 py-8 shadow-flat sm:px-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">
@@ -62,7 +62,7 @@ export default async function PartnerSetupIndexPage() {
               description="관리자에서 초기 설정용 토큰이 만들어지면 여기에서 테스트할 수 있습니다."
             />
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
               {setups.map((setup) => (
                 <Card key={setup.token} className="flex h-full flex-col gap-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">

@@ -1,21 +1,24 @@
 import { Suspense } from "react";
 import RoutePageViewTracker from "@/components/analytics/RoutePageViewTracker";
-import PartnerPortalHeader from "@/components/partner/PartnerPortalHeader";
-import PartnerPortalFooter from "@/components/partner/PartnerPortalFooter";
+import PartnerPortalShellView from "@/components/partner/PartnerPortalShellView";
+import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { getPartnerSession } from "@/lib/partner-session";
 
-export default function PartnerLayout({
+export default async function PartnerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getPartnerSession();
+
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <>
       <Suspense fallback={null}>
         <RoutePageViewTracker area="partner" />
       </Suspense>
-      <PartnerPortalHeader />
-      <main className="flex-1">{children}</main>
-      <PartnerPortalFooter />
-    </div>
+      <PartnerPortalShellView session={session} isMock={isPartnerPortalMock}>
+        {children}
+      </PartnerPortalShellView>
+    </>
   );
 }

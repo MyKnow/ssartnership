@@ -44,9 +44,31 @@ export default async function PartnerLoginPage({
 
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto max-w-2xl">
+      <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(28rem,0.55fr)] xl:items-start">
           <PartnerLoginSetupToast show={setupStatus === "completed"} />
+          <Card tone="default" className="space-y-5">
+            <Badge variant="primary">제휴 포털</Badge>
+            <div className="space-y-3">
+              <h1 className="ui-page-title">협력사 운영 공간</h1>
+              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                연결된 회사와 브랜드 현황, 수정 요청, 리뷰와 알림을 한 화면에서
+                관리합니다. 태블릿 이상에서는 운영 정보를 넓은 화면으로 확인할 수
+                있습니다.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {["브랜드 현황", "수정 요청", "운영 알림"].map((label) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-border bg-surface-inset/80 p-4 text-sm font-medium text-foreground"
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+          </Card>
+
           <Card tone="elevated" className="space-y-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="primary">제휴 포털</Badge>
@@ -86,7 +108,7 @@ export default async function PartnerLoginPage({
               </label>
 
               <FormMessage>
-                초기 설정이 끝난 계정만 로그인할 수 있습니다.< br/>아직 설정하지
+                초기 설정이 끝난 계정만 로그인할 수 있습니다.<br />아직 설정하지
                 않았다면 받은 초기 설정 링크를 먼저 열어 주세요.
               </FormMessage>
               {errorMessage ? (

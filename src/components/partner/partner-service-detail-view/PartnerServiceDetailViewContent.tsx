@@ -49,8 +49,8 @@ export default function PartnerServiceDetailViewContent({
 
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6">
+      <Container size="wide" className="pb-16 pt-6 lg:pt-8">
+        <div className="w-full min-w-0 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <Button href="/partner" variant="ghost">
@@ -137,7 +137,7 @@ export default function PartnerServiceDetailViewContent({
                 />
               ) : null}
 
-              <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start 2xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                 <PartnerServiceSummaryCard
                   context={context}
                   badgeStyle={visualState.badgeStyle}

@@ -25,8 +25,18 @@ export default async function PartnerPasswordChangePage() {
 
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto max-w-2xl">
+      <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.7fr)_minmax(28rem,0.5fr)] xl:items-start">
+          <Card tone="default" className="space-y-4 p-6 sm:p-8">
+            <Badge className="bg-primary/10 text-primary">보안 설정</Badge>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              포털 이용 전 비밀번호를 정리합니다.
+            </h1>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              임시 비밀번호 상태에서는 다른 포털 화면으로 이동할 수 없습니다.
+              변경을 완료하면 대시보드로 이동합니다.
+            </p>
+          </Card>
           <Card className="space-y-6 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary/10 text-primary">제휴 포털</Badge>

@@ -29,8 +29,8 @@ export default async function PartnerNotificationsPage() {
   const data = await getPartnerNotificationCenter(session.companyIds, session.accountId);
 
   return (
-    <Container className="pb-16 pt-10">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <Container size="wide" className="pb-16 pt-6 lg:pt-8">
+      <div className="space-y-6">
         <ShellHeader
           eyebrow="Partner Portal"
           title="알림센터"

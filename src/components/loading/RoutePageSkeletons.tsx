@@ -69,7 +69,17 @@ function CenteredAuthCardSkeleton({
   secondaryAction?: boolean;
 }) {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,0.7fr)_minmax(28rem,0.5fr)] xl:items-start">
+      <Card tone="default" className="space-y-4 p-6 sm:p-8">
+        <Skeleton className="h-7 w-24 rounded-full" />
+        <Skeleton className="h-10 w-full max-w-xl" />
+        <Skeleton className="h-4 w-full max-w-2xl" />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-20 w-full rounded-2xl" />
+        </div>
+      </Card>
       <Card tone="elevated" className="space-y-6 p-6 sm:p-8">
         <div className="space-y-2">
           <Skeleton className="h-4 w-24 rounded-lg" />
@@ -243,8 +253,8 @@ export function GlobalRouteSkeleton() {
 
 export function PartnerPortalRouteSkeleton() {
   return (
-    <Container className="pb-16 pt-10">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+      <div className="space-y-6">
         <Card tone="default" padding="md" className="space-y-5">
           <div className="space-y-2">
             <Skeleton className="h-4 w-24 rounded-lg" />
@@ -331,7 +341,7 @@ export function PublicPartnerDetailSkeleton() {
 
 export function PartnerLoginSkeleton() {
   return (
-    <Container className="pb-16 pt-10">
+    <Container size="wide" className="pb-16 pt-8 lg:pt-10">
       <CenteredAuthCardSkeleton
         titleWidth="w-40"
         descriptionWidth="max-w-md"
@@ -344,7 +354,7 @@ export function PartnerLoginSkeleton() {
 
 export function PartnerPasswordResetSkeleton() {
   return (
-    <Container className="pb-16 pt-10">
+    <Container size="wide" className="pb-16 pt-8 lg:pt-10">
       <CenteredAuthCardSkeleton
         titleWidth="w-44"
         descriptionWidth="max-w-md"
@@ -357,7 +367,7 @@ export function PartnerPasswordResetSkeleton() {
 
 export function PartnerPasswordChangeSkeleton() {
   return (
-    <Container className="pb-16 pt-10">
+    <Container size="wide" className="pb-16 pt-8 lg:pt-10">
       <CenteredAuthCardSkeleton
         titleWidth="w-40"
         descriptionWidth="max-w-md"
@@ -370,8 +380,8 @@ export function PartnerPasswordChangeSkeleton() {
 
 export function PartnerSupportSkeleton() {
   return (
-    <Container className="pb-16 pt-10">
-      <div className="mx-auto max-w-3xl space-y-5">
+    <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
         <Card tone="default" padding="md" className="space-y-4">
           <TextStack eyebrowWidth="w-24" titleWidth="w-32" descriptionWidth="max-w-xl" />
         </Card>
@@ -391,10 +401,10 @@ export function PartnerSupportSkeleton() {
 export function PartnerSetupIndexSkeleton() {
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto max-w-5xl space-y-8">
+      <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+        <div className="space-y-8">
           <PartnerSetupHeroSkeleton />
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
               <Card key={index} className="space-y-4 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -426,34 +436,10 @@ export function PartnerSetupPageSkeleton() {
   return (
     <div className="relative overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.10),transparent_34%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_30%)]" />
-      <Container className="relative pb-16 pt-10">
-        <div className="mx-auto max-w-6xl space-y-6">
+      <Container size="wide" className="relative pb-16 pt-8 lg:pt-10">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.82fr)_minmax(28rem,0.5fr)] xl:items-start">
           <PartnerSetupHeroSkeleton />
-          <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-            <div className="space-y-6">
-              <Card className="space-y-4">
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-4 w-full max-w-lg" />
-                <Skeleton className="h-28 w-full rounded-2xl" />
-              </Card>
-              <Card className="space-y-4">
-                <Skeleton className="h-6 w-28" />
-                <Skeleton className="h-4 w-full max-w-md" />
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="rounded-2xl border border-border bg-surface-inset/80 p-4"
-                    >
-                      <Skeleton className="h-5 w-32" />
-                      <Skeleton className="mt-2 h-4 w-full max-w-lg" />
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-
-            <Card className="space-y-4 xl:sticky xl:top-6">
+          <Card className="space-y-4 xl:sticky xl:top-6">
               <Skeleton className="h-4 w-24 rounded-lg" />
               <Skeleton className="h-8 w-52" />
               <Skeleton className="h-4 w-full max-w-md" />
@@ -469,8 +455,7 @@ export function PartnerSetupPageSkeleton() {
                 <Skeleton className="h-12 w-40 rounded-full" />
                 <Skeleton className="h-12 w-32 rounded-full" />
               </div>
-            </Card>
-          </div>
+          </Card>
         </div>
       </Container>
     </div>
@@ -480,8 +465,8 @@ export function PartnerSetupPageSkeleton() {
 export function PartnerServiceDetailSkeleton() {
   return (
     <div className="bg-background">
-      <Container className="pb-16 pt-10">
-        <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6">
+      <Container size="wide" className="pb-16 pt-8 lg:pt-10">
+        <div className="w-full min-w-0 space-y-6">
           <div className="flex flex-wrap items-center gap-2">
             <Skeleton className="h-12 w-40 rounded-full" />
             <Skeleton className="h-12 w-36 rounded-full" />
@@ -518,7 +503,7 @@ export function PartnerServiceDetailSkeleton() {
             </div>
           </Card>
 
-          <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start 2xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
             <Card className="space-y-4 p-6 sm:p-8">
               <Skeleton className="h-6 w-28" />
               <Skeleton className="h-32 w-full rounded-[2rem]" />
