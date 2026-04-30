@@ -88,5 +88,7 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
   - A 기능 의존성 개선
   - A 기능의 B 변수 수정
   ```
+- When the user asks to commit and push, use `npm run release` by default instead of manual `git add`, `git commit`, and `git push`. This keeps version bumping, Storybook build/test gates, commit formatting, and push behavior consistent.
+- If `npm run release` is blocked by a non-script environment issue after it already performed part of the release flow, inspect the partial state first, then complete only the remaining equivalent steps with the same Korean conventional commit message.
 - Do not revert user changes.
 - Review `git diff` before staging or committing.

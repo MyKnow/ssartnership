@@ -10,7 +10,6 @@ jobs:
     name: Publish Storybook to Chromatic
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -26,6 +25,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build Storybook
+        run: npm run build-storybook
 
       - name: Publish Storybook to Chromatic
         uses: chromaui/action@latest

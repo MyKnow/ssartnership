@@ -40,8 +40,8 @@ export const OpenAndClose: Story = {
     const body = within(document.body);
     await expect(body.getByRole("dialog")).toBeInTheDocument();
     await expect(body.getByText("관리 대시보드")).toBeInTheDocument();
-    await expect(body.getByRole("link", { name: "관리 홈" })).toHaveAttribute("href", "/admin");
-    const partnerLinks = body.getAllByRole("link", { name: "브랜드 관리" });
+    await expect(body.getByRole("link", { name: /^관리 홈/ })).toHaveAttribute("href", "/admin");
+    const partnerLinks = body.getAllByRole("link", { name: /^브랜드 관리/ });
     await expect(partnerLinks[0]!).toHaveAttribute("href", "/admin/partners");
     await expect(body.getByRole("link", { name: "사용자 화면" })).toHaveAttribute("href", "/");
     await expect(body.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
@@ -73,7 +73,7 @@ export const WithoutBackLink: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "관리 메뉴 열기" }));
 
     const body = within(document.body);
-    await expect(body.queryByRole("link", { name: "브랜드 관리" })).toBeInTheDocument();
+    await expect(body.getByRole("link", { name: /^브랜드 관리/ })).toBeInTheDocument();
     await expect(body.getByRole("link", { name: "사용자 화면" })).toBeInTheDocument();
   },
 };

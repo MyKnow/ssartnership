@@ -14,7 +14,7 @@
     "test": "node --import ./tests/alias-register.mjs --test tests/*.test.mts tests/push/*.test.mts",
     "test-storybook": "vitest run --project=storybook",
     "test-storybook:watch": "vitest --project=storybook",
-    "ci:local": "npm ci && npm run check:lockfile && npm run lint && npm run test && npm run build && npm run test-storybook",
+    "ci:local": "npm ci && npm run check:lockfile && npm run lint && npm run test && npm run build && npm run build-storybook && npm run test-storybook",
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",

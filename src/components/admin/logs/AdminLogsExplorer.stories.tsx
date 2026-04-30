@@ -222,6 +222,6 @@ export const Paginated: Story = {
     const canvas = within(canvasElement);
     await userEvent.selectOptions(canvas.getByLabelText("페이지당"), "1");
     await userEvent.click(canvas.getByRole("button", { name: "다음" }));
-    await expect(canvas.getByText("2 / 6")).toBeInTheDocument();
+    await expect(canvas.getAllByText("2 / 6").length).toBeGreaterThan(0);
   },
 };

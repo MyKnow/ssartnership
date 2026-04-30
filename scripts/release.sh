@@ -338,6 +338,12 @@ else
   echo "Lighthouse 검사를 건너뜁니다."
 fi
 
+echo "Storybook 정적 빌드를 실행합니다."
+npm run build-storybook
+
+echo "Storybook interaction/smoke 테스트를 실행합니다."
+npm run test-storybook
+
 NEXT_VERSION="$CURRENT_VERSION"
 if [[ "$RELEASE_TYPE" != "none" ]]; then
   npm version "$RELEASE_TYPE" --no-git-tag-version >/dev/null

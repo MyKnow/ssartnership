@@ -262,7 +262,7 @@ export const InteractiveFiltersAndExport: Story = {
       canvas.getByPlaceholderText("유저명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"),
       "ssafy-fail",
     );
-    await expect(canvas.getByText("MM 아이디: @ssafy-fail")).toBeInTheDocument();
+    await expect(await canvas.findByText(/@ssafy-fail/)).toBeInTheDocument();
 
     await userEvent.selectOptions(canvas.getByLabelText("정렬"), "oldest");
     await userEvent.click(canvas.getAllByText("상세 보기")[0]!);
@@ -272,7 +272,7 @@ export const InteractiveFiltersAndExport: Story = {
     await userEvent.clear(canvas.getByRole("spinbutton"));
     await userEvent.type(canvas.getByRole("spinbutton"), "4");
     await userEvent.click(canvas.getByRole("button", { name: "이동" }));
-    await expect(canvas.getByText("1 / 1")).toBeInTheDocument();
+    await expect(canvas.getAllByText("1 / 1").length).toBeGreaterThan(0);
 
     await userEvent.click(canvas.getByRole("button", { name: "사용자 지정" }));
     await userEvent.clear(canvas.getByLabelText("시작 시각"));

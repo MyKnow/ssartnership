@@ -25,6 +25,8 @@ Recent history uses conventional commits with Korean, outcome-focused subjects:
 
 Keep commit subjects short unless the change intentionally records a multi-part recovery or production hardening plan.
 
+When the user asks to commit and push, use `npm run release` by default rather than running `git add`, `git commit`, and `git push` manually. The release script is the canonical path because it handles version updates, Storybook build/test gates, Korean commit-message entry, and push behavior. If the release script fails after completing part of the flow, inspect the current git/package state before finishing only the remaining equivalent steps.
+
 ## Repository Shape
 
 ```txt
