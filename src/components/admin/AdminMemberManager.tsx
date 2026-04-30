@@ -65,8 +65,14 @@ export default function AdminMemberManager({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const [pageInputValue, setPageInputValue] = useState(String(pagination.page));
-  const [searchInputValue, setSearchInputValue] = useState(filters.searchValue);
+  const [pageInputDraft, setPageInputDraft] = useState({
+    sourcePage: pagination.page,
+    value: String(pagination.page),
+  });
+  const [searchInputDraft, setSearchInputDraft] = useState({
+    sourceValue: filters.searchValue,
+    value: filters.searchValue,
+  });
 
   const normalizedMembers = useMemo(
     () => normalizeAdminMembers(members, activePolicyVersions),
@@ -75,6 +81,15 @@ export default function AdminMemberManager({
   const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
   const currentPage = Math.min(pagination.page, totalPages);
   const pageStart = (currentPage - 1) * pagination.pageSize;
+  const pageInputValue =
+    pageInputDraft.sourcePage === pagination.page
+      ? pageInputDraft.value
+      : String(pagination.page);
+  const searchInputValue =
+    searchInputDraft.sourceValue === filters.searchValue
+      ? searchInputDraft.value
+      : filters.searchValue;
+  const isSearchDirty = searchInputValue !== filters.searchValue;
 
   const updateQuery = (updates: Record<string, string | number | null>) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -91,13 +106,34 @@ export default function AdminMemberManager({
   };
 
   const updateFilter = (key: string, value: string | number) => {
-    setPageInputValue("1");
+    setPageInputDraft({ sourcePage: pagination.page, value: "1" });
     updateQuery({ [key]: value, page: null });
+  };
+
+  const applySearchFilter = () => {
+    const nextSearchValue = searchInputValue.trim();
+    setSearchInputDraft({
+      sourceValue: filters.searchValue,
+      value: nextSearchValue,
+    });
+
+    if (nextSearchValue === filters.searchValue) {
+      return;
+    }
+
+    setPageInputDraft({ sourcePage: pagination.page, value: "1" });
+    updateQuery({ q: nextSearchValue, page: null });
+  };
+
+  const resetSearchFilter = () => {
+    setSearchInputDraft({ sourceValue: filters.searchValue, value: "" });
+    setPageInputDraft({ sourcePage: pagination.page, value: "1" });
+    updateQuery({ q: null, page: null });
   };
 
   const syncPage = (nextPage: number) => {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
-    setPageInputValue(String(safePage));
+    setPageInputDraft({ sourcePage: pagination.page, value: String(safePage) });
     updateQuery({ page: safePage });
   };
 
@@ -108,16 +144,44 @@ export default function AdminMemberManager({
         description="이름, 기수, 캠퍼스, 현재 활성 버전 기준 약관 상태로 회원 목록을 빠르게 좁힙니다."
         tone="elevated"
       >
-        <div className="grid min-w-[14rem] flex-1 gap-1">
+        <div className="grid min-w-[18rem] flex-1 gap-1">
           <span className="ui-caption">검색</span>
-          <Input
-            value={searchInputValue}
-            onChange={(event) => {
-              setSearchInputValue(event.target.value);
-              updateFilter("q", event.target.value);
-            }}
-            placeholder="이름, MM 아이디로 검색"
-          />
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <Input
+              value={searchInputValue}
+              onChange={(event) => {
+                setSearchInputDraft({
+                  sourceValue: filters.searchValue,
+                  value: event.target.value,
+                });
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applySearchFilter();
+                }
+              }}
+              placeholder="이름, MM 아이디로 검색"
+            />
+            <button
+              type="button"
+              onClick={applySearchFilter}
+              disabled={!isSearchDirty || isPending}
+              className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              검색
+            </button>
+            {filters.searchValue ? (
+              <button
+                type="button"
+                onClick={resetSearchFilter}
+                disabled={isPending}
+                className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                초기화
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">기수</span>
@@ -334,7 +398,7 @@ export default function AdminMemberManager({
                   onChange={(event) => {
                     const nextPageSize = Number(event.target.value) as
                       | (typeof MEMBER_PAGE_SIZE_OPTIONS)[number];
-                    setPageInputValue("1");
+                    setPageInputDraft({ sourcePage: pagination.page, value: "1" });
                     updateQuery({ pageSize: nextPageSize, page: null });
                   }}
                 >
@@ -372,7 +436,12 @@ export default function AdminMemberManager({
                   min={1}
                   max={totalPages}
                   value={pageInputValue}
-                  onChange={(event) => setPageInputValue(event.target.value)}
+                  onChange={(event) => {
+                    setPageInputDraft({
+                      sourcePage: pagination.page,
+                      value: event.target.value,
+                    });
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();

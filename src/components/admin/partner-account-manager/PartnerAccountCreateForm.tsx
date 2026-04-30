@@ -24,23 +24,25 @@ export default function PartnerAccountCreateForm({
   const hasCompanies = companies.length > 0;
 
   return (
-    <Card tone="muted" padding="md" className="grid gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <Card tone="muted" padding="md" className="grid gap-4">
+      <div className="grid gap-3">
         <SectionHeading
           title="계정 추가"
           description="새 협력사 계정을 만들고 첫 연결 협력사를 함께 지정합니다."
         />
-        <Badge variant="neutral">
-          {hasCompanies ? "협력사 선택 가능" : "협력사 먼저 추가"}
-        </Badge>
+        <div>
+          <Badge variant="neutral">
+            {hasCompanies ? "협력사 선택 가능" : "협력사 먼저 추가"}
+          </Badge>
+        </div>
       </div>
 
       <form
         id={formId}
         action={createPartnerAccount}
-        className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]"
+        className="grid min-w-0 gap-4"
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid min-w-0 gap-4">
           <FieldGroup label="로그인 아이디(이메일)">
             <Input
               name="loginId"
@@ -58,7 +60,7 @@ export default function PartnerAccountCreateForm({
               required
             />
           </FieldGroup>
-          <FieldGroup label="첫 연결 협력사" className="md:col-span-2">
+          <FieldGroup label="첫 연결 협력사">
             <Select
               name="companyId"
               defaultValue=""
@@ -101,7 +103,7 @@ export default function PartnerAccountCreateForm({
           <SubmitButton
             form={formId}
             pendingText="추가 중"
-            className="w-full sm:w-auto"
+            className="w-full"
             disabled={!hasCompanies}
           >
             계정 추가

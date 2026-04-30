@@ -62,23 +62,20 @@ export default function AdminCompanyManager({
   accounts: AdminPartnerAccount[];
 }) {
   return (
-    <div className="grid gap-4">
-      <Card tone="muted" padding="md" className="grid gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SectionHeading
-            title="협력사 추가"
-            description="한 협력사를 먼저 만들고, 브랜드와 관리 계정을 이어서 연결합니다."
-          />
-          <Badge variant="neutral">
-            총 {companies.length}개
-          </Badge>
-        </div>
+    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] md:items-start xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
+      <aside className="md:sticky md:top-24 md:order-2">
+        <Card tone="muted" padding="md" className="grid gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionHeading
+              title="협력사 추가"
+              description="한 협력사를 먼저 만들고, 브랜드와 관리 계정을 이어서 연결합니다."
+            />
+            <Badge variant="neutral">
+              총 {companies.length}개
+            </Badge>
+          </div>
 
-        <form
-          action={createPartnerCompany}
-          className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]"
-        >
-          <div className="grid gap-4">
+          <form action={createPartnerCompany} className="grid gap-4">
             <FieldGroup label="협력사명">
               <Input name="companyName" placeholder="협력사명" required />
             </FieldGroup>
@@ -86,49 +83,52 @@ export default function AdminCompanyManager({
               <Textarea
                 name="companyDescription"
                 placeholder="포털과 관리자 화면에 함께 보일 협력사 소개를 입력합니다."
-                rows={4}
+                rows={5}
               />
             </FieldGroup>
-          </div>
 
-          <div className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/85 p-4">
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold text-foreground">기본 상태</h4>
-              <p className="text-xs leading-5 text-muted-foreground">
-                비활성으로 저장하면 연결된 브랜드와 계정은 유지되고, 상태만 내려갑니다.
+            <div className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/85 p-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-foreground">기본 상태</h4>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  비활성으로 저장하면 연결된 브랜드와 계정은 유지되고, 상태만 내려갑니다.
+                </p>
+              </div>
+              <label className="flex items-center gap-3 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  name="companyIsActive"
+                  value="true"
+                  defaultChecked
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                협력사 활성
+              </label>
+              <p className="text-xs text-muted-foreground">
+                식별자(`slug`)는 저장 시 자동 생성되고 이후에도 유지됩니다.
               </p>
+              <SubmitButton pendingText="추가 중" className="w-full">
+                협력사 추가
+              </SubmitButton>
             </div>
-            <label className="flex items-center gap-3 text-sm font-medium text-foreground">
-              <input
-                type="checkbox"
-                name="companyIsActive"
-                value="true"
-                defaultChecked
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-              />
-              협력사 활성
-            </label>
-            <p className="text-xs text-muted-foreground">
-              식별자(`slug`)는 저장 시 자동 생성되고 이후에도 유지됩니다.
-            </p>
-            <SubmitButton pendingText="추가 중" className="w-full sm:w-auto">
-              협력사 추가
-            </SubmitButton>
-          </div>
-        </form>
-      </Card>
+          </form>
+        </Card>
+      </aside>
 
-      {companies.length === 0 ? (
-        <EmptyState
-          title="협력사가 없습니다."
-          description="새 협력사를 추가하면 이곳에서 목록을 관리할 수 있습니다."
-        />
-      ) : (
-        <div className="grid gap-4">
+      <section className="grid min-w-0 gap-4 md:order-1">
+        {companies.length === 0 ? (
+          <Card tone="elevated" padding="md">
+            <EmptyState
+              title="협력사가 없습니다."
+              description="새 협력사를 추가하면 이곳에서 목록을 관리할 수 있습니다."
+            />
+          </Card>
+        ) : (
+          <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionHeading
               title="협력사 목록"
-              description="기본 정보 수정, 계정 연결, 삭제를 각 협력사 단위로 정리했습니다."
+              description="기본 정보와 연결 수를 먼저 훑고, 필요한 항목만 펼쳐 수정합니다."
             />
             <Badge variant="neutral">{companies.length}개</Badge>
           </div>
@@ -140,52 +140,46 @@ export default function AdminCompanyManager({
             const hasLinkedData = company.brandCount > 0 || company.accountCount > 0;
 
             return (
-              <Card key={company.id} padding="md" className="grid gap-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0 space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={isActive ? "success" : "danger"}>
-                        {isActive ? "활성" : "비활성"}
-                      </Badge>
-                      <Badge variant="neutral">
-                        브랜드 {company.brandCount}개
-                      </Badge>
-                      <Badge variant="neutral">
-                        계정 {company.accountCount}개
-                      </Badge>
-                    </div>
-                    <div>
-                      <h3 className="truncate text-lg font-semibold text-foreground">
-                        {company.name}
-                      </h3>
-                      <p className="mt-1 break-all text-sm text-muted-foreground">
-                        slug · {company.slug}
-                      </p>
-                      {company.description ? (
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                          {company.description}
+              <Card key={company.id} padding="none" className="overflow-hidden">
+                <details className="group">
+                  <summary className="grid cursor-pointer list-none gap-4 px-5 py-4 transition hover:bg-surface-muted/50 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-6">
+                    <div className="min-w-0 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={isActive ? "success" : "danger"}>
+                          {isActive ? "활성" : "비활성"}
+                        </Badge>
+                        <Badge variant="neutral">
+                          브랜드 {company.brandCount}개
+                        </Badge>
+                        <Badge variant="neutral">
+                          계정 {company.accountCount}개
+                        </Badge>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-lg font-semibold text-foreground">
+                          {company.name}
+                        </h3>
+                        <p className="mt-1 break-all text-sm text-muted-foreground">
+                          slug · {company.slug}
                         </p>
-                      ) : null}
+                        {company.description ? (
+                          <p className="mt-2 line-clamp-2 max-w-4xl text-sm leading-6 text-muted-foreground">
+                            {company.description}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid min-w-[220px] gap-3 rounded-2xl border border-border/70 bg-surface-muted/70 p-4 text-sm">
-                    <div className="grid gap-1">
-                      <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground">
-                        생성
-                      </p>
-                      <p className="text-foreground">{formatDateTime(company.created_at)}</p>
+                    <div className="grid gap-2 text-sm text-muted-foreground md:min-w-[18rem] md:justify-items-end">
+                      <p>생성 {formatDateTime(company.created_at)}</p>
+                      <p>수정 {formatDateTime(company.updated_at)}</p>
+                      <span className="text-xs font-semibold text-primary">
+                        펼쳐서 수정
+                      </span>
                     </div>
-                    <div className="grid gap-1">
-                      <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground">
-                        마지막 수정
-                      </p>
-                      <p className="text-foreground">{formatDateTime(company.updated_at)}</p>
-                    </div>
-                  </div>
-                </div>
+                  </summary>
 
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+                  <div className="grid gap-5 border-t border-border/70 bg-surface-inset/40 p-5 md:p-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
                   <form
                     id={updateFormId}
                     action={updatePartnerCompany}
@@ -287,12 +281,14 @@ export default function AdminCompanyManager({
                   </div>
                 </div>
 
-                <CompanyAccountConnections company={company} accounts={accounts} />
+                  <CompanyAccountConnections company={company} accounts={accounts} />
+                </details>
               </Card>
             );
           })}
-        </div>
-      )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

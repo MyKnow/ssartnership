@@ -4,7 +4,6 @@ import AdminMemberManager from "@/components/admin/AdminMemberManager";
 import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineMessage from "@/components/ui/InlineMessage";
 import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
@@ -594,9 +593,7 @@ export default async function AdminMembersPage({
           ]}
           minItemWidth="13rem"
         />
-        {memberTrendCreatedAts.length > 0 ? (
-          <AdminMemberTrendChart createdAts={memberTrendCreatedAts} />
-        ) : null}
+        <AdminMemberTrendChart createdAts={memberTrendCreatedAts} />
         {membersError ? (
           <FormMessage variant="error">
             회원 목록을 불러오지 못했습니다. {membersError.message}
@@ -627,55 +624,46 @@ export default async function AdminMembersPage({
 
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.72fr)] 2xl:items-start">
           <div className="grid gap-6">
-            {safeMembers.length === 0 ? (
-              <Card tone="elevated">
-                <EmptyState
-                  title="등록된 회원이 없습니다."
-                  description="회원가입이 완료된 교육생이 생기면 이곳에서 관리할 수 있습니다."
+            <Card tone="elevated">
+              <SectionHeading
+                title="회원 목록"
+                description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
+              />
+              <div className="mt-6">
+                <AdminMemberManager
+                  key={[
+                    page,
+                    pageSize,
+                    filters.searchValue,
+                    filters.sortValue,
+                    filters.filterValue,
+                    filters.yearFilter,
+                    filters.campusFilter,
+                    filters.serviceConsentFilter,
+                    filters.privacyConsentFilter,
+                    filters.marketingConsentFilter,
+                    filters.pushEnabledFilter,
+                    filters.announcementEnabledFilter,
+                    filters.newPartnerEnabledFilter,
+                    filters.expiringPartnerEnabledFilter,
+                    filters.reviewEnabledFilter,
+                    filters.mmEnabledFilter,
+                    filters.marketingEnabledFilter,
+                  ].join(":")}
+                  members={enrichedMembers}
+                  activePolicyVersions={activePolicyVersions}
+                  pagination={{
+                    totalCount,
+                    page,
+                    pageSize,
+                  }}
+                  filters={filters}
+                  options={options}
+                  updateMember={updateMember}
+                  deleteMember={deleteMember}
                 />
-              </Card>
-            ) : (
-              <Card tone="elevated">
-                <SectionHeading
-                  title="회원 목록"
-                  description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
-                />
-                <div className="mt-6">
-                  <AdminMemberManager
-                    key={[
-                      page,
-                      pageSize,
-                      filters.searchValue,
-                      filters.sortValue,
-                      filters.filterValue,
-                      filters.yearFilter,
-                      filters.campusFilter,
-                      filters.serviceConsentFilter,
-                      filters.privacyConsentFilter,
-                      filters.marketingConsentFilter,
-                      filters.pushEnabledFilter,
-                      filters.announcementEnabledFilter,
-                      filters.newPartnerEnabledFilter,
-                      filters.expiringPartnerEnabledFilter,
-                      filters.reviewEnabledFilter,
-                      filters.mmEnabledFilter,
-                      filters.marketingEnabledFilter,
-                    ].join(":")}
-                    members={enrichedMembers}
-                    activePolicyVersions={activePolicyVersions}
-                    pagination={{
-                      totalCount,
-                      page,
-                      pageSize,
-                    }}
-                    filters={filters}
-                    options={options}
-                    updateMember={updateMember}
-                    deleteMember={deleteMember}
-                  />
-                </div>
-              </Card>
-            )}
+              </div>
+            </Card>
           </div>
 
           <div className="grid gap-6 2xl:sticky 2xl:top-24">

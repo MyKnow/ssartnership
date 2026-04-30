@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
@@ -314,12 +315,13 @@ export default function AdminMemberListItem({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-      <button
-        type="button"
-        onClick={() => setExpanded((current) => !current)}
-        className="grid w-full grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-surface-muted/50"
-      >
-        <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg font-semibold text-foreground">
+      <div className="grid grid-cols-[56px_minmax(0,1fr)] items-center gap-4 px-4 py-4 transition-colors hover:bg-surface-muted/50 lg:grid-cols-[56px_minmax(0,1fr)_auto]">
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg font-semibold text-foreground"
+          aria-label={`${displayName} 행 ${expanded ? "접기" : "펼치기"}`}
+        >
           {hasAvatar && !avatarFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -333,9 +335,13 @@ export default function AdminMemberListItem({
           ) : (
             <span aria-hidden="true">{avatarLabel || "?"}</span>
           )}
-        </div>
+        </button>
 
-        <div className="grid min-w-0 gap-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="grid min-w-0 gap-2 text-left"
+        >
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="truncate text-base font-semibold text-foreground">{displayName}</p>
             <p className="truncate text-sm text-muted-foreground">@{member.mm_username}</p>
@@ -351,12 +357,24 @@ export default function AdminMemberListItem({
             <span>가입 {formatDateTime(member.created_at)}</span>
             <span>수정 {formatDateTime(member.updated_at)}</span>
           </div>
-        </div>
+        </button>
 
-        <span className="text-sm font-medium text-muted-foreground">
-          {expanded ? "접기" : "상세"}
-        </span>
-      </button>
+        <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 lg:col-span-1">
+          <button
+            type="button"
+            onClick={() => setExpanded((current) => !current)}
+            className="inline-flex min-h-10 items-center justify-center rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground shadow-flat transition-interactive hover:-translate-y-px hover:border-strong"
+          >
+            {expanded ? "접기" : "빠른 수정"}
+          </button>
+          <Link
+            href={`/admin/members/${member.id}`}
+            className="inline-flex min-h-10 items-center justify-center rounded-[0.95rem] border border-primary/10 bg-primary-soft px-4 text-sm font-semibold text-primary shadow-flat transition-interactive hover:-translate-y-px hover:border-primary/20"
+          >
+            회원 상세
+          </Link>
+        </div>
+      </div>
 
       {expanded ? (
         <div className="border-t border-border px-4 py-4">

@@ -5,7 +5,6 @@ import {
   CartesianGrid,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -202,10 +201,11 @@ export default function AdminTimeseriesChart({
     };
 
     updateBounds();
-    window.addEventListener("resize", updateBounds);
+    const observer = new ResizeObserver(updateBounds);
+    observer.observe(element);
 
     return () => {
-      window.removeEventListener("resize", updateBounds);
+      observer.disconnect();
     };
   }, []);
 
@@ -323,8 +323,10 @@ export default function AdminTimeseriesChart({
               </div>
             ) : null}
 
-            <ResponsiveContainer width="100%" height="100%">
+            {chartBounds.width > 0 && chartBounds.height > 0 ? (
               <LineChart
+                width={chartBounds.width}
+                height={chartBounds.height}
                 data={chartData}
                 margin={CHART_MARGIN}
                 onMouseMove={(state) => {
@@ -409,7 +411,7 @@ export default function AdminTimeseriesChart({
                   );
                 })}
               </LineChart>
-            </ResponsiveContainer>
+            ) : null}
           </div>
         </div>
       </div>
