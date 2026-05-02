@@ -1,14 +1,5 @@
-import nodemailer from "nodemailer";
 import { SITE_NAME } from "./site";
-
-function getSmtpCredentials() {
-  const smtpUser = process.env.NAVER_SMTP_USER;
-  const smtpPass = process.env.NAVER_SMTP_PASS;
-  if (!smtpUser || !smtpPass) {
-    throw new Error("메일 설정이 누락되었습니다.");
-  }
-  return { smtpUser, smtpPass };
-}
+import { createSmtpTransport, getSmtpConfig } from "./smtp";
 
 function escapeHtml(value: string) {
   return value
@@ -29,23 +20,15 @@ export async function sendPartnerPortalTemporaryPasswordEmail(input: {
   loginId: string;
   temporaryPassword: string;
 }) {
-  const { smtpUser, smtpPass } = getSmtpCredentials();
-  const transporter = nodemailer.createTransport({
-    host: "smtp.naver.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
+  const smtpConfig = getSmtpConfig();
+  const transporter = createSmtpTransport(smtpConfig);
 
   const safeDisplayName = toHtml(input.displayName || "담당자");
   const safeLoginId = toHtml(input.loginId);
   const safeTemporaryPassword = toHtml(input.temporaryPassword);
 
   await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpUser}>`,
+    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.to,
     subject: `[${SITE_NAME}] 협력사 포털 임시 비밀번호 안내`,
     text: [
@@ -82,23 +65,15 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
   loginId: string;
   setupUrl: string;
 }) {
-  const { smtpUser, smtpPass } = getSmtpCredentials();
-  const transporter = nodemailer.createTransport({
-    host: "smtp.naver.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
+  const smtpConfig = getSmtpConfig();
+  const transporter = createSmtpTransport(smtpConfig);
 
   const safeDisplayName = toHtml(input.displayName || "담당자");
   const safeLoginId = toHtml(input.loginId);
   const safeSetupUrl = escapeHtml(input.setupUrl);
 
   await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpUser}>`,
+    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.to,
     subject: `[${SITE_NAME}] 협력사 포털 초기 설정 안내`,
     text: [
