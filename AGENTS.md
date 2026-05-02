@@ -92,3 +92,12 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - If `npm run release` is blocked by a non-script environment issue after it already performed part of the release flow, inspect the partial state first, then complete only the remaining equivalent steps with the same Korean conventional commit message.
 - Do not revert user changes.
 - Review `git diff` before staging or committing.
+
+## GitHub Issue / PR Workflow
+
+- For planned work, create or identify a GitHub Issue before changing code.
+- Use branch names that match the work type: `feat/*`, `fix/*`, `refactor/*`, `perf/*`, `chore/*`, `docs/*`, `test/*`, or `ci/*`.
+- Create one focused PR per independently reviewable change. If one Issue needs multiple PRs, link each PR with `Refs #<issue-number>`.
+- Use `Closes #<issue-number>` only when a single PR fully resolves the Issue on merge. For multi-PR work, close the Issue manually after the final PR is merged.
+- PR descriptions must include Summary, Related Issue, Changes, Test Plan, and Checklist.
+- Before opening or updating a PR, review the diff and run focused verification appropriate to the changed files.

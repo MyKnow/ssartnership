@@ -1,0 +1,57 @@
+name: Task
+description: 계획된 기능, 수정, 리팩터링 작업을 추적합니다.
+title: "[Task] "
+labels: []
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표
+      description: 이 Issue가 해결해야 하는 사용자/운영 관점의 목표를 적어 주세요.
+      placeholder: 예) Footer 연락처와 지원 이메일을 최신 운영 기준에 맞춘다.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 변경 범위
+      description: 포함할 작업과 제외할 작업을 구분해 주세요.
+      placeholder: |
+        포함:
+        - Footer 인스타그램 링크 제거
+        - 지원 이메일 변경
+
+        제외:
+        - 제휴처 연락처 파싱 로직 변경
+    validations:
+      required: true
+  - type: textarea
+    id: pr-plan
+    attributes:
+      label: PR 분리 계획
+      description: 하나의 Issue에 여러 PR이 필요하면 PR 단위와 브랜치 이름을 적어 주세요.
+      placeholder: |
+        - PR 1: refactor/remove-footer-instagram
+        - PR 2: chore/update-support-email
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 기준
+      description: Issue를 닫기 전에 확인할 수 있는 완료 기준을 적어 주세요.
+      placeholder: |
+        - Footer에서 Instagram 버튼이 보이지 않는다.
+        - 모든 지원 메일 수신 주소가 myknow@ssafy.com이다.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 검증 계획
+      description: 실행할 명령 또는 수동 확인 시나리오를 적어 주세요.
+      placeholder: |
+        - npx eslint src/components/Footer.tsx src/lib/site.ts
+        - rg -n "myknow00@naver\\.com|myknow@ssafy\\.com" src
+    validations:
+      required: true
