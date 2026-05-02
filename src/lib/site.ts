@@ -204,4 +204,4 @@ export const SITE_RSS_URL = "/rss.xml";
 
 export const GITHUB_URL = "https://github.com/MyKnow";
 export const INSTAGRAM_URL = "https://instagram.com/myknow00";
-export const BUG_REPORT_EMAIL = "myknow00@naver.com";
+export const BUG_REPORT_EMAIL = "myknow@ssafy.com";
