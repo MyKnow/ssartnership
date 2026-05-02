@@ -92,3 +92,12 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - If `npm run release` is blocked by a non-script environment issue after it already performed part of the release flow, inspect the partial state first, then complete only the remaining equivalent steps with the same Korean conventional commit message.
 - Do not revert user changes.
 - Review `git diff` before staging or committing.
+
+### Branch Strategy
+
+- `main` is connected to Vercel Production and Supabase Production. Treat it as the production deployment branch.
+- `dev` is connected to Vercel Preview and Supabase Preview. Treat it as the integration and pre-production validation branch.
+- Start all planned work from `dev`, then create a typed work branch such as `feat/*`, `fix/*`, `refactor/*`, `perf/*`, `chore/*`, `docs/*`, `test/*`, or `ci/*`.
+- Complete the task and run local verification inside the typed work branch before merging it into `dev`.
+- When every task for an Issue has been merged into `dev`, run Preview/integration testing from `dev`.
+- Merge `dev` into `main` only after the Preview/integration test is clean and the change is ready for Production.
