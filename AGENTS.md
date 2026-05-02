@@ -101,3 +101,15 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - Complete the task and run local verification inside the typed work branch before merging it into `dev`.
 - When every task for an Issue has been merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after the Preview/integration test is clean and the change is ready for Production.
+
+### Issue / PR Workflow
+
+- For planned work, create or identify a GitHub Issue before changing code.
+- Record scope, PR split plan, verification plan, and target branch flow in the Issue.
+- Open task PRs from typed work branches into `dev`, not `main`.
+- Create one focused PR per independently reviewable change.
+- If one Issue needs multiple PRs, link each PR with `Refs #<issue-number>`.
+- Use `Closes #<issue-number>` only when a single PR fully resolves the Issue, or when the final promotion PR intentionally closes it.
+- PR descriptions must include Summary, Related Issue, Branch Flow, Changes, Test Plan, and Checklist.
+- Before opening or updating a PR, review the diff and run focused verification appropriate to the changed files.
+- Close the Issue only after all related work is merged into `dev`, Preview/integration verification passes, and the change has either been promoted to `main` or explicitly accepted as Preview-only.
