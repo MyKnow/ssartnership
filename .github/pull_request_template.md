@@ -6,17 +6,7 @@
 
 Refs #
 
-<!--
-Use `Refs #<issue-number>` for PRs that are part of a multi-PR Issue.
-Use `Closes #<issue-number>` only when this single PR fully resolves the Issue
-or when this is the final promotion PR intended to close it.
--->
-
-## Branch Flow
-
-- Base: `dev`
-- Source: `<type>/*`
-- Production promotion: `dev` -> `main` after Preview verification
+> 단일 PR이 Issue를 완전히 해결하는 경우에만 `Closes #`를 사용합니다. 하나의 Issue에 여러 PR이 연결되면 모든 PR은 `Refs #`를 사용하고 마지막 PR 병합 후 Issue를 수동으로 닫습니다.
 
 ## Changes
 
@@ -24,14 +14,12 @@ or when this is the final promotion PR intended to close it.
 
 ## Test Plan
 
-- [ ] Local verification completed on the work branch
-- [ ] Ready to merge into `dev`
-- [ ] Preview verification plan is clear for `dev`
+-
 
 ## Checklist
 
-- [ ] Branch was created from `dev`
-- [ ] PR targets `dev` unless this is a production promotion PR
-- [ ] No unrelated changes included
-- [ ] User-facing text and commit messages are Korean where applicable
-- [ ] Issue close behavior is correct (`Refs #` for partial PRs, `Closes #` only for final/single-PR work)
+- [ ] 변경 범위가 Issue와 일치합니다.
+- [ ] 브랜치명이 작업 성격에 맞는 prefix를 사용합니다. (`feat/*`, `fix/*`, `refactor/*`, `perf/*`, `chore/*`, `docs/*`, `test/*`, `ci/*`)
+- [ ] 관련 Issue가 PR 본문에 연결되어 있습니다.
+- [ ] `git diff`를 검토했습니다.
+- [ ] 필요한 집중 검증을 실행하고 결과를 Test Plan에 적었습니다.

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { FaGithub, FaInstagram } from "react-icons/fa";
+import { FaGithub } from "react-icons/fa";
 import {
   BellIcon,
   BugAntIcon,
@@ -18,7 +18,6 @@ import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import {
   GITHUB_URL,
-  INSTAGRAM_URL,
   SITE_NAME,
 } from "@/lib/site";
 import { BUG_REPORT_HREF } from "@/lib/support-mail";
@@ -95,16 +94,6 @@ export default function Footer() {
             >
               <FaGithub className="h-5 w-5" />
               {githubHandle}
-            </Button>
-            <Button
-              variant="secondary"
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full justify-start gap-2"
-            >
-              <FaInstagram className="h-5 w-5 text-[#E1306C]" />
-              @myknow00
             </Button>
           </FooterSection>
 
