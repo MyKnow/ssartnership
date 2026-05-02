@@ -101,3 +101,12 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - Complete the task and run local verification inside the typed work branch before merging it into `dev`.
 - When every task for an Issue has been merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after the Preview/integration test is clean and the change is ready for Production.
+
+### Issue / PR Workflow
+
+- Create an Issue before planned work and record scope, split plan, verification, and branch strategy.
+- Open task PRs from typed work branches into `dev`, not `main`.
+- Link multi-PR work with `Refs #<issue-number>` so the Issue stays open while partial work lands.
+- Use `Closes #<issue-number>` only when a single PR fully resolves the Issue, or when the final promotion PR intentionally closes it.
+- After every Issue task is merged into `dev`, run Preview/integration verification from `dev`.
+- Close the Issue only after `dev` verification is complete and the change has either been promoted to `main` or is explicitly accepted as Preview-only.
