@@ -19,6 +19,39 @@ Best practices for Git version control, branching strategies, and collaborative 
 
 ## Branching Strategies
 
+### Ssartnership Dev-to-Production Flow
+
+This repository uses a two-environment branch strategy:
+
+```
+main (Vercel Production + Supabase Production)
+  ▲
+  │ promote only after preview validation
+  │
+dev (Vercel Preview + Supabase Preview)
+  ▲
+  │ merge after local verification
+  │
+  ├── feat/*
+  ├── fix/*
+  ├── refactor/*
+  ├── perf/*
+  ├── chore/*
+  ├── docs/*
+  ├── test/*
+  └── ci/*
+```
+
+**Rules:**
+- Treat `main` as production-only. Do not start normal feature work from `main`.
+- Treat `dev` as the integration and pre-production validation branch.
+- Start planned work by updating `dev`, then create a typed work branch from `dev`.
+- Use branch prefixes that match the work type: `feat/*`, `fix/*`, `refactor/*`, `perf/*`, `chore/*`, `docs/*`, `test/*`, or `ci/*`.
+- Finish the task and run local verification in the typed work branch.
+- Merge the typed work branch into `dev` after local verification passes.
+- When every task connected to an Issue is merged into `dev`, run Preview/integration testing from `dev`.
+- Merge `dev` into `main` only after Preview/integration testing passes and the change is ready for Production.
+
 ### GitHub Flow (Simple, Recommended for Most)
 
 Best for continuous deployment and small-to-medium teams.
