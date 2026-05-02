@@ -19,6 +19,39 @@ Best practices for Git version control, branching strategies, and collaborative 
 
 ## Branching Strategies
 
+### Ssartnership Dev-to-Production Flow
+
+This repository uses a two-environment branch strategy:
+
+```
+main (Vercel Production + Supabase Production)
+  ▲
+  │ promote only after preview validation
+  │
+dev (Vercel Preview + Supabase Preview)
+  ▲
+  │ merge after local verification
+  │
+  ├── feat/*
+  ├── fix/*
+  ├── refactor/*
+  ├── perf/*
+  ├── chore/*
+  ├── docs/*
+  ├── test/*
+  └── ci/*
+```
+
+**Rules:**
+- Treat `main` as production-only. Do not start normal feature work from `main`.
+- Treat `dev` as the integration and pre-production validation branch.
+- Start planned work by updating `dev`, then create a typed work branch from `dev`.
+- Use branch prefixes that match the work type: `feat/*`, `fix/*`, `refactor/*`, `perf/*`, `chore/*`, `docs/*`, `test/*`, or `ci/*`.
+- Finish the task and run local verification in the typed work branch.
+- Merge the typed work branch into `dev` after local verification passes.
+- When every task connected to an Issue is merged into `dev`, run Preview/integration testing from `dev`.
+- Merge `dev` into `main` only after Preview/integration testing passes and the change is ready for Production.
+
 ### GitHub Flow (Simple, Recommended for Most)
 
 Best for continuous deployment and small-to-medium teams.
@@ -217,6 +250,26 @@ git push --force-with-lease origin feature/user-auth
 ```
 
 ## Pull Request Workflow
+
+### Ssartnership Issue / PR Rules
+
+Use this repository-specific flow when the user asks to create Issues, PRs, branches, or to close an Issue after implementation:
+
+1. Create or identify a GitHub Issue before code changes when the work is planned rather than an immediate one-line fix.
+2. Create branches from the current base branch using a type prefix that matches the work:
+   - `feat/*` for new user-facing or admin-facing functionality
+   - `fix/*` for production/runtime bugs
+   - `refactor/*` for behavior-preserving UI, structure, or code cleanup
+   - `perf/*` for performance improvements
+   - `chore/*` for maintenance, contact/config updates, and workflow housekeeping
+   - `docs/*`, `test/*`, `ci/*` for documentation, tests, and CI-only changes
+3. Keep PRs focused. Split work into multiple PRs when the changes are independently reviewable or when the user requests separation.
+4. Link PRs to Issues explicitly:
+   - Use `Refs #<issue-number>` when multiple PRs share one Issue.
+   - Use `Closes #<issue-number>` only when that PR alone fully resolves the Issue on merge.
+5. For multi-PR Issues, close the Issue only after the final PR has merged and the acceptance criteria are satisfied.
+6. Before opening a PR, review `git diff`, run focused verification, and include the exact verification commands/results in the PR body.
+7. When the user asks to commit and push, use `npm run release` unless the task is explicitly PR-only or the release script is blocked after partially completing.
 
 ### PR Title Format
 
