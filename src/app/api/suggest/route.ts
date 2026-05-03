@@ -5,7 +5,7 @@ import {
   resolveCurrentActor,
 } from "@/lib/activity-logs";
 import { BUG_REPORT_EMAIL } from "@/lib/site";
-import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
+import { createSmtpTransport, getSmtpConfig, toSmtpConfigErrorLog } from "@/lib/smtp";
 import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
 import { isValidEmail, sanitizeHttpUrl } from "@/lib/validation";
 
@@ -95,7 +95,8 @@ export async function POST(request: Request) {
     let smtpConfig: ReturnType<typeof getSmtpConfig>;
     try {
       smtpConfig = getSmtpConfig();
-    } catch {
+    } catch (error) {
+      console.error("[suggest] smtp config error", toSmtpConfigErrorLog(error));
       return errorResponse(
         "메일 설정이 누락되었습니다.",
         503,

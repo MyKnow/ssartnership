@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getSmtpConfig } from "@/lib/smtp";
+import { getSmtpConfig, SmtpConfigError, toSmtpConfigErrorLog } from "@/lib/smtp";
 
 test("smtp config prefers generic SMTP env values", () => {
   const config = getSmtpConfig({
@@ -67,6 +67,28 @@ test("smtp config requires host, user, and password", () => {
   );
 });
 
+test("smtp config exposes missing generic env names without values", () => {
+  try {
+    getSmtpConfig({
+      SMTP_HOST: "smtp.ssafy.com",
+      SMTP_USER: "myknow@ssafy.com",
+    });
+    assert.fail("Expected SMTP config to fail");
+  } catch (error) {
+    assert.ok(error instanceof SmtpConfigError);
+    assert.equal(error.code, "smtp_incomplete_env");
+    assert.equal(error.mode, "generic");
+    assert.deepEqual(error.missingEnv, ["SMTP_PASS"]);
+    assert.deepEqual(toSmtpConfigErrorLog(error), {
+      code: "smtp_incomplete_env",
+      mode: "generic",
+      missingEnv: ["SMTP_PASS"],
+      invalidEnv: undefined,
+      message: "SMTP 설정이 불완전합니다.",
+    });
+  }
+});
+
 test("smtp config rejects mixed generic and legacy credentials", () => {
   assert.throws(
     () =>
@@ -101,4 +123,20 @@ test("smtp config rejects invalid TLS compatibility options", () => {
       }),
     /SMTP_TLS_MIN_DH_SIZE 설정이 올바르지 않습니다\./,
   );
+});
+
+test("smtp config exposes invalid env names without values", () => {
+  try {
+    getSmtpConfig({
+      SMTP_HOST: "smtp.ssafy.com",
+      SMTP_USER: "myknow@ssafy.com",
+      SMTP_PASS: "secret",
+      SMTP_TLS_MIN_DH_SIZE: "small",
+    });
+    assert.fail("Expected SMTP config to fail");
+  } catch (error) {
+    assert.ok(error instanceof SmtpConfigError);
+    assert.equal(error.code, "smtp_invalid_env");
+    assert.equal(error.invalidEnv, "SMTP_TLS_MIN_DH_SIZE");
+  }
 });
