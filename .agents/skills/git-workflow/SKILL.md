@@ -52,6 +52,20 @@ dev (Vercel Preview + Supabase Preview)
 - When every task connected to an Issue is merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after Preview/integration testing passes and the change is ready for Production.
 
+**Issue and PR rules for this flow:**
+- Create an Issue before planned work starts.
+- Record the intended PR split in the Issue so partial work can be reviewed independently.
+- Open each work PR from its typed branch into `dev`.
+- Use `Refs #<issue-number>` for PRs that are part of a multi-PR Issue.
+- Use `Closes #<issue-number>` only when a single PR fully resolves the Issue or when the final promotion PR is intended to close it.
+- Do not close the Issue immediately after the first partial PR lands in `dev`.
+- Close the Issue after all related work is merged into `dev`, Preview/integration verification passes, and the change is either promoted to `main` or explicitly accepted as Preview-only.
+
+**PR base selection:**
+- Work PR base: `dev`
+- Integration/Preview validation branch: `dev`
+- Production promotion PR base: `main`, source: `dev`
+
 ### GitHub Flow (Simple, Recommended for Most)
 
 Best for continuous deployment and small-to-medium teams.
