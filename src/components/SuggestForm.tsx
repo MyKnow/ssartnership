@@ -369,6 +369,7 @@ export default function SuggestForm() {
         title="제휴 제안 제출"
         description="제안을 제출할까요? 제출 후 홈 화면으로 이동합니다."
         onClose={() => setConfirmOpen(false)}
+        bodyClassName="flex justify-end gap-2"
       >
         <Button
           variant="secondary"

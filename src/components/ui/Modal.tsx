@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
@@ -22,6 +23,7 @@ export default function Modal({
   bodyClassName?: string;
 }) {
   const shouldReduceMotion = useReducedMotion();
+  const portalRoot = typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
     if (!open) {
@@ -36,7 +38,11 @@ export default function Modal({
     };
   }, [open]);
 
-  return (
+  if (!portalRoot) {
+    return null;
+  }
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:px-4 sm:py-6">
@@ -76,6 +82,7 @@ export default function Modal({
           </motion.div>
         </div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    portalRoot,
   );
 }
