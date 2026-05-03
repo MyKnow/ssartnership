@@ -11,6 +11,30 @@ export type SmtpConfig = {
   tlsCiphers?: string;
 };
 
+type SmtpConfigErrorInput = {
+  code: "smtp_missing_env" | "smtp_incomplete_env" | "smtp_invalid_env";
+  mode: "generic" | "legacy" | "unknown";
+  missingEnv?: string[];
+  invalidEnv?: string;
+  message: string;
+};
+
+export class SmtpConfigError extends Error {
+  code: SmtpConfigErrorInput["code"];
+  mode: SmtpConfigErrorInput["mode"];
+  missingEnv: string[];
+  invalidEnv?: string;
+
+  constructor(input: SmtpConfigErrorInput) {
+    super(input.message);
+    this.name = "SmtpConfigError";
+    this.code = input.code;
+    this.mode = input.mode;
+    this.missingEnv = input.missingEnv ?? [];
+    this.invalidEnv = input.invalidEnv;
+  }
+}
+
 function parseSmtpPort(value?: string) {
   if (!value) {
     return 465;
@@ -18,7 +42,12 @@ function parseSmtpPort(value?: string) {
 
   const port = Number(value);
   if (!Number.isInteger(port) || port <= 0) {
-    throw new Error("SMTP_PORT 설정이 올바르지 않습니다.");
+    throw new SmtpConfigError({
+      code: "smtp_invalid_env",
+      mode: "generic",
+      invalidEnv: "SMTP_PORT",
+      message: "SMTP_PORT 설정이 올바르지 않습니다.",
+    });
   }
 
   return port;
@@ -39,7 +68,12 @@ function parseOptionalPositiveInteger(value: string | undefined, name: string) {
 
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} 설정이 올바르지 않습니다.`);
+    throw new SmtpConfigError({
+      code: "smtp_invalid_env",
+      mode: "unknown",
+      invalidEnv: name,
+      message: `${name} 설정이 올바르지 않습니다.`,
+    });
   }
 
   return parsed;
@@ -47,6 +81,30 @@ function parseOptionalPositiveInteger(value: string | undefined, name: string) {
 
 function hasAnyValue(values: Array<string | undefined>) {
   return values.some((value) => Boolean(value?.trim()));
+}
+
+function getMissingEnv(requiredEnv: Record<string, string | undefined>) {
+  return Object.entries(requiredEnv)
+    .filter(([, value]) => !value?.trim())
+    .map(([name]) => name);
+}
+
+export function toSmtpConfigErrorLog(error: unknown) {
+  if (error instanceof SmtpConfigError) {
+    return {
+      code: error.code,
+      mode: error.mode,
+      missingEnv: error.missingEnv,
+      invalidEnv: error.invalidEnv,
+      message: error.message,
+    };
+  }
+
+  return {
+    code: "smtp_unknown_config_error",
+    mode: "unknown",
+    message: error instanceof Error ? error.message : String(error),
+  };
 }
 
 export function getSmtpConfig(env: NodeJS.ProcessEnv = process.env): SmtpConfig {
@@ -62,23 +120,39 @@ export function getSmtpConfig(env: NodeJS.ProcessEnv = process.env): SmtpConfig 
   if (hasGenericSmtpConfig) {
     const port = parseSmtpPort(env.SMTP_PORT);
     const secure = parseSmtpSecure(env.SMTP_SECURE, port);
-    const fromEmail = env.SMTP_FROM_EMAIL ?? env.SMTP_USER;
+    const fromEmailValue = env.SMTP_FROM_EMAIL ?? env.SMTP_USER;
     const tlsMinDhSize = parseOptionalPositiveInteger(
       env.SMTP_TLS_MIN_DH_SIZE,
       "SMTP_TLS_MIN_DH_SIZE",
     );
     const tlsCiphers = env.SMTP_TLS_CIPHERS;
+    const missingEnv = getMissingEnv({
+      SMTP_HOST: env.SMTP_HOST,
+      SMTP_USER: env.SMTP_USER,
+      SMTP_PASS: env.SMTP_PASS,
+      SMTP_FROM_EMAIL: fromEmailValue,
+    });
 
-    if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS || !fromEmail) {
-      throw new Error("SMTP 설정이 불완전합니다.");
+    if (missingEnv.length > 0) {
+      throw new SmtpConfigError({
+        code: "smtp_incomplete_env",
+        mode: "generic",
+        missingEnv,
+        message: "SMTP 설정이 불완전합니다.",
+      });
     }
 
+    const host = env.SMTP_HOST!;
+    const user = env.SMTP_USER!;
+    const pass = env.SMTP_PASS!;
+    const fromEmail = fromEmailValue!;
+
     return {
-      host: env.SMTP_HOST,
+      host,
       port,
       secure,
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
+      user,
+      pass,
       fromEmail,
       ...(tlsMinDhSize ? { tlsMinDhSize } : {}),
       ...(tlsCiphers ? { tlsCiphers } : {}),
@@ -87,23 +161,36 @@ export function getSmtpConfig(env: NodeJS.ProcessEnv = process.env): SmtpConfig 
 
   const port = 465;
   const secure = true;
-  const fromEmail = env.NAVER_SMTP_USER;
+  const fromEmailValue = env.NAVER_SMTP_USER;
   const tlsMinDhSize = parseOptionalPositiveInteger(
     env.SMTP_TLS_MIN_DH_SIZE,
     "SMTP_TLS_MIN_DH_SIZE",
   );
   const tlsCiphers = env.SMTP_TLS_CIPHERS;
+  const missingEnv = getMissingEnv({
+    NAVER_SMTP_USER: env.NAVER_SMTP_USER,
+    NAVER_SMTP_PASS: env.NAVER_SMTP_PASS,
+  });
 
-  if (!env.NAVER_SMTP_USER || !env.NAVER_SMTP_PASS || !fromEmail) {
-    throw new Error("메일 설정이 누락되었습니다.");
-  }
+    if (missingEnv.length > 0) {
+      throw new SmtpConfigError({
+        code: "smtp_missing_env",
+        mode: "legacy",
+        missingEnv,
+        message: "메일 설정이 누락되었습니다.",
+      });
+    }
+
+  const user = env.NAVER_SMTP_USER!;
+  const pass = env.NAVER_SMTP_PASS!;
+  const fromEmail = fromEmailValue!;
 
   return {
     host: "smtp.naver.com",
     port,
     secure,
-    user: env.NAVER_SMTP_USER,
-    pass: env.NAVER_SMTP_PASS,
+    user,
+    pass,
     fromEmail,
     ...(tlsMinDhSize ? { tlsMinDhSize } : {}),
     ...(tlsCiphers ? { tlsCiphers } : {}),
