@@ -112,6 +112,8 @@ export async function loginAction(formData: FormData) {
     });
   }
 
+  let successRedirectPath = "/partner";
+
   try {
     const result = await authenticatePartnerPortalLogin(loginId, password);
     await setPartnerSession({
@@ -137,7 +139,9 @@ export async function loginAction(formData: FormData) {
       },
     });
 
-    redirect(result.account.mustChangePassword ? "/partner/change-password" : "/partner");
+    successRedirectPath = result.account.mustChangePassword
+      ? "/partner/change-password"
+      : "/partner";
   } catch (error) {
     if (error instanceof PartnerPortalLoginError) {
       return redirectPartnerLoginFailure({
@@ -166,4 +170,6 @@ export async function loginAction(formData: FormData) {
     await delayPartnerAuthAttempt("login", true);
     redirect(buildPartnerLoginErrorRedirect("server_error", loginId));
   }
+
+  redirect(successRedirectPath);
 }

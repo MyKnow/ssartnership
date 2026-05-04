@@ -49,9 +49,6 @@ export default function PartnerSetupHero({
           <p className="mt-2 text-sm font-semibold text-foreground">
             {context.account.displayName}
           </p>
-          <p className="mt-1 break-all text-xs text-muted-foreground">
-            {context.account.email}
-          </p>
         </div>
         <div className="rounded-2xl border border-border bg-surface-inset/85 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
@@ -59,11 +56,6 @@ export default function PartnerSetupHero({
           </p>
           <p className="mt-2 text-sm font-semibold text-foreground">
             {context.company.services.length}개
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {context.isSetupComplete
-              ? "로그인 후 바로 확인할 수 있습니다."
-              : "비밀번호 설정 후 바로 관리할 수 있습니다."}
           </p>
         </div>
       </div>
