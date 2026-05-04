@@ -101,6 +101,7 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - Complete the task and run local verification inside the typed work branch before merging it into `dev`.
 - When every task for an Issue has been merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after the Preview/integration test is clean and the change is ready for Production.
+- For urgent production fixes, start from `main` and create a `hotfix/*` branch. After local verification, merge the hotfix into `main` first for Production recovery, then back-merge or cherry-pick the same fix into `dev` so Preview does not drift from Production.
 
 ### Issue / PR Workflow
 

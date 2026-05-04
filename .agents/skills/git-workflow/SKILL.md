@@ -40,6 +40,9 @@ dev (Vercel Preview + Supabase Preview)
   ├── docs/*
   ├── test/*
   └── ci/*
+
+main
+  └── hotfix/*  (urgent Production recovery only)
 ```
 
 **Rules:**
@@ -51,6 +54,7 @@ dev (Vercel Preview + Supabase Preview)
 - Merge the typed work branch into `dev` after local verification passes.
 - When every task connected to an Issue is merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after Preview/integration testing passes and the change is ready for Production.
+- Use `hotfix/*` only for urgent Production fixes. Create the hotfix branch from `main`, verify locally, merge it into `main` first to recover Production, then back-merge or cherry-pick the same fix into `dev`.
 
 **Issue and PR rules for this flow:**
 - Create an Issue before planned work starts.
@@ -65,6 +69,7 @@ dev (Vercel Preview + Supabase Preview)
 - Work PR base: `dev`
 - Integration/Preview validation branch: `dev`
 - Production promotion PR base: `main`, source: `dev`
+- Urgent hotfix PR base: `main`, source: `hotfix/*`; follow with a `dev` synchronization PR or cherry-pick.
 
 ### GitHub Flow (Simple, Recommended for Most)
 
