@@ -2,6 +2,37 @@ import type { AdminLogsRecordCollections } from "@/lib/log-insights";
 import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from "./types";
 import { getActorSearchLabel, getLogLabel, stringifyForSearch } from "./utils.ts";
 
+function getStringProperty(
+  properties: Record<string, unknown> | null,
+  key: string,
+) {
+  const value = properties?.[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function isPartnerPortalAuditAction(action: string) {
+  return action.startsWith("partner_portal_");
+}
+
+export function isPartnerPortalLog(log: NormalizedLog) {
+  return (
+    log.path?.startsWith("/partner") === true ||
+    getStringProperty(log.properties, "area") === "partner" ||
+    (log.group === "security" && log.name.startsWith("partner_")) ||
+    (log.group === "audit" && isPartnerPortalAuditAction(log.name))
+  );
+}
+
+function matchesGroupFilter(log: NormalizedLog, groupFilter: GroupFilter) {
+  if (groupFilter === "all") {
+    return true;
+  }
+  if (groupFilter === "partner") {
+    return isPartnerPortalLog(log);
+  }
+  return log.group === groupFilter;
+}
+
 export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLog[] {
   const normalizedProduct = data.productLogs.map((log) => {
     const actorSearchLabel = getActorSearchLabel({
@@ -55,18 +86,23 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
   });
 
   const normalizedAudit = data.auditLogs.map((log) => {
-    const actorSearchLabel = log.actor_id ?? "admin";
+    const actorLoginId = getStringProperty(log.properties ?? null, "actorLoginId");
+    const actorDisplayName = getStringProperty(log.properties ?? null, "actorDisplayName");
+    const isPartnerAudit = isPartnerPortalAuditAction(String(log.action));
+    const actorSearchLabel = isPartnerAudit
+      ? actorLoginId ?? actorDisplayName ?? log.actor_id ?? "협력사 계정"
+      : log.actor_id ?? "admin";
     return {
       id: log.id,
       group: "audit" as const,
       name: String(log.action),
       label: getLogLabel("audit", String(log.action)),
       status: null,
-      actorType: "admin",
+      actorType: isPartnerAudit ? "partner" : "admin",
       actorId: log.actor_id ?? null,
-      actorName: null,
+      actorName: isPartnerAudit ? actorDisplayName : null,
       actorMmUsername: null,
-      identifier: null,
+      identifier: isPartnerAudit ? actorLoginId : null,
       ipAddress: log.ip_address ?? null,
       path: log.path ?? null,
       referrer: null,
@@ -80,6 +116,8 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
       searchText: [
         log.action,
         log.actor_id,
+        actorDisplayName,
+        actorLoginId,
         log.ip_address,
         log.path,
         log.target_type,
@@ -147,7 +185,7 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
 
 export function getAvailableLogNames(unifiedLogs: NormalizedLog[], groupFilter: GroupFilter) {
   const names = unifiedLogs
-    .filter((log) => groupFilter === "all" || log.group === groupFilter)
+    .filter((log) => matchesGroupFilter(log, groupFilter))
     .map((log) => ({ value: log.name, label: log.label }));
   return Array.from(new Map(names.map((item) => [item.value, item])).values()).sort(
     (a, b) => a.label.localeCompare(b.label, "ko-KR"),
@@ -183,7 +221,7 @@ export function filterAndSortLogs({
 }) {
   const query = searchValue.trim().toLowerCase();
   const next = unifiedLogs.filter((log) => {
-    if (groupFilter !== "all" && log.group !== groupFilter) {
+    if (!matchesGroupFilter(log, groupFilter)) {
       return false;
     }
     if (actorFilter !== "all" && log.actorType !== actorFilter) {

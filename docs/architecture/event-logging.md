@@ -32,6 +32,7 @@
 - `certification_view`
 - `certification_qr_open`
 - `certification_qr_verify`
+- `/partner` 하위 `page_view`는 `properties.area = "partner"`로 남기며 관리자 로그에서 파트너 포털 필터로 모아본다.
 
 ### 2. Admin Audit
 관리자 조작 추적용 로그입니다.
@@ -49,6 +50,11 @@
 - `member_delete`
 - `push_send`
 - `push_log_delete`
+- `partner_portal_immediate_update`
+- `partner_portal_change_request_submit`
+- `partner_portal_change_request_cancel`
+- `partner_portal_review_hide`
+- `partner_portal_review_restore`
 
 ### 3. Auth Security
 인증/보안 추적용 로그입니다.
@@ -62,10 +68,15 @@
 - `member_password_change`
 - `member_delete`
 - `admin_login`
+- `partner_login`
+- `partner_logout`
+- `partner_initial_setup`
+- `partner_password_reset`
+- `partner_password_change`
 
 ## 공통 필드
-- `actor_type`: `guest`, `member`, `admin`, `system`
-- `actor_id`: 회원 UUID 또는 관리자 ID
+- `actor_type`: `guest`, `member`, `admin`, `partner`, `system`
+- `actor_id`: 회원 UUID, 관리자 ID, 협력사 계정 ID
 - `path`: 이벤트가 발생한 경로
 - `referrer`: 이전 경로 또는 참조 URL
 - `target_type`: 대상 엔터티 유형

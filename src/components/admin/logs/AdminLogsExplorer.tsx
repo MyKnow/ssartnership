@@ -158,6 +158,7 @@ export function AdminLogsExplorer({
                 <option value="product">사용자</option>
                 <option value="audit">관리자</option>
                 <option value="security">보안</option>
+                <option value="partner">파트너 포털</option>
               </Select>
             </label>
             <label className="grid gap-2 text-sm font-medium text-foreground">
