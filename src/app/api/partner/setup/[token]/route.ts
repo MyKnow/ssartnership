@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import {
   completePartnerPortalInitialSetup,
   getPartnerPortalSetupContext,
@@ -55,9 +56,30 @@ export async function POST(
       confirmPassword: String(payload.confirmPassword ?? ""),
     });
 
+    await logAuthSecurity({
+      ...getRequestLogContext(request),
+      eventName: "partner_initial_setup",
+      status: "success",
+      actorType: "partner",
+      actorId: result.accountId,
+      identifier: result.loginId,
+      properties: {
+        companyId: result.companyId,
+      },
+    });
+
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     if (isPartnerPortalSetupError(error)) {
+      await logAuthSecurity({
+        ...getRequestLogContext(request),
+        eventName: "partner_initial_setup",
+        status: "failure",
+        actorType: "guest",
+        properties: {
+          reason: error.code,
+        },
+      });
       return NextResponse.json(
         {
           error: error.code,
@@ -76,6 +98,16 @@ export async function POST(
         request.headers.get("x-request-id") ??
         null,
       error,
+    });
+
+    await logAuthSecurity({
+      ...getRequestLogContext(request),
+      eventName: "partner_initial_setup",
+      status: "failure",
+      actorType: "guest",
+      properties: {
+        reason: "exception",
+      },
     });
 
     return NextResponse.json(

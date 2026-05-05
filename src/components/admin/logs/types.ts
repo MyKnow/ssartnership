@@ -25,5 +25,5 @@ export type NormalizedLog = {
 };
 
 export type SortFilter = 'newest' | 'oldest' | 'actor' | 'ip';
-export type GroupFilter = 'all' | LogGroup;
+export type GroupFilter = 'all' | LogGroup | 'partner';
 export type StatusFilter = 'all' | 'success' | 'failure' | 'blocked';

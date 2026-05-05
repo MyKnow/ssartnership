@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getPartnerSession } from "@/lib/partner-session";
 import { parsePartnerAudienceSelection } from "@/lib/partner-audience";
 import {
@@ -66,7 +67,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       redirect(`${getReturnUrl(partnerId)}?mode=edit&error=forbidden`);
     }
 
-    await createPartnerChangeRequest({
+    const request = await createPartnerChangeRequest({
       companyIds: session.companyIds,
       partnerId,
       requestedByAccountId: session.accountId,
@@ -85,6 +86,23 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       requestedInquiryLink: context.inquiryLink,
       requestedPeriodStart: periodStart || null,
       requestedPeriodEnd: periodEnd || null,
+    });
+
+    await logAdminAudit({
+      ...(await getServerActionLogContext(getReturnUrl(partnerId))),
+      actorId: session.accountId,
+      action: "partner_portal_change_request_submit",
+      targetType: "partner",
+      targetId: partnerId,
+      properties: {
+        requestId: request.id,
+        partnerId,
+        partnerName: request.partnerName,
+        companyId: request.companyId,
+        companyIds: session.companyIds,
+        actorLoginId: session.loginId,
+        actorDisplayName: session.displayName,
+      },
     });
   } catch (error) {
     if (error instanceof PartnerChangeRequestError) {

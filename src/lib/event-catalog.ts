@@ -61,6 +61,11 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_review_restore',
   'partner_review_update',
   'partner_review_delete',
+  'partner_portal_immediate_update',
+  'partner_portal_change_request_submit',
+  'partner_portal_change_request_cancel',
+  'partner_portal_review_hide',
+  'partner_portal_review_restore',
   'promotion_event_create',
   'promotion_event_update',
   'promotion_event_delete',
@@ -88,13 +93,14 @@ export const AUTH_SECURITY_EVENT_NAMES = [
   'admin_access',
   'partner_login',
   'partner_logout',
+  'partner_initial_setup',
   'partner_password_reset',
   'partner_password_change',
 ] as const;
 
 export type AuthSecurityEventName = (typeof AUTH_SECURITY_EVENT_NAMES)[number];
 export type AuthSecurityStatus = 'success' | 'failure' | 'blocked';
-export type EventActorType = 'guest' | 'member' | 'admin' | 'system';
+export type EventActorType = 'guest' | 'member' | 'admin' | 'partner' | 'system';
 
 const PRODUCT_EVENT_NAME_SET = new Set<string>(PRODUCT_EVENT_NAMES);
 

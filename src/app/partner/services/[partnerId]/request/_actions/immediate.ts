@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getPartnerSession } from "@/lib/partner-session";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
@@ -74,6 +75,26 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         (url) => !result.currentMediaUrls.includes(url),
       ),
     ).catch(() => undefined);
+
+    await logAdminAudit({
+      ...(await getServerActionLogContext(getReturnUrl(partnerId))),
+      actorId: session.accountId,
+      action: "partner_portal_immediate_update",
+      targetType: "partner",
+      targetId: partnerId,
+      properties: {
+        partnerId,
+        companyId: result.companyId,
+        companyIds: session.companyIds,
+        actorLoginId: session.loginId,
+        actorDisplayName: session.displayName,
+        tagCount: tags.length,
+        imageCount: media.images.length,
+        thumbnailChanged: context.thumbnail !== media.thumbnail,
+        reservationLinkChanged: context.reservationLink !== reservationLink,
+        inquiryLinkChanged: context.inquiryLink !== inquiryLink,
+      },
+    });
   } catch (error) {
     if (media) {
       await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);

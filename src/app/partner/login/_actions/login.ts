@@ -113,7 +113,6 @@ export async function loginAction(formData: FormData) {
   }
 
   let successRedirectPath = "/partner";
-
   try {
     const result = await authenticatePartnerPortalLogin(loginId, password);
     await setPartnerSession({
@@ -131,7 +130,8 @@ export async function loginAction(formData: FormData) {
       ...context,
       eventName: "partner_login",
       status: "success",
-      actorType: "guest",
+      actorType: "partner",
+      actorId: result.account.id,
       identifier: result.account.loginId,
       properties: {
         accountId: result.account.id,

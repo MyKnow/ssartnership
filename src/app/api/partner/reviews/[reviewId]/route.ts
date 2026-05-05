@@ -68,7 +68,10 @@ export async function PATCH(
   await logAdminAudit({
     ...getRequestLogContext(request),
     actorId: session.accountId,
-    action: action === "hide" ? "partner_review_hide" : "partner_review_restore",
+    action:
+      action === "hide"
+        ? "partner_portal_review_hide"
+        : "partner_portal_review_restore",
     targetType: "partner_review",
     targetId: reviewId,
     properties: {

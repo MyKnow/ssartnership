@@ -253,3 +253,95 @@ test("log selectors build actor/name options and sort filtered logs", async () =
     blocked: 1,
   });
 });
+
+test("log selectors expose partner portal activity as a virtual group", async () => {
+  const {
+    buildUnifiedLogs,
+    filterAndSortLogs,
+    getAvailableLogNames,
+    isPartnerPortalLog,
+  } = await logsSelectorsPromise;
+
+  const data = {
+    productLogs: [
+      {
+        id: "partner-page-1",
+        event_name: "page_view",
+        actor_type: "guest",
+        actor_mm_username: null,
+        actor_name: null,
+        actor_id: null,
+        ip_address: "127.0.0.1",
+        path: "/partner/services/partner-1",
+        referrer: null,
+        target_type: null,
+        target_id: null,
+        partner_name: null,
+        properties: { area: "partner" },
+        created_at: "2026-04-08T00:00:00.000Z",
+      },
+    ],
+    auditLogs: [
+      {
+        id: "partner-audit-1",
+        action: "partner_portal_change_request_submit",
+        actor_id: "account-1",
+        ip_address: "127.0.0.2",
+        path: "/partner/services/partner-1",
+        target_type: "partner",
+        target_id: "partner-1",
+        partner_name: "세이프닥",
+        properties: {
+          actorLoginId: "owner@safedoc.io",
+          actorDisplayName: "이세연",
+          partnerId: "partner-1",
+        },
+        created_at: "2026-04-08T01:00:00.000Z",
+      },
+    ],
+    securityLogs: [
+      {
+        id: "partner-security-1",
+        event_name: "partner_login",
+        status: "success",
+        actor_type: "partner",
+        actor_mm_username: null,
+        actor_name: null,
+        actor_id: "account-1",
+        identifier: "owner@safedoc.io",
+        ip_address: "127.0.0.3",
+        path: "/partner/login",
+        properties: { accountId: "account-1" },
+        created_at: "2026-04-08T02:00:00.000Z",
+      },
+    ],
+  };
+
+  const unified = buildUnifiedLogs(data as never);
+  assert.equal(unified.every(isPartnerPortalLog), true);
+  assert.deepStrictEqual(
+    filterAndSortLogs({
+      unifiedLogs: unified,
+      searchValue: "",
+      groupFilter: "partner",
+      nameFilter: "all",
+      actorFilter: "all",
+      statusFilter: "all",
+      sortFilter: "newest",
+    }).map((log) => log.id),
+    ["partner-security-1", "partner-audit-1", "partner-page-1"],
+  );
+  assert.deepStrictEqual(
+    getAvailableLogNames(unified, "partner").map((item) => item.label),
+    [
+      "페이지 조회",
+      "협력사 포털 로그인",
+      "협력사 포털 변경 요청 제출",
+    ].sort((a, b) => a.localeCompare(b, "ko-KR")),
+  );
+
+  const auditLog = unified.find((log) => log.id === "partner-audit-1");
+  assert.equal(auditLog?.actorType, "partner");
+  assert.equal(auditLog?.actorSearchLabel, "owner@safedoc.io");
+  assert.equal(auditLog?.identifier, "owner@safedoc.io");
+});

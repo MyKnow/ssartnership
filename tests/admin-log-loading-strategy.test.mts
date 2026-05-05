@@ -50,7 +50,7 @@ test("shouldUseDbPagedAdminLogList allows newest queries including all-group and
   );
 });
 
-test("shouldUseDbPagedAdminLogList rejects non-newest sort combinations", () => {
+test("shouldUseDbPagedAdminLogList rejects non-newest sort combinations and virtual groups", () => {
   assert.equal(
     shouldUseDbPagedAdminLogList(
       {
@@ -68,6 +68,18 @@ test("shouldUseDbPagedAdminLogList rejects non-newest sort combinations", () => 
       {
         group: "audit",
         sort: "actor",
+      },
+      1,
+      100,
+    ),
+    false,
+  );
+
+  assert.equal(
+    shouldUseDbPagedAdminLogList(
+      {
+        group: "partner",
+        sort: "newest",
       },
       1,
       100,

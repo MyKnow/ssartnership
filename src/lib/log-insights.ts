@@ -21,6 +21,7 @@ import {
   filterAndSortLogs,
 } from '@/components/admin/logs/selectors';
 import { getLogLabel } from '@/components/admin/logs/utils';
+import type { GroupFilter } from '@/components/admin/logs/types';
 import type {
   AdminLogsAggregateData,
   AdminAuditLogRecord,
@@ -72,6 +73,20 @@ function parsePageSize(value: string | number | null | undefined) {
   return LOG_PAGE_SIZE_OPTIONS.includes(parsed as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
     ? parsed
     : 100;
+}
+
+function resolveGroupFilter(value: string | null | undefined): GroupFilter {
+  if (value === 'product' || value === 'audit' || value === 'security' || value === 'partner') {
+    return value;
+  }
+  return 'all';
+}
+
+function resolveActualGroupFilter(value: string | null | undefined): LogGroup | 'all' {
+  if (value === 'product' || value === 'audit' || value === 'security') {
+    return value;
+  }
+  return 'all';
 }
 
 function shouldUseSplitAdminLogLoading(options: GetAdminLogsPageDataOptions, page: number, pageSize: number) {
@@ -250,13 +265,9 @@ function buildAdminLogsPageDataFromRows({
     securityLogs,
   };
   const unifiedLogs = buildUnifiedLogs(fullRecords);
+  const groupFilter = resolveGroupFilter(options.group);
   const filters: AdminLogsFilterMeta = {
-    availableNames: getAvailableLogNames(
-      unifiedLogs,
-      options.group === 'product' || options.group === 'audit' || options.group === 'security'
-        ? options.group
-        : 'all',
-    ),
+    availableNames: getAvailableLogNames(unifiedLogs, groupFilter),
     actorOptions: getActorOptions(unifiedLogs),
   };
   const summary: AdminLogsSummary = {
@@ -282,10 +293,7 @@ function buildAdminLogsPageDataFromRows({
         })
       : unifiedLogs,
     searchValue: options.search ?? '',
-    groupFilter:
-      options.group === 'product' || options.group === 'audit' || options.group === 'security'
-        ? options.group
-        : 'all',
+    groupFilter,
     nameFilter: options.name || 'all',
     actorFilter: options.actor || 'all',
     statusFilter:
@@ -345,6 +353,9 @@ export function shouldUseDbPagedAdminLogList(
   void _pageSize;
   const sort = options.sort ?? 'newest';
   if (sort !== 'newest') {
+    return false;
+  }
+  if (options.group === 'partner') {
     return false;
   }
   return true;
@@ -424,10 +435,7 @@ export async function getAdminLogsPageData(
         securityLogs: listSecurityLogs,
       }),
       searchValue: options.search ?? '',
-      groupFilter:
-        options.group === 'product' || options.group === 'audit' || options.group === 'security'
-          ? options.group
-          : 'all',
+      groupFilter: resolveGroupFilter(options.group),
       nameFilter: options.name || 'all',
       actorFilter: options.actor || 'all',
       statusFilter:
@@ -461,9 +469,7 @@ export async function getAdminLogsPageData(
       chartBuckets: buildAggregateChartBuckets(range, aggregate),
       filters: buildAggregateFilters(
         aggregate,
-        options.group === 'product' || options.group === 'audit' || options.group === 'security'
-          ? options.group
-          : 'all',
+        resolveActualGroupFilter(options.group),
       ),
       summary: {
         topProductEvents: buildAggregateTopNamedItems('product', aggregate.topProductEvents),
@@ -484,10 +490,12 @@ export async function getAdminLogsPageData(
     };
   }
 
+  const partnerPortalOnly = options.group === 'partner';
   const summaryData = useSplitLoading
     ? await loadAdminLogSummaryRows(options, ['product', 'audit', 'security'])
     : await loadAdminLogRows(options, ['product', 'audit', 'security'], {
         maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
+        partnerPortalOnly,
       });
   const listSourceData = useDbPagedList
     ? (
@@ -506,6 +514,7 @@ export async function getAdminLogsPageData(
     : useSplitLoading
       ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
           maxRowsPerGroup: page * pageSize,
+          partnerPortalOnly,
         })
       : summaryData;
 
