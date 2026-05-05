@@ -98,6 +98,7 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - `main` is connected to Vercel Production and Supabase Production. Treat it as the production deployment branch.
 - `dev` is connected to Vercel Preview and Supabase Preview. Treat it as the integration and pre-production validation branch.
 - Start all planned work from `dev`, then create a typed work branch such as `feat/*`, `fix/*`, `refactor/*`, `perf/*`, `chore/*`, `docs/*`, `test/*`, or `ci/*`.
+- For urgent production fixes, create `hotfix/*` branches directly from `main`.
 - Complete the task and run local verification inside the typed work branch before merging it into `dev`.
 - When every task for an Issue has been merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after the Preview/integration test is clean and the change is ready for Production.
