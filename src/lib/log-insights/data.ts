@@ -31,15 +31,22 @@ async function queryAllRows<T>(
   startIso: string,
   endIso: string,
   maxRows: number | null,
+  orFilter?: string,
 ): Promise<{ rows: T[]; truncated: boolean }> {
   return collectPagedRows<T>(
     maxRows,
     async (from, to) => {
-      const { data, error } = await supabase
+      let query = supabase
         .from(table)
         .select(select)
         .gte('created_at', startIso)
-        .lte('created_at', endIso)
+        .lte('created_at', endIso);
+
+      if (orFilter) {
+        query = query.or(orFilter);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -190,12 +197,14 @@ export async function loadAdminLogRows(
   config: {
     maxRowsPerGroup: number | null;
     shape?: 'full' | 'summary';
+    partnerPortalOnly?: boolean;
   },
 ): Promise<AdminLogsLoadedData> {
   const supabase = getSupabaseAdminClient();
   const range = resolveLogRange(options);
   const selectedGroups = uniqueLogGroups(groups);
   const shape = config.shape ?? 'full';
+  const partnerPortalOnly = Boolean(config.partnerPortalOnly);
 
   const [productResult, auditResult, securityResult] = await Promise.all([
     selectedGroups.includes('product')
@@ -208,6 +217,7 @@ export async function loadAdminLogRows(
           range.start,
           range.end,
           config.maxRowsPerGroup,
+          partnerPortalOnly ? 'path.like./partner%' : undefined,
         )
       : Promise.resolve({ rows: [] as ProductLogRow[], truncated: false }),
     selectedGroups.includes('audit')
@@ -220,6 +230,9 @@ export async function loadAdminLogRows(
           range.start,
           range.end,
           config.maxRowsPerGroup,
+          partnerPortalOnly
+            ? 'action.like.partner_portal_%,path.like./partner%,path.like./api/partner%'
+            : undefined,
         )
       : Promise.resolve({ rows: [] as AdminAuditLogRow[], truncated: false }),
     selectedGroups.includes('security')
@@ -232,6 +245,9 @@ export async function loadAdminLogRows(
           range.start,
           range.end,
           config.maxRowsPerGroup,
+          partnerPortalOnly
+            ? 'event_name.like.partner_%,path.like./partner%,path.like./api/partner%'
+            : undefined,
         )
       : Promise.resolve({ rows: [] as AuthSecurityLogRow[], truncated: false }),
   ]);

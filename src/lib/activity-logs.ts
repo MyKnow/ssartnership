@@ -15,6 +15,7 @@ import {
 } from '@/lib/partner-metric-rollups';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { getSignedUserSession } from '@/lib/user-auth';
+import { getPartnerSession } from '@/lib/partner-session';
 
 type HeaderSource = {
   get(name: string): string | null;
@@ -179,6 +180,14 @@ export async function resolveCurrentActor(): Promise<{
     return {
       actorType: 'admin',
       actorId: adminSession.adminId,
+    };
+  }
+
+  const partnerSession = await getPartnerSession().catch(() => null);
+  if (partnerSession?.accountId) {
+    return {
+      actorType: 'partner',
+      actorId: partnerSession.accountId,
     };
   }
 

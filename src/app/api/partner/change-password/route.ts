@@ -21,6 +21,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   let sessionLoginId = "";
+  let sessionAccountId = "";
   try {
     const session = await getPartnerSession();
     if (!session?.accountId) {
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
     sessionLoginId = session.loginId;
+    sessionAccountId = session.accountId;
 
     const throttleContext = {
       ipAddress: context.ipAddress ?? null,
@@ -48,7 +50,8 @@ export async function POST(request: Request) {
         ...context,
         eventName: "partner_password_change",
         status: "blocked",
-        actorType: "guest",
+        actorType: "partner",
+        actorId: sessionAccountId,
         identifier: sessionLoginId,
         properties: {
           reason: "rate_limit",
@@ -71,7 +74,8 @@ export async function POST(request: Request) {
         ...context,
         eventName: "partner_password_change",
         status: "failure",
-        actorType: "guest",
+        actorType: "partner",
+        actorId: sessionAccountId,
         identifier: sessionLoginId,
         properties: { reason: "missing_fields" },
       });
@@ -101,7 +105,8 @@ export async function POST(request: Request) {
       ...context,
       eventName: "partner_password_change",
       status: "success",
-      actorType: "guest",
+      actorType: "partner",
+      actorId: result.account.id,
       identifier: result.account.loginId,
       properties: {
         accountId: result.account.id,
@@ -116,7 +121,9 @@ export async function POST(request: Request) {
         ...context,
         eventName: "partner_password_change",
         status: "failure",
-        actorType: "guest",
+        actorType: sessionAccountId ? "partner" : "guest",
+        actorId: sessionAccountId || null,
+        identifier: sessionLoginId || null,
         properties: {
           reason: error.code,
         },
@@ -145,7 +152,9 @@ export async function POST(request: Request) {
       ...context,
       eventName: "partner_password_change",
       status: "failure",
-      actorType: "guest",
+      actorType: sessionAccountId ? "partner" : "guest",
+      actorId: sessionAccountId || null,
+      identifier: sessionLoginId || null,
       properties: {
         reason: "exception",
         message: (error as Error).message,

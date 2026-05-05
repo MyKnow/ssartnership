@@ -66,6 +66,11 @@ const auditLabels: Record<string, string> = {
   partner_account_company_update: '협력사 포털 연결 수정',
   partner_account_initial_setup_link_generate: '협력사 포털 초기설정 URL 생성',
   partner_account_initial_setup_link_send: '협력사 포털 초기설정 URL 전송',
+  partner_portal_immediate_update: '협력사 포털 즉시 수정',
+  partner_portal_change_request_submit: '협력사 포털 변경 요청 제출',
+  partner_portal_change_request_cancel: '협력사 포털 변경 요청 취소',
+  partner_portal_review_hide: '협력사 포털 리뷰 숨김',
+  partner_portal_review_restore: '협력사 포털 리뷰 복구',
 };
 
 const securityLabels: Record<string, string> = {
@@ -84,6 +89,7 @@ const securityLabels: Record<string, string> = {
   admin_access: '관리자 접근 제어',
   partner_login: '협력사 포털 로그인',
   partner_logout: '협력사 포털 로그아웃',
+  partner_initial_setup: '협력사 포털 초기 설정',
   partner_password_reset: '협력사 포털 비밀번호 재설정',
   partner_password_change: '협력사 포털 비밀번호 변경',
 };

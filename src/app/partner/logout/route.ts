@@ -13,7 +13,8 @@ export async function GET(request: Request) {
       ...context,
       eventName: "partner_logout",
       status: "success",
-      actorType: "guest",
+      actorType: "partner",
+      actorId: session.accountId,
       identifier: session.loginId,
       properties: {
         accountId: session.accountId,
