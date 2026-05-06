@@ -195,6 +195,27 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
   const previewColumnsByTable = await listPublicTableColumns(previewDbUrl);
   const sourceSql = await readFile(dumpPath, "utf8");
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+  const { stats } = sanitized;
+
+  if (stats.partnerCopyBlocksSeen > 0) {
+    console.log(
+      [
+        "Preview sync partner campus diagnostics:",
+        `partnerCopyBlocksSeen=${stats.partnerCopyBlocksSeen}`,
+        `partnerRowsSeen=${stats.partnerRowsSeen}`,
+        `partnerCampusSlugsAppended=${stats.partnerCampusSlugsAppended}`,
+        `partnerCampusSlugsBackfilled=${stats.partnerCampusSlugsBackfilled}`,
+        `partnerRowsSkippedColumnMismatch=${stats.partnerRowsSkippedColumnMismatch}`,
+        `unresolvedPartnerCampusSlugRows=${stats.unresolvedPartnerCampusSlugRows}`,
+      ].join(" "),
+    );
+  }
+
+  if (stats.unresolvedPartnerCampusSlugRows > 0) {
+    throw new Error(
+      `Preview dump still has ${stats.unresolvedPartnerCampusSlugRows} partner row(s) that can violate partners_campus_slugs_check after sanitizing.`,
+    );
+  }
 
   if (!sanitized.changed) {
     return;
