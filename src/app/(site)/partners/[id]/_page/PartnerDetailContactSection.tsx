@@ -1,5 +1,6 @@
 import ContactCopyRow from "@/components/ContactCopyRow";
 import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
 import SectionHeading from "@/components/ui/SectionHeading";
 
 type ContactDisplay = NonNullable<
@@ -44,14 +45,24 @@ export default function PartnerDetailContactSection({
       {benefitUseAction ? (
         <Card className="w-full p-4 sm:p-5">
           <SectionHeading title="혜택 이용" />
-          <ContactCopyRow
-            href={benefitUseAction.href}
-            label={benefitUseAction.label}
-            rawValue={normalizedLinks.benefitActionLink || normalizedLinks.reservationLink || benefitUseAction.href}
-            eventName="reservation_click"
-            targetType="partner"
-            targetId={partnerId}
-          />
+          {benefitUseAction.disabled ? (
+            <Button
+              className="mt-4 w-full justify-center"
+              disabled
+              variant="secondary"
+            >
+              {benefitUseAction.label}
+            </Button>
+          ) : (
+            <ContactCopyRow
+              href={benefitUseAction.href}
+              label={benefitUseAction.label}
+              rawValue={normalizedLinks.benefitActionLink || normalizedLinks.reservationLink || benefitUseAction.href}
+              eventName="reservation_click"
+              targetType="partner"
+              targetId={partnerId}
+            />
+          )}
         </Card>
       ) : null}
 

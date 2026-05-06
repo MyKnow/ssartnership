@@ -77,7 +77,7 @@
   - CTAs that reveal the benefit flow
 - Mask copy:
   - logged out: `로그인 후 조회 가능합니다.`
-  - logged in but not eligible: `혜택 대상자만 조회 가능합니다.`
+  - logged in but not eligible: `적용 대상만 조회 가능합니다.`
 - SEO metadata and structured data must not include masked benefit text.
 
 ## Benefit Use Action Design Notes

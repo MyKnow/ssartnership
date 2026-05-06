@@ -188,6 +188,7 @@ export async function getPartnerDetailPageData(
         actionType: normalizedLinks.benefitActionType,
         actionLink: normalizedLinks.benefitActionLink,
         legacyReservationLink: normalizedLinks.reservationLink,
+        accessStatus: partner.benefitAccessStatus,
       })
     : null;
   const reservationDisplay = isActive

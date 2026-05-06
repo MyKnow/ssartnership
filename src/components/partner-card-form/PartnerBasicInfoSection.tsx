@@ -118,7 +118,7 @@ export default function PartnerBasicInfoSection({
               className={getPartnerCardInvalidClass(Boolean(fieldErrors?.benefitVisibility))}
             >
               <option value="public">혜택 전체 공개</option>
-              <option value="eligible_only">혜택 대상자만 공개</option>
+              <option value="eligible_only">적용 대상만 공개</option>
             </Select>
           </FieldGroup>
         </div>

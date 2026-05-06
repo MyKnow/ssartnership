@@ -133,16 +133,19 @@ export type BenefitUseAction = {
   label: string;
   href: string;
   type: PartnerBenefitActionType;
+  disabled?: boolean;
 };
 
 export function getBenefitUseAction({
   actionType,
   actionLink,
   legacyReservationLink,
+  accessStatus,
 }: {
   actionType?: string | null;
   actionLink?: string | null;
   legacyReservationLink?: string | null;
+  accessStatus?: "login_required" | "not_eligible" | null;
 }): BenefitUseAction | null {
   const resolvedType = resolvePartnerBenefitActionType({
     benefitActionType:
@@ -154,6 +157,14 @@ export function getBenefitUseAction({
   });
 
   if (resolvedType === "certification") {
+    if (accessStatus === "not_eligible") {
+      return {
+        label: "적용 대상 아님",
+        href: "/certification",
+        type: resolvedType,
+        disabled: true,
+      };
+    }
     return {
       label: "인증하고 혜택 이용",
       href: "/certification",

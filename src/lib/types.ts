@@ -22,6 +22,7 @@ export type Partner = {
   category: CategoryKey;
   visibility: PartnerVisibility;
   benefitVisibility?: PartnerBenefitVisibility;
+  benefitAccessStatus?: "login_required" | "not_eligible";
   createdAt: string;
   location: string;
   campusSlugs?: CampusSlug[];

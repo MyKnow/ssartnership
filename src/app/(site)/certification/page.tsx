@@ -10,6 +10,7 @@ import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
 import CertificationProfileSync from "@/components/certification/CertificationProfileSync";
 import { SITE_NAME } from "@/lib/site";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export const metadata: Metadata = {
   title: `SSAFY 인증 | ${SITE_NAME}`,
@@ -32,11 +33,30 @@ type CertificationMember = {
   avatar_base64?: string | null;
 };
 
-export default async function CertificationPage() {
+function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
+  const nestedReturnTo = sanitizeReturnTo(
+    Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo,
+    "",
+  );
+  const params = new URLSearchParams();
+  if (nestedReturnTo) {
+    params.set("returnTo", nestedReturnTo);
+  }
+  const queryString = params.toString();
+  return queryString ? `/certification?${queryString}` : "/certification";
+}
+
+export default async function CertificationPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ returnTo?: string | string[] }>;
+}) {
   const initialTimestamp = new Date().toISOString();
+  const params = (await searchParams) ?? {};
+  const returnTo = buildCertificationReturnTo(params.returnTo);
   const session = await getSignedUserSession();
   if (!session?.userId) {
-    redirect("/auth/login");
+    redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
   const headerSession = await getHeaderSession(session.userId);
@@ -51,7 +71,7 @@ export default async function CertificationPage() {
     .maybeSingle();
 
   if (!member) {
-    redirect("/auth/login");
+    redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
   return (

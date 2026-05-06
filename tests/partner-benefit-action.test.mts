@@ -35,6 +35,21 @@ describe("partner benefit action", () => {
     });
   });
 
+  it("disables certification action for non-eligible viewers", () => {
+    const action = getBenefitUseAction({
+      actionType: "certification",
+      actionLink: "",
+      accessStatus: "not_eligible",
+    });
+
+    assert.deepEqual(action, {
+      label: "적용 대상 아님",
+      href: "/certification",
+      type: "certification",
+      disabled: true,
+    });
+  });
+
   it("does not expose CTA for onsite or none actions", () => {
     assert.equal(
       getBenefitUseAction({ actionType: "onsite", actionLink: "" }),

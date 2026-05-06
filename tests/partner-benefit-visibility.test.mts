@@ -42,6 +42,7 @@ test("benefit visibility masks eligible-only benefits for logged out users", asy
     authenticated: false,
   });
 
+  assert.equal(masked.benefitAccessStatus, "login_required");
   assert.equal(masked.reservationLink, undefined);
   assert.deepEqual(masked.benefits, [BENEFIT_LOGIN_REQUIRED_MESSAGE]);
   assert.deepEqual(masked.conditions, [BENEFIT_LOGIN_REQUIRED_MESSAGE]);
@@ -73,6 +74,7 @@ test("benefit visibility masks eligible-only benefits for non-eligible users", a
     viewerAudience: "graduate",
   });
 
+  assert.equal(masked.benefitAccessStatus, "not_eligible");
   assert.equal(masked.reservationLink, undefined);
   assert.deepEqual(masked.benefits, [BENEFIT_ELIGIBLE_ONLY_MESSAGE]);
   assert.deepEqual(masked.conditions, [BENEFIT_ELIGIBLE_ONLY_MESSAGE]);
@@ -102,6 +104,7 @@ test("benefit visibility preserves eligible-only benefits for eligible users", a
   });
 
   assert.equal(visible.reservationLink, "https://reserve.example.com");
+  assert.equal(visible.benefitAccessStatus, undefined);
   assert.deepEqual(visible.benefits, ["10% 할인"]);
   assert.deepEqual(visible.conditions, ["SSAFY 인증 화면 제시"]);
 });

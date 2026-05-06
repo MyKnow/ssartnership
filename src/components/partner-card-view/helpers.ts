@@ -64,6 +64,7 @@ export function createPartnerCardPresentation(
           actionType: normalizedLinks.benefitActionType,
           actionLink: normalizedLinks.benefitActionLink,
           legacyReservationLink: normalizedLinks.reservationLink,
+          accessStatus: partner.benefitAccessStatus,
         })
       : null,
     inquiryAction: isActive

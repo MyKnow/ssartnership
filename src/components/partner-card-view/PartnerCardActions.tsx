@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 type PartnerAction = {
   href: string;
   label: string;
+  disabled?: boolean;
 };
 
 export default function PartnerCardActions({
@@ -37,6 +38,7 @@ export default function PartnerCardActions({
             rel={reservationAction.href.startsWith("http") ? "noreferrer" : undefined}
             className="w-full justify-center"
             onClick={onReservationClick}
+            disabled={reservationAction.disabled}
           >
             {reservationAction.label}
           </Button>
