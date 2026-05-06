@@ -89,6 +89,9 @@ For a new user-facing or admin-facing feature:
 
 - Treat auth, password reset, Mattermost verification, admin actions, push, image proxy, and Supabase service-role paths as sensitive.
 - Validate request bodies and form inputs at route/action boundaries.
+- When adding or changing a form, add matching FE and BE validation. Prefer one shared helper/schema imported by both the client component and the server route/action; if direct sharing is impossible, document the equivalence and test both sides.
+- FE validation should prevent avoidable submits, set field-level messages, and focus the first invalid field. BE validation must still reject invalid input at the trust boundary with user-safe errors.
+- Keep validation messages and error codes in a shared mapping when the same rule appears in admin, partner, or public user flows.
 - Prefer typed recoverable errors and user-safe messages over raw `Error` leaks.
 - Avoid public env vars for server-only concerns.
 - Keep redirect return paths explicit and testable to avoid login/consent loops.
