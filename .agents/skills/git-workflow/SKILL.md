@@ -54,12 +54,15 @@ dev (Vercel Preview + Supabase Preview)
 
 **Issue and PR rules for this flow:**
 - Create an Issue before planned work starts.
+- Planned work includes any change that touches database migrations or `supabase/schema.sql`, changes shared domain/repository contracts, spans multiple UI surfaces, affects admin/partner auth or approval flows, or is expected to require more than a small single-file fix.
+- If the request is already written as an implementation plan, treat it as planned work by default and create or identify the Issue before editing files.
 - Record the intended PR split in the Issue so partial work can be reviewed independently.
 - Open each work PR from its typed branch into `dev`.
 - Use `Refs #<issue-number>` for PRs that are part of a multi-PR Issue.
 - Use `Closes #<issue-number>` only when a single PR fully resolves the Issue or when the final promotion PR is intended to close it.
 - Do not close the Issue immediately after the first partial PR lands in `dev`.
 - Close the Issue after all related work is merged into `dev`, Preview/integration verification passes, and the change is either promoted to `main` or explicitly accepted as Preview-only.
+- If work has already started without an Issue, recover immediately: create the Issue, keep the current typed branch, mention the sequencing recovery in the PR body, and tighten this workflow documentation in the same PR.
 
 **PR base selection:**
 - Work PR base: `dev`

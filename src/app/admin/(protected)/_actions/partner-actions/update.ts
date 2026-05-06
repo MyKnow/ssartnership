@@ -51,7 +51,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,company:partner_companies(id,name,slug),categories(id,label)",
+      "company_id,category_id,name,location,campus_slugs,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,company:partner_companies(id,name,slug),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -130,6 +130,7 @@ export async function updatePartnerAction(formData: FormData) {
         name: payload.name,
         category_id: payload.categoryId,
         location: payload.location,
+        campus_slugs: payload.campusSlugs,
         map_url: payload.mapUrl,
         reservation_link: payload.reservationLink,
         inquiry_link: payload.inquiryLink,
@@ -193,6 +194,11 @@ export async function updatePartnerAction(formData: FormData) {
       label: "위치",
       before: previousPartner.location ?? "",
       after: payload.location,
+    },
+    {
+      label: "노출 캠퍼스",
+      before: previousPartner.campus_slugs ?? [],
+      after: payload.campusSlugs,
     },
     {
       label: "지도 링크",

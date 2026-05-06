@@ -1,4 +1,5 @@
 import { normalizePartnerAudience } from "../../partner-audience.ts";
+import { inferCampusSlugsFromLocation, normalizeCampusSlugs } from "../../campuses.ts";
 import { sanitizeHttpUrl, sanitizePartnerLinkValue } from "../../validation.ts";
 import type {
   PartnerChangeRequestSummary,
@@ -107,6 +108,10 @@ export function normalizeServiceRecord(
     currentConditions: [...(service.currentConditions ?? [])],
     currentBenefits: [...(service.currentBenefits ?? [])],
     currentAppliesTo: [...(service.currentAppliesTo ?? [])],
+    currentCampusSlugs:
+      normalizeCampusSlugs(service.currentCampusSlugs ?? []).length > 0
+        ? normalizeCampusSlugs(service.currentCampusSlugs ?? [])
+        : inferCampusSlugsFromLocation(service.partnerLocation),
   };
 }
 
@@ -127,6 +132,7 @@ export function normalizeRequestRecord(
     currentPartnerName?: string | null;
     currentPartnerLocation?: string | null;
     currentMapUrl?: string | null;
+    currentCampusSlugs?: string[] | null;
     currentConditions?: string[] | null;
     currentBenefits?: string[] | null;
     currentAppliesTo?: string[] | null;
@@ -140,6 +146,7 @@ export function normalizeRequestRecord(
     requestedPartnerName?: string | null;
     requestedPartnerLocation?: string | null;
     requestedMapUrl?: string | null;
+    requestedCampusSlugs?: string[] | null;
     requestedConditions?: string[] | null;
     requestedBenefits?: string[] | null;
     requestedAppliesTo?: string[] | null;
@@ -163,6 +170,10 @@ export function normalizeRequestRecord(
       : request.currentPartnerLocation;
   const currentMapUrlSource =
     request.currentMapUrl === undefined ? service?.mapUrl : request.currentMapUrl;
+  const currentCampusSlugsSource =
+    request.currentCampusSlugs === undefined
+      ? service?.currentCampusSlugs
+      : request.currentCampusSlugs;
   const currentConditionsSource =
     request.currentConditions === undefined
       ? service?.currentConditions
@@ -229,6 +240,10 @@ export function normalizeRequestRecord(
       : request.requestedPartnerLocation;
   const requestedMapUrlSource =
     request.requestedMapUrl === undefined ? currentMapUrlSource : request.requestedMapUrl;
+  const requestedCampusSlugsSource =
+    request.requestedCampusSlugs === undefined
+      ? currentCampusSlugsSource
+      : request.requestedCampusSlugs;
   const reviewedByAdminId = request.reviewedByAdminId ?? null;
   const reviewedAt = request.reviewedAt ?? null;
   const cancelledByAccountId = request.cancelledByAccountId ?? null;
@@ -255,6 +270,7 @@ export function normalizeRequestRecord(
         request.partnerLocation,
     ),
     currentMapUrl: sanitizeHttpUrl(currentMapUrlSource ?? undefined),
+    currentCampusSlugs: normalizeCampusSlugs(currentCampusSlugsSource ?? []),
     currentConditions: normalizeTextList(currentConditionsSource),
     currentBenefits: normalizeTextList(currentBenefitsSource),
     currentAppliesTo: normalizeAudience(currentAppliesToSource),
@@ -278,6 +294,7 @@ export function normalizeRequestRecord(
         request.partnerLocation,
     ),
     requestedMapUrl: sanitizeHttpUrl(requestedMapUrlSource ?? undefined),
+    requestedCampusSlugs: normalizeCampusSlugs(requestedCampusSlugsSource ?? []),
     requestedConditions: normalizeTextList(request.requestedConditions),
     requestedBenefits: normalizeTextList(request.requestedBenefits),
     requestedAppliesTo: normalizeAudience(request.requestedAppliesTo),
@@ -303,10 +320,12 @@ export function toSummary(request: MockChangeRequestRecord): PartnerChangeReques
     currentConditions: normalizeTextList(request.currentConditions),
     currentBenefits: normalizeTextList(request.currentBenefits),
     currentAppliesTo: normalizeAudience(request.currentAppliesTo),
+    currentCampusSlugs: normalizeCampusSlugs(request.currentCampusSlugs),
     currentTags: normalizeTextList(request.currentTags),
     requestedTags: normalizeTextList(request.requestedTags),
     requestedConditions: normalizeTextList(request.requestedConditions),
     requestedBenefits: normalizeTextList(request.requestedBenefits),
     requestedAppliesTo: normalizeAudience(request.requestedAppliesTo),
+    requestedCampusSlugs: normalizeCampusSlugs(request.requestedCampusSlugs),
   };
 }

@@ -1,4 +1,5 @@
 import type { PartnerAudienceKey } from "../../partner-audience.ts";
+import type { CampusSlug } from "../../campuses.ts";
 import type {
   PartnerChangeRequestSummary,
 } from "../../partner-change-requests/shared.ts";
@@ -26,6 +27,7 @@ export type MockChangeRequestServiceRecord = {
   currentConditions: string[];
   currentBenefits: string[];
   currentAppliesTo: PartnerAudienceKey[];
+  currentCampusSlugs: CampusSlug[];
 };
 
 export type MockChangeRequestRecord = PartnerChangeRequestSummary & {
@@ -75,6 +77,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     currentConditions: ["전 직원 SSAFY 구성원 인증"],
     currentBenefits: ["월 이용권 20% 할인", "PT 5회 패키지 10% 할인"],
     currentAppliesTo: ["staff", "student"],
+    currentCampusSlugs: ["seoul"],
   },
   {
     companyId: "mock-partner-company-cafe-haeon",
@@ -98,6 +101,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     currentConditions: ["예약 후 이용", "2인 이상 주문 시"],
     currentBenefits: ["아메리카노 15% 할인", "디저트 세트 1,000원 할인"],
     currentAppliesTo: ["student"],
+    currentCampusSlugs: ["seoul"],
   },
   {
     companyId: "mock-partner-company-urban-gym",
@@ -121,6 +125,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     currentConditions: ["상담 예약 필수"],
     currentBenefits: ["PT 5회 15% 할인", "운동복 무료 대여"],
     currentAppliesTo: ["staff", "student", "graduate"],
+    currentCampusSlugs: ["seoul"],
   },
   {
     companyId: "mock-partner-company-urban-gym",
@@ -144,6 +149,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     currentConditions: ["평일 1일 1회", "운동복 착용"],
     currentBenefits: ["사우나 20% 할인"],
     currentAppliesTo: ["staff", "graduate"],
+    currentCampusSlugs: ["seoul"],
   },
 ];
 
@@ -164,9 +170,11 @@ export const seededRequests: MockChangeRequestSeed[] = [
     currentConditions: ["평일 1일 1회", "운동복 착용"],
     currentBenefits: ["사우나 20% 할인"],
     currentAppliesTo: ["staff", "graduate"],
+    currentCampusSlugs: ["seoul"],
     requestedConditions: ["평일 1일 1회", "세면도구 지참"],
     requestedBenefits: ["사우나 25% 할인", "수건 무료 제공"],
     requestedAppliesTo: ["staff", "student", "graduate"],
+    requestedCampusSlugs: ["seoul"],
     reviewedByAdminId: null,
     reviewedAt: null,
     cancelledByAccountId: null,

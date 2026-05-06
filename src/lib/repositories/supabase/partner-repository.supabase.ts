@@ -2,6 +2,7 @@ import type { Category, Partner } from "@/lib/types";
 import {
   normalizePartnerAudience,
 } from "@/lib/partner-audience";
+import { normalizeCampusSlugs } from "@/lib/campuses";
 import type {
   PartnerRepository,
   PartnerViewContext,
@@ -20,6 +21,7 @@ type PartnerRow = {
   created_at: string;
   updated_at?: string | null;
   location: string;
+  campus_slugs?: string[] | null;
   thumbnail?: string | null;
   map_url?: string | null;
   reservation_link?: string | null;
@@ -51,7 +53,7 @@ type PublicCacheVersionRow = {
 };
 
 const PARTNER_SELECT_COLUMNS =
-  "id,name,category_id,created_at,updated_at,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)";
+  "id,name,category_id,created_at,updated_at,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -181,6 +183,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
     visibility: normalizePartnerVisibility(row.visibility),
     createdAt: row.created_at,
     location: row.location,
+    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
     thumbnail,
     mapUrl: row.map_url ?? undefined,
     reservationLink: row.reservation_link ?? undefined,
@@ -205,6 +208,7 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
     visibility: normalizePartnerVisibility(row.visibility),
     createdAt: row.created_at,
     location: "",
+    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
     period: {
       start: "",
       end: "",

@@ -7,6 +7,7 @@ export type CampusSlug =
 
 export type CampusPartnerLike = {
   location: string;
+  campusSlugs?: string[] | null;
 };
 
 export type CampusSummary = {
@@ -80,6 +81,8 @@ export const CAMPUS_DIRECTORY: Array<{
   },
 ];
 
+export const CAMPUS_SLUGS = CAMPUS_DIRECTORY.map((campus) => campus.slug);
+
 export function getCampusBySlug(slug: string) {
   return CAMPUS_DIRECTORY.find((campus) => campus.slug === slug) ?? null;
 }
@@ -92,17 +95,53 @@ export function isNationwideCampusLocation(location: string) {
   return /전국/.test(location);
 }
 
+export function isAllCampusLocation(location: string) {
+  return /전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장/.test(location);
+}
+
+export function isCampusSlug(value: string): value is CampusSlug {
+  return CAMPUS_SLUGS.includes(value as CampusSlug);
+}
+
+export function normalizeCampusSlugs(values: string[]) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value.trim())
+        .filter(isCampusSlug),
+    ),
+  );
+}
+
 export function inferCampusSlugsFromLocation(location: string) {
   const normalized = location.trim();
   if (!normalized) {
     return [];
   }
-  if (isNationwideCampusLocation(normalized)) {
-    return CAMPUS_DIRECTORY.map((campus) => campus.slug);
+  if (isAllCampusLocation(normalized)) {
+    return [...CAMPUS_SLUGS];
   }
   return CAMPUS_DIRECTORY.filter((campus) =>
     campus.patterns.some((pattern) => pattern.test(normalized)),
   ).map((campus) => campus.slug);
+}
+
+export function resolvePartnerCampusSlugs(partner: CampusPartnerLike) {
+  const explicitSlugs = normalizeCampusSlugs(partner.campusSlugs ?? []);
+  if (explicitSlugs.length > 0) {
+    return explicitSlugs;
+  }
+  return inferCampusSlugsFromLocation(partner.location);
+}
+
+export function resolveFormCampusSlugs(values: string[], location: string) {
+  const explicitSlugs = normalizeCampusSlugs(values);
+  if (explicitSlugs.length > 0) {
+    return explicitSlugs;
+  }
+
+  const inferredSlugs = inferCampusSlugsFromLocation(location);
+  return inferredSlugs.length > 0 ? inferredSlugs : [...CAMPUS_SLUGS];
 }
 
 export function getCampusLabelsFromLocation(location: string) {
@@ -116,7 +155,7 @@ export function doesPartnerMatchCampus(
   partner: CampusPartnerLike,
   campusSlug: CampusSlug,
 ) {
-  return inferCampusSlugsFromLocation(partner.location).includes(campusSlug);
+  return resolvePartnerCampusSlugs(partner).includes(campusSlug);
 }
 
 export function getCampusPartners<T extends CampusPartnerLike>(

@@ -100,7 +100,7 @@ export default async function AdminPartnerDetailPage({
     supabase
       .from("partners")
       .select(
-        "id,created_at,name,category_id,company_id,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
+        "id,created_at,name,category_id,company_id,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
       )
       .eq("id", partnerId)
       .maybeSingle(),
@@ -284,6 +284,7 @@ export default async function AdminPartnerDetailPage({
                   name: partner.name ?? "",
                   visibility: partner.visibility,
                   location: partner.location ?? "",
+                  campusSlugs: partner.campus_slugs ?? [],
                   mapUrl: partner.map_url ?? "",
                   reservationLink: partner.reservation_link ?? "",
                   inquiryLink: partner.inquiry_link ?? "",
