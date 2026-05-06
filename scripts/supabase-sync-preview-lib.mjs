@@ -57,6 +57,17 @@ const CAMPUS_SLUGS = [
   "gwangju",
 ];
 
+const CAMPUS_SCOPE_RULES = {
+  partners: {
+    locationColumns: ["location"],
+    campusColumns: ["campus_slugs"],
+  },
+  partner_change_requests: {
+    locationColumns: ["current_partner_location", "requested_partner_location"],
+    campusColumns: ["current_campus_slugs", "requested_campus_slugs"],
+  },
+};
+
 function inferCampusSlugsFromLocation(location) {
   const normalized = location.trim();
   if (!normalized) {
@@ -107,34 +118,47 @@ function createSanitizeStats() {
     partnerCampusSlugsBackfilled: 0,
     partnerRowsSkippedColumnMismatch: 0,
     unresolvedPartnerCampusSlugRows: 0,
+    partnerChangeRequestCopyBlocksSeen: 0,
+    partnerChangeRequestRowsSeen: 0,
+    partnerChangeRequestCampusSlugsAppended: 0,
+    partnerChangeRequestCampusSlugsBackfilled: 0,
+    partnerChangeRequestRowsSkippedColumnMismatch: 0,
+    unresolvedPartnerChangeRequestCampusSlugRows: 0,
   };
 }
+
+function getCampusScopeRule(table) {
+  return CAMPUS_SCOPE_RULES[table] ?? null;
+}
+
+function getStatsPrefixForTable(table) {
+  if (table === "partners") {
+    return "partner";
+  }
+  if (table === "partner_change_requests") {
+    return "partnerChangeRequest";
+  }
+  return null;
+}
+
+function recordCampusScopeTransformation(stats, table, reason) {
+  const prefix = getStatsPrefixForTable(table);
+  if (!prefix || !reason) {
+    return;
+  }
+
+  if (reason === "appended") {
+    stats[`${prefix}CampusSlugsAppended`] += 1;
+  }
+
+  if (reason === "backfilled") {
+    stats[`${prefix}CampusSlugsBackfilled`] += 1;
+  }
+}
+
 function transformKeptValuesForPreview(table, columns, values) {
-  if (table !== "partners") {
-    return {
-      values,
-      changed: false,
-      reason: null,
-    };
-  }
-
-  const locationIndex = columns.indexOf("location");
-  const campusSlugsIndex = columns.indexOf("campus_slugs");
-  if (campusSlugsIndex < 0) {
-    return {
-      values: [
-        ...values,
-        buildPostgresTextArray(
-          inferCampusSlugsFromLocation(locationIndex >= 0 ? values[locationIndex] ?? "" : ""),
-        ),
-      ],
-      changed: true,
-      reason: "appended",
-    };
-  }
-
-  const currentCampusSlugs = values[campusSlugsIndex]?.trim() ?? "";
-  if (isValidCampusSlugsValue(currentCampusSlugs)) {
+  const rule = getCampusScopeRule(table);
+  if (!rule) {
     return {
       values,
       changed: false,
@@ -143,28 +167,80 @@ function transformKeptValuesForPreview(table, columns, values) {
   }
 
   const nextValues = [...values];
-  nextValues[campusSlugsIndex] = buildPostgresTextArray(
-    inferCampusSlugsFromLocation(locationIndex >= 0 ? values[locationIndex] ?? "" : ""),
-  );
+  let changed = false;
+  let appendedCount = 0;
+  let backfilledCount = 0;
+
+  for (let index = 0; index < rule.campusColumns.length; index += 1) {
+    const campusColumn = rule.campusColumns[index];
+    const locationColumn = rule.locationColumns[index];
+    const campusSlugsIndex = columns.indexOf(campusColumn);
+    const locationIndex = columns.indexOf(locationColumn);
+    const inferredValue = buildPostgresTextArray(
+      inferCampusSlugsFromLocation(locationIndex >= 0 ? values[locationIndex] ?? "" : ""),
+    );
+
+    if (campusSlugsIndex < 0) {
+      nextValues.push(inferredValue);
+      changed = true;
+      appendedCount += 1;
+      continue;
+    }
+
+    if (campusSlugsIndex >= values.length) {
+      nextValues[campusSlugsIndex] = inferredValue;
+      changed = true;
+      appendedCount += 1;
+      continue;
+    }
+
+    const currentCampusSlugs = values[campusSlugsIndex]?.trim() ?? "";
+    if (isValidCampusSlugsValue(currentCampusSlugs)) {
+      continue;
+    }
+
+    nextValues[campusSlugsIndex] = inferredValue;
+    changed = true;
+    backfilledCount += 1;
+  }
+
+  if (!changed) {
+    return {
+      values,
+      changed: false,
+      reason: null,
+    };
+  }
 
   return {
     values: nextValues,
     changed: true,
-    reason: campusSlugsIndex >= values.length ? "appended" : "backfilled",
+    reason:
+      appendedCount > 0 && backfilledCount > 0
+        ? "mixed"
+        : appendedCount > 0
+          ? "appended"
+          : "backfilled",
   };
 }
 
 function hasUnresolvedPartnerCampusSlugs(table, columns, values) {
-  if (table !== "partners") {
+  const rule = getCampusScopeRule(table);
+  if (!rule) {
     return false;
   }
 
-  const campusSlugsIndex = columns.indexOf("campus_slugs");
-  if (campusSlugsIndex < 0) {
-    return true;
+  for (const campusColumn of rule.campusColumns) {
+    const campusSlugsIndex = columns.indexOf(campusColumn);
+    if (campusSlugsIndex < 0) {
+      return true;
+    }
+    if (!isValidCampusSlugsValue(values[campusSlugsIndex])) {
+      return true;
+    }
   }
 
-  return !isValidCampusSlugsValue(values[campusSlugsIndex]);
+  return false;
 }
 
 function copyStats(stats) {
@@ -224,8 +300,12 @@ export function sanitizeDumpSqlForPreview(
     }
 
     const isPartnerCopyBlock = copyStatement.table === "partners";
+    const isPartnerChangeRequestCopyBlock = copyStatement.table === "partner_change_requests";
     if (isPartnerCopyBlock) {
       stats.partnerCopyBlocksSeen += 1;
+    }
+    if (isPartnerChangeRequestCopyBlock) {
+      stats.partnerChangeRequestCopyBlocksSeen += 1;
     }
 
     const excludedColumns = excludedColumnsByTable.get(copyStatement.table) ?? new Set();
@@ -235,14 +315,17 @@ export function sanitizeDumpSqlForPreview(
       )
       .filter((columnIndex) => columnIndex >= 0);
 
-    const shouldAppendPartnerCampusSlugs =
-      isPartnerCopyBlock &&
-      previewColumns.has("campus_slugs") &&
-      !copyStatement.columns.includes("campus_slugs");
+    const rule = getCampusScopeRule(copyStatement.table);
+    const shouldAppendCampusScopeColumns =
+      rule &&
+      rule.campusColumns.every((campusColumn) => previewColumns.has(campusColumn)) &&
+      rule.locationColumns.every((locationColumn) => copyStatement.columns.includes(locationColumn)) &&
+      rule.campusColumns.some((campusColumn) => !copyStatement.columns.includes(campusColumn));
     const mayTransformValues =
-      isPartnerCopyBlock &&
-      previewColumns.has("campus_slugs") &&
-      (copyStatement.columns.includes("campus_slugs") || shouldAppendPartnerCampusSlugs);
+      Boolean(rule) &&
+      rule.campusColumns.every((campusColumn) => previewColumns.has(campusColumn)) &&
+      (rule.campusColumns.some((campusColumn) => copyStatement.columns.includes(campusColumn)) ||
+        shouldAppendCampusScopeColumns);
 
     if (keptIndexes.length === copyStatement.columns.length && !mayTransformValues) {
       output.push(line);
@@ -250,15 +333,18 @@ export function sanitizeDumpSqlForPreview(
     }
 
     const keptColumns = keptIndexes.map((columnIndex) => copyStatement.columns[columnIndex]);
-    const outputColumns = shouldAppendPartnerCampusSlugs
-      ? [...keptColumns, "campus_slugs"]
+    const outputColumns = shouldAppendCampusScopeColumns
+      ? [
+          ...keptColumns,
+          ...rule.campusColumns.filter((campusColumn) => !keptColumns.includes(campusColumn)),
+        ]
       : keptColumns;
     const statementLine =
-      keptIndexes.length === copyStatement.columns.length && !shouldAppendPartnerCampusSlugs
+      keptIndexes.length === copyStatement.columns.length && !shouldAppendCampusScopeColumns
         ? line
         : buildCopyStatement(copyStatement.schema, copyStatement.table, outputColumns);
     output.push(statementLine);
-    if (keptIndexes.length !== copyStatement.columns.length || shouldAppendPartnerCampusSlugs) {
+    if (keptIndexes.length !== copyStatement.columns.length || shouldAppendCampusScopeColumns) {
       stats.copyBlocksChanged += 1;
       changed = true;
     }
@@ -275,11 +361,18 @@ export function sanitizeDumpSqlForPreview(
       if (isPartnerCopyBlock) {
         stats.partnerRowsSeen += 1;
       }
+      if (isPartnerChangeRequestCopyBlock) {
+        stats.partnerChangeRequestRowsSeen += 1;
+      }
 
       if (values.length !== copyStatement.columns.length) {
         if (isPartnerCopyBlock) {
           stats.partnerRowsSkippedColumnMismatch += 1;
           stats.unresolvedPartnerCampusSlugRows += 1;
+        }
+        if (isPartnerChangeRequestCopyBlock) {
+          stats.partnerChangeRequestRowsSkippedColumnMismatch += 1;
+          stats.unresolvedPartnerChangeRequestCampusSlugRows += 1;
         }
         output.push(dataLine);
       } else {
@@ -292,14 +385,19 @@ export function sanitizeDumpSqlForPreview(
         if (transformed.changed) {
           changed = true;
         }
-        if (transformed.reason === "appended") {
-          stats.partnerCampusSlugsAppended += 1;
-        }
-        if (transformed.reason === "backfilled") {
-          stats.partnerCampusSlugsBackfilled += 1;
-        }
-        if (hasUnresolvedPartnerCampusSlugs(copyStatement.table, outputColumns, transformed.values)) {
-          stats.unresolvedPartnerCampusSlugRows += 1;
+        recordCampusScopeTransformation(stats, copyStatement.table, transformed.reason);
+        const hasUnresolvedCampusScopes = hasUnresolvedPartnerCampusSlugs(
+          copyStatement.table,
+          outputColumns,
+          transformed.values,
+        );
+        if (hasUnresolvedCampusScopes) {
+          if (isPartnerCopyBlock) {
+            stats.unresolvedPartnerCampusSlugRows += 1;
+          }
+          if (isPartnerChangeRequestCopyBlock) {
+            stats.unresolvedPartnerChangeRequestCampusSlugRows += 1;
+          }
         }
         output.push(transformed.values.join("\t"));
       }

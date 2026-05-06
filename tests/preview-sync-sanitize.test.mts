@@ -166,3 +166,81 @@ test("sanitizeDumpSqlForPreview adds partner campus slugs when production dump l
     ].join("\n"),
   );
 });
+
+test("sanitizeDumpSqlForPreview backfills partner change request campus slugs", async () => {
+  const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
+
+  const sourceSql = [
+    "COPY public.partner_change_requests (id, current_partner_location, current_campus_slugs, requested_partner_location, requested_campus_slugs, created_at) FROM stdin;",
+    "request-1\t전국 전 지점\t{}\t서울 강남구\t\\N\t2026-04-27T00:00:00.000Z",
+    "\\.",
+  ].join("\n");
+
+  const previewColumnsByTable = new Map([
+    [
+      "partner_change_requests",
+      new Set([
+        "id",
+        "current_partner_location",
+        "current_campus_slugs",
+        "requested_partner_location",
+        "requested_campus_slugs",
+        "created_at",
+      ]),
+    ],
+  ]);
+
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.partnerChangeRequestRowsSeen, 1);
+  assert.equal(sanitized.stats.partnerChangeRequestCampusSlugsBackfilled, 1);
+  assert.equal(sanitized.stats.unresolvedPartnerChangeRequestCampusSlugRows, 0);
+  assert.equal(
+    sanitized.sql,
+    [
+      "COPY public.partner_change_requests (id, current_partner_location, current_campus_slugs, requested_partner_location, requested_campus_slugs, created_at) FROM stdin;",
+      "request-1\t전국 전 지점\t{seoul,gumi,daejeon,busan-ulsan-gyeongnam,gwangju}\t서울 강남구\t{seoul}\t2026-04-27T00:00:00.000Z",
+      "\\.",
+    ].join("\n"),
+  );
+});
+
+test("sanitizeDumpSqlForPreview adds missing partner change request campus slug columns", async () => {
+  const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
+
+  const sourceSql = [
+    "COPY public.partner_change_requests (id, current_partner_location, requested_partner_location, created_at) FROM stdin;",
+    "request-1\t전국 전 지점\t서울 강남구\t2026-04-27T00:00:00.000Z",
+    "\\.",
+  ].join("\n");
+
+  const previewColumnsByTable = new Map([
+    [
+      "partner_change_requests",
+      new Set([
+        "id",
+        "current_partner_location",
+        "current_campus_slugs",
+        "requested_partner_location",
+        "requested_campus_slugs",
+        "created_at",
+      ]),
+    ],
+  ]);
+
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.partnerChangeRequestRowsSeen, 1);
+  assert.equal(sanitized.stats.partnerChangeRequestCampusSlugsAppended, 1);
+  assert.equal(sanitized.stats.unresolvedPartnerChangeRequestCampusSlugRows, 0);
+  assert.equal(
+    sanitized.sql,
+    [
+      'COPY "public"."partner_change_requests" ("id", "current_partner_location", "requested_partner_location", "created_at", "current_campus_slugs", "requested_campus_slugs") FROM stdin;',
+      "request-1\t전국 전 지점\t서울 강남구\t2026-04-27T00:00:00.000Z\t{seoul,gumi,daejeon,busan-ulsan-gyeongnam,gwangju}\t{seoul}",
+      "\\.",
+    ].join("\n"),
+  );
+});
