@@ -1,4 +1,5 @@
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
+import { normalizeCampusSlugs } from "../../campuses.ts";
 import type {
   PartnerChangeRequestCancelInput,
   PartnerChangeRequestCreateInput,
@@ -43,6 +44,7 @@ export async function createMockPartnerChangeRequest(
     input.requestedPartnerLocation,
   );
   const requestedMapUrl = normalizeOptionalText(input.requestedMapUrl);
+  const requestedCampusSlugs = normalizeCampusSlugs(input.requestedCampusSlugs);
   const requestedThumbnail = normalizeOptionalText(input.requestedThumbnail);
   const requestedImages = normalizeHttpUrlList(input.requestedImages);
   const requestedReservationLink = normalizeOptionalLink(
@@ -52,6 +54,13 @@ export async function createMockPartnerChangeRequest(
   const requestedPeriodStart = normalizeOptionalText(input.requestedPeriodStart);
   const requestedPeriodEnd = normalizeOptionalText(input.requestedPeriodEnd);
 
+  if (requestedCampusSlugs.length === 0) {
+    throw new PartnerChangeRequestError(
+      "invalid_request",
+      "노출 캠퍼스를 하나 이상 선택해 주세요.",
+    );
+  }
+
   if (
     service.partnerName === requestedPartnerName &&
     service.partnerLocation === requestedPartnerLocation &&
@@ -59,6 +68,7 @@ export async function createMockPartnerChangeRequest(
     arraysEqual(service.currentConditions, requestedConditions) &&
     arraysEqual(service.currentBenefits, requestedBenefits) &&
     arraysEqual(service.currentAppliesTo, requestedAppliesTo) &&
+    arraysEqual(service.currentCampusSlugs, requestedCampusSlugs) &&
     service.periodStart === requestedPeriodStart &&
     service.periodEnd === requestedPeriodEnd
   ) {
@@ -80,6 +90,7 @@ export async function createMockPartnerChangeRequest(
     currentPartnerName: service.partnerName,
     currentPartnerLocation: service.partnerLocation,
     currentMapUrl: service.mapUrl,
+    currentCampusSlugs: [...service.currentCampusSlugs],
     categoryLabel: service.categoryLabel,
     status: "pending" as const,
     requestedByAccountId: input.requestedByAccountId,
@@ -101,6 +112,7 @@ export async function createMockPartnerChangeRequest(
     requestedPartnerName,
     requestedPartnerLocation,
     requestedMapUrl,
+    requestedCampusSlugs,
     requestedConditions,
     requestedBenefits,
     requestedAppliesTo,
@@ -175,6 +187,7 @@ export async function approveMockPartnerChangeRequest(
     service.currentConditions = [...request.requestedConditions];
     service.currentBenefits = [...request.requestedBenefits];
     service.currentAppliesTo = [...request.requestedAppliesTo];
+    service.currentCampusSlugs = [...request.requestedCampusSlugs];
     service.periodStart = request.requestedPeriodStart;
     service.periodEnd = request.requestedPeriodEnd;
   }

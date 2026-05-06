@@ -1,4 +1,5 @@
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
+import { normalizeCampusSlugs } from "../../campuses.ts";
 import { getSupabaseAdminClient } from "../../supabase/server.ts";
 import {
   sanitizeHttpUrl,
@@ -48,6 +49,7 @@ export async function createSupabaseRequest(
     input.requestedPartnerLocation,
   );
   const requestedMapUrl = sanitizeHttpUrl(input.requestedMapUrl ?? undefined);
+  const requestedCampusSlugs = normalizeCampusSlugs(input.requestedCampusSlugs);
   const requestedThumbnail = normalizeOptionalText(input.requestedThumbnail);
   const requestedImages = normalizeHttpUrlList(input.requestedImages);
   const requestedReservationLink = sanitizePartnerLinkValue(
@@ -72,11 +74,18 @@ export async function createSupabaseRequest(
       "브랜드명과 위치를 입력해 주세요.",
     );
   }
+  if (requestedCampusSlugs.length === 0) {
+    throw new PartnerChangeRequestError(
+      "invalid_request",
+      "노출 캠퍼스를 하나 이상 선택해 주세요.",
+    );
+  }
 
   if (
     context.partnerName === requestedPartnerName &&
     context.partnerLocation === requestedPartnerLocation &&
     context.mapUrl === requestedMapUrl &&
+    arraysEqual(context.currentCampusSlugs, requestedCampusSlugs) &&
     requestedConditions.length === 0 &&
     requestedBenefits.length === 0 &&
     requestedAppliesTo.length === 0 &&
@@ -93,6 +102,7 @@ export async function createSupabaseRequest(
     context.partnerName === requestedPartnerName &&
     context.partnerLocation === requestedPartnerLocation &&
     context.mapUrl === requestedMapUrl &&
+    arraysEqual(context.currentCampusSlugs, requestedCampusSlugs) &&
     arraysEqual(context.currentConditions, requestedConditions) &&
     arraysEqual(context.currentBenefits, requestedBenefits) &&
     arraysEqual(context.currentAppliesTo, requestedAppliesTo) &&
@@ -131,6 +141,7 @@ export async function createSupabaseRequest(
       current_partner_name: context.partnerName,
       current_partner_location: context.partnerLocation,
       current_map_url: context.mapUrl,
+      current_campus_slugs: context.currentCampusSlugs,
       current_conditions: context.currentConditions,
       current_benefits: context.currentBenefits,
       current_applies_to: context.currentAppliesTo,
@@ -144,6 +155,7 @@ export async function createSupabaseRequest(
       requested_partner_name: requestedPartnerName,
       requested_partner_location: requestedPartnerLocation,
       requested_map_url: requestedMapUrl,
+      requested_campus_slugs: requestedCampusSlugs,
       requested_conditions: requestedConditions,
       requested_benefits: requestedBenefits,
       requested_applies_to: requestedAppliesTo,

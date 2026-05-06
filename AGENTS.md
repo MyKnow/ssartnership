@@ -73,8 +73,10 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 ## Supabase Migration Naming
 
 - New files under `supabase/migrations/` must remain forward-only and lexicographically increasing.
-- This repo already contains future-dated prefixes, so treat the filename prefix as an ordering key, not the literal wall-clock creation time.
-- Starting after `20260501012000_partner_review_visibility.sql`, create new migrations by incrementing the `SS` portion while keeping ordering monotonic. Example: `20260501012001_*`, `20260501012002_*`, `20260501012003_*`.
+- Use the actual current local time for new migration prefixes in `YYYYMMDDHHMMSS_name.sql` format.
+- Before creating a migration, run `date '+%Y%m%d%H%M%S'` and use that exact timestamp as the prefix.
+- The previous temporary `202605010120xx_*` sequencing convention was only for speed while the repo had future-dated migrations around May 1, 2026. Do not continue that convention for new migrations now that real time is later.
+- If the generated real-time prefix would not be lexicographically greater than the latest migration already present, stop and ask before creating the file instead of inventing an artificial old prefix.
 - Do not rename or edit previously applied migration files just to match real clock time.
 
 ## Git
@@ -106,6 +108,7 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 ### Issue / PR Workflow
 
 - For planned work, create or identify a GitHub Issue before changing code.
+- Treat a change as planned work whenever it touches any database migration/schema, multiple app surfaces, repository/domain contracts, admin/partner auth flows, or more than a small single-file fix. In that case, stop before implementation and create the Issue/PR plan first.
 - Record scope, PR split plan, verification plan, and target branch flow in the Issue.
 - Open task PRs from typed work branches into `dev`, not `main`.
 - Create one focused PR per independently reviewable change.
@@ -114,3 +117,4 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - PR descriptions must include Summary, Related Issue, Branch Flow, Changes, Test Plan, and Checklist.
 - Before opening or updating a PR, review the diff and run focused verification appropriate to the changed files.
 - Close the Issue only after all related work is merged into `dev`, Preview/integration verification passes, and the change has either been promoted to `main` or explicitly accepted as Preview-only.
+- If implementation accidentally starts before Issue/PR setup, create the Issue immediately, document the sequencing miss in the PR, and update this workflow documentation in the same branch before review.

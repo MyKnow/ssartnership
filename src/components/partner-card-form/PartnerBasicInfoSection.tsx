@@ -8,6 +8,7 @@ import {
   PartnerThumbnailField,
 } from "@/components/admin/PartnerMediaEditor";
 import FieldGroup from "@/components/partner-card-form/FieldGroup";
+import PartnerCampusSlugField from "@/components/partner-card-form/PartnerCampusSlugField";
 import { getPartnerCardInvalidClass } from "@/components/partner-card-form/usePartnerCardFormState";
 import type {
   PartnerCardCategoryOption,
@@ -146,6 +147,12 @@ export default function PartnerBasicInfoSection({
             className={getPartnerCardInvalidClass(Boolean(fieldErrors?.location))}
           />
         </FieldGroup>
+
+        <PartnerCampusSlugField
+          defaultValue={partner.campusSlugs}
+          location={values.locationValue}
+          error={fieldErrors?.campusSlugs}
+        />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FieldGroup label="지도 URL" error={fieldErrors?.mapUrl}>

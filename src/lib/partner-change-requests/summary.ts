@@ -1,3 +1,4 @@
+import { resolveFormCampusSlugs } from "../campuses.ts";
 import { sanitizeHttpUrl } from "../validation.ts";
 import {
   normalizeAudience,
@@ -38,6 +39,10 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
   const currentMapUrl = normalizeOptionalText(
     sanitizeHttpUrl(row.current_map_url ?? partner?.map_url ?? undefined),
   );
+  const currentCampusSlugs = resolveFormCampusSlugs(
+    row.current_campus_slugs ?? partner?.campus_slugs ?? [],
+    currentPartnerLocation,
+  );
   const requestedPartnerName = normalizeRequiredText(
     row.requested_partner_name || currentPartnerName || partner?.name || "",
   );
@@ -49,6 +54,10 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
   );
   const requestedMapUrl = normalizeOptionalText(
     sanitizeHttpUrl(row.requested_map_url ?? currentMapUrl ?? undefined),
+  );
+  const requestedCampusSlugs = resolveFormCampusSlugs(
+    row.requested_campus_slugs ?? currentCampusSlugs,
+    requestedPartnerLocation,
   );
 
   return {
@@ -62,6 +71,7 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
     currentPartnerName,
     currentPartnerLocation,
     currentMapUrl,
+    currentCampusSlugs,
     categoryLabel: extractCategoryLabel(partner?.categories ?? null),
     status: row.status,
     requestedByAccountId: row.requested_by_account_id ?? null,
@@ -92,6 +102,7 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
     requestedPartnerName,
     requestedPartnerLocation,
     requestedMapUrl,
+    requestedCampusSlugs,
     reviewedByAdminId: row.reviewed_by_admin_id ?? null,
     reviewedAt: row.reviewed_at ?? null,
     cancelledByAccountId: row.cancelled_by_account_id ?? null,

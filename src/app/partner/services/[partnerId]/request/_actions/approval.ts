@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getPartnerSession } from "@/lib/partner-session";
+import { resolveFormCampusSlugs } from "@/lib/campuses";
 import { parsePartnerAudienceSelection } from "@/lib/partner-audience";
 import {
   createPartnerChangeRequest,
@@ -31,6 +32,10 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
   const rawMapUrl = String(formData.get("mapUrl") || "").trim();
   const conditions = parseList(String(formData.get("conditions") || ""));
   const benefits = parseList(String(formData.get("benefits") || ""));
+  const campusSlugs = resolveFormCampusSlugs(
+    formData.getAll("campusSlugs").map((item) => String(item).trim()),
+    partnerLocation,
+  );
   const appliesTo = parsePartnerAudienceSelection(
     formData.getAll("appliesTo").map((item) => String(item).trim()),
   );
@@ -46,6 +51,12 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       throw new PartnerChangeRequestError(
         "invalid_request",
         "브랜드명과 위치를 입력해 주세요.",
+      );
+    }
+    if (campusSlugs.length === 0) {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "노출 캠퍼스를 하나 이상 선택해 주세요.",
       );
     }
 
@@ -76,6 +87,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       requestedPartnerName: partnerName,
       requestedPartnerLocation: partnerLocation,
       requestedMapUrl: mapUrl,
+      requestedCampusSlugs: campusSlugs,
       requestedConditions: conditions,
       requestedBenefits: benefits,
       requestedTags: context.tags,

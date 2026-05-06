@@ -92,6 +92,7 @@ export default async function AdminPartnerNewPage() {
                   name: "",
                   visibility: "public",
                   location: "",
+                  campusSlugs: ["seoul", "gumi", "daejeon", "busan-ulsan-gyeongnam", "gwangju"],
                   mapUrl: "",
                   reservationLink: "",
                   inquiryLink: "",

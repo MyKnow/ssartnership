@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
+import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 import {
   arraysEqual,
@@ -17,6 +18,14 @@ export type PartnerChangeRequestDiffItem = {
   current: ReactNode;
   requested: ReactNode;
 };
+
+const campusLabelBySlug = new Map(
+  CAMPUS_DIRECTORY.map((campus) => [campus.slug, campus.fullLabel]),
+);
+
+function formatCampusSlugs(slugs: CampusSlug[]) {
+  return slugs.map((slug) => campusLabelBySlug.get(slug) ?? slug);
+}
 
 export function buildPartnerChangeRequestDiffItems(
   request: PartnerChangeRequestSummary | null,
@@ -105,6 +114,26 @@ export function buildPartnerChangeRequestDiffItems(
           requested: (
             <PartnerAudienceChips
               appliesTo={request.requestedAppliesTo}
+              badgeClassName={REQUESTED_DIFF_BADGE_CLASS}
+            />
+          ),
+        }
+      : null,
+    !arraysEqual(request.currentCampusSlugs, request.requestedCampusSlugs)
+      ? {
+          key: "campusSlugs",
+          label: "노출 캠퍼스",
+          current: (
+            <ListChips
+              values={formatCampusSlugs(request.currentCampusSlugs)}
+              emptyText="선택된 캠퍼스가 없습니다."
+              badgeClassName={CURRENT_DIFF_BADGE_CLASS}
+            />
+          ),
+          requested: (
+            <ListChips
+              values={formatCampusSlugs(request.requestedCampusSlugs)}
+              emptyText="선택된 캠퍼스가 없습니다."
               badgeClassName={REQUESTED_DIFF_BADGE_CLASS}
             />
           ),

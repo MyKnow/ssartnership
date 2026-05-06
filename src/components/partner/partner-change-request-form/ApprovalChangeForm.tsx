@@ -4,6 +4,7 @@ import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import TokenChipField from "@/components/admin/TokenChipField";
+import PartnerCampusSlugField from "@/components/partner-card-form/PartnerCampusSlugField";
 import { PARTNER_AUDIENCE_OPTIONS } from "@/lib/partner-audience";
 import type {
   PartnerChangeRequestContext,
@@ -68,6 +69,13 @@ export function ApprovalChangeForm({
                 placeholder="https://map.naver.com/..."
               />
             </FieldGroup>
+          </div>
+          <div className="mt-4">
+            <PartnerCampusSlugField
+              defaultValue={context.currentCampusSlugs}
+              location={context.partnerLocation}
+              description="캠퍼스별 제휴 목록에 이 브랜드를 노출할 범위를 선택합니다."
+            />
           </div>
         </FormSection>
 

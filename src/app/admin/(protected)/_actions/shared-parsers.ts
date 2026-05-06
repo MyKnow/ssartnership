@@ -1,3 +1,4 @@
+import { resolveFormCampusSlugs } from "../../../../lib/campuses.ts";
 import {
   isPartnerVisibility,
   normalizePartnerVisibility,
@@ -233,6 +234,10 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const benefits = String(formData.get("benefits") || "").trim();
   const tags = String(formData.get("tags") || "").trim();
   const appliesTo = formData.getAll("appliesTo").map((item) => String(item).trim());
+  const campusSlugs = resolveFormCampusSlugs(
+    formData.getAll("campusSlugs").map((item) => String(item).trim()),
+    location,
+  );
 
   if (!name) {
     throw new Error("partner_form_missing_name");
@@ -271,11 +276,15 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   if (!parsedAppliesTo) {
     throw new Error("partner_form_invalid_applies_to");
   }
+  if (campusSlugs.length === 0) {
+    throw new Error("partner_form_invalid_campus_slugs");
+  }
 
   return {
     name,
     categoryId,
     location,
+    campusSlugs,
     mapUrl,
     reservationLink,
     inquiryLink,
