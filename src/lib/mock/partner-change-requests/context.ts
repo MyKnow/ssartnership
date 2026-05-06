@@ -49,6 +49,7 @@ export async function getMockPartnerChangeRequestContext(
     currentConditions: [...normalizedService.currentConditions],
     currentBenefits: [...normalizedService.currentBenefits],
     currentAppliesTo: [...normalizedService.currentAppliesTo],
+    currentCampusSlugs: [...normalizedService.currentCampusSlugs],
     currentTags: [...normalizedService.tags],
     currentThumbnail: normalizedService.thumbnail,
     currentImages: [...normalizedService.images],

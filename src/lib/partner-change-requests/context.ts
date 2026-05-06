@@ -1,4 +1,5 @@
 import { normalizePartnerVisibility } from "../partner-visibility.ts";
+import { resolvePartnerCampusSlugs } from "../campuses.ts";
 import { sanitizePartnerLinkValue } from "../validation.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import {
@@ -36,7 +37,7 @@ export async function getSupabaseRequestContext(
   const { data: partner, error } = await supabase
     .from("partners")
     .select(
-      "id,company_id,created_at,name,location,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
+      "id,company_id,created_at,name,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
     )
     .eq("id", partnerId)
     .maybeSingle();
@@ -85,6 +86,10 @@ export async function getSupabaseRequestContext(
     currentConditions: normalizeTextList(row.conditions),
     currentBenefits: normalizeTextList(row.benefits),
     currentAppliesTo: normalizeAudience(row.applies_to),
+    currentCampusSlugs: resolvePartnerCampusSlugs({
+      location: row.location,
+      campusSlugs: row.campus_slugs ?? [],
+    }),
     currentTags: normalizeTextList(row.tags),
     currentThumbnail: row.thumbnail ?? null,
     currentImages: normalizeHttpUrlList(row.images),

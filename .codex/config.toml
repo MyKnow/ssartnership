@@ -35,6 +35,12 @@ persistent_instructions = "Follow project AGENTS.md guidelines. Use available MC
 # so leave it unset unless you intentionally want a single override file.
 # model_instructions_file = "/absolute/path/to/instructions.md"
 
+# Allow outbound network access inside the workspace-write sandbox. This covers
+# the repo's recurring release, PR, package, Supabase, Vercel, Chromatic, and
+# Playwright verification commands without switching to danger-full-access.
+[sandbox_workspace_write]
+network_access = true
+
 # MCP servers
 # Keep the default project set lean. API-backed servers inherit credentials from
 # the launching environment or can be supplied by a user-level ~/.codex/config.toml.

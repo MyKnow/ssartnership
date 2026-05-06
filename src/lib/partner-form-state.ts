@@ -4,6 +4,7 @@ export type PartnerFormField =
   | "periodStart"
   | "periodEnd"
   | "location"
+  | "campusSlugs"
   | "mapUrl"
   | "reservationLink"
   | "inquiryLink"

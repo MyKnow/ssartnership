@@ -2,6 +2,7 @@ import type {
   PartnerAudienceFilter,
   PartnerAudienceKey,
 } from "@/lib/partner-audience";
+import type { CampusSlug } from "@/lib/campuses";
 
 export type CategoryKey = string;
 export type PartnerVisibility = "public" | "confidential" | "private";
@@ -20,6 +21,7 @@ export type Partner = {
   visibility: PartnerVisibility;
   createdAt: string;
   location: string;
+  campusSlugs?: CampusSlug[];
   mapUrl?: string;
   reservationLink?: string;
   inquiryLink?: string;

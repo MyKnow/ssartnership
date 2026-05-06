@@ -1,3 +1,4 @@
+import type { CampusSlug } from "../../../../lib/campuses.ts";
 import type { PartnerVisibility } from "../../../../lib/types.ts";
 
 export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getSupabaseAdminClient>;
@@ -6,6 +7,7 @@ export type PartnerCoreInput = {
   name: string;
   categoryId: string;
   location: string;
+  campusSlugs: CampusSlug[];
   mapUrl: string | null;
   reservationLink: string | null;
   inquiryLink: string | null;

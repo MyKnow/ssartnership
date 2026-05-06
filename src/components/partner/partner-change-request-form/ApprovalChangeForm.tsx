@@ -1,15 +1,21 @@
+"use client";
+
+import { type FormEvent, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import TokenChipField from "@/components/admin/TokenChipField";
+import PartnerCampusSlugField from "@/components/partner-card-form/PartnerCampusSlugField";
 import { PARTNER_AUDIENCE_OPTIONS } from "@/lib/partner-audience";
+import { validateFormCampusSlugSelection } from "@/lib/campuses";
 import type {
   PartnerChangeRequestContext,
   PartnerChangeRequestSummary,
 } from "@/lib/partner-change-requests";
 import { cn } from "@/lib/cn";
+import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { FieldGroup } from "./FieldGroup";
 import FloatingSubmitButton from "./FloatingSubmitButton";
 
@@ -22,8 +28,34 @@ export function ApprovalChangeForm({
   pendingRequest: PartnerChangeRequestSummary | null;
   createAction: (formData: FormData) => void | Promise<void>;
 }) {
+  const [campusSlugError, setCampusSlugError] = useState<string | null>(null);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const formData = new FormData(event.currentTarget);
+    const partnerLocation = String(formData.get("partnerLocation") || "").trim();
+    const campusSlugSelection = validateFormCampusSlugSelection(
+      formData.getAll("campusSlugs").map((item) => String(item).trim()),
+      partnerLocation,
+    );
+
+    if (campusSlugSelection.ok) {
+      setCampusSlugError(null);
+      return;
+    }
+
+    event.preventDefault();
+    setCampusSlugError(partnerFormErrorMessages.partner_form_invalid_campus_slugs);
+    event.currentTarget
+      .querySelector<HTMLInputElement>('input[name="campusSlugs"]')
+      ?.focus();
+  };
+
   return (
-    <form action={createAction} className="space-y-6 pb-24 sm:pb-28">
+    <form
+      action={createAction}
+      onSubmit={handleSubmit}
+      className="space-y-6 pb-24 sm:pb-28"
+    >
       <input type="hidden" name="partnerId" value={context.partnerId} />
 
       <InlineMessage
@@ -68,6 +100,19 @@ export function ApprovalChangeForm({
                 placeholder="https://map.naver.com/..."
               />
             </FieldGroup>
+          </div>
+          <div className="mt-4">
+            <PartnerCampusSlugField
+              defaultValue={context.currentCampusSlugs}
+              location={context.partnerLocation}
+              error={campusSlugError ?? undefined}
+              onSelectionChange={(value) => {
+                if (value.length > 0) {
+                  setCampusSlugError(null);
+                }
+              }}
+              description="캠퍼스별 제휴 목록에 이 브랜드를 노출할 범위를 선택합니다."
+            />
           </div>
         </FormSection>
 

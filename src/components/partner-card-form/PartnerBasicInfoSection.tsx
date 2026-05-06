@@ -1,4 +1,5 @@
 import type { PartnerVisibility } from "@/lib/types";
+import type { CampusSlug } from "@/lib/campuses";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -8,6 +9,7 @@ import {
   PartnerThumbnailField,
 } from "@/components/admin/PartnerMediaEditor";
 import FieldGroup from "@/components/partner-card-form/FieldGroup";
+import PartnerCampusSlugField from "@/components/partner-card-form/PartnerCampusSlugField";
 import { getPartnerCardInvalidClass } from "@/components/partner-card-form/usePartnerCardFormState";
 import type {
   PartnerCardCategoryOption,
@@ -20,6 +22,7 @@ export default function PartnerBasicInfoSection({
   categoryOptions,
   fieldErrors,
   focusField,
+  onCampusSlugSelectionChange,
   values,
   setters,
 }: {
@@ -27,6 +30,7 @@ export default function PartnerBasicInfoSection({
   categoryOptions?: PartnerCardCategoryOption[];
   fieldErrors?: Partial<Record<PartnerCardFormField, string>>;
   focusField?: PartnerCardFormField;
+  onCampusSlugSelectionChange?: (value: CampusSlug[]) => void;
   values: {
     nameValue: string;
     visibilityValue: PartnerVisibility;
@@ -146,6 +150,13 @@ export default function PartnerBasicInfoSection({
             className={getPartnerCardInvalidClass(Boolean(fieldErrors?.location))}
           />
         </FieldGroup>
+
+        <PartnerCampusSlugField
+          defaultValue={partner.campusSlugs}
+          location={values.locationValue}
+          error={fieldErrors?.campusSlugs}
+          onSelectionChange={onCampusSlugSelectionChange}
+        />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <FieldGroup label="지도 URL" error={fieldErrors?.mapUrl}>

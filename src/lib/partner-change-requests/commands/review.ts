@@ -63,6 +63,7 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
     .update({
       name: summary.requestedPartnerName,
       location: summary.requestedPartnerLocation,
+      campus_slugs: summary.requestedCampusSlugs,
       map_url: summary.requestedMapUrl,
       conditions: summary.requestedConditions,
       benefits: summary.requestedBenefits,

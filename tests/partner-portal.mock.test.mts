@@ -289,6 +289,7 @@ test("creates and approves partner change requests for approval-required fields 
     requestedPartnerName: "카페 해온 본점 리뉴얼",
     requestedPartnerLocation: "서울 강남구 역삼로 125",
     requestedMapUrl: "https://map.example.com/cafe-haeon-renewal",
+    requestedCampusSlugs: ["seoul", "gumi"],
     requestedConditions: [...(currentContext?.currentConditions ?? []), "평일만 사용"],
     requestedBenefits: [...(currentContext?.currentBenefits ?? []), "추가 혜택"],
     requestedAppliesTo: ["staff", "student", "graduate"],
@@ -304,6 +305,7 @@ test("creates and approves partner change requests for approval-required fields 
   assert.equal(request.requestedPartnerName, "카페 해온 본점 리뉴얼");
   assert.equal(request.requestedPartnerLocation, "서울 강남구 역삼로 125");
   assert.equal(request.requestedMapUrl, "https://map.example.com/cafe-haeon-renewal");
+  assert.deepStrictEqual(request.requestedCampusSlugs, ["seoul", "gumi"]);
   assert.deepStrictEqual(request.requestedConditions, [
     ...(currentContext?.currentConditions ?? []),
     "평일만 사용",
@@ -329,6 +331,7 @@ test("creates and approves partner change requests for approval-required fields 
   assert.equal(updatedContext?.partnerName, "카페 해온 본점 리뉴얼");
   assert.equal(updatedContext?.partnerLocation, "서울 강남구 역삼로 125");
   assert.equal(updatedContext?.mapUrl, "https://map.example.com/cafe-haeon-renewal");
+  assert.deepStrictEqual(updatedContext?.currentCampusSlugs, ["seoul", "gumi"]);
   assert.deepStrictEqual(updatedContext?.currentConditions, [
     ...(currentContext?.currentConditions ?? []),
     "평일만 사용",
