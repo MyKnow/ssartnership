@@ -139,6 +139,14 @@ export function resolveFormCampusSlugs(values: string[], _location: string) {
   return normalizeCampusSlugs(values);
 }
 
+export function validateFormCampusSlugSelection(values: string[], location: string) {
+  const campusSlugs = resolveFormCampusSlugs(values, location);
+  return {
+    ok: campusSlugs.length > 0,
+    campusSlugs,
+  };
+}
+
 export function getCampusLabelsFromLocation(location: string) {
   return inferCampusSlugsFromLocation(location)
     .map((slug) => getCampusBySlug(slug))

@@ -30,6 +30,7 @@ export default function PartnerCampusSlugField({
   name = "campusSlugs",
   label = "노출 캠퍼스",
   description = "위치 문구와 별개로 실제 노출할 캠퍼스를 명시합니다.",
+  onSelectionChange,
 }: {
   defaultValue?: CampusSlug[] | null;
   location?: string | null;
@@ -37,6 +38,7 @@ export default function PartnerCampusSlugField({
   name?: string;
   label?: string;
   description?: string;
+  onSelectionChange?: (value: CampusSlug[]) => void;
 }) {
   const initialValue = useMemo(
     () => getInitialCampusSlugs(defaultValue, location),
@@ -45,11 +47,16 @@ export default function PartnerCampusSlugField({
   const [selectedSlugs, setSelectedSlugs] = useState<CampusSlug[]>(initialValue);
   const allSelected = selectedSlugs.length === CAMPUS_SLUGS.length;
 
+  const updateSelectedSlugs = (nextValue: CampusSlug[]) => {
+    setSelectedSlugs(nextValue);
+    onSelectionChange?.(nextValue);
+  };
+
   const toggleCampus = (slug: CampusSlug) => {
-    setSelectedSlugs((current) =>
-      current.includes(slug)
-        ? current.filter((item) => item !== slug)
-        : [...current, slug],
+    updateSelectedSlugs(
+      selectedSlugs.includes(slug)
+        ? selectedSlugs.filter((item) => item !== slug)
+        : [...selectedSlugs, slug],
     );
   };
 
@@ -61,7 +68,7 @@ export default function PartnerCampusSlugField({
             type="checkbox"
             checked={allSelected}
             onChange={(event) =>
-              setSelectedSlugs(event.target.checked ? [...CAMPUS_SLUGS] : [])
+              updateSelectedSlugs(event.target.checked ? [...CAMPUS_SLUGS] : [])
             }
             className="mt-1 h-4 w-4 rounded border-slate-300 text-[#234577] focus:ring-[#234577]"
           />

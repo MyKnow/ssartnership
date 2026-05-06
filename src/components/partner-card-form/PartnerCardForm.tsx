@@ -1,5 +1,6 @@
 "use client";
 
+import { type FormEvent, useMemo, useState } from "react";
 import type { PartnerVisibility } from "@/lib/types";
 import usePartnerCardFormState from "@/components/partner-card-form/usePartnerCardFormState";
 import PartnerFormHero from "@/components/partner-card-form/PartnerFormHero";
@@ -9,6 +10,8 @@ import PartnerChipSections from "@/components/partner-card-form/PartnerChipSecti
 import PartnerAudienceSection from "@/components/partner-card-form/PartnerAudienceSection";
 import PartnerFormActions from "@/components/partner-card-form/PartnerFormActions";
 import { cn } from "@/lib/cn";
+import { validateFormCampusSlugSelection } from "@/lib/campuses";
+import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import type {
   PartnerCardCategoryOption,
   PartnerCardCompanyOption,
@@ -46,6 +49,9 @@ export default function PartnerCardForm({
   formError?: string | null;
   hiddenFields?: Array<{ name: string; value: string }>;
 }) {
+  const [clientFieldErrors, setClientFieldErrors] = useState<
+    Partial<Record<PartnerCardFormField, string>>
+  >({});
   const {
     formRef,
     periodStart,
@@ -85,6 +91,44 @@ export default function PartnerCardForm({
     companyFieldsLocked,
   } = usePartnerCardFormState({ partner, categoryId, focusField });
 
+  const mergedFieldErrors = useMemo(
+    () => ({
+      ...fieldErrors,
+      ...clientFieldErrors,
+    }),
+    [fieldErrors, clientFieldErrors],
+  );
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const formData = new FormData(event.currentTarget);
+    const location = String(formData.get("location") || "").trim();
+    const campusSlugSelection = validateFormCampusSlugSelection(
+      formData.getAll("campusSlugs").map((item) => String(item).trim()),
+      location,
+    );
+
+    if (campusSlugSelection.ok) {
+      setClientFieldErrors((current) => {
+        if (!current.campusSlugs) {
+          return current;
+        }
+        const { campusSlugs: _campusSlugs, ...nextErrors } = current;
+        void _campusSlugs;
+        return nextErrors;
+      });
+      return;
+    }
+
+    event.preventDefault();
+    setClientFieldErrors((current) => ({
+      ...current,
+      campusSlugs: partnerFormErrorMessages.partner_form_invalid_campus_slugs,
+    }));
+    event.currentTarget
+      .querySelector<HTMLInputElement>('input[name="campusSlugs"]')
+      ?.focus();
+  };
+
   return (
     <article className={cn("grid gap-6", className)}>
       <PartnerFormHero
@@ -94,7 +138,12 @@ export default function PartnerCardForm({
         periodEnd={periodEnd}
       />
 
-      <form ref={formRef} action={formAction} className="grid gap-6">
+      <form
+        ref={formRef}
+        action={formAction}
+        onSubmit={handleSubmit}
+        className="grid gap-6"
+      >
         {mode === "edit" && partner.id ? (
           <input type="hidden" name="id" value={partner.id} />
         ) : null}
@@ -106,8 +155,20 @@ export default function PartnerCardForm({
           <PartnerBasicInfoSection
             partner={partner}
             categoryOptions={categoryOptions}
-            fieldErrors={fieldErrors}
+            fieldErrors={mergedFieldErrors}
             focusField={focusField}
+            onCampusSlugSelectionChange={(value) => {
+              if (value.length > 0) {
+                setClientFieldErrors((current) => {
+                  if (!current.campusSlugs) {
+                    return current;
+                  }
+                  const { campusSlugs: _campusSlugs, ...nextErrors } = current;
+                  void _campusSlugs;
+                  return nextErrors;
+                });
+              }
+            }}
             values={{
               nameValue,
               visibilityValue,
@@ -134,7 +195,7 @@ export default function PartnerCardForm({
 
           <PartnerCompanySection
             companyOptions={companyOptions}
-            fieldErrors={fieldErrors}
+            fieldErrors={mergedFieldErrors}
             focusField={focusField}
             companyFieldsLocked={companyFieldsLocked}
             values={{
@@ -162,7 +223,7 @@ export default function PartnerCardForm({
             setAppliesToValue={(updater) =>
               setAppliesToValue((current) => updater(current))
             }
-            fieldErrors={fieldErrors}
+            fieldErrors={mergedFieldErrors}
           />
 
           <PartnerFormActions
