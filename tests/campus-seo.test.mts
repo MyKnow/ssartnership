@@ -19,6 +19,7 @@ test("campus helpers infer campus slugs and summarize partner counts", async () 
   const {
     inferCampusSlugsFromLocation,
     getCampusSummaries,
+    resolveFormCampusSlugs,
   } = await campusesModulePromise;
 
   assert.deepStrictEqual(
@@ -56,6 +57,15 @@ test("campus helpers infer campus slugs and summarize partner counts", async () 
   assert.equal(summaries.find((campus) => campus.slug === "seoul")?.partnerCount, 2);
   assert.equal(summaries.find((campus) => campus.slug === "gumi")?.partnerCount, 3);
   assert.equal(summaries.find((campus) => campus.slug === "daejeon")?.partnerCount, 1);
+
+  assert.deepStrictEqual(
+    resolveFormCampusSlugs([], "등록된 병원 전 지점"),
+    [],
+  );
+  assert.deepStrictEqual(
+    resolveFormCampusSlugs(["seoul", "invalid", "seoul", "gumi"], ""),
+    ["seoul", "gumi"],
+  );
 });
 
 test("campus seo helpers include campus and category context", async () => {

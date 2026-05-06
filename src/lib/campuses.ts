@@ -134,14 +134,9 @@ export function resolvePartnerCampusSlugs(partner: CampusPartnerLike) {
   return inferCampusSlugsFromLocation(partner.location);
 }
 
-export function resolveFormCampusSlugs(values: string[], location: string) {
-  const explicitSlugs = normalizeCampusSlugs(values);
-  if (explicitSlugs.length > 0) {
-    return explicitSlugs;
-  }
-
-  const inferredSlugs = inferCampusSlugsFromLocation(location);
-  return inferredSlugs.length > 0 ? inferredSlugs : [...CAMPUS_SLUGS];
+export function resolveFormCampusSlugs(values: string[], _location: string) {
+  void _location;
+  return normalizeCampusSlugs(values);
 }
 
 export function getCampusLabelsFromLocation(location: string) {
