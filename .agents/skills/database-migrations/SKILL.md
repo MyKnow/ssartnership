@@ -54,7 +54,13 @@ supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
 
 Supabase migration files must match the `<timestamp>_name.sql` pattern. Files such as `20260409.sql` are skipped because they do not include a descriptive suffix.
 
-For this repo, the migration prefix must also stay lexicographically increasing relative to the latest file already present. The current anchor is `20260501012000_partner_review_visibility.sql`; after that point, prefer incrementing the `SS` portion for each new migration, for example `20260501012001_*`, `20260501012002_*`, and so on. Treat the prefix as an ordering key when the repo history already contains future-dated values.
+For this repo, create new Supabase migration prefixes from the actual current local time in `YYYYMMDDHHMMSS_name.sql` format. Before creating a migration, run:
+
+```bash
+date '+%Y%m%d%H%M%S'
+```
+
+Use that exact timestamp as the migration prefix. The previous temporary `202605010120xx_*` sequencing convention was only for speed while the repo had future-dated migrations around May 1, 2026; do not continue it for new migrations now that real time is later. If the real-time prefix is not lexicographically greater than the latest migration already present, stop and ask before creating a file.
 
 ### Adding a Column Safely
 
