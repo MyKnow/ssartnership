@@ -118,6 +118,9 @@ test("sanitizeDumpSqlForPreview backfills empty partner campus slugs", async () 
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
 
   assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.partnerRowsSeen, 3);
+  assert.equal(sanitized.stats.partnerCampusSlugsBackfilled, 2);
+  assert.equal(sanitized.stats.unresolvedPartnerCampusSlugRows, 0);
   assert.equal(
     sanitized.sql,
     [
@@ -125,6 +128,40 @@ test("sanitizeDumpSqlForPreview backfills empty partner campus slugs", async () 
       "partner-1\tcategory-1\t역삼 카페\t서울 강남구 논현로 508 1층\t{seoul}\t2026-04-27T00:00:00.000Z",
       "partner-2\tcategory-1\t전국 병원\t등록된 병원 전 지점\t{seoul,gumi,daejeon,busan-ulsan-gyeongnam,gwangju}\t2026-04-27T00:00:00.000Z",
       "partner-3\tcategory-1\t구미 카페\t경북 구미시\t{gumi}\t2026-04-27T00:00:00.000Z",
+      "\\.",
+    ].join("\n"),
+  );
+});
+
+test("sanitizeDumpSqlForPreview adds partner campus slugs when production dump lacks the column", async () => {
+  const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
+
+  const sourceSql = [
+    "COPY public.partners (id, category_id, name, location, created_at) FROM stdin;",
+    "partner-1\tcategory-1\t역삼 카페\t서울 강남구 논현로 508 1층\t2026-04-27T00:00:00.000Z",
+    "partner-2\tcategory-1\t전국 병원\t등록된 병원 전 지점\t2026-04-27T00:00:00.000Z",
+    "\\.",
+  ].join("\n");
+
+  const previewColumnsByTable = new Map([
+    [
+      "partners",
+      new Set(["id", "category_id", "name", "location", "campus_slugs", "created_at"]),
+    ],
+  ]);
+
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.partnerRowsSeen, 2);
+  assert.equal(sanitized.stats.partnerCampusSlugsAppended, 2);
+  assert.equal(sanitized.stats.unresolvedPartnerCampusSlugRows, 0);
+  assert.equal(
+    sanitized.sql,
+    [
+      'COPY "public"."partners" ("id", "category_id", "name", "location", "created_at", "campus_slugs") FROM stdin;',
+      "partner-1\tcategory-1\t역삼 카페\t서울 강남구 논현로 508 1층\t2026-04-27T00:00:00.000Z\t{seoul}",
+      "partner-2\tcategory-1\t전국 병원\t등록된 병원 전 지점\t2026-04-27T00:00:00.000Z\t{seoul,gumi,daejeon,busan-ulsan-gyeongnam,gwangju}",
       "\\.",
     ].join("\n"),
   );

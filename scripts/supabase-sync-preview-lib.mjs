@@ -85,39 +85,91 @@ function buildPostgresTextArray(values) {
   return `{${values.join(",")}}`;
 }
 
+function isValidCampusSlugsValue(value) {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed || trimmed === "\\N" || trimmed === "{}") {
+    return false;
+  }
+  const match = trimmed.match(/^\{(.+)\}$/);
+  if (!match) {
+    return false;
+  }
+  const values = match[1].split(",").map((item) => item.trim()).filter(Boolean);
+  return values.length > 0 && values.every((item) => CAMPUS_SLUGS.includes(item));
+}
+
+function createSanitizeStats() {
+  return {
+    copyBlocksChanged: 0,
+    partnerCopyBlocksSeen: 0,
+    partnerRowsSeen: 0,
+    partnerCampusSlugsAppended: 0,
+    partnerCampusSlugsBackfilled: 0,
+    partnerRowsSkippedColumnMismatch: 0,
+    unresolvedPartnerCampusSlugRows: 0,
+  };
+}
 function transformKeptValuesForPreview(table, columns, values) {
   if (table !== "partners") {
     return {
       values,
       changed: false,
+      reason: null,
     };
   }
 
   const locationIndex = columns.indexOf("location");
   const campusSlugsIndex = columns.indexOf("campus_slugs");
-  if (locationIndex < 0 || campusSlugsIndex < 0) {
+  if (campusSlugsIndex < 0) {
     return {
-      values,
-      changed: false,
+      values: [
+        ...values,
+        buildPostgresTextArray(
+          inferCampusSlugsFromLocation(locationIndex >= 0 ? values[locationIndex] ?? "" : ""),
+        ),
+      ],
+      changed: true,
+      reason: "appended",
     };
   }
 
   const currentCampusSlugs = values[campusSlugsIndex]?.trim() ?? "";
-  if (currentCampusSlugs && currentCampusSlugs !== "\\N" && currentCampusSlugs !== "{}") {
+  if (isValidCampusSlugsValue(currentCampusSlugs)) {
     return {
       values,
       changed: false,
+      reason: null,
     };
   }
 
   const nextValues = [...values];
   nextValues[campusSlugsIndex] = buildPostgresTextArray(
-    inferCampusSlugsFromLocation(values[locationIndex] ?? ""),
+    inferCampusSlugsFromLocation(locationIndex >= 0 ? values[locationIndex] ?? "" : ""),
   );
 
   return {
     values: nextValues,
     changed: true,
+    reason: campusSlugsIndex >= values.length ? "appended" : "backfilled",
+  };
+}
+
+function hasUnresolvedPartnerCampusSlugs(table, columns, values) {
+  if (table !== "partners") {
+    return false;
+  }
+
+  const campusSlugsIndex = columns.indexOf("campus_slugs");
+  if (campusSlugsIndex < 0) {
+    return true;
+  }
+
+  return !isValidCampusSlugsValue(values[campusSlugsIndex]);
+}
+
+function copyStats(stats) {
+  return {
+    ...stats,
   };
 }
 
@@ -153,6 +205,7 @@ export function sanitizeDumpSqlForPreview(
 ) {
   const lines = sql.split("\n");
   const output = [];
+  const stats = createSanitizeStats();
   let changed = false;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -170,6 +223,11 @@ export function sanitizeDumpSqlForPreview(
       continue;
     }
 
+    const isPartnerCopyBlock = copyStatement.table === "partners";
+    if (isPartnerCopyBlock) {
+      stats.partnerCopyBlocksSeen += 1;
+    }
+
     const excludedColumns = excludedColumnsByTable.get(copyStatement.table) ?? new Set();
     const keptIndexes = copyStatement.columns
       .map((column, columnIndex) =>
@@ -177,10 +235,14 @@ export function sanitizeDumpSqlForPreview(
       )
       .filter((columnIndex) => columnIndex >= 0);
 
+    const shouldAppendPartnerCampusSlugs =
+      isPartnerCopyBlock &&
+      previewColumns.has("campus_slugs") &&
+      !copyStatement.columns.includes("campus_slugs");
     const mayTransformValues =
-      copyStatement.table === "partners" &&
-      copyStatement.columns.includes("location") &&
-      copyStatement.columns.includes("campus_slugs");
+      isPartnerCopyBlock &&
+      previewColumns.has("campus_slugs") &&
+      (copyStatement.columns.includes("campus_slugs") || shouldAppendPartnerCampusSlugs);
 
     if (keptIndexes.length === copyStatement.columns.length && !mayTransformValues) {
       output.push(line);
@@ -188,12 +250,16 @@ export function sanitizeDumpSqlForPreview(
     }
 
     const keptColumns = keptIndexes.map((columnIndex) => copyStatement.columns[columnIndex]);
+    const outputColumns = shouldAppendPartnerCampusSlugs
+      ? [...keptColumns, "campus_slugs"]
+      : keptColumns;
     const statementLine =
-      keptIndexes.length === copyStatement.columns.length
+      keptIndexes.length === copyStatement.columns.length && !shouldAppendPartnerCampusSlugs
         ? line
-        : buildCopyStatement(copyStatement.schema, copyStatement.table, keptColumns);
+        : buildCopyStatement(copyStatement.schema, copyStatement.table, outputColumns);
     output.push(statementLine);
-    if (keptIndexes.length !== copyStatement.columns.length) {
+    if (keptIndexes.length !== copyStatement.columns.length || shouldAppendPartnerCampusSlugs) {
+      stats.copyBlocksChanged += 1;
       changed = true;
     }
 
@@ -206,17 +272,34 @@ export function sanitizeDumpSqlForPreview(
       }
 
       const values = dataLine.split("\t");
+      if (isPartnerCopyBlock) {
+        stats.partnerRowsSeen += 1;
+      }
+
       if (values.length !== copyStatement.columns.length) {
+        if (isPartnerCopyBlock) {
+          stats.partnerRowsSkippedColumnMismatch += 1;
+          stats.unresolvedPartnerCampusSlugRows += 1;
+        }
         output.push(dataLine);
       } else {
         const keptValues = keptIndexes.map((columnIndex) => values[columnIndex]);
         const transformed = transformKeptValuesForPreview(
           copyStatement.table,
-          keptColumns,
+          outputColumns,
           keptValues,
         );
         if (transformed.changed) {
           changed = true;
+        }
+        if (transformed.reason === "appended") {
+          stats.partnerCampusSlugsAppended += 1;
+        }
+        if (transformed.reason === "backfilled") {
+          stats.partnerCampusSlugsBackfilled += 1;
+        }
+        if (hasUnresolvedPartnerCampusSlugs(copyStatement.table, outputColumns, transformed.values)) {
+          stats.unresolvedPartnerCampusSlugRows += 1;
         }
         output.push(transformed.values.join("\t"));
       }
@@ -227,5 +310,6 @@ export function sanitizeDumpSqlForPreview(
   return {
     sql: output.join("\n"),
     changed,
+    stats: copyStats(stats),
   };
 }
