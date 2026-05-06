@@ -1,4 +1,5 @@
 import type { PartnerVisibility } from "@/lib/types";
+import type { CampusSlug } from "@/lib/campuses";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -21,6 +22,7 @@ export default function PartnerBasicInfoSection({
   categoryOptions,
   fieldErrors,
   focusField,
+  onCampusSlugSelectionChange,
   values,
   setters,
 }: {
@@ -28,6 +30,7 @@ export default function PartnerBasicInfoSection({
   categoryOptions?: PartnerCardCategoryOption[];
   fieldErrors?: Partial<Record<PartnerCardFormField, string>>;
   focusField?: PartnerCardFormField;
+  onCampusSlugSelectionChange?: (value: CampusSlug[]) => void;
   values: {
     nameValue: string;
     visibilityValue: PartnerVisibility;
@@ -152,6 +155,7 @@ export default function PartnerBasicInfoSection({
           defaultValue={partner.campusSlugs}
           location={values.locationValue}
           error={fieldErrors?.campusSlugs}
+          onSelectionChange={onCampusSlugSelectionChange}
         />
 
         <div className="grid gap-3 sm:grid-cols-2">

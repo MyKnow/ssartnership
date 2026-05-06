@@ -20,6 +20,7 @@ test("campus helpers infer campus slugs and summarize partner counts", async () 
     inferCampusSlugsFromLocation,
     getCampusSummaries,
     resolveFormCampusSlugs,
+    validateFormCampusSlugSelection,
   } = await campusesModulePromise;
 
   assert.deepStrictEqual(
@@ -65,6 +66,14 @@ test("campus helpers infer campus slugs and summarize partner counts", async () 
   assert.deepStrictEqual(
     resolveFormCampusSlugs(["seoul", "invalid", "seoul", "gumi"], ""),
     ["seoul", "gumi"],
+  );
+  assert.deepStrictEqual(
+    validateFormCampusSlugSelection([], "등록된 병원 전 지점"),
+    { ok: false, campusSlugs: [] },
+  );
+  assert.deepStrictEqual(
+    validateFormCampusSlugSelection(["seoul", "invalid", "seoul"], ""),
+    { ok: true, campusSlugs: ["seoul"] },
   );
 });
 
