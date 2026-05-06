@@ -20,6 +20,7 @@ import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 
 export const revalidate = 300;
 
@@ -127,6 +128,9 @@ export default async function Home() {
             <HomeContent
               viewerAuthenticated={Boolean(session?.userId)}
               currentUserId={session?.userId ?? null}
+              viewerAudience={resolvePartnerAudienceFromMemberYear(
+                typeof member?.year === "number" ? member.year : null,
+              )}
             />
           </Suspense>
         </Container>

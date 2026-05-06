@@ -1,4 +1,5 @@
 import type { CampusSlug } from "../../../../lib/campuses.ts";
+import type { PartnerBenefitVisibility } from "../../../../lib/partner-benefit-visibility.ts";
 import type { PartnerVisibility } from "../../../../lib/types.ts";
 
 export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getSupabaseAdminClient>;
@@ -18,6 +19,7 @@ export type PartnerCoreInput = {
   appliesTo: string[];
   tags: string[];
   visibility: PartnerVisibility;
+  benefitVisibility: PartnerBenefitVisibility;
 };
 
 export type PartnerMediaInput = {

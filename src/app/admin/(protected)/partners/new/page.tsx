@@ -91,6 +91,7 @@ export default async function AdminPartnerNewPage() {
                 partner={{
                   name: "",
                   visibility: "public",
+                  benefitVisibility: "public",
                   location: "",
                   campusSlugs: ["seoul", "gumi", "daejeon", "busan-ulsan-gyeongnam", "gwangju"],
                   mapUrl: "",

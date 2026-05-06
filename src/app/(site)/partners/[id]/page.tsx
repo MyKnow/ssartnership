@@ -9,6 +9,8 @@ import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import ShareLinkButton from "@/components/ShareLinkButton";
 import { SITE_NAME } from "@/lib/site";
 import { createCanonicalAlternates } from "@/lib/seo";
+import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
@@ -104,10 +106,21 @@ export default async function PartnerDetailPage({
   if (!rawId) {
     redirect("/");
   }
+  const member = headerSession?.userId
+    ? await getSupabaseAdminClient()
+        .from("members")
+        .select("year")
+        .eq("id", headerSession.userId)
+        .maybeSingle()
+        .then(({ data }) => data)
+    : null;
   const pageData = await getPartnerDetailPageData(
     rawId,
     Boolean(headerSession?.userId),
     headerSession?.userId ?? null,
+    resolvePartnerAudienceFromMemberYear(
+      typeof member?.year === "number" ? member.year : null,
+    ),
   );
   if (!pageData) {
     redirect("/");

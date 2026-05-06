@@ -9,6 +9,8 @@ export const partnerFormErrorMessages: Record<string, string> = {
   partner_form_invalid_reservation_url: "예약 링크 형식을 확인해 주세요.",
   partner_form_invalid_inquiry_url: "문의 링크 형식을 확인해 주세요.",
   partner_form_invalid_visibility: "노출 상태는 공개, 대외비, 비공개 중 하나여야 합니다.",
+  partner_form_invalid_benefit_visibility:
+    "혜택 공개 범위는 전체 공개 또는 대상자 공개 중 하나여야 합니다.",
   partner_form_invalid_applies_to: "적용 대상을 하나 이상 선택해 주세요.",
   partner_form_invalid_request: "입력값을 확인해 주세요.",
   partner_company_missing_name: "협력사명을 입력해 주세요.",

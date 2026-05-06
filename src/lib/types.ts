@@ -3,6 +3,7 @@ import type {
   PartnerAudienceKey,
 } from "@/lib/partner-audience";
 import type { CampusSlug } from "@/lib/campuses";
+import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
 
 export type CategoryKey = string;
 export type PartnerVisibility = "public" | "confidential" | "private";
@@ -19,6 +20,7 @@ export type Partner = {
   name: string;
   category: CategoryKey;
   visibility: PartnerVisibility;
+  benefitVisibility?: PartnerBenefitVisibility;
   createdAt: string;
   location: string;
   campusSlugs?: CampusSlug[];

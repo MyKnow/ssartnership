@@ -4,6 +4,10 @@ import {
   normalizePartnerVisibility,
 } from "../../../../lib/partner-visibility.ts";
 import { parsePartnerAudienceSelection } from "../../../../lib/partner-audience.ts";
+import {
+  isPartnerBenefitVisibility,
+  normalizePartnerBenefitVisibility,
+} from "../../../../lib/partner-benefit-visibility.ts";
 import { normalizePartnerLoginId } from "../../../../lib/partner-utils.ts";
 import {
   isValidEmail,
@@ -228,6 +232,7 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const rawReservationLink = String(formData.get("reservationLink") || "").trim();
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
   const rawVisibility = String(formData.get("visibility") || "").trim();
+  const rawBenefitVisibility = String(formData.get("benefitVisibility") || "").trim();
   const periodStart = String(formData.get("periodStart") || "").trim();
   const periodEnd = String(formData.get("periodEnd") || "").trim();
   const conditions = String(formData.get("conditions") || "").trim();
@@ -272,6 +277,9 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   if (rawVisibility && !isPartnerVisibility(rawVisibility)) {
     throw new Error("partner_form_invalid_visibility");
   }
+  if (rawBenefitVisibility && !isPartnerBenefitVisibility(rawBenefitVisibility)) {
+    throw new Error("partner_form_invalid_benefit_visibility");
+  }
 
   const parsedAppliesTo = parsePartnerAudienceSelection(appliesTo);
   if (!parsedAppliesTo) {
@@ -296,5 +304,8 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     appliesTo: parsedAppliesTo,
     tags: parseList(tags),
     visibility: normalizePartnerVisibility(rawVisibility || "public"),
+    benefitVisibility: normalizePartnerBenefitVisibility(
+      rawBenefitVisibility || "public",
+    ),
   };
 }

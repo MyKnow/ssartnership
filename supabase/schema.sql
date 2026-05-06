@@ -45,6 +45,7 @@ create table if not exists partners (
   category_id uuid not null references categories(id) on delete cascade,
   name text not null,
   visibility text not null default 'public',
+  benefit_visibility text not null default 'public',
   location text not null,
   campus_slugs text[] not null default '{}',
   map_url text,
@@ -92,6 +93,7 @@ as $$
 $$;
 
 alter table partners add column if not exists visibility text not null default 'public';
+alter table partners add column if not exists benefit_visibility text not null default 'public';
 alter table partners add column if not exists campus_slugs text[] not null default '{}';
 update partners
 set visibility = case lower(trim(coalesce(visibility, 'public')))
@@ -105,6 +107,16 @@ alter table partners alter column visibility set not null;
 alter table partners drop constraint if exists partners_visibility_check;
 alter table partners add constraint partners_visibility_check
   check (visibility in ('public', 'confidential', 'private'));
+update partners
+set benefit_visibility = case lower(trim(coalesce(benefit_visibility, 'public')))
+  when 'eligible_only' then 'eligible_only'
+  else 'public'
+end;
+alter table partners alter column benefit_visibility set default 'public';
+alter table partners alter column benefit_visibility set not null;
+alter table partners drop constraint if exists partners_benefit_visibility_check;
+alter table partners add constraint partners_benefit_visibility_check
+  check (benefit_visibility in ('public', 'eligible_only'));
 update partners
 set campus_slugs = public.infer_partner_campus_slugs(location)
 where cardinality(campus_slugs) = 0;

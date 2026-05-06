@@ -22,11 +22,20 @@ import {
 } from "@/lib/seo/partners";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { Category, Partner } from "@/lib/types";
+import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
 const getCategoriesCached = cache(async () => partnerRepository.getCategories());
 
-const getPartnerByIdCached = cache(async (id: string, authenticated: boolean) =>
-  partnerRepository.getPartnerById(id, { authenticated }),
+const getPartnerByIdCached = cache(
+  async (
+    id: string,
+    authenticated: boolean,
+    viewerAudience?: PartnerAudienceKey | null,
+  ) =>
+    partnerRepository.getPartnerById(id, {
+      authenticated,
+      viewerAudience,
+    }),
 );
 
 const getPartnerByIdRawCached = cache(async (id: string) =>
@@ -122,10 +131,11 @@ export async function getPartnerDetailPageData(
   rawId: string,
   authenticated: boolean,
   currentUserId?: string | null,
+  viewerAudience?: PartnerAudienceKey | null,
 ): Promise<PartnerDetailPageData | PartnerDetailAccessGateData | null> {
   const [categories, partner, favoriteIds] = await Promise.all([
     getCategoriesCached(),
-    getPartnerByIdCached(rawId, authenticated),
+    getPartnerByIdCached(rawId, authenticated, viewerAudience),
     currentUserId ? partnerFavoriteRepository.getMemberFavoritePartnerIds(currentUserId, [rawId]) : Promise.resolve(new Set<string>()),
   ]);
 

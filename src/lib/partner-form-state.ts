@@ -9,6 +9,7 @@ export type PartnerFormField =
   | "reservationLink"
   | "inquiryLink"
   | "visibility"
+  | "benefitVisibility"
   | "companyId"
   | "companyName"
   | "companyContactName"

@@ -3,18 +3,22 @@ import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import { partnerFavoriteRepository, partnerRepository } from "@/lib/repositories";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
+import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
 export default async function HomeContent({
   viewerAuthenticated,
   currentUserId,
+  viewerAudience,
 }: {
   viewerAuthenticated: boolean;
   currentUserId: string | null;
+  viewerAudience?: PartnerAudienceKey | null;
 }) {
   const [categories, partners] = await Promise.all([
     partnerRepository.getCategories(),
     partnerRepository.getPartners({
       authenticated: viewerAuthenticated,
+      viewerAudience,
     }),
   ]);
 

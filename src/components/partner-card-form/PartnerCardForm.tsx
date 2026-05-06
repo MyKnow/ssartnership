@@ -62,6 +62,8 @@ export default function PartnerCardForm({
     setNameValue,
     visibilityValue,
     setVisibilityValue,
+    benefitVisibilityValue,
+    setBenefitVisibilityValue,
     categoryValue,
     setCategoryValue,
     periodStartValue,
@@ -172,6 +174,7 @@ export default function PartnerCardForm({
             values={{
               nameValue,
               visibilityValue,
+              benefitVisibilityValue,
               categoryValue,
               periodStartValue,
               periodEndValue,
@@ -183,6 +186,7 @@ export default function PartnerCardForm({
             setters={{
               setNameValue,
               setVisibilityValue: (value) => setVisibilityValue(value),
+              setBenefitVisibilityValue,
               setCategoryValue,
               setPeriodStartValue,
               setPeriodEndValue,

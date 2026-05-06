@@ -51,7 +51,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,campus_slugs,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,company:partner_companies(id,name,slug),categories(id,label)",
+      "company_id,category_id,name,location,campus_slugs,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -143,6 +143,7 @@ export async function updatePartnerAction(formData: FormData) {
         images: media.images,
         tags: payload.tags,
         visibility: payload.visibility,
+        benefit_visibility: payload.benefitVisibility,
       })
       .eq("id", id);
 
@@ -270,6 +271,11 @@ export async function updatePartnerAction(formData: FormData) {
       before: previousPartner.visibility,
       after: payload.visibility,
     },
+    {
+      label: "혜택 공개 범위",
+      before: previousPartner.benefit_visibility ?? "public",
+      after: payload.benefitVisibility,
+    },
   ]);
 
   if (partnerAudit.changedFields.length > 0) {
@@ -284,6 +290,7 @@ export async function updatePartnerAction(formData: FormData) {
         companyName: nextCompanyLabel,
         categoryLabel: nextCategoryLabel,
         visibility: payload.visibility,
+        benefitVisibility: payload.benefitVisibility,
       },
     });
   }

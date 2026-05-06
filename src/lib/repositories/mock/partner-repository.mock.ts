@@ -1,6 +1,7 @@
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerRepository } from "@/lib/repositories/partner-repository";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
+import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
 
 const categories: Category[] = [
   {
@@ -35,6 +36,7 @@ const partners: Partner[] = [
     name: "바디라인 피트니스",
     category: "health",
     visibility: "public",
+    benefitVisibility: "eligible_only",
     createdAt: "2026-03-01T00:00:00.000Z",
     location: "서울 강남구 테헤란로 123, 4층",
     campusSlugs: ["seoul"],
@@ -54,6 +56,7 @@ const partners: Partner[] = [
     name: "역삼 국밥집",
     category: "restaurant",
     visibility: "confidential",
+    benefitVisibility: "public",
     createdAt: "2026-03-10T00:00:00.000Z",
     location: "서울 강남구 역삼로 45",
     campusSlugs: ["seoul"],
@@ -73,6 +76,7 @@ const partners: Partner[] = [
     name: "노트북 허브 카페",
     category: "cafe",
     visibility: "private",
+    benefitVisibility: "public",
     createdAt: "2026-02-15T00:00:00.000Z",
     location: "서울 강남구 봉은사로 12",
     campusSlugs: ["seoul"],
@@ -92,6 +96,7 @@ const partners: Partner[] = [
     name: "협업 스테이션",
     category: "space",
     visibility: "public",
+    benefitVisibility: "public",
     createdAt: "2026-01-01T00:00:00.000Z",
     location: "서울 강남구 언주로 88, 7층",
     campusSlugs: ["seoul"],
@@ -116,13 +121,14 @@ export class MockPartnerRepository implements PartnerRepository {
   async getPartners(context: { authenticated: boolean } = { authenticated: false }): Promise<Partner[]> {
     return partners.map((partner) => {
       if (canViewPartnerDetails(partner.visibility, context.authenticated)) {
-        return partner;
+        return maskPartnerBenefitsForAccess(partner, context);
       }
       return {
         id: partner.id,
         name: "",
         category: partner.category,
         visibility: partner.visibility,
+        benefitVisibility: partner.benefitVisibility,
         createdAt: partner.createdAt,
         location: "",
         campusSlugs: partner.campusSlugs,
@@ -153,7 +159,7 @@ export class MockPartnerRepository implements PartnerRepository {
     ) {
       return null;
     }
-    return partner;
+    return maskPartnerBenefitsForAccess(partner, context);
   }
 
   async getPartnerByIdRaw(id: string): Promise<Partner | null> {
