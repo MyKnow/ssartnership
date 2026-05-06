@@ -17,6 +17,7 @@ function isPartnerPortalAuditAction(action: string) {
 export function isPartnerPortalLog(log: NormalizedLog) {
   return (
     log.path?.startsWith("/partner") === true ||
+    log.path?.startsWith("/api/partner") === true ||
     getStringProperty(log.properties, "area") === "partner" ||
     (log.group === "security" && log.name.startsWith("partner_")) ||
     (log.group === "audit" && isPartnerPortalAuditAction(log.name))
