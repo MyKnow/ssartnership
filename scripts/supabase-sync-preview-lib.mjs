@@ -49,6 +49,78 @@ const DEFAULT_EXCLUDED_COPY_COLUMNS_BY_TABLE = new Map([
   ],
 ]);
 
+const CAMPUS_SLUGS = [
+  "seoul",
+  "gumi",
+  "daejeon",
+  "busan-ulsan-gyeongnam",
+  "gwangju",
+];
+
+function inferCampusSlugsFromLocation(location) {
+  const normalized = location.trim();
+  if (!normalized) {
+    return CAMPUS_SLUGS;
+  }
+  if (/전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장/.test(normalized)) {
+    return CAMPUS_SLUGS;
+  }
+
+  const slugs = [
+    /서울|강남|역삼|역삼역|선릉|테헤란|봉은사|논현/.test(normalized)
+      ? "seoul"
+      : null,
+    /구미|경북|경상북도/.test(normalized) ? "gumi" : null,
+    /대전|유성|둔산/.test(normalized) ? "daejeon" : null,
+    /부산|울산|경남|창원|김해|양산|해운대|서면/.test(normalized)
+      ? "busan-ulsan-gyeongnam"
+      : null,
+    /광주|전남/.test(normalized) ? "gwangju" : null,
+  ].filter(Boolean);
+
+  return slugs.length > 0 ? slugs : CAMPUS_SLUGS;
+}
+
+function buildPostgresTextArray(values) {
+  return `{${values.join(",")}}`;
+}
+
+function transformKeptValuesForPreview(table, columns, values) {
+  if (table !== "partners") {
+    return {
+      values,
+      changed: false,
+    };
+  }
+
+  const locationIndex = columns.indexOf("location");
+  const campusSlugsIndex = columns.indexOf("campus_slugs");
+  if (locationIndex < 0 || campusSlugsIndex < 0) {
+    return {
+      values,
+      changed: false,
+    };
+  }
+
+  const currentCampusSlugs = values[campusSlugsIndex]?.trim() ?? "";
+  if (currentCampusSlugs && currentCampusSlugs !== "\\N" && currentCampusSlugs !== "{}") {
+    return {
+      values,
+      changed: false,
+    };
+  }
+
+  const nextValues = [...values];
+  nextValues[campusSlugsIndex] = buildPostgresTextArray(
+    inferCampusSlugsFromLocation(values[locationIndex] ?? ""),
+  );
+
+  return {
+    values: nextValues,
+    changed: true,
+  };
+}
+
 export function parseCopyStatement(line) {
   const match = line.match(/^COPY\s+(.+?)\s+\((.+)\)\s+FROM\s+stdin;$/);
   if (!match) {
@@ -105,14 +177,25 @@ export function sanitizeDumpSqlForPreview(
       )
       .filter((columnIndex) => columnIndex >= 0);
 
-    if (keptIndexes.length === copyStatement.columns.length) {
+    const mayTransformValues =
+      copyStatement.table === "partners" &&
+      copyStatement.columns.includes("location") &&
+      copyStatement.columns.includes("campus_slugs");
+
+    if (keptIndexes.length === copyStatement.columns.length && !mayTransformValues) {
       output.push(line);
       continue;
     }
 
-    changed = true;
     const keptColumns = keptIndexes.map((columnIndex) => copyStatement.columns[columnIndex]);
-    output.push(buildCopyStatement(copyStatement.schema, copyStatement.table, keptColumns));
+    const statementLine =
+      keptIndexes.length === copyStatement.columns.length
+        ? line
+        : buildCopyStatement(copyStatement.schema, copyStatement.table, keptColumns);
+    output.push(statementLine);
+    if (keptIndexes.length !== copyStatement.columns.length) {
+      changed = true;
+    }
 
     index += 1;
     while (index < lines.length) {
@@ -126,7 +209,16 @@ export function sanitizeDumpSqlForPreview(
       if (values.length !== copyStatement.columns.length) {
         output.push(dataLine);
       } else {
-        output.push(keptIndexes.map((columnIndex) => values[columnIndex]).join("\t"));
+        const keptValues = keptIndexes.map((columnIndex) => values[columnIndex]);
+        const transformed = transformKeptValuesForPreview(
+          copyStatement.table,
+          keptColumns,
+          keptValues,
+        );
+        if (transformed.changed) {
+          changed = true;
+        }
+        output.push(transformed.values.join("\t"));
       }
       index += 1;
     }
