@@ -1,4 +1,5 @@
 import type { PartnerVisibility } from "@/lib/types";
+import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
 import type { CampusSlug } from "@/lib/campuses";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
@@ -34,6 +35,7 @@ export default function PartnerBasicInfoSection({
   values: {
     nameValue: string;
     visibilityValue: PartnerVisibility;
+    benefitVisibilityValue: PartnerBenefitVisibility;
     categoryValue: string;
     periodStartValue: string;
     periodEndValue: string;
@@ -45,6 +47,7 @@ export default function PartnerBasicInfoSection({
   setters: {
     setNameValue: (value: string) => void;
     setVisibilityValue: (value: PartnerVisibility) => void;
+    setBenefitVisibilityValue: (value: PartnerBenefitVisibility) => void;
     setCategoryValue: (value: string) => void;
     setPeriodStartValue: (value: string) => void;
     setPeriodEndValue: (value: string) => void;
@@ -95,6 +98,27 @@ export default function PartnerBasicInfoSection({
               <option value="private">비공개</option>
             </Select>
           </FieldGroup>
+          <FieldGroup label="혜택 공개 범위" error={fieldErrors?.benefitVisibility}>
+            <Select
+              name="benefitVisibility"
+              value={values.benefitVisibilityValue}
+              onChange={(event) =>
+                setters.setBenefitVisibilityValue(
+                  event.target.value as PartnerBenefitVisibility,
+                )
+              }
+              required
+              autoFocus={focusField === "benefitVisibility"}
+              aria-invalid={Boolean(fieldErrors?.benefitVisibility) || undefined}
+              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.benefitVisibility))}
+            >
+              <option value="public">혜택 전체 공개</option>
+              <option value="eligible_only">혜택 대상자만 공개</option>
+            </Select>
+          </FieldGroup>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
           <FieldGroup label="카테고리" error={fieldErrors?.categoryId}>
             <Select
               name="categoryId"

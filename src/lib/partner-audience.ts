@@ -90,3 +90,14 @@ export function getPartnerAudienceLabel(value: PartnerAudienceKey) {
   return PARTNER_AUDIENCE_LABEL_MAP[value];
 }
 
+export function resolvePartnerAudienceFromMemberYear(
+  year?: number | null,
+): PartnerAudienceKey | null {
+  if (typeof year !== "number") {
+    return null;
+  }
+  if (year === 0) {
+    return "staff";
+  }
+  return year >= 14 ? "student" : "graduate";
+}

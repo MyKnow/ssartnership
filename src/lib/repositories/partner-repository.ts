@@ -1,7 +1,9 @@
 import type { Category, Partner } from "@/lib/types";
+import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
 export type PartnerViewContext = {
   authenticated: boolean;
+  viewerAudience?: PartnerAudienceKey | null;
 };
 
 export interface PartnerRepository {

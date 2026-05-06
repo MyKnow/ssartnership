@@ -56,6 +56,7 @@ async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRe
       images: media.images,
       tags: payload.tags,
       visibility: payload.visibility,
+      benefit_visibility: payload.benefitVisibility,
     });
 
     if (error) {
@@ -96,6 +97,7 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
       periodEnd: payload.periodEnd,
       conditionCount: payload.conditions.length,
       visibility: payload.visibility,
+      benefitVisibility: payload.benefitVisibility,
       benefitCount: payload.benefits.length,
       appliesTo: payload.appliesTo,
       hasThumbnail: Boolean(media.thumbnail),

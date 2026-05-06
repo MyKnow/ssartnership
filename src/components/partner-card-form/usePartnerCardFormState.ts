@@ -28,6 +28,7 @@ export function createPartnerCardFormState(
     selectedCompanyId: partner.company?.id ?? "",
     nameValue: partner.name ?? "",
     visibilityValue: partner.visibility ?? "public",
+    benefitVisibilityValue: partner.benefitVisibility ?? "public",
     categoryValue: categoryId ?? "",
     locationValue: partner.location ?? "",
     mapUrlValue: partner.mapUrl ?? "",
@@ -58,6 +59,9 @@ export default function usePartnerCardFormState({
   const [selectedCompanyId, setSelectedCompanyId] = useState(defaults.selectedCompanyId);
   const [nameValue, setNameValue] = useState(defaults.nameValue);
   const [visibilityValue, setVisibilityValue] = useState(defaults.visibilityValue);
+  const [benefitVisibilityValue, setBenefitVisibilityValue] = useState(
+    defaults.benefitVisibilityValue,
+  );
   const [categoryValue, setCategoryValue] = useState(defaults.categoryValue);
   const [periodStartValue, setPeriodStartValue] = useState(defaults.periodStart);
   const [periodEndValue, setPeriodEndValue] = useState(defaults.periodEnd);
@@ -100,6 +104,8 @@ export default function usePartnerCardFormState({
     setNameValue,
     visibilityValue,
     setVisibilityValue,
+    benefitVisibilityValue,
+    setBenefitVisibilityValue,
     categoryValue,
     setCategoryValue,
     periodStartValue,

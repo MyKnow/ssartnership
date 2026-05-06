@@ -25,6 +25,7 @@ const partnerFormFocusByError: Record<string, PartnerCardFormField> = {
   partner_form_invalid_reservation_url: "reservationLink",
   partner_form_invalid_inquiry_url: "inquiryLink",
   partner_form_invalid_visibility: "visibility",
+  partner_form_invalid_benefit_visibility: "benefitVisibility",
   partner_form_invalid_applies_to: "appliesTo",
   partner_company_missing_name: "companyName",
   partner_company_missing_email: "companyContactEmail",

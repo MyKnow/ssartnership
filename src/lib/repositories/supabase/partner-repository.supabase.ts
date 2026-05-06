@@ -13,6 +13,10 @@ import {
   canViewPartnerDetails,
   normalizePartnerVisibility,
 } from "@/lib/partner-visibility";
+import {
+  maskPartnerBenefitsForAccess,
+  normalizePartnerBenefitVisibility,
+} from "@/lib/partner-benefit-visibility";
 
 type PartnerRow = {
   id: string;
@@ -34,6 +38,7 @@ type PartnerRow = {
   images?: string[] | null;
   tags?: string[] | null;
   visibility?: string | null;
+  benefit_visibility?: string | null;
   categories?: { key?: string | null } | Array<{ key?: string | null }> | null;
 };
 
@@ -53,7 +58,7 @@ type PublicCacheVersionRow = {
 };
 
 const PARTNER_SELECT_COLUMNS =
-  "id,name,category_id,created_at,updated_at,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key)";
+  "id,name,category_id,created_at,updated_at,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,categories(key)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -181,6 +186,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
     name: row.name,
     category: categoryKey,
     visibility: normalizePartnerVisibility(row.visibility),
+    benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
     createdAt: row.created_at,
     location: row.location,
     campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
@@ -206,6 +212,7 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
     name: "",
     category: categoryKey,
     visibility: normalizePartnerVisibility(row.visibility),
+    benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
     createdAt: row.created_at,
     location: "",
     campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
@@ -229,7 +236,7 @@ function mapPartnerForList(
   const categoryKey = extractCategoryKey(row.categories) ?? "health";
   const visibility = normalizePartnerVisibility(row.visibility);
   if (canViewPartnerDetails(visibility, context.authenticated)) {
-    return toVisiblePartner(row, categoryKey);
+    return maskPartnerBenefitsForAccess(toVisiblePartner(row, categoryKey), context);
   }
   return toLockedPartner(row, categoryKey);
 }
@@ -290,7 +297,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
       return null;
     }
 
-    return toVisiblePartner(row, categoryKey);
+    return maskPartnerBenefitsForAccess(toVisiblePartner(row, categoryKey), context);
   }
 
   async getPartnerByIdRaw(id: string): Promise<Partner | null> {
