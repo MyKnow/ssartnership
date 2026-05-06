@@ -48,3 +48,22 @@ export function resolvePartnerBenefitActionType(partner: Pick<
   }
   return explicitType;
 }
+
+export function resolveSubmittedBenefitActionLink({
+  hasBenefitActionLinkField,
+  benefitActionLink,
+  reservationLink,
+}: {
+  hasBenefitActionLinkField: boolean;
+  benefitActionLink?: string | null;
+  reservationLink?: string | null;
+}) {
+  const normalizedBenefitActionLink = benefitActionLink?.trim() ?? "";
+  const normalizedReservationLink = reservationLink?.trim() ?? "";
+
+  if (hasBenefitActionLinkField) {
+    return normalizedBenefitActionLink;
+  }
+
+  return normalizedBenefitActionLink || normalizedReservationLink;
+}

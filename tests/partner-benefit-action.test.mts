@@ -4,7 +4,10 @@ import {
   getBenefitUseAction,
   normalizeBenefitUseInquiry,
 } from "../src/lib/partner-links.ts";
-import { resolvePartnerBenefitActionType } from "../src/lib/partner-benefit-action.ts";
+import {
+  resolvePartnerBenefitActionType,
+  resolveSubmittedBenefitActionLink,
+} from "../src/lib/partner-benefit-action.ts";
 
 describe("partner benefit action", () => {
   it("treats legacy reservation links as external benefit-use links", () => {
@@ -56,6 +59,28 @@ describe("partner benefit action", () => {
         reservationLink: "https://booking.example.com/demo",
       }),
       "none",
+    );
+  });
+
+  it("does not reuse legacy reservation links when the edited benefit link is present but empty", () => {
+    assert.equal(
+      resolveSubmittedBenefitActionLink({
+        hasBenefitActionLinkField: true,
+        benefitActionLink: "",
+        reservationLink: "https://booking.example.com/old",
+      }),
+      "",
+    );
+  });
+
+  it("keeps legacy reservation fallback only for old submissions without benefit link fields", () => {
+    assert.equal(
+      resolveSubmittedBenefitActionLink({
+        hasBenefitActionLinkField: false,
+        benefitActionLink: "",
+        reservationLink: "https://booking.example.com/old",
+      }),
+      "https://booking.example.com/old",
     );
   });
 });

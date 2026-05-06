@@ -59,11 +59,6 @@ export function ImmediateChangeForm({
                 defaultValue={context.benefitActionLink ?? context.reservationLink ?? ""}
                 placeholder="혜택 이용 링크 또는 연락처"
               />
-              <input
-                type="hidden"
-                name="reservationLink"
-                value={context.benefitActionLink ?? context.reservationLink ?? ""}
-              />
             </FieldGroup>
             <FieldGroup
               label="문의 링크"

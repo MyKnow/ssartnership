@@ -8,6 +8,7 @@ import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import {
   isPartnerBenefitActionType,
   normalizePartnerBenefitActionType,
+  resolveSubmittedBenefitActionLink,
 } from "@/lib/partner-benefit-action";
 import {
   getPartnerChangeRequestContext,
@@ -40,6 +41,11 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
   const rawBenefitActionType = String(formData.get("benefitActionType") || "").trim();
   const rawBenefitActionLink = String(formData.get("benefitActionLink") || "").trim();
   const rawReservationLink = String(formData.get("reservationLink") || "").trim();
+  const submittedBenefitActionLink = resolveSubmittedBenefitActionLink({
+    hasBenefitActionLinkField: formData.has("benefitActionLink"),
+    benefitActionLink: rawBenefitActionLink,
+    reservationLink: rawReservationLink,
+  });
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
   let media = null;
 
@@ -52,10 +58,10 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     }
     const benefitActionType = normalizePartnerBenefitActionType(
       rawBenefitActionType,
-      rawBenefitActionLink || rawReservationLink ? "external_link" : "none",
+      submittedBenefitActionLink ? "external_link" : "none",
     );
-    const parsedBenefitActionLink = rawBenefitActionLink || rawReservationLink
-      ? sanitizePartnerLinkValue(rawBenefitActionLink || rawReservationLink)
+    const parsedBenefitActionLink = submittedBenefitActionLink
+      ? sanitizePartnerLinkValue(submittedBenefitActionLink)
       : null;
     if (benefitActionType === "external_link" && !parsedBenefitActionLink) {
       throw new PartnerChangeRequestError(
