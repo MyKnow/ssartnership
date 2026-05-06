@@ -1,5 +1,8 @@
 import type { Category, Partner } from "@/lib/types";
-import type { PartnerRepository } from "@/lib/repositories/partner-repository";
+import type {
+  PartnerRepository,
+  PartnerViewContext,
+} from "@/lib/repositories/partner-repository";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
 
@@ -118,7 +121,9 @@ export class MockPartnerRepository implements PartnerRepository {
     return categories;
   }
 
-  async getPartners(context: { authenticated: boolean } = { authenticated: false }): Promise<Partner[]> {
+  async getPartners(
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
     return partners.map((partner) => {
       if (canViewPartnerDetails(partner.visibility, context.authenticated)) {
         return maskPartnerBenefitsForAccess(partner, context);
@@ -145,7 +150,7 @@ export class MockPartnerRepository implements PartnerRepository {
 
   async getPartnerById(
     id: string,
-    context: { authenticated: boolean } = { authenticated: false },
+    context: PartnerViewContext = { authenticated: false },
   ): Promise<Partner | null> {
     const partner = partners.find((item) => item.id === id) ?? null;
     if (!partner) {

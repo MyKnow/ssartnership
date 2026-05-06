@@ -4,6 +4,7 @@ import {
 } from "@/lib/partner-reviews";
 import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import { getPartnerSession } from "@/lib/partner-session";
+import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { partnerRepository } from "@/lib/repositories";
 import {
   extractReviewMediaStoragePath,
@@ -29,9 +30,10 @@ export async function ensureVisibleReviewPartner(
   partnerId: string,
   currentUserId?: string | null,
 ) {
-  return partnerRepository.getPartnerById(partnerId, {
-    authenticated: Boolean(currentUserId),
-  });
+  return partnerRepository.getPartnerById(
+    partnerId,
+    await getPartnerViewerContext(currentUserId),
+  );
 }
 
 export function parseReviewListParams(request: Request) {

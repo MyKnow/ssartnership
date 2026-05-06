@@ -115,6 +115,25 @@ test("member year maps to partner audience for benefit eligibility", async () =>
   assert.equal(resolvePartnerAudienceFromMemberYear(null), null);
 });
 
+test("member year audience follows the current SSAFY lifecycle", async () => {
+  const { resolvePartnerAudienceFromMemberYear } = await partnerAudiencePromise;
+
+  const afterNextCycleStarts = new Date("2026-07-01T00:00:00.000+09:00");
+
+  assert.equal(
+    resolvePartnerAudienceFromMemberYear(14, afterNextCycleStarts),
+    "graduate",
+  );
+  assert.equal(
+    resolvePartnerAudienceFromMemberYear(15, afterNextCycleStarts),
+    "student",
+  );
+  assert.equal(
+    resolvePartnerAudienceFromMemberYear(16, afterNextCycleStarts),
+    "student",
+  );
+});
+
 test("mock partner repository applies benefit masking at list boundary", async () => {
   const {
     BENEFIT_LOGIN_REQUIRED_MESSAGE,
