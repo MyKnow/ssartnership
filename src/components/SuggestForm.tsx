@@ -8,67 +8,16 @@ import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
-import { sanitizeHttpUrl } from "@/lib/validation";
-
-const initialState = {
-  companyName: "",
-  businessArea: "",
-  partnershipConditions: "",
-  contactName: "",
-  contactRole: "",
-  contactEmail: "",
-  companyUrl: "",
-};
-
-type SuggestFormState = typeof initialState;
-type SuggestFieldName = keyof SuggestFormState;
-type SuggestFieldErrors = Partial<Record<SuggestFieldName, string>>;
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const requiredFieldLabels: Record<Exclude<SuggestFieldName, "companyUrl">, string> = {
-  companyName: "업체명을 입력해 주세요.",
-  businessArea: "업체 분야 소개를 입력해 주세요.",
-  partnershipConditions: "제안 제휴 조건을 입력해 주세요.",
-  contactName: "담당자 이름을 입력해 주세요.",
-  contactRole: "담당자 직위를 입력해 주세요.",
-  contactEmail: "담당자 이메일을 입력해 주세요.",
-};
-
-const fieldOrder: SuggestFieldName[] = [
-  "companyName",
-  "businessArea",
-  "partnershipConditions",
-  "companyUrl",
-  "contactName",
-  "contactRole",
-  "contactEmail",
-];
+import {
+  SUGGEST_FIELD_ORDER,
+  suggestFormInitialState,
+  type SuggestFieldErrors,
+  type SuggestFieldName,
+  validateSuggestForm,
+} from "@/lib/suggest-validation";
 
 const invalidFieldClassName =
   "border-danger/50 bg-danger/5 focus:border-danger focus:ring-danger/15";
-
-function validateSuggestForm(values: SuggestFormState): SuggestFieldErrors {
-  const errors: SuggestFieldErrors = {};
-
-  for (const [fieldName, message] of Object.entries(requiredFieldLabels) as [
-    Exclude<SuggestFieldName, "companyUrl">,
-    string,
-  ][]) {
-    if (!values[fieldName].trim()) {
-      errors[fieldName] = message;
-    }
-  }
-
-  if (values.contactEmail.trim() && !emailRegex.test(values.contactEmail.trim())) {
-    errors.contactEmail = "이메일 형식을 확인해 주세요.";
-  }
-
-  if (values.companyUrl.trim() && !sanitizeHttpUrl(values.companyUrl)) {
-    errors.companyUrl = "회사 사이트 URL 형식을 확인해 주세요.";
-  }
-
-  return errors;
-}
 
 function SuggestField({
   label,
@@ -111,7 +60,7 @@ function SuggestField({
 }
 
 export default function SuggestForm() {
-  const [formState, setFormState] = useState(initialState);
+  const [formState, setFormState] = useState(suggestFormInitialState);
   const [isSubmitting, setSubmitting] = useState(false);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -188,7 +137,7 @@ export default function SuggestForm() {
         const nextFieldErrors = validateSuggestForm(formState);
         setFieldErrors(nextFieldErrors);
 
-        const firstInvalidField = fieldOrder.find(
+        const firstInvalidField = SUGGEST_FIELD_ORDER.find(
           (fieldName) => nextFieldErrors[fieldName],
         );
         if (firstInvalidField) {
