@@ -2,6 +2,7 @@ import ContactCopyRow from "@/components/ContactCopyRow";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import SectionHeading from "@/components/ui/SectionHeading";
+import PartnerDetailBenefitActionLink from "./PartnerDetailBenefitActionLink";
 
 type ContactDisplay = NonNullable<
   ReturnType<typeof import("@/lib/partner-links").getContactDisplay>
@@ -61,6 +62,11 @@ export default function PartnerDetailContactSection({
             >
               {benefitUseAction.label}
             </Button>
+          ) : benefitUseAction.type === "external_link" ? (
+            <PartnerDetailBenefitActionLink
+              href={benefitUseAction.href}
+              partnerId={partnerId}
+            />
           ) : (
             <ContactCopyRow
               href={benefitUseAction.href}
