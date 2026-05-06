@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 type PartnerAction = {
   href: string;
   label: string;
+  disabled?: boolean;
 };
 
 export default function PartnerCardActions({
@@ -37,6 +38,7 @@ export default function PartnerCardActions({
             rel={reservationAction.href.startsWith("http") ? "noreferrer" : undefined}
             className="w-full justify-center"
             onClick={onReservationClick}
+            disabled={reservationAction.disabled}
           >
             {reservationAction.label}
           </Button>
@@ -65,7 +67,7 @@ export default function PartnerCardActions({
   if (!isActive) {
     return (
       <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
-        현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다.
+        현재 제휴기간이 아니므로, 혜택 이용/문의를 할 수 없습니다.
       </div>
     );
   }

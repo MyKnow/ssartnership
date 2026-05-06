@@ -44,6 +44,8 @@ export async function getMockPartnerChangeRequestContext(
     images: [...normalizedService.images],
     tags: [...normalizedService.tags],
     mapUrl: normalizedService.mapUrl,
+    benefitActionType: normalizedService.benefitActionType,
+    benefitActionLink: normalizedService.benefitActionLink,
     reservationLink: normalizedService.reservationLink,
     inquiryLink: normalizedService.inquiryLink,
     currentConditions: [...normalizedService.currentConditions],

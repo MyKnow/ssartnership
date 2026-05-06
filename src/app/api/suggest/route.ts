@@ -7,14 +7,10 @@ import {
 import { BUG_REPORT_EMAIL } from "@/lib/site";
 import { createSmtpTransport, getSmtpConfig, toSmtpConfigErrorLog } from "@/lib/smtp";
 import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
-import { isValidEmail, sanitizeHttpUrl } from "@/lib/validation";
+import { validateSuggestPayload } from "@/lib/suggest-validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function isEmpty(value: unknown) {
-  return !value || String(value).trim().length === 0;
-}
 
 function errorResponse(message: string, status: number, code: string) {
   return NextResponse.json({ ok: false, code, message }, { status });
@@ -52,42 +48,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = (await request.json()) as {
-      companyName?: string;
-      businessArea?: string;
-      partnershipConditions?: string;
-      contactName?: string;
-      contactRole?: string;
-      contactEmail?: string;
-      companyUrl?: string;
-    };
-
-    if (
-      isEmpty(payload.companyName) ||
-      isEmpty(payload.businessArea) ||
-      isEmpty(payload.partnershipConditions) ||
-      isEmpty(payload.contactName) ||
-      isEmpty(payload.contactRole) ||
-      isEmpty(payload.contactEmail)
-    ) {
-      return errorResponse("필수 항목이 누락되었습니다.", 400, "suggest_missing_required");
+    const rawPayload = (await request.json()) as Parameters<
+      typeof validateSuggestPayload
+    >[0];
+    const validation = validateSuggestPayload(rawPayload);
+    if (!validation.ok) {
+      return errorResponse(validation.message, 400, validation.code);
     }
-
-    if (!isValidEmail(payload.contactEmail)) {
-      return errorResponse("이메일 형식이 올바르지 않습니다.", 400, "suggest_invalid_email");
-    }
-
-    const safeCompanyUrlValue =
-      payload.companyUrl?.trim()
-        ? sanitizeHttpUrl(payload.companyUrl)
-        : null;
-    if (payload.companyUrl?.trim() && !safeCompanyUrlValue) {
-      return errorResponse(
-        "회사 사이트 URL 형식이 올바르지 않습니다.",
-        400,
-        "suggest_invalid_company_url",
-      );
-    }
+    const payload = validation.values;
+    const safeCompanyUrlValue = validation.safeCompanyUrl;
 
     await recordAttempt(identifier, false, SUGGEST_RATE_LIMIT);
 

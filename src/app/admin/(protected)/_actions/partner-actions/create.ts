@@ -45,6 +45,8 @@ async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRe
       location: payload.location,
       campus_slugs: payload.campusSlugs,
       map_url: payload.mapUrl,
+      benefit_action_type: payload.benefitActionType,
+      benefit_action_link: payload.benefitActionLink,
       reservation_link: payload.reservationLink,
       inquiry_link: payload.inquiryLink,
       period_start: payload.periodStart,
@@ -56,6 +58,7 @@ async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRe
       images: media.images,
       tags: payload.tags,
       visibility: payload.visibility,
+      benefit_visibility: payload.benefitVisibility,
     });
 
     if (error) {
@@ -90,12 +93,15 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
       location: payload.location,
       campusSlugs: payload.campusSlugs,
       hasMapUrl: Boolean(payload.mapUrl),
+      benefitActionType: payload.benefitActionType,
+      hasBenefitActionLink: Boolean(payload.benefitActionLink),
       hasReservationLink: Boolean(payload.reservationLink),
       hasInquiryLink: Boolean(payload.inquiryLink),
       periodStart: payload.periodStart,
       periodEnd: payload.periodEnd,
       conditionCount: payload.conditions.length,
       visibility: payload.visibility,
+      benefitVisibility: payload.benefitVisibility,
       benefitCount: payload.benefits.length,
       appliesTo: payload.appliesTo,
       hasThumbnail: Boolean(media.thumbnail),

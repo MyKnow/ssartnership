@@ -1,4 +1,6 @@
 import type { PartnerVisibility } from "@/lib/types";
+import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
+import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import type { CampusSlug } from "@/lib/campuses";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
@@ -34,22 +36,28 @@ export default function PartnerBasicInfoSection({
   values: {
     nameValue: string;
     visibilityValue: PartnerVisibility;
+    benefitVisibilityValue: PartnerBenefitVisibility;
     categoryValue: string;
     periodStartValue: string;
     periodEndValue: string;
     locationValue: string;
     mapUrlValue: string;
+    benefitActionTypeValue: PartnerBenefitActionType;
+    benefitActionLinkValue: string;
     reservationLinkValue: string;
     inquiryLinkValue: string;
   };
   setters: {
     setNameValue: (value: string) => void;
     setVisibilityValue: (value: PartnerVisibility) => void;
+    setBenefitVisibilityValue: (value: PartnerBenefitVisibility) => void;
     setCategoryValue: (value: string) => void;
     setPeriodStartValue: (value: string) => void;
     setPeriodEndValue: (value: string) => void;
     setLocationValue: (value: string) => void;
     setMapUrlValue: (value: string) => void;
+    setBenefitActionTypeValue: (value: PartnerBenefitActionType) => void;
+    setBenefitActionLinkValue: (value: string) => void;
     setReservationLinkValue: (value: string) => void;
     setInquiryLinkValue: (value: string) => void;
   };
@@ -95,6 +103,27 @@ export default function PartnerBasicInfoSection({
               <option value="private">비공개</option>
             </Select>
           </FieldGroup>
+          <FieldGroup label="혜택 공개 범위" error={fieldErrors?.benefitVisibility}>
+            <Select
+              name="benefitVisibility"
+              value={values.benefitVisibilityValue}
+              onChange={(event) =>
+                setters.setBenefitVisibilityValue(
+                  event.target.value as PartnerBenefitVisibility,
+                )
+              }
+              required
+              autoFocus={focusField === "benefitVisibility"}
+              aria-invalid={Boolean(fieldErrors?.benefitVisibility) || undefined}
+              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.benefitVisibility))}
+            >
+              <option value="public">혜택 전체 공개</option>
+              <option value="eligible_only">적용 대상만 공개</option>
+            </Select>
+          </FieldGroup>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
           <FieldGroup label="카테고리" error={fieldErrors?.categoryId}>
             <Select
               name="categoryId"
@@ -169,17 +198,66 @@ export default function PartnerBasicInfoSection({
               className={getPartnerCardInvalidClass(Boolean(fieldErrors?.mapUrl))}
             />
           </FieldGroup>
-          <FieldGroup label="예약 링크" error={fieldErrors?.reservationLink}>
-            <Input
-              name="reservationLink"
-              value={values.reservationLinkValue}
-              onChange={(event) => setters.setReservationLinkValue(event.target.value)}
-              autoFocus={focusField === "reservationLink"}
-              aria-invalid={Boolean(fieldErrors?.reservationLink) || undefined}
-              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.reservationLink))}
-            />
+          <FieldGroup label="혜택 이용 방식" error={fieldErrors?.benefitActionType}>
+            <Select
+              name="benefitActionType"
+              value={values.benefitActionTypeValue}
+              onChange={(event) => {
+                const nextType = event.target.value as PartnerBenefitActionType;
+                setters.setBenefitActionTypeValue(nextType);
+                if (nextType !== "external_link") {
+                  setters.setBenefitActionLinkValue("");
+                  setters.setReservationLinkValue("");
+                }
+              }}
+              autoFocus={focusField === "benefitActionType"}
+              aria-invalid={Boolean(fieldErrors?.benefitActionType) || undefined}
+              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.benefitActionType))}
+            >
+              <option value="external_link">외부 링크로 이용</option>
+              <option value="certification">싸트너십 인증으로 이용</option>
+              <option value="onsite">현장 제시로 이용</option>
+              <option value="none">별도 행동 없음</option>
+            </Select>
           </FieldGroup>
         </div>
+
+        <FieldGroup
+          label="혜택 이용 링크"
+          error={fieldErrors?.benefitActionLink ?? fieldErrors?.reservationLink}
+        >
+          <Input
+            name="benefitActionLink"
+            value={values.benefitActionLinkValue}
+            onChange={(event) => {
+              setters.setBenefitActionLinkValue(event.target.value);
+              setters.setReservationLinkValue(event.target.value);
+            }}
+            autoFocus={focusField === "benefitActionLink" || focusField === "reservationLink"}
+            aria-invalid={
+              Boolean(fieldErrors?.benefitActionLink ?? fieldErrors?.reservationLink) ||
+              undefined
+            }
+            className={getPartnerCardInvalidClass(
+              Boolean(fieldErrors?.benefitActionLink ?? fieldErrors?.reservationLink),
+            )}
+            disabled={values.benefitActionTypeValue !== "external_link"}
+            placeholder={
+              values.benefitActionTypeValue === "external_link"
+                ? "https://booking.naver.com/... 또는 연락처"
+                : "외부 링크 방식에서만 입력합니다."
+            }
+          />
+          <input
+            type="hidden"
+            name="reservationLink"
+            value={
+              values.benefitActionTypeValue === "external_link"
+                ? values.benefitActionLinkValue
+                : ""
+            }
+          />
+        </FieldGroup>
 
         <FieldGroup label="문의 링크" error={fieldErrors?.inquiryLink}>
           <Input

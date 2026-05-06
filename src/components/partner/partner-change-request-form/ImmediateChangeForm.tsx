@@ -1,6 +1,7 @@
 import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import TokenChipField from "@/components/admin/TokenChipField";
 import {
   PartnerGalleryField,
@@ -23,7 +24,7 @@ export function ImmediateChangeForm({
 
       <InlineMessage
         title="즉시 반영 항목"
-        description="메인 썸네일, 추가 이미지, 예약/문의 링크, 태그는 저장 즉시 반영됩니다."
+        description="메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그는 저장 즉시 반영됩니다."
       />
 
       <div className="grid gap-5">
@@ -31,23 +32,37 @@ export function ImmediateChangeForm({
         <PartnerGalleryField initial={context.images} className="w-full" />
 
         <FormSection
-          title="링크"
-          description="예약 링크와 문의 링크를 수정합니다."
+          title="혜택 이용/문의"
+          description="혜택을 실제로 이용하는 방식과 문의 링크를 수정합니다."
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <FieldGroup
-              label="예약 링크"
-              note="http(s), 전화번호, 이메일, 인스타그램 아이디를 입력할 수 있습니다."
+              label="혜택 이용 방식"
+              note="인증 화면 이동, 외부 링크, 현장 제시, 없음 중 하나를 선택합니다."
+            >
+              <Select
+                name="benefitActionType"
+                defaultValue={context.benefitActionType}
+              >
+                <option value="external_link">외부 링크로 이용</option>
+                <option value="certification">싸트너십 인증으로 이용</option>
+                <option value="onsite">현장 제시로 이용</option>
+                <option value="none">별도 행동 없음</option>
+              </Select>
+            </FieldGroup>
+            <FieldGroup
+              label="혜택 이용 링크"
+              note="외부 링크 방식일 때 입력합니다. http(s), 전화번호, 이메일, 인스타그램 아이디를 입력할 수 있습니다."
             >
               <Input
-                name="reservationLink"
-                defaultValue={context.reservationLink ?? ""}
-                placeholder="예약 링크 또는 연락처"
+                name="benefitActionLink"
+                defaultValue={context.benefitActionLink ?? context.reservationLink ?? ""}
+                placeholder="혜택 이용 링크 또는 연락처"
               />
             </FieldGroup>
             <FieldGroup
               label="문의 링크"
-              note="예약 링크와 같은 형식으로 입력할 수 있습니다."
+              note="혜택 이용 링크와 같은 형식으로 입력할 수 있습니다."
             >
               <Input
                 name="inquiryLink"

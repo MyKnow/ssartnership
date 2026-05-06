@@ -1,5 +1,6 @@
 import { normalizePartnerAudience } from "../../partner-audience.ts";
 import { inferCampusSlugsFromLocation, normalizeCampusSlugs } from "../../campuses.ts";
+import { normalizePartnerBenefitActionType } from "../../partner-benefit-action.ts";
 import { sanitizeHttpUrl, sanitizePartnerLinkValue } from "../../validation.ts";
 import type {
   PartnerChangeRequestSummary,
@@ -103,6 +104,13 @@ export function normalizeServiceRecord(
     images: normalizeHttpUrlList(service.images),
     tags: [...(service.tags ?? [])],
     mapUrl: service.mapUrl ?? null,
+    benefitActionType: normalizePartnerBenefitActionType(
+      service.benefitActionType,
+      service.benefitActionLink || service.reservationLink ? "external_link" : "none",
+    ),
+    benefitActionLink: normalizeOptionalLink(
+      service.benefitActionLink ?? service.reservationLink,
+    ),
     reservationLink: normalizeOptionalLink(service.reservationLink),
     inquiryLink: normalizeOptionalLink(service.inquiryLink),
     currentConditions: [...(service.currentConditions ?? [])],

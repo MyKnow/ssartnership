@@ -98,7 +98,7 @@ export default function PartnerServiceDetailViewContent({
                 {context.partnerName}
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                메인 썸네일, 추가 이미지, 예약/문의 링크, 태그는 즉시 반영되고,
+                메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그는 즉시 반영되고,
                 브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자
                 승인 후 반영됩니다.
               </p>
@@ -162,7 +162,11 @@ export default function PartnerServiceDetailViewContent({
                 partnerId={context.partnerId}
                 reservationDisplay={visualState.reservationDisplay}
                 inquiryDisplay={visualState.inquiryDisplay}
-                reservationRawValue={visualState.normalizedLinks.reservationLink ?? ""}
+                reservationRawValue={
+                  visualState.normalizedLinks.benefitActionLink ||
+                  visualState.normalizedLinks.reservationLink ||
+                  ""
+                }
                 inquiryRawValue={visualState.normalizedLinks.inquiryLink ?? ""}
               />
             </>

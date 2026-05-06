@@ -4,6 +4,7 @@ import type {
   PartnerChangeRequestSummary,
 } from "../../partner-change-requests/shared.ts";
 import type { PartnerVisibility } from "../../types.ts";
+import type { PartnerBenefitActionType } from "../../partner-benefit-action.ts";
 
 export type MockChangeRequestServiceRecord = {
   companyId: string;
@@ -22,6 +23,8 @@ export type MockChangeRequestServiceRecord = {
   images: string[];
   tags: string[];
   mapUrl: string | null;
+  benefitActionType: PartnerBenefitActionType;
+  benefitActionLink: string | null;
   reservationLink: string | null;
   inquiryLink: string | null;
   currentConditions: string[];
@@ -72,6 +75,8 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     images: [],
     tags: ["작업", "디저트"],
     mapUrl: "https://map.naver.com/",
+    benefitActionType: "external_link",
+    benefitActionLink: "https://booking.naver.com/",
     reservationLink: "https://booking.naver.com/",
     inquiryLink: "02-555-8123",
     currentConditions: ["전 직원 SSAFY 구성원 인증"],
@@ -96,6 +101,8 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     images: [],
     tags: ["디저트"],
     mapUrl: "https://map.naver.com/",
+    benefitActionType: "external_link",
+    benefitActionLink: "https://booking.naver.com/",
     reservationLink: "https://booking.naver.com/",
     inquiryLink: "02-555-8133",
     currentConditions: ["예약 후 이용", "2인 이상 주문 시"],
@@ -120,6 +127,8 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     images: [],
     tags: ["PT", "운동복"],
     mapUrl: "https://map.kakao.com/",
+    benefitActionType: "external_link",
+    benefitActionLink: "https://booking.naver.com/",
     reservationLink: "https://booking.naver.com/",
     inquiryLink: "02-777-8811",
     currentConditions: ["상담 예약 필수"],
@@ -144,6 +153,8 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     images: [],
     tags: ["사우나"],
     mapUrl: "https://map.kakao.com/",
+    benefitActionType: "external_link",
+    benefitActionLink: "https://booking.naver.com/",
     reservationLink: "https://booking.naver.com/",
     inquiryLink: "02-777-8811",
     currentConditions: ["평일 1일 1회", "운동복 착용"],

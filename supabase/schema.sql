@@ -45,9 +45,12 @@ create table if not exists partners (
   category_id uuid not null references categories(id) on delete cascade,
   name text not null,
   visibility text not null default 'public',
+  benefit_visibility text not null default 'public',
   location text not null,
   campus_slugs text[] not null default '{}',
   map_url text,
+  benefit_action_type text not null default 'none',
+  benefit_action_link text,
   reservation_link text,
   inquiry_link text,
   period_start date,
@@ -92,6 +95,7 @@ as $$
 $$;
 
 alter table partners add column if not exists visibility text not null default 'public';
+alter table partners add column if not exists benefit_visibility text not null default 'public';
 alter table partners add column if not exists campus_slugs text[] not null default '{}';
 update partners
 set visibility = case lower(trim(coalesce(visibility, 'public')))
@@ -105,6 +109,16 @@ alter table partners alter column visibility set not null;
 alter table partners drop constraint if exists partners_visibility_check;
 alter table partners add constraint partners_visibility_check
   check (visibility in ('public', 'confidential', 'private'));
+update partners
+set benefit_visibility = case lower(trim(coalesce(benefit_visibility, 'public')))
+  when 'eligible_only' then 'eligible_only'
+  else 'public'
+end;
+alter table partners alter column benefit_visibility set default 'public';
+alter table partners alter column benefit_visibility set not null;
+alter table partners drop constraint if exists partners_benefit_visibility_check;
+alter table partners add constraint partners_benefit_visibility_check
+  check (benefit_visibility in ('public', 'eligible_only'));
 update partners
 set campus_slugs = public.infer_partner_campus_slugs(location)
 where cardinality(campus_slugs) = 0;
@@ -133,10 +147,38 @@ alter table partners add column if not exists company_id uuid references partner
 alter table partners add column if not exists thumbnail text;
 alter table partners add column if not exists conditions text[] not null default '{}';
 alter table partners add column if not exists images text[] not null default '{}';
+alter table partners add column if not exists benefit_action_type text not null default 'none';
+alter table partners add column if not exists benefit_action_link text;
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;
 alter table partners add column if not exists updated_at timestamp with time zone default now();
 alter table partners drop column if exists contact;
+
+update partners
+set
+  benefit_action_type = case
+    when reservation_link is not null and trim(reservation_link) <> ''
+      then 'external_link'
+    when benefit_action_type in ('certification', 'external_link', 'onsite', 'none')
+      then benefit_action_type
+    else 'none'
+  end,
+  benefit_action_link = case
+    when benefit_action_link is not null and trim(benefit_action_link) <> ''
+      then benefit_action_link
+    when reservation_link is not null and trim(reservation_link) <> ''
+      then reservation_link
+    else null
+  end;
+
+update partners
+set benefit_action_link = null
+where benefit_action_type <> 'external_link';
+
+alter table partners drop constraint if exists partners_benefit_action_type_check;
+alter table partners
+  add constraint partners_benefit_action_type_check
+  check (benefit_action_type in ('certification', 'external_link', 'onsite', 'none'));
 
 update partners
 set updated_at = coalesce(updated_at, created_at, now())

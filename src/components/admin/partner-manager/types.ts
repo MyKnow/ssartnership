@@ -1,4 +1,6 @@
 import type { CategoryKey } from "@/lib/types";
+import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
+import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 
 export type AdminCategory = {
@@ -15,8 +17,11 @@ export type AdminPartner = {
   category_id: string;
   company_id?: string | null;
   visibility: "public" | "confidential" | "private";
+  benefit_visibility?: PartnerBenefitVisibility | null;
   location: string;
   map_url?: string | null;
+  benefit_action_type?: PartnerBenefitActionType | null;
+  benefit_action_link?: string | null;
   reservation_link?: string | null;
   inquiry_link?: string | null;
   period_start?: string | null;

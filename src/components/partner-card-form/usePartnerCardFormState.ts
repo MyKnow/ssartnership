@@ -5,6 +5,7 @@ import {
   DEFAULT_PARTNER_AUDIENCE,
   normalizePartnerAudience,
 } from "../../lib/partner-audience.ts";
+import { resolvePartnerBenefitActionType } from "../../lib/partner-benefit-action.ts";
 import type {
   PartnerCardFormField,
   PartnerCardFormValues,
@@ -28,9 +29,12 @@ export function createPartnerCardFormState(
     selectedCompanyId: partner.company?.id ?? "",
     nameValue: partner.name ?? "",
     visibilityValue: partner.visibility ?? "public",
+    benefitVisibilityValue: partner.benefitVisibility ?? "public",
     categoryValue: categoryId ?? "",
     locationValue: partner.location ?? "",
     mapUrlValue: partner.mapUrl ?? "",
+    benefitActionTypeValue: resolvePartnerBenefitActionType(partner),
+    benefitActionLinkValue: partner.benefitActionLink ?? partner.reservationLink ?? "",
     reservationLinkValue: partner.reservationLink ?? "",
     inquiryLinkValue: partner.inquiryLink ?? "",
     companyNameValue: partner.company?.name ?? "",
@@ -58,11 +62,20 @@ export default function usePartnerCardFormState({
   const [selectedCompanyId, setSelectedCompanyId] = useState(defaults.selectedCompanyId);
   const [nameValue, setNameValue] = useState(defaults.nameValue);
   const [visibilityValue, setVisibilityValue] = useState(defaults.visibilityValue);
+  const [benefitVisibilityValue, setBenefitVisibilityValue] = useState(
+    defaults.benefitVisibilityValue,
+  );
   const [categoryValue, setCategoryValue] = useState(defaults.categoryValue);
   const [periodStartValue, setPeriodStartValue] = useState(defaults.periodStart);
   const [periodEndValue, setPeriodEndValue] = useState(defaults.periodEnd);
   const [locationValue, setLocationValue] = useState(defaults.locationValue);
   const [mapUrlValue, setMapUrlValue] = useState(defaults.mapUrlValue);
+  const [benefitActionTypeValue, setBenefitActionTypeValue] = useState(
+    defaults.benefitActionTypeValue,
+  );
+  const [benefitActionLinkValue, setBenefitActionLinkValue] = useState(
+    defaults.benefitActionLinkValue,
+  );
   const [reservationLinkValue, setReservationLinkValue] = useState(
     defaults.reservationLinkValue,
   );
@@ -100,6 +113,8 @@ export default function usePartnerCardFormState({
     setNameValue,
     visibilityValue,
     setVisibilityValue,
+    benefitVisibilityValue,
+    setBenefitVisibilityValue,
     categoryValue,
     setCategoryValue,
     periodStartValue,
@@ -110,6 +125,10 @@ export default function usePartnerCardFormState({
     setLocationValue,
     mapUrlValue,
     setMapUrlValue,
+    benefitActionTypeValue,
+    setBenefitActionTypeValue,
+    benefitActionLinkValue,
+    setBenefitActionLinkValue,
     reservationLinkValue,
     setReservationLinkValue,
     inquiryLinkValue,

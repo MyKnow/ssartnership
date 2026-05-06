@@ -73,7 +73,7 @@ export default function PartnerServiceMetricsPanel({
           {
             label: "예약 클릭 수",
             value: formatCount(metrics.reservationClicks),
-            hint: "예약 링크 클릭 수",
+            hint: "혜택 이용 클릭 수",
           },
           {
             label: "문의 클릭 수",

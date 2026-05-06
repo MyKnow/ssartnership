@@ -51,7 +51,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,campus_slugs,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,company:partner_companies(id,name,slug),categories(id,label)",
+      "company_id,category_id,name,location,campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -132,6 +132,8 @@ export async function updatePartnerAction(formData: FormData) {
         location: payload.location,
         campus_slugs: payload.campusSlugs,
         map_url: payload.mapUrl,
+        benefit_action_type: payload.benefitActionType,
+        benefit_action_link: payload.benefitActionLink,
         reservation_link: payload.reservationLink,
         inquiry_link: payload.inquiryLink,
         period_start: payload.periodStart,
@@ -143,6 +145,7 @@ export async function updatePartnerAction(formData: FormData) {
         images: media.images,
         tags: payload.tags,
         visibility: payload.visibility,
+        benefit_visibility: payload.benefitVisibility,
       })
       .eq("id", id);
 
@@ -207,9 +210,14 @@ export async function updatePartnerAction(formData: FormData) {
       format: (value) => (value ? String(value) : "없음"),
     },
     {
-      label: "예약 링크",
-      before: previousPartner.reservation_link ?? null,
-      after: payload.reservationLink,
+      label: "혜택 이용 방식",
+      before: previousPartner.benefit_action_type ?? "none",
+      after: payload.benefitActionType,
+    },
+    {
+      label: "혜택 이용 링크",
+      before: previousPartner.benefit_action_link ?? previousPartner.reservation_link ?? null,
+      after: payload.benefitActionLink,
       format: (value) => (value ? String(value) : "없음"),
     },
     {
@@ -270,6 +278,11 @@ export async function updatePartnerAction(formData: FormData) {
       before: previousPartner.visibility,
       after: payload.visibility,
     },
+    {
+      label: "혜택 공개 범위",
+      before: previousPartner.benefit_visibility ?? "public",
+      after: payload.benefitVisibility,
+    },
   ]);
 
   if (partnerAudit.changedFields.length > 0) {
@@ -284,6 +297,9 @@ export async function updatePartnerAction(formData: FormData) {
         companyName: nextCompanyLabel,
         categoryLabel: nextCategoryLabel,
         visibility: payload.visibility,
+        benefitVisibility: payload.benefitVisibility,
+        benefitActionType: payload.benefitActionType,
+        hasBenefitActionLink: Boolean(payload.benefitActionLink),
       },
     });
   }

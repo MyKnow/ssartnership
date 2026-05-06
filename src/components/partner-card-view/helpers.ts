@@ -1,9 +1,9 @@
 import type { CategoryKey, Partner } from "../../lib/types.ts";
 import {
+  getBenefitUseAction,
   getInquiryAction,
   getMapLink,
-  getReservationAction,
-  normalizeReservationInquiry,
+  normalizeBenefitUseInquiry,
 } from "../../lib/partner-links.ts";
 import { getPartnerLockKind } from "../../lib/partner-visibility.ts";
 import { isWithinPeriod } from "../../lib/partner-utils.ts";
@@ -42,18 +42,30 @@ export function createPartnerCardPresentation(
     partner.thumbnail ?? (partner.images && partner.images.length > 0 ? partner.images[0] : "");
   const isActive = isWithinPeriod(partner.period.start, partner.period.end);
   const normalizedLinks = isActive
-    ? normalizeReservationInquiry(
-        partner.reservationLink,
-        partner.inquiryLink,
-      )
-    : { reservationLink: "", inquiryLink: "" };
+    ? normalizeBenefitUseInquiry({
+        benefitActionType: partner.benefitActionType,
+        benefitActionLink: partner.benefitActionLink,
+        reservationLink: partner.reservationLink,
+        inquiryLink: partner.inquiryLink,
+      })
+    : {
+        benefitActionType: "none" as const,
+        benefitActionLink: "",
+        reservationLink: "",
+        inquiryLink: "",
+      };
 
   return {
     lockKind,
     thumbnailUrl,
     isActive,
     reservationAction: isActive
-      ? getReservationAction(normalizedLinks.reservationLink)
+      ? getBenefitUseAction({
+          actionType: normalizedLinks.benefitActionType,
+          actionLink: normalizedLinks.benefitActionLink,
+          legacyReservationLink: normalizedLinks.reservationLink,
+          accessStatus: partner.benefitAccessStatus,
+        })
       : null,
     inquiryAction: isActive
       ? getInquiryAction(normalizedLinks.inquiryLink)

@@ -83,7 +83,7 @@ export const Summary: Story = {
       canvas.getByText(/public:.*"thumbnailUrl":"https:\/\/example\.com\/image-a\.webp"/),
     ).toBeInTheDocument();
     await expect(
-      canvas.getByText(/public:.*"reservationAction":{"label":"예약하기","href":"https:\/\/booking\.naver\.com\/demo"}/),
+      canvas.getByText(/public:.*"reservationAction":{"label":"혜택 이용","href":"https:\/\/booking\.naver\.com\/demo","type":"external_link"}/),
     ).toBeInTheDocument();
     await expect(canvas.getByText(/public:.*"mapLink":"https:\/\/map\.naver\.com\/p\/search\//)).toBeInTheDocument();
     await expect(canvas.getByText(/public:.*"detailHref":"\/partners\/partner-1"/)).toBeInTheDocument();

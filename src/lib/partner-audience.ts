@@ -1,3 +1,5 @@
+import { getSsafyMemberLifecycle, type SsafyYearRule } from "@/lib/ssafy-year";
+
 export const PARTNER_AUDIENCE_OPTIONS = [
   { value: "staff", label: "운영진" },
   { value: "student", label: "교육생" },
@@ -90,3 +92,13 @@ export function getPartnerAudienceLabel(value: PartnerAudienceKey) {
   return PARTNER_AUDIENCE_LABEL_MAP[value];
 }
 
+export function resolvePartnerAudienceFromMemberYear(
+  year?: number | null,
+  now: Date = new Date(),
+  rule?: SsafyYearRule,
+): PartnerAudienceKey | null {
+  if (typeof year !== "number") {
+    return null;
+  }
+  return getSsafyMemberLifecycle(year, now, rule).kind;
+}

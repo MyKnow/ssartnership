@@ -1,8 +1,9 @@
 import { getCachedImageUrl } from "../../../lib/image-cache.ts";
 import {
+  getBenefitUseAction,
   getContactDisplay,
   getMapLink,
-  normalizeReservationInquiry,
+  normalizeBenefitUseInquiry,
 } from "../../../lib/partner-links.ts";
 import { isWithinPeriod } from "../../../lib/partner-utils.ts";
 import type { PartnerChangeRequestContext } from "../../../lib/partner-change-requests.ts";
@@ -36,13 +37,24 @@ export function getPartnerServiceVisualState(context: PartnerChangeRequestContex
     context.partnerName,
   );
   const normalizedLinks = isActive
-    ? normalizeReservationInquiry(
-        context.reservationLink ?? undefined,
-        context.inquiryLink ?? undefined,
-      )
-    : { reservationLink: "", inquiryLink: "" };
-  const reservationDisplay = isActive
-    ? getContactDisplay(normalizedLinks.reservationLink)
+    ? normalizeBenefitUseInquiry({
+        benefitActionType: context.benefitActionType,
+        benefitActionLink: context.benefitActionLink,
+        reservationLink: context.reservationLink,
+        inquiryLink: context.inquiryLink,
+      })
+    : {
+        benefitActionType: "none",
+        benefitActionLink: "",
+        reservationLink: "",
+        inquiryLink: "",
+      };
+  const benefitUseAction = isActive
+    ? getBenefitUseAction({
+        actionType: normalizedLinks.benefitActionType,
+        actionLink: normalizedLinks.benefitActionLink,
+        legacyReservationLink: normalizedLinks.reservationLink,
+      })
     : null;
   const inquiryDisplay = isActive ? getContactDisplay(normalizedLinks.inquiryLink) : null;
 
@@ -53,8 +65,9 @@ export function getPartnerServiceVisualState(context: PartnerChangeRequestContex
     thumbnailUrl,
     mapLink,
     normalizedLinks,
-    reservationDisplay,
+    benefitUseAction,
+    reservationDisplay: benefitUseAction,
     inquiryDisplay,
-    contactCount: [reservationDisplay, inquiryDisplay].filter(Boolean).length,
+    contactCount: [benefitUseAction, inquiryDisplay].filter(Boolean).length,
   };
 }

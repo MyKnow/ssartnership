@@ -13,6 +13,7 @@ import {
 } from "@/lib/campuses";
 import { partnerFavoriteRepository, partnerRepository } from "@/lib/repositories";
 import { getHeaderSession } from "@/lib/header-session";
+import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
@@ -106,11 +107,11 @@ export default async function CampusLandingPage({
     notFound();
   }
 
+  const viewerContext = await getPartnerViewerContext(headerSession?.userId);
+
   const [categories, partners] = await Promise.all([
     partnerRepository.getCategories(),
-    partnerRepository.getPartners({
-      authenticated: Boolean(headerSession?.userId),
-    }),
+    partnerRepository.getPartners(viewerContext),
   ]);
 
   const campusPartners = getCampusPartners(partners, campus.slug).map((partner) => {

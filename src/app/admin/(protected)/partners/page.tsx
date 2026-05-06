@@ -71,7 +71,7 @@ export default async function AdminPartnersPage({
       .order("created_at", { ascending: true }),
     supabase
       .from("partners")
-      .select("id,name,category_id,company_id,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,company:partner_companies(id,name,slug,description,is_active)")
+      .select("id,name,category_id,company_id,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active)")
       .order("created_at", { ascending: false }),
     listPartnerChangeRequests(),
   ]);
