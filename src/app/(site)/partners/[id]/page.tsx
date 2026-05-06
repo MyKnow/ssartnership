@@ -129,7 +129,7 @@ export default async function PartnerDetailPage({
     thumbnailUrl,
     mapLink,
     normalizedLinks,
-    reservationDisplay,
+    benefitUseAction,
     inquiryDisplay,
     contactCount,
     badgeStyle,
@@ -224,7 +224,7 @@ export default async function PartnerDetailPage({
             <PartnerDetailContactSection
               isActive={isActive}
               contactCount={contactCount}
-              reservationDisplay={reservationDisplay}
+              benefitUseAction={benefitUseAction}
               inquiryDisplay={inquiryDisplay}
               normalizedLinks={normalizedLinks}
               partnerId={partner.id}

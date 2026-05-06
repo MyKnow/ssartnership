@@ -22,6 +22,8 @@ const partnerFormFocusByError: Record<string, PartnerCardFormField> = {
   partner_form_invalid_campus_slugs: "campusSlugs",
   partner_form_invalid_period: "periodStart",
   partner_form_invalid_map_url: "mapUrl",
+  partner_form_invalid_benefit_action_type: "benefitActionType",
+  partner_form_invalid_benefit_action_link: "benefitActionLink",
   partner_form_invalid_reservation_url: "reservationLink",
   partner_form_invalid_inquiry_url: "inquiryLink",
   partner_form_invalid_visibility: "visibility",

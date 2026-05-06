@@ -1,4 +1,10 @@
 import { sanitizeHttpUrl } from "./validation.ts";
+import {
+  isPartnerBenefitActionType,
+  normalizePartnerBenefitActionType,
+  resolvePartnerBenefitActionType,
+  type PartnerBenefitActionType,
+} from "./partner-benefit-action.ts";
 
 function isPhone(value: string) {
   return /^[+0-9()\-\s]{7,}$/.test(value);
@@ -123,15 +129,59 @@ function toLinkHref(link: string) {
   return sanitizeHttpUrl(link);
 }
 
-export function getReservationAction(link?: string) {
-  if (!link) {
+export type BenefitUseAction = {
+  label: string;
+  href: string;
+  type: PartnerBenefitActionType;
+};
+
+export function getBenefitUseAction({
+  actionType,
+  actionLink,
+  legacyReservationLink,
+}: {
+  actionType?: string | null;
+  actionLink?: string | null;
+  legacyReservationLink?: string | null;
+}): BenefitUseAction | null {
+  const resolvedType = resolvePartnerBenefitActionType({
+    benefitActionType:
+      actionType && isPartnerBenefitActionType(actionType)
+        ? actionType
+        : undefined,
+    benefitActionLink: actionLink ?? undefined,
+    reservationLink: legacyReservationLink ?? undefined,
+  });
+
+  if (resolvedType === "certification") {
+    return {
+      label: "인증하고 혜택 이용",
+      href: "/certification",
+      type: resolvedType,
+    };
+  }
+
+  if (resolvedType !== "external_link") {
     return null;
   }
-  const href = toLinkHref(link);
+
+  const href = toLinkHref((actionLink || legacyReservationLink || "").trim());
   if (!href) {
     return null;
   }
-  return { label: "예약하기", href };
+
+  return {
+    label: "혜택 이용",
+    href,
+    type: resolvedType,
+  };
+}
+
+export function getReservationAction(link?: string) {
+  return getBenefitUseAction({
+    actionType: "external_link",
+    actionLink: link,
+  });
 }
 
 export function getInquiryAction(link?: string) {
@@ -161,4 +211,34 @@ export function normalizeReservationInquiry(
     return { reservationLink: inquiry, inquiryLink: "" };
   }
   return { reservationLink: reservation, inquiryLink: inquiry };
+}
+
+export function normalizeBenefitUseInquiry({
+  benefitActionType,
+  benefitActionLink,
+  reservationLink,
+  inquiryLink,
+}: {
+  benefitActionType?: string | null;
+  benefitActionLink?: string | null;
+  reservationLink?: string | null;
+  inquiryLink?: string | null;
+}) {
+  const normalized = normalizeReservationInquiry(
+    benefitActionLink || reservationLink || undefined,
+    inquiryLink || undefined,
+  );
+  const actionType = normalizePartnerBenefitActionType(
+    benefitActionType,
+    normalized.reservationLink ? "external_link" : "none",
+  );
+
+  return {
+    benefitActionType: actionType,
+    benefitActionLink:
+      actionType === "external_link" ? normalized.reservationLink : "",
+    inquiryLink: normalized.inquiryLink,
+    reservationLink:
+      actionType === "external_link" ? normalized.reservationLink : "",
+  };
 }

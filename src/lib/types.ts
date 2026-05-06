@@ -3,6 +3,7 @@ import type {
   PartnerAudienceKey,
 } from "@/lib/partner-audience";
 import type { CampusSlug } from "@/lib/campuses";
+import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
 
 export type CategoryKey = string;
 export type PartnerVisibility = "public" | "confidential" | "private";
@@ -23,6 +24,8 @@ export type Partner = {
   location: string;
   campusSlugs?: CampusSlug[];
   mapUrl?: string;
+  benefitActionType?: PartnerBenefitActionType;
+  benefitActionLink?: string;
   reservationLink?: string;
   inquiryLink?: string;
   period: {
@@ -38,3 +41,4 @@ export type Partner = {
 };
 
 export type { PartnerAudienceFilter, PartnerAudienceKey };
+export type { PartnerBenefitActionType };

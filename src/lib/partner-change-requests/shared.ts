@@ -1,6 +1,9 @@
 import type { PartnerAudienceKey } from "../partner-audience.ts";
 import type { CampusSlug } from "../campuses.ts";
-import type { PartnerVisibility } from "../types.ts";
+import type {
+  PartnerBenefitActionType,
+  PartnerVisibility,
+} from "../types.ts";
 import { PartnerChangeRequestError } from "../partner-change-request-errors.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
@@ -93,6 +96,8 @@ export type PartnerChangeRequestContext = {
   images: string[];
   tags: string[];
   mapUrl: string | null;
+  benefitActionType: PartnerBenefitActionType;
+  benefitActionLink: string | null;
   reservationLink: string | null;
   inquiryLink: string | null;
   currentConditions: string[];
@@ -149,6 +154,8 @@ export type PartnerImmediateUpdateInput = {
   images: string[];
   tags: string[];
   reservationLink: string | null;
+  benefitActionType?: PartnerBenefitActionType;
+  benefitActionLink?: string | null;
   inquiryLink: string | null;
 };
 
@@ -199,6 +206,8 @@ export type PartnerRow = {
   location: string;
   thumbnail?: string | null;
   map_url?: string | null;
+  benefit_action_type?: string | null;
+  benefit_action_link?: string | null;
   reservation_link?: string | null;
   inquiry_link?: string | null;
   period_start?: string | null;

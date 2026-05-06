@@ -77,7 +77,7 @@ test("partner card helpers derive accent styles and CTA presentation", async () 
   assert.equal(activePresentation.lockKind, null);
   assert.equal(activePresentation.thumbnailUrl, "https://example.com/thumb.webp");
   assert.equal(activePresentation.isActive, true);
-  assert.equal(activePresentation.reservationAction?.label, "예약하기");
+  assert.equal(activePresentation.reservationAction?.label, "혜택 이용");
   assert.equal(activePresentation.inquiryAction?.label, "문의하기");
   assert.equal(activePresentation.detailHref, "/partners/partner-1");
 

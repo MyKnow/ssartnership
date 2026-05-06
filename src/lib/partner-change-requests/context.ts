@@ -1,4 +1,5 @@
 import { normalizePartnerVisibility } from "../partner-visibility.ts";
+import { normalizePartnerBenefitActionType } from "../partner-benefit-action.ts";
 import { resolvePartnerCampusSlugs } from "../campuses.ts";
 import { sanitizePartnerLinkValue } from "../validation.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
@@ -37,7 +38,7 @@ export async function getSupabaseRequestContext(
   const { data: partner, error } = await supabase
     .from("partners")
     .select(
-      "id,company_id,created_at,name,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
+      "id,company_id,created_at,name,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
     )
     .eq("id", partnerId)
     .maybeSingle();
@@ -81,6 +82,13 @@ export async function getSupabaseRequestContext(
     images: normalizeHttpUrlList(row.images),
     tags: normalizeTextList(row.tags),
     mapUrl: row.map_url ?? null,
+    benefitActionType: normalizePartnerBenefitActionType(
+      row.benefit_action_type,
+      row.benefit_action_link || row.reservation_link ? "external_link" : "none",
+    ),
+    benefitActionLink: sanitizePartnerLinkValue(
+      row.benefit_action_link ?? row.reservation_link ?? undefined,
+    ),
     reservationLink: sanitizePartnerLinkValue(row.reservation_link ?? undefined),
     inquiryLink: sanitizePartnerLinkValue(row.inquiry_link ?? undefined),
     currentConditions: normalizeTextList(row.conditions),

@@ -51,7 +51,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,campus_slugs,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,company:partner_companies(id,name,slug),categories(id,label)",
+      "company_id,category_id,name,location,campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,company:partner_companies(id,name,slug),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -132,6 +132,8 @@ export async function updatePartnerAction(formData: FormData) {
         location: payload.location,
         campus_slugs: payload.campusSlugs,
         map_url: payload.mapUrl,
+        benefit_action_type: payload.benefitActionType,
+        benefit_action_link: payload.benefitActionLink,
         reservation_link: payload.reservationLink,
         inquiry_link: payload.inquiryLink,
         period_start: payload.periodStart,
@@ -207,9 +209,14 @@ export async function updatePartnerAction(formData: FormData) {
       format: (value) => (value ? String(value) : "없음"),
     },
     {
-      label: "예약 링크",
-      before: previousPartner.reservation_link ?? null,
-      after: payload.reservationLink,
+      label: "혜택 이용 방식",
+      before: previousPartner.benefit_action_type ?? "none",
+      after: payload.benefitActionType,
+    },
+    {
+      label: "혜택 이용 링크",
+      before: previousPartner.benefit_action_link ?? previousPartner.reservation_link ?? null,
+      after: payload.benefitActionLink,
       format: (value) => (value ? String(value) : "없음"),
     },
     {
@@ -284,6 +291,8 @@ export async function updatePartnerAction(formData: FormData) {
         companyName: nextCompanyLabel,
         categoryLabel: nextCategoryLabel,
         visibility: payload.visibility,
+        benefitActionType: payload.benefitActionType,
+        hasBenefitActionLink: Boolean(payload.benefitActionLink),
       },
     });
   }

@@ -6,6 +6,10 @@ import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getPartnerSession } from "@/lib/partner-session";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import {
+  isPartnerBenefitActionType,
+  normalizePartnerBenefitActionType,
+} from "@/lib/partner-benefit-action";
+import {
   getPartnerChangeRequestContext,
   updatePartnerImmediateFields,
 } from "@/lib/partner-change-requests";
@@ -33,20 +37,35 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
   }
 
   const tags = parseList(String(formData.get("tags") || ""));
+  const rawBenefitActionType = String(formData.get("benefitActionType") || "").trim();
+  const rawBenefitActionLink = String(formData.get("benefitActionLink") || "").trim();
   const rawReservationLink = String(formData.get("reservationLink") || "").trim();
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
   let media = null;
 
   try {
-    const reservationLink = rawReservationLink
-      ? sanitizePartnerLinkValue(rawReservationLink)
-      : null;
-    if (rawReservationLink && !reservationLink) {
+    if (rawBenefitActionType && !isPartnerBenefitActionType(rawBenefitActionType)) {
       throw new PartnerChangeRequestError(
         "invalid_request",
-        "예약 링크 형식을 확인해 주세요.",
+        "혜택 이용 방식을 확인해 주세요.",
       );
     }
+    const benefitActionType = normalizePartnerBenefitActionType(
+      rawBenefitActionType,
+      rawBenefitActionLink || rawReservationLink ? "external_link" : "none",
+    );
+    const parsedBenefitActionLink = rawBenefitActionLink || rawReservationLink
+      ? sanitizePartnerLinkValue(rawBenefitActionLink || rawReservationLink)
+      : null;
+    if (benefitActionType === "external_link" && !parsedBenefitActionLink) {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "혜택 이용 링크 형식을 확인해 주세요.",
+      );
+    }
+    const benefitActionLink =
+      benefitActionType === "external_link" ? parsedBenefitActionLink : null;
+    const reservationLink = benefitActionLink;
 
     const inquiryLink = rawInquiryLink
       ? sanitizePartnerLinkValue(rawInquiryLink)
@@ -66,6 +85,8 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
       thumbnail: media.thumbnail,
       images: media.images,
       tags,
+      benefitActionType,
+      benefitActionLink,
       reservationLink,
       inquiryLink,
     });
@@ -91,6 +112,8 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         tagCount: tags.length,
         imageCount: media.images.length,
         thumbnailChanged: context.thumbnail !== media.thumbnail,
+        benefitActionTypeChanged: context.benefitActionType !== benefitActionType,
+        benefitActionLinkChanged: context.benefitActionLink !== benefitActionLink,
         reservationLinkChanged: context.reservationLink !== reservationLink,
         inquiryLinkChanged: context.inquiryLink !== inquiryLink,
       },

@@ -1,4 +1,7 @@
-import type { PartnerVisibility } from "@/lib/types";
+import type {
+  PartnerBenefitActionType,
+  PartnerVisibility,
+} from "@/lib/types";
 import type { CampusSlug } from "@/lib/campuses";
 import type { PartnerFormField } from "@/lib/partner-form-state";
 
@@ -29,6 +32,8 @@ export type PartnerCardFormValues = {
   location?: string;
   campusSlugs?: CampusSlug[];
   mapUrl?: string;
+  benefitActionType?: PartnerBenefitActionType;
+  benefitActionLink?: string;
   reservationLink?: string;
   inquiryLink?: string;
   period?: {
