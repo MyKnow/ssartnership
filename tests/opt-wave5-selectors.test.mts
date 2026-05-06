@@ -280,6 +280,22 @@ test("log selectors expose partner portal activity as a virtual group", async ()
         properties: { area: "partner" },
         created_at: "2026-04-08T00:00:00.000Z",
       },
+      {
+        id: "partner-api-1",
+        event_name: "api_request",
+        actor_type: "guest",
+        actor_mm_username: null,
+        actor_name: null,
+        actor_id: null,
+        ip_address: "127.0.0.4",
+        path: "/api/partner/services/partner-1",
+        referrer: null,
+        target_type: null,
+        target_id: null,
+        partner_name: null,
+        properties: {},
+        created_at: "2026-04-08T00:30:00.000Z",
+      },
     ],
     auditLogs: [
       {
@@ -329,7 +345,7 @@ test("log selectors expose partner portal activity as a virtual group", async ()
       statusFilter: "all",
       sortFilter: "newest",
     }).map((log) => log.id),
-    ["partner-security-1", "partner-audit-1", "partner-page-1"],
+    ["partner-security-1", "partner-audit-1", "partner-api-1", "partner-page-1"],
   );
   assert.deepStrictEqual(
     getAvailableLogNames(unified, "partner").map((item) => item.label),
@@ -337,6 +353,7 @@ test("log selectors expose partner portal activity as a virtual group", async ()
       "페이지 조회",
       "협력사 포털 로그인",
       "협력사 포털 변경 요청 제출",
+      "api_request",
     ].sort((a, b) => a.localeCompare(b, "ko-KR")),
   );
 
