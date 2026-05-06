@@ -11,7 +11,9 @@ import PartnerAudienceSection from "@/components/partner-card-form/PartnerAudien
 import PartnerFormActions from "@/components/partner-card-form/PartnerFormActions";
 import { cn } from "@/lib/cn";
 import { validateFormCampusSlugSelection } from "@/lib/campuses";
+import { isPartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
+import { sanitizePartnerLinkValue } from "@/lib/validation";
 import type {
   PartnerCardCategoryOption,
   PartnerCardCompanyOption,
@@ -74,6 +76,10 @@ export default function PartnerCardForm({
     setLocationValue,
     mapUrlValue,
     setMapUrlValue,
+    benefitActionTypeValue,
+    setBenefitActionTypeValue,
+    benefitActionLinkValue,
+    setBenefitActionLinkValue,
     reservationLinkValue,
     setReservationLinkValue,
     inquiryLinkValue,
@@ -104,18 +110,40 @@ export default function PartnerCardForm({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     const formData = new FormData(event.currentTarget);
     const location = String(formData.get("location") || "").trim();
+    const benefitActionType = String(formData.get("benefitActionType") || "").trim();
+    const benefitActionLink = String(formData.get("benefitActionLink") || "").trim();
     const campusSlugSelection = validateFormCampusSlugSelection(
       formData.getAll("campusSlugs").map((item) => String(item).trim()),
       location,
     );
+    const benefitActionError =
+      benefitActionType && !isPartnerBenefitActionType(benefitActionType)
+        ? {
+            field: "benefitActionType" as const,
+            message: partnerFormErrorMessages.partner_form_invalid_benefit_action_type,
+          }
+        : benefitActionType === "external_link" &&
+            !sanitizePartnerLinkValue(benefitActionLink)
+          ? {
+              field: "benefitActionLink" as const,
+              message: partnerFormErrorMessages.partner_form_invalid_benefit_action_link,
+            }
+          : null;
 
-    if (campusSlugSelection.ok) {
+    if (campusSlugSelection.ok && !benefitActionError) {
       setClientFieldErrors((current) => {
-        if (!current.campusSlugs) {
+        if (!current.campusSlugs && !current.benefitActionType && !current.benefitActionLink) {
           return current;
         }
-        const { campusSlugs: _campusSlugs, ...nextErrors } = current;
+        const {
+          campusSlugs: _campusSlugs,
+          benefitActionType: _benefitActionType,
+          benefitActionLink: _benefitActionLink,
+          ...nextErrors
+        } = current;
         void _campusSlugs;
+        void _benefitActionType;
+        void _benefitActionLink;
         return nextErrors;
       });
       return;
@@ -124,10 +152,23 @@ export default function PartnerCardForm({
     event.preventDefault();
     setClientFieldErrors((current) => ({
       ...current,
-      campusSlugs: partnerFormErrorMessages.partner_form_invalid_campus_slugs,
+      ...(!campusSlugSelection.ok
+        ? {
+            campusSlugs: partnerFormErrorMessages.partner_form_invalid_campus_slugs,
+          }
+        : {}),
+      ...(benefitActionError
+        ? { [benefitActionError.field]: benefitActionError.message }
+        : {}),
     }));
+    if (!campusSlugSelection.ok) {
+      event.currentTarget
+        .querySelector<HTMLInputElement>('input[name="campusSlugs"]')
+        ?.focus();
+      return;
+    }
     event.currentTarget
-      .querySelector<HTMLInputElement>('input[name="campusSlugs"]')
+      .querySelector<HTMLElement>(`[name="${benefitActionError?.field}"]`)
       ?.focus();
   };
 
@@ -180,6 +221,8 @@ export default function PartnerCardForm({
               periodEndValue,
               locationValue,
               mapUrlValue,
+              benefitActionTypeValue,
+              benefitActionLinkValue,
               reservationLinkValue,
               inquiryLinkValue,
             }}
@@ -192,6 +235,8 @@ export default function PartnerCardForm({
               setPeriodEndValue,
               setLocationValue,
               setMapUrlValue,
+              setBenefitActionTypeValue,
+              setBenefitActionLinkValue,
               setReservationLinkValue,
               setInquiryLinkValue,
             }}

@@ -1,5 +1,6 @@
 import type { CampusSlug } from "../../../../lib/campuses.ts";
 import type { PartnerBenefitVisibility } from "../../../../lib/partner-benefit-visibility.ts";
+import type { PartnerBenefitActionType } from "../../../../lib/partner-benefit-action.ts";
 import type { PartnerVisibility } from "../../../../lib/types.ts";
 
 export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getSupabaseAdminClient>;
@@ -10,6 +11,8 @@ export type PartnerCoreInput = {
   location: string;
   campusSlugs: CampusSlug[];
   mapUrl: string | null;
+  benefitActionType: PartnerBenefitActionType;
+  benefitActionLink: string | null;
   reservationLink: string | null;
   inquiryLink: string | null;
   periodStart: string | null;

@@ -29,7 +29,7 @@ export function summarizeRequestChanges(summary: PartnerChangeRequestSummary) {
     { label: "메인 썸네일", before: summary.currentThumbnail, after: summary.requestedThumbnail },
     { label: "추가 이미지", before: summary.currentImages, after: summary.requestedImages },
     {
-      label: "예약 링크",
+      label: "혜택 이용",
       before: summary.currentReservationLink,
       after: summary.requestedReservationLink,
     },
@@ -94,4 +94,3 @@ export function createRequestEntry(summary: PartnerChangeRequestSummary): Partne
     createdAt: resolvedAt,
   };
 }
-

@@ -102,16 +102,16 @@ export const Summary: Story = {
       ),
     ).toBeInTheDocument();
     await expect(
-      canvas.getByText('reservation-phone:{"label":"예약하기","href":"tel:01012345678"}'),
+      canvas.getByText('reservation-phone:{"label":"혜택 이용","href":"tel:01012345678","type":"external_link"}'),
     ).toBeInTheDocument();
     await expect(
       canvas.getByText(
-        'reservation-instagram:{"label":"예약하기","href":"https://instagram.com/ssafy.seoul"}',
+        'reservation-instagram:{"label":"혜택 이용","href":"https://instagram.com/ssafy.seoul","type":"external_link"}',
       ),
     ).toBeInTheDocument();
     await expect(
       canvas.getByText(
-        'reservation-email:{"label":"예약하기","href":"mailto:hello@example.com"}',
+        'reservation-email:{"label":"혜택 이용","href":"mailto:hello@example.com","type":"external_link"}',
       ),
     ).toBeInTheDocument();
     await expect(

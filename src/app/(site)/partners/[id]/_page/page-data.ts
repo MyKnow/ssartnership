@@ -4,9 +4,10 @@ import { getCachedImageUrl } from "@/lib/image-cache";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
 import {
+  getBenefitUseAction,
   getContactDisplay,
   getMapLink,
-  normalizeReservationInquiry,
+  normalizeBenefitUseInquiry,
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import type { PartnerReviewListResult, PartnerReviewSort, PartnerReviewSummary } from "@/lib/partner-reviews";
@@ -100,9 +101,12 @@ export type PartnerDetailPageData = {
   thumbnailUrl: string;
   mapLink: string | undefined;
   normalizedLinks: {
+    benefitActionType: string;
+    benefitActionLink: string;
     reservationLink: string;
     inquiryLink: string;
   };
+  benefitUseAction: ReturnType<typeof getBenefitUseAction>;
   reservationDisplay: ContactDisplay | null;
   inquiryDisplay: ContactDisplay | null;
   contactCount: number;
@@ -167,10 +171,27 @@ export async function getPartnerDetailPageData(
   const thumbnailUrl = partner.thumbnail ? getCachedImageUrl(partner.thumbnail) : "";
   const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name) ?? undefined;
   const normalizedLinks = isActive
-    ? normalizeReservationInquiry(partner.reservationLink, partner.inquiryLink)
-    : { reservationLink: "", inquiryLink: "" };
+    ? normalizeBenefitUseInquiry({
+        benefitActionType: partner.benefitActionType,
+        benefitActionLink: partner.benefitActionLink,
+        reservationLink: partner.reservationLink,
+        inquiryLink: partner.inquiryLink,
+      })
+    : {
+        benefitActionType: "none",
+        benefitActionLink: "",
+        reservationLink: "",
+        inquiryLink: "",
+      };
+  const benefitUseAction = isActive
+    ? getBenefitUseAction({
+        actionType: normalizedLinks.benefitActionType,
+        actionLink: normalizedLinks.benefitActionLink,
+        legacyReservationLink: normalizedLinks.reservationLink,
+      })
+    : null;
   const reservationDisplay = isActive
-    ? getContactDisplay(normalizedLinks.reservationLink)
+    ? getContactDisplay(normalizedLinks.benefitActionLink)
     : null;
   const inquiryDisplay = isActive
     ? getContactDisplay(normalizedLinks.inquiryLink)
@@ -189,9 +210,10 @@ export async function getPartnerDetailPageData(
     thumbnailUrl,
     mapLink,
     normalizedLinks,
+    benefitUseAction,
     reservationDisplay,
     inquiryDisplay,
-    contactCount: [reservationDisplay, inquiryDisplay].filter(Boolean).length,
+    contactCount: [benefitUseAction, inquiryDisplay].filter(Boolean).length,
     badgeStyle: category?.color
       ? {
           backgroundColor: withAlpha(category.color, "1f"),

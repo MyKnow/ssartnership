@@ -3,6 +3,7 @@ import {
   normalizePartnerAudience,
 } from "@/lib/partner-audience";
 import { normalizeCampusSlugs } from "@/lib/campuses";
+import { normalizePartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import type {
   PartnerRepository,
   PartnerViewContext,
@@ -28,6 +29,8 @@ type PartnerRow = {
   campus_slugs?: string[] | null;
   thumbnail?: string | null;
   map_url?: string | null;
+  benefit_action_type?: string | null;
+  benefit_action_link?: string | null;
   reservation_link?: string | null;
   inquiry_link?: string | null;
   period_start?: string | null;
@@ -58,7 +61,7 @@ type PublicCacheVersionRow = {
 };
 
 const PARTNER_SELECT_COLUMNS =
-  "id,name,category_id,created_at,updated_at,location,campus_slugs,thumbnail,map_url,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,categories(key)";
+  "id,name,category_id,created_at,updated_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,categories(key)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -192,6 +195,11 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
     campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
     thumbnail,
     mapUrl: row.map_url ?? undefined,
+    benefitActionType: normalizePartnerBenefitActionType(
+      row.benefit_action_type,
+      row.benefit_action_link || row.reservation_link ? "external_link" : "none",
+    ),
+    benefitActionLink: row.benefit_action_link ?? undefined,
     reservationLink: row.reservation_link ?? undefined,
     inquiryLink: row.inquiry_link ?? undefined,
     period: {

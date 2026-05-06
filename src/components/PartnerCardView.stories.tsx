@@ -92,7 +92,7 @@ export const InteractivePublicCard: Story = {
       "href",
       "https://maps.example.com/partner-1",
     );
-    await expect(canvas.getByRole("link", { name: "예약하기" })).toHaveAttribute(
+    await expect(canvas.getByRole("link", { name: "혜택 이용" })).toHaveAttribute(
       "href",
       "https://booking.example.com/partner-1",
     );
@@ -102,7 +102,7 @@ export const InteractivePublicCard: Story = {
     );
     const titleLink = detailLinks[detailLinks.length - 1]!;
     const mapLink = canvas.getByRole("link", { name: "지도 보기" });
-    const reservationLink = canvas.getByRole("link", { name: "예약하기" });
+    const reservationLink = canvas.getByRole("link", { name: "혜택 이용" });
     const inquiryLink = canvas.getByRole("link", { name: "문의하기" });
     [titleLink, mapLink, reservationLink, inquiryLink].forEach((link) => {
       link.addEventListener("click", (event) => event.preventDefault(), {
@@ -174,9 +174,9 @@ export const InactivePeriod: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByText("현재 제휴기간이 아니므로, 예약/문의를 할 수 없습니다."),
+      canvas.getByText("현재 제휴기간이 아니므로, 혜택 이용/문의를 할 수 없습니다."),
     ).toBeInTheDocument();
-    await expect(canvas.queryByRole("link", { name: "예약하기" })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("link", { name: "혜택 이용" })).not.toBeInTheDocument();
   },
 };
 

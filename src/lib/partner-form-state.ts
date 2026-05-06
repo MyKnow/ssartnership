@@ -6,6 +6,8 @@ export type PartnerFormField =
   | "location"
   | "campusSlugs"
   | "mapUrl"
+  | "benefitActionType"
+  | "benefitActionLink"
   | "reservationLink"
   | "inquiryLink"
   | "visibility"

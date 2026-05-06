@@ -1,4 +1,5 @@
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
+import { normalizePartnerBenefitActionType } from "../../partner-benefit-action.ts";
 import type { PartnerImmediateUpdateInput } from "../../partner-change-requests/shared.ts";
 import { arraysEqual, collectServiceMediaUrls, normalizeHttpUrlList } from "./normalizers.ts";
 import { findService } from "./service-store.ts";
@@ -19,11 +20,21 @@ export async function updateMockPartnerImmediateFields(
     input.thumbnail ?? null,
     ...(input.images ?? []),
   ]);
+  const benefitActionType = normalizePartnerBenefitActionType(
+    input.benefitActionType,
+    input.benefitActionLink || input.reservationLink ? "external_link" : "none",
+  );
+  const benefitActionLink =
+    benefitActionType === "external_link"
+      ? input.benefitActionLink ?? input.reservationLink
+      : null;
 
   if (
     service.thumbnail === input.thumbnail &&
     arraysEqual(service.images, input.images) &&
     arraysEqual(service.tags, input.tags) &&
+    service.benefitActionType === benefitActionType &&
+    service.benefitActionLink === benefitActionLink &&
     service.reservationLink === input.reservationLink &&
     service.inquiryLink === input.inquiryLink
   ) {
@@ -36,6 +47,8 @@ export async function updateMockPartnerImmediateFields(
   service.thumbnail = input.thumbnail;
   service.images = [...input.images];
   service.tags = [...input.tags];
+  service.benefitActionType = benefitActionType;
+  service.benefitActionLink = benefitActionLink;
   service.reservationLink = input.reservationLink;
   service.inquiryLink = input.inquiryLink;
 

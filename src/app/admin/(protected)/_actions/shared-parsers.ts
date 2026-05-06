@@ -8,6 +8,10 @@ import {
   isPartnerBenefitVisibility,
   normalizePartnerBenefitVisibility,
 } from "../../../../lib/partner-benefit-visibility.ts";
+import {
+  isPartnerBenefitActionType,
+  normalizePartnerBenefitActionType,
+} from "../../../../lib/partner-benefit-action.ts";
 import { normalizePartnerLoginId } from "../../../../lib/partner-utils.ts";
 import {
   isValidEmail,
@@ -229,6 +233,8 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const categoryId = String(formData.get("categoryId") || "").trim();
   const location = String(formData.get("location") || "").trim();
   const rawMapUrl = String(formData.get("mapUrl") || "").trim();
+  const rawBenefitActionType = String(formData.get("benefitActionType") || "").trim();
+  const rawBenefitActionLink = String(formData.get("benefitActionLink") || "").trim();
   const rawReservationLink = String(formData.get("reservationLink") || "").trim();
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
   const rawVisibility = String(formData.get("visibility") || "").trim();
@@ -264,10 +270,29 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     throw new Error("partner_form_invalid_map_url");
   }
 
-  const reservationLink = parsePartnerLink(rawReservationLink);
-  if (rawReservationLink && !reservationLink) {
-    throw new Error("partner_form_invalid_reservation_url");
+  if (rawBenefitActionType && !isPartnerBenefitActionType(rawBenefitActionType)) {
+    throw new Error("partner_form_invalid_benefit_action_type");
   }
+  const benefitActionType = normalizePartnerBenefitActionType(
+    rawBenefitActionType,
+    rawBenefitActionLink || rawReservationLink ? "external_link" : "none",
+  );
+  const parsedBenefitActionLink = parsePartnerLink(
+    rawBenefitActionLink || rawReservationLink,
+  );
+  if (benefitActionType === "external_link" && !parsedBenefitActionLink) {
+    throw new Error("partner_form_invalid_benefit_action_link");
+  }
+  if (
+    benefitActionType !== "external_link" &&
+    rawBenefitActionLink &&
+    !parsePartnerLink(rawBenefitActionLink)
+  ) {
+    throw new Error("partner_form_invalid_benefit_action_link");
+  }
+  const benefitActionLink =
+    benefitActionType === "external_link" ? parsedBenefitActionLink : null;
+  const reservationLink = benefitActionLink;
 
   const inquiryLink = parsePartnerLink(rawInquiryLink);
   if (rawInquiryLink && !inquiryLink) {
@@ -295,6 +320,8 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     location,
     campusSlugs,
     mapUrl,
+    benefitActionType,
+    benefitActionLink,
     reservationLink,
     inquiryLink,
     periodStart: periodStart || null,

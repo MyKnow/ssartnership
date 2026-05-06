@@ -1,4 +1,5 @@
 import { PartnerChangeRequestError } from "../partner-change-request-errors.ts";
+import { normalizePartnerBenefitActionType } from "../partner-benefit-action.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { getSupabaseRequestContext } from "./context.ts";
 import {
@@ -31,11 +32,21 @@ export async function updateSupabasePartnerImmediateFields(
     thumbnail: input.thumbnail,
     images: input.images,
   });
+  const benefitActionType = normalizePartnerBenefitActionType(
+    input.benefitActionType,
+    input.benefitActionLink || input.reservationLink ? "external_link" : "none",
+  );
+  const benefitActionLink =
+    benefitActionType === "external_link"
+      ? input.benefitActionLink ?? input.reservationLink
+      : null;
 
   if (
     context.thumbnail === input.thumbnail &&
     arraysEqual(context.images, input.images) &&
     arraysEqual(context.tags, input.tags) &&
+    context.benefitActionType === benefitActionType &&
+    context.benefitActionLink === benefitActionLink &&
     context.reservationLink === input.reservationLink &&
     context.inquiryLink === input.inquiryLink
   ) {
@@ -52,6 +63,8 @@ export async function updateSupabasePartnerImmediateFields(
       thumbnail: input.thumbnail,
       images: input.images,
       tags: input.tags,
+      benefit_action_type: benefitActionType,
+      benefit_action_link: benefitActionLink,
       reservation_link: input.reservationLink,
       inquiry_link: input.inquiryLink,
     })

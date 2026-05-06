@@ -211,7 +211,7 @@ export function ApprovalChangeForm({
 
       <InlineMessage
         title="안내"
-        description="메인 썸네일, 추가 이미지, 예약/문의 링크, 태그는 즉시 저장됩니다. 브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자 승인 후 반영됩니다."
+        description="메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그는 즉시 저장됩니다. 브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자 승인 후 반영됩니다."
       />
 
       <div className="flex flex-wrap items-center gap-3">

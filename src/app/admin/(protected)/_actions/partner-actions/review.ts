@@ -75,7 +75,7 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
       format: (value) => (Array.isArray(value) ? `${value.length}장` : "0장"),
     },
     {
-      label: "예약 링크",
+      label: "혜택 이용",
       before: request.currentReservationLink ?? null,
       after: request.requestedReservationLink ?? null,
       format: (value) => (value ? String(value) : "없음"),
