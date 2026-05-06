@@ -53,6 +53,14 @@ export default function PartnerDetailContactSection({
             >
               {benefitUseAction.label}
             </Button>
+          ) : benefitUseAction.type === "certification" ? (
+            <Button
+              className="mt-4 w-full justify-center"
+              href={benefitUseAction.href}
+              variant="primary"
+            >
+              {benefitUseAction.label}
+            </Button>
           ) : (
             <ContactCopyRow
               href={benefitUseAction.href}
