@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Tabs from "@/components/ui/Tabs";
 import SectionHeading from "@/components/ui/SectionHeading";
 import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
@@ -22,6 +22,7 @@ type AdminCompanyWorkspaceProps = {
   accounts: AdminPartnerAccount[];
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
+  initialTab?: AdminCompanyTab;
 };
 
 type AdminCompanyTab = "companies" | "accounts";
@@ -44,8 +45,13 @@ export default function AdminCompanyWorkspace({
   accounts,
   generatedSetupUrl,
   generatedSetupAccountId,
+  initialTab = "companies",
 }: AdminCompanyWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<AdminCompanyTab>("companies");
+  const [activeTab, setActiveTab] = useState<AdminCompanyTab>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   return (
     <section className="grid gap-4">

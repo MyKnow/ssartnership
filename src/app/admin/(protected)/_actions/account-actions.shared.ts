@@ -10,17 +10,17 @@ export async function loadPartnerAccountOrRedirect(accountId: string) {
   const { data: account, error } = await supabase
     .from("partner_accounts")
     .select(
-      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,last_login_at,created_at,updated_at",
+      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at",
     )
     .eq("id", accountId)
     .maybeSingle();
 
   if (error) {
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
   if (!account) {
-    redirectAdminActionError("/admin/companies", "partner_account_missing_id");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
   }
 
   return { supabase, account };
@@ -40,4 +40,3 @@ export async function loadPartnerCompanyOrRedirect(companyId: string) {
 
   return { supabase, company };
 }
-

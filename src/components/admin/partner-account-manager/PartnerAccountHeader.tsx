@@ -7,6 +7,8 @@ import {
 } from "@/app/admin/(protected)/actions";
 import {
   formatPartnerAccountDateTime,
+  getPartnerInitialSetupBadge,
+  hasIssuedPartnerInitialSetupLink,
 } from "@/components/admin/partner-account-manager/helpers";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
@@ -17,7 +19,8 @@ export default function PartnerAccountHeader({
   account: AdminPartnerAccount;
   generatedSetupUrl?: string | null;
 }) {
-  const hasActiveSetupLink = Boolean(account.initial_setup_link_sent_at);
+  const hasIssuedSetupLink = hasIssuedPartnerInitialSetupLink(account);
+  const setupBadge = getPartnerInitialSetupBadge(account);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
@@ -32,23 +35,7 @@ export default function PartnerAccountHeader({
           <Badge variant="neutral">
             협력사 연결 {account.links.length}개
           </Badge>
-          <Badge
-            variant={
-              account.initial_setup_completed_at
-                ? "success"
-                : hasActiveSetupLink
-                  ? "primary"
-                  : "neutral"
-            }
-          >
-            {account.initial_setup_completed_at
-              ? "초기 설정 완료"
-              : hasActiveSetupLink
-                ? account.initial_setup_link_sent_at
-                  ? "초기설정 URL 전송됨"
-                  : "초기설정 URL 준비됨"
-                : "초기설정 URL 미생성"}
-          </Badge>
+          <Badge variant={setupBadge.variant}>{setupBadge.label}</Badge>
         </div>
         <div>
           <h3 className="text-lg font-semibold text-foreground">{account.display_name}</h3>
@@ -76,7 +63,7 @@ export default function PartnerAccountHeader({
                 variant="ghost"
                 className="w-full sm:w-auto"
               >
-                {hasActiveSetupLink ? "초기설정 URL 재생성" : "초기설정 URL 생성"}
+                {hasIssuedSetupLink ? "초기설정 URL 재생성" : "초기설정 URL 생성"}
               </SubmitButton>
             </form>
           ) : null}
@@ -91,7 +78,7 @@ export default function PartnerAccountHeader({
             <form action={sendPartnerAccountInitialSetupUrl}>
               <input type="hidden" name="id" value={account.id} />
               <SubmitButton pendingText="전송 중" className="w-full sm:w-auto">
-                {account.initial_setup_link_sent_at
+                {hasIssuedSetupLink
                   ? "초기설정 URL 재전송"
                   : "초기설정 URL 메일 전송"}
               </SubmitButton>

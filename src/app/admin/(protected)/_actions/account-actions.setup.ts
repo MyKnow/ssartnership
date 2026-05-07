@@ -13,7 +13,7 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
   await requireAdmin();
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
-    redirectAdminActionError("/admin/companies", "partner_account_missing_id");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
   }
 
   const supabase = getPartnerAccountSupabase();
@@ -21,7 +21,7 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
   try {
     issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
   } catch {
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
   await logAdminAction("partner_account_initial_setup_link_generate", {
@@ -38,7 +38,7 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
 
   revalidatePartnerAccountData();
   redirect(
-    `/admin/companies?generatedSetupAccountId=${encodeURIComponent(issued.account.id)}&generatedSetupUrl=${encodeURIComponent(issued.setupUrl)}`,
+    `/admin/companies?tab=accounts&generatedSetupAccountId=${encodeURIComponent(issued.account.id)}&generatedSetupUrl=${encodeURIComponent(issued.setupUrl)}`,
   );
 }
 
@@ -46,7 +46,7 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
   await requireAdmin();
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
-    redirectAdminActionError("/admin/companies", "partner_account_missing_id");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
   }
 
   const supabase = getPartnerAccountSupabase();
@@ -54,7 +54,7 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
   try {
     issued = await issuePartnerAccountInitialSetupLink(supabase, accountId);
   } catch {
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
   try {
@@ -65,7 +65,7 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
       setupUrl: issued.setupUrl,
     });
   } catch {
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
   const { error: sentAtError } = await supabase
@@ -77,7 +77,7 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
     .eq("id", issued.account.id);
 
   if (sentAtError) {
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
   await logAdminAction("partner_account_initial_setup_link_send", {
@@ -93,6 +93,5 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
   });
 
   revalidatePartnerAccountData();
-  redirect("/admin/companies");
+  redirect("/admin/companies?tab=accounts");
 }
-

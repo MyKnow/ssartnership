@@ -91,5 +91,6 @@ export function revalidateCyclePaths() {
 }
 
 export function redirectAdminActionError(path: string, code: string): never {
-  redirect(`${path}?error=${encodeURIComponent(code)}`);
+  const separator = path.includes("?") ? "&" : "?";
+  redirect(`${path}${separator}error=${encodeURIComponent(code)}`);
 }

@@ -53,6 +53,7 @@ export function normalizePartnerAccountRow(
     email_verified_at: row.email_verified_at ?? null,
     initial_setup_completed_at: row.initial_setup_completed_at ?? null,
     initial_setup_link_sent_at: row.initial_setup_link_sent_at ?? null,
+    initial_setup_expires_at: row.initial_setup_expires_at ?? null,
     last_login_at: row.last_login_at ?? null,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,

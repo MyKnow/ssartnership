@@ -25,7 +25,7 @@ export async function updatePartnerAccountAction(formData: FormData) {
     payload = parsePartnerAccountPayload(formData);
   } catch (error) {
     redirectAdminActionError(
-      "/admin/companies",
+      "/admin/companies?tab=accounts",
       error instanceof Error ? error.message : "partner_account_invalid_request",
     );
   }
@@ -54,7 +54,7 @@ export async function updatePartnerAccountAction(formData: FormData) {
       .eq("id", payload.id);
 
     if (error) {
-      redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+      redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
     }
   }
 
@@ -77,7 +77,7 @@ export async function updatePartnerAccountAction(formData: FormData) {
   });
 
   revalidatePartnerAccountData();
-  redirect("/admin/companies");
+  redirect("/admin/companies?tab=accounts");
 }
 
 export async function createPartnerAccountAction(formData: FormData) {
@@ -87,7 +87,7 @@ export async function createPartnerAccountAction(formData: FormData) {
     payload = parsePartnerAccountCreatePayload(formData);
   } catch (error) {
     redirectAdminActionError(
-      "/admin/companies",
+      "/admin/companies?tab=accounts",
       error instanceof Error ? error.message : "partner_account_invalid_request",
     );
   }
@@ -100,10 +100,10 @@ export async function createPartnerAccountAction(formData: FormData) {
     .maybeSingle();
 
   if (lookupError) {
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
   if (existingAccount) {
-    redirectAdminActionError("/admin/companies", "partner_account_exists");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_exists");
   }
 
   const { company } = await loadPartnerCompanyOrRedirect(payload.companyId);
@@ -123,16 +123,17 @@ export async function createPartnerAccountAction(formData: FormData) {
       email_verified_at: null,
       initial_setup_completed_at: null,
       initial_setup_link_sent_at: null,
+      initial_setup_expires_at: null,
       created_at: now,
       updated_at: now,
     })
     .select(
-      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at",
+      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at",
     )
     .single();
 
   if (createError || !createdAccount) {
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
   const cleanup = async () => {
@@ -165,7 +166,7 @@ export async function createPartnerAccountAction(formData: FormData) {
   } catch (error) {
     await cleanup();
     console.error("[admin] partner account create failed", error);
-    redirectAdminActionError("/admin/companies", "partner_account_invalid_request");
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
   await logAdminAction("partner_account_create", {
@@ -182,5 +183,5 @@ export async function createPartnerAccountAction(formData: FormData) {
 
   revalidatePartnerAccountData();
   revalidatePartnerCompanyData();
-  redirect("/admin/companies");
+  redirect("/admin/companies?tab=accounts");
 }

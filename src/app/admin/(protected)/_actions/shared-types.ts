@@ -74,6 +74,7 @@ export type PartnerAccountRow = {
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
   initial_setup_link_sent_at?: string | null;
+  initial_setup_expires_at?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
