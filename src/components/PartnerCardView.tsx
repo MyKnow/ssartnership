@@ -69,7 +69,7 @@ export default function PartnerCardView({
     <article
       data-testid="partner-card"
       className={cn(
-        "relative flex h-full w-full flex-col justify-between rounded-card border border-border/80 bg-surface-overlay p-5 shadow-flat backdrop-blur-md transition-surface-transform duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
+        "relative flex h-full w-full flex-col gap-5 overflow-hidden rounded-card border border-border/80 bg-surface-overlay p-5 shadow-flat backdrop-blur-md transition-surface-transform duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
         canNavigate ? "cursor-pointer" : null,
         className,
       )}

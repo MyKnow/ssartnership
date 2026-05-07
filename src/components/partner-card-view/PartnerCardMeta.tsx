@@ -74,15 +74,66 @@ export default function PartnerCardMeta({
   const serviceMode = getPartnerServiceMode(partner.location);
   const isOnlineService = serviceMode === "online";
   const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);
+  const placeLinkAction = mapLink ? (
+    <a
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-control text-foreground shadow-flat hover:border-strong hover:bg-surface-elevated"
+      href={mapLink}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={onMapClick}
+      aria-label={placeLinkLabel}
+      title={placeLinkLabel}
+    >
+      {isOnlineService ? (
+        <svg
+          width={15}
+          height={15}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M7 17 17 7" />
+          <path d="M8 7h9v9" />
+        </svg>
+      ) : (
+        <svg
+          width={15}
+          height={15}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+          <path d="M9 3v15" />
+          <path d="M15 6v15" />
+        </svg>
+      )}
+    </a>
+  ) : null;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start gap-4">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(8rem,9rem)_minmax(0,1fr)] sm:items-start">
         {media}
         <div className="grid min-w-0 flex-1 gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">{categoryBadge}</div>
-            {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {categoryBadge}
+            </div>
+            {placeLinkAction || headerAction ? (
+              <div className="flex shrink-0 items-center gap-1.5">
+                {placeLinkAction}
+                {headerAction}
+              </div>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             {canNavigate ? (
@@ -100,57 +151,11 @@ export default function PartnerCardMeta({
               </h3>
             )}
           </div>
-          <div className="flex items-start justify-between gap-2 text-sm text-muted-foreground">
-            {!isOnlineService ? (
-              <span className="min-w-0 flex-1 leading-snug">{partner.location}</span>
-            ) : (
-              <span className="min-w-0 flex-1" aria-hidden="true" />
-            )}
-            {mapLink ? (
-              <a
-                className="inline-flex h-8 w-8 shrink-0 self-start items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
-                href={mapLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={onMapClick}
-                aria-label={placeLinkLabel}
-                title={placeLinkLabel}
-              >
-                {isOnlineService ? (
-                  <svg
-                    width={14}
-                    height={14}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M7 17 17 7" />
-                    <path d="M8 7h9v9" />
-                  </svg>
-                ) : (
-                  <svg
-                    width={14}
-                    height={14}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
-                    <path d="M9 3v15" />
-                    <path d="M15 6v15" />
-                  </svg>
-                )}
-              </a>
-            ) : null}
-          </div>
+          {!isOnlineService ? (
+            <p className="min-w-0 break-words text-sm leading-snug text-muted-foreground">
+              {partner.location}
+            </p>
+          ) : null}
         </div>
       </div>
       <div className="text-sm text-foreground">
