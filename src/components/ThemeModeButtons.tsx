@@ -1,14 +1,25 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/solid";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/cn";
 
+const subscribeHydrationState = () => () => {};
+const getClientHydrationState = () => true;
+const getServerHydrationState = () => false;
+
 export default function ThemeModeButtons() {
   const { theme, setTheme, systemTheme, resolvedTheme } = useTheme();
-  const activeTheme =
-    resolvedTheme ?? (theme === "system" ? systemTheme : theme) ?? "light";
+  const mounted = useSyncExternalStore(
+    subscribeHydrationState,
+    getClientHydrationState,
+    getServerHydrationState,
+  );
+  const activeTheme = mounted
+    ? (resolvedTheme ?? (theme === "system" ? systemTheme : theme) ?? "light")
+    : null;
 
   return (
     <div className="@container min-w-0 w-full rounded-[1.4rem] border border-border/80 bg-surface-muted/90 p-1 shadow-flat">

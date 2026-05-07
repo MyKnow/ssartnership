@@ -30,7 +30,7 @@ import {
 } from "@/components/home-view/selectors";
 
 const APPLIES_TO_FILTER_STORAGE_KEY = "home:partner-applies-to-filter";
-const PARTNER_GRID_TEMPLATE_COLUMNS = "repeat(auto-fit, minmax(min(100%, 36rem), 1fr))";
+const PARTNER_GRID_TEMPLATE_COLUMNS = "repeat(auto-fit, minmax(min(100%, 22rem), 1fr))";
 
 export default function HomeView({
   categories,

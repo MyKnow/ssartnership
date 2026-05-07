@@ -121,7 +121,7 @@ export default function PartnerCardMeta({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(8rem,9rem)_minmax(0,1fr)] sm:items-start">
+      <div className="grid min-w-0 gap-4 @2xs/card:grid-cols-[minmax(8rem,9rem)_minmax(0,1fr)] @2xs/card:items-start">
         {media}
         <div className="grid min-w-0 flex-1 gap-2">
           <div className="flex items-start justify-between gap-3">
