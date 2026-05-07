@@ -70,74 +70,107 @@ export default function PartnerCompanySection({
           </p>
         </FieldGroup>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FieldGroup label="협력사명" error={fieldErrors?.companyName}>
-            <Input
-              name="companyName"
-              value={values.companyNameValue}
-              onChange={(event) => setters.setCompanyNameValue(event.target.value)}
-              placeholder="협력사명"
-              disabled={companyFieldsLocked}
-              autoFocus={focusField === "companyName"}
-              aria-invalid={Boolean(fieldErrors?.companyName) || undefined}
-              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyName))}
-            />
-          </FieldGroup>
-          <FieldGroup label="담당자 이름" error={fieldErrors?.companyContactName}>
-            <Input
-              name="companyContactName"
-              value={values.companyContactNameValue}
-              onChange={(event) => setters.setCompanyContactNameValue(event.target.value)}
-              placeholder="담당자 이름"
-              disabled={companyFieldsLocked}
-              autoFocus={focusField === "companyContactName"}
-              aria-invalid={Boolean(fieldErrors?.companyContactName) || undefined}
-              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyContactName))}
-            />
-          </FieldGroup>
-        </div>
+        <section className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset p-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">협력사 정보</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              법인/사업자 단위의 기본 정보를 먼저 정리합니다.
+            </p>
+          </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FieldGroup label="담당자 이메일" error={fieldErrors?.companyContactEmail}>
-            <Input
-              name="companyContactEmail"
-              type="email"
-              value={values.companyContactEmailValue}
-              onChange={(event) => setters.setCompanyContactEmailValue(event.target.value)}
-              placeholder="partner@example.com"
-              disabled={companyFieldsLocked}
-              autoFocus={focusField === "companyContactEmail"}
-              aria-invalid={Boolean(fieldErrors?.companyContactEmail) || undefined}
-              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyContactEmail))}
-            />
-          </FieldGroup>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+            <FieldGroup label="협력사명" error={fieldErrors?.companyName}>
+              <Input
+                name="companyName"
+                value={values.companyNameValue}
+                onChange={(event) => setters.setCompanyNameValue(event.target.value)}
+                placeholder="협력사명"
+                disabled={companyFieldsLocked}
+                autoFocus={focusField === "companyName"}
+                aria-invalid={Boolean(fieldErrors?.companyName) || undefined}
+                className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyName))}
+              />
+            </FieldGroup>
+
+            <FieldGroup label="협력사 설명" error={fieldErrors?.companyDescription}>
+              <Textarea
+                name="companyDescription"
+                value={values.companyDescriptionValue}
+                onChange={(event) =>
+                  setters.setCompanyDescriptionValue(event.target.value)
+                }
+                rows={3}
+                placeholder="포털에서 함께 보일 협력사 소개를 입력합니다."
+                disabled={companyFieldsLocked}
+                autoFocus={focusField === "companyDescription"}
+                aria-invalid={Boolean(fieldErrors?.companyDescription) || undefined}
+                className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyDescription))}
+              />
+            </FieldGroup>
+          </div>
+        </section>
+
+        <section className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset p-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">담당자 정보</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              포털 계정 안내와 운영 연락에 쓰는 실제 담당자 정보를 분리합니다.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FieldGroup label="담당자 이름" error={fieldErrors?.companyContactName}>
+              <Input
+                name="companyContactName"
+                value={values.companyContactNameValue}
+                onChange={(event) =>
+                  setters.setCompanyContactNameValue(event.target.value)
+                }
+                placeholder="담당자 이름"
+                disabled={companyFieldsLocked}
+                autoFocus={focusField === "companyContactName"}
+                aria-invalid={Boolean(fieldErrors?.companyContactName) || undefined}
+                className={getPartnerCardInvalidClass(
+                  Boolean(fieldErrors?.companyContactName),
+                )}
+              />
+            </FieldGroup>
+            <FieldGroup label="담당자 이메일" error={fieldErrors?.companyContactEmail}>
+              <Input
+                name="companyContactEmail"
+                type="email"
+                value={values.companyContactEmailValue}
+                onChange={(event) =>
+                  setters.setCompanyContactEmailValue(event.target.value)
+                }
+                placeholder="partner@example.com"
+                disabled={companyFieldsLocked}
+                autoFocus={focusField === "companyContactEmail"}
+                aria-invalid={Boolean(fieldErrors?.companyContactEmail) || undefined}
+                className={getPartnerCardInvalidClass(
+                  Boolean(fieldErrors?.companyContactEmail),
+                )}
+              />
+            </FieldGroup>
+          </div>
+
           <FieldGroup label="담당자 전화번호" error={fieldErrors?.companyContactPhone}>
             <Input
               name="companyContactPhone"
               value={values.companyContactPhoneValue}
-              onChange={(event) => setters.setCompanyContactPhoneValue(event.target.value)}
+              onChange={(event) =>
+                setters.setCompanyContactPhoneValue(event.target.value)
+              }
               placeholder="010-1234-5678"
               disabled={companyFieldsLocked}
               autoFocus={focusField === "companyContactPhone"}
               aria-invalid={Boolean(fieldErrors?.companyContactPhone) || undefined}
-              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyContactPhone))}
+              className={getPartnerCardInvalidClass(
+                Boolean(fieldErrors?.companyContactPhone),
+              )}
             />
           </FieldGroup>
-        </div>
-
-        <FieldGroup label="협력사 설명" error={fieldErrors?.companyDescription}>
-          <Textarea
-            name="companyDescription"
-            value={values.companyDescriptionValue}
-            onChange={(event) => setters.setCompanyDescriptionValue(event.target.value)}
-            rows={3}
-            placeholder="포털에서 함께 보일 협력사 소개를 입력합니다."
-            disabled={companyFieldsLocked}
-            autoFocus={focusField === "companyDescription"}
-            aria-invalid={Boolean(fieldErrors?.companyDescription) || undefined}
-            className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyDescription))}
-          />
-        </FieldGroup>
+        </section>
 
         <p className="text-xs leading-5 text-muted-foreground">
           {companyFieldsLocked

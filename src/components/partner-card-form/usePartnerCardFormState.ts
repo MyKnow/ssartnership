@@ -6,6 +6,11 @@ import {
   normalizePartnerAudience,
 } from "../../lib/partner-audience.ts";
 import { resolvePartnerBenefitActionType } from "../../lib/partner-benefit-action.ts";
+import {
+  ONLINE_PARTNER_LOCATION,
+  getPartnerServiceMode,
+  type PartnerServiceMode,
+} from "../../lib/partner-service-mode.ts";
 import type {
   PartnerCardFormField,
   PartnerCardFormValues,
@@ -31,6 +36,7 @@ export function createPartnerCardFormState(
     visibilityValue: partner.visibility ?? "public",
     benefitVisibilityValue: partner.benefitVisibility ?? "public",
     categoryValue: categoryId ?? "",
+    serviceModeValue: getPartnerServiceMode(partner.location),
     locationValue: partner.location ?? "",
     mapUrlValue: partner.mapUrl ?? "",
     benefitActionTypeValue: resolvePartnerBenefitActionType(partner),
@@ -66,6 +72,9 @@ export default function usePartnerCardFormState({
     defaults.benefitVisibilityValue,
   );
   const [categoryValue, setCategoryValue] = useState(defaults.categoryValue);
+  const [serviceModeValue, setServiceModeValue] = useState<PartnerServiceMode>(
+    defaults.serviceModeValue,
+  );
   const [periodStartValue, setPeriodStartValue] = useState(defaults.periodStart);
   const [periodEndValue, setPeriodEndValue] = useState(defaults.periodEnd);
   const [locationValue, setLocationValue] = useState(defaults.locationValue);
@@ -117,6 +126,17 @@ export default function usePartnerCardFormState({
     setBenefitVisibilityValue,
     categoryValue,
     setCategoryValue,
+    serviceModeValue,
+    setServiceModeValue: (value: PartnerServiceMode) => {
+      setServiceModeValue(value);
+      if (value === "online") {
+        setLocationValue(ONLINE_PARTNER_LOCATION);
+      } else {
+        setLocationValue((current) =>
+          current.trim() === ONLINE_PARTNER_LOCATION ? "" : current,
+        );
+      }
+    },
     periodStartValue,
     setPeriodStartValue,
     periodEndValue,

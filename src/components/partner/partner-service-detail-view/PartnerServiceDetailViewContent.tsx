@@ -17,6 +17,7 @@ import PartnerServiceMetricsPanel from "@/components/partner/partner-service-det
 import PartnerPendingRequestSection from "@/components/partner/partner-service-detail-view/PartnerPendingRequestSection";
 import PartnerServiceContacts from "@/components/partner/partner-service-detail-view/PartnerServiceContacts";
 import PartnerServiceSummaryCard from "@/components/partner/partner-service-detail-view/PartnerServiceSummaryCard";
+import PartnerRequestHistorySection from "@/components/partner/partner-service-detail-view/PartnerRequestHistorySection";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { getPartnerServiceVisualState } from "@/components/partner/partner-service-detail-view/helpers";
 import type { PartnerServiceDetailViewProps } from "@/components/partner/partner-service-detail-view/types";
@@ -46,6 +47,9 @@ export default function PartnerServiceDetailViewContent({
   const pendingRequest = context.pendingRequest;
   const pendingDiffItems = buildPartnerChangeRequestDiffItems(pendingRequest);
   const canCancelPendingRequest = pendingRequest?.requestedByAccountId === session.accountId;
+  const visibleRequestHistory = (context.requestHistory ?? []).filter(
+    (request) => request.id !== pendingRequest?.id,
+  );
 
   return (
     <div className="bg-background">
@@ -135,6 +139,10 @@ export default function PartnerServiceDetailViewContent({
                   pendingRequest={pendingRequest}
                   pendingDiffItems={pendingDiffItems}
                 />
+              ) : null}
+
+              {visibleRequestHistory.length > 0 ? (
+                <PartnerRequestHistorySection requests={visibleRequestHistory} />
               ) : null}
 
               <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start 2xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">

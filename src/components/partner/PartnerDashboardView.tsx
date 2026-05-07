@@ -19,6 +19,7 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
+import { isOnlinePartnerLocation } from "@/lib/partner-service-mode";
 import { cn } from "@/lib/cn";
 
 const partnerPortalDataSource =
@@ -79,6 +80,8 @@ function ServiceCard({
 }: {
   service: PartnerPortalDashboard["companies"][number]["services"][number];
 }) {
+  const isOnlineService = isOnlinePartnerLocation(service.location);
+
   return (
     <Link
       href={`/partner/services/${encodeURIComponent(service.id)}`}
@@ -101,9 +104,11 @@ function ServiceCard({
           </div>
           <div className="space-y-1">
             <p className="text-lg font-semibold text-foreground">{service.name}</p>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {service.location}
-            </p>
+            {!isOnlineService ? (
+              <p className="text-sm leading-6 text-muted-foreground">
+                {service.location}
+              </p>
+            ) : null}
           </div>
         </div>
 

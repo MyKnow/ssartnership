@@ -3,8 +3,10 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
+import { buildPartnerChangeRequestDiffItems } from "@/components/partner-change-request-ui/buildDiffItems";
 import { cn } from "@/lib/cn";
 import { formatDateTime, getLogLabel } from "@/components/admin/logs/utils";
+import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 
 type PartnerAuditLog = {
   id: string;
@@ -119,25 +121,119 @@ function getChangeCountLabel(rows: DiffRow[], changedFields: string[]) {
   return "변경 없음";
 }
 
+const requestStatusLabel: Record<PartnerChangeRequestSummary["status"], string> = {
+  pending: "승인 대기",
+  approved: "승인됨",
+  rejected: "반려됨",
+  cancelled: "취소됨",
+};
+
 export default function AdminPartnerChangeHistory({
   logs,
+  requests = [],
 }: {
   logs: PartnerAuditLog[];
+  requests?: PartnerChangeRequestSummary[];
 }) {
+  const hasHistory = logs.length > 0 || requests.length > 0;
+
   return (
     <Card tone="default" className="grid gap-5">
       <SectionHeading
         title="수정 이력"
-        description="브랜드 정보 수정 기록을 펼쳐서 필드별 변경 내역을 확인합니다."
+        description="관리자 수정, 파트너 계정 수정 요청, 승인/반려 기록을 함께 확인합니다."
       />
 
-      {logs.length === 0 ? (
+      {!hasHistory ? (
         <EmptyState
           title="수정 이력이 없습니다."
           description="아직 이 브랜드에 대한 수정 로그가 생성되지 않았습니다."
         />
       ) : (
         <div className="grid gap-4">
+          {requests.map((request) => {
+            const diffItems = buildPartnerChangeRequestDiffItems(request);
+            const requester =
+              request.requestedByDisplayName ??
+              request.requestedByLoginId ??
+              "파트너 계정";
+
+            return (
+              <details
+                key={`request-${request.id}`}
+                className="group rounded-panel border border-border/70 bg-surface-elevated shadow-raised"
+              >
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 outline-none transition hover:bg-surface/50 focus-visible:bg-surface/50 [&::-webkit-details-marker]:hidden">
+                  <div className="grid min-w-0 gap-3 text-left">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="primary">파트너 요청</Badge>
+                      <Badge>{requestStatusLabel[request.status]}</Badge>
+                      <Badge>{diffItems.length > 0 ? `${diffItems.length}개 변경` : "변경 없음"}</Badge>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {formatDateTime(request.createdAt)}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        {request.requestedPartnerName} 변경 요청
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {request.companyName} · {requester}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <span className="hidden sm:inline">펼치기</span>
+                    <ChevronDownIcon
+                      className={cn(
+                        "h-5 w-5 transition-transform duration-200",
+                        "group-open:rotate-180",
+                      )}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </summary>
+
+                <div className="grid gap-4 border-t border-border/70 bg-surface px-4 py-4">
+                  {diffItems.length > 0 ? (
+                    <div className="grid gap-3">
+                      {diffItems.map((change) => (
+                        <div
+                          key={change.key}
+                          className="grid gap-3 rounded-2xl border border-border/70 bg-surface-inset p-4 shadow-none md:grid-cols-2"
+                        >
+                          <div className="grid gap-2">
+                            <Badge variant="danger" className="w-fit">
+                              {change.label} · 현재
+                            </Badge>
+                            <div className="text-sm leading-6 text-danger">
+                              {change.current}
+                            </div>
+                          </div>
+                          <div className="grid gap-2">
+                            <Badge variant="success" className="w-fit">
+                              {change.label} · 요청
+                            </Badge>
+                            <div className="text-sm leading-6 text-success">
+                              {change.requested}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title="변경된 필드가 없습니다."
+                      description="이 요청은 실제 변경 diff가 없거나 즉시 반영 항목만 포함합니다."
+                    />
+                  )}
+                </div>
+              </details>
+            );
+          })}
+
           {logs.map((log) => {
             const summary = getStringValue(log.properties?.summary) ?? getLogLabel("audit", log.action);
             const changedFields = getStringArray(log.properties?.changedFields);

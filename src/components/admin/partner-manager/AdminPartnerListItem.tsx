@@ -9,6 +9,10 @@ import {
   getPartnerVisibilityLabel,
   getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
+import {
+  getPartnerPlaceLinkLabel,
+  getPartnerServiceMode,
+} from "@/lib/partner-service-mode";
 import type { AdminCategory, AdminPartner } from "@/components/admin/partner-manager/types";
 
 function MetricPill({
@@ -41,6 +45,9 @@ export default function AdminPartnerListItem({
     partner.period_start,
     partner.period_end,
   );
+  const serviceMode = getPartnerServiceMode(partner.location);
+  const isOnlineService = serviceMode === "online";
+  const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);
 
   return (
     <article className="grid min-w-0 gap-4 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4">
@@ -66,7 +73,34 @@ export default function AdminPartnerListItem({
               <span className="truncate">{partner.name}</span>
               <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
             </Link>
-            <p className="text-sm text-muted-foreground">{partner.location}</p>
+            <div className="flex min-h-5 items-center gap-2 text-sm text-muted-foreground">
+              {!isOnlineService ? <p>{partner.location}</p> : null}
+              {isOnlineService && partner.map_url ? (
+                <a
+                  href={partner.map_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
+                  aria-label={placeLinkLabel}
+                  title={placeLinkLabel}
+                >
+                  <svg
+                    width={14}
+                    height={14}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M7 17 17 7" />
+                    <path d="M8 7h9v9" />
+                  </svg>
+                </a>
+              ) : null}
+            </div>
           </div>
 
           <PartnerAudienceChips appliesTo={partner.applies_to ?? []} />

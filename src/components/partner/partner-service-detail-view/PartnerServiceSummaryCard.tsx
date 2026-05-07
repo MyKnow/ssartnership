@@ -10,6 +10,10 @@ import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import SectionTitle from "@/components/partner/partner-service-detail-view/SectionTitle";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import type { PartnerChangeRequestContext } from "@/lib/partner-change-requests";
+import {
+  getPartnerPlaceLinkLabel,
+  getPartnerServiceMode,
+} from "@/lib/partner-service-mode";
 import { ChatBubbleLeftEllipsisIcon } from "@heroicons/react/24/outline";
 
 export default function PartnerServiceSummaryCard({
@@ -28,6 +32,9 @@ export default function PartnerServiceSummaryCard({
   metrics?: PartnerPortalServiceMetrics;
 }) {
   const categoryBadgeClass = "px-2 py-0.5 text-[10px] tracking-[0.06em]";
+  const serviceMode = getPartnerServiceMode(context.partnerLocation);
+  const isOnlineService = serviceMode === "online";
+  const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);
 
   return (
     <Card
@@ -73,7 +80,7 @@ export default function PartnerServiceSummaryCard({
         <h1 className="mt-4 text-3xl font-semibold text-foreground">{context.partnerName}</h1>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span>{context.partnerLocation}</span>
+          {!isOnlineService ? <span>{context.partnerLocation}</span> : null}
           {mapLink ? (
             <TrackedAnchor
               className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
@@ -84,24 +91,41 @@ export default function PartnerServiceSummaryCard({
               targetType="partner"
               targetId={context.partnerId}
               properties={{ source: "partner-portal" }}
-              aria-label="지도 보기"
-              title="지도 보기"
+              aria-label={placeLinkLabel}
+              title={placeLinkLabel}
             >
-              <svg
-                width={16}
-                height={16}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
-                <path d="M9 3v15" />
-                <path d="M15 6v15" />
-              </svg>
+              {isOnlineService ? (
+                <svg
+                  width={16}
+                  height={16}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M7 17 17 7" />
+                  <path d="M8 7h9v9" />
+                </svg>
+              ) : (
+                <svg
+                  width={16}
+                  height={16}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+                  <path d="M9 3v15" />
+                  <path d="M15 6v15" />
+                </svg>
+              )}
             </TrackedAnchor>
           ) : null}
         </div>

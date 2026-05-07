@@ -112,6 +112,7 @@ export type PartnerChangeRequestContext = {
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   pendingRequest: PartnerChangeRequestSummary | null;
+  requestHistory: PartnerChangeRequestSummary[];
 };
 
 export type PartnerChangeRequestCreateInput = {
@@ -170,6 +171,7 @@ export interface PartnerChangeRequestRepository {
   getRequestContext(
     companyIds: string[],
     partnerId: string,
+    accountId?: string,
   ): Promise<PartnerChangeRequestContext | null>;
   listPendingRequests(companyIds?: string[]): Promise<PartnerChangeRequestSummary[]>;
   createRequest(

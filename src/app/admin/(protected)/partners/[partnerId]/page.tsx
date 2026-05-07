@@ -28,6 +28,7 @@ import {
   getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
+import { fetchRequestSummariesForPartner } from "@/lib/partner-change-requests/summary";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -140,11 +141,14 @@ export default async function AdminPartnerDetailPage({
     "partner_delete",
     "partner_change_request_approve",
     "partner_change_request_reject",
+    "partner_portal_immediate_update",
+    "partner_portal_change_request_submit",
+    "partner_portal_change_request_cancel",
     "partner_company_create",
     "partner_company_update",
     "partner_company_delete",
   ] as const;
-  const [metricTimeseries, partnerAuditLogsResult] = await Promise.all([
+  const [metricTimeseries, partnerAuditLogsResult, partnerRequestHistory] = await Promise.all([
     getPartnerMetricTimeseriesSnapshot(
       partnerId,
       partner.created_at,
@@ -156,6 +160,7 @@ export default async function AdminPartnerDetailPage({
       .in("target_type", ["partner", "partner_company", "partner_change_request"])
       .order("created_at", { ascending: false })
       .limit(200),
+    fetchRequestSummariesForPartner(supabase, partnerId, { limit: 50 }),
   ]);
   const partnerAuditLogs = (partnerAuditLogsResult.data ?? []).filter((log) => {
     const properties = log.properties && typeof log.properties === "object"
@@ -271,70 +276,71 @@ export default async function AdminPartnerDetailPage({
         <PartnerMetricTimeseriesPanel data={metricTimeseries} />
 
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">
-          <Card tone="elevated">
+          <div className="grid min-w-0 gap-4">
             <SectionHeading
               title="브랜드 수정"
               description="리스트 화면이 아니라 상세 편집 화면에서 브랜드 정보를 수정합니다."
             />
-            <div className="mt-6">
-              <PartnerCardForm
-                mode="edit"
-                partner={{
-                  id: partner.id,
-                  name: partner.name ?? "",
-                  visibility: partner.visibility,
-                  benefitVisibility: partner.benefit_visibility ?? "public",
-                  location: partner.location ?? "",
-                  campusSlugs: partner.campus_slugs ?? [],
-                  mapUrl: partner.map_url ?? "",
-                  benefitActionType: partner.benefit_action_type ?? undefined,
-                  benefitActionLink: partner.benefit_action_link ?? undefined,
-                  reservationLink: partner.reservation_link ?? "",
-                  inquiryLink: partner.inquiry_link ?? "",
-                  period: {
-                    start: partner.period_start ?? "",
-                    end: partner.period_end ?? "",
-                  },
-                  conditions: partner.conditions ?? [],
-                  benefits: partner.benefits ?? [],
-                  appliesTo: partner.applies_to ?? [],
-                  thumbnail,
-                  images: galleryImages,
-                  tags: partner.tags ?? [],
-                  company: company
-                    ? {
-                        id: company.id,
-                        name: company.name,
-                        description: company.description ?? "",
-                        contactName: "",
-                        contactEmail: "",
-                        contactPhone: "",
-                      }
-                    : null,
-                }}
-                categoryOptions={(categoriesResult.data ?? []).map((item) => ({
-                  id: item.id,
-                  label: item.label,
-                }))}
-                companyOptions={(companiesResult.data ?? []).map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                  slug: item.slug,
-                }))}
-                categoryId={partner.category_id}
-                formAction={updatePartner}
-                deleteAction={deletePartner}
-                submitLabel="브랜드 저장"
-                hiddenFields={[
-                  { name: "updateRedirectTo", value: detailPath },
-                  { name: "deleteRedirectTo", value: "/admin/partners" },
-                ]}
-              />
-            </div>
-          </Card>
+            <PartnerCardForm
+              mode="edit"
+              partner={{
+                id: partner.id,
+                name: partner.name ?? "",
+                visibility: partner.visibility,
+                benefitVisibility: partner.benefit_visibility ?? "public",
+                location: partner.location ?? "",
+                campusSlugs: partner.campus_slugs ?? [],
+                mapUrl: partner.map_url ?? "",
+                benefitActionType: partner.benefit_action_type ?? undefined,
+                benefitActionLink: partner.benefit_action_link ?? undefined,
+                reservationLink: partner.reservation_link ?? "",
+                inquiryLink: partner.inquiry_link ?? "",
+                period: {
+                  start: partner.period_start ?? "",
+                  end: partner.period_end ?? "",
+                },
+                conditions: partner.conditions ?? [],
+                benefits: partner.benefits ?? [],
+                appliesTo: partner.applies_to ?? [],
+                thumbnail,
+                images: galleryImages,
+                tags: partner.tags ?? [],
+                company: company
+                  ? {
+                      id: company.id,
+                      name: company.name,
+                      description: company.description ?? "",
+                      contactName: "",
+                      contactEmail: "",
+                      contactPhone: "",
+                    }
+                  : null,
+              }}
+              categoryOptions={(categoriesResult.data ?? []).map((item) => ({
+                id: item.id,
+                label: item.label,
+              }))}
+              companyOptions={(companiesResult.data ?? []).map((item) => ({
+                id: item.id,
+                name: item.name,
+                slug: item.slug,
+              }))}
+              categoryId={partner.category_id}
+              formAction={updatePartner}
+              deleteAction={deletePartner}
+              submitLabel="브랜드 저장"
+              hiddenFields={[
+                { name: "updateRedirectTo", value: detailPath },
+                { name: "deleteRedirectTo", value: "/admin/partners" },
+              ]}
+            />
+          </div>
 
           <div className="2xl:sticky 2xl:top-24">
-            <AdminPartnerChangeHistory logs={partnerAuditLogs} />
+            <AdminPartnerChangeHistory
+              logs={partnerAuditLogs}
+              requests={partnerRequestHistory}
+            />
           </div>
         </div>
 

@@ -2,6 +2,10 @@ import type { PartnerVisibility } from "@/lib/types";
 import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
 import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import type { CampusSlug } from "@/lib/campuses";
+import {
+  ONLINE_PARTNER_LOCATION,
+  type PartnerServiceMode,
+} from "@/lib/partner-service-mode";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -38,6 +42,7 @@ export default function PartnerBasicInfoSection({
     visibilityValue: PartnerVisibility;
     benefitVisibilityValue: PartnerBenefitVisibility;
     categoryValue: string;
+    serviceModeValue: PartnerServiceMode;
     periodStartValue: string;
     periodEndValue: string;
     locationValue: string;
@@ -52,6 +57,7 @@ export default function PartnerBasicInfoSection({
     setVisibilityValue: (value: PartnerVisibility) => void;
     setBenefitVisibilityValue: (value: PartnerBenefitVisibility) => void;
     setCategoryValue: (value: string) => void;
+    setServiceModeValue: (value: PartnerServiceMode) => void;
     setPeriodStartValue: (value: string) => void;
     setPeriodEndValue: (value: string) => void;
     setLocationValue: (value: string) => void;
@@ -62,6 +68,12 @@ export default function PartnerBasicInfoSection({
     setInquiryLinkValue: (value: string) => void;
   };
 }) {
+  const isOnlineService = values.serviceModeValue === "online";
+  const placeLinkLabel = isOnlineService ? "사이트 링크" : "지도 URL";
+  const placeLinkPlaceholder = isOnlineService
+    ? "https://service.example.com"
+    : "https://map.naver.com/...";
+
   return (
     <Card className="overflow-hidden">
       <SectionHeading
@@ -141,6 +153,21 @@ export default function PartnerBasicInfoSection({
               ))}
             </Select>
           </FieldGroup>
+          <FieldGroup label="브랜드 운영 형태">
+            <Select
+              name="serviceMode"
+              value={values.serviceModeValue}
+              onChange={(event) =>
+                setters.setServiceModeValue(event.target.value as PartnerServiceMode)
+              }
+            >
+              <option value="offline">오프라인</option>
+              <option value="online">온라인</option>
+            </Select>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              온라인 브랜드는 위치 대신 사이트 링크를 노출합니다.
+            </p>
+          </FieldGroup>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -168,17 +195,22 @@ export default function PartnerBasicInfoSection({
           </FieldGroup>
         </div>
 
-        <FieldGroup label="위치" error={fieldErrors?.location}>
-          <Input
-            name="location"
-            value={values.locationValue}
-            onChange={(event) => setters.setLocationValue(event.target.value)}
-            required
-            autoFocus={focusField === "location"}
-            aria-invalid={Boolean(fieldErrors?.location) || undefined}
-            className={getPartnerCardInvalidClass(Boolean(fieldErrors?.location))}
-          />
-        </FieldGroup>
+        {isOnlineService ? (
+          <input type="hidden" name="location" value={ONLINE_PARTNER_LOCATION} />
+        ) : (
+          <FieldGroup label="위치" error={fieldErrors?.location}>
+            <Input
+              name="location"
+              value={values.locationValue}
+              onChange={(event) => setters.setLocationValue(event.target.value)}
+              required
+              autoFocus={focusField === "location"}
+              aria-invalid={Boolean(fieldErrors?.location) || undefined}
+              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.location))}
+              placeholder="서울 강남구 테헤란로 212"
+            />
+          </FieldGroup>
+        )}
 
         <PartnerCampusSlugField
           defaultValue={partner.campusSlugs}
@@ -188,7 +220,7 @@ export default function PartnerBasicInfoSection({
         />
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FieldGroup label="지도 URL" error={fieldErrors?.mapUrl}>
+          <FieldGroup label={placeLinkLabel} error={fieldErrors?.mapUrl}>
             <Input
               name="mapUrl"
               value={values.mapUrlValue}
@@ -196,7 +228,13 @@ export default function PartnerBasicInfoSection({
               autoFocus={focusField === "mapUrl"}
               aria-invalid={Boolean(fieldErrors?.mapUrl) || undefined}
               className={getPartnerCardInvalidClass(Boolean(fieldErrors?.mapUrl))}
+              placeholder={placeLinkPlaceholder}
             />
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {isOnlineService
+                ? "카드에서는 위치 문구 없이 웹사이트 바로가기 아이콘으로 표시됩니다."
+                : "지도 URL이 없으면 위치와 브랜드명으로 지도 검색 링크를 만듭니다."}
+            </p>
           </FieldGroup>
           <FieldGroup label="혜택 이용 방식" error={fieldErrors?.benefitActionType}>
             <Select

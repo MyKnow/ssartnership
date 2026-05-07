@@ -154,3 +154,34 @@ export async function fetchPendingRequestSummary(
 
   return data ? toSummary(data as PartnerChangeRequestRow) : null;
 }
+
+export async function fetchRequestSummariesForPartner(
+  supabase: PartnerChangeRequestSupabaseClient,
+  partnerId: string,
+  options: {
+    accountId?: string | null;
+    limit?: number;
+  } = {},
+) {
+  let query = supabase
+    .from("partner_change_requests")
+    .select(REQUEST_SELECT_VALUE)
+    .eq("partner_id", partnerId)
+    .order("created_at", { ascending: false })
+    .limit(options.limit ?? 30);
+
+  if (options.accountId) {
+    query = query.eq("requested_by_account_id", options.accountId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 이력을 불러오지 못했습니다.",
+    );
+  }
+
+  return (data ?? []).map((row) => toSummary(row as PartnerChangeRequestRow));
+}

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
+import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import {
   arraysEqual,
   CURRENT_DIFF_BADGE_CLASS,
@@ -33,6 +34,9 @@ export function buildPartnerChangeRequestDiffItems(
   if (!request) {
     return [];
   }
+  const usesOnlineLink =
+    getPartnerServiceMode(request.currentPartnerLocation) === "online" ||
+    getPartnerServiceMode(request.requestedPartnerLocation) === "online";
 
   const items: Array<PartnerChangeRequestDiffItem | null> = [
     request.currentPartnerName !== request.requestedPartnerName
@@ -56,7 +60,7 @@ export function buildPartnerChangeRequestDiffItems(
     request.currentMapUrl !== request.requestedMapUrl
       ? {
           key: "mapUrl",
-          label: "지도 URL",
+          label: usesOnlineLink ? "사이트 링크" : "지도 URL",
           current: <DiffLink tone="current" href={request.currentMapUrl} />,
           requested: <DiffLink tone="requested" href={request.requestedMapUrl} />,
         }

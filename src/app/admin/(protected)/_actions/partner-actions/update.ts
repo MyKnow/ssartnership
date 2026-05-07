@@ -194,7 +194,7 @@ export async function updatePartnerAction(formData: FormData) {
       after: nextCategoryLabel,
     },
     {
-      label: "위치",
+      label: "위치/운영 형태",
       before: previousPartner.location ?? "",
       after: payload.location,
     },
@@ -204,7 +204,7 @@ export async function updatePartnerAction(formData: FormData) {
       after: payload.campusSlugs,
     },
     {
-      label: "지도 링크",
+      label: "지도/사이트 링크",
       before: previousPartner.map_url ?? null,
       after: payload.mapUrl,
       format: (value) => (value ? String(value) : "없음"),

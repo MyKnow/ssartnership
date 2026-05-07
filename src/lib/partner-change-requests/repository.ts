@@ -34,11 +34,11 @@ export async function updatePartnerImmediateFields(
 }
 
 export const partnerChangeRequestRepository: PartnerChangeRequestRepository = {
-  async getRequestContext(companyIds: string[], partnerId: string) {
+  async getRequestContext(companyIds: string[], partnerId: string, accountId?: string) {
     if (isPartnerPortalMock) {
-      return getMockPartnerChangeRequestContext(companyIds, partnerId);
+      return getMockPartnerChangeRequestContext(companyIds, partnerId, accountId);
     }
-    return getSupabaseRequestContext(companyIds, partnerId);
+    return getSupabaseRequestContext(companyIds, partnerId, accountId);
   },
 
   async listPendingRequests(companyIds?: string[]) {
@@ -80,8 +80,13 @@ export const partnerChangeRequestRepository: PartnerChangeRequestRepository = {
 export async function getPartnerChangeRequestContext(
   companyIds: string[],
   partnerId: string,
+  accountId?: string,
 ) {
-  return partnerChangeRequestRepository.getRequestContext(companyIds, partnerId);
+  return partnerChangeRequestRepository.getRequestContext(
+    companyIds,
+    partnerId,
+    accountId,
+  );
 }
 
 export async function listPartnerChangeRequests(companyIds?: string[]) {

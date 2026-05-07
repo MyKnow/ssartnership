@@ -7,6 +7,7 @@ import {
   extractCategoryColor,
   extractCategoryLabel,
   fetchPendingRequestSummary,
+  fetchRequestSummariesForPartner,
   toSummary,
 } from "./summary.ts";
 import {
@@ -28,6 +29,7 @@ import {
 export async function getSupabaseRequestContext(
   companyIds: string[],
   partnerId: string,
+  accountId?: string,
 ): Promise<PartnerChangeRequestContext | null> {
   const uniqueCompanyIds = normalizeSupabaseCompanyIds(companyIds);
   if (uniqueCompanyIds.length === 0) {
@@ -63,7 +65,10 @@ export async function getSupabaseRequestContext(
     return null;
   }
 
-  const pendingRequest = await fetchPendingRequestSummary(supabase, partnerId);
+  const [pendingRequest, requestHistory] = await Promise.all([
+    fetchPendingRequestSummary(supabase, partnerId),
+    fetchRequestSummariesForPartner(supabase, partnerId, { accountId, limit: 20 }),
+  ]);
 
   return {
     companyId: company.id,
@@ -108,6 +113,7 @@ export async function getSupabaseRequestContext(
     currentPeriodStart: normalizeOptionalText(row.period_start),
     currentPeriodEnd: normalizeOptionalText(row.period_end),
     pendingRequest,
+    requestHistory,
   };
 }
 

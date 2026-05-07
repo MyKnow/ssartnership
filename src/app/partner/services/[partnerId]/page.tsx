@@ -72,6 +72,7 @@ export default async function PartnerServiceDetailPage({
   const context = await getPartnerChangeRequestContext(
     session.companyIds,
     partnerId,
+    session.accountId,
   );
   if (!context) {
     notFound();

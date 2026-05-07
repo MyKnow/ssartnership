@@ -18,6 +18,7 @@ export async function listMockPartnerChangeRequests(
 export async function getMockPartnerChangeRequestContext(
   companyIds: string[],
   partnerId: string,
+  accountId?: string,
 ): Promise<PartnerChangeRequestContext | null> {
   const uniqueCompanyIds = [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
   const service = findService(partnerId);
@@ -26,6 +27,14 @@ export async function getMockPartnerChangeRequestContext(
   }
 
   const pendingRequest = findPendingRequest(partnerId);
+  const requestHistory = getStore()
+    .requests.filter(
+      (request) =>
+        request.partnerId === partnerId &&
+        (!accountId || request.requestedByAccountId === accountId),
+    )
+    .map(toSummary)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const normalizedService = normalizeServiceRecord(service);
   return {
     companyId: normalizedService.companyId,
@@ -60,5 +69,6 @@ export async function getMockPartnerChangeRequestContext(
     currentPeriodStart: normalizedService.periodStart,
     currentPeriodEnd: normalizedService.periodEnd,
     pendingRequest: pendingRequest ? toSummary(pendingRequest) : null,
+    requestHistory,
   };
 }
