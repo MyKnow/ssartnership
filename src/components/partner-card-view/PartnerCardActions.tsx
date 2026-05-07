@@ -23,23 +23,6 @@ export default function PartnerCardActions({
   if (isActive && (reservationAction || inquiryAction)) {
     const hasBothActions = Boolean(reservationAction && inquiryAction);
 
-    if (!reservationAction && inquiryAction) {
-      return (
-        <div className="mt-1 flex justify-end">
-          <Button
-            variant="secondary"
-            href={inquiryAction.href}
-            target={inquiryAction.href.startsWith("http") ? "_blank" : undefined}
-            rel={inquiryAction.href.startsWith("http") ? "noreferrer" : undefined}
-            className="w-full justify-center sm:w-auto sm:min-w-36"
-            onClick={onInquiryClick}
-          >
-            {inquiryAction.label}
-          </Button>
-        </div>
-      );
-    }
-
     return (
       <div
         className={cn(

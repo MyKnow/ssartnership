@@ -30,6 +30,7 @@ import {
 } from "@/components/home-view/selectors";
 
 const APPLIES_TO_FILTER_STORAGE_KEY = "home:partner-applies-to-filter";
+const PARTNER_GRID_TEMPLATE_COLUMNS = "repeat(auto-fit, minmax(min(100%, 36rem), 1fr))";
 
 export default function HomeView({
   categories,
@@ -262,7 +263,8 @@ export default function HomeView({
             </div>
           ) : (
             <div
-              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5"
+              className="grid gap-4 xl:gap-5"
+              style={{ gridTemplateColumns: PARTNER_GRID_TEMPLATE_COLUMNS }}
               data-testid="partner-grid"
             >
               {displayPartners.map((partner) => (
