@@ -23,7 +23,16 @@ const INPUT_SHEET_NAME = "입력";
 const GUIDE_SHEET_NAME = "작성 가이드";
 const LIST_SHEET_NAME = "목록";
 const META_SHEET_NAME = "_meta";
-const MAX_DATA_ROW = 2;
+const INPUT_HEADER_ROW = 1;
+const FIRST_INPUT_ROW = 2;
+const INPUT_FIELD_COLUMN = 1;
+const INPUT_EXAMPLE_COLUMN = 2;
+const INPUT_VALUE_COLUMN = 3;
+const SSAFY_BLUE = "1428A0";
+const SSAFY_SKY = "00AEEF";
+const SSAFY_NAVY = "0B1B3F";
+const SSAFY_SOFT = "EAF4FF";
+const SSAFY_LINE = "B8CCE8";
 const REQUIRED_INPUT_HEADERS = new Set(["브랜드명", "카테고리"]);
 const URL_INPUT_HEADERS = new Set([
   "문의 링크",
@@ -84,11 +93,18 @@ function getRowValues(sheet: ExcelJS.Worksheet, rowNumber: number) {
   );
 }
 
-function mapInputRow(headers: string[], values: string[]) {
+function mapVerticalInputRows(sheet: ExcelJS.Worksheet) {
   const mapped = new Map<string, string>();
-  headers.forEach((header, index) => {
-    mapped.set(header, values[index]?.trim() ?? "");
-  });
+  for (let rowNumber = FIRST_INPUT_ROW; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const field = getCellString(sheet.getRow(rowNumber).getCell(INPUT_FIELD_COLUMN));
+    if (!field) {
+      continue;
+    }
+    mapped.set(
+      field,
+      getCellString(sheet.getRow(rowNumber).getCell(INPUT_VALUE_COLUMN)),
+    );
+  }
   return mapped;
 }
 
@@ -141,7 +157,7 @@ function toColumnName(index: number) {
   return name;
 }
 
-function cellAddress(columnIndex: number, rowNumber = MAX_DATA_ROW) {
+function cellAddress(columnIndex: number, rowNumber = FIRST_INPUT_ROW) {
   return `${toColumnName(columnIndex)}${rowNumber}`;
 }
 
@@ -165,9 +181,75 @@ function delimitedTextFormula(address: string) {
   return `LEN(${address})<=1000`;
 }
 
-function applyInputValidation(input: ExcelJS.Worksheet, header: string, columnIndex: number) {
-  const address = cellAddress(columnIndex);
-  const cell = input.getCell(MAX_DATA_ROW, columnIndex);
+function getInputExample(
+  header: string,
+  options: AdminPartnerFileTemplateOptions,
+  categories: AdminPartnerFileCategory[],
+) {
+  const firstCategory = categories[0]?.label ?? "카페";
+  const examples: Record<string, string> = {
+    브랜드명: "레뽀드라라 역삼 GS타워점",
+    카테고리: firstCategory,
+    시작일: "2026-05-01",
+    종료일: "2026-12-31",
+    "문의 링크": "https://pf.kakao.com/_example",
+    "썸네일 URL": "https://example.com/thumbnail.jpg",
+    협력사명: "샘플 협력사",
+    담당자명: "홍길동",
+    "담당자 이메일": "partner@example.com",
+    "담당자 전화번호": "010-1234-5678",
+    "협력사 설명": "역삼역 인근 제휴 매장",
+    혜택: "아메리카노 할인|베이커리 할인",
+    "이용 조건": "싸트너십 인증|현장 제시",
+    태그: "카페|역삼",
+    "이미지 URL": "https://example.com/1.jpg|https://example.com/2.jpg",
+    위치: "서울 강남구 논현로 508 1층",
+    "지도 URL": "https://map.naver.com/example",
+    "사이트 링크": "https://service.example.com",
+    "혜택 이용 링크": "https://benefit.example.com",
+  };
+
+  if (header === "혜택 이용 링크" && options.benefitActionType !== "external_link") {
+    return "";
+  }
+  return examples[header] ?? "";
+}
+
+function getInputGuide(header: string, options: AdminPartnerFileTemplateOptions) {
+  const guides: Record<string, string> = {
+    브랜드명: "필수. 사용자에게 노출되는 브랜드 이름입니다.",
+    카테고리: "필수. 드롭다운에서 선택합니다.",
+    시작일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
+    종료일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
+    "문의 링크": "선택. 문의 채널 URL을 입력합니다.",
+    "썸네일 URL": "선택. 대표 이미지 URL을 입력합니다.",
+    협력사명: "선택. 기존 협력사명과 정확히 같으면 자동 연결됩니다.",
+    담당자명: "선택. 협력사 담당자 이름입니다.",
+    "담당자 이메일": "선택. 이메일 형식으로 입력합니다.",
+    "담당자 전화번호": "선택. 연락 가능한 번호입니다.",
+    "협력사 설명": "선택. 협력사 내부 설명입니다.",
+    혜택: "선택. 여러 개면 | 로 구분합니다.",
+    "이용 조건": "선택. 여러 개면 | 로 구분합니다.",
+    태그: "선택. 여러 개면 | 로 구분합니다.",
+    "이미지 URL": "선택. 여러 개면 | 로 구분합니다.",
+    위치: "오프라인 서비스 필수. 사용자에게 보일 위치입니다.",
+    "지도 URL": "선택. 지도 또는 위치 URL입니다.",
+    "사이트 링크": "온라인 서비스용 링크입니다.",
+    "혜택 이용 링크":
+      options.benefitActionType === "external_link"
+        ? "필수. 혜택 이용을 위해 이동할 URL입니다."
+        : "현재 혜택 이용 방식에서는 사용하지 않습니다.",
+  };
+  return guides[header] ?? "선택 입력값입니다.";
+}
+
+function applyInputValidation(
+  input: ExcelJS.Worksheet,
+  header: string,
+  rowNumber: number,
+) {
+  const address = cellAddress(INPUT_VALUE_COLUMN, rowNumber);
+  const cell = input.getCell(rowNumber, INPUT_VALUE_COLUMN);
 
   if (REQUIRED_INPUT_HEADERS.has(header)) {
     cell.dataValidation = {
@@ -248,6 +330,79 @@ function applyInputValidation(input: ExcelJS.Worksheet, header: string, columnIn
   }
 }
 
+function styleInputSheet(input: ExcelJS.Worksheet, fieldCount: number) {
+  input.views = [{ state: "frozen", ySplit: 1 }];
+  input.columns = [
+    { key: "field", width: 22 },
+    { key: "example", width: 42 },
+    { key: "value", width: 52 },
+    { key: "guide", width: 58 },
+  ];
+  input.getRow(INPUT_HEADER_ROW).height = 30;
+  input.getRow(INPUT_HEADER_ROW).font = {
+    bold: true,
+    color: { argb: "FFFFFFFF" },
+  };
+  input.getRow(INPUT_HEADER_ROW).alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+
+  for (let column = 1; column <= 4; column += 1) {
+    const cell = input.getRow(INPUT_HEADER_ROW).getCell(column);
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: `FF${SSAFY_BLUE}` },
+    };
+    cell.border = {
+      top: { style: "thin", color: { argb: `FF${SSAFY_BLUE}` } },
+      left: { style: "thin", color: { argb: `FF${SSAFY_BLUE}` } },
+      bottom: { style: "thin", color: { argb: `FF${SSAFY_BLUE}` } },
+      right: { style: "thin", color: { argb: `FF${SSAFY_BLUE}` } },
+    };
+  }
+
+  for (let rowNumber = FIRST_INPUT_ROW; rowNumber < FIRST_INPUT_ROW + fieldCount; rowNumber += 1) {
+    const row = input.getRow(rowNumber);
+    row.height = 28;
+    row.alignment = { vertical: "middle", wrapText: true };
+    row.getCell(INPUT_FIELD_COLUMN).font = {
+      bold: true,
+      color: { argb: `FF${SSAFY_NAVY}` },
+    };
+    row.getCell(INPUT_EXAMPLE_COLUMN).font = {
+      color: { argb: "FF6B7A90" },
+    };
+    row.getCell(INPUT_VALUE_COLUMN).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFFFFFFF" },
+    };
+    row.getCell(INPUT_VALUE_COLUMN).border = {
+      top: { style: "thin", color: { argb: `FF${SSAFY_SKY}` } },
+      left: { style: "thin", color: { argb: `FF${SSAFY_SKY}` } },
+      bottom: { style: "thin", color: { argb: `FF${SSAFY_SKY}` } },
+      right: { style: "thin", color: { argb: `FF${SSAFY_SKY}` } },
+    };
+    row.getCell(4).font = { color: { argb: "FF496178" } };
+    for (let column = 1; column <= 4; column += 1) {
+      const cell = row.getCell(column);
+      cell.border = {
+        ...cell.border,
+        bottom: { style: "thin", color: { argb: `FF${SSAFY_LINE}` } },
+      };
+      if (column !== INPUT_VALUE_COLUMN) {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: column === INPUT_FIELD_COLUMN ? `FF${SSAFY_SOFT}` : "FFF8FBFF" },
+        };
+      }
+    }
+  }
+}
+
 function addMetaSheet(
   workbook: ExcelJS.Workbook,
   options: AdminPartnerFileTemplateOptions,
@@ -296,30 +451,30 @@ export async function createAdminPartnerXlsxTemplate(
     views: [{ state: "frozen", ySplit: 1 }],
   });
   const headers = getAdminPartnerFileInputHeaders(options);
-  input.addRow(headers);
-  input.addRow(Array.from({ length: headers.length }, () => ""));
-  input.getRow(1).font = { bold: true };
-  input.getRow(1).height = 28;
-  input.getRow(2).height = 24;
-  input.columns = headers.map((header) => ({
-    header,
-    key: header,
-    width: Math.min(Math.max(header.length + 6, 14), 24),
-  }));
+  input.addRow(["항목", "예시", "입력값", "작성 안내"]);
+  for (const header of headers) {
+    input.addRow([
+      header,
+      getInputExample(header, options, categories),
+      "",
+      getInputGuide(header, options),
+    ]);
+  }
+  styleInputSheet(input, headers.length);
   input.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: 1, column: headers.length },
+    to: { row: 1, column: 4 },
   };
 
   headers.forEach((header, index) => {
-    applyInputValidation(input, header, index + 1);
+    applyInputValidation(input, header, FIRST_INPUT_ROW + index);
   });
 
   if (options.serviceMode === "offline") {
-    const locationColumnIndex = headers.indexOf("위치") + 1;
-    if (locationColumnIndex > 0) {
-      const address = cellAddress(locationColumnIndex);
-      input.getCell(MAX_DATA_ROW, locationColumnIndex).dataValidation = {
+    const locationRowNumber = FIRST_INPUT_ROW + headers.indexOf("위치");
+    if (locationRowNumber >= FIRST_INPUT_ROW) {
+      const address = cellAddress(INPUT_VALUE_COLUMN, locationRowNumber);
+      input.getCell(locationRowNumber, INPUT_VALUE_COLUMN).dataValidation = {
         type: "custom",
         allowBlank: false,
         formulae: [requiredFormula(address)],
@@ -331,10 +486,11 @@ export async function createAdminPartnerXlsxTemplate(
   }
 
   if (options.benefitActionType === "external_link") {
-    const benefitActionLinkColumnIndex = headers.indexOf("혜택 이용 링크") + 1;
-    if (benefitActionLinkColumnIndex > 0) {
-      const address = cellAddress(benefitActionLinkColumnIndex);
-      input.getCell(MAX_DATA_ROW, benefitActionLinkColumnIndex).dataValidation = {
+    const benefitActionLinkRowNumber =
+      FIRST_INPUT_ROW + headers.indexOf("혜택 이용 링크");
+    if (benefitActionLinkRowNumber >= FIRST_INPUT_ROW) {
+      const address = cellAddress(INPUT_VALUE_COLUMN, benefitActionLinkRowNumber);
+      input.getCell(benefitActionLinkRowNumber, INPUT_VALUE_COLUMN).dataValidation = {
         type: "custom",
         allowBlank: false,
         formulae: [
@@ -348,9 +504,9 @@ export async function createAdminPartnerXlsxTemplate(
     }
   }
 
-  const categoryColumnIndex = headers.indexOf("카테고리") + 1;
-  if (categoryColumnIndex > 0 && categories.length > 0) {
-    input.getCell(MAX_DATA_ROW, categoryColumnIndex).dataValidation = {
+  const categoryRowNumber = FIRST_INPUT_ROW + headers.indexOf("카테고리");
+  if (categoryRowNumber >= FIRST_INPUT_ROW && categories.length > 0) {
+    input.getCell(categoryRowNumber, INPUT_VALUE_COLUMN).dataValidation = {
       type: "list",
       allowBlank: false,
       formulae: [`='${LIST_SHEET_NAME}'!$A$2:$A$${categories.length + 1}`],
@@ -427,40 +583,36 @@ export async function parseAdminPartnerXlsxDraft({
   }
 
   const expectedHeaders = getAdminPartnerFileInputHeaders(options) as string[];
-  const headers = getRowValues(input, 1).slice(0, expectedHeaders.length);
-  const unknownHeaders = headers.filter((header) => !expectedHeaders.includes(header));
-  const missingHeaders = expectedHeaders.filter((header) => !headers.includes(header));
+  const layoutHeaders = getRowValues(input, INPUT_HEADER_ROW).slice(0, 3);
+  const inputRows = mapVerticalInputRows(input);
+  const rowLabels = Array.from(inputRows.keys());
+  const unknownHeaders = rowLabels.filter((header) => !expectedHeaders.includes(header));
+  const missingHeaders = expectedHeaders.filter((header) => !inputRows.has(header));
   const errors: string[] = [];
 
+  if (
+    layoutHeaders[0] !== "항목" ||
+    layoutHeaders[1] !== "예시" ||
+    layoutHeaders[2] !== "입력값"
+  ) {
+    errors.push("입력 시트는 항목, 예시, 입력값 구조여야 합니다.");
+  }
   if (unknownHeaders.length > 0) {
-    errors.push(`현재 템플릿에서 지원하지 않는 헤더: ${unknownHeaders.join(", ")}`);
+    errors.push(`현재 템플릿에서 지원하지 않는 항목: ${unknownHeaders.join(", ")}`);
   }
   if (missingHeaders.length > 0) {
-    errors.push(`필수 헤더가 없습니다: ${missingHeaders.join(", ")}`);
+    errors.push(`필수 항목이 없습니다: ${missingHeaders.join(", ")}`);
   }
   if (errors.length > 0) {
     return { ok: false, errors };
   }
 
-  const dataRowValues = getRowValues(input, MAX_DATA_ROW).slice(
-    0,
-    expectedHeaders.length,
-  );
-  const hasData = dataRowValues.some(Boolean);
+  const hasData = expectedHeaders.some((header) => Boolean(inputRows.get(header)));
   if (!hasData) {
-    return { ok: false, errors: ["XLSX 입력 시트에 입력 행이 필요합니다."] };
+    return { ok: false, errors: ["XLSX 입력 시트에 입력값이 필요합니다."] };
   }
 
-  for (let rowNumber = MAX_DATA_ROW + 1; rowNumber <= input.rowCount; rowNumber += 1) {
-    if (getRowValues(input, rowNumber).some(Boolean)) {
-      return {
-        ok: false,
-        errors: ["XLSX는 한 브랜드, 한 행만 업로드할 수 있습니다."],
-      };
-    }
-  }
-
-  const row = mapInputRow(headers, dataRowValues);
+  const row = inputRows;
   const name = getValue(row, "브랜드명");
   const category = resolveCategory(getValue(row, "카테고리"), categories);
   const periodStart = getValue(row, "시작일");

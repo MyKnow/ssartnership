@@ -34,19 +34,29 @@ async function loadTemplate(options: {
 function getHeaders(workbook: ExcelJS.Workbook) {
   const sheet = workbook.getWorksheet("입력");
   assert.ok(sheet);
-  return Array.from({ length: sheet.columnCount }, (_, index) =>
-    String(sheet.getRow(1).getCell(index + 1).value ?? ""),
-  ).filter(Boolean);
+  const headers: string[] = [];
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const value = String(sheet.getRow(rowNumber).getCell(1).value ?? "");
+    if (value) {
+      headers.push(value);
+    }
+  }
+  return headers;
 }
 
 function setInputValues(workbook: ExcelJS.Workbook, values: Record<string, string>) {
   const sheet = workbook.getWorksheet("입력");
   assert.ok(sheet);
-  const headers = getHeaders(workbook);
   for (const [header, value] of Object.entries(values)) {
-    const index = headers.indexOf(header);
-    assert.notEqual(index, -1, `missing header: ${header}`);
-    sheet.getRow(2).getCell(index + 1).value = value;
+    let rowNumber = 0;
+    for (let currentRow = 2; currentRow <= sheet.rowCount; currentRow += 1) {
+      if (String(sheet.getRow(currentRow).getCell(1).value ?? "") === header) {
+        rowNumber = currentRow;
+        break;
+      }
+    }
+    assert.notEqual(rowNumber, 0, `missing header: ${header}`);
+    sheet.getRow(rowNumber).getCell(3).value = value;
   }
 }
 
@@ -72,39 +82,44 @@ test("admin partner xlsx template branches headers and writes metadata", async (
   assert.equal(offlineHeaders.includes("적용 대상 - 교육생"), false);
   const input = offlineExternal.getWorksheet("입력");
   assert.ok(input);
-  const categoryColumn = offlineHeaders.indexOf("카테고리") + 1;
+  assert.equal(input.getRow(1).getCell(1).value, "항목");
+  assert.equal(input.getRow(1).getCell(2).value, "예시");
+  assert.equal(input.getRow(1).getCell(3).value, "입력값");
+  const categoryRow = offlineHeaders.indexOf("카테고리") + 2;
   assert.match(
-    String(input.getRow(2).getCell(categoryColumn).dataValidation?.formulae?.[0] ?? ""),
+    String(input.getRow(categoryRow).getCell(3).dataValidation?.formulae?.[0] ?? ""),
     /'목록'!\$A\$2:\$A\$3/,
   );
-  const nameColumn = offlineHeaders.indexOf("브랜드명") + 1;
-  assert.equal(input.getRow(2).getCell(nameColumn).dataValidation?.type, "custom");
+  const nameRow = offlineHeaders.indexOf("브랜드명") + 2;
+  assert.equal(input.getRow(nameRow).getCell(3).dataValidation?.type, "custom");
   assert.match(
-    String(input.getRow(2).getCell(nameColumn).dataValidation?.formulae?.[0] ?? ""),
+    String(input.getRow(nameRow).getCell(3).dataValidation?.formulae?.[0] ?? ""),
     /LEN\(TRIM/,
   );
-  const emailColumn = offlineHeaders.indexOf("담당자 이메일") + 1;
+  const emailRow = offlineHeaders.indexOf("담당자 이메일") + 2;
   assert.match(
-    String(input.getRow(2).getCell(emailColumn).dataValidation?.formulae?.[0] ?? ""),
+    String(input.getRow(emailRow).getCell(3).dataValidation?.formulae?.[0] ?? ""),
     /FIND\("@"/,
   );
-  const mapUrlColumn = offlineHeaders.indexOf("지도 URL") + 1;
+  const mapUrlRow = offlineHeaders.indexOf("지도 URL") + 2;
   assert.match(
-    String(input.getRow(2).getCell(mapUrlColumn).dataValidation?.formulae?.[0] ?? ""),
+    String(input.getRow(mapUrlRow).getCell(3).dataValidation?.formulae?.[0] ?? ""),
     /https:\/\//,
   );
-  const benefitLinkColumn = offlineHeaders.indexOf("혜택 이용 링크") + 1;
+  const benefitLinkRow = offlineHeaders.indexOf("혜택 이용 링크") + 2;
   assert.match(
     String(
-      input.getRow(2).getCell(benefitLinkColumn).dataValidation?.formulae?.[0] ?? "",
+      input.getRow(benefitLinkRow).getCell(3).dataValidation?.formulae?.[0] ?? "",
     ),
     /AND\(LEN\(TRIM/,
   );
-  const benefitColumn = offlineHeaders.indexOf("혜택") + 1;
+  const benefitRow = offlineHeaders.indexOf("혜택") + 2;
   assert.match(
-    String(input.getRow(2).getCell(benefitColumn).dataValidation?.formulae?.[0] ?? ""),
+    String(input.getRow(benefitRow).getCell(3).dataValidation?.formulae?.[0] ?? ""),
     /<=1000/,
   );
+  assert.equal(input.getRow(nameRow).getCell(1).fill.type, "pattern");
+  assert.equal(input.getRow(nameRow).getCell(2).value, "레뽀드라라 역삼 GS타워점");
   const list = offlineExternal.getWorksheet("목록");
   assert.ok(list);
   assert.equal(list.getRow(2).getCell(1).value, "카페");
@@ -172,7 +187,7 @@ test("admin partner xlsx draft parser accepts one Korean row and normalizes valu
   assert.equal(result.draft.partner.benefitActionLink, "https://benefit.example.com/");
 });
 
-test("admin partner xlsx draft parser rejects empty, multiple, and invalid rows", async () => {
+test("admin partner xlsx draft parser rejects empty and invalid rows", async () => {
   const { parseAdminPartnerXlsxDraft } = await serverModulePromise;
   const emptyWorkbook = await loadTemplate({
     serviceMode: "online",
@@ -185,27 +200,7 @@ test("admin partner xlsx draft parser rejects empty, multiple, and invalid rows"
     companies,
   });
   assert.equal(emptyResult.ok, false);
-  assert.match(emptyResult.ok ? "" : emptyResult.errors.join(" "), /입력 행/);
-
-  const multiWorkbook = await loadTemplate({
-    serviceMode: "online",
-    benefitActionType: "none",
-  });
-  setInputValues(multiWorkbook, {
-    브랜드명: "A",
-    카테고리: "문화",
-    "사이트 링크": "https://a.example.com",
-  });
-  const sheet = multiWorkbook.getWorksheet("입력");
-  assert.ok(sheet);
-  sheet.getRow(3).getCell(1).value = "B";
-  const multipleResult = await parseAdminPartnerXlsxDraft({
-    fileBuffer: await toBuffer(multiWorkbook),
-    categories,
-    companies,
-  });
-  assert.equal(multipleResult.ok, false);
-  assert.match(multipleResult.ok ? "" : multipleResult.errors.join(" "), /한 행/);
+  assert.match(emptyResult.ok ? "" : emptyResult.errors.join(" "), /입력값/);
 
   const invalidWorkbook = await loadTemplate({
     serviceMode: "online",
