@@ -159,6 +159,7 @@ function readMetaOptions(workbook: ExcelJS.Workbook) {
 
 export async function createAdminPartnerXlsxTemplate(
   options: AdminPartnerFileTemplateOptions,
+  categories: AdminPartnerFileCategory[] = [],
 ) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "ssartnership";
@@ -183,6 +184,18 @@ export async function createAdminPartnerXlsxTemplate(
     to: { row: 1, column: headers.length },
   };
 
+  const categoryColumnIndex = headers.indexOf("카테고리") + 1;
+  if (categoryColumnIndex > 0 && categories.length > 0) {
+    input.getCell(MAX_DATA_ROW, categoryColumnIndex).dataValidation = {
+      type: "list",
+      allowBlank: false,
+      formulae: [`=${LIST_SHEET_NAME}!$A$2:$A$${categories.length + 1}`],
+      showErrorMessage: true,
+      errorTitle: "카테고리 확인",
+      error: "목록 시트에 있는 카테고리 중 하나를 선택해 주세요.",
+    };
+  }
+
   const guide = workbook.addWorksheet(GUIDE_SHEET_NAME);
   guide.addRow(["선택 기준", "값"]);
   guide.addRow(["서비스 형태", ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS[options.serviceMode]]);
@@ -203,7 +216,8 @@ export async function createAdminPartnerXlsxTemplate(
 
   const list = workbook.addWorksheet(LIST_SHEET_NAME);
   list.state = "veryHidden";
-  list.addRows([["이 시트는 향후 드롭다운 목록 확장을 위해 예약되어 있습니다."]]);
+  list.addRow(["카테고리"]);
+  list.addRows(categories.map((category) => [category.label]));
   addMetaSheet(workbook, options);
 
   const buffer = await workbook.xlsx.writeBuffer();

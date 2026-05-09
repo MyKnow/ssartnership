@@ -27,7 +27,7 @@ async function loadTemplate(options: {
 }) {
   const { createAdminPartnerXlsxTemplate } = await serverModulePromise;
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(await createAdminPartnerXlsxTemplate(options));
+  await workbook.xlsx.load(await createAdminPartnerXlsxTemplate(options, categories));
   return workbook;
 }
 
@@ -70,6 +70,17 @@ test("admin partner xlsx template branches headers and writes metadata", async (
   assert.equal(offlineHeaders.includes("혜택 공개 범위"), false);
   assert.equal(offlineHeaders.includes("노출 캠퍼스 - 전체"), false);
   assert.equal(offlineHeaders.includes("적용 대상 - 교육생"), false);
+  const input = offlineExternal.getWorksheet("입력");
+  assert.ok(input);
+  const categoryColumn = offlineHeaders.indexOf("카테고리") + 1;
+  assert.match(
+    String(input.getRow(2).getCell(categoryColumn).dataValidation?.formulae?.[0] ?? ""),
+    /목록!\$A\$2:\$A\$3/,
+  );
+  const list = offlineExternal.getWorksheet("목록");
+  assert.ok(list);
+  assert.equal(list.getRow(2).getCell(1).value, "카페");
+  assert.equal(list.getRow(3).getCell(1).value, "문화");
 
   const meta = offlineExternal.getWorksheet("_meta");
   assert.ok(meta);
