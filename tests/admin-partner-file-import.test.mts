@@ -75,7 +75,35 @@ test("admin partner xlsx template branches headers and writes metadata", async (
   const categoryColumn = offlineHeaders.indexOf("카테고리") + 1;
   assert.match(
     String(input.getRow(2).getCell(categoryColumn).dataValidation?.formulae?.[0] ?? ""),
-    /목록!\$A\$2:\$A\$3/,
+    /'목록'!\$A\$2:\$A\$3/,
+  );
+  const nameColumn = offlineHeaders.indexOf("브랜드명") + 1;
+  assert.equal(input.getRow(2).getCell(nameColumn).dataValidation?.type, "custom");
+  assert.match(
+    String(input.getRow(2).getCell(nameColumn).dataValidation?.formulae?.[0] ?? ""),
+    /LEN\(TRIM/,
+  );
+  const emailColumn = offlineHeaders.indexOf("담당자 이메일") + 1;
+  assert.match(
+    String(input.getRow(2).getCell(emailColumn).dataValidation?.formulae?.[0] ?? ""),
+    /FIND\("@"/,
+  );
+  const mapUrlColumn = offlineHeaders.indexOf("지도 URL") + 1;
+  assert.match(
+    String(input.getRow(2).getCell(mapUrlColumn).dataValidation?.formulae?.[0] ?? ""),
+    /https:\/\//,
+  );
+  const benefitLinkColumn = offlineHeaders.indexOf("혜택 이용 링크") + 1;
+  assert.match(
+    String(
+      input.getRow(2).getCell(benefitLinkColumn).dataValidation?.formulae?.[0] ?? "",
+    ),
+    /AND\(LEN\(TRIM/,
+  );
+  const benefitColumn = offlineHeaders.indexOf("혜택") + 1;
+  assert.match(
+    String(input.getRow(2).getCell(benefitColumn).dataValidation?.formulae?.[0] ?? ""),
+    /<=1000/,
   );
   const list = offlineExternal.getWorksheet("목록");
   assert.ok(list);

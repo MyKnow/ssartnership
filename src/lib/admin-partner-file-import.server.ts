@@ -24,6 +24,15 @@ const GUIDE_SHEET_NAME = "작성 가이드";
 const LIST_SHEET_NAME = "목록";
 const META_SHEET_NAME = "_meta";
 const MAX_DATA_ROW = 2;
+const REQUIRED_INPUT_HEADERS = new Set(["브랜드명", "카테고리"]);
+const URL_INPUT_HEADERS = new Set([
+  "문의 링크",
+  "썸네일 URL",
+  "이미지 URL",
+  "지도 URL",
+  "사이트 링크",
+  "혜택 이용 링크",
+]);
 
 const SAMPLE_GUIDE_ROWS = [
   ["브랜드명", "필수", "사용자에게 노출되는 브랜드 이름"],
@@ -121,6 +130,124 @@ function parseDelimitedValues(value: string) {
   );
 }
 
+function toColumnName(index: number) {
+  let remaining = index;
+  let name = "";
+  while (remaining > 0) {
+    const modulo = (remaining - 1) % 26;
+    name = String.fromCharCode(65 + modulo) + name;
+    remaining = Math.floor((remaining - modulo) / 26);
+  }
+  return name;
+}
+
+function cellAddress(columnIndex: number, rowNumber = MAX_DATA_ROW) {
+  return `${toColumnName(columnIndex)}${rowNumber}`;
+}
+
+function requiredFormula(address: string) {
+  return `LEN(TRIM(${address}))>0`;
+}
+
+function optionalUrlFormula(address: string) {
+  return `OR(LEN(TRIM(${address}))=0,LEFT(LOWER(TRIM(${address})),7)="http://",LEFT(LOWER(TRIM(${address})),8)="https://")`;
+}
+
+function optionalEmailFormula(address: string) {
+  return `OR(LEN(TRIM(${address}))=0,AND(ISNUMBER(FIND("@",${address})),ISNUMBER(FIND(".",${address})),LEN(TRIM(${address}))<=254))`;
+}
+
+function optionalDateFormula(address: string) {
+  return `OR(LEN(TRIM(${address}))=0,ISNUMBER(${address}))`;
+}
+
+function delimitedTextFormula(address: string) {
+  return `LEN(${address})<=1000`;
+}
+
+function applyInputValidation(input: ExcelJS.Worksheet, header: string, columnIndex: number) {
+  const address = cellAddress(columnIndex);
+  const cell = input.getCell(MAX_DATA_ROW, columnIndex);
+
+  if (REQUIRED_INPUT_HEADERS.has(header)) {
+    cell.dataValidation = {
+      type: "custom",
+      allowBlank: false,
+      formulae: [requiredFormula(address)],
+      showErrorMessage: true,
+      errorTitle: "필수 입력",
+      error: `${header} 값을 입력해 주세요.`,
+      showInputMessage: true,
+      promptTitle: header,
+      prompt: "필수 입력값입니다.",
+    };
+    return;
+  }
+
+  if (header === "담당자 이메일") {
+    cell.dataValidation = {
+      type: "custom",
+      allowBlank: true,
+      formulae: [optionalEmailFormula(address)],
+      showErrorMessage: true,
+      errorTitle: "이메일 확인",
+      error: "이메일 형식으로 입력해 주세요. 예: partner@example.com",
+      showInputMessage: true,
+      promptTitle: "담당자 이메일",
+      prompt: "선택 입력값입니다. 입력한다면 이메일 형식을 사용해 주세요.",
+    };
+    return;
+  }
+
+  if (header === "시작일" || header === "종료일") {
+    cell.dataValidation = {
+      type: "custom",
+      allowBlank: true,
+      formulae: [optionalDateFormula(address)],
+      showErrorMessage: true,
+      errorTitle: "날짜 확인",
+      error: "날짜 형식으로 입력해 주세요. 예: 2026-05-01",
+      showInputMessage: true,
+      promptTitle: header,
+      prompt: "선택 입력값입니다. 날짜 형식으로 입력해 주세요.",
+    };
+    cell.numFmt = "yyyy-mm-dd";
+    return;
+  }
+
+  if (URL_INPUT_HEADERS.has(header)) {
+    cell.dataValidation = {
+      type: "custom",
+      allowBlank: true,
+      formulae: [optionalUrlFormula(address)],
+      showErrorMessage: true,
+      errorTitle: "URL 확인",
+      error: "http:// 또는 https:// 로 시작하는 URL을 입력해 주세요.",
+      showInputMessage: true,
+      promptTitle: header,
+      prompt:
+        header === "이미지 URL"
+          ? "여러 개면 | 로 구분합니다. 각 값은 http:// 또는 https:// 로 시작해야 합니다."
+          : "http:// 또는 https:// 로 시작하는 URL을 입력해 주세요.",
+    };
+    return;
+  }
+
+  if (header === "혜택" || header === "이용 조건" || header === "태그") {
+    cell.dataValidation = {
+      type: "custom",
+      allowBlank: true,
+      formulae: [delimitedTextFormula(address)],
+      showErrorMessage: true,
+      errorTitle: "입력 길이 확인",
+      error: "1000자 이하로 입력해 주세요. 여러 개면 | 로 구분합니다.",
+      showInputMessage: true,
+      promptTitle: header,
+      prompt: "여러 개면 | 로 구분합니다.",
+    };
+  }
+}
+
 function addMetaSheet(
   workbook: ExcelJS.Workbook,
   options: AdminPartnerFileTemplateOptions,
@@ -184,15 +311,55 @@ export async function createAdminPartnerXlsxTemplate(
     to: { row: 1, column: headers.length },
   };
 
+  headers.forEach((header, index) => {
+    applyInputValidation(input, header, index + 1);
+  });
+
+  if (options.serviceMode === "offline") {
+    const locationColumnIndex = headers.indexOf("위치") + 1;
+    if (locationColumnIndex > 0) {
+      const address = cellAddress(locationColumnIndex);
+      input.getCell(MAX_DATA_ROW, locationColumnIndex).dataValidation = {
+        type: "custom",
+        allowBlank: false,
+        formulae: [requiredFormula(address)],
+        showErrorMessage: true,
+        errorTitle: "위치 확인",
+        error: "오프라인 서비스는 위치를 입력해야 합니다.",
+      };
+    }
+  }
+
+  if (options.benefitActionType === "external_link") {
+    const benefitActionLinkColumnIndex = headers.indexOf("혜택 이용 링크") + 1;
+    if (benefitActionLinkColumnIndex > 0) {
+      const address = cellAddress(benefitActionLinkColumnIndex);
+      input.getCell(MAX_DATA_ROW, benefitActionLinkColumnIndex).dataValidation = {
+        type: "custom",
+        allowBlank: false,
+        formulae: [
+          `AND(${requiredFormula(address)},${optionalUrlFormula(address)})`,
+        ],
+        showErrorMessage: true,
+        errorTitle: "혜택 이용 링크 확인",
+        error:
+          "외부 링크 이용 방식은 http:// 또는 https:// 로 시작하는 혜택 이용 링크가 필요합니다.",
+      };
+    }
+  }
+
   const categoryColumnIndex = headers.indexOf("카테고리") + 1;
   if (categoryColumnIndex > 0 && categories.length > 0) {
     input.getCell(MAX_DATA_ROW, categoryColumnIndex).dataValidation = {
       type: "list",
       allowBlank: false,
-      formulae: [`=${LIST_SHEET_NAME}!$A$2:$A$${categories.length + 1}`],
+      formulae: [`='${LIST_SHEET_NAME}'!$A$2:$A$${categories.length + 1}`],
       showErrorMessage: true,
       errorTitle: "카테고리 확인",
       error: "목록 시트에 있는 카테고리 중 하나를 선택해 주세요.",
+      showInputMessage: true,
+      promptTitle: "카테고리",
+      prompt: "드롭다운에서 카테고리를 선택해 주세요.",
     };
   }
 
