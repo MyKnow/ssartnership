@@ -84,26 +84,49 @@ function getCellString(cell: ExcelJS.Cell) {
   return String(value).trim();
 }
 
-function getRowValues(sheet: ExcelJS.Worksheet, rowNumber: number) {
-  const row = sheet.getRow(rowNumber);
-  return Array.from({ length: sheet.columnCount }, (_, index) =>
-    getCellString(row.getCell(index + 1)),
-  );
+function getLayoutHeaders(sheet: ExcelJS.Worksheet) {
+  const row = sheet.getRow(INPUT_HEADER_ROW);
+  return [
+    getCellString(row.getCell(1)),
+    getCellString(row.getCell(2)),
+    getCellString(row.getCell(3)),
+  ];
 }
 
-function mapVerticalInputRows(sheet: ExcelJS.Worksheet) {
+function hasVisibleRowValue(row: ExcelJS.Row) {
+  return Array.isArray(row.values)
+    ? row.values.some(
+        (value, index) =>
+          index > 0 &&
+          value !== null &&
+          value !== undefined &&
+          String(value).trim() !== "",
+      )
+    : row.actualCellCount > 0;
+}
+
+function mapVerticalInputRows(sheet: ExcelJS.Worksheet, maxInputRow: number) {
   const mapped = new Map<string, string>();
-  for (let rowNumber = FIRST_INPUT_ROW; rowNumber <= sheet.rowCount; rowNumber += 1) {
-    const field = getCellString(sheet.getRow(rowNumber).getCell(INPUT_FIELD_COLUMN));
-    if (!field) {
-      continue;
+  const outOfRangeRows: number[] = [];
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber < FIRST_INPUT_ROW) {
+      return;
     }
-    mapped.set(
-      field,
-      getCellString(sheet.getRow(rowNumber).getCell(INPUT_VALUE_COLUMN)),
-    );
-  }
-  return mapped;
+    if (rowNumber > maxInputRow) {
+      if (hasVisibleRowValue(row)) {
+        outOfRangeRows.push(rowNumber);
+      }
+      return;
+    }
+    const field = getCellString(row.getCell(INPUT_FIELD_COLUMN));
+    if (!field) {
+      return;
+    }
+    mapped.set(field, getCellString(row.getCell(INPUT_VALUE_COLUMN)));
+  });
+
+  return { mapped, outOfRangeRows };
 }
 
 function getValue(row: Map<string, string>, header: string) {
@@ -574,8 +597,11 @@ export async function parseAdminPartnerXlsxDraft({
   }
 
   const expectedHeaders = getAdminPartnerFileInputHeaders(options) as string[];
-  const layoutHeaders = getRowValues(input, INPUT_HEADER_ROW).slice(0, 3);
-  const inputRows = mapVerticalInputRows(input);
+  const layoutHeaders = getLayoutHeaders(input);
+  const { mapped: inputRows, outOfRangeRows } = mapVerticalInputRows(
+    input,
+    FIRST_INPUT_ROW + expectedHeaders.length - 1,
+  );
   const rowLabels = Array.from(inputRows.keys());
   const unknownHeaders = rowLabels.filter((header) => !expectedHeaders.includes(header));
   const missingHeaders = expectedHeaders.filter((header) => !inputRows.has(header));
@@ -593,6 +619,9 @@ export async function parseAdminPartnerXlsxDraft({
   }
   if (missingHeaders.length > 0) {
     errors.push(`필수 항목이 없습니다: ${missingHeaders.join(", ")}`);
+  }
+  if (outOfRangeRows.length > 0) {
+    errors.push("입력 시트에는 템플릿 항목 범위 밖의 값을 넣을 수 없습니다.");
   }
   if (errors.length > 0) {
     return { ok: false, errors };

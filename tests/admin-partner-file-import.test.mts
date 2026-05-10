@@ -228,6 +228,31 @@ test("admin partner xlsx draft parser rejects empty and invalid rows", async () 
   );
 });
 
+test("admin partner xlsx draft parser rejects values outside the template range", async () => {
+  const { parseAdminPartnerXlsxDraft } = await serverModulePromise;
+  const workbook = await loadTemplate({
+    serviceMode: "online",
+    benefitActionType: "none",
+  });
+  setInputValues(workbook, {
+    브랜드명: "온라인 브랜드",
+    카테고리: "문화",
+    "사이트 링크": "https://service.example.com",
+  });
+  const input = workbook.getWorksheet("입력");
+  assert.ok(input);
+  input.getRow(1_048_576).getCell(1).value = "범위 밖 입력";
+
+  const result = await parseAdminPartnerXlsxDraft({
+    fileBuffer: await toBuffer(workbook),
+    categories,
+    companies,
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.errors.join(" "), /범위 밖/);
+});
+
 test("admin partner xlsx draft converts to form data compatible with partner parser", async () => {
   const { createPartnerFileDraftFormData } = await sharedModulePromise;
   const { parseAdminPartnerXlsxDraft } = await serverModulePromise;

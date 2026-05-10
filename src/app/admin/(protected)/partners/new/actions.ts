@@ -5,6 +5,7 @@ import {
   type AdminPartnerFileParseResult,
 } from "@/lib/admin-partner-file-import";
 import { parseAdminPartnerXlsxDraft } from "@/lib/admin-partner-file-import.server";
+import { requireAdmin } from "@/lib/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
@@ -28,6 +29,8 @@ function normalizePartnerCompanies(value: unknown): PartnerCompanyRow[] {
 export async function parseAdminPartnerXlsxFileAction(
   formData: FormData,
 ): Promise<AdminPartnerFileParseResult> {
+  await requireAdmin();
+
   const file = formData.get("file");
   if (!(file instanceof File)) {
     return { ok: false, errors: ["XLSX 파일을 선택해 주세요."] };
