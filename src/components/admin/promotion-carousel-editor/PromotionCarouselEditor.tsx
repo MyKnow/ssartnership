@@ -18,7 +18,11 @@ import Textarea from "@/components/ui/Textarea";
 import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
 import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
-import { isImageFile, setInputFiles } from "@/components/admin/partner-media-editor/utils";
+import {
+  createWebpFile,
+  isImageFile,
+  setInputFiles,
+} from "@/components/admin/partner-media-editor/utils";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
   PROMOTION_AUDIENCE_OPTIONS,
@@ -28,6 +32,11 @@ import type { ManagedPromotionSlide } from "@/lib/promotions/events";
 import { cn } from "@/lib/cn";
 
 const PROMOTION_ASPECT_RATIO = 21 / 9;
+const PROMOTION_ASPECT_RATIO_TOLERANCE = 0.01;
+const PROMOTION_OUTPUT_SIZE = {
+  width: 2100,
+  height: 900,
+} as const;
 
 type SlideDraft = {
   id: string;
@@ -110,6 +119,59 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
 
 function getFileInputName(id: string) {
   return `slide_image_${id}`;
+}
+
+function loadImageElement(sourceUrl: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
+    image.src = sourceUrl;
+  });
+}
+
+function isPromotionAspectRatio(width: number, height: number) {
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+  return Math.abs(width / height - PROMOTION_ASPECT_RATIO) <= PROMOTION_ASPECT_RATIO_TOLERANCE;
+}
+
+async function createPromotionWebpFileFromImage(image: HTMLImageElement, outputName: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = PROMOTION_OUTPUT_SIZE.width;
+  canvas.height = PROMOTION_OUTPUT_SIZE.height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("이미지 처리에 실패했습니다.");
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(
+    image,
+    0,
+    0,
+    image.naturalWidth,
+    image.naturalHeight,
+    0,
+    0,
+    PROMOTION_OUTPUT_SIZE.width,
+    PROMOTION_OUTPUT_SIZE.height,
+  );
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (!nextBlob) {
+        reject(new Error("이미지 변환에 실패했습니다."));
+        return;
+      }
+      resolve(nextBlob);
+    }, "image/webp", 0.78);
+  });
+
+  return createWebpFile(blob, outputName);
 }
 
 function SlideBadge({
@@ -334,7 +396,7 @@ export default function PromotionCarouselEditor({
     });
   }
 
-  function onFileChange(id: string, file: File | null) {
+  async function onFileChange(id: string, file: File | null) {
     if (!file) {
       return;
     }
@@ -343,7 +405,32 @@ export default function PromotionCarouselEditor({
       return;
     }
     const sourceUrl = URL.createObjectURL(file);
-    setPendingCrop({ slideId: id, sourceUrl });
+    try {
+      const image = await loadImageElement(sourceUrl);
+      if (isPromotionAspectRatio(image.naturalWidth, image.naturalHeight)) {
+        const normalizedFile = await createPromotionWebpFileFromImage(image, `${id}-slide.webp`);
+        const nextUrl = URL.createObjectURL(normalizedFile);
+        const input = fileInputRefs.current.get(id) ?? null;
+        setInputFiles(input, [normalizedFile]);
+        updateSlide(id, (slide) => ({
+          ...slide,
+          imageSrc: nextUrl,
+          hasImageFile: true,
+          imageAlt: slide.imageAlt || slide.title || "광고 카드 이미지",
+        }));
+        URL.revokeObjectURL(sourceUrl);
+        setError(null);
+        return;
+      }
+      setPendingCrop({ slideId: id, sourceUrl });
+    } catch {
+      URL.revokeObjectURL(sourceUrl);
+      const input = fileInputRefs.current.get(id) ?? null;
+      if (input) {
+        input.value = "";
+      }
+      setError("이미지를 불러올 수 없습니다. 다른 파일을 사용해 주세요.");
+    }
   }
 
   function applyCroppedImage(file: File) {
@@ -547,7 +634,7 @@ export default function PromotionCarouselEditor({
                       <img
                         src={previewSrc}
                         alt={slide.imageAlt || slide.title || "광고 카드 이미지"}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                         draggable={false}
                       />
                     </div>
@@ -576,11 +663,13 @@ export default function PromotionCarouselEditor({
                         accept="image/*"
                         name={getFileInputName(slide.id)}
                         className="hidden"
-                        onChange={(event) => onFileChange(slide.id, event.target.files?.[0] ?? null)}
+                        onChange={(event) => {
+                          void onFileChange(slide.id, event.target.files?.[0] ?? null);
+                        }}
                       />
                     </div>
                     <p className="text-xs leading-6 text-muted-foreground">
-                      21:9 이미지를 업로드한 뒤 팝업에서 위치를 조정하면 캐러셀에서 즉시 반영됩니다.
+                      21:9 이미지는 원본 그대로 반영하고, 비율이 다르면 팝업에서 위치를 조정합니다.
                     </p>
                   </div>
 
