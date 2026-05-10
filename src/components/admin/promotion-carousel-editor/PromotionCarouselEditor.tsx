@@ -13,6 +13,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
@@ -45,6 +46,11 @@ type SlideDraft = {
 type PendingCrop = {
   slideId: string;
   sourceUrl: string;
+};
+
+export type PromotionEventPageOption = {
+  href: string;
+  label: string;
 };
 
 function createPlaceholderImage(title: string) {
@@ -148,9 +154,11 @@ function toggleAudience(
 
 export default function PromotionCarouselEditor({
   initialSlides,
+  eventPageOptions,
   saveAction,
 }: {
   initialSlides: ManagedPromotionSlide[];
+  eventPageOptions: PromotionEventPageOption[];
   saveAction: (formData: FormData) => void | Promise<void>;
 }) {
   const [slides, setSlides] = useState<SlideDraft[]>(
@@ -177,7 +185,7 @@ export default function PromotionCarouselEditor({
   const previewSlides = useMemo(
     () =>
       slides
-        .filter((slide) => slide.imageSrc)
+        .filter((slide) => slide.isActive && slide.imageSrc)
         .map((slide) => ({
           id: slide.id,
           title: slide.title || "광고 카드",
@@ -398,7 +406,13 @@ export default function PromotionCarouselEditor({
             홈에서 보기
           </Button>
         </div>
-        <PromotionCarousel slides={previewSlides} className="mt-0" />
+        {previewSlides.length > 0 ? (
+          <PromotionCarousel slides={previewSlides} className="mt-0" />
+        ) : (
+          <div className="rounded-overlay border border-dashed border-border bg-surface-inset px-4 py-10 text-center text-sm font-medium text-muted-foreground">
+            활성 광고 카드가 없습니다. 카드를 활성화하면 실제 홈 배너와 같은 기준으로 미리볼 수 있습니다.
+          </div>
+        )}
       </Card>
 
       <form ref={formRef} action={saveAction} className="grid gap-6">
@@ -571,6 +585,35 @@ export default function PromotionCarouselEditor({
                   </div>
 
                   <div className="grid gap-4 rounded-panel border border-border/70 bg-surface-inset p-4">
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium text-foreground" htmlFor={`event-page-${slide.id}`}>
+                        이벤트 페이지에서 선택
+                      </label>
+                      <Select
+                        id={`event-page-${slide.id}`}
+                        value={eventPageOptions.some((option) => option.href === slide.href) ? slide.href : ""}
+                        disabled={!editable || eventPageOptions.length === 0}
+                        onChange={(event) => {
+                          const href = event.target.value;
+                          if (!href) {
+                            return;
+                          }
+                          updateSlide(slide.id, (current) => ({ ...current, href }));
+                        }}
+                      >
+                        <option value="">
+                          {eventPageOptions.length > 0
+                            ? "활성 이벤트 페이지 선택"
+                            : "활성 이벤트 페이지 없음"}
+                        </option>
+                        {eventPageOptions.map((option) => (
+                          <option key={option.href} value={option.href}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
                     <label className="grid gap-2 text-sm font-medium text-foreground">
                       연결 페이지
                       <Input
@@ -582,6 +625,9 @@ export default function PromotionCarouselEditor({
                         disabled={!editable}
                         className={hrefInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
                       />
+                      <span className="text-xs font-normal leading-5 text-muted-foreground">
+                        직접 입력하거나 위의 활성 이벤트 페이지 목록에서 선택할 수 있습니다.
+                      </span>
                     </label>
 
                     <div className="grid gap-3">
