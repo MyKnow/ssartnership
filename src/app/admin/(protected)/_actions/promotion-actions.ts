@@ -222,30 +222,44 @@ export async function createPromotionEventAction(formData: FormData) {
 export async function updatePromotionEventAction(formData: FormData) {
   await requireAdmin();
   const id = getRequiredString(formData, "id");
+  const slug = normalizeSlug(getRequiredString(formData, "slug"));
   const supabase = getSupabaseAdminClient();
   const { data: existing, error: existingError } = await supabase
     .from("promotion_events")
-    .select("slug")
+    .select("id,slug")
     .eq("id", id)
     .maybeSingle();
   if (existingError) {
     throw new Error(existingError.message);
   }
-  if (!existing?.slug) {
-    throw new Error("이벤트를 찾지 못했습니다.");
+
+  const { data: existingBySlug, error: existingBySlugError } = existing?.slug
+    ? { data: null, error: null }
+    : await supabase
+        .from("promotion_events")
+        .select("id,slug")
+        .eq("slug", slug)
+        .maybeSingle();
+  if (existingBySlugError) {
+    throw new Error(existingBySlugError.message);
   }
-  const payload = parsePromotionEventRegistration(formData, existing.slug);
-  const { error } = await supabase.from("promotion_events").update(payload).eq("id", id);
+
+  const target = existing ?? existingBySlug;
+  const payload = parsePromotionEventRegistration(formData, target?.slug ?? slug);
+  const { error } = target?.id
+    ? await supabase.from("promotion_events").update(payload).eq("id", target.id)
+    : await supabase.from("promotion_events").insert(payload);
   if (error) {
     throw new Error(error.message);
   }
   await logAdminAction("promotion_event_update", {
     targetType: "promotion_event",
-    targetId: id,
+    targetId: target?.id ?? payload.slug,
     properties: {
       slug: payload.slug,
       pagePath: payload.page_path,
       targetAudiences: payload.target_audiences,
+      recoveredFromMissingId: !existing?.id,
     },
   });
   revalidatePromotionPaths(payload.slug);
