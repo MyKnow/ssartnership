@@ -105,6 +105,10 @@ export async function deactivatePushSubscription(params: {
     throw wrapPushDbError(error, "Push 구독을 비활성화하지 못했습니다.");
   }
 
+  if ((await countActivePushSubscriptions(memberId)) === 0) {
+    return upsertMemberPushPreferences(memberId, { enabled: false });
+  }
+
   return getMemberPushPreferences(memberId);
 }
 
@@ -169,6 +173,21 @@ export async function listPushSubscriptionDevices(params: {
     updatedAt: row.updated_at ?? null,
     lastSuccessAt: row.last_success_at ?? null,
   }));
+}
+
+export async function countActivePushSubscriptions(memberId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { count, error } = await supabase
+    .from("push_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("member_id", memberId)
+    .eq("is_active", true);
+
+  if (error) {
+    throw wrapPushDbError(error, "Push 기기 상태를 확인하지 못했습니다.");
+  }
+
+  return count ?? 0;
 }
 
 export async function deactivateAllPushSubscriptions(memberId: string) {

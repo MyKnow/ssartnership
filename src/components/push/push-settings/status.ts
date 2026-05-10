@@ -6,10 +6,12 @@ export function derivePushSettingsStatus(params: {
   iosNeedsInstall: boolean;
   isReceivingOnThisDevice: boolean;
   accountEnabled: boolean;
+  hasAnyPushDevice: boolean;
 }): PushSettingsStatus | null {
   const {
     accountEnabled,
     configured,
+    hasAnyPushDevice,
     iosNeedsInstall,
     isReceivingOnThisDevice,
     supported,
@@ -26,7 +28,7 @@ export function derivePushSettingsStatus(params: {
   if (isReceivingOnThisDevice) {
     return { label: "알림 수신 중", tone: "success" };
   }
-  if (accountEnabled) {
+  if (accountEnabled && hasAnyPushDevice) {
     return { label: "다른 기기에서만 수신 중", tone: "muted" };
   }
   return null;

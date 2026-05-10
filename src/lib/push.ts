@@ -24,6 +24,7 @@ export {
 export {
   deactivateAllPushSubscriptions,
   deactivatePushSubscription,
+  countActivePushSubscriptions,
   listPushSubscriptionDevices,
   upsertPushSubscription,
 } from "./push/subscriptions.ts";

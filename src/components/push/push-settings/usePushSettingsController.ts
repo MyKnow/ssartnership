@@ -69,7 +69,8 @@ export function usePushSettingsController({
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   const deviceEnabled = deviceState.hasSubscription;
-  const accountEnabled = preferences.enabled;
+  const hasAnyPushDevice = devices.length > 0;
+  const accountEnabled = preferences.enabled && hasAnyPushDevice;
   const isReceivingOnThisDevice = accountEnabled && deviceEnabled;
   const canControlPush =
     configured && deviceState.supported && !deviceState.iosNeedsInstall;
@@ -82,12 +83,14 @@ export function usePushSettingsController({
         iosNeedsInstall: deviceState.iosNeedsInstall,
         isReceivingOnThisDevice,
         accountEnabled,
+        hasAnyPushDevice,
       }),
     [
       accountEnabled,
       configured,
       deviceState.iosNeedsInstall,
       deviceState.supported,
+      hasAnyPushDevice,
       isReceivingOnThisDevice,
     ],
   );
@@ -278,6 +281,11 @@ export function usePushSettingsController({
     key: ChannelPreferenceKey,
     nextValue: boolean,
   ) {
+    if (key === "enabled" && nextValue && devices.length === 0) {
+      await handleSubscribe();
+      return;
+    }
+
     if (key === "enabled" && !nextValue) {
       await handleUnsubscribeAll({ confirm: false });
       return;
@@ -340,6 +348,7 @@ export function usePushSettingsController({
     vapidPublicKey,
     deviceEnabled,
     accountEnabled,
+    pushEnabled: accountEnabled,
     isReceivingOnThisDevice,
     canControlPush,
     hasPendingAction,
