@@ -75,6 +75,14 @@ type ReviewRow = {
   member_id: string | null;
 };
 
+function assertEventRewardQuerySucceeded(error: unknown, label: string) {
+  if (!error) {
+    return;
+  }
+  const message = error instanceof Error && error.message ? error.message : String(error);
+  throw new Error(`이벤트 추첨권 현황 조회에 실패했습니다. (${label}: ${message})`);
+}
+
 function isJoinedByCampaignEnd(value: string | null, campaign: EventCampaign) {
   if (!value) {
     return false;
@@ -310,8 +318,10 @@ async function fetchAllEventMembers(
       .select("id,display_name,mm_username,year,campus,marketing_policy_version,created_at")
       .order("year", { ascending: false })
       .order("display_name", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, to);
-    return { rows: (data ?? []) as MemberRow[], error: Boolean(error) };
+    assertEventRewardQuerySucceeded(error, "members");
+    return { rows: (data ?? []) as MemberRow[], error: false };
   });
   return result.rows;
 }
@@ -323,8 +333,10 @@ async function fetchAllEventPreferences(
     const { data, error } = await supabase
       .from("push_preferences")
       .select("member_id,enabled,mm_enabled")
+      .order("member_id", { ascending: true })
       .range(from, to);
-    return { rows: (data ?? []) as PreferenceRow[], error: Boolean(error) };
+    assertEventRewardQuerySucceeded(error, "push_preferences");
+    return { rows: (data ?? []) as PreferenceRow[], error: false };
   });
   return result.rows;
 }
@@ -341,8 +353,12 @@ async function fetchAllEventReviewCounts(
       .lte("created_at", campaign.endsAt)
       .is("deleted_at", null)
       .is("hidden_at", null)
+      .order("member_id", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, to);
-    return { rows: (data ?? []) as ReviewRow[], error: Boolean(error) };
+    assertEventRewardQuerySucceeded(error, "partner_reviews");
+    return { rows: (data ?? []) as ReviewRow[], error: false };
   });
   const counts = new Map<string, number>();
   for (const row of result.rows) {
