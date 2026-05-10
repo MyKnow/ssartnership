@@ -36,8 +36,6 @@ const SSAFY_LINE = "B8CCE8";
 const REQUIRED_INPUT_HEADERS = new Set(["브랜드명", "카테고리"]);
 const URL_INPUT_HEADERS = new Set([
   "문의 링크",
-  "썸네일 URL",
-  "이미지 URL",
   "지도 URL",
   "사이트 링크",
   "혜택 이용 링크",
@@ -49,7 +47,7 @@ const SAMPLE_GUIDE_ROWS = [
   ["혜택", "선택", "여러 개면 | 로 구분. 예: 아메리카노 할인|베이커리 할인"],
   ["이용 조건", "선택", "여러 개면 | 로 구분. 예: 싸트너십 인증|현장 제시"],
   ["태그", "선택", "여러 개면 | 로 구분. 예: 카페|역삼"],
-  ["이미지 URL", "선택", "여러 개면 | 로 구분. 예: https://.../1.jpg|https://.../2.jpg"],
+  ["이미지", "폼에서 등록", "파일 값 반영 후 단건 추가 폼에서 직접 등록합니다."],
   [
     "노출 상태 / 혜택 공개 범위 / 노출 캠퍼스 / 적용 대상",
     "폼에서 지정",
@@ -193,7 +191,6 @@ function getInputExample(
     시작일: "2026-05-01",
     종료일: "2026-12-31",
     "문의 링크": "https://pf.kakao.com/_example",
-    "썸네일 URL": "https://example.com/thumbnail.jpg",
     협력사명: "샘플 협력사",
     담당자명: "홍길동",
     "담당자 이메일": "partner@example.com",
@@ -202,7 +199,6 @@ function getInputExample(
     혜택: "아메리카노 할인|베이커리 할인",
     "이용 조건": "싸트너십 인증|현장 제시",
     태그: "카페|역삼",
-    "이미지 URL": "https://example.com/1.jpg|https://example.com/2.jpg",
     위치: "서울 강남구 논현로 508 1층",
     "지도 URL": "https://map.naver.com/example",
     "사이트 링크": "https://service.example.com",
@@ -222,7 +218,6 @@ function getInputGuide(header: string, options: AdminPartnerFileTemplateOptions)
     시작일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     종료일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     "문의 링크": "선택. 문의 채널 URL을 입력합니다.",
-    "썸네일 URL": "선택. 대표 이미지 URL을 입력합니다.",
     협력사명: "선택. 기존 협력사명과 정확히 같으면 자동 연결됩니다.",
     담당자명: "선택. 협력사 담당자 이름입니다.",
     "담당자 이메일": "선택. 이메일 형식으로 입력합니다.",
@@ -231,7 +226,6 @@ function getInputGuide(header: string, options: AdminPartnerFileTemplateOptions)
     혜택: "선택. 여러 개면 | 로 구분합니다.",
     "이용 조건": "선택. 여러 개면 | 로 구분합니다.",
     태그: "선택. 여러 개면 | 로 구분합니다.",
-    "이미지 URL": "선택. 여러 개면 | 로 구분합니다.",
     위치: "오프라인 서비스 필수. 사용자에게 보일 위치입니다.",
     "지도 URL": "선택. 지도 또는 위치 URL입니다.",
     "사이트 링크": "온라인 서비스용 링크입니다.",
@@ -307,10 +301,7 @@ function applyInputValidation(
       error: "http:// 또는 https:// 로 시작하는 URL을 입력해 주세요.",
       showInputMessage: true,
       promptTitle: header,
-      prompt:
-        header === "이미지 URL"
-          ? "여러 개면 | 로 구분합니다. 각 값은 http:// 또는 https:// 로 시작해야 합니다."
-          : "http:// 또는 https:// 로 시작하는 URL을 입력해 주세요.",
+      prompt: "http:// 또는 https:// 로 시작하는 URL을 입력해 주세요.",
     };
     return;
   }
@@ -618,10 +609,6 @@ export async function parseAdminPartnerXlsxDraft({
   const periodStart = getValue(row, "시작일");
   const periodEnd = getValue(row, "종료일");
   const inquiryLinkRaw = getValue(row, "문의 링크");
-  const thumbnailUrlRaw = getValue(row, "썸네일 URL");
-  const imageUrls = parseDelimitedValues(getValue(row, "이미지 URL")).map(
-    (item) => sanitizeHttpUrl(item) ?? "",
-  );
   const companyNameRaw = getValue(row, "협력사명");
   const company = resolveCompanyByName(companyNameRaw, companies);
   const location =
@@ -663,13 +650,6 @@ export async function parseAdminPartnerXlsxDraft({
   if (inquiryLinkRaw && !inquiryLink) {
     errors.push("문의 링크가 올바르지 않습니다.");
   }
-  const thumbnail = sanitizeHttpUrl(thumbnailUrlRaw);
-  if (thumbnailUrlRaw && !thumbnail) {
-    errors.push("썸네일 URL이 올바르지 않습니다.");
-  }
-  if (imageUrls.some((item) => !item)) {
-    errors.push("이미지 URL 목록에 올바르지 않은 URL이 있습니다.");
-  }
   const companyContactEmail = getValue(row, "담당자 이메일");
   if (!company && companyContactEmail && !isValidEmail(companyContactEmail)) {
     errors.push("담당자 이메일이 올바르지 않습니다.");
@@ -705,8 +685,8 @@ export async function parseAdminPartnerXlsxDraft({
         conditions: parseDelimitedValues(getValue(row, "이용 조건")),
         benefits: parseDelimitedValues(getValue(row, "혜택")),
         appliesTo: [],
-        thumbnail,
-        images: imageUrls.filter(Boolean),
+        thumbnail: null,
+        images: [],
         tags: parseDelimitedValues(getValue(row, "태그")),
         company: {
           ...(company ? { id: company.id, name: company.name } : {}),

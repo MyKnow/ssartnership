@@ -74,6 +74,8 @@ test("admin partner xlsx template branches headers and writes metadata", async (
   assert.ok(offlineHeaders.includes("지도 URL"));
   assert.ok(offlineHeaders.includes("혜택 이용 링크"));
   assert.equal(offlineHeaders.includes("사이트 링크"), false);
+  assert.equal(offlineHeaders.includes("썸네일 URL"), false);
+  assert.equal(offlineHeaders.includes("이미지 URL"), false);
   assert.ok(offlineHeaders.includes("혜택"));
   assert.ok(offlineHeaders.includes("이용 조건"));
   assert.equal(offlineHeaders.includes("노출 상태"), false);
@@ -160,7 +162,6 @@ test("admin partner xlsx draft parser accepts one Korean row and normalizes valu
     혜택: "아메리카노 할인|베이커리 할인",
     "이용 조건": "싸트너십 인증",
     태그: "카페",
-    "이미지 URL": "https://example.com/1.jpg",
   });
 
   const result = await parseAdminPartnerXlsxDraft({
@@ -182,6 +183,8 @@ test("admin partner xlsx draft parser accepts one Korean row and normalizes valu
     "아메리카노 할인",
     "베이커리 할인",
   ]);
+  assert.equal(result.draft.partner.thumbnail, null);
+  assert.deepStrictEqual(result.draft.partner.images, []);
   assert.equal(result.draft.partner.company?.id, "company-1");
   assert.equal(result.draft.partner.benefitActionType, "external_link");
   assert.equal(result.draft.partner.benefitActionLink, "https://benefit.example.com/");

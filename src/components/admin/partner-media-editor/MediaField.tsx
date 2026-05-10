@@ -5,6 +5,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
 import { getCachedImageUrl } from "@/lib/image-cache";
 import {
@@ -42,6 +43,7 @@ export default function MediaField({
     currentManifest,
     currentCrop,
     handleAddUrl,
+    handleAddUrls,
     ingestFiles,
     replaceItemAt,
     removeItem,
@@ -57,8 +59,18 @@ export default function MediaField({
 
   const hasItems = items.length > 0;
   const emptyMessage = multiple
-    ? "URL을 추가하거나 이미지 파일을 끌어오세요."
+    ? "여러 URL을 한 번에 추가하거나 이미지 파일을 끌어오세요."
     : "썸네일을 선택하거나 이미지를 끌어오세요.";
+  const addDraftUrls = () => {
+    if (!multiple) {
+      return handleAddUrl();
+    }
+    const urls = draftUrl
+      .split(/\n|\|/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return urls.length > 1 ? handleAddUrls(urls) : handleAddUrl();
+  };
 
   return (
     <div className={cn("grid gap-2.5", className)}>
@@ -93,22 +105,31 @@ export default function MediaField({
             }}
           >
             <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <Input
-                value={draftUrl}
-                onChange={(event) => setDraftUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleAddUrl();
-                  }
-                }}
-                placeholder="이미지 링크를 붙여넣으세요"
-              />
+              {multiple ? (
+                <Textarea
+                  value={draftUrl}
+                  onChange={(event) => setDraftUrl(event.target.value)}
+                  placeholder="이미지 링크를 여러 개 붙여넣으세요. 줄바꿈 또는 | 로 구분합니다."
+                  className="min-h-24"
+                />
+              ) : (
+                <Input
+                  value={draftUrl}
+                  onChange={(event) => setDraftUrl(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddUrl();
+                    }
+                  }}
+                  placeholder="이미지 링크를 붙여넣으세요"
+                />
+              )}
               <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => handleAddUrl()}
+                  onClick={addDraftUrls}
                   className="w-auto"
                 >
                   추가
@@ -163,6 +184,7 @@ export default function MediaField({
                   <MediaCardToolbar
                     multiple
                     onAddUrl={(url) => handleAddUrl(url, index + 1)}
+                    onAddUrls={(urls) => handleAddUrls(urls, index + 1)}
                     onAddFiles={(files) => ingestFiles(files, index + 1)}
                   />
 

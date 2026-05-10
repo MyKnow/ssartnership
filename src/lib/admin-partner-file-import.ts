@@ -96,7 +96,6 @@ const BASE_HEADERS = [
   "시작일",
   "종료일",
   "문의 링크",
-  "썸네일 URL",
   "협력사명",
   "담당자명",
   "담당자 이메일",
@@ -105,7 +104,6 @@ const BASE_HEADERS = [
   "혜택",
   "이용 조건",
   "태그",
-  "이미지 URL",
 ] as const;
 
 const OFFLINE_HEADERS = ["위치", "지도 URL"] as const;
