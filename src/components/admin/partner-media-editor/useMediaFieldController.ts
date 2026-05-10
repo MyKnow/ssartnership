@@ -42,6 +42,11 @@ export default function useMediaFieldController({
     const currentBlobUrls = new Set(
       items.filter((item) => item.kind === "file" && isBlobUrl(item.url)).map((item) => item.url),
     );
+    for (const pendingCrop of pendingCrops) {
+      if (isBlobUrl(pendingCrop.sourceUrl)) {
+        currentBlobUrls.add(pendingCrop.sourceUrl);
+      }
+    }
 
     for (const url of createdBlobUrlsRef.current) {
       if (!currentBlobUrls.has(url)) {
@@ -49,7 +54,7 @@ export default function useMediaFieldController({
       }
     }
     createdBlobUrlsRef.current = currentBlobUrls;
-  }, [items]);
+  }, [items, pendingCrops]);
 
   useEffect(() => {
     return () => {
@@ -161,6 +166,33 @@ export default function useMediaFieldController({
     return true;
   };
 
+  const handleAddUrls = (rawUrls: string[], insertAt?: number) => {
+    const safeUrls = rawUrls
+      .map((rawUrl) => sanitizeHttpUrl(rawUrl))
+      .filter((url): url is string => Boolean(url));
+    if (safeUrls.length !== rawUrls.length || safeUrls.length === 0) {
+      setError("이미지 링크는 모두 올바른 http(s) 주소여야 합니다.");
+      return false;
+    }
+
+    setError(null);
+    safeUrls.forEach((safeUrl, index) => {
+      const safeIndex =
+        typeof insertAt === "number" ? insertAt + index : items.length + index;
+      enqueueCrop({
+        id: crypto.randomUUID(),
+        sourceUrl: getCachedImageUrl(safeUrl),
+        aspectRatio,
+        outputName: inferOutputName(role, safeIndex),
+        onApply: (croppedFile) => {
+          finishCurrentCrop(croppedFile, typeof insertAt === "number" ? safeIndex : undefined);
+        },
+      });
+    });
+    setDraftUrl("");
+    return true;
+  };
+
   const replaceItemAt = (index: number) => {
     const item = items[index];
     if (!item) {
@@ -251,7 +283,9 @@ export default function useMediaFieldController({
     fileInputRef,
     currentManifest,
     currentCrop,
+    pendingCropCount: pendingCrops.length,
     handleAddUrl,
+    handleAddUrls,
     ingestFiles,
     replaceItemAt,
     removeItem,

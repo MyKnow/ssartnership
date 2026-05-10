@@ -1,5 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
-import AdminPartnerCreateForm from "@/components/admin/AdminPartnerCreateForm";
+import AdminPartnerCreateWorkspace from "@/components/admin/AdminPartnerCreateWorkspace";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -87,7 +87,7 @@ export default async function AdminPartnerNewPage() {
                 title="브랜드 입력"
                 description="혜택, 기간, CTA, 태그, 이미지까지 한 번에 입력합니다."
               />
-              <AdminPartnerCreateForm
+              <AdminPartnerCreateWorkspace
                 partner={{
                   name: "",
                   visibility: "public",
@@ -110,6 +110,7 @@ export default async function AdminPartnerNewPage() {
                 }}
                 categoryOptions={categories.map((category) => ({
                   id: category.id,
+                  key: category.key,
                   label: category.label,
                 }))}
                 companyOptions={companies}

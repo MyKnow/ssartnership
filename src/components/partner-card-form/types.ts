@@ -6,6 +6,7 @@ import type { PartnerFormField } from "@/lib/partner-form-state";
 
 export type PartnerCardCategoryOption = {
   id: string;
+  key?: string;
   label: string;
 };
 
