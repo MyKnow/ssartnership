@@ -73,6 +73,15 @@ node --test tests/<focused-test>.test.mts
 
 Run `next build` only when the change touches build/runtime behavior broadly or the user asks for production verification.
 
+## Preview Supabase Sync
+
+- `npm run sync:preview` may copy public Production data into Preview, but it must not copy member password material.
+- The preview sync sanitizer intentionally strips `members.password_hash`, `members.password_salt`, and heavy avatar payloads from the Production dump before restore.
+- Because member password hashes are stripped, Production member passwords are not expected to work in `dev` or Preview after sync. Use the Preview password reset flow or explicit Preview test accounts instead.
+- If `PREVIEW_TEST_MEMBER_USERNAME` and `PREVIEW_TEST_MEMBER_PASSWORD` are configured, `npm run sync:preview` re-seeds that single Preview-only member password after restore.
+- Do not “fix” this by copying Production member password hashes into Preview unless the user explicitly accepts the security risk for a one-off operation.
+- If login suddenly requires reset in Preview, first check the preview sync sanitizer diagnostics before assuming a migration failure.
+
 ## Supabase Migration Naming
 
 - New files under `supabase/migrations/` must remain forward-only and lexicographically increasing.

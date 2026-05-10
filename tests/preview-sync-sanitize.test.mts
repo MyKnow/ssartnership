@@ -84,6 +84,9 @@ test("sanitizeDumpSqlForPreview strips heavy and sensitive member columns", asyn
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
 
   assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.memberCopyBlocksSeen, 1);
+  assert.equal(sanitized.stats.memberRowsSeen, 1);
+  assert.equal(sanitized.stats.memberPasswordRowsStripped, 1);
   assert.equal(
     sanitized.sql,
     [

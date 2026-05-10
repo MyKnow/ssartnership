@@ -9,6 +9,11 @@ import {
   formatStorageError,
   runStorageOperation,
 } from "./supabase-sync-preview-storage.mjs";
+import {
+  hashPreviewSeedPassword,
+  isValidPreviewSeedPassword,
+  resolvePreviewMemberCredentialSeedConfig,
+} from "./preview-credential-seed-lib.mjs";
 import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
@@ -197,6 +202,18 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
   const { stats } = sanitized;
 
+  if (stats.memberCopyBlocksSeen > 0) {
+    console.log(
+      [
+        "Preview sync member credential sanitization:",
+        `memberCopyBlocksSeen=${stats.memberCopyBlocksSeen}`,
+        `memberRowsSeen=${stats.memberRowsSeen}`,
+        `memberPasswordRowsStripped=${stats.memberPasswordRowsStripped}`,
+        "production password hashes are intentionally not restored to preview; use preview reset/test credentials.",
+      ].join(" "),
+    );
+  }
+
   if (stats.partnerCopyBlocksSeen > 0) {
     console.log(
       [
@@ -284,6 +301,59 @@ async function restorePreviewDatabase(dumpPath, previewDbUrl) {
       "--file",
       dumpPath,
     ],
+  );
+}
+
+async function seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey) {
+  const seedConfig = resolvePreviewMemberCredentialSeedConfig();
+  if (!seedConfig) {
+    console.log(
+      "Skipping preview member credential seed: PREVIEW_TEST_MEMBER_USERNAME/PREVIEW_TEST_MEMBER_PASSWORD are not set.",
+    );
+    return;
+  }
+
+  if (!isValidPreviewSeedPassword(seedConfig.password)) {
+    throw new Error(
+      "PREVIEW_TEST_MEMBER_PASSWORD must be 8-64 characters and include letters, numbers, and symbols.",
+    );
+  }
+
+  const previewClient = createStorageClient(previewUrl, previewServiceRoleKey);
+  const { data: member, error: findError } = await previewClient
+    .from("members")
+    .select("id,mm_username")
+    .eq("mm_username", seedConfig.username)
+    .maybeSingle();
+
+  if (findError) {
+    throw findError;
+  }
+
+  if (!member?.id) {
+    throw new Error(
+      `Preview test member "${seedConfig.username}" was not found after sync.`,
+    );
+  }
+
+  const passwordRecord = hashPreviewSeedPassword(seedConfig.password);
+  const updatedAt = new Date().toISOString();
+  const { error: updateError } = await previewClient
+    .from("members")
+    .update({
+      password_hash: passwordRecord.hash,
+      password_salt: passwordRecord.salt,
+      must_change_password: false,
+      updated_at: updatedAt,
+    })
+    .eq("id", member.id);
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  console.log(
+    `Seeded preview member credentials for ${seedConfig.username}. Production password hashes remain stripped.`,
   );
 }
 
@@ -558,6 +628,7 @@ async function main() {
     await sanitizeDumpForPreview(dumpPath, previewDbUrl);
     await truncatePreviewDatabase(previewDbUrl);
     await restorePreviewDatabase(dumpPath, previewDbUrl);
+    await seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey);
     await syncStorageBuckets(
       productionUrl,
       productionServiceRoleKey,

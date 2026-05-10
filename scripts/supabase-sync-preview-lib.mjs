@@ -112,6 +112,9 @@ function isValidCampusSlugsValue(value) {
 function createSanitizeStats() {
   return {
     copyBlocksChanged: 0,
+    memberCopyBlocksSeen: 0,
+    memberRowsSeen: 0,
+    memberPasswordRowsStripped: 0,
     partnerCopyBlocksSeen: 0,
     partnerRowsSeen: 0,
     partnerCampusSlugsAppended: 0,
@@ -299,8 +302,12 @@ export function sanitizeDumpSqlForPreview(
       continue;
     }
 
+    const isMemberCopyBlock = copyStatement.table === "members";
     const isPartnerCopyBlock = copyStatement.table === "partners";
     const isPartnerChangeRequestCopyBlock = copyStatement.table === "partner_change_requests";
+    if (isMemberCopyBlock) {
+      stats.memberCopyBlocksSeen += 1;
+    }
     if (isPartnerCopyBlock) {
       stats.partnerCopyBlocksSeen += 1;
     }
@@ -309,6 +316,11 @@ export function sanitizeDumpSqlForPreview(
     }
 
     const excludedColumns = excludedColumnsByTable.get(copyStatement.table) ?? new Set();
+    const memberPasswordColumnIndexes = isMemberCopyBlock
+      ? ["password_hash", "password_salt"]
+          .map((column) => copyStatement.columns.indexOf(column))
+          .filter((columnIndex) => columnIndex >= 0)
+      : [];
     const keptIndexes = copyStatement.columns
       .map((column, columnIndex) =>
         previewColumns.has(column) && !excludedColumns.has(column) ? columnIndex : -1,
@@ -358,6 +370,9 @@ export function sanitizeDumpSqlForPreview(
       }
 
       const values = dataLine.split("\t");
+      if (isMemberCopyBlock) {
+        stats.memberRowsSeen += 1;
+      }
       if (isPartnerCopyBlock) {
         stats.partnerRowsSeen += 1;
       }
@@ -376,6 +391,15 @@ export function sanitizeDumpSqlForPreview(
         }
         output.push(dataLine);
       } else {
+        if (
+          memberPasswordColumnIndexes.some((columnIndex) => {
+            const value = values[columnIndex]?.trim() ?? "";
+            return value && value !== "\\N";
+          })
+        ) {
+          stats.memberPasswordRowsStripped += 1;
+        }
+
         const keptValues = keptIndexes.map((columnIndex) => values[columnIndex]);
         const transformed = transformKeptValuesForPreview(
           copyStatement.table,

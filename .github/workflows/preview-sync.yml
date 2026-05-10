@@ -37,6 +37,8 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_PREVIEW_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_PREVIEW_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
+      PREVIEW_TEST_MEMBER_USERNAME: ${{ secrets.PREVIEW_TEST_MEMBER_USERNAME }}
+      PREVIEW_TEST_MEMBER_PASSWORD: ${{ secrets.PREVIEW_TEST_MEMBER_PASSWORD }}
     steps:
       - name: Checkout workflow run commit
         if: github.event_name == 'workflow_run'

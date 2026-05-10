@@ -17,6 +17,15 @@ Production deployment workflows and CI/CD best practices.
 - Preparing for a production release
 - Configuring environment-specific settings
 
+## SSAFY Partnership Preview Sync
+
+- `main` maps to Production and `dev` maps to Preview. Treat `npm run sync:preview` as a Production-to-Preview data restore with sanitization, not as a byte-for-byte clone.
+- The preview sync sanitizer intentionally removes `members.password_hash`, `members.password_salt`, and heavy avatar payloads before restoring Production data into Preview.
+- Production member passwords must not be expected to work in Preview after sync. Use Preview password reset or explicit Preview-only test accounts for login verification.
+- If `PREVIEW_TEST_MEMBER_USERNAME` and `PREVIEW_TEST_MEMBER_PASSWORD` are configured in CI secrets, `npm run sync:preview` re-seeds that single Preview-only member password after restore.
+- Do not reintroduce Production member password hashes into Preview sync unless the user explicitly accepts the security risk for a one-off operation.
+- If Preview login requires password reset after sync, inspect the sanitizer diagnostics before treating it as a migration or auth regression.
+
 ## Deployment Strategies
 
 ### Rolling Deployment (Default)
