@@ -42,6 +42,7 @@ export default function MediaField({
     fileInputRef,
     currentManifest,
     currentCrop,
+    pendingCropCount,
     handleAddUrl,
     handleAddUrls,
     ingestFiles,
@@ -312,6 +313,7 @@ export default function MediaField({
           aspectRatio={currentCrop.aspectRatio}
           sourceUrl={currentCrop.sourceUrl}
           outputName={currentCrop.outputName}
+          queueCount={pendingCropCount}
           onCancel={dismissCurrentCrop}
           onApply={applyCurrentCrop}
         />

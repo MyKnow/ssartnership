@@ -42,6 +42,11 @@ export default function useMediaFieldController({
     const currentBlobUrls = new Set(
       items.filter((item) => item.kind === "file" && isBlobUrl(item.url)).map((item) => item.url),
     );
+    for (const pendingCrop of pendingCrops) {
+      if (isBlobUrl(pendingCrop.sourceUrl)) {
+        currentBlobUrls.add(pendingCrop.sourceUrl);
+      }
+    }
 
     for (const url of createdBlobUrlsRef.current) {
       if (!currentBlobUrls.has(url)) {
@@ -49,7 +54,7 @@ export default function useMediaFieldController({
       }
     }
     createdBlobUrlsRef.current = currentBlobUrls;
-  }, [items]);
+  }, [items, pendingCrops]);
 
   useEffect(() => {
     return () => {
@@ -278,6 +283,7 @@ export default function useMediaFieldController({
     fileInputRef,
     currentManifest,
     currentCrop,
+    pendingCropCount: pendingCrops.length,
     handleAddUrl,
     handleAddUrls,
     ingestFiles,

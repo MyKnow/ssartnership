@@ -7,6 +7,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -51,6 +52,7 @@ export default function MediaCropModal({
   aspectRatio,
   sourceUrl,
   outputName,
+  queueCount = 1,
   onCancel,
   onApply,
 }: {
@@ -60,6 +62,7 @@ export default function MediaCropModal({
   aspectRatio: number;
   sourceUrl: string;
   outputName: string;
+  queueCount?: number;
   onCancel: () => void;
   onApply: (file: File) => void;
 }) {
@@ -78,6 +81,7 @@ export default function MediaCropModal({
   const [error, setError] = useState<string | null>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const offsetStartRef = useRef({ x: 0, y: 0 });
+  const portalRoot = typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
     if (!open || !frameRef.current) {
@@ -249,14 +253,22 @@ export default function MediaCropModal({
   if (!open) {
     return null;
   }
+  if (!portalRoot) {
+    return null;
+  }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6">
       <div className="my-auto grid w-full max-w-5xl max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[28px] border border-white/10 bg-surface-overlay p-4 shadow-overlay sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="grid gap-1">
             <p className="text-base font-semibold text-foreground">{title}</p>
             <p className="text-sm text-muted-foreground">{subtitle}</p>
+            {queueCount > 1 ? (
+              <p className="text-xs font-semibold text-primary">
+                여러 이미지를 순차 처리 중입니다. 현재 이미지 적용 후 다음 이미지가 열립니다. 남은 이미지 {queueCount}개
+              </p>
+            ) : null}
           </div>
           <Button variant="ghost" size="icon" onClick={onCancel} ariaLabel="닫기" title="닫기">
             <XMarkIcon className="h-5 w-5" />
@@ -339,6 +351,7 @@ export default function MediaCropModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    portalRoot,
   );
 }
