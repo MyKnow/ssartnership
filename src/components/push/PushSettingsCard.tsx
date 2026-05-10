@@ -138,17 +138,17 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                 <span className="text-sm font-medium text-foreground">푸시</span>
                 <span className="flex items-center gap-3">
                   <span
-                    className={controller.preferences.enabled
+                    className={controller.pushEnabled
                       ? "min-w-10 text-right text-xs font-semibold text-emerald-600 dark:text-emerald-300"
                       : "min-w-10 text-right text-xs font-semibold text-muted-foreground"}
                   >
-                    {controller.preferences.enabled ? "켜짐" : "꺼짐"}
+                    {controller.pushEnabled ? "켜짐" : "꺼짐"}
                   </span>
                   <span className="relative inline-flex items-center">
                     <input
                       type="checkbox"
                       className="peer sr-only"
-                      checked={controller.preferences.enabled}
+                      checked={controller.pushEnabled}
                       disabled={controller.hasPendingAction}
                       onChange={(event) => {
                         void controller.updateChannelPreference(
@@ -162,7 +162,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                   </span>
                 </span>
               </label>
-              {controller.preferences.enabled ? (
+              {controller.pushEnabled ? (
                 <div className="grid gap-2 border-t border-border/70 pt-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">

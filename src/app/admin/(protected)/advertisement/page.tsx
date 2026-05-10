@@ -6,7 +6,10 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { savePromotionSlidesAction } from "@/app/admin/(protected)/_actions/promotion-actions";
-import { listManagedPromotionSlides } from "@/lib/promotions/events";
+import {
+  listManagedEventCampaigns,
+  listManagedPromotionSlides,
+} from "@/lib/promotions/events";
 import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +36,16 @@ export default async function AdminAdvertisementPage({
 }) {
   const params = (await searchParams) ?? {};
   const message = statusMessage(params.status);
-  const slides = await listManagedPromotionSlides({ includeInactive: true });
+  const [slides, eventCampaigns] = await Promise.all([
+    listManagedPromotionSlides({ includeInactive: true }),
+    listManagedEventCampaigns({ includeInactive: false }),
+  ]);
+  const eventPageOptions = eventCampaigns
+    .filter((campaign) => campaign.isActive)
+    .map((campaign) => ({
+      href: campaign.pagePath,
+      label: `${campaign.title} (${campaign.pagePath})`,
+    }));
   const activeSlides = slides.filter((slide) => slide.isActive).length;
   const databaseSlides = slides.filter((slide) => slide.source === "database").length;
   const catalogSlides = slides.filter((slide) => slide.source === "catalog").length;
@@ -63,7 +75,11 @@ export default async function AdminAdvertisementPage({
             title="캐러셀 편집기"
             description="메인 미리보기와 카드별 상세 편집을 같은 워크스페이스에서 다룹니다."
           />
-          <PromotionCarouselEditor initialSlides={slides} saveAction={savePromotionSlidesAction} />
+          <PromotionCarouselEditor
+            initialSlides={slides}
+            eventPageOptions={eventPageOptions}
+            saveAction={savePromotionSlidesAction}
+          />
         </section>
       </div>
     </AdminShell>

@@ -1,5 +1,6 @@
 import { getPolicyDocumentByKind, recordMarketingPolicyConsent } from "@/lib/policy-documents";
 import {
+  countActivePushSubscriptions,
   DEFAULT_PUSH_PREFERENCES,
   getMemberPushPreferences,
   upsertMemberPushPreferences,
@@ -101,6 +102,9 @@ export function deactivateMockPushDevice(params: {
       ),
     );
   }
+  if ((mockPushDeviceStore.get(params.memberId) ?? []).length === 0) {
+    return updateMemberNotificationPreferences(params.memberId, { enabled: false });
+  }
   return getMemberNotificationPreferences(params.memberId);
 }
 
@@ -111,10 +115,20 @@ export function deactivateAllMockPushDevices(memberId: string) {
 
 export async function getMemberNotificationPreferences(memberId: string) {
   if (useMockPreferences) {
-    return getMockPreferences(memberId);
+    const preferences = getMockPreferences(memberId);
+    return {
+      ...preferences,
+      enabled:
+        preferences.enabled && (mockPushDeviceStore.get(memberId) ?? []).length > 0,
+    };
   }
   const supabase = getSupabaseAdminClient();
-  const [preferences, activeMarketingPolicy, memberResult] = await Promise.all([
+  const [
+    preferences,
+    activeMarketingPolicy,
+    memberResult,
+    activePushSubscriptionCount,
+  ] = await Promise.all([
     getMemberPushPreferences(memberId),
     getPolicyDocumentByKind("marketing").catch(() => null),
     supabase
@@ -122,6 +136,7 @@ export async function getMemberNotificationPreferences(memberId: string) {
       .select("marketing_policy_version")
       .eq("id", memberId)
       .maybeSingle(),
+    countActivePushSubscriptions(memberId),
   ]);
 
   if (memberResult.error) {
@@ -130,6 +145,7 @@ export async function getMemberNotificationPreferences(memberId: string) {
 
   return {
     ...preferences,
+    enabled: preferences.enabled && activePushSubscriptionCount > 0,
     marketingEnabled: Boolean(
       activeMarketingPolicy &&
         memberResult.data?.marketing_policy_version === activeMarketingPolicy.version,
@@ -146,15 +162,25 @@ export async function updateMemberNotificationPreferences(
   },
 ) {
   if (useMockPreferences) {
+    const current = getMockPreferences(memberId);
+    const hasPushDevice = (mockPushDeviceStore.get(memberId) ?? []).length > 0;
     const next = {
-      ...getMockPreferences(memberId),
+      ...current,
       ...value,
+      enabled: (value.enabled ?? current.enabled) && hasPushDevice,
     };
     mockPreferenceStore.set(memberId, next);
     return next;
   }
 
-  const preferences = await upsertMemberPushPreferences(memberId, value);
+  const activePushSubscriptionCount = await countActivePushSubscriptions(memberId);
+  const currentPreferences = await getMemberPushPreferences(memberId);
+  const preferences = await upsertMemberPushPreferences(memberId, {
+    ...value,
+    enabled:
+      (value.enabled ?? currentPreferences.enabled) &&
+      activePushSubscriptionCount > 0,
+  });
   const activeMarketingPolicy = await getPolicyDocumentByKind("marketing");
 
   await recordMarketingPolicyConsent({

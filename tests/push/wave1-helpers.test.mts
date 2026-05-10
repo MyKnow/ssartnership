@@ -177,6 +177,7 @@ test("push settings status derives stable labels and tones", async () => {
       iosNeedsInstall: false,
       isReceivingOnThisDevice: false,
       accountEnabled: false,
+      hasAnyPushDevice: false,
     }),
     { label: "서버 설정 필요", tone: "warn" },
   );
@@ -188,7 +189,20 @@ test("push settings status derives stable labels and tones", async () => {
       iosNeedsInstall: false,
       isReceivingOnThisDevice: true,
       accountEnabled: true,
+      hasAnyPushDevice: true,
     }),
     { label: "알림 수신 중", tone: "success" },
+  );
+
+  assert.equal(
+    derivePushSettingsStatus({
+      configured: true,
+      supported: true,
+      iosNeedsInstall: false,
+      isReceivingOnThisDevice: false,
+      accountEnabled: true,
+      hasAnyPushDevice: false,
+    }),
+    null,
   );
 });

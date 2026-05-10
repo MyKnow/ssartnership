@@ -13,11 +13,16 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
 import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
-import { isImageFile, setInputFiles } from "@/components/admin/partner-media-editor/utils";
+import {
+  createWebpFile,
+  isImageFile,
+  setInputFiles,
+} from "@/components/admin/partner-media-editor/utils";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
   PROMOTION_AUDIENCE_OPTIONS,
@@ -27,6 +32,11 @@ import type { ManagedPromotionSlide } from "@/lib/promotions/events";
 import { cn } from "@/lib/cn";
 
 const PROMOTION_ASPECT_RATIO = 21 / 9;
+const PROMOTION_ASPECT_RATIO_TOLERANCE = 0.01;
+const PROMOTION_OUTPUT_SIZE = {
+  width: 2100,
+  height: 900,
+} as const;
 
 type SlideDraft = {
   id: string;
@@ -45,6 +55,11 @@ type SlideDraft = {
 type PendingCrop = {
   slideId: string;
   sourceUrl: string;
+};
+
+export type PromotionEventPageOption = {
+  href: string;
+  label: string;
 };
 
 function createPlaceholderImage(title: string) {
@@ -106,6 +121,59 @@ function getFileInputName(id: string) {
   return `slide_image_${id}`;
 }
 
+function loadImageElement(sourceUrl: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
+    image.src = sourceUrl;
+  });
+}
+
+function isPromotionAspectRatio(width: number, height: number) {
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+  return Math.abs(width / height - PROMOTION_ASPECT_RATIO) <= PROMOTION_ASPECT_RATIO_TOLERANCE;
+}
+
+async function createPromotionWebpFileFromImage(image: HTMLImageElement, outputName: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = PROMOTION_OUTPUT_SIZE.width;
+  canvas.height = PROMOTION_OUTPUT_SIZE.height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("이미지 처리에 실패했습니다.");
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(
+    image,
+    0,
+    0,
+    image.naturalWidth,
+    image.naturalHeight,
+    0,
+    0,
+    PROMOTION_OUTPUT_SIZE.width,
+    PROMOTION_OUTPUT_SIZE.height,
+  );
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (!nextBlob) {
+        reject(new Error("이미지 변환에 실패했습니다."));
+        return;
+      }
+      resolve(nextBlob);
+    }, "image/webp", 0.78);
+  });
+
+  return createWebpFile(blob, outputName);
+}
+
 function SlideBadge({
   children,
   active = false,
@@ -148,9 +216,11 @@ function toggleAudience(
 
 export default function PromotionCarouselEditor({
   initialSlides,
+  eventPageOptions,
   saveAction,
 }: {
   initialSlides: ManagedPromotionSlide[];
+  eventPageOptions: PromotionEventPageOption[];
   saveAction: (formData: FormData) => void | Promise<void>;
 }) {
   const [slides, setSlides] = useState<SlideDraft[]>(
@@ -177,7 +247,7 @@ export default function PromotionCarouselEditor({
   const previewSlides = useMemo(
     () =>
       slides
-        .filter((slide) => slide.imageSrc)
+        .filter((slide) => slide.isActive && slide.imageSrc)
         .map((slide) => ({
           id: slide.id,
           title: slide.title || "광고 카드",
@@ -326,7 +396,7 @@ export default function PromotionCarouselEditor({
     });
   }
 
-  function onFileChange(id: string, file: File | null) {
+  async function onFileChange(id: string, file: File | null) {
     if (!file) {
       return;
     }
@@ -335,7 +405,32 @@ export default function PromotionCarouselEditor({
       return;
     }
     const sourceUrl = URL.createObjectURL(file);
-    setPendingCrop({ slideId: id, sourceUrl });
+    try {
+      const image = await loadImageElement(sourceUrl);
+      if (isPromotionAspectRatio(image.naturalWidth, image.naturalHeight)) {
+        const normalizedFile = await createPromotionWebpFileFromImage(image, `${id}-slide.webp`);
+        const nextUrl = URL.createObjectURL(normalizedFile);
+        const input = fileInputRefs.current.get(id) ?? null;
+        setInputFiles(input, [normalizedFile]);
+        updateSlide(id, (slide) => ({
+          ...slide,
+          imageSrc: nextUrl,
+          hasImageFile: true,
+          imageAlt: slide.imageAlt || slide.title || "광고 카드 이미지",
+        }));
+        URL.revokeObjectURL(sourceUrl);
+        setError(null);
+        return;
+      }
+      setPendingCrop({ slideId: id, sourceUrl });
+    } catch {
+      URL.revokeObjectURL(sourceUrl);
+      const input = fileInputRefs.current.get(id) ?? null;
+      if (input) {
+        input.value = "";
+      }
+      setError("이미지를 불러올 수 없습니다. 다른 파일을 사용해 주세요.");
+    }
   }
 
   function applyCroppedImage(file: File) {
@@ -398,7 +493,13 @@ export default function PromotionCarouselEditor({
             홈에서 보기
           </Button>
         </div>
-        <PromotionCarousel slides={previewSlides} className="mt-0" />
+        {previewSlides.length > 0 ? (
+          <PromotionCarousel slides={previewSlides} className="mt-0" />
+        ) : (
+          <div className="rounded-overlay border border-dashed border-border bg-surface-inset px-4 py-10 text-center text-sm font-medium text-muted-foreground">
+            활성 광고 카드가 없습니다. 카드를 활성화하면 실제 홈 배너와 같은 기준으로 미리볼 수 있습니다.
+          </div>
+        )}
       </Card>
 
       <form ref={formRef} action={saveAction} className="grid gap-6">
@@ -533,7 +634,7 @@ export default function PromotionCarouselEditor({
                       <img
                         src={previewSrc}
                         alt={slide.imageAlt || slide.title || "광고 카드 이미지"}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                         draggable={false}
                       />
                     </div>
@@ -562,15 +663,46 @@ export default function PromotionCarouselEditor({
                         accept="image/*"
                         name={getFileInputName(slide.id)}
                         className="hidden"
-                        onChange={(event) => onFileChange(slide.id, event.target.files?.[0] ?? null)}
+                        onChange={(event) => {
+                          void onFileChange(slide.id, event.target.files?.[0] ?? null);
+                        }}
                       />
                     </div>
                     <p className="text-xs leading-6 text-muted-foreground">
-                      21:9 이미지를 업로드한 뒤 팝업에서 위치를 조정하면 캐러셀에서 즉시 반영됩니다.
+                      21:9 이미지는 원본 그대로 반영하고, 비율이 다르면 팝업에서 위치를 조정합니다.
                     </p>
                   </div>
 
                   <div className="grid gap-4 rounded-panel border border-border/70 bg-surface-inset p-4">
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium text-foreground" htmlFor={`event-page-${slide.id}`}>
+                        이벤트 페이지에서 선택
+                      </label>
+                      <Select
+                        id={`event-page-${slide.id}`}
+                        value={eventPageOptions.some((option) => option.href === slide.href) ? slide.href : ""}
+                        disabled={!editable || eventPageOptions.length === 0}
+                        onChange={(event) => {
+                          const href = event.target.value;
+                          if (!href) {
+                            return;
+                          }
+                          updateSlide(slide.id, (current) => ({ ...current, href }));
+                        }}
+                      >
+                        <option value="">
+                          {eventPageOptions.length > 0
+                            ? "활성 이벤트 페이지 선택"
+                            : "활성 이벤트 페이지 없음"}
+                        </option>
+                        {eventPageOptions.map((option) => (
+                          <option key={option.href} value={option.href}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
                     <label className="grid gap-2 text-sm font-medium text-foreground">
                       연결 페이지
                       <Input
@@ -582,6 +714,9 @@ export default function PromotionCarouselEditor({
                         disabled={!editable}
                         className={hrefInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
                       />
+                      <span className="text-xs font-normal leading-5 text-muted-foreground">
+                        직접 입력하거나 위의 활성 이벤트 페이지 목록에서 선택할 수 있습니다.
+                      </span>
                     </label>
 
                     <div className="grid gap-3">

@@ -130,7 +130,7 @@ export default function PromotionCarousel({
                   <img
                     src={slide.imageSrc}
                     alt={slide.imageAlt}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     draggable={false}
                   />
                 ) : (
@@ -141,7 +141,7 @@ export default function PromotionCarousel({
                     sizes="(min-width: 1280px) 1084px, calc(100vw - 32px)"
                     priority={index === 0}
                     unoptimized={isRemoteImageSrc(slide.imageSrc)}
-                    className="object-cover"
+                    className="object-contain"
                   />
                 )}
               </div>
