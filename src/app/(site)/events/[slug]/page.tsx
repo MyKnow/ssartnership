@@ -145,6 +145,7 @@ export default async function EventPage({
           <EventLanding
             campaign={campaign}
             summary={summary}
+            showHeroImage={campaign.slug !== "signup-reward"}
           />
           {registration?.source !== "database" || !registration.isActive ? (
             <Card tone="muted" padding="md" className="mt-5">

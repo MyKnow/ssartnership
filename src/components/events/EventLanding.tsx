@@ -24,16 +24,18 @@ const conditionIcons: Record<EventConditionKey, typeof UserPlusIcon> = {
 export default function EventLanding({
   campaign,
   summary,
+  showHeroImage = true,
 }: {
   campaign: EventCampaign;
   summary: EventRewardSummary;
+  showHeroImage?: boolean;
 }) {
   const summaryMap = new Map(summary.conditions.map((condition) => [condition.key, condition]));
 
   return (
     <div className="space-y-5">
       <Card tone="hero" padding="none" className="overflow-hidden">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className={showHeroImage ? "grid gap-0 lg:grid-cols-[minmax(0,1fr)_24rem]" : "grid gap-0"}>
           <div className="p-6 sm:p-8 lg:p-10">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] opacity-80">
               Event
@@ -46,16 +48,18 @@ export default function EventLanding({
             </p>
             <p className="mt-4 text-sm font-semibold opacity-90">{campaign.periodLabel}</p>
           </div>
-          <div className="relative min-h-48 border-t border-white/10 bg-black/15 lg:border-l lg:border-t-0">
-            <Image
-              src={campaign.heroImageSrc}
-              alt={campaign.heroImageAlt}
-              fill
-              priority
-              sizes="(min-width: 1024px) 384px, calc(100vw - 32px)"
-              className="object-cover"
-            />
-          </div>
+          {showHeroImage ? (
+            <div className="relative min-h-48 border-t border-white/10 bg-black/15 lg:border-l lg:border-t-0">
+              <Image
+                src={campaign.heroImageSrc}
+                alt={campaign.heroImageAlt}
+                fill
+                priority
+                sizes="(min-width: 1024px) 384px, calc(100vw - 32px)"
+                className="object-cover"
+              />
+            </div>
+          ) : null}
         </div>
       </Card>
 
