@@ -96,7 +96,7 @@ export default function MediaField({
           </div>
         </div>
 
-        {!hasItems ? (
+        {multiple || !hasItems ? (
           <div
             className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-2.5"
             onDragOver={(event) => event.preventDefault()}
@@ -141,7 +141,7 @@ export default function MediaField({
                   onClick={() => fileInputRef.current?.click()}
                   className="w-auto"
                 >
-                  파일
+                  {multiple ? "파일/갤러리" : "파일"}
                 </Button>
               </div>
             </div>
@@ -153,15 +153,20 @@ export default function MediaField({
         ) : null}
 
         {hasItems ? (
-          <div className={cn("grid gap-3", multiple ? "sm:grid-cols-2" : null)}>
+          <div
+            className={cn(
+              "grid gap-3",
+              multiple ? "grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" : null,
+            )}
+          >
             {items.map((item, index) =>
               multiple ? (
                 <div
                   key={item.id}
-                  className="grid min-w-0 gap-2 rounded-2xl border border-border bg-surface-inset p-2"
+                  className="grid min-w-0 gap-1.5 rounded-[1.15rem] border border-border bg-surface-inset p-1.5"
                 >
                   <div
-                    className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
+                    className="relative overflow-hidden rounded-[0.95rem] border border-border bg-surface-muted"
                     style={{ aspectRatio: PARTNER_GALLERY_ASPECT_RATIO }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- preview may use blob/object URL */}
@@ -182,13 +187,6 @@ export default function MediaField({
                     </Badge>
                   </div>
 
-                  <MediaCardToolbar
-                    multiple
-                    onAddUrl={(url) => handleAddUrl(url, index + 1)}
-                    onAddUrls={(urls) => handleAddUrls(urls, index + 1)}
-                    onAddFiles={(files) => ingestFiles(files, index + 1)}
-                  />
-
                   <div className="flex flex-wrap items-center justify-end gap-1">
                     <Button
                       type="button"
@@ -197,7 +195,7 @@ export default function MediaField({
                       onClick={() => moveItem(index, -1)}
                       ariaLabel="위로"
                       title="위로"
-                      className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
+                      className="h-9 w-9 min-h-9 min-w-9 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
                     >
                       <ArrowUpIcon className="h-4 w-4" />
                     </Button>
@@ -208,7 +206,7 @@ export default function MediaField({
                       onClick={() => moveItem(index, 1)}
                       ariaLabel="아래로"
                       title="아래로"
-                      className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
+                      className="h-9 w-9 min-h-9 min-w-9 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
                     >
                       <ArrowDownIcon className="h-4 w-4" />
                     </Button>
@@ -219,7 +217,7 @@ export default function MediaField({
                       onClick={() => replaceItemAt(index)}
                       ariaLabel="구도 수정"
                       title="구도 수정"
-                      className="h-10 w-10 min-h-10 min-w-10"
+                      className="h-9 w-9 min-h-9 min-w-9"
                     >
                       <PencilIcon className="h-4 w-4" />
                     </Button>
@@ -230,7 +228,7 @@ export default function MediaField({
                       onClick={() => removeItem(index)}
                       ariaLabel="삭제"
                       title="삭제"
-                      className="h-10 w-10 min-h-10 min-w-10"
+                      className="h-9 w-9 min-h-9 min-w-9"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </Button>
