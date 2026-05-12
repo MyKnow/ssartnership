@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getRequestLogContext,
-  logProductEvent,
+  scheduleProductEventLog,
   resolveCurrentActor,
 } from "@/lib/activity-logs";
 import { BUG_REPORT_EMAIL } from "@/lib/site";
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     });
 
     const actor = await resolveCurrentActor();
-    await logProductEvent({
+    scheduleProductEventLog({
       ...context,
       eventName: "suggest_submit",
       actorType: actor.actorType,
