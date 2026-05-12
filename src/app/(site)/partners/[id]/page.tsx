@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import SiteHeader from "@/components/SiteHeader";
@@ -14,8 +15,10 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
-import PartnerReviewSection from "@/components/partner-reviews/PartnerReviewSection";
 import PartnerDetailSummaryCard from "./_page/PartnerDetailSummaryCard";
+import PartnerDetailReviews, {
+  PartnerDetailReviewsFallback,
+} from "./_page/PartnerDetailReviews";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -151,12 +154,6 @@ export default async function PartnerDetailPage({
     partnerJsonLd,
     carouselKey,
     metrics,
-    reviewSummary,
-    initialReviews,
-    initialReviewSort,
-    initialReviewOffset,
-    initialReviewHasMore,
-    canWriteReview,
     isFavorited,
     currentUserId,
   } = pageData;
@@ -231,6 +228,7 @@ export default async function PartnerDetailPage({
                 images={partner.images ?? []}
                 name={partner.name}
                 matchHeightSelector="[data-partner-detail-summary]"
+                priority
               />
             </div>
 
@@ -243,15 +241,12 @@ export default async function PartnerDetailPage({
               partnerId={partner.id}
             />
 
-            <PartnerReviewSection
-              partnerId={partner.id}
-              canWriteReview={canWriteReview}
-              initialSummary={reviewSummary}
-              initialReviews={initialReviews}
-              initialSort={initialReviewSort}
-              initialOffset={initialReviewOffset}
-              initialHasMore={initialReviewHasMore}
-            />
+            <Suspense fallback={<PartnerDetailReviewsFallback />}>
+              <PartnerDetailReviews
+                partnerId={partner.id}
+                currentUserId={currentUserId}
+              />
+            </Suspense>
           </div>
         </Container>
       </main>

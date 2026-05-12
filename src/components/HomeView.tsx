@@ -31,6 +31,8 @@ import {
 
 const APPLIES_TO_FILTER_STORAGE_KEY = "home:partner-applies-to-filter";
 const PARTNER_GRID_TEMPLATE_COLUMNS = "repeat(auto-fit, minmax(min(100%, 22rem), 1fr))";
+const INITIAL_PARTNER_CARD_COUNT = 12;
+const PARTNER_CARD_INCREMENT = 12;
 
 export default function HomeView({
   categories,
@@ -70,6 +72,10 @@ export default function HomeView({
   );
   const [searchValue, setSearchValue] = useState("");
   const [sortValue, setSortValue] = useState<PartnerSortOption>("popular");
+  const [visibleCardState, setVisibleCardState] = useState({
+    key: "",
+    limit: INITIAL_PARTNER_CARD_COUNT,
+  });
   const [localPopularityById, setLocalPopularityById] = useState<
     Record<string, PartnerPopularityMetrics | undefined>
   >(partnerPopularityById ?? {});
@@ -102,7 +108,14 @@ export default function HomeView({
     });
   }, [activeCategory, appliesToFilter, deferredSearchValue, normalizedPartners, sortValue]);
 
-  const displayPartners = filteredPartners.display;
+  const visibleCardKey = `${activeCategory}:${appliesToFilter}:${deferredSearchValue}:${sortValue}`;
+  const visibleCardLimit =
+    visibleCardState.key === visibleCardKey
+      ? visibleCardState.limit
+      : INITIAL_PARTNER_CARD_COUNT;
+  const displayPartners = filteredPartners.display.slice(0, visibleCardLimit);
+  const hasMoreDisplayPartners =
+    filteredPartners.display.length > displayPartners.length;
 
   const visibleResultCount = filteredPartners.visible.length;
 
@@ -262,27 +275,47 @@ export default function HomeView({
               />
             </div>
           ) : (
-            <div
-              className="grid gap-4 xl:gap-5"
-              style={{ gridTemplateColumns: PARTNER_GRID_TEMPLATE_COLUMNS }}
-              data-testid="partner-grid"
-            >
-              {displayPartners.map((partner) => (
-                <PartnerCardView
-                  key={partner.id}
-                  partner={partner}
-                  categoryLabel={
-                    categoryMap.get(partner.category)?.label ?? "알 수 없음"
-                  }
-                  categoryColor={categoryMap.get(partner.category)?.color}
-                  viewerAuthenticated={viewerAuthenticated}
-                  currentUserId={currentUserId}
-                  isFavorited={partnerFavoriteStateById?.[partner.id] ?? false}
-                  metrics={localPopularityById?.[partner.id]}
-                  onCategoryClick={handleCategoryChange}
-                  onFavoriteChange={handleFavoriteChange}
-                />
-              ))}
+            <div className="grid gap-6">
+              <div
+                className="grid gap-4 xl:gap-5"
+                style={{ gridTemplateColumns: PARTNER_GRID_TEMPLATE_COLUMNS }}
+                data-testid="partner-grid"
+              >
+                {displayPartners.map((partner) => (
+                  <PartnerCardView
+                    key={partner.id}
+                    partner={partner}
+                    categoryLabel={
+                      categoryMap.get(partner.category)?.label ?? "알 수 없음"
+                    }
+                    categoryColor={categoryMap.get(partner.category)?.color}
+                    viewerAuthenticated={viewerAuthenticated}
+                    currentUserId={currentUserId}
+                    isFavorited={partnerFavoriteStateById?.[partner.id] ?? false}
+                    metrics={localPopularityById?.[partner.id]}
+                    onCategoryClick={handleCategoryChange}
+                    onFavoriteChange={handleFavoriteChange}
+                  />
+                ))}
+              </div>
+              {hasMoreDisplayPartners ? (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-surface-control px-5 text-sm font-semibold text-foreground shadow-flat transition hover:border-strong hover:bg-surface-elevated"
+                    onClick={() => {
+                      startTransition(() => {
+                        setVisibleCardState({
+                          key: visibleCardKey,
+                          limit: visibleCardLimit + PARTNER_CARD_INCREMENT,
+                        });
+                      });
+                    }}
+                  >
+                    더 보기
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
         </section>

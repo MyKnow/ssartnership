@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import { cache } from "react";
 import { getCachedImageUrl } from "@/lib/image-cache";
-import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
 import {
   getBenefitUseAction,
@@ -10,11 +9,9 @@ import {
   normalizeBenefitUseInquiry,
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
-import type { PartnerReviewListResult, PartnerReviewSort, PartnerReviewSummary } from "@/lib/partner-reviews";
 import {
   partnerFavoriteRepository,
   partnerRepository,
-  partnerReviewRepository,
 } from "@/lib/repositories";
 import { buildSiteUrl } from "@/lib/seo";
 import {
@@ -42,6 +39,15 @@ const getPartnerByIdCached = cache(
 const getPartnerByIdRawCached = cache(async (id: string) =>
   partnerRepository.getPartnerByIdRaw(id),
 );
+
+const getFavoriteCountsSafe = cache(async (partnerIds: string[]) => {
+  try {
+    return await partnerFavoriteRepository.getFavoriteCounts(partnerIds);
+  } catch (error) {
+    console.error("[partner-detail] favorite count fetch failed", error);
+    return new Map<string, number>();
+  }
+});
 
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
@@ -116,12 +122,6 @@ export type PartnerDetailPageData = {
   partnerJsonLd: Record<string, unknown>;
   carouselKey: string;
   metrics: PartnerPortalServiceMetrics;
-  reviewSummary: PartnerReviewSummary;
-  initialReviews: PartnerReviewListResult["items"];
-  initialReviewSort: PartnerReviewSort;
-  initialReviewOffset: number;
-  initialReviewHasMore: boolean;
-  canWriteReview: boolean;
   currentUserId: string | null;
   isFavorited: boolean;
 };
@@ -137,10 +137,11 @@ export async function getPartnerDetailPageData(
   currentUserId?: string | null,
   viewerAudience?: PartnerAudienceKey | null,
 ): Promise<PartnerDetailPageData | PartnerDetailAccessGateData | null> {
-  const [categories, partner, favoriteIds] = await Promise.all([
+  const [categories, partner, favoriteIds, favoriteCounts] = await Promise.all([
     getCategoriesCached(),
     getPartnerByIdCached(rawId, authenticated, viewerAudience),
     currentUserId ? partnerFavoriteRepository.getMemberFavoritePartnerIds(currentUserId, [rawId]) : Promise.resolve(new Set<string>()),
+    getFavoriteCountsSafe([rawId]),
   ]);
 
   if (!partner) {
@@ -155,15 +156,6 @@ export async function getPartnerDetailPageData(
     }
     return null;
   }
-
-  const initialReviewData = await partnerReviewRepository.listPartnerReviews({
-    partnerId: rawId,
-    currentUserId,
-    sort: "latest",
-    offset: 0,
-    limit: 10,
-    includeHidden: false,
-  });
 
   const category = categories.find((item) => item.key === partner.category);
   const categoryLabel = category?.label ?? "알 수 없음";
@@ -198,10 +190,10 @@ export async function getPartnerDetailPageData(
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
   const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
-  const partnerMetricsResult = await getAdminPartnerMetrics([rawId]);
-  const metrics =
-    partnerMetricsResult.metricsByPartnerId.get(rawId) ??
-    createEmptyPartnerServiceMetrics();
+  const metrics = {
+    ...createEmptyPartnerServiceMetrics(),
+    favoriteCount: favoriteCounts.get(rawId) ?? 0,
+  };
 
   return {
     kind: "detail",
@@ -252,12 +244,6 @@ export async function getPartnerDetailPageData(
     }),
     carouselKey: `${partner.id}:${(partner.images ?? []).join("|")}`,
     metrics,
-    reviewSummary: initialReviewData.summary,
-    initialReviews: initialReviewData.items,
-    initialReviewSort: "latest",
-    initialReviewOffset: initialReviewData.nextOffset,
-    initialReviewHasMore: initialReviewData.hasMore,
-    canWriteReview: Boolean(currentUserId),
     currentUserId: currentUserId ?? null,
     isFavorited: favoriteIds.has(rawId),
   };

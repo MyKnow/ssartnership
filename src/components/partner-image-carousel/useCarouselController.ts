@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getCachedImageUrl,
-  isCachedImageUrlPreloaded,
-  preloadCachedImageUrls,
+  warmCachedImageUrls,
 } from "@/lib/image-cache";
 import {
   clampCarouselZoom,
@@ -41,12 +40,6 @@ export function useCarouselController({
   const thumbStripRef = useRef<HTMLDivElement | null>(null);
   const [thumbPlacement, setThumbPlacement] =
     useState<CarouselThumbPlacement>("side");
-  const [isPreloaded, setIsPreloaded] = useState(
-    () =>
-      cachedImages.length === 0 ||
-      cachedImages.every((url) => isCachedImageUrlPreloaded(url)),
-  );
-
   useEffect(() => {
     if (typeof document === "undefined") {
       return;
@@ -65,27 +58,15 @@ export function useCarouselController({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!hasImages) {
-      return;
-    }
-    if (cachedImages.every((url) => isCachedImageUrlPreloaded(url))) {
+    if (!hasImages || cachedImages.length <= 1) {
       return;
     }
 
-    let cancelled = false;
-    void preloadCachedImageUrls(cachedImages).then(() => {
-      if (!cancelled) {
-        setIsPreloaded(true);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    warmCachedImageUrls(cachedImages.slice(1));
   }, [cachedImages, hasImages]);
 
   useEffect(() => {
-    if (!hasImages || !isPreloaded || isOpen || imageCount <= 1) {
+    if (!hasImages || isOpen || imageCount <= 1) {
       return;
     }
     if (!window.matchMedia("(min-width: 1280px) and (pointer: fine)").matches) {
@@ -99,7 +80,7 @@ export function useCarouselController({
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [hasImages, imageCount, isOpen, isPreloaded]);
+  }, [hasImages, imageCount, isOpen]);
 
   useEffect(() => {
     const thumb = activeThumbRef.current;
@@ -242,7 +223,7 @@ export function useCarouselController({
     activeThumbRef,
     thumbStripRef,
     thumbPlacement,
-    isPreloaded,
+    isPreloaded: true,
     isOpen,
     zoom,
     offset,
