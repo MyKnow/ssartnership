@@ -67,6 +67,7 @@ main
 - Do not close the Issue immediately after the first partial PR lands in `dev`.
 - Close the Issue after all related work is merged into `dev`, Preview/integration verification passes, and the change is either promoted to `main` or explicitly accepted as Preview-only.
 - If work has already started without an Issue, recover immediately: create the Issue, keep the current typed branch, mention the sequencing recovery in the PR body, and tighten this workflow documentation in the same PR.
+- If the user pastes a `chatgpt-codex-connector` or Codex Review comment, handle it as a review-response task without waiting for another instruction: verify the cited code path, apply the fix when the finding is valid, run focused verification, stage only the review-response files, and print the proposed Korean conventional commit message. If the finding is invalid, respond with the evidence and leave code unchanged.
 
 **PR base selection:**
 - Work PR base: `dev`
@@ -154,6 +155,7 @@ After finishing each requested work unit in this repository:
 - Leave unrelated dirty files unstaged.
 - Print the proposed Korean conventional commit message in a fenced code block so the user can review it before commit/release.
 - If the work unit contains multiple meaningful changes, use a detailed commit message format: Korean conventional subject plus a short Korean bullet-list body.
+- Pasted Codex Review feedback counts as a requested work unit: address valid findings through code and verification, then stage the review-response scope and provide the commit message.
 
 ### Conventional Commits Format
 

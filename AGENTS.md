@@ -131,5 +131,6 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - Use `Closes #<issue-number>` only when a single PR fully resolves the Issue, or when the final promotion PR intentionally closes it.
 - PR descriptions must include Summary, Related Issue, Branch Flow, Changes, Test Plan, and Checklist.
 - Before opening or updating a PR, review the diff and run focused verification appropriate to the changed files.
+- When the user pastes a `chatgpt-codex-connector` or Codex Review comment, treat it as an actionable review request by default: inspect the cited code, decide whether the finding is valid, implement the fix when valid, run focused verification, stage the fix scope, and print the proposed commit message. If the review is not valid, explain the evidence and do not change code.
 - Close the Issue only after all related work is merged into `dev`, Preview/integration verification passes, and the change has either been promoted to `main` or explicitly accepted as Preview-only.
 - If implementation accidentally starts before Issue/PR setup, create the Issue immediately, document the sequencing miss in the PR, and update this workflow documentation in the same branch before review.
