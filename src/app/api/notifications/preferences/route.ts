@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
+import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { updateMemberNotificationPreferences } from "@/lib/notification-preferences";
 
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    await logProductEvent({
+    scheduleProductEventLog({
       ...context,
       eventName: "push_preference_change",
       actorType: "member",

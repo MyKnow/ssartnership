@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
+import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import {
   isMockNotificationPreferenceMode,
   upsertMockPushDevice,
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
           userAgent,
         });
 
-    await logProductEvent({
+    scheduleProductEventLog({
       ...context,
       eventName: "push_subscribe",
       actorType: "member",

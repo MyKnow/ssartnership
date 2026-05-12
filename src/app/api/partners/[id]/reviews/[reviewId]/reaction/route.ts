@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
+import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { ensureVisibleReviewPartner, getReviewMemberSession } from "../../_shared";
 
@@ -56,7 +56,7 @@ export async function PATCH(
       reaction,
     });
     if (reaction) {
-      await logProductEvent({
+      scheduleProductEventLog({
         ...getRequestLogContext(request),
         actorType: "member",
         actorId: session.userId,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
+import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import {
   deactivateAllMockPushDevices,
   deactivateMockPushDevice,
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
               subscriptionId: body?.subscriptionId ?? null,
             });
 
-    await logProductEvent({
+    scheduleProductEventLog({
       ...context,
       eventName:
         scope === "all" ? "push_unsubscribe_all" : "push_unsubscribe_device",
