@@ -5,6 +5,7 @@ import Image from "next/image";
 import { cn } from "@/lib/cn";
 import ThumbStrip from "@/components/partner-image-carousel/ThumbStrip";
 import { useCarouselController } from "@/components/partner-image-carousel/useCarouselController";
+import { isProxiedCachedImageUrl } from "@/lib/image-cache";
 
 const LightboxModal = dynamic(
   () => import("@/components/partner-image-carousel/LightboxModal"),
@@ -102,6 +103,7 @@ export default function PartnerImageCarousel({
             className="object-cover"
             loading={priority ? undefined : "eager"}
             priority={priority}
+            unoptimized={isProxiedCachedImageUrl(activeImage)}
           />
         ) : (
           placeholder
