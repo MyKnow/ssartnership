@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   startTransition,
   useDeferredValue,
   useEffect,
@@ -81,6 +82,7 @@ export default function HomeView({
   >(partnerPopularityById ?? {});
   const deferredSearchValue = useDeferredValue(searchValue);
   const searchTimeoutRef = useRef<number | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const lastLoggedSearchRef = useRef("");
   const { notify } = useToast();
 
@@ -118,6 +120,40 @@ export default function HomeView({
     filteredPartners.display.length > displayPartners.length;
 
   const visibleResultCount = filteredPartners.visible.length;
+
+  const loadMorePartners = useCallback(() => {
+    if (!hasMoreDisplayPartners) {
+      return;
+    }
+    startTransition(() => {
+      setVisibleCardState((prev) => ({
+        key: visibleCardKey,
+        limit:
+          prev.key === visibleCardKey
+            ? prev.limit + PARTNER_CARD_INCREMENT
+            : INITIAL_PARTNER_CARD_COUNT + PARTNER_CARD_INCREMENT,
+      }));
+    });
+  }, [hasMoreDisplayPartners, visibleCardKey]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !hasMoreDisplayPartners) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMorePartners();
+        }
+      },
+      { rootMargin: "480px 0px 640px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreDisplayPartners, loadMorePartners]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -299,21 +335,13 @@ export default function HomeView({
                 ))}
               </div>
               {hasMoreDisplayPartners ? (
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-border bg-surface-control px-5 text-sm font-semibold text-foreground shadow-flat transition hover:border-strong hover:bg-surface-elevated"
-                    onClick={() => {
-                      startTransition(() => {
-                        setVisibleCardState({
-                          key: visibleCardKey,
-                          limit: visibleCardLimit + PARTNER_CARD_INCREMENT,
-                        });
-                      });
-                    }}
-                  >
-                    더 보기
-                  </button>
+                <div
+                  ref={loadMoreSentinelRef}
+                  aria-hidden="true"
+                  className="h-10"
+                  data-testid="partner-infinite-scroll-sentinel"
+                >
+                  <span className="sr-only">다음 제휴처를 불러오는 중</span>
                 </div>
               ) : null}
             </div>
