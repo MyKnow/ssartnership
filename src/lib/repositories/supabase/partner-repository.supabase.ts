@@ -26,6 +26,7 @@ type PartnerRow = {
   created_at: string;
   updated_at?: string | null;
   location: string;
+  detail_description?: string | null;
   campus_slugs?: string[] | null;
   thumbnail?: string | null;
   map_url?: string | null;
@@ -61,7 +62,7 @@ type PublicCacheVersionRow = {
 };
 
 const PARTNER_SELECT_COLUMNS =
-  "id,name,category_id,created_at,updated_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,categories(key)";
+  "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,categories(key)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -192,6 +193,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
     benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
     createdAt: row.created_at,
     location: row.location,
+    detailDescription: row.detail_description ?? null,
     campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
     thumbnail,
     mapUrl: row.map_url ?? undefined,

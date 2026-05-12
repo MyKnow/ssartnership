@@ -42,6 +42,8 @@ const partners: Partner[] = [
     benefitVisibility: "eligible_only",
     createdAt: "2026-03-01T00:00:00.000Z",
     location: "서울 강남구 테헤란로 123, 4층",
+    detailDescription:
+      "교육장과 가까운 피트니스 센터로 퇴근 후에도 이용하기 좋고, 샤워실과 개인 락커를 함께 운영합니다.",
     campusSlugs: ["seoul"],
     mapUrl: "https://map.kakao.com/",
     benefitActionType: "certification",
@@ -63,6 +65,8 @@ const partners: Partner[] = [
     benefitVisibility: "public",
     createdAt: "2026-03-10T00:00:00.000Z",
     location: "서울 강남구 역삼로 45",
+    detailDescription:
+      "점심시간 회전이 빠른 국밥집으로 혼밥과 단체 식사 모두 이용하기 편합니다.",
     campusSlugs: ["seoul"],
     mapUrl: "https://map.naver.com/",
     benefitActionType: "external_link",
@@ -85,6 +89,8 @@ const partners: Partner[] = [
     benefitVisibility: "public",
     createdAt: "2026-02-15T00:00:00.000Z",
     location: "서울 강남구 봉은사로 12",
+    detailDescription:
+      "콘센트 좌석이 많아 짧은 회의나 과제 정리에 적합한 조용한 카페입니다.",
     campusSlugs: ["seoul"],
     mapUrl: "https://map.kakao.com/",
     benefitActionType: "external_link",
@@ -107,6 +113,8 @@ const partners: Partner[] = [
     benefitVisibility: "public",
     createdAt: "2026-01-01T00:00:00.000Z",
     location: "서울 강남구 언주로 88, 7층",
+    detailDescription:
+      "프로젝터와 화이트보드가 있는 협업 공간으로 팀 단위 스터디에 적합합니다.",
     campusSlugs: ["seoul"],
     mapUrl: "https://map.naver.com/",
     benefitActionType: "onsite",

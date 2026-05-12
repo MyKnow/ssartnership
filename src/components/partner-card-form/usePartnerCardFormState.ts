@@ -38,6 +38,7 @@ export function createPartnerCardFormState(
     categoryValue: categoryId ?? "",
     serviceModeValue: getPartnerServiceMode(partner.location),
     locationValue: partner.location ?? "",
+    detailDescriptionValue: partner.detailDescription ?? "",
     mapUrlValue: partner.mapUrl ?? "",
     benefitActionTypeValue: resolvePartnerBenefitActionType(partner),
     benefitActionLinkValue: partner.benefitActionLink ?? partner.reservationLink ?? "",
@@ -78,6 +79,9 @@ export default function usePartnerCardFormState({
   const [periodStartValue, setPeriodStartValue] = useState(defaults.periodStart);
   const [periodEndValue, setPeriodEndValue] = useState(defaults.periodEnd);
   const [locationValue, setLocationValue] = useState(defaults.locationValue);
+  const [detailDescriptionValue, setDetailDescriptionValue] = useState(
+    defaults.detailDescriptionValue,
+  );
   const [mapUrlValue, setMapUrlValue] = useState(defaults.mapUrlValue);
   const [benefitActionTypeValue, setBenefitActionTypeValue] = useState(
     defaults.benefitActionTypeValue,
@@ -143,6 +147,8 @@ export default function usePartnerCardFormState({
     setPeriodEndValue,
     locationValue,
     setLocationValue,
+    detailDescriptionValue,
+    setDetailDescriptionValue,
     mapUrlValue,
     setMapUrlValue,
     benefitActionTypeValue,

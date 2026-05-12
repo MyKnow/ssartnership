@@ -146,6 +146,17 @@ export default function PartnerDetailSummaryCard({
         </div>
 
         <div className="mt-6 grid gap-5">
+          {partner.detailDescription ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                브랜드 소개
+              </p>
+              <p className="mt-3 whitespace-pre-line rounded-3xl border border-border bg-surface-inset px-4 py-3 text-sm leading-7 text-muted-foreground">
+                {partner.detailDescription}
+              </p>
+            </div>
+          ) : null}
+
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               이용 조건

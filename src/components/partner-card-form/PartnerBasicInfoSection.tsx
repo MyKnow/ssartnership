@@ -9,6 +9,7 @@ import {
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
+import Textarea from "@/components/ui/Textarea";
 import SectionHeading from "@/components/ui/SectionHeading";
 import {
   PartnerGalleryField,
@@ -17,6 +18,7 @@ import {
 import FieldGroup from "@/components/partner-card-form/FieldGroup";
 import PartnerCampusSlugField from "@/components/partner-card-form/PartnerCampusSlugField";
 import { getPartnerCardInvalidClass } from "@/components/partner-card-form/usePartnerCardFormState";
+import { PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH } from "@/lib/partner-detail-description";
 import type {
   PartnerCardCategoryOption,
   PartnerCardFormField,
@@ -46,6 +48,7 @@ export default function PartnerBasicInfoSection({
     periodStartValue: string;
     periodEndValue: string;
     locationValue: string;
+    detailDescriptionValue: string;
     mapUrlValue: string;
     benefitActionTypeValue: PartnerBenefitActionType;
     benefitActionLinkValue: string;
@@ -61,6 +64,7 @@ export default function PartnerBasicInfoSection({
     setPeriodStartValue: (value: string) => void;
     setPeriodEndValue: (value: string) => void;
     setLocationValue: (value: string) => void;
+    setDetailDescriptionValue: (value: string) => void;
     setMapUrlValue: (value: string) => void;
     setBenefitActionTypeValue: (value: PartnerBenefitActionType) => void;
     setBenefitActionLinkValue: (value: string) => void;
@@ -306,6 +310,30 @@ export default function PartnerBasicInfoSection({
             aria-invalid={Boolean(fieldErrors?.inquiryLink) || undefined}
             className={getPartnerCardInvalidClass(Boolean(fieldErrors?.inquiryLink))}
           />
+        </FieldGroup>
+
+        <FieldGroup
+          label="상세 설명"
+          error={fieldErrors?.detailDescription}
+        >
+          <Textarea
+            name="detailDescription"
+            value={values.detailDescriptionValue}
+            onChange={(event) =>
+              setters.setDetailDescriptionValue(event.target.value)
+            }
+            autoFocus={focusField === "detailDescription"}
+            aria-invalid={Boolean(fieldErrors?.detailDescription) || undefined}
+            className={getPartnerCardInvalidClass(
+              Boolean(fieldErrors?.detailDescription),
+            )}
+            maxLength={PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH}
+            placeholder="구성원이 브랜드의 특징, 이용 흐름, 추천 상황을 이해할 수 있도록 설명해 주세요."
+          />
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            상세 페이지에만 표시됩니다. 최대{" "}
+            {PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH.toLocaleString()}자까지 입력할 수 있습니다.
+          </p>
         </FieldGroup>
 
         <PartnerGalleryField

@@ -44,6 +44,7 @@ const URL_INPUT_HEADERS = new Set([
 const SAMPLE_GUIDE_ROWS = [
   ["브랜드명", "필수", "사용자에게 노출되는 브랜드 이름"],
   ["카테고리", "필수", "카테고리 이름을 그대로 입력"],
+  ["상세 설명", "선택", "구성원이 브랜드를 이해할 수 있도록 1200자 이내로 입력"],
   ["혜택", "선택", "여러 개면 | 로 구분. 예: 아메리카노 할인|베이커리 할인"],
   ["이용 조건", "선택", "여러 개면 | 로 구분. 예: 싸트너십 인증|현장 제시"],
   ["태그", "선택", "여러 개면 | 로 구분. 예: 카페|역삼"],
@@ -214,6 +215,7 @@ function getInputExample(
     시작일: "2026-05-01",
     종료일: "2026-12-31",
     "문의 링크": "https://pf.kakao.com/_example",
+    "상세 설명": "교육장 근처에서 빠르게 방문하기 좋은 제휴 매장입니다.",
     협력사명: "샘플 협력사",
     담당자명: "홍길동",
     "담당자 이메일": "partner@example.com",
@@ -241,6 +243,7 @@ function getInputGuide(header: string, options: AdminPartnerFileTemplateOptions)
     시작일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     종료일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     "문의 링크": "선택. 문의 채널 URL을 입력합니다.",
+    "상세 설명": "선택. 상세 페이지에 표시할 브랜드 설명입니다. 1200자 이내로 입력합니다.",
     협력사명: "선택. 기존 협력사명과 정확히 같으면 자동 연결됩니다.",
     담당자명: "선택. 협력사 담당자 이름입니다.",
     "담당자 이메일": "선택. 이메일 형식으로 입력합니다.",
@@ -638,6 +641,7 @@ export async function parseAdminPartnerXlsxDraft({
   const periodStart = getValue(row, "시작일");
   const periodEnd = getValue(row, "종료일");
   const inquiryLinkRaw = getValue(row, "문의 링크");
+  const detailDescription = getValue(row, "상세 설명");
   const companyNameRaw = getValue(row, "협력사명");
   const company = resolveCompanyByName(companyNameRaw, companies);
   const location =
@@ -656,6 +660,9 @@ export async function parseAdminPartnerXlsxDraft({
   }
   if (!category) {
     errors.push("카테고리를 찾을 수 없습니다.");
+  }
+  if (detailDescription.length > 1200) {
+    errors.push("상세 설명은 1,200자 이내로 입력해 주세요.");
   }
   if (options.serviceMode === "offline" && !location) {
     errors.push("오프라인 서비스는 위치가 필요합니다.");
@@ -701,6 +708,7 @@ export async function parseAdminPartnerXlsxDraft({
         visibility: "public",
         benefitVisibility: "public",
         location,
+        detailDescription,
         campusSlugs: [],
         mapUrl: mapUrl ?? "",
         benefitActionType,

@@ -25,6 +25,7 @@ export type Partner = {
   benefitAccessStatus?: "login_required" | "not_eligible";
   createdAt: string;
   location: string;
+  detailDescription?: string | null;
   campusSlugs?: CampusSlug[];
   mapUrl?: string;
   benefitActionType?: PartnerBenefitActionType;

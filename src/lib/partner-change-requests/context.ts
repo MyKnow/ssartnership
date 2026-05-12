@@ -40,7 +40,7 @@ export async function getSupabaseRequestContext(
   const { data: partner, error } = await supabase
     .from("partners")
     .select(
-      "id,company_id,created_at,name,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
+      "id,company_id,created_at,name,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
     )
     .eq("id", partnerId)
     .maybeSingle();
@@ -77,6 +77,7 @@ export async function getSupabaseRequestContext(
     partnerId: row.id,
     partnerName: row.name,
     partnerLocation: row.location,
+    detailDescription: normalizeOptionalText(row.detail_description),
     partnerCreatedAt: row.created_at,
     categoryLabel: extractCategoryLabel(row.categories ?? null),
     categoryColor: extractCategoryColor(row.categories ?? null),
@@ -97,6 +98,7 @@ export async function getSupabaseRequestContext(
     reservationLink: sanitizePartnerLinkValue(row.reservation_link ?? undefined),
     inquiryLink: sanitizePartnerLinkValue(row.inquiry_link ?? undefined),
     currentConditions: normalizeTextList(row.conditions),
+    currentDetailDescription: normalizeOptionalText(row.detail_description),
     currentBenefits: normalizeTextList(row.benefits),
     currentAppliesTo: normalizeAudience(row.applies_to),
     currentCampusSlugs: resolvePartnerCampusSlugs({

@@ -35,6 +35,7 @@ export type AdminPartnerFileDraft = {
     visibility: PartnerVisibility;
     benefitVisibility: PartnerBenefitVisibility;
     location: string;
+    detailDescription: string;
     campusSlugs: CampusSlug[];
     mapUrl: string;
     benefitActionType: PartnerBenefitActionType;
@@ -96,6 +97,7 @@ const BASE_HEADERS = [
   "시작일",
   "종료일",
   "문의 링크",
+  "상세 설명",
   "협력사명",
   "담당자명",
   "담당자 이메일",
@@ -142,6 +144,7 @@ export function createPartnerFileDraftFormData(draft: AdminPartnerFileDraft) {
     partner.location === ONLINE_PARTNER_LOCATION ? "online" : "offline",
   );
   formData.set("location", partner.location);
+  formData.set("detailDescription", partner.detailDescription);
   for (const campusSlug of partner.campusSlugs) {
     formData.append("campusSlugs", campusSlug);
   }

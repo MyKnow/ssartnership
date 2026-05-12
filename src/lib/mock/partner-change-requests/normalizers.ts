@@ -95,6 +95,7 @@ export function normalizeServiceRecord(
     partnerName: service.partnerName,
     partnerCreatedAt: service.partnerCreatedAt,
     partnerLocation: service.partnerLocation,
+    detailDescription: normalizeOptionalText(service.detailDescription),
     categoryLabel: service.categoryLabel,
     categoryColor: service.categoryColor ?? null,
     visibility: service.visibility ?? "public",
@@ -139,6 +140,7 @@ export function normalizeRequestRecord(
     requestedByDisplayName: string | null;
     currentPartnerName?: string | null;
     currentPartnerLocation?: string | null;
+    currentDetailDescription?: string | null;
     currentMapUrl?: string | null;
     currentCampusSlugs?: string[] | null;
     currentConditions?: string[] | null;
@@ -153,6 +155,7 @@ export function normalizeRequestRecord(
     currentPeriodEnd?: string | null;
     requestedPartnerName?: string | null;
     requestedPartnerLocation?: string | null;
+    requestedDetailDescription?: string | null;
     requestedMapUrl?: string | null;
     requestedCampusSlugs?: string[] | null;
     requestedConditions?: string[] | null;
@@ -178,6 +181,10 @@ export function normalizeRequestRecord(
       : request.currentPartnerLocation;
   const currentMapUrlSource =
     request.currentMapUrl === undefined ? service?.mapUrl : request.currentMapUrl;
+  const currentDetailDescriptionSource =
+    request.currentDetailDescription === undefined
+      ? service?.detailDescription
+      : request.currentDetailDescription;
   const currentCampusSlugsSource =
     request.currentCampusSlugs === undefined
       ? service?.currentCampusSlugs
@@ -248,6 +255,10 @@ export function normalizeRequestRecord(
       : request.requestedPartnerLocation;
   const requestedMapUrlSource =
     request.requestedMapUrl === undefined ? currentMapUrlSource : request.requestedMapUrl;
+  const requestedDetailDescriptionSource =
+    request.requestedDetailDescription === undefined
+      ? currentDetailDescriptionSource
+      : request.requestedDetailDescription;
   const requestedCampusSlugsSource =
     request.requestedCampusSlugs === undefined
       ? currentCampusSlugsSource
@@ -277,6 +288,9 @@ export function normalizeRequestRecord(
         service?.partnerLocation ||
         request.partnerLocation,
     ),
+    currentDetailDescription: normalizeOptionalText(
+      currentDetailDescriptionSource,
+    ),
     currentMapUrl: sanitizeHttpUrl(currentMapUrlSource ?? undefined),
     currentCampusSlugs: normalizeCampusSlugs(currentCampusSlugsSource ?? []),
     currentConditions: normalizeTextList(currentConditionsSource),
@@ -300,6 +314,9 @@ export function normalizeRequestRecord(
         currentPartnerLocationSource ||
         service?.partnerLocation ||
         request.partnerLocation,
+    ),
+    requestedDetailDescription: normalizeOptionalText(
+      requestedDetailDescriptionSource,
     ),
     requestedMapUrl: sanitizeHttpUrl(requestedMapUrlSource ?? undefined),
     requestedCampusSlugs: normalizeCampusSlugs(requestedCampusSlugsSource ?? []),

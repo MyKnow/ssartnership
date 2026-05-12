@@ -14,6 +14,7 @@ import { validateFormCampusSlugSelection } from "@/lib/campuses";
 import { isPartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
+import { isPartnerDetailDescriptionValid } from "@/lib/partner-detail-description";
 import type {
   PartnerCardCategoryOption,
   PartnerCardCompanyOption,
@@ -76,6 +77,8 @@ export default function PartnerCardForm({
     setPeriodEndValue,
     locationValue,
     setLocationValue,
+    detailDescriptionValue,
+    setDetailDescriptionValue,
     mapUrlValue,
     setMapUrlValue,
     benefitActionTypeValue,
@@ -114,6 +117,7 @@ export default function PartnerCardForm({
     const location = String(formData.get("location") || "").trim();
     const benefitActionType = String(formData.get("benefitActionType") || "").trim();
     const benefitActionLink = String(formData.get("benefitActionLink") || "").trim();
+    const detailDescription = String(formData.get("detailDescription") || "").trim();
     const campusSlugSelection = validateFormCampusSlugSelection(
       formData.getAll("campusSlugs").map((item) => String(item).trim()),
       location,
@@ -131,21 +135,36 @@ export default function PartnerCardForm({
               message: partnerFormErrorMessages.partner_form_invalid_benefit_action_link,
             }
           : null;
+    const detailDescriptionError = !isPartnerDetailDescriptionValid(
+      detailDescription,
+    )
+      ? {
+          field: "detailDescription" as const,
+          message: partnerFormErrorMessages.partner_form_invalid_detail_description,
+        }
+      : null;
 
-    if (campusSlugSelection.ok && !benefitActionError) {
+    if (campusSlugSelection.ok && !benefitActionError && !detailDescriptionError) {
       setClientFieldErrors((current) => {
-        if (!current.campusSlugs && !current.benefitActionType && !current.benefitActionLink) {
+        if (
+          !current.campusSlugs &&
+          !current.benefitActionType &&
+          !current.benefitActionLink &&
+          !current.detailDescription
+        ) {
           return current;
         }
         const {
           campusSlugs: _campusSlugs,
           benefitActionType: _benefitActionType,
           benefitActionLink: _benefitActionLink,
+          detailDescription: _detailDescription,
           ...nextErrors
         } = current;
         void _campusSlugs;
         void _benefitActionType;
         void _benefitActionLink;
+        void _detailDescription;
         return nextErrors;
       });
       return;
@@ -162,6 +181,9 @@ export default function PartnerCardForm({
       ...(benefitActionError
         ? { [benefitActionError.field]: benefitActionError.message }
         : {}),
+      ...(detailDescriptionError
+        ? { detailDescription: detailDescriptionError.message }
+        : {}),
     }));
     if (!campusSlugSelection.ok) {
       event.currentTarget
@@ -170,7 +192,9 @@ export default function PartnerCardForm({
       return;
     }
     event.currentTarget
-      .querySelector<HTMLElement>(`[name="${benefitActionError?.field}"]`)
+      .querySelector<HTMLElement>(
+        `[name="${benefitActionError?.field ?? detailDescriptionError?.field}"]`,
+      )
       ?.focus();
   };
 
@@ -223,6 +247,7 @@ export default function PartnerCardForm({
               periodStartValue,
               periodEndValue,
               locationValue,
+              detailDescriptionValue,
               mapUrlValue,
               benefitActionTypeValue,
               benefitActionLinkValue,
@@ -238,6 +263,7 @@ export default function PartnerCardForm({
               setPeriodStartValue,
               setPeriodEndValue,
               setLocationValue,
+              setDetailDescriptionValue,
               setMapUrlValue,
               setBenefitActionTypeValue,
               setBenefitActionLinkValue,
