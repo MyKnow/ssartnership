@@ -12,6 +12,7 @@ import {
   getPartnerPlaceLinkLabel,
   getPartnerServiceMode,
 } from "@/lib/partner-service-mode";
+import { isProxiedCachedImageUrl } from "@/lib/image-cache";
 import type { Partner } from "@/lib/types";
 
 export default function PartnerDetailSummaryCard({
@@ -86,6 +87,7 @@ export default function PartnerDetailSummaryCard({
                 fill
                 sizes="(max-width: 640px) 40vw, 192px"
                 className="object-cover"
+                unoptimized={isProxiedCachedImageUrl(thumbnailUrl)}
               />
             </div>
           </div>

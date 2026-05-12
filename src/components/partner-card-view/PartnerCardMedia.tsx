@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { getBlurDataURL } from "@/lib/image-blur";
-import { getCachedImageUrl } from "@/lib/image-cache";
+import { getCachedImageUrl, isProxiedCachedImageUrl } from "@/lib/image-cache";
 
 export default function PartnerCardMedia({
   thumbnailUrl,
@@ -21,6 +21,7 @@ export default function PartnerCardMedia({
           className="object-cover"
           placeholder="blur"
           blurDataURL={blurDataURL}
+          unoptimized={isProxiedCachedImageUrl(cachedThumbnailUrl)}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-muted-foreground">
