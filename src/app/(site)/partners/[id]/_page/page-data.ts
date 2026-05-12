@@ -40,6 +40,15 @@ const getPartnerByIdRawCached = cache(async (id: string) =>
   partnerRepository.getPartnerByIdRaw(id),
 );
 
+const getFavoriteCountsSafe = cache(async (partnerIds: string[]) => {
+  try {
+    return await partnerFavoriteRepository.getFavoriteCounts(partnerIds);
+  } catch (error) {
+    console.error("[partner-detail] favorite count fetch failed", error);
+    return new Map<string, number>();
+  }
+});
+
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
     return color;
@@ -132,7 +141,7 @@ export async function getPartnerDetailPageData(
     getCategoriesCached(),
     getPartnerByIdCached(rawId, authenticated, viewerAudience),
     currentUserId ? partnerFavoriteRepository.getMemberFavoritePartnerIds(currentUserId, [rawId]) : Promise.resolve(new Set<string>()),
-    partnerFavoriteRepository.getFavoriteCounts([rawId]),
+    getFavoriteCountsSafe([rawId]),
   ]);
 
   if (!partner) {

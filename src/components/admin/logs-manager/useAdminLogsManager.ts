@@ -85,13 +85,19 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
 
   useEffect(() => {
     return () => {
-      if (searchDebounceRef.current) {
-        window.clearTimeout(searchDebounceRef.current);
-      }
+      clearPendingSearch();
     };
   }, []);
 
+  function clearPendingSearch() {
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+  }
+
   function syncPage(nextPage: number) {
+    clearPendingSearch();
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
     setPageInputValue(String(safePage));
     void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, page: safePage });
@@ -193,6 +199,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   }
 
   function handlePresetSelect(preset: LogRangePreset) {
+    clearPendingSearch();
     setActivePreset(preset);
     if (preset === 'custom') {
       fetchSequenceRef.current += 1;
@@ -203,6 +210,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   }
 
   function handleApplyCustomRange() {
+    clearPendingSearch();
     if (!customStartInput || !customEndInput) {
       notify('시작 시각과 종료 시각을 모두 입력해 주세요.');
       return;
@@ -223,6 +231,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   }
 
   function handleBucketSelect(bucket: LogChartBucket) {
+    clearPendingSearch();
     setActivePreset('custom');
     setCustomStartInput(toDateTimeLocalValue(bucket.start));
     setCustomEndInput(toDateTimeLocalValue(bucket.end));
@@ -348,10 +357,9 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     setCustomEndInput,
     setSearchValue: (value: string) => {
       setSearchValue(value);
-      if (searchDebounceRef.current) {
-        window.clearTimeout(searchDebounceRef.current);
-      }
+      clearPendingSearch();
       searchDebounceRef.current = window.setTimeout(() => {
+        searchDebounceRef.current = null;
         void fetchLogs({
           preset: activePreset,
           start: data.range.start,
@@ -362,27 +370,33 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       }, LOG_SEARCH_DEBOUNCE_MS);
     },
     setGroupFilter: (value: GroupFilter) => {
+      clearPendingSearch();
       setGroupFilter(value);
       void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, groupFilter: value });
     },
     setNameFilter: (value: string) => {
+      clearPendingSearch();
       setNameFilter(value);
       void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, nameFilter: value });
     },
     setActorFilter: (value: 'all' | string) => {
+      clearPendingSearch();
       setActorFilter(value);
       void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, actorFilter: value });
     },
     setStatusFilter: (value: StatusFilter) => {
+      clearPendingSearch();
       setStatusFilter(value);
       void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, statusFilter: value });
     },
     setSortFilter: (value: SortFilter) => {
+      clearPendingSearch();
       setSortFilter(value);
       void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, sortFilter: value });
     },
     setPageInputValue,
     setPageSize: (value: number) => {
+      clearPendingSearch();
       const nextPageSize = LOG_PAGE_SIZE_OPTIONS.includes(
         value as (typeof LOG_PAGE_SIZE_OPTIONS)[number],
       )
