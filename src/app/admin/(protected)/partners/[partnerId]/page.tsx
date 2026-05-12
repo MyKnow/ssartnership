@@ -101,7 +101,7 @@ export default async function AdminPartnerDetailPage({
     supabase
       .from("partners")
       .select(
-        "id,created_at,name,category_id,company_id,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
+        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
       )
       .eq("id", partnerId)
       .maybeSingle(),
@@ -289,6 +289,7 @@ export default async function AdminPartnerDetailPage({
                 visibility: partner.visibility,
                 benefitVisibility: partner.benefit_visibility ?? "public",
                 location: partner.location ?? "",
+                detailDescription: partner.detail_description ?? "",
                 campusSlugs: partner.campus_slugs ?? [],
                 mapUrl: partner.map_url ?? "",
                 benefitActionType: partner.benefit_action_type ?? undefined,

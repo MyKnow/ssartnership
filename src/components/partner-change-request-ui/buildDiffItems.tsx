@@ -57,6 +57,22 @@ export function buildPartnerChangeRequestDiffItems(
           ),
         }
       : null,
+    request.currentDetailDescription !== request.requestedDetailDescription
+      ? {
+          key: "detailDescription",
+          label: "상세 설명",
+          current: (
+            <DiffText tone="current">
+              {request.currentDetailDescription || "설명이 없습니다."}
+            </DiffText>
+          ),
+          requested: (
+            <DiffText tone="requested">
+              {request.requestedDetailDescription || "설명이 없습니다."}
+            </DiffText>
+          ),
+        }
+      : null,
     request.currentMapUrl !== request.requestedMapUrl
       ? {
           key: "mapUrl",

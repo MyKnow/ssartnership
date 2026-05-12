@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
+import Textarea from "@/components/ui/Textarea";
 import TokenChipField from "@/components/admin/TokenChipField";
 import PartnerCampusSlugField from "@/components/partner-card-form/PartnerCampusSlugField";
 import { PARTNER_AUDIENCE_OPTIONS } from "@/lib/partner-audience";
@@ -16,6 +17,7 @@ import type {
 } from "@/lib/partner-change-requests";
 import { cn } from "@/lib/cn";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
+import { PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH } from "@/lib/partner-detail-description";
 import { FieldGroup } from "./FieldGroup";
 import FloatingSubmitButton from "./FloatingSubmitButton";
 
@@ -98,6 +100,19 @@ export function ApprovalChangeForm({
                 name="mapUrl"
                 defaultValue={context.mapUrl ?? ""}
                 placeholder="https://map.naver.com/..."
+              />
+            </FieldGroup>
+          </div>
+          <div className="mt-4">
+            <FieldGroup
+              label="상세 설명"
+              note="구성원이 브랜드의 특징과 이용 흐름을 이해할 수 있도록 상세 페이지에 표시됩니다."
+            >
+              <Textarea
+                name="detailDescription"
+                defaultValue={context.detailDescription ?? ""}
+                maxLength={PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH}
+                placeholder="예: 교육장과 가까워 점심시간에 방문하기 좋고, 사전 예약 시 대기 시간을 줄일 수 있습니다."
               />
             </FieldGroup>
           </div>

@@ -47,6 +47,7 @@ create table if not exists partners (
   visibility text not null default 'public',
   benefit_visibility text not null default 'public',
   location text not null,
+  detail_description text,
   campus_slugs text[] not null default '{}',
   map_url text,
   benefit_action_type text not null default 'none',
@@ -96,6 +97,7 @@ $$;
 
 alter table partners add column if not exists visibility text not null default 'public';
 alter table partners add column if not exists benefit_visibility text not null default 'public';
+alter table partners add column if not exists detail_description text;
 alter table partners add column if not exists campus_slugs text[] not null default '{}';
 update partners
 set visibility = case lower(trim(coalesce(visibility, 'public')))
@@ -119,6 +121,12 @@ alter table partners alter column benefit_visibility set not null;
 alter table partners drop constraint if exists partners_benefit_visibility_check;
 alter table partners add constraint partners_benefit_visibility_check
   check (benefit_visibility in ('public', 'eligible_only'));
+alter table partners drop constraint if exists partners_detail_description_length_check;
+alter table partners add constraint partners_detail_description_length_check
+  check (
+    detail_description is null
+    or char_length(detail_description) <= 1200
+  );
 update partners
 set campus_slugs = public.infer_partner_campus_slugs(location)
 where cardinality(campus_slugs) = 0;
@@ -311,6 +319,7 @@ create table if not exists partner_change_requests (
   status text not null default 'pending',
   current_partner_name text not null default '',
   current_partner_location text not null default '',
+  current_detail_description text,
   current_map_url text,
   current_conditions text[] not null default '{}',
   current_benefits text[] not null default '{}',
@@ -325,6 +334,7 @@ create table if not exists partner_change_requests (
   current_period_end date,
   requested_partner_name text not null default '',
   requested_partner_location text not null default '',
+  requested_detail_description text,
   requested_map_url text,
   requested_conditions text[] not null default '{}',
   requested_benefits text[] not null default '{}',
@@ -349,11 +359,13 @@ create table if not exists partner_change_requests (
 
 alter table partner_change_requests add column if not exists current_partner_name text not null default '';
 alter table partner_change_requests add column if not exists current_partner_location text not null default '';
+alter table partner_change_requests add column if not exists current_detail_description text;
 alter table partner_change_requests add column if not exists current_map_url text;
 alter table partner_change_requests add column if not exists current_campus_slugs text[] not null default '{}';
 alter table partner_change_requests add column if not exists current_tags text[] not null default '{}';
 alter table partner_change_requests add column if not exists requested_partner_name text not null default '';
 alter table partner_change_requests add column if not exists requested_partner_location text not null default '';
+alter table partner_change_requests add column if not exists requested_detail_description text;
 alter table partner_change_requests add column if not exists requested_map_url text;
 alter table partner_change_requests add column if not exists requested_campus_slugs text[] not null default '{}';
 alter table partner_change_requests add column if not exists requested_tags text[] not null default '{}';
@@ -392,6 +404,18 @@ alter table partner_change_requests add constraint partner_change_requests_reque
   check (
     cardinality(requested_campus_slugs) > 0
     and requested_campus_slugs <@ array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
+  );
+alter table partner_change_requests drop constraint if exists partner_change_requests_current_detail_description_length_check;
+alter table partner_change_requests add constraint partner_change_requests_current_detail_description_length_check
+  check (
+    current_detail_description is null
+    or char_length(current_detail_description) <= 1200
+  );
+alter table partner_change_requests drop constraint if exists partner_change_requests_requested_detail_description_length_check;
+alter table partner_change_requests add constraint partner_change_requests_requested_detail_description_length_check
+  check (
+    requested_detail_description is null
+    or char_length(requested_detail_description) <= 1200
   );
 
 create table if not exists admin_login_attempts (

@@ -51,7 +51,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug),categories(id,label)",
+      "company_id,category_id,name,location,detail_description,campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -130,6 +130,7 @@ export async function updatePartnerAction(formData: FormData) {
         name: payload.name,
         category_id: payload.categoryId,
         location: payload.location,
+        detail_description: payload.detailDescription,
         campus_slugs: payload.campusSlugs,
         map_url: payload.mapUrl,
         benefit_action_type: payload.benefitActionType,
@@ -197,6 +198,19 @@ export async function updatePartnerAction(formData: FormData) {
       label: "위치/운영 형태",
       before: previousPartner.location ?? "",
       after: payload.location,
+    },
+    {
+      label: "상세 설명",
+      before: previousPartner.detail_description ?? null,
+      after: payload.detailDescription,
+      format: (value) => (value ? "입력됨" : "없음"),
+      describeChange: (before, after) => {
+        const beforeText = before ? "입력됨" : "없음";
+        const afterText = after ? "입력됨" : "없음";
+        return beforeText === afterText
+          ? "상세 설명 내용이 수정되었습니다."
+          : `상세 설명: ${beforeText} → ${afterText}`;
+      },
     },
     {
       label: "노출 캠퍼스",

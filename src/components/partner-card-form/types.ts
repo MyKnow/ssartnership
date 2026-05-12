@@ -31,6 +31,7 @@ export type PartnerCardFormValues = {
   visibility?: PartnerVisibility;
   benefitVisibility?: PartnerBenefitVisibility;
   location?: string;
+  detailDescription?: string | null;
   campusSlugs?: CampusSlug[];
   mapUrl?: string;
   benefitActionType?: PartnerBenefitActionType;

@@ -41,6 +41,7 @@ const partnerFormFocusByError: Record<string, PartnerCardFormField> = {
   partner_form_missing_name: "name",
   partner_form_missing_category: "categoryId",
   partner_form_missing_location: "location",
+  partner_form_invalid_detail_description: "detailDescription",
   partner_form_invalid_campus_slugs: "campusSlugs",
   partner_form_invalid_period: "periodStart",
   partner_form_invalid_map_url: "mapUrl",
