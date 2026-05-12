@@ -145,6 +145,16 @@ main (production releases)
 
 ## Commit Messages
 
+### Ssartnership Completion Handoff
+
+After finishing each requested work unit in this repository:
+
+- Review the diff for that work unit.
+- Stage only files that belong to the completed work unit.
+- Leave unrelated dirty files unstaged.
+- Print the proposed Korean conventional commit message in a fenced code block so the user can review it before commit/release.
+- If the work unit contains multiple meaningful changes, use a detailed commit message format: Korean conventional subject plus a short Korean bullet-list body.
+
 ### Conventional Commits Format
 
 ```

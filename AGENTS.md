@@ -106,6 +106,8 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 - If `npm run release` is blocked by a non-script environment issue after it already performed part of the release flow, inspect the partial state first, then complete only the remaining equivalent steps with the same Korean conventional commit message.
 - Do not revert user changes.
 - Review `git diff` before staging or committing.
+- After each requested work unit is complete, stage only the files that belong to that work unit, then print the proposed Korean conventional commit message in a fenced code block. Do not include unrelated dirty files in that staging step.
+- If the completed work unit is not a single small change, propose a detailed commit format with a Korean conventional subject and short Korean bullet-list body.
 
 ### Branch Strategy
 
