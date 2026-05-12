@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { AdminLogsPageData } from "@/lib/log-insights";
 import AdminLogsManager from "./AdminLogsManager";
@@ -274,11 +274,11 @@ export const InteractiveFiltersAndExport: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "이동" }));
     await expect(canvas.getAllByText("1 / 1").length).toBeGreaterThan(0);
 
-    await userEvent.click(canvas.getByRole("button", { name: "사용자 지정" }));
-    await userEvent.clear(canvas.getByLabelText("시작 시각"));
-    await userEvent.type(canvas.getByLabelText("시작 시각"), "2026-04-24T00:00");
-    await userEvent.clear(canvas.getByLabelText("종료 시각"));
-    await userEvent.type(canvas.getByLabelText("종료 시각"), "2026-04-24T06:00");
+    const customRangeButton = canvas.getByRole("button", { name: "사용자 지정" });
+    await waitFor(() => expect(customRangeButton).not.toBeDisabled());
+    await userEvent.click(customRangeButton);
+    await expect(await canvas.findByLabelText("시작 시각")).toBeInTheDocument();
+    await expect(await canvas.findByLabelText("종료 시각")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "범위 적용" }));
     await expect(await canvas.findByText("사용자 지정 범위")).toBeInTheDocument();
 

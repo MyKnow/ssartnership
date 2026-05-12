@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { getAdminSession } from '@/lib/auth';
 import {
   type AdminAuditAction,
@@ -227,6 +228,12 @@ export async function logProductEvent(input: ProductLogInput) {
       }
     }
   }
+}
+
+export function scheduleProductEventLog(input: ProductLogInput) {
+  after(async () => {
+    await logProductEvent(input);
+  });
 }
 
 export async function logAdminAudit(input: AdminAuditInput) {

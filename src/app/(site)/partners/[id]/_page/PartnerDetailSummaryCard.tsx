@@ -86,7 +86,6 @@ export default function PartnerDetailSummaryCard({
                 fill
                 sizes="(max-width: 640px) 40vw, 192px"
                 className="object-cover"
-                unoptimized
               />
             </div>
           </div>

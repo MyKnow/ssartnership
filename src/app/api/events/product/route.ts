@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isProductEventName } from '@/lib/event-catalog';
 import {
   getRequestLogContext,
-  logProductEvent,
   resolveCurrentActor,
+  scheduleProductEventLog,
 } from '@/lib/activity-logs';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const actor = await resolveCurrentActor();
     const context = getRequestLogContext(request);
 
-    await logProductEvent({
+    scheduleProductEventLog({
       eventName: body.eventName,
       actorType: actor.actorType,
       actorId: actor.actorId,
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       ipAddress: context.ipAddress,
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { status: 202 });
   } catch {
     return NextResponse.json({ message: '이벤트를 기록하지 못했습니다.' }, { status: 400 });
   }

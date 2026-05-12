@@ -12,7 +12,10 @@ import {
   deletePartnerCompany,
   updatePartnerCompany,
 } from "@/app/admin/(protected)/actions";
-import CompanyAccountConnections from "@/components/admin/company-manager/CompanyAccountConnections";
+import CompanyAccountConnections, {
+  type CompanyAccountOption,
+  type LinkedCompanyAccount,
+} from "@/components/admin/company-manager/CompanyAccountConnections";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
 type AdminCompany = {
@@ -61,6 +64,38 @@ export default function AdminCompanyManager({
   companies: AdminCompany[];
   accounts: AdminPartnerAccount[];
 }) {
+  const accountSummaries = accounts.map((account) => ({
+    id: account.id,
+    display_name: account.display_name,
+    login_id: account.login_id,
+  }));
+  const linkedAccountsByCompanyId = new Map<string, LinkedCompanyAccount[]>();
+  const linkedAccountIdsByCompanyId = new Map<string, Set<string>>();
+
+  for (const account of accounts) {
+    for (const link of account.links) {
+      const companyId = link.company?.id;
+      if (!companyId) {
+        continue;
+      }
+
+      const links = linkedAccountsByCompanyId.get(companyId) ?? [];
+      links.push({
+        account: {
+          id: account.id,
+          display_name: account.display_name,
+          login_id: account.login_id,
+        },
+        link,
+      });
+      linkedAccountsByCompanyId.set(companyId, links);
+
+      const linkedIds = linkedAccountIdsByCompanyId.get(companyId) ?? new Set<string>();
+      linkedIds.add(account.id);
+      linkedAccountIdsByCompanyId.set(companyId, linkedIds);
+    }
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] md:items-start xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
       <aside className="md:sticky md:top-24 md:order-2">
@@ -138,6 +173,14 @@ export default function AdminCompanyManager({
             const deleteFormId = `company-delete-${company.id}`;
             const isActive = company.is_active !== false;
             const hasLinkedData = company.brandCount > 0 || company.accountCount > 0;
+            const linkedAccountIds =
+              linkedAccountIdsByCompanyId.get(company.id) ?? new Set<string>();
+            const accountOptions: CompanyAccountOption[] = accountSummaries.map(
+              (account) => ({
+                ...account,
+                isLinked: linkedAccountIds.has(account.id),
+              }),
+            );
 
             return (
               <Card key={company.id} padding="none" className="overflow-hidden">
@@ -281,7 +324,11 @@ export default function AdminCompanyManager({
                   </div>
                 </div>
 
-                  <CompanyAccountConnections company={company} accounts={accounts} />
+                  <CompanyAccountConnections
+                    company={company}
+                    accountOptions={accountOptions}
+                    linkedAccounts={linkedAccountsByCompanyId.get(company.id) ?? []}
+                  />
                 </details>
               </Card>
             );

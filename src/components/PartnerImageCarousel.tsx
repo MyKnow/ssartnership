@@ -1,11 +1,15 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
-import CarouselLoadingSkeleton from "@/components/partner-image-carousel/CarouselLoadingSkeleton";
-import LightboxModal from "@/components/partner-image-carousel/LightboxModal";
 import ThumbStrip from "@/components/partner-image-carousel/ThumbStrip";
 import { useCarouselController } from "@/components/partner-image-carousel/useCarouselController";
+
+const LightboxModal = dynamic(
+  () => import("@/components/partner-image-carousel/LightboxModal"),
+  { ssr: false },
+);
 
 const placeholder = (
   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -32,16 +36,17 @@ export default function PartnerImageCarousel({
   name,
   className,
   matchHeightSelector,
+  priority = false,
 }: {
   images: string[];
   name: string;
   className?: string;
   matchHeightSelector?: string;
+  priority?: boolean;
 }) {
   const {
     cachedImages,
     hasImages,
-    imageCount,
     activeIndex,
     activeImage,
     canNavigate,
@@ -49,7 +54,6 @@ export default function PartnerImageCarousel({
     activeThumbRef,
     thumbStripRef,
     thumbPlacement,
-    isPreloaded,
     isOpen,
     zoom,
     offset,
@@ -67,16 +71,6 @@ export default function PartnerImageCarousel({
     images,
     matchHeightSelector,
   });
-
-  if (hasImages && !isPreloaded) {
-    return (
-      <CarouselLoadingSkeleton
-        className={className}
-        imageCount={imageCount}
-        thumbPlacement={thumbPlacement}
-      />
-    );
-  }
 
   return (
     <div
@@ -106,8 +100,8 @@ export default function PartnerImageCarousel({
             fill
             sizes="(max-width: 1279px) 100vw, 50vw"
             className="object-cover"
-            unoptimized
-            loading="eager"
+            loading={priority ? undefined : "eager"}
+            priority={priority}
           />
         ) : (
           placeholder
@@ -125,26 +119,28 @@ export default function PartnerImageCarousel({
         />
       ) : null}
 
-      <LightboxModal
-        open={isOpen}
-        canNavigate={canNavigate}
-        activeImage={activeImage}
-        name={name}
-        zoom={zoom}
-        offset={offset}
-        onClose={() => {
-          resetInteractiveState();
-          setOpen(false);
-        }}
-        onPrev={goPrev}
-        onNext={goNext}
-        onZoomChange={handleZoom}
-        onOffsetChange={setOffset}
-        onPanStart={handlePanStart}
-        onPanMove={handlePanMove}
-        onPanEnd={handlePanEnd}
-        fallback={placeholder}
-      />
+      {isOpen ? (
+        <LightboxModal
+          open={isOpen}
+          canNavigate={canNavigate}
+          activeImage={activeImage}
+          name={name}
+          zoom={zoom}
+          offset={offset}
+          onClose={() => {
+            resetInteractiveState();
+            setOpen(false);
+          }}
+          onPrev={goPrev}
+          onNext={goNext}
+          onZoomChange={handleZoom}
+          onOffsetChange={setOffset}
+          onPanStart={handlePanStart}
+          onPanMove={handlePanMove}
+          onPanEnd={handlePanEnd}
+          fallback={placeholder}
+        />
+      ) : null}
     </div>
   );
 }

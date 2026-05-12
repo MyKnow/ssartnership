@@ -1,4 +1,5 @@
 import type { Category, Partner } from "@/lib/types";
+import { cache } from "react";
 import {
   normalizePartnerAudience,
 } from "@/lib/partner-audience";
@@ -81,7 +82,10 @@ function extractCategoryKey(categories: PartnerRow["categories"]) {
   return undefined;
 }
 
-async function getPublicCacheVersionKey(scopes: PublicCacheScope[]) {
+const getPublicCacheVersionKeyByScopeKey = cache(async (scopeKey: string) => {
+  const scopes = scopeKey.split(",").filter((value): value is PublicCacheScope =>
+    value === "partners" || value === "categories",
+  );
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("public_cache_versions")
@@ -106,6 +110,11 @@ async function getPublicCacheVersionKey(scopes: PublicCacheScope[]) {
       return `${scope}:${row?.version ?? "0"}:${row?.updated_at ?? "missing"}`;
     })
     .join("|");
+});
+
+async function getPublicCacheVersionKey(scopes: PublicCacheScope[]) {
+  const normalizedScopes = [...new Set(scopes)].sort();
+  return getPublicCacheVersionKeyByScopeKey(normalizedScopes.join(","));
 }
 
 const getCachedCategories = unstable_cache(

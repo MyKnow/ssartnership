@@ -560,9 +560,18 @@ as $$
       from public.push_subscriptions
       where is_active = true
     ) as active_push_subscription_count,
-    (select count(*)::bigint from public.event_logs) as product_log_count,
-    (select count(*)::bigint from public.admin_audit_logs) as audit_log_count,
-    (select count(*)::bigint from public.auth_security_logs) as security_log_count;
+    greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.event_logs'::regclass), 0),
+      0
+    ) as product_log_count,
+    greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.admin_audit_logs'::regclass), 0),
+      0
+    ) as audit_log_count,
+    greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.auth_security_logs'::regclass), 0),
+      0
+    ) as security_log_count;
 $$;
 
 create or replace function public.get_admin_logs_page(
@@ -2043,13 +2052,22 @@ create index if not exists members_year_campus_display_name_idx
 create index if not exists members_campus_display_name_idx
   on members(campus, display_name);
 create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
+create index if not exists event_logs_created_at_id_idx
+  on event_logs(created_at desc, id desc);
 create index if not exists event_logs_event_name_idx on event_logs(event_name);
+create index if not exists event_logs_name_created_at_idx
+  on event_logs(event_name, created_at desc);
 create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
+create index if not exists event_logs_actor_type_created_at_idx
+  on event_logs(actor_type, created_at desc);
 create index if not exists event_logs_target_idx on event_logs(target_type, target_id);
 create index if not exists event_logs_partner_metric_idx
   on event_logs(target_type, target_id, event_name, created_at)
   where target_id is not null;
 create index if not exists event_logs_path_idx on event_logs(path);
+create index if not exists event_logs_path_prefix_idx
+  on event_logs(path text_pattern_ops)
+  where path is not null;
 create index if not exists event_logs_session_id_idx on event_logs(session_id);
 create unique index if not exists partner_metric_rollups_total_unique_idx
   on partner_metric_rollups(partner_id, metric_name, metric_kind, bucket_timezone)
@@ -2089,14 +2107,32 @@ create unique index if not exists partner_metric_unique_visitors_weekday_unique_
 create index if not exists partner_metric_unique_visitors_partner_metric_idx
   on partner_metric_unique_visitors(partner_id, metric_name, granularity);
 create index if not exists admin_audit_logs_created_at_idx on admin_audit_logs(created_at desc);
+create index if not exists admin_audit_logs_created_at_id_idx
+  on admin_audit_logs(created_at desc, id desc);
 create index if not exists admin_audit_logs_action_idx on admin_audit_logs(action);
+create index if not exists admin_audit_logs_action_created_at_idx
+  on admin_audit_logs(action, created_at desc);
 create index if not exists admin_audit_logs_actor_id_idx on admin_audit_logs(actor_id);
+create index if not exists admin_audit_logs_actor_created_at_idx
+  on admin_audit_logs(actor_id, created_at desc);
 create index if not exists admin_audit_logs_target_idx on admin_audit_logs(target_type, target_id);
+create index if not exists admin_audit_logs_path_prefix_idx
+  on admin_audit_logs(path text_pattern_ops)
+  where path is not null;
 create index if not exists auth_security_logs_created_at_idx on auth_security_logs(created_at desc);
+create index if not exists auth_security_logs_created_at_id_idx
+  on auth_security_logs(created_at desc, id desc);
 create index if not exists auth_security_logs_event_name_idx on auth_security_logs(event_name);
 create index if not exists auth_security_logs_status_idx on auth_security_logs(status);
+create index if not exists auth_security_logs_name_status_created_at_idx
+  on auth_security_logs(event_name, status, created_at desc);
 create index if not exists auth_security_logs_actor_id_idx on auth_security_logs(actor_id);
+create index if not exists auth_security_logs_actor_status_created_at_idx
+  on auth_security_logs(actor_type, status, created_at desc);
 create index if not exists auth_security_logs_identifier_idx on auth_security_logs(identifier);
+create index if not exists auth_security_logs_path_prefix_idx
+  on auth_security_logs(path text_pattern_ops)
+  where path is not null;
 create index if not exists auth_security_logs_member_policy_consent_idx
   on auth_security_logs(actor_type, event_name, status, actor_id, created_at desc)
   where actor_id is not null;

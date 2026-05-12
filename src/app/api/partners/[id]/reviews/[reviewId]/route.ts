@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logProductEvent } from "@/lib/activity-logs";
+import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { deleteReviewMediaUrls } from "@/lib/review-media-storage";
 import {
@@ -73,7 +73,7 @@ export async function PATCH(
     const removedUrls = ownedReview.images.filter((url) => !media.images.includes(url));
     await deleteReviewMediaUrls(removedUrls).catch(() => undefined);
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
-    await logProductEvent({
+    scheduleProductEventLog({
       ...getRequestLogContext(request),
       actorType: "member",
       actorId: session.userId,
@@ -138,7 +138,7 @@ export async function DELETE(
       memberId: session.userId,
     });
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
-    await logProductEvent({
+    scheduleProductEventLog({
       ...getRequestLogContext(request),
       actorType: "member",
       actorId: session.userId,
