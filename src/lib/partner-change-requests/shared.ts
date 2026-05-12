@@ -38,6 +38,7 @@ export type PartnerChangeRequestSummary = {
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
+  currentDetailDescription: string | null;
   currentPartnerName: string;
   currentPartnerLocation: string;
   currentMapUrl: string | null;
@@ -69,6 +70,7 @@ export type PartnerChangeRequestSummary = {
   requestedPeriodEnd: string | null;
   requestedPartnerName: string;
   requestedPartnerLocation: string;
+  requestedDetailDescription?: string | null;
   requestedMapUrl: string | null;
   requestedCampusSlugs: CampusSlug[];
   reviewedByAdminId: string | null;
@@ -86,6 +88,7 @@ export type PartnerChangeRequestContext = {
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
+  detailDescription: string | null;
   partnerCreatedAt: string;
   categoryLabel: string;
   categoryColor: string | null;
@@ -101,6 +104,7 @@ export type PartnerChangeRequestContext = {
   reservationLink: string | null;
   inquiryLink: string | null;
   currentConditions: string[];
+  currentDetailDescription: string | null;
   currentBenefits: string[];
   currentAppliesTo: PartnerAudienceKey[];
   currentTags: string[];
@@ -124,6 +128,7 @@ export type PartnerChangeRequestCreateInput = {
   requestedPartnerName: string;
   requestedPartnerLocation: string;
   requestedMapUrl: string | null;
+  requestedDetailDescription?: string | null;
   requestedCampusSlugs: CampusSlug[];
   requestedConditions: string[];
   requestedBenefits: string[];
@@ -206,6 +211,7 @@ export type PartnerRow = {
   name: string;
   created_at: string;
   location: string;
+  detail_description?: string | null;
   thumbnail?: string | null;
   map_url?: string | null;
   benefit_action_type?: string | null;
@@ -239,6 +245,7 @@ export type PartnerChangeRequestRow = {
   status: PartnerChangeRequestStatus;
   current_partner_name?: string | null;
   current_partner_location?: string | null;
+  current_detail_description?: string | null;
   current_map_url?: string | null;
   current_campus_slugs?: string[] | null;
   current_conditions?: string[] | null;
@@ -253,6 +260,7 @@ export type PartnerChangeRequestRow = {
   current_period_end?: string | null;
   requested_partner_name?: string | null;
   requested_partner_location?: string | null;
+  requested_detail_description?: string | null;
   requested_map_url?: string | null;
   requested_campus_slugs?: string[] | null;
   requested_conditions?: string[] | null;
@@ -281,7 +289,7 @@ export type PartnerChangeRequestRow = {
 };
 
 export const REQUEST_SELECT =
-  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_map_url,current_campus_slugs,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_map_url,requested_campus_slugs,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,campus_slugs,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
+  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_detail_description,current_map_url,current_campus_slugs,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_detail_description,requested_map_url,requested_campus_slugs,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,detail_description,campus_slugs,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
 
 export type PartnerChangeRequestSupabaseClient = ReturnType<
   typeof getSupabaseAdminClient

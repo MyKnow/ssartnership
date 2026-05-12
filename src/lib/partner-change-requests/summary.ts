@@ -36,6 +36,9 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
   const currentPartnerLocation = normalizeRequiredText(
     row.current_partner_location || partner?.location || "",
   );
+  const currentDetailDescription = normalizeOptionalText(
+    row.current_detail_description ?? partner?.detail_description ?? null,
+  );
   const currentMapUrl = normalizeOptionalText(
     sanitizeHttpUrl(row.current_map_url ?? partner?.map_url ?? undefined),
   );
@@ -51,6 +54,9 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
       currentPartnerLocation ||
       partner?.location ||
       "",
+  );
+  const requestedDetailDescription = normalizeOptionalText(
+    row.requested_detail_description ?? currentDetailDescription,
   );
   const requestedMapUrl = normalizeOptionalText(
     sanitizeHttpUrl(row.requested_map_url ?? currentMapUrl ?? undefined),
@@ -68,6 +74,7 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
     partnerId: row.partner_id,
     partnerName: currentPartnerName || "미지정",
     partnerLocation: currentPartnerLocation || "",
+    currentDetailDescription,
     currentPartnerName,
     currentPartnerLocation,
     currentMapUrl,
@@ -101,6 +108,7 @@ export function toSummary(row: PartnerChangeRequestRow): PartnerChangeRequestSum
     requestedPeriodEnd: normalizeOptionalText(row.requested_period_end),
     requestedPartnerName,
     requestedPartnerLocation,
+    requestedDetailDescription,
     requestedMapUrl,
     requestedCampusSlugs,
     reviewedByAdminId: row.reviewed_by_admin_id ?? null,

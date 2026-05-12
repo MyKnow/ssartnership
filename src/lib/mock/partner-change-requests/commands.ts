@@ -43,6 +43,9 @@ export async function createMockPartnerChangeRequest(
   const requestedPartnerLocation = normalizeRequiredText(
     input.requestedPartnerLocation,
   );
+  const requestedDetailDescription = normalizeOptionalText(
+    input.requestedDetailDescription,
+  );
   const requestedMapUrl = normalizeOptionalText(input.requestedMapUrl);
   const requestedCampusSlugs = normalizeCampusSlugs(input.requestedCampusSlugs);
   const requestedThumbnail = normalizeOptionalText(input.requestedThumbnail);
@@ -64,6 +67,7 @@ export async function createMockPartnerChangeRequest(
   if (
     service.partnerName === requestedPartnerName &&
     service.partnerLocation === requestedPartnerLocation &&
+    service.detailDescription === requestedDetailDescription &&
     service.mapUrl === requestedMapUrl &&
     arraysEqual(service.currentConditions, requestedConditions) &&
     arraysEqual(service.currentBenefits, requestedBenefits) &&
@@ -87,6 +91,7 @@ export async function createMockPartnerChangeRequest(
     partnerId: service.partnerId,
     partnerName: service.partnerName,
     partnerLocation: service.partnerLocation,
+    currentDetailDescription: service.detailDescription,
     currentPartnerName: service.partnerName,
     currentPartnerLocation: service.partnerLocation,
     currentMapUrl: service.mapUrl,
@@ -111,6 +116,7 @@ export async function createMockPartnerChangeRequest(
     currentPeriodEnd: service.periodEnd,
     requestedPartnerName,
     requestedPartnerLocation,
+    requestedDetailDescription,
     requestedMapUrl,
     requestedCampusSlugs,
     requestedConditions,
@@ -183,6 +189,7 @@ export async function approveMockPartnerChangeRequest(
   if (service) {
     service.partnerName = request.requestedPartnerName;
     service.partnerLocation = request.requestedPartnerLocation;
+    service.detailDescription = request.requestedDetailDescription ?? null;
     service.mapUrl = request.requestedMapUrl;
     service.currentConditions = [...request.requestedConditions];
     service.currentBenefits = [...request.requestedBenefits];

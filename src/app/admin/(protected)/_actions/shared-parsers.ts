@@ -12,6 +12,7 @@ import {
   isPartnerBenefitActionType,
   normalizePartnerBenefitActionType,
 } from "../../../../lib/partner-benefit-action.ts";
+import { normalizePartnerDetailDescription } from "../../../../lib/partner-detail-description.ts";
 import { normalizePartnerLoginId } from "../../../../lib/partner-utils.ts";
 import {
   isValidEmail,
@@ -232,6 +233,9 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const name = String(formData.get("name") || "").trim();
   const categoryId = String(formData.get("categoryId") || "").trim();
   const location = String(formData.get("location") || "").trim();
+  const detailDescription = normalizePartnerDetailDescription(
+    formData.get("detailDescription"),
+  );
   const rawMapUrl = String(formData.get("mapUrl") || "").trim();
   const rawBenefitActionType = String(formData.get("benefitActionType") || "").trim();
   const rawBenefitActionLink = String(formData.get("benefitActionLink") || "").trim();
@@ -318,6 +322,7 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     name,
     categoryId,
     location,
+    detailDescription,
     campusSlugs,
     mapUrl,
     benefitActionType,

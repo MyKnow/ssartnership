@@ -9,6 +9,7 @@ export type PartnerCoreInput = {
   name: string;
   categoryId: string;
   location: string;
+  detailDescription: string | null;
   campusSlugs: CampusSlug[];
   mapUrl: string | null;
   benefitActionType: PartnerBenefitActionType;

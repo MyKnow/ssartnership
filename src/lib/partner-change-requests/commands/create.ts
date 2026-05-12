@@ -6,6 +6,7 @@ import {
   sanitizePartnerLinkValue,
   validateDateRange,
 } from "../../validation.ts";
+import { normalizePartnerDetailDescription } from "../../partner-detail-description.ts";
 import { getSupabaseRequestContext } from "../context.ts";
 import {
   arraysEqual,
@@ -48,6 +49,9 @@ export async function createSupabaseRequest(
   const requestedPartnerLocation = normalizeRequiredText(
     input.requestedPartnerLocation,
   );
+  const requestedDetailDescription = normalizePartnerDetailDescription(
+    input.requestedDetailDescription,
+  );
   const requestedMapUrl = sanitizeHttpUrl(input.requestedMapUrl ?? undefined);
   const requestedCampusSlugs = normalizeCampusSlugs(input.requestedCampusSlugs);
   const requestedThumbnail = normalizeOptionalText(input.requestedThumbnail);
@@ -84,6 +88,7 @@ export async function createSupabaseRequest(
   if (
     context.partnerName === requestedPartnerName &&
     context.partnerLocation === requestedPartnerLocation &&
+    context.detailDescription === requestedDetailDescription &&
     context.mapUrl === requestedMapUrl &&
     arraysEqual(context.currentCampusSlugs, requestedCampusSlugs) &&
     requestedConditions.length === 0 &&
@@ -101,6 +106,7 @@ export async function createSupabaseRequest(
   if (
     context.partnerName === requestedPartnerName &&
     context.partnerLocation === requestedPartnerLocation &&
+    context.detailDescription === requestedDetailDescription &&
     context.mapUrl === requestedMapUrl &&
     arraysEqual(context.currentCampusSlugs, requestedCampusSlugs) &&
     arraysEqual(context.currentConditions, requestedConditions) &&
@@ -140,6 +146,7 @@ export async function createSupabaseRequest(
       status: "pending",
       current_partner_name: context.partnerName,
       current_partner_location: context.partnerLocation,
+      current_detail_description: context.detailDescription,
       current_map_url: context.mapUrl,
       current_campus_slugs: context.currentCampusSlugs,
       current_conditions: context.currentConditions,
@@ -154,6 +161,7 @@ export async function createSupabaseRequest(
       current_period_end: context.periodEnd,
       requested_partner_name: requestedPartnerName,
       requested_partner_location: requestedPartnerLocation,
+      requested_detail_description: requestedDetailDescription,
       requested_map_url: requestedMapUrl,
       requested_campus_slugs: requestedCampusSlugs,
       requested_conditions: requestedConditions,

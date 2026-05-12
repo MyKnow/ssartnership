@@ -10,6 +10,7 @@ import {
   getPartnerChangeRequestContext,
 } from "@/lib/partner-change-requests";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
+import { normalizePartnerDetailDescription } from "@/lib/partner-detail-description";
 import { sanitizeHttpUrl, validateDateRange } from "@/lib/validation";
 import { getReturnUrl, parseList, revalidatePartnerServicePaths } from "./shared";
 
@@ -29,6 +30,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
 
   const partnerName = String(formData.get("partnerName") || "").trim();
   const partnerLocation = String(formData.get("partnerLocation") || "").trim();
+  const rawDetailDescription = formData.get("detailDescription");
   const rawMapUrl = String(formData.get("mapUrl") || "").trim();
   const conditions = parseList(String(formData.get("conditions") || ""));
   const benefits = parseList(String(formData.get("benefits") || ""));
@@ -52,6 +54,15 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       throw new PartnerChangeRequestError(
         "invalid_request",
         "브랜드명과 위치를 입력해 주세요.",
+      );
+    }
+    let detailDescription: string | null = null;
+    try {
+      detailDescription = normalizePartnerDetailDescription(rawDetailDescription);
+    } catch {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "상세 설명은 1,200자 이내로 입력해 주세요.",
       );
     }
     if (!campusSlugSelection.ok) {
@@ -87,6 +98,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       requestedByDisplayName: session.displayName,
       requestedPartnerName: partnerName,
       requestedPartnerLocation: partnerLocation,
+      requestedDetailDescription: detailDescription,
       requestedMapUrl: mapUrl,
       requestedCampusSlugs: campusSlugs,
       requestedConditions: conditions,

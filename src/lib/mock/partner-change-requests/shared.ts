@@ -14,6 +14,7 @@ export type MockChangeRequestServiceRecord = {
   partnerName: string;
   partnerCreatedAt: string;
   partnerLocation: string;
+  detailDescription: string | null;
   categoryLabel: string;
   categoryColor: string | null;
   visibility: PartnerVisibility;
@@ -66,6 +67,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     partnerName: "카페 해온 본점",
     partnerCreatedAt: "2026-03-01T00:00:00.000Z",
     partnerLocation: "서울 강남구 역삼로 123",
+    detailDescription: "디저트와 작업 좌석을 함께 운영하는 카페입니다.",
     categoryLabel: "카페",
     categoryColor: "#38bdf8",
     visibility: "public",
@@ -92,6 +94,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     partnerName: "카페 해온 디저트 바",
     partnerCreatedAt: "2026-03-01T00:00:00.000Z",
     partnerLocation: "서울 강남구 논현로 45",
+    detailDescription: "포장 디저트와 단체 주문을 함께 받을 수 있는 매장입니다.",
     categoryLabel: "카페",
     categoryColor: "#38bdf8",
     visibility: "confidential",
@@ -118,6 +121,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     partnerName: "어반짐 PT 패키지",
     partnerCreatedAt: "2026-03-10T00:00:00.000Z",
     partnerLocation: "서울 강남구 봉은사로 11",
+    detailDescription: "기초 체력 상담 후 PT 패키지를 선택할 수 있는 운동 공간입니다.",
     categoryLabel: "헬스",
     categoryColor: "#10b981",
     visibility: "public",
@@ -144,6 +148,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     partnerName: "어반짐 사우나",
     partnerCreatedAt: "2026-03-10T00:00:00.000Z",
     partnerLocation: "서울 강남구 봉은사로 11, B1",
+    detailDescription: "운동 후 이용할 수 있는 사우나 시설입니다.",
     categoryLabel: "헬스",
     categoryColor: "#10b981",
     visibility: "confidential",
@@ -173,6 +178,8 @@ export const seededRequests: MockChangeRequestSeed[] = [
     partnerId: "mock-partner-service-urban-gym-sauna",
     partnerName: "어반짐 사우나",
     partnerLocation: "서울 강남구 봉은사로 11, B1",
+    currentDetailDescription: "운동 후 이용할 수 있는 사우나 시설입니다.",
+    requestedDetailDescription: "운동 후 간단히 정리하고 쉬어갈 수 있는 사우나 시설입니다.",
     categoryLabel: "헬스",
     status: "pending",
     requestedByAccountId: "mock-partner-account-urban-gym",
