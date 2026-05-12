@@ -1,5 +1,6 @@
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
 import { normalizeCampusSlugs } from "../../campuses.ts";
+import { normalizePartnerDetailDescription } from "../../partner-detail-description.ts";
 import type {
   PartnerChangeRequestCancelInput,
   PartnerChangeRequestCreateInput,
@@ -43,7 +44,7 @@ export async function createMockPartnerChangeRequest(
   const requestedPartnerLocation = normalizeRequiredText(
     input.requestedPartnerLocation,
   );
-  const requestedDetailDescription = normalizeOptionalText(
+  const requestedDetailDescription = normalizePartnerDetailDescription(
     input.requestedDetailDescription,
   );
   const requestedMapUrl = normalizeOptionalText(input.requestedMapUrl);
