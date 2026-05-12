@@ -6,12 +6,27 @@ import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { updatePartnerAccountCompanyConnection } from "@/app/admin/(protected)/actions";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type {
+  AdminPartnerAccount,
+  AdminPartnerAccountCompany,
+} from "@/components/admin/partner-account-manager/types";
 
 type CompanySummary = {
   id: string;
   name: string;
   slug: string;
+};
+
+export type CompanyAccountOption = Pick<
+  AdminPartnerAccount,
+  "id" | "display_name" | "login_id"
+> & {
+  isLinked: boolean;
+};
+
+export type LinkedCompanyAccount = {
+  account: Pick<AdminPartnerAccount, "id" | "display_name" | "login_id">;
+  link: AdminPartnerAccountCompany;
 };
 
 function FieldGroup({
@@ -39,21 +54,15 @@ function formatDateTime(value?: string | null) {
 
 export default function CompanyAccountConnections({
   company,
-  accounts,
+  accountOptions,
+  linkedAccounts,
 }: {
   company: CompanySummary;
-  accounts: AdminPartnerAccount[];
+  accountOptions: CompanyAccountOption[];
+  linkedAccounts: LinkedCompanyAccount[];
 }) {
-  const linkedAccounts = accounts.flatMap((account) =>
-    account.links
-      .filter((link) => link.company?.id === company.id)
-      .map((link) => ({
-        account,
-        link,
-      })),
-  );
-
   const connectionFormId = `company-account-connection-${company.id}`;
+  const hasAccountOptions = accountOptions.length > 0;
 
   return (
     <div className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
@@ -76,18 +85,15 @@ export default function CompanyAccountConnections({
       >
         <input type="hidden" name="companyId" value={company.id} />
         <FieldGroup label="관리 계정">
-          <Select name="accountId" defaultValue="" required disabled={accounts.length === 0}>
+          <Select name="accountId" defaultValue="" required disabled={!hasAccountOptions}>
             <option value="" disabled>
               계정을 선택해 주세요
             </option>
-            {accounts.map((account) => {
-              const isLinked = account.links.some(
-                (link) => link.company?.id === company.id,
-              );
+            {accountOptions.map((account) => {
               return (
                 <option key={account.id} value={account.id}>
                   {account.display_name} ({account.login_id})
-                  {isLinked ? " · 연결됨" : ""}
+                  {account.isLinked ? " · 연결됨" : ""}
                 </option>
               );
             })}
@@ -101,7 +107,7 @@ export default function CompanyAccountConnections({
               name="isActive"
               value="true"
               defaultChecked
-              disabled={accounts.length === 0}
+              disabled={!hasAccountOptions}
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             연결 활성
@@ -112,14 +118,14 @@ export default function CompanyAccountConnections({
             form={connectionFormId}
             pendingText="연결 중"
             className="w-full md:w-auto"
-            disabled={accounts.length === 0}
+            disabled={!hasAccountOptions}
           >
             기존 계정 연결
           </SubmitButton>
         </div>
       </form>
 
-      {accounts.length === 0 ? (
+      {!hasAccountOptions ? (
         <p className="text-xs text-muted-foreground">
           등록된 계정이 없어 새 연결을 추가할 수 없습니다.
         </p>

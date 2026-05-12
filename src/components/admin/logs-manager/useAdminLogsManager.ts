@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/components/ui/Toast';
 import {
   buildUnifiedLogs,
@@ -18,6 +18,7 @@ import type {
 } from '@/lib/log-insights';
 
 const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
+const LOG_SEARCH_DEBOUNCE_MS = 350;
 
 export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const { notify } = useToast();
@@ -56,6 +57,8 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const [pageSize, setPageSizeState] =
     useState<(typeof LOG_PAGE_SIZE_OPTIONS)[number]>(initialData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number]);
   const [pageInputValue, setPageInputValue] = useState(String(initialData.list.page));
+  const searchDebounceRef = useRef<number | null>(null);
+  const fetchSequenceRef = useRef(0);
 
   const visibleLogs = useMemo<NormalizedLog[]>(
     () =>
@@ -80,6 +83,14 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const topPaths = data.summary.topPaths;
   const securityStatusCounts = data.summary.securityStatusCounts;
 
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
+
   function syncPage(nextPage: number) {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
     setPageInputValue(String(safePage));
@@ -99,6 +110,8 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     statusFilter?: StatusFilter;
     sortFilter?: SortFilter;
   }) {
+    const fetchSequence = fetchSequenceRef.current + 1;
+    fetchSequenceRef.current = fetchSequence;
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -146,11 +159,16 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
         const payload = (await response.json().catch(() => null)) as
           | { message?: string }
           | null;
-        setErrorMessage(payload?.message ?? '로그 조회에 실패했습니다.');
+        if (fetchSequence === fetchSequenceRef.current) {
+          setErrorMessage(payload?.message ?? '로그 조회에 실패했습니다.');
+        }
         return;
       }
 
       const nextData = (await response.json()) as AdminLogsPageData;
+      if (fetchSequence !== fetchSequenceRef.current) {
+        return;
+      }
       setData(nextData);
       setActivePreset(nextData.range.preset);
       setCustomStartInput(toDateTimeLocalValue(nextData.range.start));
@@ -164,15 +182,21 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       );
       setPageInputValue(String(nextData.list.page));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : '로그 조회에 실패했습니다.');
+      if (fetchSequence === fetchSequenceRef.current) {
+        setErrorMessage(error instanceof Error ? error.message : '로그 조회에 실패했습니다.');
+      }
     } finally {
-      setIsLoading(false);
+      if (fetchSequence === fetchSequenceRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 
   function handlePresetSelect(preset: LogRangePreset) {
     setActivePreset(preset);
     if (preset === 'custom') {
+      fetchSequenceRef.current += 1;
+      setIsLoading(false);
       return;
     }
     void fetchLogs({ preset });
@@ -324,7 +348,18 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     setCustomEndInput,
     setSearchValue: (value: string) => {
       setSearchValue(value);
-      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, searchValue: value });
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current);
+      }
+      searchDebounceRef.current = window.setTimeout(() => {
+        void fetchLogs({
+          preset: activePreset,
+          start: data.range.start,
+          end: data.range.end,
+          page: 1,
+          searchValue: value,
+        });
+      }, LOG_SEARCH_DEBOUNCE_MS);
     },
     setGroupFilter: (value: GroupFilter) => {
       setGroupFilter(value);
