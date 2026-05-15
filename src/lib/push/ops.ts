@@ -7,6 +7,7 @@ import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import { isPushConfigured } from "./config.ts";
 import { parsePushAudience } from "./audience.ts";
 import { sendPushToAudience } from "./send.ts";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import type {
   DeliveryResult,
   PushAudience,
@@ -50,10 +51,14 @@ export function isPushOpsConfigured() {
 
 export function isSameOriginPushRequest(request: {
   headers: Pick<Headers, "get">;
+  method?: string;
+  url: string;
   nextUrl: { origin: string };
 }) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
+  return isTrustedSameOriginRequest(request, {
+    expectedOrigin: request.nextUrl.origin,
+    allowedContentTypes: ["application/json"],
+  });
 }
 
 export function filterExpiringPartnersForPush(

@@ -13,6 +13,9 @@ type ToastContextValue = {
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
+const noopToastContext: ToastContextValue = {
+  notify: () => {},
+};
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -57,8 +60,5 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 export function useToast() {
   const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error("ToastProvider가 필요합니다.");
-  }
-  return context;
+  return context ?? noopToastContext;
 }

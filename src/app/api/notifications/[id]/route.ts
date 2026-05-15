@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationRepository } from "@/lib/repositories";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const runtime = "nodejs";
-
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+    })
+  ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
@@ -47,7 +47,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+    })
+  ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 

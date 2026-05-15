@@ -6,13 +6,9 @@ import {
   getPartnerPortalSetupErrorStatus,
   isPartnerPortalSetupError,
 } from "@/lib/partner-auth";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
-
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
 
 function maskPartnerSetupToken(token: string) {
   if (token.length <= 12) {
@@ -38,7 +34,12 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ token: string }> },
 ) {
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

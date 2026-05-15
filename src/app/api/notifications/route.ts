@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationRepository } from "@/lib/repositories";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const runtime = "nodejs";
-
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
 
 function parsePositiveInt(value: string | null, fallback: number, max: number) {
   const parsed = Number(value);
@@ -18,7 +14,11 @@ function parsePositiveInt(value: string | null, fallback: number, max: number) {
 }
 
 async function requireSession(request: NextRequest) {
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+    })
+  ) {
     return { response: NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 }) };
   }
 

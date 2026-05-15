@@ -5,16 +5,16 @@ import {
 } from "@/lib/notification-preferences";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { listPushSubscriptionDevices } from "@/lib/push";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
-
 export async function GET(request: NextRequest) {
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+    })
+  ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 

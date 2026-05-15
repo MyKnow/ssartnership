@@ -25,6 +25,7 @@
     "test:partner-portal": "node --import ./tests/alias-register.mjs --test tests/partner-portal.mock.test.mts",
     "test:ssafy-cycle": "node --import ./tests/alias-register.mjs --test tests/ssafy-cycle-simulation.test.mts",
     "validate:migrations": "node scripts/validate-supabase-migrations.mjs",
+    "audit:security": "node scripts/security-audit.mjs",
     "release": "bash scripts/release.sh"
   },
   "dependencies": {

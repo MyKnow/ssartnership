@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  MAX_REVIEW_MEDIA_IMAGE_BYTES,
   createSignedReviewMediaUpload,
   getSignedReviewMediaUploadHeaders,
 } from "@/lib/review-media-storage";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   ensureVisibleReviewPartner,
   getReviewMemberSession,
@@ -12,7 +14,7 @@ import {
 export const runtime = "nodejs";
 
 const MAX_REVIEW_IMAGE_COUNT = 5;
-const MAX_REVIEW_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_REVIEW_IMAGE_BYTES = MAX_REVIEW_MEDIA_IMAGE_BYTES;
 
 type UploadRequest = {
   reviewId?: unknown;
@@ -69,6 +71,17 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "잘못된 요청입니다." },
+      { status: 403 },
+    );
+  }
+
   const { id } = await context.params;
   const session = await getReviewMemberSession().catch(() => null);
   if (!session?.userId) {
