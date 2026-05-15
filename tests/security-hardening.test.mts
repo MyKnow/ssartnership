@@ -10,6 +10,15 @@ const hmacModulePromise = import(
 const verificationModulePromise = import(
   new URL("../src/lib/mm-verification.ts", import.meta.url).href
 );
+const productEventThrottleModulePromise = import(
+  new URL("../src/lib/product-event-throttle.ts", import.meta.url).href
+);
+const requestGuardsModulePromise = import(
+  new URL("../src/lib/request-guards.ts", import.meta.url).href
+);
+const adminSecurityModulePromise = import(
+  new URL("../src/lib/admin-security.ts", import.meta.url).href
+);
 
 test("product event locations mask verification tokens", async () => {
   const { normalizeProductEventLocation } = await pathModulePromise;
@@ -69,4 +78,137 @@ test("verification codes use crypto-safe generation and dedicated secret", async
       process.env.USER_SESSION_SECRET = originalSessionSecret;
     }
   }
+});
+
+test("product event throttle rejects bursty repeated events", async () => {
+  const { consumeProductEventQuota, resetProductEventThrottleForTests } =
+    await productEventThrottleModulePromise;
+
+  resetProductEventThrottleForTests();
+
+  for (let index = 0; index < 30; index += 1) {
+    assert.equal(
+      consumeProductEventQuota(
+        {
+          eventName: "page_view",
+          ipAddress: "203.0.113.10",
+          sessionId: "session-1",
+        },
+        1_000,
+      ),
+      true,
+    );
+  }
+
+  assert.equal(
+    consumeProductEventQuota(
+      {
+        eventName: "page_view",
+        ipAddress: "203.0.113.10",
+        sessionId: "session-1",
+      },
+      1_000,
+    ),
+    false,
+  );
+  assert.equal(
+    consumeProductEventQuota(
+      {
+        eventName: "page_view",
+        ipAddress: "203.0.113.10",
+        sessionId: "session-1",
+      },
+      62_000,
+    ),
+    true,
+  );
+
+  resetProductEventThrottleForTests();
+});
+
+test("same-origin request guard requires matching origin or trusted referrer", async () => {
+  const { isTrustedSameOriginRequest } = await requestGuardsModulePromise;
+
+  assert.equal(
+    isTrustedSameOriginRequest(
+      new Request("https://example.com/api/events/product", {
+        method: "POST",
+        headers: {
+          origin: "https://example.com",
+          "content-type": "application/json",
+        },
+      }),
+      { allowedContentTypes: ["application/json"] },
+    ),
+    true,
+  );
+  assert.equal(
+    isTrustedSameOriginRequest(
+      new Request("https://example.com/api/events/product", {
+        method: "POST",
+        headers: {
+          origin: "https://evil.example",
+          "content-type": "application/json",
+        },
+      }),
+      { allowedContentTypes: ["application/json"] },
+    ),
+    false,
+  );
+  assert.equal(
+    isTrustedSameOriginRequest(
+      new Request("https://example.com/api/events/product", {
+        method: "POST",
+        headers: {
+          referer: "https://example.com/page",
+          "content-type": "text/plain",
+        },
+      }),
+      { allowedContentTypes: ["application/json"] },
+    ),
+    false,
+  );
+});
+
+test("admin basic auth validates credentials without direct string equality", async () => {
+  const originalUsername = process.env.ADMIN_BASIC_AUTH_USERNAME;
+  const originalPassword = process.env.ADMIN_BASIC_AUTH_PASSWORD;
+
+  try {
+    process.env.ADMIN_BASIC_AUTH_USERNAME = "operator";
+    process.env.ADMIN_BASIC_AUTH_PASSWORD = "secret-password";
+
+    const { hasValidAdminBasicAuth } = await adminSecurityModulePromise;
+    const encode = (value: string) =>
+      Buffer.from(value, "utf8").toString("base64");
+
+    assert.equal(
+      hasValidAdminBasicAuth(`Basic ${encode("operator:secret-password")}`),
+      true,
+    );
+    assert.equal(
+      hasValidAdminBasicAuth(`Basic ${encode("operator:wrong")}`),
+      false,
+    );
+  } finally {
+    if (originalUsername === undefined) {
+      delete process.env.ADMIN_BASIC_AUTH_USERNAME;
+    } else {
+      process.env.ADMIN_BASIC_AUTH_USERNAME = originalUsername;
+    }
+    if (originalPassword === undefined) {
+      delete process.env.ADMIN_BASIC_AUTH_PASSWORD;
+    } else {
+      process.env.ADMIN_BASIC_AUTH_PASSWORD = originalPassword;
+    }
+  }
+});
+
+test("admin session ttl defaults to short bounded windows", async () => {
+  const { getAdminSessionTtlSeconds } = await adminSecurityModulePromise;
+
+  assert.equal(getAdminSessionTtlSeconds(undefined), 12 * 60 * 60);
+  assert.equal(getAdminSessionTtlSeconds("48"), 24 * 60 * 60);
+  assert.equal(getAdminSessionTtlSeconds("0"), 60 * 60);
+  assert.equal(getAdminSessionTtlSeconds("not-a-number"), 12 * 60 * 60);
 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { partnerFavoriteRepository, partnerRepository } from "@/lib/repositories";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 function safeDecodeSegment(value: string) {
@@ -14,6 +15,17 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    return NextResponse.json(
+      { message: "잘못된 요청입니다." },
+      { status: 403 },
+    );
+  }
+
   const session = await getSignedUserSession();
   if (!session?.userId) {
     return NextResponse.json(

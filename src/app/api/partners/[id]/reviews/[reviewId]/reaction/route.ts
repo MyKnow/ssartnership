@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { partnerReviewRepository } from "@/lib/repositories";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { ensureVisibleReviewPartner, getReviewMemberSession } from "../../_shared";
 
 export const runtime = "nodejs";
@@ -9,6 +10,17 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string; reviewId: string }> },
 ) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "잘못된 요청입니다." },
+      { status: 403 },
+    );
+  }
+
   const { id, reviewId } = await context.params;
   const session = await getReviewMemberSession().catch(() => null);
   if (!session?.userId) {

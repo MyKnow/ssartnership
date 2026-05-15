@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { partnerReviewRepository } from "@/lib/repositories";
-import { deleteReviewMediaUrls } from "@/lib/review-media-storage";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  deleteReviewMediaUrls,
+  verifyReviewMediaStorageUrls,
+} from "@/lib/review-media-storage";
 import {
   ensureVisibleReviewPartner,
   getReviewMemberSession,
@@ -16,6 +20,17 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string; reviewId: string }> },
 ) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["multipart/form-data"],
+    })
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "잘못된 요청입니다." },
+      { status: 403 },
+    );
+  }
+
   const { id, reviewId } = await context.params;
   const session = await getReviewMemberSession().catch(() => null);
   if (!session?.userId) {
@@ -60,6 +75,7 @@ export async function PATCH(
   let uploadedUrls: string[] = [];
 
   try {
+    await verifyReviewMediaStorageUrls(directUploadedUrls);
     const media = await resolveReviewMediaPayload(formData, id, reviewId);
     uploadedUrls = [...directUploadedUrls, ...media.uploadedUrls];
     const review = await partnerReviewRepository.updatePartnerReview({
@@ -101,6 +117,13 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string; reviewId: string }> },
 ) {
+  if (!isTrustedSameOriginRequest(request)) {
+    return NextResponse.json(
+      { ok: false, message: "잘못된 요청입니다." },
+      { status: 403 },
+    );
+  }
+
   const { id, reviewId } = await context.params;
   const session = await getReviewMemberSession().catch(() => null);
   if (!session?.userId) {

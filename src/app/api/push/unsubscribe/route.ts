@@ -10,17 +10,18 @@ import {
   deactivateAllPushSubscriptions,
   deactivatePushSubscription,
 } from "@/lib/push";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
-
 export async function POST(request: NextRequest) {
   const context = getRequestLogContext(request);
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
