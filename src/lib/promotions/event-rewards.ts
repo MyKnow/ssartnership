@@ -879,7 +879,7 @@ export async function createStoredEventRewardDraw(params: {
   });
   const supabase = getSupabaseAdminClient();
   const now = new Date().toISOString();
-  const guidePath = `/events/${params.campaign.slug}/winner-form`;
+  const guidePath = getEventRewardWinnerGuidePath(params.campaign.slug);
   const { data: draw, error: drawError } = await supabase
     .from("event_reward_draws")
     .insert({
@@ -968,6 +968,10 @@ export function isEventRewardNotificationSendComplete(
   sentAt: string | null,
 ) {
   return status === "sent" && Boolean(sentAt);
+}
+
+export function getEventRewardWinnerGuidePath(eventSlug: string) {
+  return `/events/${eventSlug}/winner-form`;
 }
 
 export function buildEventRewardWinnerNotificationInput(params: {
@@ -1127,18 +1131,22 @@ export async function sendEventRewardWinnerNotifications(
 }
 
 export async function sendEventRewardWinnerTestNotification(
-  drawId: string,
+  drawId: string | null,
   input: { memberId?: unknown; eventSlug?: string },
 ) {
   const request = normalizeEventRewardTestNotificationRequest(input);
-  const { drawRow } = await getEventRewardDrawRowForNotification(
-    drawId,
-    input.eventSlug,
-  );
+  const guidePath = drawId
+    ? (
+        await getEventRewardDrawRowForNotification(
+          drawId,
+          input.eventSlug,
+        )
+      ).drawRow.guide_path
+    : getEventRewardWinnerGuidePath(input.eventSlug ?? "signup-reward");
 
   const result = await sendAdminNotificationCampaign(
     buildEventRewardWinnerNotificationInput({
-      guidePath: drawRow.guide_path,
+      guidePath,
       memberIds: [request.memberId],
       confirmationText: EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
       testMode: true,
