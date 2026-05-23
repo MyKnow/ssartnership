@@ -186,7 +186,7 @@ function DashboardSidebar({
                 className={cn(
                   "flex min-h-12 items-center justify-center gap-3 rounded-[1rem] border px-3 text-sm font-semibold transition-surface xl:justify-start",
                   active
-                    ? "border-primary/20 bg-primary-soft text-primary shadow-flat"
+                    ? "border-primary bg-primary text-primary-foreground shadow-raised"
                     : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-control hover:text-foreground",
                 )}
               >
@@ -196,7 +196,7 @@ function DashboardSidebar({
                   <span
                     className={cn(
                       "block truncate text-xs font-medium",
-                      active ? "text-primary/75" : "text-muted-foreground",
+                      active ? "text-primary-foreground/80" : "text-muted-foreground",
                     )}
                   >
                     {item.description}

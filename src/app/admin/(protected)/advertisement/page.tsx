@@ -7,6 +7,7 @@ import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { savePromotionSlidesAction } from "@/app/admin/(protected)/_actions/promotion-actions";
 import {
+  getPromotionCampaignState,
   listManagedEventCampaigns,
   listManagedPromotionSlides,
 } from "@/lib/promotions/events";
@@ -41,9 +42,10 @@ export default async function AdminAdvertisementPage({
     listManagedEventCampaigns({ includeInactive: false }),
   ]);
   const eventPageOptions = eventCampaigns
-    .filter((campaign) => campaign.isActive)
+    .filter((campaign) => getPromotionCampaignState(campaign).key === "active")
     .map((campaign) => ({
       href: campaign.pagePath,
+      slug: campaign.slug,
       label: `${campaign.title} (${campaign.pagePath})`,
     }));
   const activeSlides = slides.filter((slide) => slide.isActive).length;

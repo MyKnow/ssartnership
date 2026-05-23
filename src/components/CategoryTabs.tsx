@@ -1,3 +1,4 @@
+import { CheckIcon } from "@heroicons/react/20/solid";
 import type { CategoryKey } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -24,25 +25,33 @@ export default function CategoryTabs({
           <button
             key={option.key}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(option.key)}
             className={cn(
-              "flex min-h-11 min-w-11 flex-col gap-0.5 rounded-[1rem] border px-4 py-2.5 text-left transition-surface duration-200 ease-out",
+              "flex min-h-11 min-w-11 items-start gap-2 rounded-[1rem] border px-4 py-2.5 text-left transition-surface duration-200 ease-out",
               isActive
-                ? "border-primary/20 bg-primary-soft text-primary shadow-flat"
+                ? "border-primary bg-primary text-primary-foreground shadow-raised"
                 : "border-border/80 bg-surface-control text-foreground shadow-flat hover:border-strong hover:bg-surface-elevated",
             )}
           >
-            <span className="text-sm font-semibold">{option.label}</span>
-            {option.description ? (
-              <span
-                className={cn(
-                  "text-xs leading-5",
-                  isActive ? "text-primary/80" : "text-muted-foreground",
-                )}
-              >
-                {option.description}
+            {isActive ? (
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary-foreground/18 text-primary-foreground">
+                <CheckIcon className="h-3 w-3" aria-hidden="true" />
               </span>
             ) : null}
+            <span className="grid gap-0.5">
+              <span className="text-sm font-semibold">{option.label}</span>
+              {option.description ? (
+                <span
+                  className={cn(
+                    "text-xs leading-5",
+                    isActive ? "text-primary-foreground/80" : "text-muted-foreground",
+                  )}
+                >
+                  {option.description}
+                </span>
+              ) : null}
+            </span>
           </button>
         );
       })}
