@@ -24,11 +24,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (
-    !isTrustedSameOriginRequest(request, {
-      allowedContentTypes: ["multipart/form-data"],
-    })
-  ) {
+  if (!isTrustedSameOriginRequest(request)) {
     return NextResponse.json(
       { ok: false, message: "잘못된 요청입니다." },
       { status: 403 },
@@ -68,6 +64,17 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["multipart/form-data"],
+    })
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "잘못된 요청입니다." },
+      { status: 403 },
+    );
+  }
+
   const { id } = await context.params;
   const session = await getReviewMemberSession().catch(() => null);
   if (!session?.userId) {

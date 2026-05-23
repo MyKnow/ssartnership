@@ -168,6 +168,29 @@ test("same-origin request guard requires matching origin or trusted referrer", a
     ),
     false,
   );
+  assert.equal(
+    isTrustedSameOriginRequest(
+      new Request("https://example.com/api/partners/partner-1/reviews", {
+        method: "GET",
+        headers: {
+          referer: "https://example.com/partners/partner-1",
+        },
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    isTrustedSameOriginRequest(
+      new Request("https://example.com/api/partners/partner-1/reviews", {
+        method: "GET",
+        headers: {
+          referer: "https://example.com/partners/partner-1",
+        },
+      }),
+      { allowedContentTypes: ["multipart/form-data"] },
+    ),
+    false,
+  );
 });
 
 test("admin basic auth validates credentials without direct string equality", async () => {
