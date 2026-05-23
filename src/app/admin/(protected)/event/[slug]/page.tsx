@@ -8,18 +8,28 @@ import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import {
+  createEventRewardDrawAction,
   createPromotionEventAction,
   deletePromotionEventAction,
+  sendEventRewardWinnerNotificationsAction,
   updatePromotionEventAction,
 } from "@/app/admin/(protected)/_actions/promotion-actions";
 import { getEventPageDefinition } from "@/lib/event-pages";
-import { PROMOTION_AUDIENCE_OPTIONS } from "@/lib/promotions/catalog";
+import { PROMOTION_AUDIENCE_OPTIONS, type EventCampaign } from "@/lib/promotions/catalog";
 import {
+  buildEventRewardAdminOverview,
+  buildEventRewardComparisonOverview,
   getEventRewardAdminOverview,
+  getLatestEventRewardDrawWithWinners,
   type EventRewardAdminMemberRow,
   type EventRewardAdminOverview,
+  type EventRewardStoredDraw,
 } from "@/lib/promotions/event-rewards";
-import { listManagedEventCampaigns, type ManagedEventCampaign } from "@/lib/promotions/events";
+import {
+  getPromotionCampaignState,
+  listManagedEventCampaigns,
+  type ManagedEventCampaign,
+} from "@/lib/promotions/events";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +42,12 @@ function statusMessage(status?: string) {
   }
   if (status === "deleted") {
     return "이벤트를 삭제했습니다.";
+  }
+  if (status === "draw-created") {
+    return "추첨 결과를 확정했습니다.";
+  }
+  if (status === "winner-sent") {
+    return "당첨 안내를 발송했습니다.";
   }
   return null;
 }
@@ -51,37 +67,14 @@ function formatEventDate(value: string) {
 }
 
 function getEventState(campaign: ManagedEventCampaign | null) {
-  if (!campaign || campaign.source !== "database" || !campaign.id) {
-    return {
-      label: "등록 필요",
-      className: "border-border bg-surface-inset text-muted-foreground",
-    };
-  }
-  if (!campaign.isActive) {
-    return {
-      label: "비활성",
-      className: "border-border bg-surface-inset text-muted-foreground",
-    };
-  }
-  const now = Date.now();
-  const startsAt = new Date(campaign.startsAt).getTime();
-  const endsAt = new Date(campaign.endsAt).getTime();
-  if (Number.isFinite(startsAt) && now < startsAt) {
-    return {
-      label: "진행 전",
-      className: "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-200",
-    };
-  }
-  if (Number.isFinite(endsAt) && now > endsAt) {
-    return {
-      label: "진행 후",
-      className: "border-border bg-surface-inset text-muted-foreground",
-    };
-  }
-  return {
-    label: "진행 중",
-    className: "border-primary/20 bg-primary-soft text-primary",
-  };
+  const state = getPromotionCampaignState(campaign);
+  const className =
+    state.key === "active"
+      ? "border-primary bg-primary text-primary-foreground"
+      : state.key === "upcoming"
+        ? "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-200"
+        : "border-border bg-surface-inset text-muted-foreground";
+  return { label: state.label, className };
 }
 
 function rewardConditionLabel(
@@ -116,10 +109,17 @@ function RewardStatusPill({
 }
 
 function SignupRewardOverviewSection({
+  campaign,
   overview,
+  draw,
+  warningMessage,
 }: {
+  campaign: EventCampaign;
   overview: EventRewardAdminOverview;
+  draw: EventRewardStoredDraw | null;
+  warningMessage?: string | null;
 }) {
+  const comparison = buildEventRewardComparisonOverview(campaign, overview.members);
   const conditionStats = [
     { label: "회원가입", value: `${overview.conditionCounts.signup ?? 0}명` },
     { label: "MM 알림", value: `${overview.conditionCounts.mm ?? 0}명` },
@@ -142,6 +142,12 @@ function SignupRewardOverviewSection({
         <Button href="/admin/event/signup-reward/rewards/export" variant="secondary">
           CSV 내보내기
         </Button>
+        <Button
+          href="/admin/event/signup-reward/rewards/export?kind=comparison"
+          variant="secondary"
+        >
+          전후 비교 CSV
+        </Button>
       </div>
 
       <StatsRow
@@ -150,9 +156,129 @@ function SignupRewardOverviewSection({
           { label: "총 추첨권", value: `${overview.totalTickets.toLocaleString()}장`, hint: "현재 조건 기준" },
           { label: "리뷰 인정", value: `${overview.reviewCount.toLocaleString()}개`, hint: "이벤트 기간 visible 리뷰" },
           { label: "가입 완료", value: `${(overview.conditionCounts.signup ?? 0).toLocaleString()}명`, hint: "종료 전 가입자" },
+          { label: "확인가능 증가", value: `${comparison.totalKnownTicketDelta.toLocaleString()}장`, hint: "before 복원 가능분 기준" },
         ]}
         minItemWidth="13rem"
       />
+      {warningMessage ? (
+        <FormMessage variant="error">{warningMessage}</FormMessage>
+      ) : null}
+
+      <Card tone="elevated" className="grid gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="ui-kicker">Draw</p>
+            <h3 className="mt-2 text-xl font-semibold text-foreground">
+              가중 추첨
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              추첨권 수만큼 확률을 부여하되 한 회원은 최대 1회만 당첨됩니다.
+            </p>
+          </div>
+          {draw ? (
+            <span className="rounded-full border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+              {draw.status}
+            </span>
+          ) : null}
+        </div>
+
+        {draw ? (
+          <div className="grid gap-4">
+            <StatsRow
+              items={[
+                { label: "당첨자", value: `${draw.winners.length.toLocaleString()}명`, hint: "확정 결과" },
+                { label: "후보", value: `${draw.candidateCount.toLocaleString()}명`, hint: "추첨권 1장 이상" },
+                { label: "총 추첨권", value: `${draw.totalTickets.toLocaleString()}장`, hint: "추첨 시점" },
+                { label: "Seed", value: draw.seed.slice(0, 12), hint: "재현용" },
+              ]}
+              minItemWidth="11rem"
+            />
+            <div className="overflow-x-auto rounded-[1rem] border border-border/70">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">순위</th>
+                    <th className="px-4 py-3">회원</th>
+                    <th className="px-4 py-3">기수/캠퍼스</th>
+                    <th className="px-4 py-3 text-right">추첨권</th>
+                    <th className="px-4 py-3">알림</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/70">
+                  {draw.winners.map((winner) => (
+                    <tr key={winner.id}>
+                      <td className="px-4 py-3 font-semibold text-foreground">
+                        {winner.rank}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-foreground">
+                          {winner.displayName || winner.mmUsername}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {winner.mmUsername}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {winner.year}기 · {winner.campus || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-foreground">
+                        {winner.ticketCount.toLocaleString()}장
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {winner.notificationStatus}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!draw.sentAt ? (
+              <form action={sendEventRewardWinnerNotificationsAction} className="flex justify-end">
+                <input type="hidden" name="slug" value="signup-reward" />
+                <input type="hidden" name="drawId" value={draw.id} />
+                <Button type="submit">앱+MM+푸시 발송</Button>
+              </form>
+            ) : null}
+          </div>
+        ) : (
+          <form action={createEventRewardDrawAction} className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+              <label className="grid gap-2 text-sm font-medium text-foreground">
+                당첨 인원
+                <input
+                  name="winnerCount"
+                  type="number"
+                  min="1"
+                  required
+                  className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-foreground">
+                구글폼 링크
+                <input
+                  name="googleFormUrl"
+                  type="url"
+                  required
+                  placeholder="https://docs.google.com/forms/..."
+                  className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+                />
+              </label>
+            </div>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              Seed 선택 입력
+              <input
+                name="seed"
+                placeholder="비워두면 자동 생성"
+                className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+              />
+            </label>
+            <input type="hidden" name="slug" value="signup-reward" />
+            <div className="flex justify-end">
+              <Button type="submit">추첨 확정</Button>
+            </div>
+          </form>
+        )}
+      </Card>
 
       <Card tone="muted" className="grid gap-3">
         <div className="flex flex-wrap gap-2">
@@ -242,10 +368,24 @@ export default async function AdminEventDetailPage({
   const registration = campaigns.find((campaign) => campaign.slug === slug) ?? null;
   const campaign = registration ?? definition;
   const isRegistered = registration?.source === "database" && Boolean(registration.id);
-  const state = getEventState(registration);
+  const state = getEventState(isRegistered ? registration : null);
   const message = statusMessage(paramsData.status);
-  const rewardOverview =
-    slug === "signup-reward" ? await getEventRewardAdminOverview(campaign) : null;
+  let rewardOverview: EventRewardAdminOverview | null = null;
+  let rewardDraw: EventRewardStoredDraw | null = null;
+  let rewardWarningMessage: string | null = null;
+  if (slug === "signup-reward") {
+    try {
+      [rewardOverview, rewardDraw] = await Promise.all([
+        getEventRewardAdminOverview(campaign),
+        getLatestEventRewardDrawWithWinners(slug),
+      ]);
+    } catch (error) {
+      console.error("[admin-event] reward overview query failed", error);
+      rewardOverview = buildEventRewardAdminOverview(campaign, []);
+      rewardWarningMessage =
+        "추첨권 현황 데이터를 불러오지 못했습니다. Supabase 연결과 이벤트 보상 테이블 상태를 확인해 주세요.";
+    }
+  }
   const targetLabel =
     registration?.targetAudiences?.map(
       (audience) => PROMOTION_AUDIENCE_OPTIONS.find((option) => option.key === audience)?.label ?? audience,
@@ -380,7 +520,12 @@ export default async function AdminEventDetailPage({
         </div>
 
         {rewardOverview ? (
-          <SignupRewardOverviewSection overview={rewardOverview} />
+          <SignupRewardOverviewSection
+            campaign={campaign}
+            overview={rewardOverview}
+            draw={rewardDraw}
+            warningMessage={rewardWarningMessage}
+          />
         ) : null}
       </div>
     </AdminShell>

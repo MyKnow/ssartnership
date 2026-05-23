@@ -126,7 +126,7 @@ export const Summary: Story = {
     await expect(canvas.getByText("local:/local.png")).toBeInTheDocument();
     await expect(
       canvas.getByText(
-        "storage:https://project.supabase.co/storage/v1/object/public/partner-media/path/file.webp",
+        "storage:/api/image?url=https%3A%2F%2Fproject.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fpartner-media%2Fpath%2Ffile.webp",
       ),
     ).toBeInTheDocument();
     await expect(canvas.getByText("data:data:image/png;base64,abc")).toBeInTheDocument();

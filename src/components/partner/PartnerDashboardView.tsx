@@ -150,15 +150,16 @@ function CompanyTabs({
             className={cn(
               "rounded-[1.1rem] border px-4 py-3 text-left transition-surface duration-200 ease-out",
               active
-                ? "border-primary/20 bg-primary-soft text-primary shadow-flat"
+                ? "border-primary bg-primary text-primary-foreground shadow-raised"
                 : "border-border/80 bg-surface-control text-foreground shadow-flat hover:border-strong hover:bg-surface-elevated",
             )}
+            aria-pressed={active}
           >
             <p className="text-sm font-semibold">{company.name}</p>
             <p
               className={cn(
                 "mt-1 text-xs",
-                active ? "text-primary/80" : "text-muted-foreground",
+                active ? "text-primary-foreground/80" : "text-muted-foreground",
               )}
             >
               {company.services.length}개 브랜드

@@ -2,13 +2,19 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { getAdminSession, requireAdmin } from "@/lib/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
 import { getEventPageDefinition } from "@/lib/event-pages";
+import {
+  createStoredEventRewardDraw,
+  normalizeEventRewardDrawRequest,
+  sendEventRewardWinnerNotifications,
+} from "@/lib/promotions/event-rewards";
+import { getManagedEventCampaign } from "@/lib/promotions/events";
 import {
   deletePromotionSlideImageUrls,
   uploadPromotionSlideImageFile,
@@ -113,6 +119,7 @@ type PromotionSlideDraftPayload = {
   isActive: boolean;
   audiences: PromotionAudience[];
   allowedCampuses: string[];
+  eventSlug: string | null;
 };
 
 function normalizeStringArray(value: unknown) {
@@ -139,6 +146,11 @@ function normalizePromotionAudiences(value: unknown) {
   return audiences.length > 0 ? audiences : [...DEFAULT_PROMOTION_AUDIENCES];
 }
 
+function extractEventSlugFromHref(href: string) {
+  const match = href.match(/^\/events\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:[/?#]|$)/);
+  return match?.[1] ?? null;
+}
+
 function parsePromotionSlideDrafts(formData: FormData) {
   const raw = getRequiredString(formData, "slidesJson");
   let parsed: unknown;
@@ -160,16 +172,27 @@ function parsePromotionSlideDrafts(formData: FormData) {
     if (!id) {
       throw new Error("광고 카드 식별자가 필요합니다.");
     }
+    const href = typeof record.href === "string" ? record.href.trim() : "";
+    const derivedEventSlug = extractEventSlugFromHref(href);
+    const rawEventSlug =
+      typeof record.eventSlug === "string" && record.eventSlug.trim()
+        ? normalizeSlug(record.eventSlug)
+        : null;
+    const eventSlug =
+      derivedEventSlug && (!rawEventSlug || rawEventSlug === derivedEventSlug)
+        ? derivedEventSlug
+        : null;
     return {
       id,
       title: typeof record.title === "string" ? record.title.trim() : "",
       subtitle: typeof record.subtitle === "string" ? record.subtitle.trim() : "",
       imageSrc: typeof record.imageSrc === "string" ? record.imageSrc.trim() : "",
       imageAlt: typeof record.imageAlt === "string" ? record.imageAlt.trim() : "",
-      href: typeof record.href === "string" ? record.href.trim() : "",
+      href,
       isActive: record.isActive === true,
       audiences: normalizePromotionAudiences(record.audiences),
       allowedCampuses: normalizeStringArray(record.allowedCampuses),
+      eventSlug,
     };
   });
   const ids = new Set(slides.map((slide) => slide.id));
@@ -317,6 +340,7 @@ export async function savePromotionSlidesAction(formData: FormData) {
     is_active: boolean;
     audiences: PromotionAudience[];
     allowed_campuses: string[];
+    event_slug: string | null;
   }> = [];
   const removedImageUrls = new Set<string>();
   const nextImageUrls = new Set<string>();
@@ -357,6 +381,7 @@ export async function savePromotionSlidesAction(formData: FormData) {
       is_active: slide.isActive,
       audiences: slide.audiences,
       allowed_campuses: slide.allowedCampuses,
+      event_slug: slide.eventSlug,
     });
     keepIds.add(slide.id);
     nextImageUrls.add(imageSrc);
@@ -408,4 +433,58 @@ export async function savePromotionSlidesAction(formData: FormData) {
 
   revalidateAdvertisementPaths();
   redirect("/admin/advertisement?status=updated");
+}
+
+export async function createEventRewardDrawAction(formData: FormData) {
+  await requireAdmin();
+  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const definition = getEventPageDefinition(slug);
+  if (!definition) {
+    throw new Error("이벤트 정의를 찾을 수 없습니다.");
+  }
+  const campaign = (await getManagedEventCampaign(slug)) ?? definition;
+  const request = normalizeEventRewardDrawRequest({
+    winnerCount: getRequiredString(formData, "winnerCount"),
+    seed: getString(formData, "seed"),
+    googleFormUrl: getRequiredString(formData, "googleFormUrl"),
+  });
+  const adminSession = await getAdminSession();
+  const draw = await createStoredEventRewardDraw({
+    campaign,
+    request,
+    createdByAdminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? null,
+  });
+
+  await logAdminAction("event_reward_draw_create", {
+    targetType: "event_reward_draw",
+    targetId: draw.id,
+    properties: {
+      eventSlug: slug,
+      winnerCount: draw.winnerCount,
+      candidateCount: draw.candidateCount,
+      totalTickets: draw.totalTickets,
+    },
+  });
+  revalidatePromotionPaths(slug);
+  redirect(`/admin/event/${slug}?status=draw-created`);
+}
+
+export async function sendEventRewardWinnerNotificationsAction(formData: FormData) {
+  await requireAdmin();
+  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const drawId = getRequiredString(formData, "drawId");
+  const result = await sendEventRewardWinnerNotifications(drawId);
+
+  await logAdminAction("event_reward_winner_notification_send", {
+    targetType: "event_reward_draw",
+    targetId: drawId,
+    properties: {
+      eventSlug: slug,
+      status: result.status,
+      notificationId: result.notificationId,
+      warnings: result.warnings.length,
+    },
+  });
+  revalidatePromotionPaths(slug);
+  redirect(`/admin/event/${slug}?status=winner-sent`);
 }
