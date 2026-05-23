@@ -46,6 +46,7 @@ type PromotionSlideRow = {
   is_active: boolean | null;
   audiences: unknown;
   allowed_campuses: unknown;
+  event_slug: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -67,6 +68,7 @@ export type ManagedPromotionSlide = PromotionSlide & {
   isActive: boolean;
   audiences: PromotionAudience[];
   allowedCampuses: string[];
+  eventSlug: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -143,6 +145,7 @@ function mapStaticSlide(slide: PromotionSlide, index: number): ManagedPromotionS
     isActive: true,
     audiences: normalizePromotionAudiences(slide.audiences),
     allowedCampuses: slide.allowedCampuses ?? [],
+    eventSlug: extractEventSlugFromHref(slide.href),
     createdAt: null,
     updatedAt: null,
   };
@@ -225,9 +228,15 @@ function mapSlideRow(row: PromotionSlideRow): ManagedPromotionSlide {
     isActive: row.is_active !== false,
     audiences: normalizePromotionAudiences(row.audiences),
     allowedCampuses: normalizeStringArray(row.allowed_campuses),
+    eventSlug: row.event_slug ?? extractEventSlugFromHref(row.href),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function extractEventSlugFromHref(href: string) {
+  const match = href.trim().match(/^\/events\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:[/?#]|$)/);
+  return match?.[1] ?? null;
 }
 
 function canUseSupabase() {
@@ -254,7 +263,7 @@ export async function listManagedPromotionSlides(options?: {
     let query = supabase
       .from("promotion_slides")
       .select(
-        "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,created_at,updated_at",
+        "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,event_slug,created_at,updated_at",
       )
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: true });
@@ -279,6 +288,74 @@ export type PromotionSlideViewer = {
   year?: number | null;
   campus?: string | null;
 };
+
+export type PromotionCampaignStateKey =
+  | "unregistered"
+  | "inactive"
+  | "upcoming"
+  | "active"
+  | "expired";
+
+export type PromotionCampaignState = {
+  key: PromotionCampaignStateKey;
+  label: string;
+  isVisible: boolean;
+};
+
+function toTime(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+export function getPromotionCampaignState(
+  campaign: ManagedEventCampaign | null,
+  now: Date = new Date(),
+): PromotionCampaignState {
+  if (!campaign) {
+    return {
+      key: "unregistered",
+      label: "등록 필요",
+      isVisible: false,
+    };
+  }
+  if (!campaign.isActive) {
+    return {
+      key: "inactive",
+      label: "비활성",
+      isVisible: false,
+    };
+  }
+
+  const nowTime = now.getTime();
+  const startsAt = toTime(campaign.startsAt);
+  const endsAt = toTime(campaign.endsAt);
+  if (startsAt !== null && nowTime < startsAt) {
+    return {
+      key: "upcoming",
+      label: "진행 전",
+      isVisible: false,
+    };
+  }
+  if (endsAt !== null && nowTime > endsAt) {
+    return {
+      key: "expired",
+      label: "진행 후",
+      isVisible: false,
+    };
+  }
+  return {
+    key: "active",
+    label: "진행 중",
+    isVisible: true,
+  };
+}
+
+export function isPromotionCampaignVisible(
+  campaign: ManagedEventCampaign | null,
+  now: Date = new Date(),
+) {
+  return getPromotionCampaignState(campaign, now).isVisible;
+}
 
 export function canViewPromotionSlide(
   slide: ManagedPromotionSlide,
@@ -305,6 +382,21 @@ export function canViewPromotionSlide(
     }
   }
   return true;
+}
+
+export function canDisplayHomePromotionSlide(
+  slide: ManagedPromotionSlide,
+  viewer: PromotionSlideViewer,
+  campaignsBySlug: ReadonlyMap<string, ManagedEventCampaign>,
+  now: Date = new Date(),
+) {
+  if (!slide.isActive || !canViewPromotionSlide(slide, viewer)) {
+    return false;
+  }
+  if (!slide.eventSlug) {
+    return true;
+  }
+  return isPromotionCampaignVisible(campaignsBySlug.get(slide.eventSlug) ?? null, now);
 }
 
 export async function listManagedEventCampaigns(options?: {
@@ -347,9 +439,13 @@ export async function getManagedEventCampaign(slug: string) {
 export async function getHomePromotionSlides(
   viewer: PromotionSlideViewer = { authenticated: false, year: null, campus: null },
 ): Promise<PromotionSlide[]> {
-  const slides = await listManagedPromotionSlides({ includeInactive: false });
+  const [slides, campaigns] = await Promise.all([
+    listManagedPromotionSlides({ includeInactive: false }),
+    listManagedEventCampaigns({ includeInactive: true }),
+  ]);
+  const campaignsBySlug = new Map(campaigns.map((campaign) => [campaign.slug, campaign]));
   return slides
-    .filter((slide) => canViewPromotionSlide(slide, viewer))
+    .filter((slide) => canDisplayHomePromotionSlide(slide, viewer, campaignsBySlug))
     .map((slide) => ({
       id: slide.id,
       title: slide.title,

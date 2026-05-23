@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/rss",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/archive-expired-promotions",
+      "schedule": "5 0 * * *"
     }
   ]
 }

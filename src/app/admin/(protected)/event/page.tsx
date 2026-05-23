@@ -6,7 +6,11 @@ import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { listEventPageDefinitions } from "@/lib/event-pages";
 import { PROMOTION_AUDIENCE_OPTIONS } from "@/lib/promotions/catalog";
-import { listManagedEventCampaigns, type ManagedEventCampaign } from "@/lib/promotions/events";
+import {
+  getPromotionCampaignState,
+  listManagedEventCampaigns,
+  type ManagedEventCampaign,
+} from "@/lib/promotions/events";
 
 export const dynamic = "force-dynamic";
 
@@ -32,37 +36,14 @@ function formatEventDate(value: string) {
 }
 
 function getEventState(campaign: ManagedEventCampaign | null) {
-  if (!campaign || campaign.source !== "database" || !campaign.id) {
-    return {
-      label: "등록 필요",
-      className: "border-border bg-surface-inset text-muted-foreground",
-    };
-  }
-  if (!campaign.isActive) {
-    return {
-      label: "비활성",
-      className: "border-border bg-surface-inset text-muted-foreground",
-    };
-  }
-  const now = Date.now();
-  const startsAt = new Date(campaign.startsAt).getTime();
-  const endsAt = new Date(campaign.endsAt).getTime();
-  if (Number.isFinite(startsAt) && now < startsAt) {
-    return {
-      label: "진행 전",
-      className: "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-200",
-    };
-  }
-  if (Number.isFinite(endsAt) && now > endsAt) {
-    return {
-      label: "진행 후",
-      className: "border-border bg-surface-inset text-muted-foreground",
-    };
-  }
-  return {
-    label: "진행 중",
-    className: "border-primary/20 bg-primary-soft text-primary",
-  };
+  const state = getPromotionCampaignState(campaign);
+  const className =
+    state.key === "active"
+      ? "border-primary bg-primary text-primary-foreground"
+      : state.key === "upcoming"
+        ? "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-200"
+        : "border-border bg-surface-inset text-muted-foreground";
+  return { label: state.label, className };
 }
 
 function EventPill({
@@ -87,7 +68,7 @@ function EventCard({
   registration: ManagedEventCampaign | null;
 }) {
   const isRegistered = registration?.source === "database" && Boolean(registration.id);
-  const state = getEventState(registration);
+  const state = getEventState(isRegistered ? registration : null);
   const periodStarts = formatEventDate(registration?.startsAt ?? definition.startsAt);
   const periodEnds = formatEventDate(registration?.endsAt ?? definition.endsAt);
   const targetLabel =
@@ -172,7 +153,8 @@ export default async function AdminEventPage({
       bucket,
       items: definitions.filter((definition) => {
         const registration = registrationMap.get(definition.slug) ?? null;
-        if (!registration) {
+        const isRegistered = registration?.source === "database" && Boolean(registration.id);
+        if (!isRegistered) {
           return bucket === "등록 필요";
         }
         return getEventState(registration).label === bucket;
