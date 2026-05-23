@@ -18,6 +18,7 @@ import {
 import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
+const CHECK_ONLY_FLAG = "--check-only";
 const DEFAULT_CACHE_CONTROL = "31536000";
 const EXCLUDED_PUBLIC_TABLES = [
   "admin_login_attempts",
@@ -649,6 +650,7 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
 }
 
 async function main() {
+  const checkOnly = process.argv.includes(CHECK_ONLY_FLAG);
   const productionDbUrl = requiredEnv("SUPABASE_PRODUCTION_DB_URL");
   const productionUrl = requiredEnv("SUPABASE_PRODUCTION_URL");
   const productionServiceRoleKey = requiredEnv("SUPABASE_PRODUCTION_SERVICE_ROLE_KEY");
@@ -678,6 +680,11 @@ async function main() {
     }
 
     throw error;
+  }
+
+  if (checkOnly) {
+    console.log("Preview database connection preflight passed.");
+    return;
   }
 
   const tempDir = await mkdtemp(join(tmpdir(), "ssartnership-preview-sync-"));
