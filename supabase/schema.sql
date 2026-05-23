@@ -2167,6 +2167,171 @@ create index if not exists partner_review_reactions_member_id_idx
 
 drop index if exists mm_verification_codes_email_idx;
 
+create table if not exists promotion_events (
+  id uuid primary key default uuid_generate_v4(),
+  slug text not null unique,
+  page_path text not null default '',
+  target_audiences text[] not null default array['guest', 'student', 'graduate', 'staff']::text[],
+  title text not null,
+  short_title text not null,
+  description text not null,
+  period_label text not null,
+  starts_at timestamp with time zone not null,
+  ends_at timestamp with time zone not null,
+  hero_image_src text not null,
+  hero_image_alt text not null,
+  conditions jsonb not null default '[]'::jsonb,
+  rules jsonb not null default '[]'::jsonb,
+  is_active boolean not null default true,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint promotion_events_slug_format_check
+    check (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+  constraint promotion_events_period_check
+    check (starts_at <= ends_at),
+  constraint promotion_events_conditions_array_check
+    check (jsonb_typeof(conditions) = 'array'),
+  constraint promotion_events_rules_array_check
+    check (jsonb_typeof(rules) = 'array')
+);
+
+comment on table promotion_events is
+  'Admin-managed public event landing pages and home promotion carousel event entries.';
+
+create index if not exists promotion_events_active_period_idx
+  on promotion_events(is_active, starts_at desc, ends_at desc);
+create index if not exists promotion_events_updated_at_idx
+  on promotion_events(updated_at desc);
+
+create table if not exists promotion_slides (
+  id uuid primary key default uuid_generate_v4(),
+  display_order integer not null,
+  title text not null,
+  subtitle text not null,
+  image_src text not null,
+  image_alt text not null,
+  href text not null,
+  is_active boolean not null default true,
+  requires_login boolean not null default false,
+  allowed_years integer[] not null default '{}'::integer[],
+  allowed_campuses text[] not null default '{}'::text[],
+  audiences text[] not null default array['guest', 'student', 'graduate', 'staff']::text[],
+  event_slug text references promotion_events(slug) on delete set null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+create index if not exists promotion_slides_active_order_idx
+  on promotion_slides(is_active, display_order, created_at);
+create index if not exists promotion_slides_event_slug_idx
+  on promotion_slides(event_slug);
+
+create table if not exists event_reward_draws (
+  id uuid primary key default uuid_generate_v4(),
+  event_slug text not null references promotion_events(slug) on delete cascade,
+  status text not null default 'draft',
+  seed text not null,
+  winner_count integer not null,
+  candidate_count integer not null default 0,
+  total_tickets integer not null default 0,
+  google_form_url text not null,
+  guide_path text not null,
+  sent_notification_id uuid references notifications(id) on delete set null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_by_admin_id text,
+  created_at timestamp with time zone not null default now(),
+  finalized_at timestamp with time zone,
+  sent_at timestamp with time zone,
+  updated_at timestamp with time zone not null default now(),
+  constraint event_reward_draws_status_check
+    check (status in ('draft', 'finalized', 'sent', 'partial_failed', 'failed')),
+  constraint event_reward_draws_winner_count_check
+    check (winner_count > 0),
+  constraint event_reward_draws_candidate_count_check
+    check (candidate_count >= 0),
+  constraint event_reward_draws_total_tickets_check
+    check (total_tickets >= 0),
+  constraint event_reward_draws_google_form_url_check
+    check (google_form_url like 'https://%'),
+  constraint event_reward_draws_guide_path_check
+    check (guide_path like '/%' and guide_path not like '//%')
+);
+
+comment on table event_reward_draws is
+  'Admin-created weighted reward event draws. One finalized draw is allowed per event.';
+
+create unique index if not exists event_reward_draws_one_finalized_per_event_idx
+  on event_reward_draws(event_slug)
+  where status in ('finalized', 'sent', 'partial_failed', 'failed');
+create index if not exists event_reward_draws_event_created_at_idx
+  on event_reward_draws(event_slug, created_at desc);
+
+create table if not exists event_reward_winners (
+  id uuid primary key default uuid_generate_v4(),
+  draw_id uuid not null references event_reward_draws(id) on delete cascade,
+  event_slug text not null references promotion_events(slug) on delete cascade,
+  member_id uuid not null references members(id) on delete cascade,
+  winner_rank integer not null,
+  ticket_count integer not null,
+  display_name text,
+  mm_username text,
+  year integer,
+  campus text,
+  notification_status text not null default 'pending',
+  notification_sent_at timestamp with time zone,
+  notification_error text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint event_reward_winners_rank_check
+    check (winner_rank > 0),
+  constraint event_reward_winners_ticket_count_check
+    check (ticket_count > 0),
+  constraint event_reward_winners_notification_status_check
+    check (notification_status in ('pending', 'sent', 'partial_failed', 'failed', 'skipped')),
+  constraint event_reward_winners_draw_member_key unique (draw_id, member_id),
+  constraint event_reward_winners_draw_rank_key unique (draw_id, winner_rank)
+);
+
+comment on table event_reward_winners is
+  'Persisted winners for reward event draws and notification delivery status.';
+
+create index if not exists event_reward_winners_event_member_idx
+  on event_reward_winners(event_slug, member_id);
+create index if not exists event_reward_winners_draw_rank_idx
+  on event_reward_winners(draw_id, winner_rank);
+
+create or replace function set_event_reward_draws_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists event_reward_draws_set_updated_at on event_reward_draws;
+create trigger event_reward_draws_set_updated_at
+  before update on event_reward_draws
+  for each row
+  execute function set_event_reward_draws_updated_at();
+
+create or replace function set_event_reward_winners_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists event_reward_winners_set_updated_at on event_reward_winners;
+create trigger event_reward_winners_set_updated_at
+  before update on event_reward_winners
+  for each row
+  execute function set_event_reward_winners_updated_at();
+
 alter table categories enable row level security;
 alter table public_cache_versions enable row level security;
 alter table partner_companies enable row level security;
@@ -2198,6 +2363,10 @@ alter table push_delivery_logs enable row level security;
 alter table event_logs enable row level security;
 alter table partner_metric_rollups enable row level security;
 alter table partner_metric_unique_visitors enable row level security;
+alter table promotion_events enable row level security;
+alter table promotion_slides enable row level security;
+alter table event_reward_draws enable row level security;
+alter table event_reward_winners enable row level security;
 alter table admin_audit_logs enable row level security;
 alter table auth_security_logs enable row level security;
 
@@ -2270,6 +2439,14 @@ revoke all on table partner_metric_rollups from anon;
 revoke all on table partner_metric_rollups from authenticated;
 revoke all on table partner_metric_unique_visitors from anon;
 revoke all on table partner_metric_unique_visitors from authenticated;
+revoke all on table promotion_events from anon;
+revoke all on table promotion_events from authenticated;
+revoke all on table promotion_slides from anon;
+revoke all on table promotion_slides from authenticated;
+revoke all on table event_reward_draws from anon;
+revoke all on table event_reward_draws from authenticated;
+revoke all on table event_reward_winners from anon;
+revoke all on table event_reward_winners from authenticated;
 revoke all on table admin_audit_logs from anon;
 revoke all on table admin_audit_logs from authenticated;
 revoke all on table auth_security_logs from anon;

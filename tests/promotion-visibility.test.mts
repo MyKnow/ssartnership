@@ -16,6 +16,7 @@ const promotionsPromise = import(
 function createSlide(options: {
   audiences: PromotionAudience[];
   allowedCampuses?: string[];
+  eventSlug?: string | null;
 }): ManagedPromotionSlide {
   return {
     id: "guest-visible-ad",
@@ -30,6 +31,34 @@ function createSlide(options: {
     isActive: true,
     audiences: options.audiences,
     allowedCampuses: options.allowedCampuses ?? [],
+    eventSlug: options.eventSlug ?? null,
+    createdAt: "2026-04-27T00:00:00.000Z",
+    updatedAt: "2026-04-27T00:00:00.000Z",
+  };
+}
+
+function createCampaign(options: {
+  isActive?: boolean;
+  startsAt?: string;
+  endsAt?: string;
+}) {
+  return {
+    id: "event-1",
+    slug: "signup-reward",
+    title: "싸트너십 추첨권 이벤트",
+    shortTitle: "추첨권 이벤트",
+    description: "이벤트",
+    periodLabel: "기간",
+    startsAt: options.startsAt ?? "2026-05-01T00:00:00+09:00",
+    endsAt: options.endsAt ?? "2026-05-31T23:59:59+09:00",
+    heroImageSrc: "/ads/reward-event.svg",
+    heroImageAlt: "이벤트",
+    conditions: [],
+    rules: [],
+    pagePath: "/events/signup-reward",
+    targetAudiences: ["guest", "student", "graduate", "staff"] as PromotionAudience[],
+    isActive: options.isActive ?? true,
+    source: "database" as const,
     createdAt: "2026-04-27T00:00:00.000Z",
     updatedAt: "2026-04-27T00:00:00.000Z",
   };
@@ -79,4 +108,90 @@ test("promotion slide visibility still respects audience and campus for authenti
   assert.equal(canViewPromotionSlide(slide, seoulStudent), true);
   assert.equal(canViewPromotionSlide(slide, daejeonStudent), false);
   assert.equal(canViewPromotionSlide(slide, guest), false);
+});
+
+test("promotion campaign visibility follows active flag and period", async () => {
+  const { getPromotionCampaignState, isPromotionCampaignVisible } =
+    await promotionsPromise;
+  const now = new Date("2026-05-10T12:00:00+09:00");
+  const expiredCatalogCampaign = {
+    ...createCampaign({
+      endsAt: "2026-05-09T23:59:59+09:00",
+    }),
+    id: null,
+    source: "catalog" as const,
+  };
+
+  assert.equal(getPromotionCampaignState(null, now).key, "unregistered");
+  assert.equal(
+    getPromotionCampaignState(createCampaign({ isActive: false }), now).key,
+    "inactive",
+  );
+  assert.equal(
+    getPromotionCampaignState(
+      createCampaign({ startsAt: "2026-05-20T00:00:00+09:00" }),
+      now,
+    ).key,
+    "upcoming",
+  );
+  assert.equal(getPromotionCampaignState(createCampaign({}), now).key, "active");
+  assert.equal(
+    getPromotionCampaignState(
+      createCampaign({ endsAt: "2026-05-09T23:59:59+09:00" }),
+      now,
+    ).key,
+    "expired",
+  );
+  assert.equal(isPromotionCampaignVisible(createCampaign({}), now), true);
+  assert.equal(
+    isPromotionCampaignVisible(
+      createCampaign({ endsAt: "2026-05-09T23:59:59+09:00" }),
+      now,
+    ),
+    false,
+  );
+  assert.equal(getPromotionCampaignState(expiredCatalogCampaign, now).key, "expired");
+  assert.equal(isPromotionCampaignVisible(expiredCatalogCampaign, now), false);
+});
+
+test("linked home carousel slides are hidden when the event is no longer visible", async () => {
+  const { canDisplayHomePromotionSlide } = await promotionsPromise;
+  const viewer = {
+    authenticated: false,
+    year: null,
+    campus: null,
+  };
+  const linkedSlide = createSlide({
+    audiences: ["guest"],
+    eventSlug: "signup-reward",
+  });
+  const unlinkedSlide = createSlide({
+    audiences: ["guest"],
+    eventSlug: null,
+  });
+  const campaigns = new Map([
+    [
+      "signup-reward",
+      createCampaign({ endsAt: "2026-05-09T23:59:59+09:00" }),
+    ],
+  ]);
+
+  assert.equal(
+    canDisplayHomePromotionSlide(
+      linkedSlide,
+      viewer,
+      campaigns,
+      new Date("2026-05-10T12:00:00+09:00"),
+    ),
+    false,
+  );
+  assert.equal(
+    canDisplayHomePromotionSlide(
+      unlinkedSlide,
+      viewer,
+      campaigns,
+      new Date("2026-05-10T12:00:00+09:00"),
+    ),
+    true,
+  );
 });

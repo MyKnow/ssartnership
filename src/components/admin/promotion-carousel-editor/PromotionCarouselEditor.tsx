@@ -49,6 +49,7 @@ type SlideDraft = {
   isActive: boolean;
   audiences: PromotionAudience[];
   allowedCampuses: CampusSlug[];
+  eventSlug: string | null;
   source: "database" | "catalog";
 };
 
@@ -59,6 +60,7 @@ type PendingCrop = {
 
 export type PromotionEventPageOption = {
   href: string;
+  slug: string;
   label: string;
 };
 
@@ -113,12 +115,18 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
     audiences:
       slide.audiences.length > 0 ? [...slide.audiences] : [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses,
+    eventSlug: slide.eventSlug,
     source: slide.source,
   };
 }
 
 function getFileInputName(id: string) {
   return `slide_image_${id}`;
+}
+
+function extractEventSlugFromHref(href: string) {
+  const match = href.trim().match(/^\/events\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:[/?#]|$)/);
+  return match?.[1] ?? null;
 }
 
 function loadImageElement(sourceUrl: string) {
@@ -276,6 +284,7 @@ export default function PromotionCarouselEditor({
           isActive: slide.isActive,
           audiences: slide.audiences,
           allowedCampuses: slide.allowedCampuses,
+          eventSlug: slide.eventSlug,
         })),
       ),
     [slides],
@@ -357,6 +366,7 @@ export default function PromotionCarouselEditor({
         isActive: true,
         audiences: [...DEFAULT_PROMOTION_AUDIENCES],
         allowedCampuses: [],
+        eventSlug: null,
         source: "database",
       },
     ]);
@@ -687,7 +697,12 @@ export default function PromotionCarouselEditor({
                           if (!href) {
                             return;
                           }
-                          updateSlide(slide.id, (current) => ({ ...current, href }));
+                          const option = eventPageOptions.find((item) => item.href === href);
+                          updateSlide(slide.id, (current) => ({
+                            ...current,
+                            href,
+                            eventSlug: option?.slug ?? null,
+                          }));
                         }}
                       >
                         <option value="">
@@ -707,9 +722,16 @@ export default function PromotionCarouselEditor({
                       연결 페이지
                       <Input
                         value={slide.href}
-                        onChange={(event) =>
-                          updateSlide(slide.id, (current) => ({ ...current, href: event.target.value }))
-                        }
+                        onChange={(event) => {
+                          const href = event.target.value;
+                          updateSlide(slide.id, (current) => ({
+                            ...current,
+                            href,
+                            eventSlug:
+                              eventPageOptions.find((option) => option.href === href)?.slug ??
+                              extractEventSlugFromHref(href),
+                          }));
+                        }}
                         placeholder="/events/signup-reward"
                         disabled={!editable}
                         className={hrefInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}

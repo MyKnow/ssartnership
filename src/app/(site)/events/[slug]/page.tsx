@@ -6,7 +6,10 @@ import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
 import { getHeaderSession } from "@/lib/header-session";
 import { getEventPageDefinition, listEventPageDefinitions } from "@/lib/event-pages";
-import { getManagedEventCampaign } from "@/lib/promotions/events";
+import {
+  getManagedEventCampaign,
+  isPromotionCampaignVisible,
+} from "@/lib/promotions/events";
 import { getEventRewardSummary } from "@/lib/promotions/event-rewards";
 import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import { SITE_NAME } from "@/lib/site";
@@ -31,6 +34,7 @@ export async function generateMetadata({
   const registration = await getManagedEventCampaign(slug);
   const campaign = registration ?? definition;
   const canonicalPath = registration?.pagePath ?? `/events/${campaign.slug}`;
+  const visible = registration ? isPromotionCampaignVisible(registration) : false;
 
   return {
     title: `${campaign.title} | ${SITE_NAME}`,
@@ -59,7 +63,7 @@ export async function generateMetadata({
       images: [campaign.heroImageSrc],
     },
     robots: {
-      index: Boolean(registration?.source === "database" && registration.isActive),
+      index: visible,
       follow: true,
     },
   };
@@ -77,11 +81,16 @@ export default async function EventPage({
   }
   const registration = await getManagedEventCampaign(slug);
   const campaign = registration ?? definition;
+  if (!registration || !isPromotionCampaignVisible(registration)) {
+    notFound();
+  }
   const canonicalPath = registration?.pagePath ?? `/events/${campaign.slug}`;
 
   const session = await getSignedUserSession();
   const rewardsEnabled = Boolean(
-    registration?.source === "database" && registration.id && registration.isActive,
+    registration?.source === "database" &&
+      registration.id &&
+      isPromotionCampaignVisible(registration),
   );
   const [headerSession, summary] = await Promise.all([
     getHeaderSession(session?.userId ?? undefined),
