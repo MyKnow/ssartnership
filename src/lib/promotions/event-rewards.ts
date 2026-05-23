@@ -122,10 +122,17 @@ type ReviewRow = {
   member_id: string | null;
 };
 
+export type EventRewardDrawStatus =
+  | "draft"
+  | "finalized"
+  | "sent"
+  | "partial_failed"
+  | "failed";
+
 type EventRewardDrawRow = {
   id: string;
   event_slug: string;
-  status: "draft" | "finalized" | "sent" | "partial_failed" | "failed";
+  status: EventRewardDrawStatus;
   seed: string;
   winner_count: number;
   candidate_count: number;
@@ -180,7 +187,7 @@ export type EventRewardStoredWinner = {
 export type EventRewardStoredDraw = {
   id: string;
   eventSlug: string;
-  status: EventRewardDrawRow["status"];
+  status: EventRewardDrawStatus;
   seed: string;
   winnerCount: number;
   candidateCount: number;
@@ -195,6 +202,8 @@ export type EventRewardStoredDraw = {
   updatedAt: string;
   winners: EventRewardStoredWinner[];
 };
+
+export type EventRewardNotificationSendStatus = "sent" | "partial_failed" | "failed";
 
 function assertEventRewardQuerySucceeded(error: unknown, label: string) {
   if (!error) {
@@ -906,17 +915,31 @@ function drawNotificationStatus(params: {
   targeted: number;
   sent: number;
   failed: number;
-}) {
+}): EventRewardNotificationSendStatus {
   if (params.targeted === 0) {
-    return "skipped" as const;
+    return "failed";
   }
   if (params.sent === 0) {
-    return "failed" as const;
+    return "failed";
   }
   if (params.failed > 0 || params.sent < params.targeted) {
-    return "partial_failed" as const;
+    return "partial_failed";
   }
-  return "sent" as const;
+  return "sent";
+}
+
+export function resolveEventRewardNotificationSentAt(
+  status: EventRewardNotificationSendStatus,
+  attemptedAt: string,
+) {
+  return status === "sent" ? attemptedAt : null;
+}
+
+export function isEventRewardNotificationSendComplete(
+  status: EventRewardDrawStatus,
+  sentAt: string | null,
+) {
+  return status === "sent" && Boolean(sentAt);
 }
 
 export async function sendEventRewardWinnerNotifications(drawId: string) {
@@ -934,7 +957,12 @@ export async function sendEventRewardWinnerNotifications(drawId: string) {
   if (!drawRow) {
     throw new Error("추첨 결과를 찾을 수 없습니다.");
   }
-  if (drawRow.sent_at) {
+  if (
+    isEventRewardNotificationSendComplete(
+      drawRow.status as EventRewardDrawStatus,
+      drawRow.sent_at as string | null,
+    )
+  ) {
     throw new Error("이미 당첨 안내를 발송했습니다.");
   }
 
@@ -981,7 +1009,8 @@ export async function sendEventRewardWinnerNotifications(drawId: string) {
     { targeted: 0, sent: 0, failed: 0 },
   );
   const status = drawNotificationStatus(aggregate);
-  const sentAt = new Date().toISOString();
+  const attemptedAt = new Date().toISOString();
+  const sentAt = resolveEventRewardNotificationSentAt(status, attemptedAt);
   const errorMessage = result.warnings.length > 0 ? result.warnings.join("\n") : null;
 
   const { error: updateDrawError } = await supabase
@@ -993,6 +1022,7 @@ export async function sendEventRewardWinnerNotifications(drawId: string) {
       metadata: {
         ...(drawRow.metadata ?? {}),
         channelResults: result.channelResults,
+        lastNotificationAttemptedAt: attemptedAt,
         warnings: result.warnings,
       },
     })

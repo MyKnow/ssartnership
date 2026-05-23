@@ -279,6 +279,22 @@ test("event reward draw input validates winner count and Google Forms URL", asyn
   );
 });
 
+test("event reward winner notification failures stay retryable", async () => {
+  const {
+    isEventRewardNotificationSendComplete,
+    resolveEventRewardNotificationSentAt,
+  } = await eventRewardsModulePromise;
+  const attemptedAt = "2026-05-23T10:30:00.000Z";
+
+  assert.equal(resolveEventRewardNotificationSentAt("sent", attemptedAt), attemptedAt);
+  assert.equal(resolveEventRewardNotificationSentAt("partial_failed", attemptedAt), null);
+  assert.equal(resolveEventRewardNotificationSentAt("failed", attemptedAt), null);
+  assert.equal(isEventRewardNotificationSendComplete("sent", attemptedAt), true);
+  assert.equal(isEventRewardNotificationSendComplete("sent", null), false);
+  assert.equal(isEventRewardNotificationSendComplete("partial_failed", attemptedAt), false);
+  assert.equal(isEventRewardNotificationSendComplete("failed", attemptedAt), false);
+});
+
 test("winner form access only allows the winning signed-in member", async () => {
   const { canViewEventRewardWinnerForm } = await eventRewardsModulePromise;
 
