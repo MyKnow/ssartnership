@@ -4,7 +4,10 @@ import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
 import { collectPagedRows } from "@/lib/log-insights/paging";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { getPushPreferencesOrDefault } from "@/lib/push";
-import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
+import {
+  sendAdminNotificationCampaign,
+  type AdminNotificationComposerInput,
+} from "@/lib/admin-notification-ops";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog";
 
@@ -204,6 +207,8 @@ export type EventRewardStoredDraw = {
 };
 
 export type EventRewardNotificationSendStatus = "sent" | "partial_failed" | "failed";
+
+export const EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT = "알림 발송";
 
 function assertEventRewardQuerySucceeded(error: unknown, label: string) {
   if (!error) {
@@ -577,6 +582,29 @@ export function normalizeEventRewardDrawRequest(input: {
   };
 }
 
+export function normalizeEventRewardWinnerNotificationRequest(input: {
+  confirmationText?: unknown;
+}) {
+  const confirmationText =
+    typeof input.confirmationText === "string" ? input.confirmationText.trim() : "";
+  if (confirmationText !== EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT) {
+    throw new Error(
+      `확인 문구 '${EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}'를 정확히 입력해 주세요.`,
+    );
+  }
+  return { confirmationText };
+}
+
+export function normalizeEventRewardTestNotificationRequest(input: {
+  memberId?: unknown;
+}) {
+  const memberId = typeof input.memberId === "string" ? input.memberId.trim() : "";
+  if (!memberId) {
+    throw new Error("테스트 수신자를 선택해 주세요.");
+  }
+  return { memberId };
+}
+
 export function createEventRewardDrawPlan(
   overview: EventRewardAdminOverview,
   input: {
@@ -942,21 +970,77 @@ export function isEventRewardNotificationSendComplete(
   return status === "sent" && Boolean(sentAt);
 }
 
-export async function sendEventRewardWinnerNotifications(drawId: string) {
+export function buildEventRewardWinnerNotificationInput(params: {
+  guidePath: string;
+  memberIds: readonly string[];
+  confirmationText: string;
+  testMode?: boolean;
+}): AdminNotificationComposerInput {
+  const memberIds = Array.from(
+    new Set(params.memberIds.map((memberId) => memberId.trim()).filter(Boolean)),
+  );
+  if (memberIds.length === 0) {
+    throw new Error("발송 대상 당첨자를 찾을 수 없습니다.");
+  }
+
+  const title = params.testMode
+    ? "[테스트] 싸트너십 추첨권 이벤트 당첨 안내"
+    : "싸트너십 추첨권 이벤트 당첨 안내";
+  const body = params.testMode
+    ? "운영 테스트 발송입니다. 실제 당첨 안내가 아니며, 구글폼은 로그인한 당첨자에게만 노출됩니다."
+    : "축하합니다. 기프티콘 발송 정보 입력을 위해 당첨 안내 페이지에서 구글폼을 확인해 주세요.";
+
+  return {
+    notificationType: "announcement",
+    title,
+    body,
+    url: params.guidePath,
+    audience: {
+      scope: "member",
+      memberIds,
+    },
+    channels: {
+      in_app: true,
+      push: true,
+      mm: true,
+    },
+    confirmationText: params.confirmationText,
+  };
+}
+
+async function getEventRewardDrawRowForNotification(
+  drawId: string,
+  eventSlug?: string,
+) {
   const supabase = getSupabaseAdminClient();
-  const { data: drawRow, error: drawError } = await supabase
+  let query = supabase
     .from("event_reward_draws")
     .select(
       "id,event_slug,status,seed,winner_count,candidate_count,total_tickets,google_form_url,guide_path,sent_notification_id,metadata,created_by_admin_id,created_at,finalized_at,sent_at,updated_at",
     )
-    .eq("id", drawId)
-    .maybeSingle();
+    .eq("id", drawId);
+  if (eventSlug) {
+    query = query.eq("event_slug", eventSlug);
+  }
+  const { data: drawRow, error: drawError } = await query.maybeSingle();
   if (drawError) {
     throw new Error(drawError.message);
   }
   if (!drawRow) {
     throw new Error("추첨 결과를 찾을 수 없습니다.");
   }
+  return { supabase, drawRow: drawRow as EventRewardDrawRow };
+}
+
+export async function sendEventRewardWinnerNotifications(
+  drawId: string,
+  input: { confirmationText?: unknown; eventSlug?: string },
+) {
+  const request = normalizeEventRewardWinnerNotificationRequest(input);
+  const { supabase, drawRow } = await getEventRewardDrawRowForNotification(
+    drawId,
+    input.eventSlug,
+  );
   if (
     isEventRewardNotificationSendComplete(
       drawRow.status as EventRewardDrawStatus,
@@ -983,22 +1067,13 @@ export async function sendEventRewardWinnerNotifications(drawId: string) {
     throw new Error("당첨자가 없습니다.");
   }
 
-  const result = await sendAdminNotificationCampaign({
-    notificationType: "announcement",
-    title: "싸트너십 추첨권 이벤트 당첨 안내",
-    body: "축하합니다. 기프티콘 발송 정보 입력을 위해 당첨 안내 페이지에서 구글폼을 확인해 주세요.",
-    url: drawRow.guide_path,
-    audience: {
-      scope: "member",
+  const result = await sendAdminNotificationCampaign(
+    buildEventRewardWinnerNotificationInput({
+      guidePath: drawRow.guide_path,
       memberIds,
-    },
-    channels: {
-      in_app: true,
-      push: true,
-      mm: true,
-    },
-    confirmationText: "알림 발송",
-  });
+      confirmationText: request.confirmationText,
+    }),
+  );
 
   const aggregate = Object.values(result.channelResults).reduce(
     (accumulator, channel) => ({
@@ -1045,6 +1120,42 @@ export async function sendEventRewardWinnerNotifications(drawId: string) {
 
   return {
     status,
+    notificationId: result.notificationId,
+    channelResults: result.channelResults,
+    warnings: result.warnings,
+  };
+}
+
+export async function sendEventRewardWinnerTestNotification(
+  drawId: string,
+  input: { memberId?: unknown; eventSlug?: string },
+) {
+  const request = normalizeEventRewardTestNotificationRequest(input);
+  const { drawRow } = await getEventRewardDrawRowForNotification(
+    drawId,
+    input.eventSlug,
+  );
+
+  const result = await sendAdminNotificationCampaign(
+    buildEventRewardWinnerNotificationInput({
+      guidePath: drawRow.guide_path,
+      memberIds: [request.memberId],
+      confirmationText: EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
+      testMode: true,
+    }),
+  );
+
+  return {
+    status: drawNotificationStatus(
+      Object.values(result.channelResults).reduce(
+        (accumulator, channel) => ({
+          targeted: accumulator.targeted + channel.targeted,
+          sent: accumulator.sent + channel.sent,
+          failed: accumulator.failed + channel.failed,
+        }),
+        { targeted: 0, sent: 0, failed: 0 },
+      ),
+    ),
     notificationId: result.notificationId,
     channelResults: result.channelResults,
     warnings: result.warnings,
