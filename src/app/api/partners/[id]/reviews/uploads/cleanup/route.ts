@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractReviewMediaStoragePath, REVIEW_MEDIA_BUCKET } from "@/lib/review-media";
 import { deleteReviewMediaUrls } from "@/lib/review-media-storage";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   ensureVisibleReviewPartner,
   getReviewMemberSession,
@@ -38,6 +39,17 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "잘못된 요청입니다." },
+      { status: 403 },
+    );
+  }
+
   const { id } = await context.params;
   const session = await getReviewMemberSession().catch(() => null);
   if (!session?.userId) {

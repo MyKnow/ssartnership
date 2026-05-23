@@ -12,11 +12,19 @@ const ADMIN_COOKIE_NAME = "admin_session";
 const PARTNER_COOKIE_NAME = "partner_session";
 
 function getSecret() {
-  return process.env.USER_SESSION_SECRET ?? "";
+  const secret = process.env.USER_SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    return null;
+  }
+  return secret;
 }
 
 function getPartnerSecret() {
-  return process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET ?? "";
+  const secret = process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    return null;
+  }
+  return secret;
 }
 
 function getAdminSecret() {
@@ -62,8 +70,12 @@ async function verifyToken(token: string) {
   if (!payload || !signature) {
     return null;
   }
+  const secret = getSecret();
+  if (!secret) {
+    return null;
+  }
   try {
-    const expected = await hmacSha256Hex(payload, getSecret());
+    const expected = await hmacSha256Hex(payload, secret);
     if (expected !== signature) {
       return null;
     }
@@ -98,8 +110,12 @@ async function verifyPartnerToken(token: string) {
   if (!payload || !signature) {
     return null;
   }
+  const secret = getPartnerSecret();
+  if (!secret) {
+    return null;
+  }
   try {
-    const expected = await hmacSha256Hex(payload, getPartnerSecret());
+    const expected = await hmacSha256Hex(payload, secret);
     if (expected !== signature) {
       return null;
     }

@@ -4,6 +4,7 @@ import {
   type AdminPartnerFileTemplateOptions,
 } from "@/lib/admin-partner-file-import";
 import { createAdminPartnerXlsxTemplate } from "@/lib/admin-partner-file-import.server";
+import { requireAdmin } from "@/lib/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ function parseTemplateOptions(request: Request): AdminPartnerFileTemplateOptions
 }
 
 export async function GET(request: Request) {
+  await requireAdmin();
+
   const options = parseTemplateOptions(request);
   if (!options) {
     return NextResponse.json(

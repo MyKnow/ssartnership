@@ -2,13 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { updateMemberNotificationPreferences } from "@/lib/notification-preferences";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
-
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || origin === request.nextUrl.origin;
-}
 
 function toOptionalBoolean(value: unknown) {
   return typeof value === "boolean" ? value : undefined;
@@ -16,7 +12,12 @@ function toOptionalBoolean(value: unknown) {
 
 export async function POST(request: NextRequest) {
   const context = getRequestLogContext(request);
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 

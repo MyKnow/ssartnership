@@ -5,17 +5,19 @@ import {
   resolveCurrentActor,
   scheduleProductEventLog,
 } from '@/lib/activity-logs';
+import { consumeProductEventQuota } from '@/lib/product-event-throttle';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
+import { isTrustedSameOriginRequest } from '@/lib/request-guards';
 
 export const runtime = 'nodejs';
 
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  return !origin || origin === request.nextUrl.origin;
-}
-
 export async function POST(request: NextRequest) {
-  if (!isSameOrigin(request)) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+      allowedContentTypes: ['application/json'],
+    })
+  ) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 403 });
   }
 
@@ -34,8 +36,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: '허용되지 않은 이벤트입니다.' }, { status: 400 });
     }
 
-    const actor = await resolveCurrentActor();
     const context = getRequestLogContext(request);
+    if (
+      !consumeProductEventQuota({
+        eventName: body.eventName,
+        ipAddress: context.ipAddress,
+        sessionId: body.sessionId,
+      })
+    ) {
+      return NextResponse.json({ ok: true, throttled: true }, { status: 202 });
+    }
+
+    const actor = await resolveCurrentActor();
 
     scheduleProductEventLog({
       eventName: body.eventName,

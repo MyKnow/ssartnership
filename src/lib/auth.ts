@@ -6,10 +6,9 @@ import {
   splitSignedToken,
   verifyHmacDigest,
 } from "./hmac.js";
+import { getAdminSessionTtlSeconds } from "./admin-security";
 
 const COOKIE_NAME = "admin_session";
-const SESSION_TTL_DAYS = 7;
-const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 type AdminSessionPayload = {
   issuedAt: number;
@@ -73,9 +72,11 @@ function parseAdminSessionToken(token: string): AdminSessionPayload | null {
 
 export async function setAdminSession(adminId: string) {
   const now = Date.now();
+  const ttlSeconds = getAdminSessionTtlSeconds();
+  const ttlMs = ttlSeconds * 1000;
   const payload = JSON.stringify({
     issuedAt: now,
-    expiresAt: now + SESSION_TTL_MS,
+    expiresAt: now + ttlMs,
     adminId,
   });
   const token = signPayload(payload);
@@ -84,7 +85,7 @@ export async function setAdminSession(adminId: string) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+    maxAge: ttlSeconds,
     path: "/",
   });
 }

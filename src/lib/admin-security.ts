@@ -20,6 +20,9 @@ type AdminLoginSearchParamsInput = Record<string, SearchParamValue>;
 const ADMIN_LOGIN_ERROR_CODE_SET = new Set<string>(ADMIN_LOGIN_ERROR_CODES);
 const ADMIN_LOGIN_ALLOWED_QUERY_KEYS = new Set(["error", "id"]);
 const ADMIN_FORM_ALLOWED_FIELDS = new Set(["id", "password"]);
+const DEFAULT_ADMIN_SESSION_TTL_HOURS = 12;
+const MIN_ADMIN_SESSION_TTL_HOURS = 1;
+const MAX_ADMIN_SESSION_TTL_HOURS = 24;
 
 export function parseAdminLoginErrorCode(
   value?: string | null,
@@ -176,6 +179,18 @@ function decodeBase64(value: string) {
   return atob(value);
 }
 
+function timingSafeStringEqual(left: string, right: string) {
+  const maxLength = Math.max(left.length, right.length);
+  let difference = left.length ^ right.length;
+
+  for (let index = 0; index < maxLength; index += 1) {
+    difference |=
+      (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+
+  return difference === 0;
+}
+
 export function hasValidAdminBasicAuth(authorization?: string | null) {
   const username = process.env.ADMIN_BASIC_AUTH_USERNAME;
   const password = process.env.ADMIN_BASIC_AUTH_PASSWORD;
@@ -196,10 +211,28 @@ export function hasValidAdminBasicAuth(authorization?: string | null) {
     }
     const providedUsername = decoded.slice(0, separatorIndex);
     const providedPassword = decoded.slice(separatorIndex + 1);
-    return providedUsername === username && providedPassword === password;
+    return (
+      timingSafeStringEqual(providedUsername, username) &&
+      timingSafeStringEqual(providedPassword, password)
+    );
   } catch {
     return false;
   }
+}
+
+export function getAdminSessionTtlSeconds(
+  rawValue = process.env.ADMIN_SESSION_TTL_HOURS,
+) {
+  const parsedHours = rawValue ? Number.parseInt(rawValue, 10) : NaN;
+  const ttlHours = Number.isFinite(parsedHours)
+    ? parsedHours
+    : DEFAULT_ADMIN_SESSION_TTL_HOURS;
+  const clampedHours = Math.min(
+    Math.max(ttlHours, MIN_ADMIN_SESSION_TTL_HOURS),
+    MAX_ADMIN_SESSION_TTL_HOURS,
+  );
+
+  return clampedHours * 60 * 60;
 }
 
 export async function delay(ms: number) {
