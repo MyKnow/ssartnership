@@ -320,6 +320,7 @@ test("event reward notification payload separates test and final send copy", asy
   const {
     EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
     buildEventRewardWinnerNotificationInput,
+    getEventRewardWinnerGuidePath,
   } = await eventRewardsModulePromise;
 
   const finalInput = buildEventRewardWinnerNotificationInput({
@@ -328,7 +329,7 @@ test("event reward notification payload separates test and final send copy", asy
     confirmationText: EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
   });
   const testInput = buildEventRewardWinnerNotificationInput({
-    guidePath: "/events/signup-reward/winner-form",
+    guidePath: getEventRewardWinnerGuidePath("signup-reward"),
     memberIds: ["member-test"],
     confirmationText: EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
     testMode: true,
@@ -341,6 +342,7 @@ test("event reward notification payload separates test and final send copy", asy
   });
   assert.match(testInput.title, /\[테스트\]/);
   assert.match(testInput.body, /운영 테스트/);
+  assert.equal(testInput.url, "/events/signup-reward/winner-form");
   assert.deepEqual(testInput.audience, {
     scope: "member",
     memberIds: ["member-test"],

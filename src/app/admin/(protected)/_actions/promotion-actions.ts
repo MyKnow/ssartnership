@@ -496,7 +496,7 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
 export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {
   await requireAdmin();
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
-  const drawId = getRequiredString(formData, "drawId");
+  const drawId = getString(formData, "drawId") || null;
   const memberId = getRequiredString(formData, "memberId");
   const result = await sendEventRewardWinnerTestNotification(drawId, {
     eventSlug: slug,
@@ -505,9 +505,10 @@ export async function sendEventRewardWinnerTestNotificationAction(formData: Form
 
   await logAdminAction("event_reward_winner_notification_test_send", {
     targetType: "event_reward_draw",
-    targetId: drawId,
+    targetId: drawId ?? slug,
     properties: {
       eventSlug: slug,
+      drawId,
       memberId,
       status: result.status,
       notificationId: result.notificationId,
