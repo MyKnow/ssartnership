@@ -279,6 +279,74 @@ test("event reward draw input validates winner count and Google Forms URL", asyn
   );
 });
 
+test("event reward winner notification requires explicit confirmation text", async () => {
+  const {
+    EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
+    normalizeEventRewardWinnerNotificationRequest,
+  } = await eventRewardsModulePromise;
+
+  assert.throws(
+    () =>
+      normalizeEventRewardWinnerNotificationRequest({
+        confirmationText: "",
+      }),
+    /확인 문구/,
+  );
+  assert.deepEqual(
+    normalizeEventRewardWinnerNotificationRequest({
+      confirmationText: ` ${EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT} `,
+    }),
+    {
+      confirmationText: EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
+    },
+  );
+});
+
+test("event reward test notification input requires a target member", async () => {
+  const { normalizeEventRewardTestNotificationRequest } =
+    await eventRewardsModulePromise;
+
+  assert.throws(
+    () => normalizeEventRewardTestNotificationRequest({ memberId: " " }),
+    /테스트 수신자/,
+  );
+  assert.deepEqual(
+    normalizeEventRewardTestNotificationRequest({ memberId: " member-1 " }),
+    { memberId: "member-1" },
+  );
+});
+
+test("event reward notification payload separates test and final send copy", async () => {
+  const {
+    EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
+    buildEventRewardWinnerNotificationInput,
+  } = await eventRewardsModulePromise;
+
+  const finalInput = buildEventRewardWinnerNotificationInput({
+    guidePath: "/events/signup-reward/winner-form",
+    memberIds: ["member-1", "member-2"],
+    confirmationText: EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
+  });
+  const testInput = buildEventRewardWinnerNotificationInput({
+    guidePath: "/events/signup-reward/winner-form",
+    memberIds: ["member-test"],
+    confirmationText: EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
+    testMode: true,
+  });
+
+  assert.equal(finalInput.title, "싸트너십 추첨권 이벤트 당첨 안내");
+  assert.deepEqual(finalInput.audience, {
+    scope: "member",
+    memberIds: ["member-1", "member-2"],
+  });
+  assert.match(testInput.title, /\[테스트\]/);
+  assert.match(testInput.body, /운영 테스트/);
+  assert.deepEqual(testInput.audience, {
+    scope: "member",
+    memberIds: ["member-test"],
+  });
+});
+
 test("event reward winner notification failures stay retryable", async () => {
   const {
     isEventRewardNotificationSendComplete,

@@ -11,6 +11,7 @@ import {
   createEventRewardDrawAction,
   createPromotionEventAction,
   deletePromotionEventAction,
+  sendEventRewardWinnerTestNotificationAction,
   sendEventRewardWinnerNotificationsAction,
   updatePromotionEventAction,
 } from "@/app/admin/(protected)/_actions/promotion-actions";
@@ -19,6 +20,7 @@ import { PROMOTION_AUDIENCE_OPTIONS, type EventCampaign } from "@/lib/promotions
 import {
   buildEventRewardAdminOverview,
   buildEventRewardComparisonOverview,
+  EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
   getEventRewardAdminOverview,
   getLatestEventRewardDrawWithWinners,
   type EventRewardAdminMemberRow,
@@ -48,6 +50,9 @@ function statusMessage(status?: string) {
   }
   if (status === "winner-sent") {
     return "당첨 안내를 발송했습니다.";
+  }
+  if (status === "winner-test-sent") {
+    return "당첨 안내 테스트를 발송했습니다.";
   }
   return null;
 }
@@ -126,6 +131,11 @@ function SignupRewardOverviewSection({
     { label: "푸시", value: `${overview.conditionCounts.push ?? 0}명` },
     { label: "마케팅", value: `${overview.conditionCounts.marketing ?? 0}명` },
   ];
+  const testRecipientOptions = overview.members.map((member) => ({
+    id: member.id,
+    label: `${member.displayName || member.mmUsername} (@${member.mmUsername})`,
+    meta: `${member.year}기 · ${member.campus || "-"} · ${member.totalTickets.toLocaleString()}장`,
+  }));
 
   return (
     <section className="grid gap-5" aria-label="추첨권 현황">
@@ -232,13 +242,81 @@ function SignupRewardOverviewSection({
                 </tbody>
               </table>
             </div>
-            {!draw.sentAt ? (
-              <form action={sendEventRewardWinnerNotificationsAction} className="flex justify-end">
+            <div className="grid gap-3 lg:grid-cols-2">
+              <form
+                action={sendEventRewardWinnerTestNotificationAction}
+                className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
+              >
                 <input type="hidden" name="slug" value="signup-reward" />
                 <input type="hidden" name="drawId" value={draw.id} />
-                <Button type="submit">앱+MM+푸시 발송</Button>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">테스트 발송</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    앱+MM+푸시 채널로 테스트 안내를 보냅니다.
+                  </p>
+                </div>
+                <label className="grid gap-2 text-sm font-medium text-foreground">
+                  수신자
+                  <select
+                    name="memberId"
+                    required
+                    defaultValue=""
+                    className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+                  >
+                    <option value="" disabled>
+                      테스트 수신자 선택
+                    </option>
+                    {testRecipientOptions.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.label} · {member.meta}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex justify-end">
+                  <Button type="submit" variant="secondary">
+                    테스트 발송
+                  </Button>
+                </div>
               </form>
-            ) : null}
+
+              {!draw.sentAt ? (
+                <form
+                  action={sendEventRewardWinnerNotificationsAction}
+                  className="grid gap-3 rounded-[1rem] border border-primary/20 bg-primary-soft p-4"
+                >
+                  <input type="hidden" name="slug" value="signup-reward" />
+                  <input type="hidden" name="drawId" value={draw.id} />
+                  <div>
+                    <p className="text-sm font-semibold text-primary">실제 발송</p>
+                    <p className="mt-1 text-xs text-primary/80">
+                      당첨자 {draw.winners.length.toLocaleString()}명에게 앱+MM+푸시 안내를 보냅니다.
+                    </p>
+                  </div>
+                  <label className="grid gap-2 text-sm font-medium text-primary">
+                    확인 문구
+                    <input
+                      name="confirmationText"
+                      required
+                      pattern={EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}
+                      placeholder={EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}
+                      title={EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}
+                      className="h-11 rounded-input border border-primary/20 bg-surface-control px-3 text-sm text-foreground"
+                    />
+                  </label>
+                  <div className="flex justify-end">
+                    <Button type="submit">발송 확인</Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+                  <p className="text-sm font-semibold text-foreground">발송 완료</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatEventDate(draw.sentAt)}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <form action={createEventRewardDrawAction} className="grid gap-4">

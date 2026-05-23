@@ -12,6 +12,7 @@ import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   createStoredEventRewardDraw,
   normalizeEventRewardDrawRequest,
+  sendEventRewardWinnerTestNotification,
   sendEventRewardWinnerNotifications,
 } from "@/lib/promotions/event-rewards";
 import { getManagedEventCampaign } from "@/lib/promotions/events";
@@ -473,7 +474,10 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
   await requireAdmin();
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
   const drawId = getRequiredString(formData, "drawId");
-  const result = await sendEventRewardWinnerNotifications(drawId);
+  const result = await sendEventRewardWinnerNotifications(drawId, {
+    eventSlug: slug,
+    confirmationText: getString(formData, "confirmationText"),
+  });
 
   await logAdminAction("event_reward_winner_notification_send", {
     targetType: "event_reward_draw",
@@ -487,4 +491,29 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
   });
   revalidatePromotionPaths(slug);
   redirect(`/admin/event/${slug}?status=winner-sent`);
+}
+
+export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {
+  await requireAdmin();
+  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const drawId = getRequiredString(formData, "drawId");
+  const memberId = getRequiredString(formData, "memberId");
+  const result = await sendEventRewardWinnerTestNotification(drawId, {
+    eventSlug: slug,
+    memberId,
+  });
+
+  await logAdminAction("event_reward_winner_notification_test_send", {
+    targetType: "event_reward_draw",
+    targetId: drawId,
+    properties: {
+      eventSlug: slug,
+      memberId,
+      status: result.status,
+      notificationId: result.notificationId,
+      warnings: result.warnings.length,
+    },
+  });
+  revalidatePromotionPaths(slug);
+  redirect(`/admin/event/${slug}?status=winner-test-sent`);
 }
