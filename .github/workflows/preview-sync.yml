@@ -73,10 +73,19 @@ jobs:
         with:
           version: latest
 
+      - name: Check preview database connection
+        id: preview-db
+        run: node scripts/supabase-sync-preview.mjs --check-only
+
+      - name: Apply preview migrations before sync
+        if: steps.preview-db.outputs.preview_database_available != 'false'
+        run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
+
       - name: Sync production data and storage to preview
         id: sync-preview-data
+        if: steps.preview-db.outputs.preview_database_available != 'false'
         run: npm run sync:preview
 
-      - name: Apply preview migrations
-        if: steps.sync-preview-data.outputs.preview_database_available != 'false'
+      - name: Verify preview migrations after sync
+        if: steps.preview-db.outputs.preview_database_available != 'false'
         run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
