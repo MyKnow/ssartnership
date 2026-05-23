@@ -39,6 +39,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
       PREVIEW_TEST_MEMBER_USERNAME: ${{ secrets.PREVIEW_TEST_MEMBER_USERNAME }}
       PREVIEW_TEST_MEMBER_PASSWORD: ${{ secrets.PREVIEW_TEST_MEMBER_PASSWORD }}
+      SUPABASE_PREVIEW_SYNC_SKIP_UNAVAILABLE: ${{ github.event_name == 'workflow_run' && 'true' || 'false' }}
     steps:
       - name: Checkout workflow run commit
         if: github.event_name == 'workflow_run'
@@ -73,7 +74,9 @@ jobs:
           version: latest
 
       - name: Sync production data and storage to preview
+        id: sync-preview-data
         run: npm run sync:preview
 
       - name: Apply preview migrations
+        if: steps.sync-preview-data.outputs.preview_database_available != 'false'
         run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all

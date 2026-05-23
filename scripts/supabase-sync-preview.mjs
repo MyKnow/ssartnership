@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -9,6 +9,7 @@ import {
   formatStorageError,
   runStorageOperation,
 } from "./supabase-sync-preview-storage.mjs";
+import { isMissingSupabasePoolerTenantErrorMessage } from "./supabase-db-health-lib.mjs";
 import {
   hashPreviewSeedPassword,
   isValidPreviewSeedPassword,
@@ -41,6 +42,21 @@ function requiredEnv(name) {
     throw new Error(`${name} 환경 변수가 필요합니다.`);
   }
   return value;
+}
+
+function isTruthyEnv(name) {
+  return ["1", "true", "yes", "on"].includes(
+    (process.env[name] ?? "").trim().toLowerCase(),
+  );
+}
+
+async function writeGithubOutput(name, value) {
+  const outputPath = process.env.GITHUB_OUTPUT;
+  if (!outputPath) {
+    return;
+  }
+
+  await appendFile(outputPath, `${name}=${value}\n`, "utf8");
 }
 
 function quoteIdentifier(identifier) {
@@ -194,6 +210,26 @@ async function dumpProductionDatabase(dumpPath, productionDbUrl) {
 
   console.log("Syncing production public data dump...");
   await runCommand("supabase", args);
+}
+
+async function assertPreviewDatabaseAvailable(previewDbUrl) {
+  await runCommand(
+    "psql",
+    [
+      "--dbname",
+      previewDbUrl,
+      "--tuples-only",
+      "--no-align",
+      "--command",
+      "select 1;",
+    ],
+    {
+      captureStdout: true,
+      env: {
+        PGCONNECT_TIMEOUT: "10",
+      },
+    },
+  );
 }
 
 async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
@@ -619,6 +655,30 @@ async function main() {
   const previewDbUrl = requiredEnv("SUPABASE_PREVIEW_DB_URL");
   const previewUrl = requiredEnv("SUPABASE_PREVIEW_URL");
   const previewServiceRoleKey = requiredEnv("SUPABASE_PREVIEW_SERVICE_ROLE_KEY");
+  const skipUnavailablePreview = isTruthyEnv("SUPABASE_PREVIEW_SYNC_SKIP_UNAVAILABLE");
+
+  try {
+    await assertPreviewDatabaseAvailable(previewDbUrl);
+    await writeGithubOutput("preview_database_available", "true");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      skipUnavailablePreview &&
+      isMissingSupabasePoolerTenantErrorMessage(message)
+    ) {
+      console.warn(
+        [
+          "Skipping preview sync because the Supabase Preview database is unavailable.",
+          "The pooler returned a missing tenant/user error; update SUPABASE_PREVIEW_DB_URL",
+          "or recreate the Preview Supabase database before running a manual sync.",
+        ].join(" "),
+      );
+      await writeGithubOutput("preview_database_available", "false");
+      return;
+    }
+
+    throw error;
+  }
 
   const tempDir = await mkdtemp(join(tmpdir(), "ssartnership-preview-sync-"));
   const dumpPath = join(tempDir, "production-data.sql");
