@@ -73,6 +73,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'promotion_slide_update',
   'promotion_slide_delete',
   'promotion_slide_bulk_update',
+  'event_reward_draw_preview',
   'event_reward_draw_create',
   'event_reward_winner_notification_test_send',
   'event_reward_winner_notification_send',

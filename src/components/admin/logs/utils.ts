@@ -71,6 +71,10 @@ const auditLabels: Record<string, string> = {
   partner_portal_change_request_cancel: '협력사 포털 변경 요청 취소',
   partner_portal_review_hide: '협력사 포털 리뷰 숨김',
   partner_portal_review_restore: '협력사 포털 리뷰 복구',
+  event_reward_draw_preview: '이벤트 추첨 테스트',
+  event_reward_draw_create: '이벤트 추첨 확정',
+  event_reward_winner_notification_test_send: '이벤트 당첨 안내 테스트 발송',
+  event_reward_winner_notification_send: '이벤트 당첨 안내 발송',
 };
 
 const securityLabels: Record<string, string> = {

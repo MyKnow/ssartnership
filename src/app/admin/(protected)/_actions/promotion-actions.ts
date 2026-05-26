@@ -11,7 +11,8 @@ import {
 import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   createStoredEventRewardDraw,
-  normalizeEventRewardDrawRequest,
+  parseEventRewardDrawPreviewRequest,
+  parseEventRewardDrawRequest,
   sendEventRewardWinnerTestNotification,
   sendEventRewardWinnerNotifications,
 } from "@/lib/promotions/event-rewards";
@@ -41,6 +42,61 @@ function normalizeSlug(value: string) {
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/-{2,}/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function eventRewardActionSlug(formData: FormData) {
+  return normalizeSlug(getString(formData, "slug")) || "signup-reward";
+}
+
+function eventRewardActionErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
+function adminEventUrl(
+  slug: string,
+  entries: Record<string, string | number | null | undefined>,
+) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(entries)) {
+    const stringValue = String(value ?? "").trim();
+    if (stringValue) {
+      params.set(key, stringValue);
+    }
+  }
+  const query = params.toString();
+  return `/admin/event/${slug}${query ? `?${query}` : ""}`;
+}
+
+function redirectEventRewardDrawError(params: {
+  slug: string;
+  message: string;
+  winnerCount?: string;
+  seed?: string;
+}): never {
+  redirect(
+    adminEventUrl(params.slug, {
+      status: "draw-error",
+      drawError: params.message,
+      drawWinnerCount: params.winnerCount,
+      drawSeed: params.seed,
+    }),
+  );
+}
+
+function redirectEventRewardDrawPreviewError(params: {
+  slug: string;
+  message: string;
+  winnerCount?: string;
+  seed?: string;
+}): never {
+  redirect(
+    adminEventUrl(params.slug, {
+      status: "draw-preview-error",
+      previewError: params.message,
+      previewWinnerCount: params.winnerCount,
+      previewSeed: params.seed,
+    }),
+  );
 }
 
 function parseDateTimeLocal(value: string) {
@@ -438,23 +494,53 @@ export async function savePromotionSlidesAction(formData: FormData) {
 
 export async function createEventRewardDrawAction(formData: FormData) {
   await requireAdmin();
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const slug = eventRewardActionSlug(formData);
+  const winnerCount = getString(formData, "winnerCount");
+  const seed = getString(formData, "seed");
+  const googleFormUrl = getString(formData, "googleFormUrl");
   const definition = getEventPageDefinition(slug);
   if (!definition) {
-    throw new Error("이벤트 정의를 찾을 수 없습니다.");
+    redirectEventRewardDrawError({
+      slug,
+      message: "이벤트 정의를 찾을 수 없습니다.",
+      winnerCount,
+      seed,
+    });
   }
   const campaign = (await getManagedEventCampaign(slug)) ?? definition;
-  const request = normalizeEventRewardDrawRequest({
-    winnerCount: getRequiredString(formData, "winnerCount"),
-    seed: getString(formData, "seed"),
-    googleFormUrl: getRequiredString(formData, "googleFormUrl"),
+  const request = parseEventRewardDrawRequest({
+    winnerCount,
+    seed,
+    googleFormUrl,
   });
+  if (!request.ok) {
+    redirectEventRewardDrawError({
+      slug,
+      message: request.message,
+      winnerCount,
+      seed,
+    });
+  }
   const adminSession = await getAdminSession();
-  const draw = await createStoredEventRewardDraw({
-    campaign,
-    request,
-    createdByAdminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? null,
-  });
+  let draw: Awaited<ReturnType<typeof createStoredEventRewardDraw>>;
+  try {
+    draw = await createStoredEventRewardDraw({
+      campaign,
+      request: request.value,
+      createdByAdminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? null,
+    });
+  } catch (error) {
+    console.error("[admin-event] reward draw create failed", error);
+    redirectEventRewardDrawError({
+      slug,
+      message: eventRewardActionErrorMessage(
+        error,
+        "추첨 결과를 확정하지 못했습니다.",
+      ),
+      winnerCount,
+      seed,
+    });
+  }
 
   await logAdminAction("event_reward_draw_create", {
     targetType: "event_reward_draw",
@@ -468,6 +554,41 @@ export async function createEventRewardDrawAction(formData: FormData) {
   });
   revalidatePromotionPaths(slug);
   redirect(`/admin/event/${slug}?status=draw-created`);
+}
+
+export async function previewEventRewardDrawAction(formData: FormData) {
+  await requireAdmin();
+  const slug = eventRewardActionSlug(formData);
+  const winnerCount = getString(formData, "winnerCount");
+  const seed = getString(formData, "seed");
+  const request = parseEventRewardDrawPreviewRequest({
+    winnerCount,
+    seed,
+  });
+  if (!request.ok) {
+    redirectEventRewardDrawPreviewError({
+      slug,
+      message: request.message,
+      winnerCount,
+      seed,
+    });
+  }
+  const params = new URLSearchParams({
+    status: "draw-preview",
+    previewWinnerCount: String(request.value.winnerCount),
+    previewSeed: request.value.seed,
+  });
+
+  await logAdminAction("event_reward_draw_preview", {
+    targetType: "promotion_event",
+    targetId: slug,
+    properties: {
+      eventSlug: slug,
+      winnerCount: request.value.winnerCount,
+      seed: request.value.seed,
+    },
+  });
+  redirect(`/admin/event/${slug}?${params.toString()}`);
 }
 
 export async function sendEventRewardWinnerNotificationsAction(formData: FormData) {

@@ -247,6 +247,7 @@ test("event reward weighted draw is deterministic and excludes zero-ticket membe
 test("event reward draw input validates winner count and Google Forms URL", async () => {
   const {
     normalizeEventRewardDrawRequest,
+    parseEventRewardDrawRequest,
   } = await eventRewardsModulePromise;
 
   assert.throws(
@@ -276,6 +277,68 @@ test("event reward draw input validates winner count and Google Forms URL", asyn
       seed: "seed",
       googleFormUrl: "https://docs.google.com/forms/d/e/abc/viewform",
     },
+  );
+  const invalid = parseEventRewardDrawRequest({
+    winnerCount: 1,
+    googleFormUrl: "https://example.com/form",
+  });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) {
+    assert.match(invalid.message, /구글폼/);
+  }
+  assert.doesNotThrow(() =>
+    parseEventRewardDrawRequest({
+      winnerCount: 1,
+      googleFormUrl: "https://example.com/form",
+    }),
+  );
+});
+
+test("event reward draw preview input does not require Google Forms URL", async () => {
+  const {
+    normalizeEventRewardDrawPreviewRequest,
+    parseEventRewardDrawPreviewRequest,
+  } =
+    await eventRewardsModulePromise;
+
+  assert.throws(
+    () =>
+      normalizeEventRewardDrawPreviewRequest({
+        winnerCount: 0,
+        seed: "stable-seed",
+      }),
+    /당첨 인원/,
+  );
+  assert.deepEqual(
+    normalizeEventRewardDrawPreviewRequest({
+      winnerCount: 2,
+      seed: " stable-seed ",
+    }),
+    {
+      winnerCount: 2,
+      seed: "stable-seed",
+    },
+  );
+  assert.match(
+    normalizeEventRewardDrawPreviewRequest({
+      winnerCount: 1,
+      seed: "",
+    }).seed,
+    /^[a-f0-9]{32}$/,
+  );
+  const invalid = parseEventRewardDrawPreviewRequest({
+    winnerCount: "",
+    seed: "stable-seed",
+  });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) {
+    assert.match(invalid.message, /당첨 인원/);
+  }
+  assert.doesNotThrow(() =>
+    parseEventRewardDrawPreviewRequest({
+      winnerCount: "",
+      seed: "stable-seed",
+    }),
   );
 });
 

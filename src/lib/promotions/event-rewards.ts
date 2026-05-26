@@ -87,6 +87,15 @@ export type EventRewardDrawRequest = {
   googleFormUrl: string;
 };
 
+export type EventRewardDrawPreviewRequest = {
+  winnerCount: number;
+  seed: string;
+};
+
+export type EventRewardValidationResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; message: string };
+
 export type EventRewardDrawWinner = {
   rank: number;
   memberId: string;
@@ -549,15 +558,28 @@ function hashToIndex(seed: string, round: number, maxExclusive: number) {
   return value % maxExclusive;
 }
 
+function normalizeEventRewardWinnerCount(value: unknown) {
+  const winnerCount = Number(value);
+  if (!Number.isInteger(winnerCount) || winnerCount <= 0) {
+    throw new Error("당첨 인원은 1명 이상이어야 합니다.");
+  }
+  return winnerCount;
+}
+
+function normalizeEventRewardDrawSeed(value: unknown) {
+  return String(value ?? "").trim() || randomBytes(16).toString("hex");
+}
+
+function eventRewardValidationErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
 export function normalizeEventRewardDrawRequest(input: {
   winnerCount?: unknown;
   seed?: unknown;
   googleFormUrl?: unknown;
 }): EventRewardDrawRequest {
-  const winnerCount = Number(input.winnerCount);
-  if (!Number.isInteger(winnerCount) || winnerCount <= 0) {
-    throw new Error("당첨 인원은 1명 이상이어야 합니다.");
-  }
+  const winnerCount = normalizeEventRewardWinnerCount(input.winnerCount);
 
   const rawUrl = String(input.googleFormUrl ?? "").trim();
   let url: URL;
@@ -574,12 +596,57 @@ export function normalizeEventRewardDrawRequest(input: {
     throw new Error("구글폼 HTTPS 링크만 사용할 수 있습니다.");
   }
 
-  const seed = String(input.seed ?? "").trim() || randomBytes(16).toString("hex");
+  const seed = normalizeEventRewardDrawSeed(input.seed);
   return {
     winnerCount,
     seed,
     googleFormUrl: url.toString(),
   };
+}
+
+export function parseEventRewardDrawRequest(input: {
+  winnerCount?: unknown;
+  seed?: unknown;
+  googleFormUrl?: unknown;
+}): EventRewardValidationResult<EventRewardDrawRequest> {
+  try {
+    return { ok: true, value: normalizeEventRewardDrawRequest(input) };
+  } catch (error) {
+    return {
+      ok: false,
+      message: eventRewardValidationErrorMessage(
+        error,
+        "추첨 확정 입력값을 확인해 주세요.",
+      ),
+    };
+  }
+}
+
+export function normalizeEventRewardDrawPreviewRequest(input: {
+  winnerCount?: unknown;
+  seed?: unknown;
+}): EventRewardDrawPreviewRequest {
+  return {
+    winnerCount: normalizeEventRewardWinnerCount(input.winnerCount),
+    seed: normalizeEventRewardDrawSeed(input.seed),
+  };
+}
+
+export function parseEventRewardDrawPreviewRequest(input: {
+  winnerCount?: unknown;
+  seed?: unknown;
+}): EventRewardValidationResult<EventRewardDrawPreviewRequest> {
+  try {
+    return { ok: true, value: normalizeEventRewardDrawPreviewRequest(input) };
+  } catch (error) {
+    return {
+      ok: false,
+      message: eventRewardValidationErrorMessage(
+        error,
+        "테스트 추첨 입력값을 확인해 주세요.",
+      ),
+    };
+  }
 }
 
 export function normalizeEventRewardWinnerNotificationRequest(input: {

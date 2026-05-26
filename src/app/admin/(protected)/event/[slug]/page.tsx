@@ -11,6 +11,7 @@ import {
   createEventRewardDrawAction,
   createPromotionEventAction,
   deletePromotionEventAction,
+  previewEventRewardDrawAction,
   sendEventRewardWinnerTestNotificationAction,
   sendEventRewardWinnerNotificationsAction,
   updatePromotionEventAction,
@@ -21,10 +22,13 @@ import {
   buildEventRewardAdminOverview,
   buildEventRewardComparisonOverview,
   EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT,
+  createEventRewardDrawPlan,
   getEventRewardAdminOverview,
   getLatestEventRewardDrawWithWinners,
+  parseEventRewardDrawPreviewRequest,
   type EventRewardAdminMemberRow,
   type EventRewardAdminOverview,
+  type EventRewardDrawPlan,
   type EventRewardStoredDraw,
 } from "@/lib/promotions/event-rewards";
 import {
@@ -47,6 +51,9 @@ function statusMessage(status?: string) {
   }
   if (status === "draw-created") {
     return "추첨 결과를 확정했습니다.";
+  }
+  if (status === "draw-preview") {
+    return "테스트 추첨 결과를 계산했습니다.";
   }
   if (status === "winner-sent") {
     return "당첨 안내를 발송했습니다.";
@@ -113,15 +120,55 @@ function RewardStatusPill({
   );
 }
 
+function getEventRewardDrawPreview(params: {
+  overview: EventRewardAdminOverview;
+  winnerCount?: string;
+  seed?: string;
+}): { plan: EventRewardDrawPlan | null; error: string | null } {
+  if (!params.winnerCount && !params.seed) {
+    return { plan: null, error: null };
+  }
+  if (!params.seed?.trim()) {
+    return { plan: null, error: "테스트 추첨 Seed를 확인해 주세요." };
+  }
+  const request = parseEventRewardDrawPreviewRequest({
+    winnerCount: params.winnerCount,
+    seed: params.seed,
+  });
+  if (!request.ok) {
+    return {
+      plan: null,
+      error: request.message,
+    };
+  }
+  return {
+    plan: createEventRewardDrawPlan(params.overview, {
+      winnerCount: request.value.winnerCount,
+      seed: request.value.seed,
+    }),
+    error: null,
+  };
+}
+
 function SignupRewardOverviewSection({
   campaign,
   overview,
   draw,
+  drawPreview,
+  drawPreviewError,
+  drawError,
+  drawInputWinnerCount,
+  drawInputSeed,
   warningMessage,
 }: {
   campaign: EventCampaign;
   overview: EventRewardAdminOverview;
   draw: EventRewardStoredDraw | null;
+  drawPreview?: EventRewardDrawPlan | null;
+  drawPreviewError?: string | null;
+  drawError?: string | null;
+  drawInputWinnerCount?: string | null;
+  drawInputSeed?: string | null;
   warningMessage?: string | null;
 }) {
   const comparison = buildEventRewardComparisonOverview(campaign, overview.members);
@@ -322,42 +369,123 @@ function SignupRewardOverviewSection({
             )}
           </div>
         ) : (
-          <form action={createEventRewardDrawAction} className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+          <div className="grid gap-4">
+            <form action={createEventRewardDrawAction} className="grid gap-4">
+              <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+                <label className="grid gap-2 text-sm font-medium text-foreground">
+                  당첨 인원
+                  <input
+                    name="winnerCount"
+                    type="number"
+                    min="1"
+                    required
+                    defaultValue={
+                      drawPreview?.winnerCount ?? drawInputWinnerCount ?? undefined
+                    }
+                    className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-foreground">
+                  구글폼 링크
+                  <input
+                    name="googleFormUrl"
+                    type="url"
+                    required
+                    placeholder="https://docs.google.com/forms/..."
+                    className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+                  />
+                </label>
+              </div>
               <label className="grid gap-2 text-sm font-medium text-foreground">
-                당첨 인원
+                Seed 선택 입력
                 <input
-                  name="winnerCount"
-                  type="number"
-                  min="1"
-                  required
+                  name="seed"
+                  defaultValue={drawPreview?.seed ?? drawInputSeed ?? ""}
+                  placeholder="비워두면 자동 생성"
                   className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
                 />
               </label>
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                구글폼 링크
-                <input
-                  name="googleFormUrl"
-                  type="url"
-                  required
-                  placeholder="https://docs.google.com/forms/..."
-                  className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+              <input type="hidden" name="slug" value="signup-reward" />
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  formAction={previewEventRewardDrawAction}
+                  formNoValidate
+                >
+                  테스트 추첨
+                </Button>
+                <Button type="submit">추첨 확정</Button>
+              </div>
+            </form>
+
+            {drawError ? (
+              <FormMessage variant="error">{drawError}</FormMessage>
+            ) : null}
+            {drawPreviewError ? (
+              <FormMessage variant="error">{drawPreviewError}</FormMessage>
+            ) : null}
+            {drawPreview ? (
+              <div className="grid gap-4 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      테스트 추첨 결과
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      DB에 저장되지 않는 미리보기입니다. 같은 Seed로 확정하면 같은 순서가 재현됩니다.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-border/70 bg-surface px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                    Seed {drawPreview.seed}
+                  </span>
+                </div>
+                <StatsRow
+                  items={[
+                    { label: "미리보기 당첨자", value: `${drawPreview.winners.length.toLocaleString()}명`, hint: "저장 안 됨" },
+                    { label: "후보", value: `${drawPreview.candidateCount.toLocaleString()}명`, hint: "추첨권 1장 이상" },
+                    { label: "총 추첨권", value: `${drawPreview.totalTickets.toLocaleString()}장`, hint: "현재 조건 기준" },
+                  ]}
+                  minItemWidth="11rem"
                 />
-              </label>
-            </div>
-            <label className="grid gap-2 text-sm font-medium text-foreground">
-              Seed 선택 입력
-              <input
-                name="seed"
-                placeholder="비워두면 자동 생성"
-                className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
-              />
-            </label>
-            <input type="hidden" name="slug" value="signup-reward" />
-            <div className="flex justify-end">
-              <Button type="submit">추첨 확정</Button>
-            </div>
-          </form>
+                <div className="overflow-x-auto rounded-[1rem] border border-border/70 bg-surface">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3">순위</th>
+                        <th className="px-4 py-3">회원</th>
+                        <th className="px-4 py-3">기수/캠퍼스</th>
+                        <th className="px-4 py-3 text-right">추첨권</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/70">
+                      {drawPreview.winners.map((winner) => (
+                        <tr key={winner.memberId}>
+                          <td className="px-4 py-3 font-semibold text-foreground">
+                            {winner.rank}
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-foreground">
+                              {winner.displayName || winner.mmUsername}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {winner.mmUsername}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {winner.year}기 · {winner.campus || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-foreground">
+                            {winner.ticketCount.toLocaleString()}장
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </div>
         )}
       </Card>
 
@@ -436,7 +564,15 @@ export default async function AdminEventDetailPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{
+    status?: string;
+    drawError?: string;
+    drawWinnerCount?: string;
+    drawSeed?: string;
+    previewError?: string;
+    previewWinnerCount?: string;
+    previewSeed?: string;
+  }>;
 }) {
   const { slug } = await params;
   const paramsData = (await searchParams) ?? {};
@@ -453,8 +589,16 @@ export default async function AdminEventDetailPage({
   const message = statusMessage(paramsData.status);
   let rewardOverview: EventRewardAdminOverview | null = null;
   let rewardDraw: EventRewardStoredDraw | null = null;
+  let rewardDrawPreview: EventRewardDrawPlan | null = null;
+  let rewardDrawPreviewError: string | null = null;
+  let rewardDrawError: string | null = null;
+  let rewardDrawInputWinnerCount: string | null = null;
+  let rewardDrawInputSeed: string | null = null;
   let rewardWarningMessage: string | null = null;
   if (slug === "signup-reward") {
+    rewardDrawError = paramsData.drawError ?? null;
+    rewardDrawInputWinnerCount = paramsData.drawWinnerCount ?? null;
+    rewardDrawInputSeed = paramsData.drawSeed ?? null;
     try {
       [rewardOverview, rewardDraw] = await Promise.all([
         getEventRewardAdminOverview(campaign),
@@ -465,6 +609,19 @@ export default async function AdminEventDetailPage({
       rewardOverview = buildEventRewardAdminOverview(campaign, []);
       rewardWarningMessage =
         "추첨권 현황 데이터를 불러오지 못했습니다. Supabase 연결과 이벤트 보상 테이블 상태를 확인해 주세요.";
+    }
+    if (rewardOverview && !rewardDraw) {
+      if (paramsData.previewError) {
+        rewardDrawPreviewError = paramsData.previewError;
+      } else {
+        const preview = getEventRewardDrawPreview({
+          overview: rewardOverview,
+          winnerCount: paramsData.previewWinnerCount,
+          seed: paramsData.previewSeed,
+        });
+        rewardDrawPreview = preview.plan;
+        rewardDrawPreviewError = preview.error;
+      }
     }
   }
   const targetLabel =
@@ -605,6 +762,11 @@ export default async function AdminEventDetailPage({
             campaign={campaign}
             overview={rewardOverview}
             draw={rewardDraw}
+            drawPreview={rewardDrawPreview}
+            drawPreviewError={rewardDrawPreviewError}
+            drawError={rewardDrawError}
+            drawInputWinnerCount={rewardDrawInputWinnerCount}
+            drawInputSeed={rewardDrawInputSeed}
             warningMessage={rewardWarningMessage}
           />
         ) : null}
