@@ -42,9 +42,9 @@ const supabase = createClient(
   },
 );
 
-const loginId = process.env.ADMIN_BOOTSTRAP_LOGIN_ID?.trim() || "myknow00";
-const displayName = process.env.ADMIN_BOOTSTRAP_DISPLAY_NAME?.trim() || "myknow00";
-const email = process.env.ADMIN_BOOTSTRAP_EMAIL?.trim() || "myknow00@naver.com";
+const loginId = process.env.ADMIN_BOOTSTRAP_LOGIN_ID?.trim() || "myknow";
+const displayName = process.env.ADMIN_BOOTSTRAP_DISPLAY_NAME?.trim() || "myknow";
+const email = process.env.ADMIN_BOOTSTRAP_EMAIL?.trim() || "myknow@naver.com";
 
 const { data: existingAccount, error: lookupError } = await supabase
   .from("admin_accounts")
