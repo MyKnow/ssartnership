@@ -134,6 +134,7 @@ export async function getAdminSession(): Promise<{
     if (
       !account ||
       !account.isActive ||
+      account.mustChangePassword ||
       account.permissionVersion !== payload.permissionVersion
     ) {
       return null;
@@ -150,7 +151,7 @@ export async function getAdminSession(): Promise<{
 export async function requireAdmin() {
   const ok = await isAdminSession();
   if (!ok) {
-    redirect("/admin/login");
+    redirect("/auth/login?returnTo=%2Fadmin");
   }
 }
 

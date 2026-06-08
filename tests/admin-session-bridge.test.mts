@@ -36,12 +36,11 @@ test("sanitizeAdminReturnTo normalizes public bridge and unsafe destinations", a
   assert.equal(sanitizeAdminReturnTo("/admin/denied"), "/admin");
 });
 
-test("admin session bridge eligibility rejects inactive or incomplete setup accounts", async () => {
+test("admin session bridge eligibility rejects inactive or password-change members", async () => {
   const { isAdminAccountEligibleForSessionBridge } = await bridgeModulePromise;
   const baseAccount = {
     isActive: true,
     mustChangePassword: false,
-    initialSetupCompletedAt: "2026-06-08T00:00:00.000Z",
   };
 
   assert.equal(isAdminAccountEligibleForSessionBridge(baseAccount), true);
@@ -56,13 +55,6 @@ test("admin session bridge eligibility rejects inactive or incomplete setup acco
     isAdminAccountEligibleForSessionBridge({
       ...baseAccount,
       mustChangePassword: true,
-    }),
-    false,
-  );
-  assert.equal(
-    isAdminAccountEligibleForSessionBridge({
-      ...baseAccount,
-      initialSetupCompletedAt: null,
     }),
     false,
   );

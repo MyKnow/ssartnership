@@ -1,20 +1,5 @@
 #!/usr/bin/env node
-import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-
-const RESOURCES = [
-  "members",
-  "reviews",
-  "logs",
-  "brands",
-  "companies",
-  "notifications",
-  "home_ads",
-  "events",
-  "cycles",
-  "admin_management",
-];
-const ACTIONS = ["create", "read", "update", "delete"];
 
 function requiredEnv(name) {
   const value = process.env[name]?.trim();
@@ -22,14 +7,6 @@ function requiredEnv(name) {
     throw new Error(`${name} is required`);
   }
   return value;
-}
-
-function hashOpaqueToken(token) {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-function siteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssartnership.vercel.app").replace(/\/$/, "");
 }
 
 const supabase = createClient(
@@ -42,85 +19,33 @@ const supabase = createClient(
   },
 );
 
-const loginId = process.env.ADMIN_BOOTSTRAP_LOGIN_ID?.trim() || "myknow";
-const displayName = process.env.ADMIN_BOOTSTRAP_DISPLAY_NAME?.trim() || "myknow";
-const email = process.env.ADMIN_BOOTSTRAP_EMAIL?.trim() || "myknow@naver.com";
+const username = process.env.ADMIN_BOOTSTRAP_LOGIN_ID?.trim() || "myknow";
+if (username !== "myknow") {
+  throw new Error("Only the myknow member can be bootstrapped as super_admin.");
+}
 
-const { data: existingAccount, error: lookupError } = await supabase
-  .from("admin_accounts")
-  .select("id,login_id,initial_setup_completed_at")
-  .eq("login_id", loginId)
+const { data: member, error: lookupError } = await supabase
+  .from("members")
+  .select("id,mm_username,admin_permission_id")
+  .eq("mm_username", username)
   .maybeSingle();
 
 if (lookupError) {
   throw new Error(lookupError.message);
 }
-
-let account = existingAccount;
-let setupUrl = null;
-let expiresAt = null;
-
-if (account) {
-  const { data: updatedAccount, error: updateError } = await supabase
-    .from("admin_accounts")
-    .update({
-      display_name: displayName,
-      email,
-      is_active: true,
-    })
-    .eq("id", account.id)
-    .select("id,login_id,initial_setup_completed_at")
-    .single();
-
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-  account = updatedAccount;
-} else {
-  const token = randomBytes(32).toString("hex");
-  expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
-  const { data: createdAccount, error: createError } = await supabase
-    .from("admin_accounts")
-    .insert({
-      login_id: loginId,
-      display_name: displayName,
-      email,
-      is_active: true,
-      must_change_password: true,
-      initial_setup_token_hash: hashOpaqueToken(token),
-      initial_setup_expires_at: expiresAt,
-    })
-    .select("id,login_id,initial_setup_completed_at")
-    .single();
-
-  if (createError) {
-    throw new Error(createError.message);
-  }
-  account = createdAccount;
-  setupUrl = `${siteUrl()}/admin/setup/${encodeURIComponent(token)}`;
+if (!member) {
+  throw new Error("myknow member was not found. Create the member before bootstrapping admin access.");
 }
 
-const rows = RESOURCES.flatMap((resource) =>
-  ACTIONS.map((action) => ({
-    admin_id: account.id,
-    resource,
-    action,
-    granted: resource === "logs" ? action === "read" : true,
-  })),
-);
+const { data: updatedMember, error: updateError } = await supabase
+  .from("members")
+  .update({ admin_permission_id: "super_admin" })
+  .eq("id", member.id)
+  .select("id,mm_username,admin_permission_id")
+  .single();
 
-const { error: permissionError } = await supabase
-  .from("admin_permissions")
-  .upsert(rows, { onConflict: "admin_id,resource,action" });
-
-if (permissionError) {
-  throw new Error(permissionError.message);
+if (updateError) {
+  throw new Error(updateError.message);
 }
 
-console.log(`Promoted super admin: ${account.login_id}`);
-if (setupUrl) {
-  console.log(`Initial setup URL: ${setupUrl}`);
-  console.log(`Expires at: ${expiresAt}`);
-} else {
-  console.log("Existing account password/setup state was preserved.");
-}
+console.log(`Promoted member super admin: ${updatedMember.mm_username}`);

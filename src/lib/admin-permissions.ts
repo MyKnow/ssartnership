@@ -160,7 +160,7 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
   {
     key: "super_admin",
     name: "Super Admin",
-    description: "어드민 계정과 전체 운영 권한을 관리합니다.",
+    description: "멤버 관리자 권한과 전체 운영 권한을 관리합니다.",
     permissions: grant([...ADMIN_PERMISSION_RESOURCES]),
   },
   {

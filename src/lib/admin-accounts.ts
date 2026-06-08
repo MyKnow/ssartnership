@@ -1,26 +1,12 @@
-import { SITE_URL } from "@/lib/site";
 import {
   ADMIN_PERMISSION_TEMPLATES,
   type AdminPermissionMatrix,
+  type AdminPermissionTemplateKey,
   assertCanManageAdminPermissions,
   findAdminPermissionTemplate,
-  matrixToPermissionRows,
   normalizeAdminPermissionMatrix,
-  permissionRowsToMatrix,
 } from "@/lib/admin-permissions";
-import {
-  generateOpaqueToken,
-  hashOpaqueToken,
-  hashPassword,
-  isValidPassword,
-  verifyPassword,
-} from "@/lib/password";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import {
-  normalizeAdminIdentifier,
-  validateAdminIdentifier,
-  validateAdminPasswordInput,
-} from "@/lib/validation";
 
 export type AdminAccount = {
   id: string;
@@ -33,178 +19,134 @@ export type AdminAccount = {
   initialSetupCompletedAt: string | null;
   lastLoginAt: string | null;
   permissionVersion: number;
+  permissionId: AdminPermissionTemplateKey;
   createdAt: string | null;
   updatedAt: string | null;
   permissions: AdminPermissionMatrix;
 };
 
-type AdminAccountRow = {
+type AdminMemberRow = {
   id: string;
-  login_id: string;
-  display_name: string;
-  email: string | null;
-  password_hash?: string | null;
-  password_salt?: string | null;
-  is_active: boolean;
-  must_change_password: boolean;
-  initial_setup_expires_at: string | null;
-  initial_setup_completed_at: string | null;
-  last_login_at: string | null;
-  permission_version: number | null;
+  mm_username: string | null;
+  display_name: string | null;
+  must_change_password: boolean | null;
+  admin_permission_id: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
-type AdminPermissionRow = {
-  resource: string | null;
-  action: string | null;
-  granted: boolean | null;
-};
+const ADMIN_MEMBER_SELECT =
+  "id,mm_username,display_name,must_change_password,admin_permission_id,created_at,updated_at";
 
-const ADMIN_ACCOUNT_SELECT =
-  "id,login_id,display_name,email,password_hash,password_salt,is_active,must_change_password,initial_setup_expires_at,initial_setup_completed_at,last_login_at,permission_version,created_at,updated_at";
+const SUPER_ADMIN_USERNAME = "myknow";
+const DEFAULT_ADMIN_PERMISSION_ID = "readonly";
 
-function mapAdminAccount(
-  row: AdminAccountRow,
-  permissions: AdminPermissionRow[] = [],
-): AdminAccount {
+function normalizeMemberUsername(value: string) {
+  return value.trim();
+}
+
+function resolveMemberPermissionId(row: AdminMemberRow) {
+  if (row.mm_username === SUPER_ADMIN_USERNAME) {
+    return "super_admin";
+  }
+  return row.admin_permission_id;
+}
+
+function getTemplateOrNull(permissionId: string | null | undefined) {
+  if (!permissionId) {
+    return null;
+  }
+  return findAdminPermissionTemplate(permissionId);
+}
+
+function mapAdminMember(row: AdminMemberRow): AdminAccount | null {
+  const permissionId = resolveMemberPermissionId(row);
+  const template = getTemplateOrNull(permissionId);
+  if (!template || !row.mm_username) {
+    return null;
+  }
+
   return {
     id: row.id,
-    loginId: row.login_id,
-    displayName: row.display_name,
-    email: row.email ?? null,
-    isActive: row.is_active,
-    mustChangePassword: row.must_change_password,
-    initialSetupExpiresAt: row.initial_setup_expires_at ?? null,
-    initialSetupCompletedAt: row.initial_setup_completed_at ?? null,
-    lastLoginAt: row.last_login_at ?? null,
-    permissionVersion: row.permission_version ?? 1,
+    loginId: row.mm_username,
+    displayName: row.display_name?.trim() || row.mm_username,
+    email: null,
+    isActive: true,
+    mustChangePassword: row.must_change_password === true,
+    initialSetupExpiresAt: null,
+    initialSetupCompletedAt: row.created_at ?? new Date(0).toISOString(),
+    lastLoginAt: null,
+    permissionVersion: 1,
+    permissionId: template.key,
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
-    permissions: permissionRowsToMatrix(permissions),
+    permissions: normalizeAdminPermissionMatrix(template.permissions),
   };
 }
 
-export function buildAdminInitialSetupUrl(token: string, host?: string | null) {
-  const base = host?.trim() || SITE_URL;
-  return new URL(`/admin/setup/${encodeURIComponent(token)}`, base).toString();
-}
-
-async function getAdminPermissionRows(adminIds: string[]) {
-  if (adminIds.length === 0) {
-    return new Map<string, AdminPermissionRow[]>();
+export async function getAdminAccountById(memberId: string) {
+  if (!memberId) {
+    return null;
   }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
-    .from("admin_permissions")
-    .select("admin_id,resource,action,granted")
-    .in("admin_id", adminIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const rowsByAdminId = new Map<string, AdminPermissionRow[]>();
-  for (const row of data ?? []) {
-    const adminId = String(row.admin_id);
-    const rows = rowsByAdminId.get(adminId) ?? [];
-    rows.push({
-      resource: row.resource ?? null,
-      action: row.action ?? null,
-      granted: row.granted ?? null,
-    });
-    rowsByAdminId.set(adminId, rows);
-  }
-  return rowsByAdminId;
-}
-
-export async function getAdminAccountById(adminId: string) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("admin_accounts")
-    .select(ADMIN_ACCOUNT_SELECT)
-    .eq("id", adminId)
+    .from("members")
+    .select(ADMIN_MEMBER_SELECT)
+    .eq("id", memberId)
     .maybeSingle();
 
   if (error || !data) {
     return null;
   }
 
-  const rowsByAdminId = await getAdminPermissionRows([data.id]);
-  return mapAdminAccount(data as AdminAccountRow, rowsByAdminId.get(data.id) ?? []);
+  return mapAdminMember(data as AdminMemberRow);
 }
 
 export async function getAdminAccountByLoginId(loginId: string) {
-  const normalized = normalizeAdminIdentifier(loginId);
+  const username = normalizeMemberUsername(loginId);
+  if (!username) {
+    return null;
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
-    .from("admin_accounts")
-    .select(ADMIN_ACCOUNT_SELECT)
-    .eq("login_id", normalized)
+    .from("members")
+    .select(ADMIN_MEMBER_SELECT)
+    .eq("mm_username", username)
     .maybeSingle();
 
   if (error || !data) {
     return null;
   }
 
-  const rowsByAdminId = await getAdminPermissionRows([data.id]);
-  return mapAdminAccount(data as AdminAccountRow, rowsByAdminId.get(data.id) ?? []);
+  return mapAdminMember(data as AdminMemberRow);
 }
 
 export async function authenticateAdminCredentials(
-  loginId: string,
-  password: string,
+  loginId?: string,
+  password?: string,
 ) {
-  if (validateAdminIdentifier(loginId) || validateAdminPasswordInput(password)) {
-    return null;
-  }
-
-  const normalized = normalizeAdminIdentifier(loginId);
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("admin_accounts")
-    .select(ADMIN_ACCOUNT_SELECT)
-    .eq("login_id", normalized)
-    .maybeSingle();
-
-  if (error || !data) {
-    return null;
-  }
-
-  const row = data as AdminAccountRow;
-  if (
-    !row.is_active ||
-    !row.password_hash ||
-    !row.password_salt ||
-    row.initial_setup_completed_at === null ||
-    !verifyPassword(password, row.password_salt, row.password_hash)
-  ) {
-    return null;
-  }
-
-  await supabase
-    .from("admin_accounts")
-    .update({ last_login_at: new Date().toISOString() })
-    .eq("id", row.id);
-
-  const rowsByAdminId = await getAdminPermissionRows([row.id]);
-  return mapAdminAccount(row, rowsByAdminId.get(row.id) ?? []);
+  void loginId;
+  void password;
+  return null;
 }
 
 export async function listAdminAccounts() {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
-    .from("admin_accounts")
-    .select(ADMIN_ACCOUNT_SELECT)
-    .order("created_at", { ascending: false });
+    .from("members")
+    .select(ADMIN_MEMBER_SELECT)
+    .or(`admin_permission_id.not.is.null,mm_username.eq.${SUPER_ADMIN_USERNAME}`)
+    .order("updated_at", { ascending: false });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const rows = (data ?? []) as AdminAccountRow[];
-  const rowsByAdminId = await getAdminPermissionRows(rows.map((row) => row.id));
-  return rows.map((row) => mapAdminAccount(row, rowsByAdminId.get(row.id) ?? []));
+  return ((data ?? []) as AdminMemberRow[])
+    .map((row) => mapAdminMember(row))
+    .filter((account): account is AdminAccount => account !== null);
 }
 
 export async function countActivePrivilegedAdmins() {
@@ -217,160 +159,42 @@ export async function countActivePrivilegedAdmins() {
   ).length;
 }
 
-async function replaceAdminPermissions(
-  adminId: string,
-  permissions: AdminPermissionMatrix,
-) {
-  const supabase = getSupabaseAdminClient();
-  const rows = matrixToPermissionRows(adminId, permissions);
-  const { error } = await supabase.from("admin_permissions").upsert(rows, {
-    onConflict: "admin_id,resource,action",
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-}
-
-export async function createAdminAccount(input: {
-  loginId: string;
-  displayName: string;
-  email?: string | null;
+export async function grantMemberAdminPermission(input: {
+  memberUsername: string;
   templateKey?: string | null;
-  permissions?: AdminPermissionMatrix | null;
 }) {
-  const loginId = normalizeAdminIdentifier(input.loginId);
-  const idError = validateAdminIdentifier(loginId);
-  if (idError) {
-    throw new Error(idError);
+  const memberUsername = normalizeMemberUsername(input.memberUsername);
+  if (!memberUsername) {
+    throw new Error("회원 아이디를 입력해 주세요.");
   }
 
-  const template = input.templateKey
-    ? findAdminPermissionTemplate(input.templateKey)
-    : findAdminPermissionTemplate("readonly");
-  const permissions = normalizeAdminPermissionMatrix(
-    input.permissions ?? template?.permissions,
-  );
-  const setup = issueAdminSetupTokenValues();
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("admin_accounts")
-    .insert({
-      login_id: loginId,
-      display_name: input.displayName.trim() || loginId,
-      email: input.email?.trim() || null,
-      must_change_password: true,
-      is_active: true,
-      initial_setup_token_hash: setup.tokenHash,
-      initial_setup_expires_at: setup.expiresAt,
-    })
-    .select(ADMIN_ACCOUNT_SELECT)
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
+  const templateKey = input.templateKey?.trim() || DEFAULT_ADMIN_PERMISSION_ID;
+  const template = findAdminPermissionTemplate(templateKey);
+  if (!template) {
+    throw new Error("권한 템플릿을 찾을 수 없습니다.");
+  }
+  if (template.key === "super_admin" && memberUsername !== SUPER_ADMIN_USERNAME) {
+    throw new Error("Super Admin 권한은 myknow 계정에만 부여할 수 있습니다.");
   }
 
-  await replaceAdminPermissions(data.id, permissions);
-  return {
-    account: mapAdminAccount(data as AdminAccountRow, matrixToPermissionRows(data.id, permissions)),
-    setupToken: setup.token,
-    setupUrl: buildAdminInitialSetupUrl(setup.token),
-  };
-}
-
-function issueAdminSetupTokenValues() {
-  const token = generateOpaqueToken(32);
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
-  return {
-    token,
-    tokenHash: hashOpaqueToken(token),
-    expiresAt,
-  };
-}
-
-export async function issueAdminInitialSetupLink(adminId: string) {
-  const setup = issueAdminSetupTokenValues();
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
-    .from("admin_accounts")
-    .update({
-      initial_setup_token_hash: setup.tokenHash,
-      initial_setup_expires_at: setup.expiresAt,
-      must_change_password: true,
-    })
-    .eq("id", adminId)
-    .select(ADMIN_ACCOUNT_SELECT)
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return {
-    account: mapAdminAccount(data as AdminAccountRow),
-    setupToken: setup.token,
-    setupUrl: buildAdminInitialSetupUrl(setup.token),
-  };
-}
-
-export async function getAdminInitialSetupAccount(token: string) {
-  const tokenHash = hashOpaqueToken(token);
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("admin_accounts")
-    .select(ADMIN_ACCOUNT_SELECT)
-    .eq("initial_setup_token_hash", tokenHash)
+    .from("members")
+    .update({ admin_permission_id: template.key })
+    .eq("mm_username", memberUsername)
+    .select(ADMIN_MEMBER_SELECT)
     .maybeSingle();
 
-  if (error || !data) {
-    return null;
-  }
-
-  const row = data as AdminAccountRow;
-  if (
-    !row.is_active ||
-    !row.initial_setup_expires_at ||
-    new Date(row.initial_setup_expires_at).getTime() < Date.now()
-  ) {
-    return null;
-  }
-
-  return mapAdminAccount(row);
-}
-
-export async function completeAdminInitialSetup(input: {
-  token: string;
-  password: string;
-  passwordConfirm: string;
-}) {
-  if (input.password !== input.passwordConfirm) {
-    throw new Error("비밀번호 확인이 일치하지 않습니다.");
-  }
-  if (!isValidPassword(input.password)) {
-    throw new Error("비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.");
-  }
-  const account = await getAdminInitialSetupAccount(input.token);
-  if (!account) {
-    throw new Error("초기 설정 링크가 만료되었거나 유효하지 않습니다.");
-  }
-  const passwordRecord = hashPassword(input.password);
-  const completedAt = new Date().toISOString();
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("admin_accounts")
-    .update({
-      password_hash: passwordRecord.hash,
-      password_salt: passwordRecord.salt,
-      must_change_password: false,
-      initial_setup_token_hash: null,
-      initial_setup_expires_at: null,
-      initial_setup_completed_at: completedAt,
-    })
-    .eq("id", account.id);
-
   if (error) {
     throw new Error(error.message);
+  }
+  if (!data) {
+    throw new Error("회원을 찾을 수 없습니다.");
+  }
+
+  const account = mapAdminMember(data as AdminMemberRow);
+  if (!account) {
+    throw new Error("관리자 권한 부여에 실패했습니다.");
   }
   return account;
 }
@@ -382,21 +206,34 @@ export async function updateAdminAccountStatus(input: {
 }) {
   const target = await getAdminAccountById(input.targetAdminId);
   if (!target) {
-    throw new Error("관리자 계정을 찾을 수 없습니다.");
+    throw new Error("관리자 권한을 가진 회원을 찾을 수 없습니다.");
   }
+
+  const nextPermissions = input.isActive
+    ? target.permissions
+    : normalizeAdminPermissionMatrix(null);
   assertCanManageAdminPermissions({
     actorAdminId: input.actorAdminId,
     targetAdminId: input.targetAdminId,
     nextIsActive: input.isActive,
-    nextPermissions: target.permissions,
+    nextPermissions,
     activePrivilegedAdminCount: await countActivePrivilegedAdmins(),
   });
 
+  if (target.loginId === SUPER_ADMIN_USERNAME && !input.isActive) {
+    throw new Error("myknow Super Admin 권한은 회수할 수 없습니다.");
+  }
+
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase
-    .from("admin_accounts")
-    .update({ is_active: input.isActive })
+    .from("members")
+    .update({
+      admin_permission_id: input.isActive
+        ? target.permissionId
+        : null,
+    })
     .eq("id", input.targetAdminId);
+
   if (error) {
     throw new Error(error.message);
   }
@@ -409,17 +246,29 @@ export async function updateAdminPermissions(input: {
 }) {
   const target = await getAdminAccountById(input.targetAdminId);
   if (!target) {
-    throw new Error("관리자 계정을 찾을 수 없습니다.");
+    throw new Error("관리자 권한을 가진 회원을 찾을 수 없습니다.");
   }
-  const permissions = normalizeAdminPermissionMatrix(input.permissions);
   assertCanManageAdminPermissions({
     actorAdminId: input.actorAdminId,
     targetAdminId: input.targetAdminId,
     nextIsActive: target.isActive,
-    nextPermissions: permissions,
+    nextPermissions: input.permissions,
     activePrivilegedAdminCount: await countActivePrivilegedAdmins(),
   });
-  await replaceAdminPermissions(input.targetAdminId, permissions);
+
+  const template = ADMIN_PERMISSION_TEMPLATES.find(
+    (candidate) =>
+      JSON.stringify(normalizeAdminPermissionMatrix(candidate.permissions)) ===
+      JSON.stringify(normalizeAdminPermissionMatrix(input.permissions)),
+  );
+  if (!template) {
+    throw new Error("권한 ID 기반 관리에서는 템플릿 권한만 저장할 수 있습니다.");
+  }
+  await applyAdminPermissionTemplate({
+    actorAdminId: input.actorAdminId,
+    targetAdminId: input.targetAdminId,
+    templateKey: template.key,
+  });
 }
 
 export async function applyAdminPermissionTemplate(input: {
@@ -427,15 +276,35 @@ export async function applyAdminPermissionTemplate(input: {
   targetAdminId: string;
   templateKey: string;
 }) {
+  const target = await getAdminAccountById(input.targetAdminId);
+  if (!target) {
+    throw new Error("관리자 권한을 가진 회원을 찾을 수 없습니다.");
+  }
   const template = findAdminPermissionTemplate(input.templateKey);
   if (!template) {
     throw new Error("권한 템플릿을 찾을 수 없습니다.");
   }
-  await updateAdminPermissions({
+  if (template.key === "super_admin" && target.loginId !== SUPER_ADMIN_USERNAME) {
+    throw new Error("Super Admin 권한은 myknow 계정에만 부여할 수 있습니다.");
+  }
+
+  assertCanManageAdminPermissions({
     actorAdminId: input.actorAdminId,
     targetAdminId: input.targetAdminId,
-    permissions: template.permissions,
+    nextIsActive: true,
+    nextPermissions: template.permissions,
+    activePrivilegedAdminCount: await countActivePrivilegedAdmins(),
   });
+
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("members")
+    .update({ admin_permission_id: template.key })
+    .eq("id", input.targetAdminId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export function listAdminPermissionTemplates() {

@@ -462,6 +462,7 @@ create table if not exists members (
   privacy_policy_consented_at timestamp with time zone,
   marketing_policy_version integer,
   marketing_policy_consented_at timestamp with time zone,
+  admin_permission_id text,
   avatar_content_type text,
   avatar_base64 text,
   created_at timestamp with time zone default now(),
@@ -2046,6 +2047,15 @@ create table if not exists admin_permission_templates (
   updated_at timestamp with time zone default now()
 );
 
+alter table members
+  drop constraint if exists members_admin_permission_id_fkey;
+alter table members
+  add constraint members_admin_permission_id_fkey
+  foreign key (admin_permission_id)
+  references admin_permission_templates(key)
+  on update cascade
+  on delete set null;
+
 create table if not exists auth_security_logs (
   id uuid primary key default uuid_generate_v4(),
   event_name text not null,
@@ -2112,6 +2122,9 @@ create index if not exists members_year_campus_display_name_idx
   on members(year, campus, display_name);
 create index if not exists members_campus_display_name_idx
   on members(campus, display_name);
+create index if not exists members_admin_permission_id_idx
+  on members(admin_permission_id)
+  where admin_permission_id is not null;
 create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
 create index if not exists event_logs_created_at_id_idx
   on event_logs(created_at desc, id desc);
@@ -2488,9 +2501,39 @@ create trigger admin_permissions_keep_privileged_admin
   for each row
   execute function ensure_active_privileged_admin_exists();
 
+create or replace function ensure_single_member_super_admin()
+returns trigger
+language plpgsql
+as $$
+declare
+  super_admin_count integer;
+begin
+  if new.admin_permission_id = 'super_admin' and new.mm_username <> 'myknow' then
+    raise exception 'only myknow member can hold super_admin permission';
+  end if;
+
+  select count(*)
+    into super_admin_count
+    from members
+   where admin_permission_id = 'super_admin';
+
+  if super_admin_count > 1 then
+    raise exception 'only one super_admin member is allowed';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists members_keep_single_super_admin on members;
+create trigger members_keep_single_super_admin
+  after insert or update of admin_permission_id, mm_username on members
+  for each row
+  execute function ensure_single_member_super_admin();
+
 insert into admin_permission_templates (key, name, description, permissions)
 values
-  ('super_admin', 'Super Admin', '어드민 계정과 전체 운영 권한을 관리합니다.', '{"members":{"create":true,"read":true,"update":true,"delete":true},"reviews":{"create":true,"read":true,"update":true,"delete":true},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":true,"read":true,"update":true,"delete":true},"notifications":{"create":true,"read":true,"update":true,"delete":true},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":true,"read":true,"update":true,"delete":true},"admin_management":{"create":true,"read":true,"update":true,"delete":true}}'::jsonb),
+  ('super_admin', 'Super Admin', '멤버 관리자 권한과 전체 운영 권한을 관리합니다.', '{"members":{"create":true,"read":true,"update":true,"delete":true},"reviews":{"create":true,"read":true,"update":true,"delete":true},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":true,"read":true,"update":true,"delete":true},"notifications":{"create":true,"read":true,"update":true,"delete":true},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":true,"read":true,"update":true,"delete":true},"admin_management":{"create":true,"read":true,"update":true,"delete":true}}'::jsonb),
   ('operations_manager', '운영 관리자', '회원, 협력사, 알림, 이벤트, 기수 운영을 담당합니다.', '{"members":{"create":true,"read":true,"update":true,"delete":true},"reviews":{"create":false,"read":true,"update":true,"delete":true},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":true,"read":true,"update":true,"delete":true},"notifications":{"create":true,"read":true,"update":true,"delete":true},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":false,"read":true,"update":true,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
   ('content_manager', '콘텐츠 관리자', '브랜드, 홈광고, 이벤트 노출 콘텐츠를 관리합니다.', '{"members":{"create":false,"read":false,"update":false,"delete":false},"reviews":{"create":false,"read":true,"update":true,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":false,"read":false,"update":false,"delete":false},"notifications":{"create":false,"read":false,"update":false,"delete":false},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":false,"read":false,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
   ('support', '고객지원', '회원과 리뷰 상태를 확인하고 필요한 조치를 수행합니다.', '{"members":{"create":false,"read":true,"update":true,"delete":false},"reviews":{"create":false,"read":true,"update":true,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":false,"read":true,"update":false,"delete":false},"companies":{"create":false,"read":true,"update":false,"delete":false},"notifications":{"create":false,"read":true,"update":false,"delete":false},"home_ads":{"create":false,"read":false,"update":false,"delete":false},"events":{"create":false,"read":true,"update":false,"delete":false},"cycles":{"create":false,"read":false,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
@@ -2500,6 +2543,12 @@ on conflict (key) do update
        description = excluded.description,
        permissions = excluded.permissions,
        updated_at = now();
+
+update members
+   set admin_permission_id = 'super_admin',
+       updated_at = now()
+ where mm_username = 'myknow'
+   and admin_permission_id is distinct from 'super_admin';
 
 alter table categories enable row level security;
 alter table public_cache_versions enable row level security;

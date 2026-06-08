@@ -7,6 +7,7 @@ import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import {
   applyAdminPermissionTemplateAction,
   createAdminAccountAction,
+  grantMemberAdminPermissionAction,
   issueAdminInitialSetupLinkAction,
   updateAdminAccountStatusAction,
   updateAdminPermissionsAction,
@@ -58,6 +59,10 @@ export async function updatePartnerAccount(formData: FormData) {
 
 export async function createAdminAccount(formData: FormData) {
   return createAdminAccountAction(formData);
+}
+
+export async function grantMemberAdminPermission(formData: FormData) {
+  return grantMemberAdminPermissionAction(formData);
 }
 
 export async function issueAdminInitialSetupLink(formData: FormData) {
