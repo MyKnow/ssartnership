@@ -53,6 +53,31 @@ test("normalizing permission matrix enforces logs read-only", async () => {
   assert.equal(canAdmin(normalized, "logs", "delete"), false);
 });
 
+test("partner manager template only grants brand and company CRUD", async () => {
+  const {
+    ADMIN_PERMISSION_ACTIONS,
+    ADMIN_PERMISSION_RESOURCES,
+    ADMIN_PERMISSION_TEMPLATES,
+    canAdmin,
+  } = await adminPermissionsModulePromise;
+
+  const template = ADMIN_PERMISSION_TEMPLATES.find(
+    (candidate) => candidate.key === "partner_manager",
+  );
+  assert.ok(template);
+
+  for (const resource of ADMIN_PERMISSION_RESOURCES) {
+    for (const action of ADMIN_PERMISSION_ACTIONS) {
+      const expected = resource === "brands" || resource === "companies";
+      assert.equal(
+        canAdmin(template.permissions, resource, action),
+        expected,
+        `${resource}.${action}`,
+      );
+    }
+  }
+});
+
 test("self protection rejects disabling the last privileged admin", async () => {
   const {
     ADMIN_PERMISSION_TEMPLATES,

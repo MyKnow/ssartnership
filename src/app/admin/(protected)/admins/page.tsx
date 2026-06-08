@@ -1,8 +1,8 @@
 import AdminShell from "@/components/admin/AdminShell";
+import AdminMemberUsernameCombobox from "@/components/admin/AdminMemberUsernameCombobox";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
-import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -14,6 +14,7 @@ import {
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
   listAdminAccounts,
+  listAdminGrantableMembers,
   listAdminPermissionTemplates,
 } from "@/lib/admin-accounts";
 import {
@@ -58,8 +59,9 @@ export default async function AdminAccountsPage({
   const status = typeof params.status === "string" ? params.status : undefined;
   const message =
     typeof params.message === "string" ? params.message : undefined;
-  const [accounts, templates] = await Promise.all([
+  const [accounts, grantableMembers, templates] = await Promise.all([
     listAdminAccounts(),
+    listAdminGrantableMembers(),
     Promise.resolve(listAdminPermissionTemplates()),
   ]);
   const feedback = statusMessage(status, message);
@@ -84,13 +86,13 @@ export default async function AdminAccountsPage({
         <Card tone="elevated" className="grid gap-4">
           <SectionHeading
             title="멤버에게 관리자 권한 부여"
-            description="회원가입된 Mattermost username을 입력하고 권한 ID를 선택합니다. 별도 관리자 계정이나 초기설정 링크는 만들지 않습니다."
+            description="회원가입된 Mattermost username을 검색해 선택하고 권한 ID를 지정합니다. 별도 관리자 계정이나 초기설정 링크는 만들지 않습니다."
           />
           <form action={grantMemberAdminPermission} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem_auto] md:items-end">
-            <label className="grid gap-2 text-sm font-medium text-foreground">
-              회원 username
-              <Input name="memberUsername" required placeholder="myknow" />
-            </label>
+            <div className="grid gap-2 text-sm font-medium text-foreground">
+              <span>회원 username</span>
+              <AdminMemberUsernameCombobox members={grantableMembers} />
+            </div>
             <label className="grid gap-2 text-sm font-medium text-foreground">
               권한 ID
               <select

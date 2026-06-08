@@ -25,6 +25,13 @@ export type AdminAccount = {
   permissions: AdminPermissionMatrix;
 };
 
+export type AdminGrantableMember = {
+  id: string;
+  username: string;
+  displayName: string;
+  permissionId: string | null;
+};
+
 type AdminMemberRow = {
   id: string;
   mm_username: string | null;
@@ -147,6 +154,37 @@ export async function listAdminAccounts() {
   return ((data ?? []) as AdminMemberRow[])
     .map((row) => mapAdminMember(row))
     .filter((account): account is AdminAccount => account !== null);
+}
+
+export async function listAdminGrantableMembers() {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("members")
+    .select("id,mm_username,display_name,admin_permission_id")
+    .not("mm_username", "is", null)
+    .order("display_name", { ascending: true, nullsFirst: false })
+    .order("mm_username", { ascending: true })
+    .limit(1000);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as AdminMemberRow[]).flatMap<AdminGrantableMember>((row) => {
+    const username = row.mm_username?.trim();
+    if (!username) {
+      return [];
+    }
+
+    return [
+      {
+        id: row.id,
+        username,
+        displayName: row.display_name?.trim() || username,
+        permissionId: resolveMemberPermissionId(row),
+      },
+    ];
+  });
 }
 
 export async function countActivePrivilegedAdmins() {
