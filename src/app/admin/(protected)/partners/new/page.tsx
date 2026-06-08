@@ -5,6 +5,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ function normalizePartnerCompanies(value: unknown): PartnerCompanyRow[] {
 }
 
 export default async function AdminPartnerNewPage() {
+  await requireAdminPermission("brands", "create", { path: "/admin/partners/new" });
   const supabase = getSupabaseAdminClient();
 
   const [categoriesResult, companiesResult] = await Promise.all([

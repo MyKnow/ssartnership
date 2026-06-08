@@ -135,20 +135,21 @@ async function loginAction(formData: FormData) {
     );
   }
 
-  const ok = validateAdminCredentials(normalizedId, password);
+  const adminAccount = await validateAdminCredentials(normalizedId, password);
+  const ok = adminAccount !== null;
   await Promise.all([
     recordAttemptBatch(ipRateLimitKeys, ok),
     recordAttemptBatch(accountRateLimitKeys, ok, ADMIN_ACCOUNT_RATE_LIMIT),
   ]);
 
-  if (ok) {
-    await setAdminSession(normalizedId);
+  if (adminAccount) {
+    await setAdminSession(adminAccount);
     await logAuthSecurity({
       ...context,
       eventName: "admin_login",
       status: "success",
       actorType: "admin",
-      actorId: normalizedId,
+      actorId: adminAccount.id,
       identifier: normalizedId,
     });
     redirect("/admin");

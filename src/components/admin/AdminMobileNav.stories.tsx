@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
+import { ADMIN_NAV_GROUPS } from "./admin-navigation";
 import AdminMobileNav from "./AdminMobileNav";
 
 const meta = {
@@ -11,6 +12,7 @@ const meta = {
     backHref: "/admin/partners",
     backLabel: "브랜드 관리",
     logoutAction: fn(),
+    navGroups: ADMIN_NAV_GROUPS,
   },
   decorators: [
     (Story) => (

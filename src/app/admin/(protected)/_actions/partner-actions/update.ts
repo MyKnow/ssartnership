@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -35,7 +35,7 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export async function updatePartnerAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("brands", "update", { path: "/admin/partners" });
   const id = String(formData.get("id") || "").trim();
   if (!id) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");

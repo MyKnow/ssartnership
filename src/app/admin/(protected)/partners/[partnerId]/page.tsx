@@ -14,6 +14,7 @@ import StatsRow from "@/components/ui/StatsRow";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import {
   getAdminReviewPageData,
@@ -68,6 +69,7 @@ export default async function AdminPartnerDetailPage({
   params: Promise<{ partnerId: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdminPermission("brands", "read", { path: "/admin/partners" });
   const { partnerId } = await params;
   const query = (await searchParams) ?? {};
   const detailPath = `/admin/partners/${partnerId}`;

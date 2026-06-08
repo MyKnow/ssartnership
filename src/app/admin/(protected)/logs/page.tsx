@@ -1,11 +1,13 @@
 import AdminLogsManager from '@/components/admin/AdminLogsManager';
 import AdminShell from '@/components/admin/AdminShell';
 import ShellHeader from '@/components/ui/ShellHeader';
+import { requireAdminPermission } from '@/lib/admin-access';
 import { getAdminLogsPageData } from '@/lib/log-insights';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminLogsPage() {
+  await requireAdminPermission('logs', 'read', { path: '/admin/logs' });
   const data = await getAdminLogsPageData({ preset: '24h' });
 
   return (

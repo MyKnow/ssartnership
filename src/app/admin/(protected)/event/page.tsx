@@ -5,6 +5,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { listEventPageDefinitions } from "@/lib/event-pages";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { PROMOTION_AUDIENCE_OPTIONS } from "@/lib/promotions/catalog";
 import {
   getPromotionCampaignState,
@@ -143,6 +144,7 @@ export default async function AdminEventPage({
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
+  await requireAdminPermission("events", "read", { path: "/admin/event" });
   const params = (await searchParams) ?? {};
   const definitions = listEventPageDefinitions();
   const registrations = await listManagedEventCampaigns({ includeInactive: true });

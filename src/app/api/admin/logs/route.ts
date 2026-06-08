@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureAdminApiAccess } from '@/lib/admin-access';
+import { ensureAdminApiPermission } from '@/lib/admin-access';
 import { getAdminLogsPageData } from '@/lib/log-insights';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  const accessDenied = await ensureAdminApiAccess(request);
+  const accessDenied = await ensureAdminApiPermission(request, 'logs', 'read');
   if (accessDenied) {
     return accessDenied;
   }

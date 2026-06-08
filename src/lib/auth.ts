@@ -1,12 +1,16 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import crypto from "crypto";
 import {
   createHmacDigest,
   splitSignedToken,
   verifyHmacDigest,
 } from "./hmac.js";
 import { getAdminSessionTtlSeconds } from "./admin-security";
+import {
+  authenticateAdminCredentials,
+  getAdminAccountById,
+  type AdminAccount,
+} from "./admin-accounts";
 
 const COOKIE_NAME = "admin_session";
 
@@ -14,6 +18,8 @@ type AdminSessionPayload = {
   issuedAt: number;
   expiresAt: number;
   adminId: string;
+  loginId: string;
+  permissionVersion: number;
 };
 
 function getSecret() {
@@ -53,7 +59,10 @@ function parseAdminSessionToken(token: string): AdminSessionPayload | null {
       typeof parsed.issuedAt !== "number" ||
       typeof parsed.expiresAt !== "number" ||
       typeof parsed.adminId !== "string" ||
-      parsed.adminId.length === 0
+      parsed.adminId.length === 0 ||
+      typeof parsed.loginId !== "string" ||
+      parsed.loginId.length === 0 ||
+      typeof parsed.permissionVersion !== "number"
     ) {
       return null;
     }
@@ -64,20 +73,24 @@ function parseAdminSessionToken(token: string): AdminSessionPayload | null {
       issuedAt: parsed.issuedAt,
       expiresAt: parsed.expiresAt,
       adminId: parsed.adminId,
+      loginId: parsed.loginId,
+      permissionVersion: parsed.permissionVersion,
     };
   } catch {
     return null;
   }
 }
 
-export async function setAdminSession(adminId: string) {
+export async function setAdminSession(account: Pick<AdminAccount, "id" | "loginId" | "permissionVersion">) {
   const now = Date.now();
   const ttlSeconds = getAdminSessionTtlSeconds();
   const ttlMs = ttlSeconds * 1000;
   const payload = JSON.stringify({
     issuedAt: now,
     expiresAt: now + ttlMs,
-    adminId,
+    adminId: account.id,
+    loginId: account.loginId,
+    permissionVersion: account.permissionVersion,
   });
   const token = signPayload(payload);
   const cookieStore = await cookies();
@@ -101,8 +114,11 @@ export async function isAdminSession() {
 
 export async function getAdminSession(): Promise<{
   adminId: string;
+  loginId: string;
   issuedAt: number;
   expiresAt: number;
+  permissionVersion: number;
+  account: AdminAccount;
 } | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -110,7 +126,22 @@ export async function getAdminSession(): Promise<{
     return null;
   }
   try {
-    return parseAdminSessionToken(token);
+    const payload = parseAdminSessionToken(token);
+    if (!payload) {
+      return null;
+    }
+    const account = await getAdminAccountById(payload.adminId);
+    if (
+      !account ||
+      !account.isActive ||
+      account.permissionVersion !== payload.permissionVersion
+    ) {
+      return null;
+    }
+    return {
+      ...payload,
+      account,
+    };
   } catch {
     return null;
   }
@@ -123,21 +154,6 @@ export async function requireAdmin() {
   }
 }
 
-export function validateAdminCredentials(id: string, password: string) {
-  const expectedId = process.env.ADMIN_ID ?? "";
-  const expectedPassword = process.env.ADMIN_PASSWORD ?? "";
-  const safeCompare = (a: string, b: string) => {
-    const aBuffer = Buffer.from(a);
-    const bBuffer = Buffer.from(b);
-    if (aBuffer.length !== bBuffer.length) {
-      const max = Math.max(aBuffer.length, bBuffer.length);
-      const paddedA = Buffer.concat([aBuffer, Buffer.alloc(max - aBuffer.length)]);
-      const paddedB = Buffer.concat([bBuffer, Buffer.alloc(max - bBuffer.length)]);
-      crypto.timingSafeEqual(paddedA, paddedB);
-      return false;
-    }
-    return crypto.timingSafeEqual(aBuffer, bBuffer);
-  };
-
-  return safeCompare(id, expectedId) && safeCompare(password, expectedPassword);
+export async function validateAdminCredentials(id: string, password: string) {
+  return authenticateAdminCredentials(id, password);
 }

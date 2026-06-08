@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureAdminApiAccess } from "@/lib/admin-access";
+import { ensureAdminApiPermission } from "@/lib/admin-access";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -19,7 +19,11 @@ export async function DELETE(
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const accessDenied = await ensureAdminApiAccess(request);
+  const accessDenied = await ensureAdminApiPermission(
+    request,
+    "notifications",
+    "delete",
+  );
   if (accessDenied) {
     return accessDenied;
   }

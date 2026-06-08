@@ -5,6 +5,7 @@ import {
   ClockIcon,
   MegaphoneIcon,
   QueueListIcon,
+  ShieldCheckIcon,
   StarIcon,
   TagIcon,
   UsersIcon,
@@ -21,6 +22,11 @@ import {
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
 import { fetchAdminDashboardCounts } from "@/lib/partner-counts";
+import { getAdminSession } from "@/lib/auth";
+import {
+  type AdminPermissionResource,
+  canAdmin,
+} from "@/lib/admin-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +36,7 @@ type LaunchpadItem = {
   description: string;
   meta: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  permission: AdminPermissionResource;
 };
 
 function OverviewMetric({
@@ -95,9 +102,10 @@ export default async function AdminPage() {
   }
 
   const supabase = getSupabaseAdminClient();
-  const [cycleSettings, dashboardCountResult] = await Promise.all([
+  const [cycleSettings, dashboardCountResult, adminSession] = await Promise.all([
     getSsafyCycleSettings(),
     fetchAdminDashboardCounts(supabase),
+    getAdminSession(),
   ]);
   const cycleOverview = getSsafyCycleOverview(cycleSettings);
 
@@ -136,6 +144,7 @@ export default async function AdminPage() {
           description: "회원 검색, 필터, 계정 상태 수정, 수동 추가와 백필 작업을 진행합니다.",
           meta: `${dashboardCounts.memberCount.toLocaleString()}명`,
           icon: UsersIcon,
+          permission: "members",
         },
         {
           href: "/admin/partners",
@@ -143,6 +152,7 @@ export default async function AdminPage() {
           description: "브랜드 노출 상태, 카테고리, 변경 요청, 상세 수정 흐름을 관리합니다.",
           meta: `${dashboardCounts.partnerCount.toLocaleString()}개`,
           icon: TagIcon,
+          permission: "brands",
         },
         {
           href: "/admin/reviews",
@@ -150,6 +160,7 @@ export default async function AdminPage() {
           description: "리뷰 공개 여부, 삭제, 이미지 포함 리뷰 검수 작업을 처리합니다.",
           meta: `${dashboardCounts.reviewCount.toLocaleString()}건`,
           icon: StarIcon,
+          permission: "reviews",
         },
         {
           href: "/admin/logs",
@@ -157,6 +168,7 @@ export default async function AdminPage() {
           description: "제품 이벤트, 관리자 감사, 보안 로그를 같은 기준으로 탐색합니다.",
           meta: `${totalLogCount.toLocaleString()}건`,
           icon: QueueListIcon,
+          permission: "logs",
         },
       ],
     },
@@ -170,6 +182,7 @@ export default async function AdminPage() {
           description: "협력사와 담당자 계정, 브랜드 연결 상태를 점검합니다.",
           meta: `회사 ${dashboardCounts.companyCount.toLocaleString()}개`,
           icon: BuildingOffice2Icon,
+          permission: "companies",
         },
         {
           href: "/admin/push",
@@ -177,6 +190,7 @@ export default async function AdminPage() {
           description: "발송 결과 확인과 공지/마케팅 전송을 같은 워크스페이스에서 처리합니다.",
           meta: `구독 ${dashboardCounts.activePushSubscriptionCount.toLocaleString()}개`,
           icon: MegaphoneIcon,
+          permission: "notifications",
         },
         {
           href: "/admin/advertisement",
@@ -184,6 +198,7 @@ export default async function AdminPage() {
           description: "사용자 홈 캐러셀 카드와 연결 경로를 관리합니다.",
           meta: "홈 노출 관리",
           icon: ChartBarSquareIcon,
+          permission: "home_ads",
         },
         {
           href: "/admin/event",
@@ -191,10 +206,30 @@ export default async function AdminPage() {
           description: "이벤트 페이지 등록과 진행 상태를 운영합니다.",
           meta: "진행 흐름 관리",
           icon: ClockIcon,
+          permission: "events",
+        },
+        {
+          href: "/admin/admins",
+          title: "어드민 관리",
+          description: "관리자 계정, 권한 템플릿, 초기 설정 링크를 관리합니다.",
+          meta: "권한 관리",
+          icon: ShieldCheckIcon,
+          permission: "admin_management",
         },
       ],
     },
   ];
+
+  const visibleLaunchpadGroups = launchpadGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        adminSession
+          ? canAdmin(adminSession.account.permissions, item.permission, "read")
+          : true,
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const cycleMeta = cycleSettings.manualCurrentYear
     ? `${cycleOverview.currentYear}기 · 조기 시작`
@@ -252,7 +287,7 @@ export default async function AdminPage() {
               </p>
             </div>
             <ResponsiveGrid minItemWidth="13rem">
-              {launchpadGroups[0]!.items.map((item) => (
+              {(visibleLaunchpadGroups[0]?.items ?? []).map((item) => (
                 <LaunchpadCard key={item.href} item={item} />
               ))}
             </ResponsiveGrid>
@@ -283,7 +318,7 @@ export default async function AdminPage() {
           </Card>
         </div>
 
-        {launchpadGroups[1]!.items.length === 0 ? (
+        {(visibleLaunchpadGroups[1]?.items ?? []).length === 0 ? (
           <EmptyState
             title="운영 바로가기가 없습니다."
             description="연결 가능한 운영 화면을 준비 중입니다."
@@ -298,7 +333,7 @@ export default async function AdminPage() {
               </p>
             </div>
             <ResponsiveGrid minItemWidth="15rem">
-              {launchpadGroups[1]!.items.map((item) => (
+              {(visibleLaunchpadGroups[1]?.items ?? []).map((item) => (
                 <LaunchpadCard key={item.href} item={item} />
               ))}
             </ResponsiveGrid>

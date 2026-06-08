@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { parsePartnerAccountCompanyPayload } from "./shared-parsers";
 import {
   logAdminAction,
@@ -10,7 +10,7 @@ import {
 import { getPartnerAccountSupabase } from "./account-actions.shared";
 
 export async function updatePartnerAccountCompanyConnectionAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
   let payload: ReturnType<typeof parsePartnerAccountCompanyPayload>;
   try {
     payload = parsePartnerAccountCompanyPayload(formData);
@@ -73,4 +73,3 @@ export async function updatePartnerAccountCompanyConnectionAction(formData: Form
   revalidatePartnerCompanyData();
   redirect("/admin/companies");
 }
-

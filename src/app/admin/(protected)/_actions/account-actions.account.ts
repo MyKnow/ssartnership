@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { generateTempPassword, hashPassword } from "@/lib/password";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
 import {
@@ -19,7 +19,7 @@ import {
 } from "./account-actions.shared";
 
 export async function updatePartnerAccountAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
   let payload: ReturnType<typeof parsePartnerAccountPayload>;
   try {
     payload = parsePartnerAccountPayload(formData);
@@ -81,7 +81,7 @@ export async function updatePartnerAccountAction(formData: FormData) {
 }
 
 export async function createPartnerAccountAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "create", { path: "/admin/companies" });
   let payload: ReturnType<typeof parsePartnerAccountCreatePayload>;
   try {
     payload = parsePartnerAccountCreatePayload(formData);

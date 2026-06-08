@@ -17,6 +17,7 @@ import {
   updateMember,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { requireAdminPermission } from "@/lib/admin-access";
 import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
@@ -181,6 +182,7 @@ export default async function AdminMembersPage({
 }: {
   searchParams?: Promise<AdminMemberSearchParams>;
 }) {
+  await requireAdminPermission("members", "read", { path: "/admin/members" });
   const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const page = parsePage(getOne(params, "page"));

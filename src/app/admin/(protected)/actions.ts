@@ -5,6 +5,13 @@ import { clearAdminSession } from "@/lib/auth";
 import type { ManualMemberAddFormState } from "@/lib/member-manual-add";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import {
+  applyAdminPermissionTemplateAction,
+  createAdminAccountAction,
+  issueAdminInitialSetupLinkAction,
+  updateAdminAccountStatusAction,
+  updateAdminPermissionsAction,
+} from "./_actions/admin-account-actions";
+import {
   createPartnerAccountAction,
   createPartnerAccountInitialSetupUrlAction,
   sendPartnerAccountInitialSetupUrlAction,
@@ -47,6 +54,26 @@ import { logAdminAction } from "./_actions/shared-helpers";
 
 export async function updatePartnerAccount(formData: FormData) {
   return updatePartnerAccountAction(formData);
+}
+
+export async function createAdminAccount(formData: FormData) {
+  return createAdminAccountAction(formData);
+}
+
+export async function issueAdminInitialSetupLink(formData: FormData) {
+  return issueAdminInitialSetupLinkAction(formData);
+}
+
+export async function updateAdminAccountStatus(formData: FormData) {
+  return updateAdminAccountStatusAction(formData);
+}
+
+export async function updateAdminPermissions(formData: FormData) {
+  return updateAdminPermissionsAction(formData);
+}
+
+export async function applyAdminPermissionTemplate(formData: FormData) {
+  return applyAdminPermissionTemplateAction(formData);
 }
 
 export async function createPartnerAccount(formData: FormData) {

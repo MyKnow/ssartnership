@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { sendPartnerPortalInitialSetupEmail } from "@/lib/partner-email";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
 import {
@@ -10,7 +10,7 @@ import {
 import { getPartnerAccountSupabase } from "./account-actions.shared";
 
 export async function createPartnerAccountInitialSetupUrlAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
@@ -43,7 +43,7 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
 }
 
 export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");

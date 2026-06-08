@@ -10,6 +10,7 @@ import {
   mockPreviewCertificationMembers,
   mockPreviewMembers,
 } from "@/lib/mock/member-preview";
+import { requireAdminPermission } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,8 @@ async function noopMemberAction(formData: FormData) {
   void formData;
 }
 
-export default function AdminMemberMockPreviewPage() {
+export default async function AdminMemberMockPreviewPage() {
+  await requireAdminPermission("members", "read", { path: "/admin/members/mock" });
   const initialTimestamp = new Date().toISOString();
 
   return (

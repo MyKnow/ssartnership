@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import { buildPartnerCompanySlug } from "./partner-support";
 import {
@@ -30,7 +30,7 @@ function normalizePartnerCompanyRow(row: PartnerCompanyRow | null | undefined) {
 }
 
 export async function createCategoryAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("brands", "create", { path: "/admin/partners" });
   const { key, label, description, color } = parseCategoryPayloadOrRedirect(
     formData,
     "/admin/partners",
@@ -57,7 +57,7 @@ export async function createCategoryAction(formData: FormData) {
 }
 
 export async function updateCategoryAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("brands", "update", { path: "/admin/partners" });
   const id = String(formData.get("id") || "").trim();
   const { key, label, description, color } = parseCategoryPayloadOrRedirect(
     formData,
@@ -89,7 +89,7 @@ export async function updateCategoryAction(formData: FormData) {
 }
 
 export async function deleteCategoryAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("brands", "delete", { path: "/admin/partners" });
   const id = String(formData.get("id") || "").trim();
   if (!id) {
     redirectAdminActionError("/admin/partners", "category_invalid_request");
@@ -111,7 +111,7 @@ export async function deleteCategoryAction(formData: FormData) {
 }
 
 export async function createPartnerCompanyAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "create", { path: "/admin/companies" });
   let payload: PartnerCompanyCrudInput;
   try {
     payload = parsePartnerCompanyCrudPayload(formData);
@@ -159,7 +159,7 @@ export async function createPartnerCompanyAction(formData: FormData) {
 }
 
 export async function updatePartnerCompanyAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
   let payload: PartnerCompanyCrudInput;
   try {
     payload = parsePartnerCompanyCrudPayload(formData);
@@ -251,7 +251,7 @@ export async function updatePartnerCompanyAction(formData: FormData) {
 }
 
 export async function deletePartnerCompanyAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("companies", "delete", { path: "/admin/companies" });
   const companyId = String(formData.get("companyId") || "").trim();
   if (!companyId) {
     redirectAdminActionError("/admin/companies", "company_invalid_request");

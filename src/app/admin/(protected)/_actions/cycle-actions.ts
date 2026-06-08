@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import {
   clearSsafyCycleOverride,
   getConfiguredCurrentSsafyYear,
@@ -14,7 +14,7 @@ import {
 import { parseSsafyCycleSettingsPayloadOrRedirect } from "./shared-parser-redirects";
 
 export async function updateSsafyCycleSettingsAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("cycles", "update", { path: "/admin/cycle" });
   const payload = parseSsafyCycleSettingsPayloadOrRedirect(
     formData,
     "/admin/cycle",
@@ -30,7 +30,7 @@ export async function updateSsafyCycleSettingsAction(formData: FormData) {
 }
 
 export async function earlyStartSsafyCycleAction() {
-  await requireAdmin();
+  await requireAdminPermission("cycles", "update", { path: "/admin/cycle" });
   const settings = await getSsafyCycleSettings();
   const currentYear = getConfiguredCurrentSsafyYear(settings);
   const targetYear = currentYear + 1;
@@ -51,7 +51,7 @@ export async function earlyStartSsafyCycleAction() {
 }
 
 export async function restoreSsafyCycleSettingsAction() {
-  await requireAdmin();
+  await requireAdminPermission("cycles", "update", { path: "/admin/cycle" });
   const settings = await getSsafyCycleSettings();
   await clearSsafyCycleOverride();
   await logAdminAction("cycle_settings_restore", {

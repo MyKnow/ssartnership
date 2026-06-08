@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import Card from "@/components/ui/Card";
+import { ADMIN_NAV_GROUPS } from "./admin-navigation";
 import AdminShellView from "./AdminShellView";
 
 const meta = {
@@ -8,6 +9,7 @@ const meta = {
   args: {
     title: "관리 대시보드",
     logoutAction: async () => {},
+    navGroups: ADMIN_NAV_GROUPS,
     children: (
       <div className="grid gap-4">
         <Card className="grid gap-2">
