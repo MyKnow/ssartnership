@@ -189,5 +189,5 @@ export async function deleteMember(formData: FormData) {
 export async function logout() {
   await logAdminAction("logout");
   await clearAdminSession();
-  redirect("/admin/login");
+  redirect("/");
 }

@@ -11,6 +11,19 @@ const COOKIE_NAME = "user_session";
 const ADMIN_COOKIE_NAME = "admin_session";
 const PARTNER_COOKIE_NAME = "partner_session";
 
+function nextWithRequestUrl(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(
+    "next-url",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+}
+
 function getSecret() {
   const secret = process.env.USER_SESSION_SECRET;
   if (!secret || secret.length < 32) {
@@ -160,10 +173,6 @@ async function verifyPartnerToken(token: string) {
 }
 
 async function verifyAdminToken(token: string) {
-  const secret = getAdminSecret();
-  if (!secret) {
-    return null;
-  }
   const signedToken = splitSignedToken(token);
   if (!signedToken) {
     return null;
@@ -172,16 +181,26 @@ async function verifyAdminToken(token: string) {
   if (!payload || !signature) {
     return null;
   }
+  const secret = getAdminSecret();
+  if (!secret) {
+    return null;
+  }
   try {
     const expected = await hmacSha256Hex(payload, secret);
     if (expected !== signature) {
       return null;
     }
     const parsed = JSON.parse(payload) as {
+      adminId?: string;
+      loginId?: string;
+      permissionVersion?: number;
       issuedAt?: number;
       expiresAt?: number;
     };
     if (
+      typeof parsed.adminId !== "string" ||
+      typeof parsed.loginId !== "string" ||
+      typeof parsed.permissionVersion !== "number" ||
       typeof parsed.issuedAt !== "number" ||
       typeof parsed.expiresAt !== "number"
     ) {
@@ -196,8 +215,41 @@ async function verifyAdminToken(token: string) {
   }
 }
 
-export async function middleware(request: NextRequest) {
+function isPublicAdminPath(pathname: string) {
+  return (
+    pathname === "/admin/login" ||
+    pathname === "/admin/session" ||
+    pathname === "/admin/denied" ||
+    pathname.startsWith("/admin/setup/")
+  );
+}
+
+function isProtectedAdminPagePath(pathname: string) {
+  return (
+    (pathname === "/admin" || pathname.startsWith("/admin/")) &&
+    !isPublicAdminPath(pathname)
+  );
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const currentPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+
+  if (isProtectedAdminPagePath(pathname)) {
+    const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+    const adminPayload = adminToken ? await verifyAdminToken(adminToken) : null;
+    if (adminPayload) {
+      return nextWithRequestUrl(request);
+    }
+
+    const userToken = request.cookies.get(COOKIE_NAME)?.value;
+    const userPayload = userToken ? await verifyToken(userToken) : null;
+    const url = request.nextUrl.clone();
+    url.pathname = userPayload ? "/admin/session" : "/auth/login";
+    url.search = "";
+    url.searchParams.set("returnTo", currentPath);
+    return NextResponse.redirect(url);
+  }
 
   if (isProtectedAdminPath(pathname)) {
     const clientIp = getForwardedClientIp(request.headers);
@@ -223,22 +275,7 @@ export async function middleware(request: NextRequest) {
       });
     }
 
-    const isAdminPage = pathname.startsWith("/admin");
-    if (isAdminPage && pathname !== "/admin/login") {
-      const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-      const adminPayload = adminToken
-        ? await verifyAdminToken(adminToken)
-        : null;
-
-      if (!adminPayload) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/admin/login";
-        url.searchParams.set("error", "access_denied");
-        return NextResponse.redirect(url);
-      }
-    }
-
-    return NextResponse.next();
+    return nextWithRequestUrl(request);
   }
 
   if (
@@ -249,7 +286,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/sitemap") ||
     pathname.startsWith("/robots")
   ) {
-    return NextResponse.next();
+    return nextWithRequestUrl(request);
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
@@ -263,7 +300,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/auth")) {
-    return NextResponse.next();
+    return nextWithRequestUrl(request);
   }
 
   const isPartnerSetupPath =
@@ -295,7 +332,7 @@ export async function middleware(request: NextRequest) {
           partnerPayload.mustChangePassword ? "/partner/change-password" : "/partner";
         return NextResponse.redirect(url);
       }
-      return NextResponse.next();
+      return nextWithRequestUrl(request);
     }
 
     if (pathname === "/partner/reset") {
@@ -304,7 +341,7 @@ export async function middleware(request: NextRequest) {
         url.pathname = "/partner";
         return NextResponse.redirect(url);
       }
-      return NextResponse.next();
+      return nextWithRequestUrl(request);
     }
 
     if (isPartnerSetupPath) {
@@ -313,7 +350,7 @@ export async function middleware(request: NextRequest) {
         url.pathname = "/partner";
         return NextResponse.redirect(url);
       }
-      return NextResponse.next();
+      return nextWithRequestUrl(request);
     }
     if (!partnerPayload && !isPartnerLogoutPath) {
       const url = request.nextUrl.clone();
@@ -322,7 +359,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return nextWithRequestUrl(request);
 }
 
 export const config = {
