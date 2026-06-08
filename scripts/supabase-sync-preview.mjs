@@ -36,6 +36,35 @@ const EXCLUDED_PUBLIC_TABLES = [
   "push_subscriptions",
   "suggestion_attempts",
 ];
+const PREVIEW_ADMIN_PERMISSION_SEED_SQL = `
+create table if not exists public.admin_permission_templates (
+  key text primary key,
+  name text not null,
+  description text not null,
+  permissions jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+insert into public.admin_permission_templates (key, name, description, permissions)
+values
+  ('super_admin', 'Super Admin', '멤버 관리자 권한과 전체 운영 권한을 관리합니다.', '{"members":{"create":true,"read":true,"update":true,"delete":true},"reviews":{"create":true,"read":true,"update":true,"delete":true},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":true,"read":true,"update":true,"delete":true},"notifications":{"create":true,"read":true,"update":true,"delete":true},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":true,"read":true,"update":true,"delete":true},"admin_management":{"create":true,"read":true,"update":true,"delete":true}}'::jsonb),
+  ('operations_manager', '운영 관리자', '회원, 협력사, 알림, 이벤트, 기수 운영을 담당합니다.', '{"members":{"create":true,"read":true,"update":true,"delete":true},"reviews":{"create":false,"read":true,"update":true,"delete":true},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":true,"read":true,"update":true,"delete":true},"notifications":{"create":true,"read":true,"update":true,"delete":true},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":false,"read":true,"update":true,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
+  ('content_manager', '콘텐츠 관리자', '브랜드, 홈광고, 이벤트 노출 콘텐츠를 관리합니다.', '{"members":{"create":false,"read":false,"update":false,"delete":false},"reviews":{"create":false,"read":true,"update":true,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":false,"read":false,"update":false,"delete":false},"notifications":{"create":false,"read":false,"update":false,"delete":false},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":false,"read":false,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
+  ('support', '고객지원', '회원과 리뷰 상태를 확인하고 필요한 조치를 수행합니다.', '{"members":{"create":false,"read":true,"update":true,"delete":false},"reviews":{"create":false,"read":true,"update":true,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":false,"read":true,"update":false,"delete":false},"companies":{"create":false,"read":true,"update":false,"delete":false},"notifications":{"create":false,"read":true,"update":false,"delete":false},"home_ads":{"create":false,"read":false,"update":false,"delete":false},"events":{"create":false,"read":true,"update":false,"delete":false},"cycles":{"create":false,"read":false,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
+  ('readonly', '조회 전용', '운영 데이터를 조회만 할 수 있습니다.', '{"members":{"create":false,"read":true,"update":false,"delete":false},"reviews":{"create":false,"read":true,"update":false,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":false,"read":true,"update":false,"delete":false},"companies":{"create":false,"read":true,"update":false,"delete":false},"notifications":{"create":false,"read":true,"update":false,"delete":false},"home_ads":{"create":false,"read":true,"update":false,"delete":false},"events":{"create":false,"read":true,"update":false,"delete":false},"cycles":{"create":false,"read":true,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb)
+on conflict (key) do update
+   set name = excluded.name,
+       description = excluded.description,
+       permissions = excluded.permissions,
+       updated_at = now();
+
+update public.members
+   set admin_permission_id = 'super_admin',
+       updated_at = now()
+ where mm_username = 'myknow'
+   and admin_permission_id is distinct from 'super_admin';
+`;
 
 function requiredEnv(name) {
   const value = process.env[name]?.trim();
@@ -337,6 +366,21 @@ async function restorePreviewDatabase(dumpPath, previewDbUrl) {
       "ON_ERROR_STOP=1",
       "--file",
       dumpPath,
+    ],
+  );
+}
+
+async function seedPreviewAdminPermissions(previewDbUrl) {
+  console.log("Seeding preview admin permission templates and myknow super admin access...");
+  await runCommand(
+    "psql",
+    [
+      "--dbname",
+      previewDbUrl,
+      "--set",
+      "ON_ERROR_STOP=1",
+      "--command",
+      PREVIEW_ADMIN_PERMISSION_SEED_SQL,
     ],
   );
 }
@@ -695,6 +739,7 @@ async function main() {
     await sanitizeDumpForPreview(dumpPath, previewDbUrl);
     await truncatePreviewDatabase(previewDbUrl);
     await restorePreviewDatabase(dumpPath, previewDbUrl);
+    await seedPreviewAdminPermissions(previewDbUrl);
     await seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey);
     await syncStorageBuckets(
       productionUrl,
