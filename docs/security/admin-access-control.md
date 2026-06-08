@@ -6,21 +6,27 @@
 
 권한은 `admin_permissions`의 리소스별 CRUD 매트릭스로 판정한다. 로그 리소스는 감사 증적 보호를 위해 `read`만 허용한다.
 
-## 최초 Super Admin 생성
+## myknow00 Super Admin 승격
 
-배포 후 service role 권한으로 1회 실행한다.
+배포 후 service role 권한으로 1회 실행한다. 기본 대상은 기존 운영 계정인 `myknow00`이다.
 
 ```bash
-ADMIN_BOOTSTRAP_LOGIN_ID="ssafy-admin" \
-ADMIN_BOOTSTRAP_DISPLAY_NAME="SSAFY 운영 관리자" \
-ADMIN_BOOTSTRAP_EMAIL="admin@example.com" \
 SUPABASE_URL="..." \
 SUPABASE_SERVICE_ROLE_KEY="..." \
 NEXT_PUBLIC_SITE_URL="https://ssartnership.vercel.app" \
 npm run bootstrap:super-admin
 ```
 
-스크립트는 super admin 계정과 초기설정 링크를 만든다. 출력된 `/admin/setup/[token]` 링크에서 비밀번호를 직접 설정한다. 토큰은 평문으로 저장하지 않고 SHA-256 hash만 DB에 저장하며 7일 뒤 만료된다.
+스크립트는 `admin_accounts.login_id = 'myknow00'` 계정을 활성화하고 super admin 권한을 부여한다. 기존 DB 계정이 있으면 비밀번호와 초기설정 상태는 건드리지 않는다. 계정이 아직 DB에 없을 때만 `myknow00` 계정을 만들고 `/admin/setup/[token]` 초기설정 링크를 출력한다. 토큰은 평문으로 저장하지 않고 SHA-256 hash만 DB에 저장하며 7일 뒤 만료된다.
+
+다른 계정을 대상으로 승격해야 할 때만 아래 값을 명시한다.
+
+```bash
+ADMIN_BOOTSTRAP_LOGIN_ID="other-admin" \
+ADMIN_BOOTSTRAP_DISPLAY_NAME="다른 관리자" \
+ADMIN_BOOTSTRAP_EMAIL="other@example.com" \
+npm run bootstrap:super-admin
+```
 
 ## 운영 원칙
 
