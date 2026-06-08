@@ -16,6 +16,7 @@ import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
 import {
+  ADMIN_NAV_ICON_BY_KEY,
   type AdminNavGroup,
   findAdminNavItem,
   isAdminNavActive,
@@ -62,7 +63,7 @@ export default function AdminShellView({
           <div className="grid gap-1.5">
             {group.items.map((item) => {
               const active = isAdminNavActive(pathname, item.href);
-              const Icon = item.icon;
+              const Icon = ADMIN_NAV_ICON_BY_KEY[item.iconKey];
 
               return (
                 <Link

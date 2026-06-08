@@ -19,12 +19,24 @@ import {
 } from "@/lib/admin-permissions";
 
 export type AdminNavIcon = ComponentType<SVGProps<SVGSVGElement>>;
+export type AdminNavIconKey =
+  | "building"
+  | "chart"
+  | "clock"
+  | "home"
+  | "megaphone"
+  | "queue"
+  | "shield"
+  | "star"
+  | "tag"
+  | "userGroup"
+  | "users";
 
 export type AdminNavItem = {
   href: string;
   label: string;
   description: string;
-  icon: AdminNavIcon;
+  iconKey: AdminNavIconKey;
   permission: {
     resource: AdminPermissionResource;
   };
@@ -35,6 +47,20 @@ export type AdminNavGroup = {
   items: AdminNavItem[];
 };
 
+export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
+  building: BuildingOffice2Icon,
+  chart: ChartBarSquareIcon,
+  clock: ClockIcon,
+  home: HomeIcon,
+  megaphone: MegaphoneIcon,
+  queue: QueueListIcon,
+  shield: ShieldCheckIcon,
+  star: StarIcon,
+  tag: TagIcon,
+  userGroup: UserGroupIcon,
+  users: UsersIcon,
+};
+
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     label: "개요",
@@ -43,7 +69,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin",
         label: "관리 홈",
         description: "운영 요약과 빠른 진입",
-        icon: HomeIcon,
+        iconKey: "home",
         permission: { resource: "members" },
       },
     ],
@@ -55,21 +81,21 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/members",
         label: "회원 관리",
         description: "회원 검색, 수정, 추가",
-        icon: UsersIcon,
+        iconKey: "users",
         permission: { resource: "members" },
       },
       {
         href: "/admin/reviews",
         label: "리뷰 관리",
         description: "리뷰 검수와 공개 상태",
-        icon: StarIcon,
+        iconKey: "star",
         permission: { resource: "reviews" },
       },
       {
         href: "/admin/logs",
         label: "로그 조회",
         description: "운영 로그 탐색",
-        icon: QueueListIcon,
+        iconKey: "queue",
         permission: { resource: "logs" },
       },
     ],
@@ -81,14 +107,14 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/partners",
         label: "브랜드 관리",
         description: "브랜드와 카테고리 운영",
-        icon: TagIcon,
+        iconKey: "tag",
         permission: { resource: "brands" },
       },
       {
         href: "/admin/companies",
         label: "협력사 관리",
         description: "협력사와 계정 연결",
-        icon: BuildingOffice2Icon,
+        iconKey: "building",
         permission: { resource: "companies" },
       },
     ],
@@ -100,21 +126,21 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/push",
         label: "알림 운영",
         description: "발송과 운영 로그 확인",
-        icon: MegaphoneIcon,
+        iconKey: "megaphone",
         permission: { resource: "notifications" },
       },
       {
         href: "/admin/advertisement",
         label: "홈 광고 관리",
         description: "캐러셀 카드 편집",
-        icon: ChartBarSquareIcon,
+        iconKey: "chart",
         permission: { resource: "home_ads" },
       },
       {
         href: "/admin/event",
         label: "이벤트 관리",
         description: "이벤트 게시와 운영",
-        icon: ClockIcon,
+        iconKey: "clock",
         permission: { resource: "events" },
       },
     ],
@@ -126,14 +152,14 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/cycle",
         label: "기수 관리",
         description: "현재 기수 계산 기준",
-        icon: UserGroupIcon,
+        iconKey: "userGroup",
         permission: { resource: "cycles" },
       },
       {
         href: "/admin/admins",
         label: "어드민 관리",
         description: "계정과 권한 템플릿",
-        icon: ShieldCheckIcon,
+        iconKey: "shield",
         permission: { resource: "admin_management" },
       },
     ],
