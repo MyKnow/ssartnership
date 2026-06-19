@@ -1224,40 +1224,6 @@ alter table mm_user_directory alter column synced_at set not null;
 alter table mm_user_directory alter column synced_at set default now();
 create index if not exists mm_user_directory_source_years_idx on mm_user_directory using gin(source_years);
 
-create table if not exists mm_verification_codes (
-  id uuid primary key default uuid_generate_v4(),
-  code_hash text not null,
-  expires_at timestamp with time zone not null,
-  mm_user_id text not null,
-  mm_username text not null,
-  display_name text,
-  year integer not null,
-  campus text,
-  avatar_content_type text,
-  avatar_base64 text,
-  created_at timestamp with time zone default now()
-);
-
-alter table mm_verification_codes drop column if exists email;
-alter table mm_verification_codes drop column if exists region;
-alter table mm_verification_codes add column if not exists year integer;
-update mm_verification_codes set year = 15 where year is null;
-alter table mm_verification_codes alter column year set not null;
-alter table mm_verification_codes alter column year drop default;
-alter table mm_verification_codes drop constraint if exists mm_verification_codes_year_check;
-alter table mm_verification_codes
-  add constraint mm_verification_codes_year_check check (year between 0 and 99);
-comment on column mm_verification_codes.year is 'SSAFY year; 0 indicates staff';
-
-create table if not exists mm_verification_attempts (
-  id uuid primary key default uuid_generate_v4(),
-  identifier text not null unique,
-  count integer not null default 0,
-  first_attempt_at timestamp with time zone not null default now(),
-  blocked_until timestamp with time zone,
-  created_at timestamp with time zone default now()
-);
-
 create table if not exists password_reset_attempts (
   id uuid primary key default uuid_generate_v4(),
   identifier text not null unique,
@@ -2101,7 +2067,6 @@ create index if not exists partner_change_requests_created_at_idx on partner_cha
 create unique index if not exists partner_change_requests_pending_partner_idx
   on partner_change_requests(partner_id)
   where status = 'pending';
-create index if not exists mm_verification_attempts_identifier_idx on mm_verification_attempts(identifier);
 create index if not exists password_reset_attempts_identifier_idx on password_reset_attempts(identifier);
 create index if not exists push_subscriptions_member_id_idx on push_subscriptions(member_id);
 create index if not exists push_subscriptions_active_idx on push_subscriptions(is_active);
@@ -2265,8 +2230,6 @@ create index if not exists partner_review_reactions_review_id_idx
   on partner_review_reactions(review_id, reaction);
 create index if not exists partner_review_reactions_member_id_idx
   on partner_review_reactions(member_id, review_id);
-
-drop index if exists mm_verification_codes_email_idx;
 
 create table if not exists promotion_events (
   id uuid primary key default uuid_generate_v4(),
@@ -2582,8 +2545,6 @@ alter table members enable row level security;
 alter table policy_documents enable row level security;
 alter table member_policy_consents enable row level security;
 alter table mm_user_directory enable row level security;
-alter table mm_verification_codes enable row level security;
-alter table mm_verification_attempts enable row level security;
 alter table password_reset_attempts enable row level security;
 alter table partner_change_requests enable row level security;
 alter table partner_reviews enable row level security;
@@ -2652,10 +2613,6 @@ revoke all on table member_policy_consents from anon;
 revoke all on table member_policy_consents from authenticated;
 revoke all on table mm_user_directory from anon;
 revoke all on table mm_user_directory from authenticated;
-revoke all on table mm_verification_codes from anon;
-revoke all on table mm_verification_codes from authenticated;
-revoke all on table mm_verification_attempts from anon;
-revoke all on table mm_verification_attempts from authenticated;
 revoke all on table password_reset_attempts from anon;
 revoke all on table password_reset_attempts from authenticated;
 revoke all on table push_preferences from anon;

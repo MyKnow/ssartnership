@@ -29,14 +29,6 @@ export async function POST(request: Request) {
 
   if (member?.mm_user_id) {
     await supabase
-      .from("mm_verification_codes")
-      .delete()
-      .eq("mm_user_id", member.mm_user_id);
-    await supabase
-      .from("mm_verification_attempts")
-      .delete()
-      .eq("identifier", member.mm_user_id);
-    await supabase
       .from("password_reset_attempts")
       .delete()
       .eq("identifier", member.mm_user_id);
@@ -46,14 +38,6 @@ export async function POST(request: Request) {
       .eq("mm_user_id", member.mm_user_id);
   }
   if (member?.mm_username && member.mm_username !== member.mm_user_id) {
-    await supabase
-      .from("mm_verification_codes")
-      .delete()
-      .eq("mm_username", member.mm_username);
-    await supabase
-      .from("mm_verification_attempts")
-      .delete()
-      .eq("identifier", member.mm_username);
     await supabase
       .from("password_reset_attempts")
       .delete()
