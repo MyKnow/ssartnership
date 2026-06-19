@@ -21,8 +21,6 @@ const sensitiveTables = [
   "policy_documents",
   "member_policy_consents",
   "mm_user_directory",
-  "mm_verification_codes",
-  "mm_verification_attempts",
   "password_reset_attempts",
   "push_preferences",
   "notifications",

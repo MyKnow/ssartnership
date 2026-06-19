@@ -31,12 +31,12 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 
 ### 회원 기능
 
-- Mattermost 기반 회원가입 / 로그인
+- Mattermost ID 기반 회원 로그인
+- SSAFY Verify 기반 회원가입 / 비밀번호 재설정 인증
 - 가입 대상
   - 14기 교육생
   - 15기 교육생
   - 운영진
-- Mattermost DM 인증코드 발송
 - 임시 비밀번호 재설정
 - 비밀번호 강제 변경 플로우
 - 약관 / 개인정보 수집·이용 동의 버전 관리
@@ -213,7 +213,7 @@ npm run ci:local
 주의:
 
 - `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용입니다.
-- `members`, `mm_verification_codes`, `member_policy_consents`, `mm_user_directory`, `push_*` 테이블은 서비스 롤 기준으로만 다룹니다.
+- `members`, `member_policy_consents`, `mm_user_directory`, `push_*` 테이블은 서비스 롤 기준으로만 다룹니다.
 
 ## 회원 / 인증 모델
 
@@ -262,20 +262,25 @@ npm run ci:local
   - 운영진 여부
 - 운영진 추정 역할명, 창업 캠퍼스, 14기/15기 다양한 닉네임 패턴을 지원합니다.
 
-## Mattermost 인증 플로우
+## SSAFY Verify 인증 플로우
+
+### 환경 설정
+
+- 브라우저는 현재 접속 origin에서 `/auth/ssafy` callback URL을 계산합니다.
+  - `http://localhost:3000` -> `http://localhost:3000/auth/ssafy`
+  - `https://ssartnership-git-dev-myknows-projects.vercel.app` -> `https://ssartnership-git-dev-myknows-projects.vercel.app/auth/ssafy`
+  - `https://ssartnership.myknow.xyz` -> `https://ssartnership.myknow.xyz/auth/ssafy`
+- 서버는 `SSAFY_VERIFY_REDIRECT_URIS`에 등록된 exact URL만 허용합니다.
+- local loopback redirect는 현재 request origin에서 자동 허용하지만, SSAFY Verify Client에도 동일한 redirect URI와 allowed origin을 등록해야 합니다.
+- `NEXT_PUBLIC_SSAFY_VERIFY_REDIRECT_URI`는 사용하지 않습니다. 공개값은 `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`만 필요합니다.
 
 ### 회원가입
 
-1. 사용자가 기수 또는 운영진을 선택합니다.
-2. 입력한 MM ID(username)를 `mm_user_directory`에서 먼저 찾습니다.
-3. 못 찾으면 선택한 조건으로 Mattermost API fallback 조회를 수행합니다.
-   - 14기: 14기 교육생만
-   - 15기: 15기 교육생만
-   - 운영진: 14기 / 15기 전체 중 운영진만
-4. 대상이 확인되면 운영용 계정이 DM으로 인증코드를 발송합니다.
-5. 사용자가 인증코드를 입력하면 회원가입을 완료합니다.
-6. 가입 시 최신 이용약관 / 개인정보 동의 버전도 함께 저장합니다.
-7. 기수별 허용 범위는 관리자 `기수 관리` 설정을 따른 뒤, 그 기준으로 signup / backfill / 디렉토리 조회가 동작합니다.
+1. 사용자가 회원가입 화면에서 SSAFY Verify를 실행합니다.
+2. SSAFY Verify callback을 서버에서 교환·검증합니다.
+3. Verify claim의 Mattermost user_id 또는 SSAFY subject로 기존 회원 레코드와 연결합니다.
+4. 가입 시 최신 이용약관 / 개인정보 동의 버전도 함께 저장합니다.
+5. 기수별 허용 범위는 관리자 `기수 관리` 설정을 따른 뒤, 그 기준으로 signup / backfill / 디렉토리 조회가 동작합니다.
 
 시뮬레이션 검증은 다음 명령으로 실행할 수 있습니다.
 
@@ -293,14 +298,10 @@ npm run test:ssafy-cycle
 
 ### 비밀번호 재설정
 
-- 가입된 회원만 가능
-- 운영진은 `staff_source_year`를 기준으로 적절한 팀 / 발신 계정을 선택합니다.
-
-주의:
-
-- 운영용 MM 계정은 대상 팀의 `view_team` 권한과 대상 채널의 `read_channel` 권한이 있어야 합니다.
-- private / invite-only 팀이거나 운영 계정이 팀 멤버가 아니면 팀 조회 단계에서 403이 날 수 있습니다.
-- 14기 / 15기 발신 계정은 분리하는 편이 안전합니다.
+- 가입된 회원만 가능합니다.
+- 사용자가 SSAFY Verify를 완료하면 서버가 Verify callback을 교환·검증합니다.
+- Verify claim의 Mattermost user_id 또는 SSAFY subject로 기존 회원을 찾은 뒤, 짧은 만료 시간의 비밀번호 재설정 completion token만 발급합니다.
+- 이 흐름은 사용자 세션을 생성하지 않습니다.
 
 ## 약관 / 개인정보 동의
 
@@ -386,7 +387,7 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 - 관리자 세션과 사용자 세션은 서명 + 만료 시각을 사용합니다.
 - 관리자 로그인은 입력 검증, suspicious parameter 탐지, IP/계정 기준 rate limit을 적용합니다.
 - 관리자 경로는 필요 시 IP allowlist 또는 Basic Auth로 한 번 더 제한할 수 있습니다.
-- 인증코드 / 비밀번호 재설정 요청은 횟수 제한이 적용됩니다.
+- 로그인, SSAFY Verify, 비밀번호 재설정 요청은 횟수 제한이 적용됩니다.
 - 교육생 인증 QR은 짧은 만료시간의 서명 토큰으로 발급됩니다.
 - 이미지 프록시는 내부망 / 사설 IP / 비정상 프로토콜을 차단합니다.
 - 외부 링크는 `noopener noreferrer`를 강제합니다.

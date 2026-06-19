@@ -6,6 +6,15 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import {
+  getSsafyVerifyClientErrorMessage,
+  normalizeSsafyVerifyCallbackFailure,
+  normalizeSsafyVerifySdkError,
+  type SsafyVerifyCallbackPayload,
+  type SsafyVerifyClient,
+  type SsafyVerifyClientFailure,
+} from "@/lib/ssafy-verify/client-errors";
+import { buildSsafyVerifyRedirectUri } from "@/lib/ssafy-verify/redirect";
 import { SSAFY_VERIFY_SCOPES } from "@/lib/ssafy-verify/scopes";
 
 type VerifyResult =
@@ -17,26 +26,11 @@ type VerifyResult =
       authTime: number;
       requiresConsent: boolean;
     }
-  | { ok: false; errorCode: string; requestId: string | null };
+  | SsafyVerifyClientFailure;
 
 declare global {
   interface Window {
-    ssafyVerify?: {
-      verify(options: {
-        clientId: string;
-        redirectUri: string;
-        scopes: string[];
-        waitForCallback: true;
-      }): Promise<{
-        code: string | null;
-        state: string | null;
-        iss: string | null;
-        error: string | null;
-        error_code: string | null;
-        request_id: string | null;
-        codeVerifier: string;
-      }>;
-    };
+    ssafyVerify?: SsafyVerifyClient;
   }
 }
 
@@ -53,7 +47,7 @@ function getErrorMessage(result: Extract<VerifyResult, { ok: false }>) {
   if (result.errorCode === "VERIFY_RATE_LIMITED") {
     return "인증 요청이 너무 자주 시도되었습니다. 잠시 후 다시 시도해 주세요.";
   }
-  return "SSAFY 인증을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return getSsafyVerifyClientErrorMessage(result.errorCode);
 }
 
 export default function SsafyVerifyButton({
@@ -80,32 +74,26 @@ export default function SsafyVerifyButton({
     setStatus("working");
     setError(null);
 
-    const expectedIssuer =
-      process.env.NEXT_PUBLIC_SSAFY_VERIFY_ISSUER ?? defaultIssuer;
-    const redirectUri = process.env.NEXT_PUBLIC_SSAFY_VERIFY_REDIRECT_URI ?? "";
+    const expectedIssuer = defaultIssuer;
+    const redirectUri = buildSsafyVerifyRedirectUri(window.location.origin);
 
-    const callback = await sdk
-      .verify({
+    let callback: SsafyVerifyCallbackPayload;
+    try {
+      callback = await sdk.verify({
         clientId: process.env.NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID ?? "",
         redirectUri,
         scopes: [...SSAFY_VERIFY_SCOPES],
         waitForCallback: true,
-      })
-      .then((value) => value, () => null);
-
-    if (!callback) {
+      });
+    } catch (sdkError) {
       setStatus("failed");
-      setError({ ok: false, errorCode: "VERIFY_POPUP_FAILED", requestId: null });
+      setError(normalizeSsafyVerifySdkError(sdkError));
       return;
     }
 
     if (callback.error || !callback.code) {
       setStatus("failed");
-      setError({
-        ok: false,
-        errorCode: callback.error_code ?? "VERIFY_CANCELLED",
-        requestId: callback.request_id,
-      });
+      setError(normalizeSsafyVerifyCallbackFailure(callback));
       return;
     }
 

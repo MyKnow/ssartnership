@@ -1,18 +1,11 @@
 import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
+import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
-import SignupForm from "@/components/auth/SignupForm";
-import FormMessage from "@/components/ui/FormMessage";
-import { getActiveRequiredPolicies, getPolicyDocumentByKind } from "@/lib/policy-documents";
+import Button from "@/components/ui/Button";
 import { SITE_NAME } from "@/lib/site";
-import {
-  getConfiguredCurrentSsafyYear,
-  getConfiguredSelectableSsafyYears,
-  getConfiguredSignupSsafyYearText,
-  getSsafyCycleSettings,
-} from "@/lib/ssafy-cycle-settings";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
 export const metadata: Metadata = {
@@ -30,23 +23,10 @@ export default async function SignupPage({
 }) {
   const headerSession = await getHeaderSession();
   const { returnTo: rawReturnTo } = await searchParams;
-  let policies = null;
-  let policyError: string | null = null;
-  const cycleSettings = await getSsafyCycleSettings();
-  const selectableYears = getConfiguredSelectableSsafyYears(cycleSettings).slice().sort((a, b) => a - b);
-  const currentYear = getConfiguredCurrentSsafyYear(cycleSettings);
-  const signupYearsText = getConfiguredSignupSsafyYearText(cycleSettings);
   const returnTo = sanitizeReturnTo(
     Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo,
     "/",
   );
-
-  try {
-    policies = await getActiveRequiredPolicies();
-  } catch (error) {
-    policyError = (error as Error).message;
-  }
-  const marketingPolicy = await getPolicyDocumentByKind("marketing").catch(() => null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -56,24 +36,14 @@ export default async function SignupPage({
           <Card className="mx-auto max-w-lg p-6">
             <h1 className="text-2xl font-semibold text-foreground">회원가입</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Mattermost 인증 후 로그인에 사용할 비밀번호를 설정합니다.
+              SSAFY Verify로 구성원 인증을 완료하면 싸트너십 계정에 연결합니다.
             </p>
-            {policies ? (
-              <SignupForm
-                policies={policies}
-              marketingPolicy={marketingPolicy}
-              selectableYears={selectableYears}
-              signupYearsText={signupYearsText}
-              defaultYear={selectableYears[selectableYears.length - 1] ?? currentYear}
-              returnTo={returnTo}
-            />
-          ) : (
-              <div className="mt-6">
-                <FormMessage variant="error">
-                  {policyError ?? "약관 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."}
-                </FormMessage>
-              </div>
-            )}
+            <SsafyVerifyButton returnTo={returnTo} />
+            <div className="mt-3 flex flex-col gap-3">
+              <Button variant="ghost" href="/auth/login">
+                로그인으로 돌아가기
+              </Button>
+            </div>
           </Card>
         </Container>
       </main>

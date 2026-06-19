@@ -9,11 +9,8 @@ type RateLimitConfig = {
 
 export type MemberAuthRoute =
   | "login"
-  | "request-code"
-  | "verify-code"
   | "reset-password"
-  | "request-reset-code"
-  | "verify-reset-code"
+  | "ssafy-reset-password"
   | "change-password"
   | "ssafy-verify";
 
@@ -24,11 +21,8 @@ type MemberAuthAttemptContext = {
 
 const MEMBER_AUTH_ROUTES: MemberAuthRoute[] = [
   "login",
-  "request-code",
-  "verify-code",
   "reset-password",
-  "request-reset-code",
-  "verify-reset-code",
+  "ssafy-reset-password",
   "change-password",
   "ssafy-verify",
 ];
@@ -51,19 +45,7 @@ const MEMBER_AUTH_FAILURE_DELAY_MS: Record<
     min: 500,
     max: 900,
   },
-  "request-code": {
-    min: 350,
-    max: 700,
-  },
-  "request-reset-code": {
-    min: 350,
-    max: 700,
-  },
-  "verify-code": {
-    min: 350,
-    max: 700,
-  },
-  "verify-reset-code": {
+  "ssafy-reset-password": {
     min: 350,
     max: 700,
   },

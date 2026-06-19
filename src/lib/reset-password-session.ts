@@ -4,15 +4,15 @@ import {
   splitSignedToken,
   verifyHmacDigest,
 } from "./hmac.js";
-import type { ResetPasswordCodeRow } from "@/app/api/mm/_shared/reset-password-code-store";
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
 export type ResetPasswordCompletionTokenPayload = {
-  version: 1;
+  version: 2;
+  memberId: string;
   mmUserId: string;
   mmUsername: string;
-  codeId: string;
+  memberUpdatedAt: string;
   issuedAt: number;
   expiresAt: number;
   nonce: string;
@@ -50,10 +50,11 @@ function parsePayload(token: string) {
   try {
     const parsed = JSON.parse(payload) as Partial<ResetPasswordCompletionTokenPayload>;
     if (
-      parsed.version !== 1 ||
+      parsed.version !== 2 ||
+      typeof parsed.memberId !== "string" ||
       typeof parsed.mmUserId !== "string" ||
       typeof parsed.mmUsername !== "string" ||
-      typeof parsed.codeId !== "string" ||
+      typeof parsed.memberUpdatedAt !== "string" ||
       typeof parsed.issuedAt !== "number" ||
       typeof parsed.expiresAt !== "number" ||
       typeof parsed.nonce !== "string"
@@ -70,16 +71,20 @@ function parsePayload(token: string) {
 }
 
 export function issueResetPasswordCompletionToken(input: {
-  codeRow: ResetPasswordCodeRow;
+  memberId: string;
+  mmUserId: string;
+  mmUsername: string;
+  memberUpdatedAt: string;
 }) {
   const now = Date.now();
   const payload: ResetPasswordCompletionTokenPayload = {
-    version: 1,
-    mmUserId: input.codeRow.mm_user_id,
-    mmUsername: input.codeRow.mm_username,
-    codeId: input.codeRow.id,
+    version: 2,
+    memberId: input.memberId,
+    mmUserId: input.mmUserId,
+    mmUsername: input.mmUsername,
+    memberUpdatedAt: input.memberUpdatedAt,
     issuedAt: now,
-    expiresAt: new Date(input.codeRow.expires_at).getTime() || now + TOKEN_TTL_MS,
+    expiresAt: now + TOKEN_TTL_MS,
     nonce: crypto.randomBytes(12).toString("base64url"),
   };
   const encoded = JSON.stringify(payload);

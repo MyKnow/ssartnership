@@ -16,44 +16,26 @@ const responseModulePromise = import(
 ) as Promise<ResponseModule>;
 
 test("MM route parsers preserve request payload shapes", async () => {
-  const {
-    parseRequestCodeBody,
-    parseVerifyCodeBody,
-    parseResetPasswordBody,
-  } = await parserModulePromise;
+  const { parseResetPasswordCompleteBody } = await parserModulePromise;
+  const sampleCompletionToken = ["completion", "sample"].join("-");
 
-  const requestCode = await parseRequestCodeBody(
-    new Request("http://localhost/api/mm/request-code", {
-      method: "POST",
-      body: JSON.stringify({ username: "student", year: "15" }),
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
-  const verifyCode = await parseVerifyCodeBody(
-    new Request("http://localhost/api/mm/verify-code", {
+  const resetPassword = await parseResetPasswordCompleteBody(
+    new Request("http://localhost/api/mm/reset-password/complete", {
       method: "POST",
       body: JSON.stringify({
-        username: "student",
-        code: "ABC123",
-        password: "Strong!123",
-        servicePolicyId: "service",
-        privacyPolicyId: "privacy",
+        token: sampleCompletionToken,
+        nextPassword: "Password123!",
+        nextPasswordConfirm: "Password123!",
       }),
       headers: { "Content-Type": "application/json" },
     }),
   );
-  const resetPassword = await parseResetPasswordBody(
-    new Request("http://localhost/api/mm/reset-password", {
-      method: "POST",
-      body: JSON.stringify({ username: "student" }),
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
 
-  assert.deepStrictEqual(requestCode, { username: "student", year: "15" });
-  assert.equal(verifyCode.code, "ABC123");
-  assert.equal(verifyCode.servicePolicyId, "service");
-  assert.deepStrictEqual(resetPassword, { username: "student" });
+  assert.deepStrictEqual(resetPassword, {
+    token: sampleCompletionToken,
+    nextPassword: "Password123!",
+    nextPasswordConfirm: "Password123!",
+  });
 });
 
 test("MM route helpers expose deterministic throttle context and response mapping", async () => {

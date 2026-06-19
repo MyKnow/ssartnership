@@ -110,7 +110,7 @@ export default function ResetPasswordCompleteForm({
           return;
         }
         if (data.error === "invalid_code" || data.error === "expired") {
-          setFormError("인증 상태가 만료되었습니다. 다시 인증번호를 발급해 주세요.");
+          setFormError("인증 상태가 만료되었습니다. SSAFY 인증을 다시 진행해 주세요.");
           window.location.replace("/auth/reset");
           return;
         }

@@ -50,7 +50,7 @@ test("SSAFY Verify callback body parser accepts only the exact safe shape", asyn
       redirectUri,
       iss: issuer,
     },
-    { issuer, redirectUri },
+    { issuer, redirectUris: [redirectUri] },
   );
 
   assert.equal(parsed.ok, true);
@@ -69,7 +69,7 @@ test("SSAFY Verify callback body parser accepts only the exact safe shape", asyn
         redirectUri,
         iss: issuer,
       },
-      { issuer, redirectUri },
+      { issuer, redirectUris: [redirectUri] },
     ).ok,
     false,
   );
@@ -81,7 +81,7 @@ test("SSAFY Verify callback body parser accepts only the exact safe shape", asyn
         redirectUri: "https://evil.example.com/callback",
         iss: issuer,
       },
-      { issuer, redirectUri },
+      { issuer, redirectUris: [redirectUri] },
     ).ok,
     false,
   );
@@ -94,7 +94,7 @@ test("SSAFY Verify callback body parser accepts only the exact safe shape", asyn
         iss: issuer,
         verification_token: "must_not_be_accepted",
       },
-      { issuer, redirectUri },
+      { issuer, redirectUris: [redirectUri] },
     ).ok,
     false,
   );

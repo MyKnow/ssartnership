@@ -24,19 +24,13 @@ test("member auth attempt keys are namespaced and normalized", async () => {
     }),
     ["login:ip:127.0.0.1", "login:account:adminuser"],
   );
-  assert.equal(
-    getMemberAuthAttemptScope("request-code:account:adminuser"),
-    "account",
-  );
+  assert.equal(getMemberAuthAttemptScope("login:account:adminuser"), "account");
   assert.deepEqual(
     getMemberAuthCleanupKeys(["AdminUser", "adminuser"]),
     [
       "login:account:adminuser",
-      "request-code:account:adminuser",
-      "verify-code:account:adminuser",
       "reset-password:account:adminuser",
-      "request-reset-code:account:adminuser",
-      "verify-reset-code:account:adminuser",
+      "ssafy-reset-password:account:adminuser",
       "change-password:account:adminuser",
       "ssafy-verify:account:adminuser",
     ],

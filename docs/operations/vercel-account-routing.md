@@ -24,7 +24,7 @@ node scripts/vercel-ssartnership.mjs env pull .env.production.local --environmen
 node scripts/vercel-ssartnership.mjs deploy --prod
 ```
 
-The wrapper loads local env files, injects `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`, and passes the project-specific token to the Vercel CLI. It blocks `vercel link`, `vercel project`, `--scope`, and manual `--token` arguments so the command cannot silently fall back to another account.
+The wrapper loads local env files, injects `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and a child-process-only `VERCEL_TOKEN` for the Vercel CLI. It blocks `vercel link`, `vercel project`, `--scope`, and manual `--token` arguments so the command cannot silently fall back to another account.
 
 ## Recovery
 

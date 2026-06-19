@@ -85,11 +85,12 @@ const childEnv = {
   ...process.env,
   VERCEL_ORG_ID: process.env.SSARTNERSHIP_VERCEL_ORG_ID,
   VERCEL_PROJECT_ID: process.env.SSARTNERSHIP_VERCEL_PROJECT_ID,
+  VERCEL_TOKEN: process.env.SSARTNERSHIP_VERCEL_TOKEN,
 };
 
 const result = spawnSync(
   "npx",
-  ["--yes", VERCEL_CLI_PACKAGE, ...args, "--token", process.env.SSARTNERSHIP_VERCEL_TOKEN],
+  ["--yes", VERCEL_CLI_PACKAGE, ...args],
   {
     env: childEnv,
     stdio: "inherit",

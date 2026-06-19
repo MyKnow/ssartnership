@@ -26,8 +26,6 @@ const EXCLUDED_PUBLIC_TABLES = [
   "auth_security_logs",
   "event_logs",
   "member_auth_attempts",
-  "mm_verification_attempts",
-  "mm_verification_codes",
   "password_reset_attempts",
   "partner_auth_attempts",
   "push_delivery_logs",
@@ -304,6 +302,17 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
         `partnerChangeRequestCampusSlugsBackfilled=${stats.partnerChangeRequestCampusSlugsBackfilled}`,
         `partnerChangeRequestRowsSkippedColumnMismatch=${stats.partnerChangeRequestRowsSkippedColumnMismatch}`,
         `unresolvedPartnerChangeRequestCampusSlugRows=${stats.unresolvedPartnerChangeRequestCampusSlugRows}`,
+      ].join(" "),
+    );
+  }
+
+  if (stats.missingPreviewTableCopyBlocksSkipped > 0) {
+    console.log(
+      [
+        "Preview sync missing table diagnostics:",
+        `missingPreviewTableCopyBlocksSkipped=${stats.missingPreviewTableCopyBlocksSkipped}`,
+        `missingPreviewTableRowsSkipped=${stats.missingPreviewTableRowsSkipped}`,
+        "production-only public tables are omitted from preview restore.",
       ].join(" "),
     );
   }

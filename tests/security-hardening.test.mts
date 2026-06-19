@@ -7,8 +7,8 @@ const pathModulePromise = import(
 const hmacModulePromise = import(
   new URL("../src/lib/hmac.js", import.meta.url).href
 );
-const verificationModulePromise = import(
-  new URL("../src/lib/mm-verification.ts", import.meta.url).href
+const resetPasswordSessionModulePromise = import(
+  new URL("../src/lib/reset-password-session.ts", import.meta.url).href
 );
 const productEventThrottleModulePromise = import(
   new URL("../src/lib/product-event-throttle.ts", import.meta.url).href
@@ -49,29 +49,34 @@ test("hmac digest verification rejects mismatched lengths", async () => {
   );
 });
 
-test("verification codes use crypto-safe generation and dedicated secret", async () => {
-  const originalVerificationSecret = process.env.MM_VERIFICATION_SECRET;
+test("reset password completion tokens are signed with the session secret", async () => {
   const originalSessionSecret = process.env.USER_SESSION_SECRET;
 
   try {
     process.env.USER_SESSION_SECRET = "s".repeat(32);
-    process.env.MM_VERIFICATION_SECRET = "a".repeat(32);
 
-    const { generateCode, hashCode } = await verificationModulePromise;
-    const code = generateCode();
-    assert.match(code, /^[A-Z0-9]{6}$/);
+    const {
+      issueResetPasswordCompletionToken,
+      verifyResetPasswordCompletionToken,
+    } = await resetPasswordSessionModulePromise;
+    const token = issueResetPasswordCompletionToken({
+      memberId: "member-id",
+      mmUserId: "mm-user-id",
+      mmUsername: "ssafy15.user",
+      memberUpdatedAt: "2026-06-19T10:00:00.000Z",
+    });
+    const payload = verifyResetPasswordCompletionToken(token);
 
-    const firstHash = hashCode("ABC123");
-    process.env.MM_VERIFICATION_SECRET = "b".repeat(32);
-    const secondHash = hashCode("ABC123");
-    assert.notEqual(firstHash, secondHash);
-    assert.match(firstHash, /^[0-9a-f]{64}$/);
+    assert.equal(payload?.version, 2);
+    assert.equal(payload?.memberId, "member-id");
+    assert.equal(payload?.mmUserId, "mm-user-id");
+    assert.equal(payload?.mmUsername, "ssafy15.user");
+    assert.equal(payload?.memberUpdatedAt, "2026-06-19T10:00:00.000Z");
+
+    process.env.USER_SESSION_SECRET = "t".repeat(32);
+    assert.equal(verifyResetPasswordCompletionToken(token), null);
+    assert.equal(verifyResetPasswordCompletionToken(`${token}tampered`), null);
   } finally {
-    if (originalVerificationSecret === undefined) {
-      delete process.env.MM_VERIFICATION_SECRET;
-    } else {
-      process.env.MM_VERIFICATION_SECRET = originalVerificationSecret;
-    }
     if (originalSessionSecret === undefined) {
       delete process.env.USER_SESSION_SECRET;
     } else {

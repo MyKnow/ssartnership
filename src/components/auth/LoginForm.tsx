@@ -11,6 +11,28 @@ import { useToast } from "@/components/ui/Toast";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
+const savedLoginIdStorageKey = "ssartnership:member-login-id";
+
+function readSavedLoginId() {
+  try {
+    return window.localStorage.getItem(savedLoginIdStorageKey) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeSavedLoginId(rememberLoginId: boolean, loginId: string) {
+  try {
+    if (rememberLoginId) {
+      window.localStorage.setItem(savedLoginIdStorageKey, loginId);
+      return;
+    }
+    window.localStorage.removeItem(savedLoginIdStorageKey);
+  } catch {
+    // Login should not fail when browser storage is unavailable.
+  }
+}
+
 export default function LoginForm({
   returnTo,
 }: {
@@ -18,6 +40,7 @@ export default function LoginForm({
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberLoginId, setRememberLoginId] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     username?: string;
     password?: string;
@@ -33,6 +56,12 @@ export default function LoginForm({
     if (typeof window === "undefined") {
       return;
     }
+    const savedLoginId = readSavedLoginId();
+    if (savedLoginId) {
+      setUsername(savedLoginId);
+      setRememberLoginId(true);
+    }
+
     const flag = sessionStorage.getItem("reset:success");
     if (flag) {
       sessionStorage.removeItem("reset:success");
@@ -79,11 +108,12 @@ export default function LoginForm({
     setPending(true);
 
     try {
+      const normalizedUsername = normalizeMmUsername(username);
       const response = await fetch("/api/mm/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: normalizeMmUsername(username),
+          username: normalizedUsername,
           password,
         }),
       });
@@ -100,6 +130,7 @@ export default function LoginForm({
 
       setFieldErrors({});
       setFormError(null);
+      writeSavedLoginId(rememberLoginId, normalizedUsername);
       notify("로그인되었습니다.");
       const safeReturnTo = sanitizeReturnTo(returnTo, "/");
       const nextHref = data.requiresConsent
@@ -150,14 +181,24 @@ export default function LoginForm({
         ) : null}
       </label>
 
+      <label className="inline-flex items-center gap-2 self-start text-sm font-medium text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={rememberLoginId}
+          onChange={(event) => {
+            const checked = event.target.checked;
+            setRememberLoginId(checked);
+            if (!checked) {
+              writeSavedLoginId(false, "");
+            }
+          }}
+          className="h-4 w-4 rounded border-border bg-surface-control text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+        />
+        ID 저장하기
+      </label>
+
       <Button onClick={handleLogin} loading={pending} loadingText="로그인 중">
         로그인
-      </Button>
-      <Button
-        variant="soft"
-        href={`/auth/ssafy?returnTo=${encodeURIComponent(sanitizeReturnTo(returnTo, "/"))}`}
-      >
-        SSAFY 인증으로 로그인
       </Button>
       <Button variant="ghost" href="/auth/reset">
         비밀번호 재설정
