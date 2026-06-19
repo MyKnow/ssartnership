@@ -153,6 +153,12 @@ export default function LoginForm({
       <Button onClick={handleLogin} loading={pending} loadingText="로그인 중">
         로그인
       </Button>
+      <Button
+        variant="soft"
+        href={`/auth/ssafy?returnTo=${encodeURIComponent(sanitizeReturnTo(returnTo, "/"))}`}
+      >
+        SSAFY 인증으로 로그인
+      </Button>
       <Button variant="ghost" href="/auth/reset">
         비밀번호 재설정
       </Button>

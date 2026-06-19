@@ -91,6 +91,7 @@ export const AUTH_SECURITY_EVENT_NAMES = [
   'member_logout',
   'member_signup_code_request',
   'member_signup_complete',
+  'member_ssafy_verify',
   'member_policy_consent',
   'member_password_reset_request',
   'member_password_reset_verify',
