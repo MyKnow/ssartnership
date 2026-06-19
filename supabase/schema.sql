@@ -465,6 +465,12 @@ create table if not exists members (
   admin_permission_id text,
   avatar_content_type text,
   avatar_base64 text,
+  ssafy_sub text,
+  ssafy_verified_at timestamp with time zone,
+  ssafy_auth_time timestamp with time zone,
+  ssafy_verification_id text,
+  ssafy_mattermost_user_id text,
+  ssafy_last_scope text,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
@@ -839,6 +845,12 @@ alter table members drop constraint if exists members_year_check;
 alter table members add constraint members_year_check check (year between 0 and 99);
 comment on column members.year is 'SSAFY year; 0 indicates staff';
 comment on column members.staff_source_year is 'Original staff lookup year when members.year is 0';
+comment on column members.ssafy_sub is 'SSAFY Verify pairwise subject for this partner service.';
+comment on column members.ssafy_verified_at is 'Timestamp when SSAFY Verify last confirmed this member.';
+comment on column members.ssafy_auth_time is 'verification_token auth_time converted from JWT NumericDate seconds.';
+comment on column members.ssafy_verification_id is 'Last SSAFY Verify transaction identifier from /verify/token result.';
+comment on column members.ssafy_mattermost_user_id is 'Mattermost raw user.id returned by ssafy.mattermost_id for legacy account mapping.';
+comment on column members.ssafy_last_scope is 'Last approved SSAFY Verify scope string used during member verification.';
 
 create table if not exists ssafy_cycle_settings (
   id integer primary key default 1,
@@ -2125,6 +2137,12 @@ create index if not exists members_campus_display_name_idx
 create index if not exists members_admin_permission_id_idx
   on members(admin_permission_id)
   where admin_permission_id is not null;
+create unique index if not exists members_ssafy_sub_key
+  on members(ssafy_sub)
+  where ssafy_sub is not null;
+create unique index if not exists members_ssafy_mattermost_user_id_key
+  on members(ssafy_mattermost_user_id)
+  where ssafy_mattermost_user_id is not null;
 create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
 create index if not exists event_logs_created_at_id_idx
   on event_logs(created_at desc, id desc);
