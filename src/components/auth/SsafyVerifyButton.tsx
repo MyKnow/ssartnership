@@ -15,7 +15,7 @@ import {
   type SsafyVerifyClientFailure,
 } from "@/lib/ssafy-verify/client-errors";
 import { buildSsafyVerifyRedirectUri } from "@/lib/ssafy-verify/redirect";
-import { SSAFY_VERIFY_SCOPES } from "@/lib/ssafy-verify/scopes";
+import { SSAFY_VERIFY_PROFILE_SCOPES } from "@/lib/ssafy-verify/scopes";
 
 type VerifyResult =
   | {
@@ -82,7 +82,7 @@ export default function SsafyVerifyButton({
       callback = await sdk.verify({
         clientId: process.env.NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID ?? "",
         redirectUri,
-        scopes: [...SSAFY_VERIFY_SCOPES],
+        scopes: [...SSAFY_VERIFY_PROFILE_SCOPES],
         waitForCallback: true,
       });
     } catch (sdkError) {

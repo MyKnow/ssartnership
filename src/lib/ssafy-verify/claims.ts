@@ -14,6 +14,8 @@ export type SsafyVerificationClaims = {
   picture: string | null;
   role: string | null;
   roleName: string | null;
+  teamCode: string | null;
+  isStaff: boolean | null;
   mattermostUserId: string | null;
 };
 
@@ -33,6 +35,10 @@ function firstAudience(value: ClaimValue) {
 
 function optionalString(value: ClaimValue) {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function optionalBoolean(value: ClaimValue) {
+  return typeof value === "boolean" ? value : null;
 }
 
 export function validateSsafyVerificationClaims(
@@ -78,7 +84,10 @@ export function validateSsafyVerificationClaims(
       name: optionalString(claims.name),
       picture: optionalString(claims.picture),
       role: optionalString(claims.ssafy_role),
-      roleName: optionalString(claims.ssafy_role_name),
+      roleName:
+        optionalString(claims.ssafy_member_role) ?? optionalString(claims.ssafy_role_name),
+      teamCode: optionalString(claims.ssafy_team_code),
+      isStaff: optionalBoolean(claims.ssafy_is_staff),
       mattermostUserId: optionalString(claims.ssafy_mattermost_user_id),
     },
   };
