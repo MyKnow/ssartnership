@@ -56,6 +56,38 @@ test("sanitizeDumpSqlForPreview leaves aligned copy blocks unchanged", async () 
   assert.equal(sanitized.sql, sourceSql);
 });
 
+test("sanitizeDumpSqlForPreview drops copy blocks for tables missing from preview schema", async () => {
+  const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
+
+  const sourceSql = [
+    "COPY public.mm_verification_attempts (id, identifier, created_at) FROM stdin;",
+    "attempt-1\trequest-code:account:ssafy15\t2026-04-27T00:00:00.000Z",
+    "attempt-2\tverify-code:account:ssafy15\t2026-04-27T00:01:00.000Z",
+    "\\.",
+    "COPY public.categories (id, key, label) FROM stdin;",
+    "category-1\tcafe\t카페",
+    "\\.",
+  ].join("\n");
+
+  const previewColumnsByTable = new Map([
+    ["categories", new Set(["id", "key", "label"])],
+  ]);
+
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.missingPreviewTableCopyBlocksSkipped, 1);
+  assert.equal(sanitized.stats.missingPreviewTableRowsSkipped, 2);
+  assert.equal(
+    sanitized.sql,
+    [
+      "COPY public.categories (id, key, label) FROM stdin;",
+      "category-1\tcafe\t카페",
+      "\\.",
+    ].join("\n"),
+  );
+});
+
 test("sanitizeDumpSqlForPreview strips heavy and sensitive member columns", async () => {
   const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
 
