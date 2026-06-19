@@ -107,7 +107,9 @@ export function toSmtpConfigErrorLog(error: unknown) {
   };
 }
 
-export function getSmtpConfig(env: NodeJS.ProcessEnv = process.env): SmtpConfig {
+export function getSmtpConfig(
+  env: Partial<NodeJS.ProcessEnv> = process.env,
+): SmtpConfig {
   const hasGenericSmtpConfig = hasAnyValue([
     env.SMTP_HOST,
     env.SMTP_PORT,

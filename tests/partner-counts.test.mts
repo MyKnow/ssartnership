@@ -39,7 +39,7 @@ test("toAdminDashboardCounts normalizes nullable and string RPC values", () => {
     member_count: "12",
     company_count: 5,
     partner_count: null,
-    category_count: undefined,
+    category_count: null,
     account_count: "4",
     review_count: "19",
     active_push_subscription_count: 3,
