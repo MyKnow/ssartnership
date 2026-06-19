@@ -11,10 +11,6 @@ import {
 } from "./throttle";
 import { mmOkResponse } from "./responses";
 import {
-  clearExistingResetPasswordCodeState,
-  getLatestResetPasswordCode,
-} from "./reset-password-code-store";
-import {
   failResetPasswordComplete,
   failResetPasswordCompleteException,
 } from "./reset-password-complete-failure";
@@ -31,7 +27,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
     const nextPasswordConfirm = String(payload.nextPasswordConfirm ?? "");
     let throttleContext = createMemberAuthThrottleContext(
       context.ipAddress ?? null,
-      token || null,
+      null,
     );
 
     if (!token || !nextPassword || !nextPasswordConfirm) {
@@ -105,32 +101,10 @@ export async function handleResetPasswordCompletePost(request: Request) {
       });
     }
 
-    const codeRow = await getLatestResetPasswordCode(tokenPayload.mmUserId);
-    if (!codeRow) {
-      return failResetPasswordComplete({
-        context,
-        throttleContext,
-        error: "invalid_code",
-        status: 400,
-        reason: "missing_code",
-        identifier: tokenPayload.mmUserId,
-      });
-    }
-
-    if (codeRow.id !== tokenPayload.codeId) {
-      return failResetPasswordComplete({
-        context,
-        throttleContext,
-        error: "invalid_code",
-        status: 400,
-        reason: "stale_code",
-        identifier: tokenPayload.mmUserId,
-      });
-    }
-
     const { data: memberRow, error: memberFetchError } = await getSupabaseAdminClient()
       .from("members")
-      .select("id,mm_user_id,mm_username,year,campus")
+      .select("id,mm_user_id,mm_username,year,campus,updated_at")
+      .eq("id", tokenPayload.memberId)
       .eq("mm_user_id", tokenPayload.mmUserId)
       .maybeSingle();
     if (memberFetchError || !memberRow) {
@@ -140,6 +114,23 @@ export async function handleResetPasswordCompletePost(request: Request) {
         error: "reset_failed",
         status: 400,
         reason: "not_registered",
+        identifier: tokenPayload.mmUserId,
+      });
+    }
+
+    const memberUpdatedAt = new Date(memberRow.updated_at).getTime();
+    const tokenUpdatedAt = new Date(tokenPayload.memberUpdatedAt).getTime();
+    if (
+      !Number.isFinite(memberUpdatedAt) ||
+      !Number.isFinite(tokenUpdatedAt) ||
+      memberUpdatedAt !== tokenUpdatedAt
+    ) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "invalid_code",
+        status: 400,
+        reason: "stale_token",
         identifier: tokenPayload.mmUserId,
       });
     }
@@ -166,7 +157,6 @@ export async function handleResetPasswordCompletePost(request: Request) {
       });
     }
 
-    await clearExistingResetPasswordCodeState(tokenPayload.mmUserId);
     const { error: resetAttemptDeleteError } = await supabase
       .from("password_reset_attempts")
       .delete()

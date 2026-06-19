@@ -30,8 +30,7 @@ test("member auth attempt keys are namespaced and normalized", async () => {
     [
       "login:account:adminuser",
       "reset-password:account:adminuser",
-      "request-reset-code:account:adminuser",
-      "verify-reset-code:account:adminuser",
+      "ssafy-reset-password:account:adminuser",
       "change-password:account:adminuser",
       "ssafy-verify:account:adminuser",
     ],

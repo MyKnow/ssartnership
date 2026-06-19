@@ -16,17 +16,26 @@ const responseModulePromise = import(
 ) as Promise<ResponseModule>;
 
 test("MM route parsers preserve request payload shapes", async () => {
-  const { parseResetPasswordBody } = await parserModulePromise;
+  const { parseResetPasswordCompleteBody } = await parserModulePromise;
+  const sampleCompletionToken = ["completion", "sample"].join("-");
 
-  const resetPassword = await parseResetPasswordBody(
-    new Request("http://localhost/api/mm/reset-password", {
+  const resetPassword = await parseResetPasswordCompleteBody(
+    new Request("http://localhost/api/mm/reset-password/complete", {
       method: "POST",
-      body: JSON.stringify({ username: "student" }),
+      body: JSON.stringify({
+        token: sampleCompletionToken,
+        nextPassword: "Password123!",
+        nextPasswordConfirm: "Password123!",
+      }),
       headers: { "Content-Type": "application/json" },
     }),
   );
 
-  assert.deepStrictEqual(resetPassword, { username: "student" });
+  assert.deepStrictEqual(resetPassword, {
+    token: sampleCompletionToken,
+    nextPassword: "Password123!",
+    nextPasswordConfirm: "Password123!",
+  });
 });
 
 test("MM route helpers expose deterministic throttle context and response mapping", async () => {

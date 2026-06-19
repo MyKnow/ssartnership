@@ -62,8 +62,9 @@
 예시:
 - `member_login`
 - `member_logout`
-- `member_signup_code_request`
 - `member_signup_complete`
+- `member_ssafy_verify`
+- `member_password_reset_ssafy`
 - `member_password_reset`
 - `member_password_change`
 - `member_delete`
@@ -93,7 +94,7 @@
 ## 기록 금지 항목
 다음 값은 로그에 남기지 않습니다.
 - 비밀번호 원문
-- 인증코드 원문
+- 인증 토큰 원문
 - 세션 토큰
 - 푸시 키 원문 중복 저장
 - 제휴 제안 본문 전체 자유서술 텍스트

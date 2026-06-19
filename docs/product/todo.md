@@ -45,14 +45,14 @@
    완료: HMAC 검증 공통 헬퍼를 추가해 길이 불일치 시 예외 없이 실패 처리하도록 맞췄다.
 
 9. [x] 멤버 인증 API brute-force 완화
-   대상: `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/route.ts`, `src/app/api/mm/change-password/route.ts`, `src/app/api/ssafy/verify-token/route.ts`
+   대상: `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/complete/route.ts`, `src/app/api/mm/change-password/route.ts`, `src/app/api/ssafy/verify-token/route.ts`, `src/app/api/ssafy/reset-password/route.ts`
    이유: 계정 + IP 기반 throttle, 실패 지연, 과도한 에러 노출 억제가 아직 더 필요하다.
    완료: `member_auth_attempts` 기반 공통 throttle을 추가하고, 실패마다 지연을 넣었으며, 계정 존재 여부와 내부 오류 메시지 노출을 줄였다.
 
-10. [x] 인증 코드와 QR 서명용 암호학적 난수 및 시크릿 분리
-    대상: `src/lib/verification-code.ts`, `src/lib/certification-qr.ts`, `src/lib/hmac.js`
-    이유: `Math.random` 기반 코드 생성은 바꾸는 편이 안전하고, 용도별 secret도 분리하는 편이 좋다.
-    완료: 인증 코드는 `crypto.randomInt`로 바꾸고, MM 가입 인증 제거 후 남은 비밀번호 재설정 코드는 `USER_SESSION_SECRET` 기반 HMAC으로 정리했다.
+10. [x] QR 서명과 reset 세션용 암호학적 서명 분리
+    대상: `src/lib/certification-qr.ts`, `src/lib/reset-password-session.ts`, `src/lib/hmac.js`
+    이유: 용도별 서명 payload와 secret fallback을 분리해 토큰 오남용 범위를 줄이는 편이 좋다.
+    완료: 구성원 QR과 비밀번호 재설정 completion token을 각각 HMAC 서명으로 검증하며, 비밀번호 재설정은 SSAFY Verify 확인 후 짧은 만료 token만 발급한다.
 
 11. [x] 관리자 로그 조회 및 CSV export의 메모리 사용량 줄이기
    대상: `src/lib/log-insights.ts`, `src/app/api/admin/logs/export/route.ts`

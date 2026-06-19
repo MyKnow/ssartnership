@@ -26,8 +26,7 @@ export default async function ResetPasswordPage() {
               비밀번호 재설정
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              가입된 MM 아이디로 인증번호를 발급받고, 확인이 끝나면 새 비밀번호
-              설정 페이지로 이동합니다.
+              SSAFY Verify 인증을 완료하면 새 비밀번호 설정 페이지로 이동합니다.
             </p>
             <ResetPasswordForm />
           </Card>
