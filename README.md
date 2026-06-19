@@ -264,6 +264,16 @@ npm run ci:local
 
 ## SSAFY Verify 인증 플로우
 
+### 환경 설정
+
+- 브라우저는 현재 접속 origin에서 `/auth/ssafy` callback URL을 계산합니다.
+  - `http://localhost:3000` -> `http://localhost:3000/auth/ssafy`
+  - `https://ssartnership-git-dev-myknows-projects.vercel.app` -> `https://ssartnership-git-dev-myknows-projects.vercel.app/auth/ssafy`
+  - `https://ssartnership.myknow.xyz` -> `https://ssartnership.myknow.xyz/auth/ssafy`
+- 서버는 `SSAFY_VERIFY_REDIRECT_URIS`에 등록된 exact URL만 허용합니다.
+- local loopback redirect는 현재 request origin에서 자동 허용하지만, SSAFY Verify Client에도 동일한 redirect URI와 allowed origin을 등록해야 합니다.
+- `NEXT_PUBLIC_SSAFY_VERIFY_REDIRECT_URI`는 사용하지 않습니다. 공개값은 `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`만 필요합니다.
+
 ### 회원가입
 
 1. 사용자가 회원가입 화면에서 SSAFY Verify를 실행합니다.
@@ -288,14 +298,10 @@ npm run test:ssafy-cycle
 
 ### 비밀번호 재설정
 
-- 가입된 회원만 가능
-- 운영진은 `staff_source_year`를 기준으로 적절한 팀 / 발신 계정을 선택합니다.
-
-주의:
-
-- 운영용 MM 계정은 대상 팀의 `view_team` 권한과 대상 채널의 `read_channel` 권한이 있어야 합니다.
-- private / invite-only 팀이거나 운영 계정이 팀 멤버가 아니면 팀 조회 단계에서 403이 날 수 있습니다.
-- 14기 / 15기 발신 계정은 분리하는 편이 안전합니다.
+- 가입된 회원만 가능합니다.
+- 사용자가 SSAFY Verify를 완료하면 서버가 Verify callback을 교환·검증합니다.
+- Verify claim의 Mattermost user_id 또는 SSAFY subject로 기존 회원을 찾은 뒤, 짧은 만료 시간의 비밀번호 재설정 completion token만 발급합니다.
+- 이 흐름은 사용자 세션을 생성하지 않습니다.
 
 ## 약관 / 개인정보 동의
 

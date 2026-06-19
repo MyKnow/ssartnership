@@ -24,7 +24,7 @@ const callbackBodySchema = z
 
 export function parseSsafyVerifyCallbackBody(
   input: unknown,
-  expected: { issuer: string; redirectUri: string },
+  expected: { issuer: string; redirectUris: readonly string[] },
 ): SsafyVerifyParseResult {
   const parsed = callbackBodySchema.safeParse(input);
   if (!parsed.success) {
@@ -35,7 +35,7 @@ export function parseSsafyVerifyCallbackBody(
     return { ok: false, errorCode: "CALLBACK_ISSUER_MISMATCH" };
   }
 
-  if (parsed.data.redirectUri !== expected.redirectUri) {
+  if (!expected.redirectUris.includes(parsed.data.redirectUri)) {
     return { ok: false, errorCode: "REDIRECT_URI_MISMATCH" };
   }
 

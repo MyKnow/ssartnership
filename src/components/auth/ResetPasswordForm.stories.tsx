@@ -71,7 +71,9 @@ export const VerifyCancelled: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: "SSAFY 인증으로 비밀번호 재설정" }),
     );
-    await expect(canvas.getByText("SSAFY 인증이 취소되었습니다.")).toBeInTheDocument();
+    await expect(canvas.getByRole("alert")).toHaveTextContent(
+      "SSAFY 인증이 취소되었습니다.",
+    );
   },
 };
 
