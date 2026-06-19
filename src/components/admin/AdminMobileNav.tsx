@@ -9,7 +9,7 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { SITE_NAME } from "@/lib/site";
 import {
-  ADMIN_NAV_GROUPS,
+  type AdminNavGroup,
   isAdminNavActive,
 } from "@/components/admin/admin-navigation";
 
@@ -71,12 +71,14 @@ export default function AdminMobileNav({
   backHref,
   backLabel,
   logoutAction,
+  navGroups,
 }: {
   title: string;
   description?: string;
   backHref?: string;
   backLabel?: string;
   logoutAction: (formData: FormData) => void | Promise<void>;
+  navGroups: AdminNavGroup[];
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -187,7 +189,7 @@ export default function AdminMobileNav({
 
                   <div className="flex-1 overflow-y-auto px-5 py-5">
                     <div className="flex flex-col gap-4">
-                      {ADMIN_NAV_GROUPS.map((group) => (
+                      {navGroups.map((group) => (
                         <DrawerSection
                           key={group.label}
                           title={group.label}

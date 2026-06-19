@@ -27,7 +27,8 @@ async function loadTemplate(options: {
 }) {
   const { createAdminPartnerXlsxTemplate } = await serverModulePromise;
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(await createAdminPartnerXlsxTemplate(options, categories));
+  const templateBuffer = await createAdminPartnerXlsxTemplate(options, categories);
+  await workbook.xlsx.load(templateBuffer as unknown as ExcelJS.Buffer);
   return workbook;
 }
 

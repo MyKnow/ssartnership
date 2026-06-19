@@ -5,7 +5,7 @@ import {
   type AdminPartnerFileParseResult,
 } from "@/lib/admin-partner-file-import";
 import { parseAdminPartnerXlsxDraft } from "@/lib/admin-partner-file-import.server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
@@ -29,7 +29,7 @@ function normalizePartnerCompanies(value: unknown): PartnerCompanyRow[] {
 export async function parseAdminPartnerXlsxFileAction(
   formData: FormData,
 ): Promise<AdminPartnerFileParseResult> {
-  await requireAdmin();
+  await requireAdminPermission("brands", "create", { path: "/admin/partners/new" });
 
   const file = formData.get("file");
   if (!(file instanceof File)) {

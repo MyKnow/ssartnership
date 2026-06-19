@@ -3,6 +3,9 @@ import crypto from "node:crypto";
 const PASSWORD_ITERATIONS = 120_000;
 const PASSWORD_KEY_LENGTH = 64;
 
+/**
+ * @param {Record<string, string | undefined>} [env]
+ */
 export function resolvePreviewMemberCredentialSeedConfig(env = process.env) {
   const username = env.PREVIEW_TEST_MEMBER_USERNAME?.trim() ?? "";
   const password = env.PREVIEW_TEST_MEMBER_PASSWORD ?? "";

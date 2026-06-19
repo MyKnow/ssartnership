@@ -6,6 +6,7 @@ import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import AdminPartnerWorkspace from "@/components/admin/AdminPartnerWorkspace";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import {
@@ -56,6 +57,7 @@ export default async function AdminPartnersPage({
 }: {
   searchParams?: Promise<{ error?: string }>;
 }) {
+  await requireAdminPermission("brands", "read", { path: "/admin/partners" });
   const supabase = getSupabaseAdminClient();
   const params = (await searchParams) ?? {};
   const partnerFormError = params.error ? adminPartnersErrorMessages[params.error] : null;

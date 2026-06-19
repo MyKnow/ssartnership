@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import {
   createNewPartnerPayload,
@@ -154,7 +154,7 @@ export async function createPartnerFormActionImpl(
   _prevState: PartnerCreateFormState,
   formData: FormData,
 ): Promise<PartnerCreateFormState> {
-  await requireAdmin();
+  await requireAdminPermission("brands", "create", { path: "/admin/partners/new" });
   try {
     const record = await createPartnerRecord(formData);
     await finalizeCreatedPartner(record);

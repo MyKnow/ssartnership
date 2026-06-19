@@ -8,6 +8,7 @@ import {
   getAdminNotificationOverview,
   isMattermostNotificationConfigured,
 } from "@/lib/admin-notification-ops";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { isPushConfigured } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -18,6 +19,7 @@ export default async function AdminPushPage({
 }: {
   searchParams?: Promise<{ tab?: string }>;
 }) {
+  await requireAdminPermission("notifications", "read", { path: "/admin/push" });
   const supabase = getSupabaseAdminClient();
   const params = (await searchParams) ?? {};
   const initialTab =

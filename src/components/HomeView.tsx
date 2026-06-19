@@ -31,7 +31,6 @@ import {
 } from "@/components/home-view/selectors";
 
 const APPLIES_TO_FILTER_STORAGE_KEY = "home:partner-applies-to-filter";
-const PARTNER_GRID_TEMPLATE_COLUMNS = "repeat(auto-fit, minmax(min(100%, 22rem), 1fr))";
 const INITIAL_PARTNER_CARD_COUNT = 12;
 const PARTNER_CARD_INCREMENT = 12;
 
@@ -313,8 +312,7 @@ export default function HomeView({
           ) : (
             <div className="grid gap-6">
               <div
-                className="grid gap-4 xl:gap-5"
-                style={{ gridTemplateColumns: PARTNER_GRID_TEMPLATE_COLUMNS }}
+                className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3 xl:gap-5"
                 data-testid="partner-grid"
               >
                 {displayPartners.map((partner) => (

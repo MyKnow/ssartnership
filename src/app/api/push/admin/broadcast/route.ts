@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureAdminApiAccess } from "@/lib/admin-access";
+import { ensureAdminApiPermission } from "@/lib/admin-access";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { isSameOriginPushRequest } from "@/lib/push/ops";
 import { sendAdminNotificationCampaign, type AdminNotificationChannelSelection, type AdminNotificationType } from "@/lib/admin-notification-ops";
@@ -13,7 +13,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const accessDenied = await ensureAdminApiAccess(request);
+  const accessDenied = await ensureAdminApiPermission(
+    request,
+    "notifications",
+    "create",
+  );
   if (accessDenied) {
     return accessDenied;
   }

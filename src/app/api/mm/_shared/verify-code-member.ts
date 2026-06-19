@@ -116,7 +116,7 @@ export async function finalizeVerifiedMember({
       await logAdminAudit({
         ...context,
         action: "member_sync",
-        actorId: process.env.ADMIN_ID ?? "admin",
+        actorId: "system",
         targetType: "member",
         targetId: member.id,
         properties: buildMemberSyncLogProperties(syncResult, {

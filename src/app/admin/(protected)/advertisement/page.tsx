@@ -6,6 +6,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { savePromotionSlidesAction } from "@/app/admin/(protected)/_actions/promotion-actions";
+import { requireAdminPermission } from "@/lib/admin-access";
 import {
   getPromotionCampaignState,
   listManagedEventCampaigns,
@@ -35,6 +36,7 @@ export default async function AdminAdvertisementPage({
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
+  await requireAdminPermission("home_ads", "read", { path: "/admin/advertisement" });
   const params = (await searchParams) ?? {};
   const message = statusMessage(params.status);
   const [slides, eventCampaigns] = await Promise.all([

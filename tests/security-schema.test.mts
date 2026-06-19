@@ -34,6 +34,9 @@ const sensitiveTables = [
   "event_logs",
   "partner_metric_rollups",
   "partner_metric_unique_visitors",
+  "admin_accounts",
+  "admin_permissions",
+  "admin_permission_templates",
   "admin_audit_logs",
   "auth_security_logs",
 ] as const;

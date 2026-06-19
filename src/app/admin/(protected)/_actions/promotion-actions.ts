@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getAdminSession, requireAdmin } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
@@ -267,7 +268,7 @@ function revalidateAdvertisementPaths() {
 }
 
 export async function createPromotionEventAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("events", "create", { path: "/admin/event" });
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
   const payload = parsePromotionEventRegistration(formData, slug);
   const supabase = getSupabaseAdminClient();
@@ -300,7 +301,7 @@ export async function createPromotionEventAction(formData: FormData) {
 }
 
 export async function updatePromotionEventAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("events", "update", { path: "/admin/event" });
   const id = getRequiredString(formData, "id");
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
   const supabase = getSupabaseAdminClient();
@@ -347,7 +348,7 @@ export async function updatePromotionEventAction(formData: FormData) {
 }
 
 export async function deletePromotionEventAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("events", "delete", { path: "/admin/event" });
   const id = getRequiredString(formData, "id");
   const slug = getString(formData, "slug") || id;
   const supabase = getSupabaseAdminClient();
@@ -365,7 +366,7 @@ export async function deletePromotionEventAction(formData: FormData) {
 }
 
 export async function savePromotionSlidesAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("home_ads", "update", { path: "/admin/advertisement" });
   const slides = parsePromotionSlideDrafts(formData);
   const supabase = getSupabaseAdminClient();
 
@@ -493,7 +494,7 @@ export async function savePromotionSlidesAction(formData: FormData) {
 }
 
 export async function createEventRewardDrawAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("events", "create", { path: "/admin/event" });
   const slug = eventRewardActionSlug(formData);
   const winnerCount = getString(formData, "winnerCount");
   const seed = getString(formData, "seed");
@@ -527,7 +528,7 @@ export async function createEventRewardDrawAction(formData: FormData) {
     draw = await createStoredEventRewardDraw({
       campaign,
       request: request.value,
-      createdByAdminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? null,
+      createdByAdminId: adminSession?.adminId ?? null,
     });
   } catch (error) {
     console.error("[admin-event] reward draw create failed", error);
@@ -557,7 +558,7 @@ export async function createEventRewardDrawAction(formData: FormData) {
 }
 
 export async function previewEventRewardDrawAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("events", "read", { path: "/admin/event" });
   const slug = eventRewardActionSlug(formData);
   const winnerCount = getString(formData, "winnerCount");
   const seed = getString(formData, "seed");
@@ -592,7 +593,7 @@ export async function previewEventRewardDrawAction(formData: FormData) {
 }
 
 export async function sendEventRewardWinnerNotificationsAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("events", "update", { path: "/admin/event" });
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
   const drawId = getRequiredString(formData, "drawId");
   const result = await sendEventRewardWinnerNotifications(drawId, {
@@ -615,7 +616,7 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
 }
 
 export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("events", "update", { path: "/admin/event" });
   const slug = normalizeSlug(getRequiredString(formData, "slug"));
   const drawId = getString(formData, "drawId") || null;
   const memberId = getRequiredString(formData, "memberId");

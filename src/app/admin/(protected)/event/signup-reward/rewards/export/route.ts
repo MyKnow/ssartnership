@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   buildEventRewardComparisonOverview,
@@ -12,7 +12,7 @@ import { getManagedEventCampaign } from "@/lib/promotions/events";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  await requireAdmin();
+  await requireAdminPermission("events", "read", { path: "/admin/event/signup-reward" });
 
   const definition = getEventPageDefinition("signup-reward");
   if (!definition) {

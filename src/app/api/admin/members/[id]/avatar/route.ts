@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { ensureAdminApiAccess } from "@/lib/admin-access";
+import { ensureAdminApiPermission } from "@/lib/admin-access";
 import {
   getMemberSyncCandidateYears,
   resolveMemberSnapshotForYears,
@@ -20,7 +20,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const accessDenied = await ensureAdminApiAccess(request);
+  const accessDenied = await ensureAdminApiPermission(request, "members", "read");
   if (accessDenied) {
     return accessDenied;
   }

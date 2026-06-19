@@ -16,6 +16,7 @@ import {
   sendEventRewardWinnerNotificationsAction,
   updatePromotionEventAction,
 } from "@/app/admin/(protected)/_actions/promotion-actions";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getEventPageDefinition } from "@/lib/event-pages";
 import { PROMOTION_AUDIENCE_OPTIONS, type EventCampaign } from "@/lib/promotions/catalog";
 import {
@@ -574,6 +575,7 @@ export default async function AdminEventDetailPage({
     previewSeed?: string;
   }>;
 }) {
+  await requireAdminPermission("events", "read", { path: "/admin/event" });
   const { slug } = await params;
   const paramsData = (await searchParams) ?? {};
   const definition = getEventPageDefinition(slug);

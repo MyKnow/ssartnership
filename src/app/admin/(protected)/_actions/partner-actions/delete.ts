@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { collectPartnerMediaUrls } from "@/app/admin/(protected)/_actions/partner-support";
@@ -19,7 +19,7 @@ function getSafeAdminPartnerPath(value: FormDataEntryValue | null, fallback: str
 }
 
 export async function deletePartnerAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("brands", "delete", { path: "/admin/partners" });
   const id = String(formData.get("id") || "").trim();
   const redirectPath = getSafeAdminPartnerPath(
     formData.get("deleteRedirectTo"),

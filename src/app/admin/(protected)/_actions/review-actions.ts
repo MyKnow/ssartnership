@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getAdminSession, isAdminSession } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { logAdminAction, revalidateReviewPaths } from "./shared-helpers";
@@ -15,18 +15,17 @@ function getSafeReturnTo(value: FormDataEntryValue | null) {
 export async function hidePartnerReviewAction(formData: FormData) {
   const reviewId = String(formData.get("reviewId") ?? "").trim();
   const returnTo = getSafeReturnTo(formData.get("returnTo"));
+  const adminSession = await requireAdminPermission("reviews", "update", {
+    path: returnTo,
+  });
 
-  if (!(await isAdminSession())) {
-    redirect("/admin/login");
-  }
   if (!reviewId) {
     redirectAdminActionError(returnTo, "review_invalid_request");
   }
 
-  const adminSession = await getAdminSession();
   const hidden = await partnerReviewRepository.hidePartnerReview(reviewId, {
     actorType: "admin",
-    adminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? "admin",
+    adminId: adminSession.adminId,
   });
   if (!hidden) {
     redirectAdminActionError(returnTo, "review_not_found");
@@ -47,18 +46,17 @@ export async function hidePartnerReviewAction(formData: FormData) {
 export async function restorePartnerReviewAction(formData: FormData) {
   const reviewId = String(formData.get("reviewId") ?? "").trim();
   const returnTo = getSafeReturnTo(formData.get("returnTo"));
+  const adminSession = await requireAdminPermission("reviews", "update", {
+    path: returnTo,
+  });
 
-  if (!(await isAdminSession())) {
-    redirect("/admin/login");
-  }
   if (!reviewId) {
     redirectAdminActionError(returnTo, "review_invalid_request");
   }
 
-  const adminSession = await getAdminSession();
   const restored = await partnerReviewRepository.restorePartnerReview(reviewId, {
     actorType: "admin",
-    adminId: adminSession?.adminId ?? process.env.ADMIN_ID ?? "admin",
+    adminId: adminSession.adminId,
   });
   if (!restored) {
     redirectAdminActionError(returnTo, "review_not_found");
@@ -83,9 +81,7 @@ export async function updatePartnerReviewAction(formData: FormData) {
   const body = String(formData.get("body") ?? "").trim();
   const rating = Number.parseInt(String(formData.get("rating") ?? "").trim(), 10);
 
-  if (!(await isAdminSession())) {
-    redirect("/admin/login");
-  }
+  await requireAdminPermission("reviews", "update", { path: returnTo });
   if (!reviewId || !title || !body || !Number.isFinite(rating) || rating < 1 || rating > 5) {
     redirectAdminActionError(returnTo, "review_invalid_request");
   }
@@ -130,9 +126,7 @@ export async function deletePartnerReviewAction(formData: FormData) {
   const reviewId = String(formData.get("reviewId") ?? "").trim();
   const returnTo = getSafeReturnTo(formData.get("returnTo"));
 
-  if (!(await isAdminSession())) {
-    redirect("/admin/login");
-  }
+  await requireAdminPermission("reviews", "delete", { path: returnTo });
   if (!reviewId) {
     redirectAdminActionError(returnTo, "review_invalid_request");
   }

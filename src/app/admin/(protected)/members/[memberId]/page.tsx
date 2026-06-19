@@ -9,6 +9,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { parseSsafyProfile } from "@/lib/mm-profile";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { formatSsafyMemberLifecycleLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -33,6 +34,7 @@ export default async function AdminMemberDetailPage({
 }: {
   params: Promise<{ memberId: string }>;
 }) {
+  await requireAdminPermission("members", "read", { path: "/admin/members" });
   const { memberId } = await params;
   const supabase = getSupabaseAdminClient();
 

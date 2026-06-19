@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import {
   buildMemberSyncLogProperties,
   syncMembersBySelectableYears,
@@ -25,7 +25,9 @@ import {
 import { revalidatePath } from "next/cache";
 
 export async function backfillMemberProfilesAction() {
-  await requireAdmin();
+  const adminSession = await requireAdminPermission("members", "update", {
+    path: "/admin/members",
+  });
 
   const context = await getServerActionLogContext("/admin/members");
   let status = "success";
@@ -38,7 +40,7 @@ export async function backfillMemberProfilesAction() {
 
   try {
     const result = await syncMembersBySelectableYears();
-    const actorId = process.env.ADMIN_ID ?? "admin";
+    const actorId = adminSession.adminId;
     summary = {
       checked: result.checked,
       updated: result.updated,
@@ -77,7 +79,7 @@ export async function backfillMemberProfilesAction() {
 }
 
 export async function updateMemberAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("members", "update", { path: "/admin/members" });
   const id = String(formData.get("id") || "").trim();
   const displayName = String(formData.get("displayName") || "").trim();
   const yearRaw = String(formData.get("year") || "").trim();
@@ -129,7 +131,9 @@ export async function manualAddMembersAction(
   _prevState: ManualMemberAddFormState,
   formData: FormData,
 ): Promise<ManualMemberAddFormState> {
-  await requireAdmin();
+  const adminSession = await requireAdminPermission("members", "create", {
+    path: "/admin/members",
+  });
 
   const requestedYearRaw = String(formData.get("requestedYear") || "").trim();
   const requestedYear = Number.parseInt(requestedYearRaw, 10) as ManualMemberAddYear;
@@ -161,7 +165,7 @@ export async function manualAddMembersAction(
   }
 
   const context = await getServerActionLogContext("/admin/members");
-  const actorId = process.env.ADMIN_ID ?? "admin";
+  const actorId = adminSession.adminId;
   const result = await provisionManualMembers(requestedYear, inputs);
 
   const auditResults = await Promise.allSettled(
@@ -213,7 +217,7 @@ export async function manualAddMembersAction(
 }
 
 export async function deleteMemberAction(formData: FormData) {
-  await requireAdmin();
+  await requireAdminPermission("members", "delete", { path: "/admin/members" });
   const id = String(formData.get("id") || "").trim();
 
   if (!id) {

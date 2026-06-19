@@ -24,6 +24,7 @@ import {
 } from "@/lib/ssafy-year";
 import { SITE_NAME } from "@/lib/site";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { requireAdminPermission } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export default async function AdminCyclePage({
 }: {
   searchParams?: Promise<{ status?: string; error?: string }>;
 }) {
+  await requireAdminPermission("cycles", "read", { path: "/admin/cycle" });
   const params = (await searchParams) ?? {};
   const cycleError = params.error ? adminCycleErrorMessages[params.error] : null;
   const settings = await getSsafyCycleSettings();

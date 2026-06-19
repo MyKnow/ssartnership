@@ -140,7 +140,6 @@ export function getAdminRateLimitKeys(clientIp: string, identifier?: string | nu
 
 export function isProtectedAdminPath(pathname: string) {
   return (
-    pathname.startsWith("/admin") ||
     pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/push/admin")
   );

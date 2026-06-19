@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const actorId = process.env.ADMIN_ID ?? "admin";
+    const actorId = "system";
     const directoryResult = await syncMmUserDirectoryBySelectableYears();
     await logAdminAudit({
       ...context,

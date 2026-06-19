@@ -9,6 +9,7 @@ import {
   parseAdminReviewFilters,
   serializeAdminReviewFilters,
 } from "@/lib/admin-reviews";
+import { requireAdminPermission } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function AdminReviewsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdminPermission("reviews", "read", { path: "/admin/reviews" });
   const params = (await searchParams) ?? {};
   const filters = parseAdminReviewFilters(params);
   const errorMessage = typeof params.error === "string" ? adminReviewsErrorMessages[params.error] ?? null : null;

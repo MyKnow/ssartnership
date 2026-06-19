@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import {
   approvePartnerChangeRequest as approvePartnerChangeRequestRecord,
@@ -14,7 +14,9 @@ import {
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 
 export async function approvePartnerChangeRequestAction(formData: FormData) {
-  await requireAdmin();
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: "/admin/partners",
+  });
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
     redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
@@ -22,7 +24,7 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
 
   const request = await approvePartnerChangeRequestRecord({
     requestId,
-    adminId: process.env.ADMIN_ID ?? "admin",
+    adminId: adminSession.adminId,
   });
 
   const approvalAudit = buildAuditChangeSummary("브랜드", [
@@ -121,7 +123,9 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
 }
 
 export async function rejectPartnerChangeRequestAction(formData: FormData) {
-  await requireAdmin();
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: "/admin/partners",
+  });
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
     redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
@@ -129,7 +133,7 @@ export async function rejectPartnerChangeRequestAction(formData: FormData) {
 
   const request = await rejectPartnerChangeRequestRecord({
     requestId,
-    adminId: process.env.ADMIN_ID ?? "admin",
+    adminId: adminSession.adminId,
   });
 
   await logAdminAction("partner_change_request_reject", {

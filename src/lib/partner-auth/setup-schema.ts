@@ -33,7 +33,7 @@ export function resolvePartnerSetupSchemaCapabilitiesFromAccount(account: {
   initial_setup_token?: string | null;
   initial_setup_token_hash?: string | null;
   initial_setup_expires_at?: string | null;
-}) {
+} & Record<string, unknown>) {
   return {
     supportsPlainToken: "initial_setup_token" in account,
     supportsHash: "initial_setup_token_hash" in account,
@@ -81,7 +81,11 @@ export function buildPartnerSetupIssuePayload(
     expiresAt: string;
   },
   capabilities: PartnerSetupSchemaCapabilities,
-) {
+): typeof basePayload & {
+  initial_setup_token?: string;
+  initial_setup_token_hash?: string;
+  initial_setup_expires_at?: string;
+} {
   return {
     ...basePayload,
     ...(capabilities.supportsHash

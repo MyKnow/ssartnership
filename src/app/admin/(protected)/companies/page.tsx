@@ -4,6 +4,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -136,6 +137,7 @@ export default async function AdminCompaniesPage({
     tab?: string;
   }>;
 }) {
+  await requireAdminPermission("companies", "read", { path: "/admin/companies" });
   const supabase = getSupabaseAdminClient();
   const params = (await searchParams) ?? {};
   const companyError = params.error ? adminCompaniesErrorMessages[params.error] : null;

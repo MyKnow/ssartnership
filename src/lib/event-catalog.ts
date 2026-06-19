@@ -77,6 +77,11 @@ export const ADMIN_AUDIT_ACTIONS = [
   'event_reward_draw_create',
   'event_reward_winner_notification_test_send',
   'event_reward_winner_notification_send',
+  'admin_account_create',
+  'admin_account_setup_link_issue',
+  'admin_account_status_update',
+  'admin_account_permissions_update',
+  'admin_account_template_apply',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

@@ -16,7 +16,8 @@ import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
 import {
-  ADMIN_NAV_GROUPS,
+  ADMIN_NAV_ICON_BY_KEY,
+  type AdminNavGroup,
   findAdminNavItem,
   isAdminNavActive,
 } from "@/components/admin/admin-navigation";
@@ -32,6 +33,7 @@ export default function AdminShellView({
   backLabel,
   children,
   logoutAction,
+  navGroups,
 }: {
   title: string;
   description?: string;
@@ -39,14 +41,19 @@ export default function AdminShellView({
   backLabel?: string;
   children: React.ReactNode;
   logoutAction: AdminLogoutAction;
+  navGroups: AdminNavGroup[];
 }) {
   const pathname = usePathname();
   const { hidden, headerHeight, headerRef } = useAutoHideHeader();
-  const activeNavItem = findAdminNavItem(pathname);
+  const activeNavItem =
+    navGroups
+      .flatMap((group) => group.items)
+      .find((item) => isAdminNavActive(pathname, item.href)) ??
+    findAdminNavItem(pathname);
 
   const renderDesktopNav = (expanded: boolean) => (
     <nav className="grid gap-6">
-      {ADMIN_NAV_GROUPS.map((group) => (
+      {navGroups.map((group) => (
         <section key={group.label} className="grid gap-2">
           {expanded ? (
             <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -56,7 +63,7 @@ export default function AdminShellView({
           <div className="grid gap-1.5">
             {group.items.map((item) => {
               const active = isAdminNavActive(pathname, item.href);
-              const Icon = item.icon;
+              const Icon = ADMIN_NAV_ICON_BY_KEY[item.iconKey];
 
               return (
                 <Link
@@ -130,6 +137,7 @@ export default function AdminShellView({
                   backHref={backHref}
                   backLabel={backLabel}
                   logoutAction={logoutAction}
+                  navGroups={navGroups}
                 />
               </div>
             </Container>

@@ -38,7 +38,7 @@ export const authSmokeRoutes: SmokeRoute[] = [
     expected: /카페해온|초기 설정/,
   },
   { path: "/partner/support", expected: /문의|지원|협력사/ },
-  { path: "/admin/login", expected: /관리자 로그인/ },
+  { path: "/admin/login", expected: /로그인/ },
 ];
 
 export const memberProtectedRoutes: RedirectRoute[] = [
@@ -60,23 +60,23 @@ export const partnerProtectedRoutes: RedirectRoute[] = [
 ];
 
 export const adminProtectedRoutes: RedirectRoute[] = [
-  { path: "/admin", expectedPath: "/admin/login" },
-  { path: "/admin/advertisement", expectedPath: "/admin/login" },
-  { path: "/admin/companies", expectedPath: "/admin/login" },
-  { path: "/admin/cycle", expectedPath: "/admin/login" },
-  { path: "/admin/event", expectedPath: "/admin/login" },
-  { path: "/admin/event/signup-reward", expectedPath: "/admin/login" },
-  { path: "/admin/logs", expectedPath: "/admin/login" },
-  { path: "/admin/members", expectedPath: "/admin/login" },
-  { path: "/admin/members/mock", expectedPath: "/admin/login" },
-  { path: "/admin/notifications", expectedPath: "/admin/login" },
-  { path: "/admin/partners", expectedPath: "/admin/login" },
+  { path: "/admin", expectedPath: "/auth/login" },
+  { path: "/admin/advertisement", expectedPath: "/auth/login" },
+  { path: "/admin/companies", expectedPath: "/auth/login" },
+  { path: "/admin/cycle", expectedPath: "/auth/login" },
+  { path: "/admin/event", expectedPath: "/auth/login" },
+  { path: "/admin/event/signup-reward", expectedPath: "/auth/login" },
+  { path: "/admin/logs", expectedPath: "/auth/login" },
+  { path: "/admin/members", expectedPath: "/auth/login" },
+  { path: "/admin/members/mock", expectedPath: "/auth/login" },
+  { path: "/admin/notifications", expectedPath: "/auth/login" },
+  { path: "/admin/partners", expectedPath: "/auth/login" },
   {
     path: "/admin/partners/mock-partner-service-cafe-haeon-main",
-    expectedPath: "/admin/login",
+    expectedPath: "/auth/login",
   },
-  { path: "/admin/partners/new", expectedPath: "/admin/login" },
-  { path: "/admin/promotions", expectedPath: "/admin/login" },
-  { path: "/admin/push", expectedPath: "/admin/login" },
-  { path: "/admin/reviews", expectedPath: "/admin/login" },
+  { path: "/admin/partners/new", expectedPath: "/auth/login" },
+  { path: "/admin/promotions", expectedPath: "/auth/login" },
+  { path: "/admin/push", expectedPath: "/auth/login" },
+  { path: "/admin/reviews", expectedPath: "/auth/login" },
 ];

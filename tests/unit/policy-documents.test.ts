@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { PolicyKind } from "../../src/lib/policy-documents";
 
 const getSupabaseAdminClient = vi.fn();
 const upsertMemberPushPreferences = vi.fn();
@@ -13,7 +14,7 @@ vi.mock("@/lib/push/preferences", () => ({
 
 type PolicyRow = {
   id: string;
-  kind: string;
+  kind: PolicyKind;
   version: number;
   title: string;
   summary: string | null;
@@ -22,6 +23,10 @@ type PolicyRow = {
   effective_at: string;
   created_at: string | null;
   updated_at: string | null;
+};
+
+type RawPolicyRow = Omit<PolicyRow, "kind"> & {
+  kind: string;
 };
 
 type MemberRow = {
@@ -68,7 +73,7 @@ function createSupabaseMock({
   policyConsentError = null,
   memberUpdateError = null,
 }: {
-  policyDocuments?: PolicyRow[];
+  policyDocuments?: RawPolicyRow[];
   member?: MemberRow | null;
   policyDocumentsError?: { message: string } | null;
   memberError?: { message: string } | null;
@@ -120,7 +125,7 @@ function createSupabaseMock({
               error: policyDocumentsError,
             });
           },
-          then(resolve: (value: { data: PolicyRow[]; error: { message: string } | null }) => unknown) {
+          then(resolve: (value: { data: RawPolicyRow[]; error: { message: string } | null }) => unknown) {
             return Promise.resolve({
               data: rows,
               error: policyDocumentsError,
@@ -273,12 +278,14 @@ describe("policy documents", () => {
             version: 3,
             is_active: true,
           }),
-          createPolicyRow({
-            id: "ignored-v1",
+          {
+            ...createPolicyRow({
+              id: "ignored-v1",
+              version: 1,
+              is_active: true,
+            }),
             kind: "invalid-kind",
-            version: 1,
-            is_active: true,
-          }),
+          },
         ],
       }),
     );
