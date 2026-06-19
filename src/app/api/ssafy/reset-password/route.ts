@@ -21,6 +21,10 @@ import {
   parseSsafyVerifyCallbackBody,
   readJson,
 } from "@/lib/ssafy-verify/schema";
+import {
+  buildSsafyVerifyRequestRedirectUri,
+  resolveSsafyVerifyAllowedRedirectUris,
+} from "@/lib/ssafy-verify/redirect";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -65,9 +69,13 @@ export async function POST(request: Request) {
       return publicError("INVALID_REQUEST", null, 400);
     }
 
+    const requestRedirectUri = buildSsafyVerifyRequestRedirectUri(request);
     const parsedBody = parseSsafyVerifyCallbackBody(rawBody.value, {
       issuer: config.issuer,
-      redirectUri: config.redirectUri,
+      redirectUris: resolveSsafyVerifyAllowedRedirectUris(
+        config,
+        requestRedirectUri,
+      ),
     });
     if (!parsedBody.ok) {
       await logAuthSecurity({
