@@ -80,11 +80,9 @@ const auditLabels: Record<string, string> = {
 const securityLabels: Record<string, string> = {
   member_login: '회원 로그인',
   member_logout: '회원 로그아웃',
-  member_signup_code_request: '회원가입 인증코드 요청',
   member_signup_complete: '회원가입 완료',
   member_policy_consent: '약관 동의',
-  member_password_reset_request: '비밀번호 재설정 인증번호 요청',
-  member_password_reset_verify: '비밀번호 재설정 인증번호 확인',
+  member_password_reset_ssafy: '비밀번호 재설정 SSAFY 인증',
   member_password_reset_complete: '비밀번호 재설정 완료',
   member_password_reset: '비밀번호 재설정',
   member_password_change: '비밀번호 변경',

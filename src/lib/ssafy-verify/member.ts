@@ -6,6 +6,7 @@ export type SsafyVerifiedMember = {
   must_change_password: boolean | null;
   ssafy_sub: string | null;
   mm_user_id: string | null;
+  mm_username: string | null;
 };
 
 export type SsafyVerificationForMember = SsafyVerificationClaims & {
@@ -35,7 +36,7 @@ export async function findSsafyVerifiedMember(
     mattermostUserId?: string | null;
   },
 ) {
-  const select = "id,must_change_password,ssafy_sub,mm_user_id";
+  const select = "id,must_change_password,ssafy_sub,mm_user_id,mm_username";
 
   if (input.currentMemberId) {
     const { data, error } = await supabase

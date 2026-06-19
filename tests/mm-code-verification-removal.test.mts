@@ -17,6 +17,12 @@ test("legacy MM signup verification endpoints are removed", () => {
     "src/app/api/mm/_shared/verify-code.ts",
     "src/app/api/mm/_shared/request-code-delivery.ts",
     "src/app/api/mm/_shared/verify-code-member.ts",
+    "src/app/api/mm/reset-password/route.ts",
+    "src/app/api/mm/reset-password/verify/route.ts",
+    "src/app/api/mm/_shared/reset-password.ts",
+    "src/app/api/mm/_shared/reset-password-verify.ts",
+    "src/app/api/mm/_shared/reset-password-code-store.ts",
+    "src/lib/verification-code.ts",
   ];
 
   for (const path of removedPaths) {
@@ -31,6 +37,7 @@ test("MM signup verification storage and secret are no longer documented", () =>
   assert.equal(envExample.includes("MM_VERIFICATION_SECRET"), false);
   assert.equal(schema.includes("create table if not exists mm_verification_codes"), false);
   assert.equal(schema.includes("create table if not exists mm_verification_attempts"), false);
+  assert.equal(schema.includes("create table if not exists password_reset_codes"), false);
 });
 
 test("SSAFY Verify transition TODOs preserve unresolved decisions", () => {
