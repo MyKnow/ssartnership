@@ -13,7 +13,7 @@ import {
   type SsafyVerifyClientFailure,
 } from "@/lib/ssafy-verify/client-errors";
 import { buildSsafyVerifyRedirectUri } from "@/lib/ssafy-verify/redirect";
-import { SSAFY_VERIFY_SCOPES } from "@/lib/ssafy-verify/scopes";
+import { SSAFY_VERIFY_REAUTH_SCOPES } from "@/lib/ssafy-verify/scopes";
 
 type ResetPasswordVerifyResult =
   | {
@@ -82,7 +82,7 @@ export default function ResetPasswordForm() {
       callback = await sdk.verify({
         clientId: process.env.NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID ?? "",
         redirectUri,
-        scopes: [...SSAFY_VERIFY_SCOPES],
+        scopes: [...SSAFY_VERIFY_REAUTH_SCOPES],
         waitForCallback: true,
       });
     } catch (sdkError) {
