@@ -1,4 +1,4 @@
-import { generateCode, hashCode } from "@/lib/mm-verification";
+import { generateCode, hashCode } from "@/lib/verification-code";
 import { createDirectChannel, sendPost } from "@/lib/mattermost/channels";
 import { loginAsSsafySender } from "./mattermost";
 import { getEffectiveSsafyYear, getPreferredStaffSourceYear } from "@/lib/ssafy-year";

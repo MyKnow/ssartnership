@@ -213,7 +213,7 @@ npm run ci:local
 주의:
 
 - `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용입니다.
-- `members`, `mm_verification_codes`, `member_policy_consents`, `mm_user_directory`, `push_*` 테이블은 서비스 롤 기준으로만 다룹니다.
+- `members`, `member_policy_consents`, `mm_user_directory`, `push_*` 테이블은 서비스 롤 기준으로만 다룹니다.
 
 ## 회원 / 인증 모델
 

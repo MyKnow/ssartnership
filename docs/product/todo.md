@@ -45,14 +45,14 @@
    완료: HMAC 검증 공통 헬퍼를 추가해 길이 불일치 시 예외 없이 실패 처리하도록 맞췄다.
 
 9. [x] 멤버 인증 API brute-force 완화
-   대상: `src/app/api/mm/login/route.ts`, `src/app/api/mm/request-code/route.ts`, `src/app/api/mm/verify-code/route.ts`, `src/app/api/mm/reset-password/route.ts`, `src/app/api/mm/change-password/route.ts`
+   대상: `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/route.ts`, `src/app/api/mm/change-password/route.ts`, `src/app/api/ssafy/verify-token/route.ts`
    이유: 계정 + IP 기반 throttle, 실패 지연, 과도한 에러 노출 억제가 아직 더 필요하다.
    완료: `member_auth_attempts` 기반 공통 throttle을 추가하고, 실패마다 지연을 넣었으며, 계정 존재 여부와 내부 오류 메시지 노출을 줄였다.
 
 10. [x] 인증 코드와 QR 서명용 암호학적 난수 및 시크릿 분리
-    대상: `src/lib/mm-verification.ts`, `src/lib/certification-qr.ts`, `src/lib/hmac.js`
+    대상: `src/lib/verification-code.ts`, `src/lib/certification-qr.ts`, `src/lib/hmac.js`
     이유: `Math.random` 기반 코드 생성은 바꾸는 편이 안전하고, 용도별 secret도 분리하는 편이 좋다.
-    완료: 인증 코드는 `crypto.randomInt`로 바꾸고, 해시는 전용 `MM_VERIFICATION_SECRET` 우선 사용으로 분리했다.
+    완료: 인증 코드는 `crypto.randomInt`로 바꾸고, MM 가입 인증 제거 후 남은 비밀번호 재설정 코드는 `USER_SESSION_SECRET` 기반 HMAC으로 정리했다.
 
 11. [x] 관리자 로그 조회 및 CSV export의 메모리 사용량 줄이기
    대상: `src/lib/log-insights.ts`, `src/app/api/admin/logs/export/route.ts`
@@ -127,6 +127,19 @@
    15-6. [x] Partner 알림센터
       대상: `src/app/partner/**`, `src/components/partner/**`, `src/lib/repositories/notification-repository.*`
       목표: `/partner/notifications` 별도 페이지에서 공지, 운영 알림, 승인/반려, 정산/리뷰 알림을 조회한다.
+
+16. [ ] SSAFY Verify 전환 후속
+   대상: `src/app/api/ssafy/verify-token/route.ts`, `src/lib/ssafy-verify/**`, `src/app/auth/**`, `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/**`, `src/app/api/mm/change-password/route.ts`, `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`
+   이유: MM 코드 본인인증은 제거했지만, 기존 서비스 식별자는 여전히 MM ID 중심이다. SSAFY Verify가 반환하는 Mattermost 식별자가 기존 `members.mm_user_id`와 같은 안정 식별자인지 운영 검증해야 기존 회원 link와 신규 온보딩을 안전하게 설계할 수 있다.
+   세부 단계:
+   16-1. [ ] SSAFY Verify Mattermost ID 매핑 검증
+      목표: `ssafy.mattermost_id`가 Mattermost raw user id인지, username인지, 또는 issuer별 pairwise 값인지 확인하고 `members.mm_user_id`와의 매칭 기준을 문서화한다.
+   16-2. [ ] SSAFY Verify 기반 신규 회원 온보딩
+      목표: 기존 회원이 없을 때 Verify 클레임만으로 `members` row를 생성할지, 약관 동의와 표시명/캠퍼스 보정을 어떤 화면에서 처리할지 정한다.
+   16-3. [ ] 기존 MM ID + 사이트 비밀번호 로그인 전환
+      목표: `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경을 SSAFY Verify 로그인/세션 모델로 대체하고, 비밀번호 해시 보존/삭제 정책을 정한다.
+   16-4. [ ] Mattermost 알림 및 프로필 동기화 존치 판단
+      목표: Mattermost 알림, DM 발송, 프로필/아바타 동기화가 계속 필요한지 결정하고 필요 없으면 `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`, 관련 env를 제거한다.
 
 ## 유지 규칙
 
