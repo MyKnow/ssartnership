@@ -14,7 +14,8 @@ export type MemberAuthRoute =
   | "reset-password"
   | "request-reset-code"
   | "verify-reset-code"
-  | "change-password";
+  | "change-password"
+  | "ssafy-verify";
 
 type MemberAuthAttemptContext = {
   ipAddress?: string | null;
@@ -29,6 +30,7 @@ const MEMBER_AUTH_ROUTES: MemberAuthRoute[] = [
   "request-reset-code",
   "verify-reset-code",
   "change-password",
+  "ssafy-verify",
 ];
 
 export const MEMBER_AUTH_RATE_LIMIT: RateLimitConfig = {
@@ -70,6 +72,10 @@ const MEMBER_AUTH_FAILURE_DELAY_MS: Record<
     max: 700,
   },
   "change-password": {
+    min: 350,
+    max: 700,
+  },
+  "ssafy-verify": {
     min: 350,
     max: 700,
   },
