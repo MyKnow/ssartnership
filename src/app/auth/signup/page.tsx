@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
+import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
@@ -35,14 +36,10 @@ export default async function SignupPage({
           <Card className="mx-auto max-w-lg p-6">
             <h1 className="text-2xl font-semibold text-foreground">회원가입</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              SSAFY Verify 기반 가입으로 전환 중입니다.
+              SSAFY Verify로 구성원 인증을 완료하면 싸트너십 계정에 연결합니다.
             </p>
-            <div className="mt-6 flex flex-col gap-3">
-              <Button
-                href={`/auth/ssafy?returnTo=${encodeURIComponent(returnTo)}`}
-              >
-                SSAFY 인증으로 계속하기
-              </Button>
+            <SsafyVerifyButton returnTo={returnTo} />
+            <div className="mt-3 flex flex-col gap-3">
               <Button variant="ghost" href="/auth/login">
                 로그인으로 돌아가기
               </Button>
