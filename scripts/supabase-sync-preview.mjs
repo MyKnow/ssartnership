@@ -306,6 +306,17 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
     );
   }
 
+  if (stats.missingPreviewTableCopyBlocksSkipped > 0) {
+    console.log(
+      [
+        "Preview sync missing table diagnostics:",
+        `missingPreviewTableCopyBlocksSkipped=${stats.missingPreviewTableCopyBlocksSkipped}`,
+        `missingPreviewTableRowsSkipped=${stats.missingPreviewTableRowsSkipped}`,
+        "production-only public tables are omitted from preview restore.",
+      ].join(" "),
+    );
+  }
+
   if (stats.unresolvedPartnerCampusSlugRows > 0) {
     throw new Error(
       `Preview dump still has ${stats.unresolvedPartnerCampusSlugRows} partner row(s) that can violate partners_campus_slugs_check after sanitizing.`,

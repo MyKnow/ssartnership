@@ -127,6 +127,8 @@ function createSanitizeStats() {
     partnerChangeRequestCampusSlugsBackfilled: 0,
     partnerChangeRequestRowsSkippedColumnMismatch: 0,
     unresolvedPartnerChangeRequestCampusSlugRows: 0,
+    missingPreviewTableCopyBlocksSkipped: 0,
+    missingPreviewTableRowsSkipped: 0,
   };
 }
 
@@ -298,7 +300,15 @@ export function sanitizeDumpSqlForPreview(
 
     const previewColumns = previewColumnsByTable.get(copyStatement.table);
     if (!previewColumns) {
-      output.push(line);
+      stats.copyBlocksChanged += 1;
+      stats.missingPreviewTableCopyBlocksSkipped += 1;
+      changed = true;
+
+      index += 1;
+      while (index < lines.length && lines[index] !== "\\.") {
+        stats.missingPreviewTableRowsSkipped += 1;
+        index += 1;
+      }
       continue;
     }
 
