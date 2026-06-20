@@ -18,6 +18,11 @@ export type SsafyVerifyCallbackPayload = {
   authorizeUrl?: string;
 };
 
+export type SsafyVerifyCallbackRelayPayload = Omit<
+  SsafyVerifyCallbackPayload,
+  "authorizeUrl" | "codeVerifier"
+>;
+
 export type SsafyVerifyClient = {
   verify(options: {
     clientId: string;
@@ -25,6 +30,9 @@ export type SsafyVerifyClient = {
     scopes: string[];
     waitForCallback: true;
   }): Promise<SsafyVerifyCallbackPayload>;
+  handleCallback?(options?: {
+    targetOrigin?: string;
+  }): SsafyVerifyCallbackRelayPayload;
 };
 
 type CallbackFailurePayload = Pick<

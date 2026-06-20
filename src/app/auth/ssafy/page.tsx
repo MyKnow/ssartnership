@@ -1,48 +1,55 @@
 import type { Metadata } from "next";
-import SiteHeader from "@/components/SiteHeader";
-import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
-import Card from "@/components/ui/Card";
-import Container from "@/components/ui/Container";
-import { getHeaderSession } from "@/lib/header-session";
+import { redirect } from "next/navigation";
+import SsafyVerifyCallbackRelay from "@/components/auth/SsafyVerifyCallbackRelay";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `SSAFY 인증 | ${SITE_NAME}`,
+  title: `SSAFY 인증 처리 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,
   },
 };
 
-export default async function SsafyAuthPage({
+type SearchParamValue = string | string[] | undefined;
+
+function firstSearchParam(value: SearchParamValue) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function hasSsafyVerifyCallbackParams(params: Record<string, SearchParamValue>) {
+  const state = firstSearchParam(params.state);
+  if (!state) {
+    return false;
+  }
+
+  const code = firstSearchParam(params.code);
+  const iss = firstSearchParam(params.iss);
+  const error = firstSearchParam(params.error);
+  const errorCode = firstSearchParam(params.error_code);
+
+  return Boolean((code && iss) || error || errorCode);
+}
+
+function buildSignupRedirect(rawReturnTo: SearchParamValue) {
+  const returnTo = sanitizeReturnTo(firstSearchParam(rawReturnTo), "/");
+  if (returnTo === "/") {
+    return "/auth/signup";
+  }
+  return `/auth/signup?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export default async function SsafyCallbackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string | string[] }>;
+  searchParams: Promise<Record<string, SearchParamValue>>;
 }) {
-  const headerSession = await getHeaderSession();
-  const { returnTo: rawReturnTo } = await searchParams;
-  const returnTo = sanitizeReturnTo(
-    Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo,
-    "/",
-  );
+  const params = await searchParams;
 
-  return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader initialSession={headerSession} />
-      <main>
-        <Container className="pb-16 pt-10">
-          <Card className="mx-auto max-w-lg p-6">
-            <h1 className="text-2xl font-semibold text-foreground">
-              SSAFY 구성원 인증
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              SSAFY Verify를 통해 구성원 여부를 확인하고 싸트너십 계정에 연결합니다.
-            </p>
-            <SsafyVerifyButton returnTo={returnTo} />
-          </Card>
-        </Container>
-      </main>
-    </div>
-  );
+  if (!hasSsafyVerifyCallbackParams(params)) {
+    redirect(buildSignupRedirect(params.returnTo));
+  }
+
+  return <SsafyVerifyCallbackRelay />;
 }

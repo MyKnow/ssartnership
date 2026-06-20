@@ -27,17 +27,29 @@ const issuer = "https://verify.myknow.xyz";
 const clientId = "client_example_public";
 const redirectUri = "https://partner.example.com/ssafy";
 
-test("SSAFY Verify requested scopes stay minimal for Mattermost account mapping", async () => {
-  const { SSAFY_VERIFY_SCOPES } = await scopesModulePromise;
+test("SSAFY Verify scopes are split between profile enrollment and re-auth", async () => {
+  const {
+    SSAFY_VERIFY_PROFILE_SCOPES,
+    SSAFY_VERIFY_REAUTH_SCOPES,
+  } = await scopesModulePromise;
 
-  assert.deepEqual([...SSAFY_VERIFY_SCOPES], [
+  assert.deepEqual([...SSAFY_VERIFY_PROFILE_SCOPES], [
     "ssafy.verify",
     "ssafy.affiliation",
+    "ssafy.name",
+    "ssafy.profile_image",
+    "ssafy.role",
     "ssafy.mattermost_id",
   ]);
-  const requestedScopes = new Set<string>(SSAFY_VERIFY_SCOPES);
-  assert.equal(requestedScopes.has("ssafy.name"), false);
-  assert.equal(requestedScopes.has("ssafy.profile_image"), false);
+
+  assert.deepEqual([...SSAFY_VERIFY_REAUTH_SCOPES], [
+    "ssafy.verify",
+    "ssafy.mattermost_id",
+  ]);
+  const reauthScopes = new Set<string>(SSAFY_VERIFY_REAUTH_SCOPES);
+  assert.equal(reauthScopes.has("ssafy.name"), false);
+  assert.equal(reauthScopes.has("ssafy.profile_image"), false);
+  assert.equal(reauthScopes.has("ssafy.role"), false);
 });
 
 test("SSAFY Verify callback body parser accepts only the exact safe shape", async () => {
@@ -115,6 +127,13 @@ test("SSAFY Verify claim validator enforces issuer, audience, assurance, and aut
     acr: "urn:ssafy:verify:assurance:mattermost-team-dm:v1",
     ssafy_cohort: "15",
     ssafy_campus: "서울 캠퍼스",
+    ssafy_region: "서울",
+    name: "김싸피",
+    picture: "https://verify.myknow.xyz/avatar/example.png",
+    ssafy_team_code: "A101",
+    ssafy_member_role: "교육생",
+    ssafy_is_staff: false,
+    ssafy_role: "member",
     ssafy_mattermost_user_id: "mattermost-user-id",
   };
 
@@ -128,11 +147,13 @@ test("SSAFY Verify claim validator enforces issuer, audience, assurance, and aut
         authTime: now - 30,
         cohort: "15",
         campus: "서울 캠퍼스",
-        region: null,
-        name: null,
-        picture: null,
-        role: null,
-        roleName: null,
+        region: "서울",
+        name: "김싸피",
+        picture: "https://verify.myknow.xyz/avatar/example.png",
+        role: "member",
+        roleName: "교육생",
+        teamCode: "A101",
+        isStaff: false,
         mattermostUserId: "mattermost-user-id",
       },
     },
@@ -174,6 +195,8 @@ test("SSAFY Verify member update payload stores minimal verification fields", as
     picture: null,
     role: null,
     roleName: null,
+    teamCode: null,
+    isStaff: null,
     mattermostUserId: "mattermost-user-id",
     verificationId: "verification-id",
     scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
