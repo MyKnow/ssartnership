@@ -16,6 +16,22 @@ test("signup page opens SSAFY Verify directly instead of linking to the intermed
   assert.doesNotMatch(signupPage, /href=\{`\/auth\/ssafy/);
 });
 
+test("SSAFY callback route is not a user-facing auth start page", () => {
+  const ssafyPage = readRepoFile("src/app/auth/ssafy/page.tsx");
+  const relay = readRepoFile("src/components/auth/SsafyVerifyCallbackRelay.tsx");
+
+  assert.match(ssafyPage, /SsafyVerifyCallbackRelay/);
+  assert.match(ssafyPage, /buildSignupRedirect/);
+  assert.match(ssafyPage, /"\/auth\/signup"/);
+  assert.doesNotMatch(ssafyPage, /SsafyVerifyButton/);
+  assert.doesNotMatch(ssafyPage, /SSAFY 구성원 인증/);
+
+  assert.match(relay, /handleCallback/);
+  assert.match(relay, /window\.opener/);
+  assert.match(relay, /https:\/\/verify\.myknow\.xyz\/sdk\/ssafy-verify\.js/);
+  assert.doesNotMatch(relay, /\.verify\(/);
+});
+
 test("member login keeps password login only and can remember the login id", () => {
   const loginForm = readRepoFile("src/components/auth/LoginForm.tsx");
 
