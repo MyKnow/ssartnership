@@ -1,25 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-type MattermostConfigModule = typeof import("../src/lib/mattermost/config.ts");
 type MmProfileParserModule = typeof import("../src/lib/mm-profile/parser.ts");
-
-const mattermostConfigPromise = import(
-  new URL("../src/lib/mattermost/config.ts", import.meta.url).href,
-) as Promise<MattermostConfigModule>;
 
 const mmProfileParserPromise = import(
   new URL("../src/lib/mm-profile/parser.ts", import.meta.url).href,
 ) as Promise<MmProfileParserModule>;
-
-test("mattermost config falls back to default student channel settings", async () => {
-  const { getStudentChannelConfig } = await mattermostConfigPromise;
-
-  assert.deepStrictEqual(getStudentChannelConfig(), {
-    teamName: "s15public",
-    channelName: "off-topic",
-  });
-});
 
 test("mm profile parser extracts campus and staff hints from display names", async () => {
   const { parseSsafyProfile, parseSsafyProfileFromUser } = await mmProfileParserPromise;

@@ -1,6 +1,6 @@
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
 import { SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
-import type { MMUser } from "@/lib/mattermost";
+import type { MMUser } from "@/lib/mattermost/types";
 
 export type MmUserDirectoryRow = {
   id: string;

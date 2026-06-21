@@ -3,7 +3,6 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { normalizeMmUsername } from "@/lib/validation";
 import { getAllSelectableUserSnapshots } from "./collector";
 import {
-  MmDirectoryError,
   type MmUserDirectoryRow,
   type MmUserDirectorySnapshot,
   type MmUserDirectorySyncResult,
@@ -185,10 +184,13 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
   });
 
   if (rows.length === 0) {
-    throw new MmDirectoryError(
-      "invalid_state",
-      "MM 유저 디렉토리를 동기화할 수 없습니다.",
-    );
+    return {
+      checked,
+      uniqueUsers: 0,
+      upserted: 0,
+      deleted: 0,
+      failures,
+    };
   }
 
   const { error: upsertError } = await supabase
