@@ -1,5 +1,5 @@
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
-import type { MMUser } from "@/lib/mattermost";
+import type { MMUser } from "@/lib/mattermost/types";
 
 export type MemberRow = {
   id: string;
@@ -18,7 +18,6 @@ export type MemberSyncField = "mmUsername" | "displayName" | "campus" | "avatar"
 
 export type SenderSession = {
   year: number;
-  token: string;
 };
 
 export type MemberSyncSnapshot = {

@@ -138,8 +138,8 @@
       목표: 기존 회원이 없을 때 Verify 클레임만으로 `members` row를 생성할지, 약관 동의와 표시명/캠퍼스 보정을 어떤 화면에서 처리할지 정한다.
    16-3. [ ] 기존 MM ID + 사이트 비밀번호 로그인 전환
       목표: `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경을 SSAFY Verify 로그인/세션 모델로 대체하고, 비밀번호 해시 보존/삭제 정책을 정한다.
-   16-4. [ ] Mattermost 알림 및 프로필 동기화 존치 판단
-      목표: Mattermost 알림, DM 발송, 프로필/아바타 동기화가 계속 필요한지 결정하고 필요 없으면 `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`, 관련 env를 제거한다.
+   16-4. [x] Mattermost 알림 및 프로필 동기화 Server API 위임
+      완료: DM 발송, 디렉터리 lookup, profile-events, 프로필/아바타 동기화를 SSAFY Verify Server API로 위임하고 직접 Mattermost env와 클라이언트 호출을 제거했다.
 
 ## 유지 규칙
 

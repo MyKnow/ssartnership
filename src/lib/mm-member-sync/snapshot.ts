@@ -2,21 +2,23 @@ import {
   getConfiguredBackfillableSsafyYears,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
-import {
-  getSenderCredentials,
-  getUserById,
-  getUserImage,
-  loginWithPassword,
-} from "@/lib/mattermost";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
-  makeSnapshot,
   MmMemberSyncError,
   type MemberRow,
   type MemberSyncSnapshot,
   type SenderSession,
   wrapMmMemberSyncDbError,
 } from "./shared";
+import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import {
+  SsafyVerifyServerApiError,
+  createSsafyVerifyServerApiClient,
+} from "@/lib/ssafy-verify/server-api";
+import {
+  normalizeSsafyVerifyMemberProfile,
+  toMemberSyncSnapshot,
+} from "@/lib/ssafy-verify/profile";
 
 export async function getSenderSessionForYear(
   year: number,
@@ -28,14 +30,8 @@ export async function getSenderSessionForYear(
   }
 
   const promise = (async () => {
-    const credentials = getSenderCredentials(year);
-    const senderLogin = await loginWithPassword(
-      credentials.loginId,
-      credentials.password,
-    );
     return {
       year,
-      token: senderLogin.token,
     } satisfies SenderSession;
   })();
 
@@ -50,16 +46,21 @@ export async function getSenderSessionForYear(
 }
 
 export async function fetchMemberSnapshotByUserId(
-  token: string,
   userId: string,
 ): Promise<MemberSyncSnapshot | null> {
-  const user = await getUserById(token, userId);
-  if (!user) {
+  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+  const payload = await client.getMattermostUserProfile(userId).catch((error) => {
+    if (error instanceof SsafyVerifyServerApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  });
+  if (!payload) {
     return null;
   }
 
-  const avatar = await getUserImage(token, userId);
-  return makeSnapshot(user, avatar);
+  const profile = normalizeSsafyVerifyMemberProfile(payload);
+  return profile ? toMemberSyncSnapshot(profile) : null;
 }
 
 export async function resolveMemberSnapshotForYears(
@@ -71,17 +72,13 @@ export async function resolveMemberSnapshotForYears(
 
   for (const senderYear of candidateYears) {
     try {
-      const sender = await getSenderSessionForYear(senderYear, cache);
-      const snapshot = await fetchMemberSnapshotByUserId(
-        sender.token,
-        member.mm_user_id,
-      );
+      await getSenderSessionForYear(senderYear, cache);
+      const snapshot = await fetchMemberSnapshotByUserId(member.mm_user_id);
       if (!snapshot) {
         continue;
       }
       return {
         senderYear,
-        senderToken: sender.token,
         snapshot,
       };
     } catch (error) {

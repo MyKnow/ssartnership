@@ -63,8 +63,7 @@ export const MANUAL_MEMBER_ADD_INITIAL_STATE: ManualMemberAddFormState = {
 export const MANUAL_MEMBER_ADD_YEAR_FALLBACKS: ManualMemberAddYear[] = [15, 14];
 
 export type SenderSession = {
-  token: string;
-  userId: string;
+  year: number;
 };
 
 export function wrapManualMemberAddDbError(

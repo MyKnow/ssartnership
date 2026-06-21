@@ -1,8 +1,5 @@
 import { notificationRepository } from "@/lib/repositories";
 import {
-  hasSenderCredentials,
-} from "@/lib/mattermost/config";
-import {
   getNotificationChannelLabel,
   normalizeNotificationTargetUrl,
   type NotificationChannel,
@@ -26,7 +23,7 @@ import {
   EMPTY_CHANNEL_RESULTS,
   absoluteUrl,
   computeOperationStatus,
-  getMattermostSenderCandidateYears,
+  hasMattermostSenderForMember,
   getNotificationTypeLabel,
   getPreviewReasonLabel,
   getTypePreferenceEnabled,
@@ -449,11 +446,9 @@ async function buildAudienceContext(
     if (!channelReasons.mm) {
       if (!preference.mmEnabled) {
         channelReasons.mm = "mm_disabled";
-      } else if (
-        !getMattermostSenderCandidateYears(member).some((year) =>
-          hasSenderCredentials(year, { allowDefaultFallback: false }),
-        )
-      ) {
+      } else if (!member.mm_user_id) {
+        channelReasons.mm = "channel_unavailable";
+      } else if (!hasMattermostSenderForMember(member)) {
         channelReasons.mm = "channel_unavailable";
       } else {
         eligibleMemberIds.mm.push(member.id);

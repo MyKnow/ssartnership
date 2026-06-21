@@ -1,42 +1,14 @@
-import {
-  getChannelByName,
-  getSenderCredentials,
-  getStudentChannelConfig,
-  getTeamByName,
-  getUserById,
-  listChannelMembers,
-  loginWithPassword,
-} from "@/lib/mattermost";
-import {
-  getConfiguredSelectableSsafyYears,
-  getSsafyCycleSettings,
-} from "@/lib/ssafy-cycle-settings";
 import type { MmUserDirectorySyncResult, MmUserDirectorySnapshot } from "./shared";
-import { buildSnapshotFromUser, mergeDirectorySnapshot } from "./shared";
-
-async function listAllChannelMemberIds(token: string, channelId: string) {
-  const memberIds: string[] = [];
-  let page = 0;
-  const perPage = 200;
-
-  for (;;) {
-    const members = await listChannelMembers(token, channelId, page, perPage);
-    if (members.length === 0) {
-      break;
-    }
-    memberIds.push(
-      ...members
-        .map((member) => member.user_id ?? member.userId ?? null)
-        .filter((value): value is string => Boolean(value)),
-    );
-    if (members.length < perPage) {
-      break;
-    }
-    page += 1;
-  }
-
-  return memberIds;
-}
+import { mergeDirectorySnapshot } from "./shared";
+import {
+  getSsafyVerifyServerApiConfig,
+} from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
+import {
+  extractSsafyVerifyMemberProfiles,
+  getSsafyVerifyProfileEventsNextCursor,
+  toMmUserDirectorySnapshot,
+} from "@/lib/ssafy-verify/profile";
 
 type SelectableYearSnapshotBatch = {
   sourceYear: number;
@@ -45,65 +17,58 @@ type SelectableYearSnapshotBatch = {
   failures: MmUserDirectorySyncResult["failures"];
 };
 
-async function getSelectableYearUserSnapshots(
-  sourceYear: number,
-): Promise<SelectableYearSnapshotBatch> {
+function createSnapshotBatch(): SelectableYearSnapshotBatch {
+  return {
+    sourceYear: 0,
+    checked: 0,
+    snapshots: new Map<string, MmUserDirectorySnapshot>(),
+    failures: [],
+  };
+}
+
+async function getVerifyProfileEventSnapshots(): Promise<SelectableYearSnapshotBatch> {
+  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
   const snapshots = new Map<string, MmUserDirectorySnapshot>();
   const failures: MmUserDirectorySyncResult["failures"] = [];
   let checked = 0;
+  let cursor: string | null = null;
+  const seenCursors = new Set<string>();
 
-  try {
-    const credentials = getSenderCredentials(sourceYear);
-    const senderLogin = await loginWithPassword(
-      credentials.loginId,
-      credentials.password,
-    );
-    const channelConfig = getStudentChannelConfig(sourceYear);
-    const team = await getTeamByName(senderLogin.token, channelConfig.teamName);
-    const channel = await getChannelByName(
-      senderLogin.token,
-      team.id,
-      channelConfig.channelName,
-    );
-    const memberIds = await listAllChannelMemberIds(senderLogin.token, channel.id);
-    checked += memberIds.length;
+  for (;;) {
+    try {
+      const payload = await client.getProfileEvents({
+        cursor,
+        limit: 100,
+      });
+      const profiles = extractSsafyVerifyMemberProfiles(payload);
+      checked += profiles.length;
 
-    const users = await Promise.all(
-      memberIds.map(async (userId) => {
-        try {
-          return await getUserById(senderLogin.token, userId);
-        } catch (error) {
-          failures.push({
-            sourceYear,
-            userId,
-            reason: error instanceof Error ? error.message : "MM 사용자 조회 실패",
-          });
-          return null;
-        }
-      }),
-    );
-
-    for (const user of users) {
-      if (!user || user.is_bot) {
-        continue;
+      for (const profile of profiles) {
+        const snapshot = toMmUserDirectorySnapshot(profile);
+        const existing = snapshots.get(snapshot.mmUserId);
+        snapshots.set(
+          snapshot.mmUserId,
+          mergeDirectorySnapshot(existing, snapshot),
+        );
       }
 
-      const snapshot = buildSnapshotFromUser(user, sourceYear);
-      const existing = snapshots.get(snapshot.mmUserId);
-      snapshots.set(
-        snapshot.mmUserId,
-        mergeDirectorySnapshot(existing, snapshot),
-      );
+      const nextCursor = getSsafyVerifyProfileEventsNextCursor(payload);
+      if (!nextCursor || seenCursors.has(nextCursor)) {
+        break;
+      }
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
+    } catch (error) {
+      failures.push({
+        sourceYear: 0,
+        reason: error instanceof Error ? error.message : "SSAFY Verify 프로필 이벤트 동기화 실패",
+      });
+      break;
     }
-  } catch (error) {
-    failures.push({
-      sourceYear,
-      reason: error instanceof Error ? error.message : "MM 디렉토리 동기화 실패",
-    });
   }
 
   return {
-    sourceYear,
+    sourceYear: 0,
     checked,
     snapshots,
     failures,
@@ -137,17 +102,10 @@ export function mergeSelectableYearSnapshotBatches(
 }
 
 export async function getAllSelectableUserSnapshots() {
-  const cycleSettings = await getSsafyCycleSettings();
-  const configuredSelectableYears = getConfiguredSelectableSsafyYears(
-    cycleSettings,
-  );
-  const years = Array.from(
-    new Set([...configuredSelectableYears, 15, 14]),
-  ).sort((a, b) => b - a);
-
-  const batches = await Promise.all(
-    years.map((sourceYear) => getSelectableYearUserSnapshots(sourceYear)),
-  );
+  const batch = await getVerifyProfileEventSnapshots();
+  const batches = batch.checked === 0 && batch.failures.length === 0
+    ? [createSnapshotBatch()]
+    : [batch];
 
   return mergeSelectableYearSnapshotBatches(batches);
 }

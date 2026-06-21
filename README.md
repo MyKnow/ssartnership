@@ -1,12 +1,12 @@
 # SSARTNERSHIP
 
 SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.  
-서울 지역 제휴 업체 정보를 빠르게 확인하고, Mattermost 기반 인증으로 교육생/운영진 신원을 확인할 수 있습니다.
+서울 지역 제휴 업체 정보를 빠르게 확인하고, SSAFY Verify 기반 인증으로 교육생/운영진 신원을 확인할 수 있습니다.
 
 핵심 목표는 다음 두 가지입니다.
 
 - 제휴 정보를 공개 페이지에서 빠르게 탐색할 수 있게 하기
-- SSAFY 구성원만 접근해야 하는 기능은 Mattermost 인증과 관리자 도구로 안전하게 운영하기
+- SSAFY 구성원만 접근해야 하는 기능은 SSAFY Verify 인증과 관리자 도구로 안전하게 운영하기
 
 ## 핵심 기능
 
@@ -31,7 +31,7 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 
 ### 회원 기능
 
-- Mattermost ID 기반 회원 로그인
+- SSAFY Verify 위임 디렉터리 기반 회원 로그인
 - SSAFY Verify 기반 회원가입 / 비밀번호 재설정 인증
 - 가입 대상
   - 14기 교육생
@@ -73,7 +73,7 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 - TypeScript
 - Tailwind CSS v4
 - Supabase
-- Mattermost API
+- SSAFY Verify Server API
 - Vercel Analytics / Speed Insights
 - Nodemailer
 - Web Push (VAPID)
@@ -97,8 +97,8 @@ src/
     ui/                    공용 UI 컴포넌트
   lib/
     repositories/          Repository 패턴
-    mattermost.ts          Mattermost 연동
-    mm-directory.ts        MM 유저 디렉토리 조회 / 동기화
+    ssafy-verify/          SSAFY Verify Hosted Auth / Server API 연동
+    mm-directory.ts        Verify 위임 디렉토리 조회 / 동기화
     mm-member-sync.ts      회원 프로필 동기화
     member-manual-add.ts   관리자 수동 회원 추가
     policy-documents.ts    약관 버전 / 동의 상태 계산
@@ -161,17 +161,14 @@ npm run ci:local
   - `SUPABASE_URL`
   - `SUPABASE_ANON_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`
-- Mattermost
-  - `MM_BASE_URL`
-  - `MM_STUDENT_CHANNEL`
-  - `MM_SENDER_LOGIN_ID_14`
-  - `MM_SENDER_PASSWORD_14`
-  - `MM_TEAM_NAME_14`
-  - `MM_STUDENT_CHANNEL_14`
-  - `MM_SENDER_LOGIN_ID_15`
-  - `MM_SENDER_PASSWORD_15`
-  - `MM_TEAM_NAME_15`
-  - `MM_STUDENT_CHANNEL_15`
+- SSAFY Verify
+  - `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`
+  - `SSAFY_VERIFY_ISSUER`
+  - `SSAFY_VERIFY_CLIENT_ID`
+  - `SSAFY_VERIFY_REDIRECT_URIS`
+  - `SSAFY_VERIFY_SERVER_CLIENT_ID`
+  - `SSAFY_VERIFY_SERVER_CLIENT_SECRET`
+  - `SSAFY_VERIFY_SERVER_API_BASE_URL` (선택)
 - 사용자 세션 / QR
   - `USER_SESSION_SECRET`
   - `CERTIFICATION_QR_SECRET`
@@ -240,7 +237,7 @@ npm run ci:local
 
 기수 기준을 조정하거나 조기 시작을 적용하려면 관리자 화면의 `기수 관리`를 사용합니다.
 
-### Mattermost 유저 디렉토리
+### SSAFY Verify 위임 디렉토리
 
 - `mm_user_directory` 테이블에 유저 스냅샷을 저장합니다.
 - 보관 값
@@ -251,7 +248,8 @@ npm run ci:local
   - `is_staff`
   - `source_years`
   - `synced_at`
-- 회원가입 / 로그인 / 재설정은 이 디렉토리를 먼저 조회하고, 없으면 Mattermost live API로 fallback 합니다.
+- 회원가입 / 로그인 / 재설정은 이 디렉토리를 먼저 조회하고, 없으면 SSAFY Verify Server API의 directory lookup으로 보강합니다.
+- Mattermost 프로필 조회, 디렉토리 lookup, 프로필 이벤트, DM 발송은 SSAFY Verify Server API로 위임합니다. SSARTNERSHIP은 Mattermost base URL, team name, sender credential을 보유하지 않습니다.
 
 ### 닉네임 파싱
 
@@ -274,6 +272,14 @@ npm run ci:local
 - local loopback redirect는 현재 request origin에서 자동 허용하지만, SSAFY Verify Client에도 동일한 redirect URI와 allowed origin을 등록해야 합니다.
 - `NEXT_PUBLIC_SSAFY_VERIFY_REDIRECT_URI`는 사용하지 않습니다. 공개값은 `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`만 필요합니다.
 
+Server API 위임에는 Hosted User Auth client와 분리된 confidential credential을 사용합니다.
+
+- `SSAFY_VERIFY_SERVER_CLIENT_ID`: Server API `client_credentials`용 client id
+- `SSAFY_VERIFY_SERVER_CLIENT_SECRET`: Server API `client_credentials`용 secret
+- `SSAFY_VERIFY_SERVER_API_BASE_URL`: 선택값, 기본값은 `${SSAFY_VERIFY_ISSUER}/v1`
+
+이 credential은 프로필 조회, 디렉토리 lookup, 프로필 이벤트 소비, 관리자 Mattermost 알림 위임에 사용됩니다. 관리자 Mattermost 알림은 `POST /v1/notifications/mattermost/batch`로 위임되며, 발송 대상은 25명 단위로 나누고 각 batch는 notification id 기반 idempotency key를 사용합니다.
+
 ### 회원가입
 
 1. 사용자가 회원가입 화면에서 SSAFY Verify를 실행합니다.
@@ -291,7 +297,7 @@ npm run test:ssafy-cycle
 ### 로그인
 
 1. `mm_username`으로 디렉토리 조회
-2. 필요 시 live fallback
+2. 필요 시 SSAFY Verify Server API directory lookup으로 보강
 3. DB에서 `mm_user_id`로 회원 조회
 4. 비밀번호 검증
 5. 최신 약관 미동의 시 `/auth/consent`로 리다이렉트
@@ -362,7 +368,7 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 
 - 공개 제휴 목록은 캐시를 사용합니다.
 - 관리자 변경 후 관련 캐시를 무효화합니다.
-- MM 유저 디렉토리는 Vercel cron으로 하루 1회 동기화합니다.
+- Verify 프로필 이벤트는 Vercel cron으로 하루 1회 반영합니다.
 - 제휴 종료 예정 알림도 하루 1회 실행합니다.
 
 [vercel.json](/Users/myknow/coding/ssartnership/vercel.json)
@@ -481,7 +487,7 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 권장:
 
 - `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `CRON_SECRET`는 충분히 긴 난수 사용
-- `SUPABASE_SERVICE_ROLE_KEY`, `MM_SENDER_PASSWORD_*`, SMTP 계정, VAPID private key는 절대 클라이언트에 노출되지 않도록 관리
+- `SUPABASE_SERVICE_ROLE_KEY`, `SSAFY_VERIFY_SERVER_CLIENT_SECRET`, SMTP 계정, VAPID private key는 절대 클라이언트에 노출되지 않도록 관리
 - 운영 환경에서는 `ADMIN_ALLOWED_IPS` 또는 Basic Auth 중 최소 하나를 같이 두는 편이 안전
 
 ## 현재 상태
