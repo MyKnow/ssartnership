@@ -234,6 +234,7 @@ test("SSAFY Verify signup payload creates a member from verified profile and pol
       campus: "서울",
       isStaff: false,
       sourceYears: [15],
+      avatarUrl: "https://verify.myknow.xyz/api/mattermost/avatar/mm.user-123",
       authTime: 1_781_740_800,
       verificationId: "verification-id",
       scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
@@ -270,6 +271,7 @@ test("SSAFY Verify signup payload creates a member from verified profile and pol
     ssafy_verification_id: "verification-id",
     ssafy_mattermost_user_id: "mm.user-123",
     ssafy_last_scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
+    avatar_url: "https://verify.myknow.xyz/api/mattermost/avatar/mm.user-123",
     created_at: "2026-06-22T02:00:00.000Z",
     updated_at: "2026-06-22T02:00:00.000Z",
   });
@@ -287,6 +289,7 @@ test("SSAFY Verify signup payload maps staff to the staff year with source year"
       campus: null,
       isStaff: true,
       sourceYears: [0, 14, 15],
+      avatarUrl: null,
       authTime: 1_781_740_800,
       verificationId: null,
       scope: null,

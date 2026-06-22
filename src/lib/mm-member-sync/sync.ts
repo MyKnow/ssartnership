@@ -63,6 +63,7 @@ export async function syncMemberSnapshot(
   const nextAvatarBase64 = snapshot.avatarFetched
     ? snapshot.avatarBase64
     : member.avatar_base64 ?? null;
+  const nextAvatarUrl = snapshot.avatarUrl ?? member.avatar_url ?? null;
 
   const changedFields: Array<"mmUsername" | "displayName" | "campus" | "avatar"> = [];
   const changes: Partial<Record<"mmUsername" | "displayName" | "campus" | "avatar", string>> = {};
@@ -81,9 +82,11 @@ export async function syncMemberSnapshot(
   }
 
   const avatarChanged =
-    snapshot.avatarFetched &&
-    ((member.avatar_content_type ?? null) !== nextAvatarContentType ||
-      (member.avatar_base64 ?? null) !== nextAvatarBase64);
+    (snapshot.avatarFetched &&
+      ((member.avatar_content_type ?? null) !== nextAvatarContentType ||
+        (member.avatar_base64 ?? null) !== nextAvatarBase64)) ||
+    (Boolean(snapshot.avatarUrl) &&
+      (member.avatar_url ?? null) !== nextAvatarUrl);
   if (avatarChanged) {
     changedFields.push("avatar");
     changes.avatar = "업데이트";
@@ -107,6 +110,7 @@ export async function syncMemberSnapshot(
     campus: nextCampus,
     avatar_content_type: nextAvatarContentType,
     avatar_base64: nextAvatarBase64,
+    avatar_url: nextAvatarUrl,
     updated_at: updatedAt,
   };
 
@@ -119,6 +123,7 @@ export async function syncMemberSnapshot(
       campus: nextMember.campus,
       avatar_content_type: nextMember.avatar_content_type,
       avatar_base64: nextMember.avatar_base64,
+      avatar_url: nextMember.avatar_url,
       updated_at: updatedAt,
     })
     .eq("id", member.id);

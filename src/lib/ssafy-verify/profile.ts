@@ -1,4 +1,5 @@
 import { SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
+import { SSAFY_VERIFY_ISSUER } from "@/lib/ssafy-verify/config";
 import type { MemberSyncSnapshot } from "@/lib/mm-member-sync/shared";
 import type { MmUserDirectorySnapshot } from "@/lib/mm-directory/shared";
 
@@ -21,6 +22,7 @@ export type SsafyVerifyMemberProfile = {
   isStaff: boolean;
   sourceYears: number[];
   profileImage: {
+    url: string | null;
     contentType: string | null;
     base64: string | null;
   } | null;
@@ -127,8 +129,28 @@ function normalizeContentType(value: string | null) {
   return value;
 }
 
+function normalizeImageUrl(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  try {
+    const url = new URL(value, SSAFY_VERIFY_ISSUER);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function readProfileImage(record: UnknownRecord) {
   const image = readRecord(record, ["profile_image", "profileImage", "picture"]);
+  const url = normalizeImageUrl(
+    readString(record, ["picture", "profile_image_url", "profileImageUrl", "avatar_url"]) ??
+      readString(image, ["url", "src", "href"]),
+  );
   const contentType = normalizeContentType(
     readString(record, ["profile_image_content_type", "avatar_content_type"]) ??
       readString(image, ["content_type", "contentType", "mime_type"]),
@@ -137,11 +159,12 @@ function readProfileImage(record: UnknownRecord) {
     readString(record, ["profile_image_base64", "avatar_base64"]) ??
     readString(image, ["base64", "data"]);
 
-  if (!contentType && !base64) {
+  if (!url && !contentType && !base64) {
     return null;
   }
 
   return {
+    url,
     contentType,
     base64,
   };
@@ -281,6 +304,7 @@ export function toMemberSyncSnapshot(
     displayName: profile.displayName,
     campus: profile.campus,
     avatarFetched: Boolean(profile.profileImage?.base64),
+    avatarUrl: profile.profileImage?.url ?? null,
     avatarContentType: profile.profileImage?.contentType ?? null,
     avatarBase64: profile.profileImage?.base64 ?? null,
   };

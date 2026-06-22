@@ -142,7 +142,7 @@ export default function AdminMemberListItem({
   const updateFormId = `member-update-${member.id}`;
   const notificationPreferences = member.notification_preferences;
   const avatarLabel = (displayName || member.mm_username || "?").trim().charAt(0).toUpperCase();
-  const hasAvatar = Boolean(member.avatar_content_type);
+  const hasAvatar = Boolean(member.avatar_content_type || member.avatar_url);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const avatarUrl = useMemo(() => {
     const params = new URLSearchParams();

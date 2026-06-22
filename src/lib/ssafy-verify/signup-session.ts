@@ -60,6 +60,7 @@ function parseSessionPayload(value: unknown): SignedSignupSession | null {
     !isNullableString(payload.campus) ||
     !isNullableString(payload.verificationId) ||
     !isNullableString(payload.scope) ||
+    (payload.avatarUrl !== undefined && !isNullableString(payload.avatarUrl)) ||
     typeof payload.isStaff !== "boolean" ||
     typeof payload.authTime !== "number" ||
     typeof payload.issuedAt !== "number" ||
@@ -90,6 +91,7 @@ function parseSessionPayload(value: unknown): SignedSignupSession | null {
     campus: payload.campus,
     isStaff: payload.isStaff,
     sourceYears,
+    avatarUrl: payload.avatarUrl ?? null,
     authTime: payload.authTime,
     verificationId: payload.verificationId,
     scope: payload.scope,
@@ -133,6 +135,7 @@ export async function getSsafySignupSession() {
     campus: session.campus,
     isStaff: session.isStaff,
     sourceYears: session.sourceYears,
+    avatarUrl: session.avatarUrl,
     authTime: session.authTime,
     verificationId: session.verificationId,
     scope: session.scope,

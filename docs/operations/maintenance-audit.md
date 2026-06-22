@@ -1,6 +1,6 @@
 # SSARTNERSHIP Maintenance Audit
 
-Last updated: 2026-03-28
+Last updated: 2026-06-22
 
 ## Scope
 
@@ -42,6 +42,9 @@ Last updated: 2026-03-28
 - Synced `must_change_password` checks with the current member row so admin updates take effect on subsequent session reads.
 - Split the Admin root into a dashboard entry page and dedicated member/partner management pages.
 - Unified member profile handling around `campus` as the canonical location field and removed `region` usage from active flows.
+- Delegated SSAFY Verify signup, profile lookup, directory lookup, profile sync, and Mattermost notification sending through Verify Server API instead of direct Mattermost credentials.
+- Reduced SSAFY Verify auth UI diagnostic exposure so request ids and provider payload diagnostics stay in server logs unless explicit debug env is enabled.
+- Added `members.avatar_url` so Verify `picture` URLs can render on signup, certification cards, and admin member views while older base64 avatars remain supported.
 
 ## Remaining candidates
 
@@ -50,7 +53,7 @@ Last updated: 2026-03-28
 - Add stronger audit logging around admin mutations and auth-sensitive flows.
 - Review remaining client components for possible server/client boundary simplification.
 - Consider moving `/api/mm/session` lookup behind a server-provided header/session model to remove client fetches entirely.
-- Add build verification in an unrestricted environment to complement local lint checks.
+- Re-measure public home, signup, certification, and partner detail routes after the Verify transition because auth/profile work moved to new server boundaries.
 
 ## Notes
 

@@ -31,6 +31,7 @@ type CertificationMember = {
   campus?: string | null;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
+  avatar_url?: string | null;
 };
 
 function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
@@ -65,7 +66,7 @@ export default async function CertificationPage({
   const { data: member } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64",
+      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,avatar_url",
     )
     .eq("id", session.userId)
     .maybeSingle();

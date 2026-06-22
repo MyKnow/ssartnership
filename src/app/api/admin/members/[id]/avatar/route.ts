@@ -16,6 +16,22 @@ function isUuid(value: string) {
   return UUID_PATTERN.test(value.trim());
 }
 
+function normalizeAvatarUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -33,7 +49,7 @@ export async function GET(
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
-    .select("id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at")
+    .select("id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,avatar_url,updated_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -53,6 +69,7 @@ export async function GET(
 
   let avatarContentType = data.avatar_content_type;
   let avatarBase64 = data.avatar_base64;
+  let avatarUrl = normalizeAvatarUrl(data.avatar_url);
 
   if (!avatarBase64 && data.mm_user_id && typeof data.year === "number") {
     try {
@@ -67,6 +84,7 @@ export async function GET(
           campus: data.campus,
           avatar_content_type: data.avatar_content_type,
           avatar_base64: data.avatar_base64,
+          avatar_url: data.avatar_url,
           updated_at: data.updated_at,
         },
         getMemberSyncCandidateYears(data.staff_source_year ?? data.year),
@@ -76,11 +94,22 @@ export async function GET(
       if (resolved?.snapshot.avatarBase64 && resolved.snapshot.avatarContentType) {
         avatarContentType = resolved.snapshot.avatarContentType;
         avatarBase64 = resolved.snapshot.avatarBase64;
+        avatarUrl = resolved.snapshot.avatarUrl ?? avatarUrl;
         await supabase
           .from("members")
           .update({
             avatar_content_type: avatarContentType,
             avatar_base64: avatarBase64,
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+      } else if (resolved?.snapshot.avatarUrl) {
+        avatarUrl = resolved.snapshot.avatarUrl;
+        await supabase
+          .from("members")
+          .update({
+            avatar_url: avatarUrl,
             updated_at: new Date().toISOString(),
           })
           .eq("id", id);
@@ -88,6 +117,12 @@ export async function GET(
     } catch (error) {
       console.error("[admin-member-avatar] Mattermost avatar fallback failed", error);
     }
+  }
+
+  if (!avatarBase64 && avatarUrl) {
+    const response = NextResponse.redirect(avatarUrl, 302);
+    response.headers.set("cache-control", "private, max-age=300");
+    return response;
   }
 
   if (!avatarBase64 || !avatarContentType) {

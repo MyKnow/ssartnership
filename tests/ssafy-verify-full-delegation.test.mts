@@ -57,6 +57,7 @@ test("SSAFY Verify profiles map to directory and member sync snapshots", async (
     isStaff: false,
     sourceYears: [15],
     profileImage: {
+      url: null,
       contentType: "image/png",
       base64: "aGVsbG8=",
     },
@@ -76,8 +77,42 @@ test("SSAFY Verify profiles map to directory and member sync snapshots", async (
     displayName: "김싸피",
     campus: "서울",
     avatarFetched: true,
+    avatarUrl: null,
     avatarContentType: "image/png",
     avatarBase64: "aGVsbG8=",
+  });
+});
+
+test("SSAFY Verify profiles preserve picture URLs for member avatars", async () => {
+  const {
+    normalizeSsafyVerifyMemberProfile,
+    toMemberSyncSnapshot,
+  } = await profileModulePromise;
+
+  const profile = normalizeSsafyVerifyMemberProfile({
+    sub: "pairwise-subject",
+    ssafy_mattermost_user_id: "mm.user-123",
+    username: "student.name",
+    name: "김싸피",
+    ssafy_campus: "서울",
+    ssafy_cohort: "15",
+    picture: "https://verify.example.com/api/mattermost/avatar/mm.user-123",
+  });
+
+  assert.equal(
+    profile?.profileImage?.url,
+    "https://verify.example.com/api/mattermost/avatar/mm.user-123",
+  );
+  assert.ok(profile);
+  assert.deepEqual(toMemberSyncSnapshot(profile), {
+    mmUserId: "mm.user-123",
+    mmUsername: "student.name",
+    displayName: "김싸피",
+    campus: "서울",
+    avatarFetched: false,
+    avatarUrl: "https://verify.example.com/api/mattermost/avatar/mm.user-123",
+    avatarContentType: null,
+    avatarBase64: null,
   });
 });
 

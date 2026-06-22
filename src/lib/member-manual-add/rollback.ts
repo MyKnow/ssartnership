@@ -35,6 +35,7 @@ export async function rollbackManualMemberProvision(input: {
       must_change_password: Boolean(input.existingMember.must_change_password),
       avatar_content_type: input.existingMember.avatar_content_type ?? null,
       avatar_base64: input.existingMember.avatar_base64 ?? null,
+      avatar_url: input.existingMember.avatar_url ?? null,
       updated_at: input.existingMember.updated_at ?? new Date().toISOString(),
     })
     .eq("id", input.memberId);

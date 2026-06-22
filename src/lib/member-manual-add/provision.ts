@@ -26,6 +26,7 @@ function buildMemberPayload(input: {
   displayName: string;
   campus: string | null;
   year: ManualMemberAddYear;
+  avatarUrl: string | null;
   avatarContentType: string | null;
   avatarBase64: string | null;
   passwordHash: string;
@@ -44,6 +45,7 @@ function buildMemberPayload(input: {
     avatar_content_type:
       input.avatarContentType ?? input.member?.avatar_content_type ?? null,
     avatar_base64: input.avatarBase64 ?? input.member?.avatar_base64 ?? null,
+    avatar_url: input.avatarUrl ?? input.member?.avatar_url ?? null,
     updated_at: input.now,
   };
 }
@@ -121,6 +123,7 @@ export async function provisionManualMembers(
         displayName,
         campus: nextCampus,
         year: requestedYear,
+        avatarUrl: avatar?.url ?? null,
         avatarContentType: avatar?.contentType ?? null,
         avatarBase64: avatar?.base64 ?? null,
         passwordHash: hash,

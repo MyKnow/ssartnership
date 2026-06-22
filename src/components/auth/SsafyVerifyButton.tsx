@@ -188,11 +188,15 @@ export default function SsafyVerifyButton({
       {error ? (
         <FormMessage variant="error">
           {getErrorMessage(error)}
-          {error.requestId ? ` request_id: ${error.requestId}` : ""}
           {error.debug ? (
-            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-red-200 bg-red-50 p-3 text-left text-xs leading-5 text-red-950">
-              {formatDebugValue(error.debug)}
-            </pre>
+            <details className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-left text-xs leading-5 text-red-950">
+              <summary className="cursor-pointer font-semibold">
+                진단 정보
+              </summary>
+              <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap">
+                {formatDebugValue(error.debug)}
+              </pre>
+            </details>
           ) : null}
         </FormMessage>
       ) : null}

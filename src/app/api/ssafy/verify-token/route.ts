@@ -44,11 +44,7 @@ function publicError(
 }
 
 function shouldExposeSsafyVerifyDebug() {
-  return (
-    process.env.SSAFY_VERIFY_DEBUG_ERRORS === "1" ||
-    process.env.VERCEL_ENV === "preview" ||
-    process.env.NODE_ENV !== "production"
-  );
+  return process.env.SSAFY_VERIFY_DEBUG_ERRORS === "1";
 }
 
 export async function POST(request: Request) {

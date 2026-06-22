@@ -16,7 +16,7 @@ import {
 } from "./shared";
 
 const MEMBER_SELECT =
-  "id,mm_user_id,mm_username,display_name,year,campus,password_hash,password_salt,must_change_password,avatar_content_type,avatar_base64,updated_at";
+  "id,mm_user_id,mm_username,display_name,year,campus,password_hash,password_salt,must_change_password,avatar_content_type,avatar_base64,avatar_url,updated_at";
 
 export type ManualMemberResolution = {
   requestedYear: ManualMemberAddYear;

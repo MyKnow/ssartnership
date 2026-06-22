@@ -42,7 +42,7 @@ export default async function AdminMemberDetailPage({
     supabase
       .from("members")
       .select(
-        "id,display_name,mm_username,mm_user_id,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,created_at,updated_at",
+        "id,display_name,mm_username,mm_user_id,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,avatar_url,created_at,updated_at",
       )
       .eq("id", memberId)
       .maybeSingle(),
@@ -84,7 +84,7 @@ export default async function AdminMemberDetailPage({
   const yearLabel = formatSsafyMemberLifecycleLabel(year);
   const campus = member.campus ?? profile.campus ?? "-";
   const avatarLabel = (displayName || member.mm_username || "?").trim().charAt(0).toUpperCase();
-  const hasAvatar = Boolean(member.avatar_content_type);
+  const hasAvatar = Boolean(member.avatar_content_type || member.avatar_url);
   const avatarUrl = `/api/admin/members/${member.id}/avatar${member.updated_at ? `?v=${encodeURIComponent(member.updated_at)}` : ""}`;
 
   return (
