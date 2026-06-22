@@ -50,6 +50,20 @@ function sourceYearsFromClaims(claims: SsafyVerificationClaims) {
   return cohort === null ? [] : [cohort];
 }
 
+function uniqueSortedYears(values: Iterable<number | null | undefined>) {
+  return Array.from(
+    new Set(
+      Array.from(values).filter(
+        (value): value is number =>
+          typeof value === "number" &&
+          Number.isInteger(value) &&
+          value >= 0 &&
+          value <= 99,
+      ),
+    ),
+  ).sort((a, b) => a - b);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -69,6 +83,23 @@ function describePayloadShape(payload: unknown) {
   };
 }
 
+function readPayloadSub(payload: unknown) {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  const candidates = [
+    payload.sub,
+    isRecord(payload.data) ? payload.data.sub : null,
+    isRecord(payload.data) && isRecord(payload.data.profile)
+      ? payload.data.profile.sub
+      : null,
+  ];
+  const sub = candidates.find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+  return sub?.trim() ?? null;
+}
+
 function safeDiagnosticMessage(error: unknown) {
   if (!(error instanceof Error)) {
     return null;
@@ -78,6 +109,59 @@ function safeDiagnosticMessage(error: unknown) {
     return null;
   }
   return message;
+}
+
+function roleIndicatesStaff(claims: SsafyVerificationClaims) {
+  return (
+    claims.role === "staff" ||
+    claims.role === "admin" ||
+    claims.role === "operator"
+  );
+}
+
+function resolveYear(input: {
+  isStaff: boolean;
+  cohort: number | null;
+  sourceYears: number[];
+}) {
+  return input.isStaff
+    ? 0
+    : input.cohort ?? input.sourceYears.find((item) => item > 0);
+}
+
+function buildClaimFallbackSession(input: {
+  claims: SsafyVerificationClaims;
+  verificationId: string | null;
+  scope: string | null;
+}) {
+  if (!input.claims.mattermostUserId) {
+    return null;
+  }
+
+  const cohort = parseCohort(input.claims.cohort);
+  const isStaff = input.claims.isStaff ?? roleIndicatesStaff(input.claims);
+  const sourceYears = uniqueSortedYears([
+    ...sourceYearsFromClaims(input.claims),
+    ...(isStaff ? [0] : []),
+  ]);
+  const year = resolveYear({ isStaff, cohort, sourceYears });
+  if (typeof year !== "number" || !getSignupSsafyYears().includes(year)) {
+    return null;
+  }
+
+  return {
+    sub: input.claims.sub,
+    mattermostUserId: input.claims.mattermostUserId,
+    mattermostUsername: input.claims.mattermostUserId,
+    displayName: input.claims.name ?? input.claims.mattermostUserId,
+    cohort,
+    campus: input.claims.campus,
+    isStaff,
+    sourceYears,
+    authTime: input.claims.authTime,
+    verificationId: input.verificationId,
+    scope: input.scope,
+  } satisfies SsafySignupSessionData;
 }
 
 export async function resolveSsafySignupProfile(input: {
@@ -103,6 +187,34 @@ export async function resolveSsafySignupProfile(input: {
       ) ?? profiles[0];
 
     if (!profile) {
+      const payloadSub = readPayloadSub(payload);
+      if (payloadSub && payloadSub !== input.claims.sub) {
+        return {
+          ok: false,
+          errorCode: "SSAFY_SIGNUP_PROFILE_MISMATCH",
+          requestId: null,
+          status: 409,
+          providerErrorCode: null,
+          lookup,
+          diagnostic: {
+            cause: "profile_mismatch",
+            message: "Verify Server API profile이 인증 token claim과 일치하지 않습니다.",
+            payloadShape: describePayloadShape(payload),
+          },
+        };
+      }
+
+      const fallbackSession =
+        lookup === "mattermost_user_id"
+          ? buildClaimFallbackSession(input)
+          : null;
+      if (fallbackSession) {
+        return {
+          ok: true,
+          session: fallbackSession,
+        };
+      }
+
       return {
         ok: false,
         errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
