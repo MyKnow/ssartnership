@@ -278,7 +278,7 @@ Server API 위임에는 Hosted User Auth client와 분리된 confidential creden
 - `SSAFY_VERIFY_SERVER_CLIENT_SECRET`: Server API `client_credentials`용 secret
 - `SSAFY_VERIFY_SERVER_API_BASE_URL`: 선택값, 기본값은 `${SSAFY_VERIFY_ISSUER}/v1`
 
-이 credential은 프로필 조회, 디렉토리 lookup, 프로필 이벤트 소비, 관리자 Mattermost 알림 위임에 사용됩니다. 관리자 Mattermost 알림은 `POST /v1/notifications/mattermost/batch`로 위임되며, 발송 대상은 25명 단위로 나누고 각 batch는 notification id 기반 idempotency key를 사용합니다.
+이 credential은 프로필 조회, 디렉토리 lookup, 프로필 이벤트 소비, 관리자 Mattermost 알림 위임에 사용됩니다. 관리자 Mattermost 알림은 `POST /v1/notifications/mattermost/batch`로 위임되며, 발송 대상은 25명 단위로 나누고 각 target은 notification id 기반 idempotency key를 사용합니다.
 
 ### 회원가입
 
@@ -293,6 +293,18 @@ Server API 위임에는 Hosted User Auth client와 분리된 confidential creden
 ```bash
 npm run test:ssafy-cycle
 ```
+
+SSAFY Verify Server API 실호출 smoke test는 기본 테스트에서 제외되어 있고, 명시적으로 켰을 때만 실행합니다. 기본 대상은 `@myknow`이며, directory lookup으로 얻은 Mattermost user id를 프로필 조회, sync, 알림 발송 대상에 사용합니다.
+
+```bash
+# 조회 / profile / sync / profile-events 실호출
+SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live
+
+# 실제 Mattermost DM batch 발송까지 포함
+SSAFY_VERIFY_LIVE_SMOKE=1 SSAFY_VERIFY_SMOKE_SEND_MM=1 npm run test:ssafy-verify:live
+```
+
+필요하면 `SSAFY_VERIFY_SMOKE_USERNAME`, `SSAFY_VERIFY_SMOKE_COHORT`, `SSAFY_VERIFY_SMOKE_MATTERMOST_USER_ID`로 대상자를 고정할 수 있습니다. `SSAFY_VERIFY_SMOKE_MATTERMOST_USER_ID`는 선택값이며 설정하면 lookup 결과가 같은 id인지도 검증합니다. 발송 template/purpose는 기본적으로 실제 앱과 같은 `ssartnership_admin_notification` / `announcement`, `ssartnership_manual_member_temp_password` / `manual_member_temp_password`를 사용하며, smoke 전용 승인 template이 있으면 `SSAFY_VERIFY_SMOKE_TEMPLATE_ID`, `SSAFY_VERIFY_SMOKE_PURPOSE`, `SSAFY_VERIFY_SMOKE_SINGLE_TEMPLATE_ID`, `SSAFY_VERIFY_SMOKE_SINGLE_PURPOSE`로 바꿀 수 있습니다.
 
 ### 로그인
 
