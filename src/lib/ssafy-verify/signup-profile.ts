@@ -14,10 +14,13 @@ export type SsafySignupProfileResult =
       ok: false;
       errorCode:
         | "SSAFY_SIGNUP_PROFILE_UNAVAILABLE"
+        | "SSAFY_SIGNUP_PROFILE_NOT_FOUND"
         | "SSAFY_SIGNUP_PROFILE_MISMATCH"
         | "SSAFY_SIGNUP_YEAR_NOT_ALLOWED";
       requestId: string | null;
       status: number;
+      providerErrorCode?: string | null;
+      lookup: "mattermost_user_id" | "sub";
     };
 
 function parseCohort(value: string | null) {
@@ -38,6 +41,8 @@ export async function resolveSsafySignupProfile(input: {
   verificationId: string | null;
   scope: string | null;
 }): Promise<SsafySignupProfileResult> {
+  const lookup = input.claims.mattermostUserId ? "mattermost_user_id" : "sub";
+
   try {
     const client = createSsafyVerifyServerApiClient(
       getSsafyVerifyServerApiConfig(),
@@ -59,6 +64,8 @@ export async function resolveSsafySignupProfile(input: {
         errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
         requestId: null,
         status: 503,
+        providerErrorCode: null,
+        lookup,
       };
     }
     if (
@@ -71,6 +78,8 @@ export async function resolveSsafySignupProfile(input: {
         errorCode: "SSAFY_SIGNUP_PROFILE_MISMATCH",
         requestId: null,
         status: 409,
+        providerErrorCode: null,
+        lookup,
       };
     }
 
@@ -86,6 +95,8 @@ export async function resolveSsafySignupProfile(input: {
         errorCode: "SSAFY_SIGNUP_YEAR_NOT_ALLOWED",
         requestId: null,
         status: 403,
+        providerErrorCode: null,
+        lookup,
       };
     }
 
@@ -107,11 +118,17 @@ export async function resolveSsafySignupProfile(input: {
     };
   } catch (error) {
     if (error instanceof SsafyVerifyServerApiError) {
+      const isProfileNotFound =
+        error.status === 404 && error.errorCode === "PROFILE_NOT_FOUND";
       return {
         ok: false,
-        errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
+        errorCode: isProfileNotFound
+          ? "SSAFY_SIGNUP_PROFILE_NOT_FOUND"
+          : "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
         requestId: error.requestId,
         status: error.status >= 400 && error.status < 500 ? error.status : 503,
+        providerErrorCode: error.errorCode,
+        lookup,
       };
     }
     return {
@@ -119,6 +136,8 @@ export async function resolveSsafySignupProfile(input: {
       errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
       requestId: null,
       status: 503,
+      providerErrorCode: null,
+      lookup,
     };
   }
 }

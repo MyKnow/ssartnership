@@ -7,6 +7,7 @@ type MemberModule = typeof import("../src/lib/ssafy-verify/member.ts");
 type ScopesModule = typeof import("../src/lib/ssafy-verify/scopes.ts");
 type SecurityModule = typeof import("../src/lib/member-auth-security.ts");
 type SignupModule = typeof import("../src/lib/ssafy-verify/signup.ts");
+type SignupProfileModule = typeof import("../src/lib/ssafy-verify/signup-profile.ts");
 
 const claimsModulePromise = import(
   new URL("../src/lib/ssafy-verify/claims.ts", import.meta.url).href,
@@ -26,6 +27,9 @@ const securityModulePromise = import(
 const signupModulePromise = import(
   new URL("../src/lib/ssafy-verify/signup.ts", import.meta.url).href,
 ) as Promise<SignupModule>;
+const signupProfileModulePromise = import(
+  new URL("../src/lib/ssafy-verify/signup-profile.ts", import.meta.url).href,
+) as Promise<SignupProfileModule>;
 
 const issuer = "https://verify.myknow.xyz";
 const clientId = "client_example_public";
@@ -301,6 +305,93 @@ test("SSAFY Verify signup payload maps staff to the staff year with source year"
   assert.equal(payload.staff_source_year, 15);
   assert.equal(payload.marketing_policy_version, null);
   assert.equal(payload.marketing_policy_consented_at, null);
+});
+
+test("SSAFY Verify signup profile maps missing Verify profile to a specific error", async () => {
+  const originalEnv = {
+    issuer: process.env.SSAFY_VERIFY_ISSUER,
+    serverClientId: process.env.SSAFY_VERIFY_SERVER_CLIENT_ID,
+    serverClientSecret: process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET,
+    apiBaseUrl: process.env.SSAFY_VERIFY_SERVER_API_BASE_URL,
+  };
+  const originalFetch = globalThis.fetch;
+
+  try {
+    process.env.SSAFY_VERIFY_ISSUER = "https://verify.example.com";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = "server-api-client";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = "server-secret";
+    process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = "https://verify.example.com/v1";
+
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      if (url === "https://verify.example.com/v1/server/token") {
+        return new Response(
+          JSON.stringify({
+            access_token: "access-token-1",
+            token_type: "Bearer",
+            expires_in: 600,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+
+      assert.equal(
+        url,
+        "https://verify.example.com/v1/ssafy-members/pairwise-subject/profile",
+      );
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: {
+            code: "PROFILE_NOT_FOUND",
+            message: "프로필을 찾을 수 없습니다.",
+            request_id: "icn1::profile-404",
+          },
+        }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    const { resolveSsafySignupProfile } = await signupProfileModulePromise;
+    const result = await resolveSsafySignupProfile({
+      claims: {
+        sub: "pairwise-subject",
+        verified: true,
+        authTime: 1_781_740_800,
+        cohort: "15",
+        campus: "서울",
+        region: "서울",
+        name: "김싸피",
+        picture: null,
+        role: "member",
+        roleName: "교육생",
+        teamCode: null,
+        isStaff: false,
+        mattermostUserId: null,
+      },
+      verificationId: "verification-id",
+      scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      errorCode: "SSAFY_SIGNUP_PROFILE_NOT_FOUND",
+      requestId: "icn1::profile-404",
+      status: 404,
+      providerErrorCode: "PROFILE_NOT_FOUND",
+      lookup: "sub",
+    });
+  } finally {
+    if (originalEnv.issuer === undefined) delete process.env.SSAFY_VERIFY_ISSUER;
+    else process.env.SSAFY_VERIFY_ISSUER = originalEnv.issuer;
+    if (originalEnv.serverClientId === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_ID;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = originalEnv.serverClientId;
+    if (originalEnv.serverClientSecret === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = originalEnv.serverClientSecret;
+    if (originalEnv.apiBaseUrl === undefined) delete process.env.SSAFY_VERIFY_SERVER_API_BASE_URL;
+    else process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = originalEnv.apiBaseUrl;
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("SSAFY Verify member lookup rejects duplicate subject linking", async () => {

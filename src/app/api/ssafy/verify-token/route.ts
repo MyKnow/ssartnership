@@ -215,7 +215,16 @@ export async function POST(request: Request) {
         status: "failure",
         actorType: "guest",
         identifier: verified.claims.sub,
-        properties: { reason: signupProfile.errorCode },
+        properties: {
+          reason: signupProfile.errorCode,
+          grantedScope: exchanged.scope,
+          hasMattermostUserId: Boolean(verified.claims.mattermostUserId),
+          hasCohort: Boolean(verified.claims.cohort),
+          hasCampus: Boolean(verified.claims.campus),
+          profileLookup: signupProfile.lookup,
+          providerErrorCode: signupProfile.providerErrorCode ?? null,
+          providerRequestId: signupProfile.requestId,
+        },
       });
       await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, false);
       await delayMemberAuthAttempt("ssafy-verify");

@@ -230,6 +230,62 @@ test("SSAFY Verify Server API normalizes stable public errors", async () => {
   );
 });
 
+test("SSAFY Verify Server API preserves nested profile error request ids", async () => {
+  const {
+    SsafyVerifyServerApiError,
+    createSsafyVerifyServerApiClient,
+  } = await serverApiModulePromise;
+
+  const fetchImpl: typeof fetch = async (input) => {
+    if (String(input).endsWith("/server/token")) {
+      return jsonResponse({
+        access_token: "access-token-1",
+        token_type: "Bearer",
+        expires_in: 600,
+      });
+    }
+
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: "PROFILE_NOT_FOUND",
+          message: "프로필을 찾을 수 없습니다.",
+          request_id: "icn1::req-123",
+        },
+      },
+      404,
+    );
+  };
+
+  const client = createSsafyVerifyServerApiClient(
+    {
+      issuer: "https://verify.example.com",
+      apiBaseUrl: "https://verify.example.com/v1",
+      clientId: "server-api-client",
+      clientSecret: "server-secret",
+    },
+    { fetch: fetchImpl },
+  );
+
+  await assert.rejects(
+    () => client.getSsafyMemberProfile("pairwise-subject"),
+    (error) => {
+      assert.equal(error instanceof SsafyVerifyServerApiError, true);
+      assert.equal((error as InstanceType<typeof SsafyVerifyServerApiError>).status, 404);
+      assert.equal(
+        (error as InstanceType<typeof SsafyVerifyServerApiError>).errorCode,
+        "PROFILE_NOT_FOUND",
+      );
+      assert.equal(
+        (error as InstanceType<typeof SsafyVerifyServerApiError>).requestId,
+        "icn1::req-123",
+      );
+      return true;
+    },
+  );
+});
+
 test("SSAFY Verify Server API validates Mattermost IDs and batch size", async () => {
   const {
     createSsafyVerifyServerApiClient,

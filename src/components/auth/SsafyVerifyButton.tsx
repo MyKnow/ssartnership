@@ -52,6 +52,9 @@ function getErrorMessage(result: Extract<VerifyResult, { ok: false }>) {
   if (result.errorCode === "SSAFY_SIGNUP_PROFILE_UNAVAILABLE") {
     return "회원가입에 필요한 SSAFY 프로필 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
+  if (result.errorCode === "SSAFY_SIGNUP_PROFILE_NOT_FOUND") {
+    return "SSAFY Verify에서 인증된 프로필을 찾지 못했습니다. 운영 설정을 확인해 주세요.";
+  }
   if (result.errorCode === "SSAFY_SIGNUP_YEAR_NOT_ALLOWED") {
     return "현재 가입 대상 기수가 아닙니다.";
   }
