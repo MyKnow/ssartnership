@@ -11,6 +11,23 @@ const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u007F]/;
 export const PASSWORD_POLICY_MESSAGE =
   "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.";
 
+export function isValidPasswordPolicy(value: string) {
+  if (value.length < 8 || value.length > 64) {
+    return false;
+  }
+  const hasLetter = /[A-Za-z]/.test(value);
+  const hasNumber = /\d/.test(value);
+  const hasSymbol = /[^A-Za-z0-9]/.test(value);
+  return hasLetter && hasNumber && hasSymbol;
+}
+
+export function validatePasswordPolicy(value: string, label = "비밀번호") {
+  if (!value) {
+    return `${label}를 입력해 주세요.`;
+  }
+  return isValidPasswordPolicy(value) ? null : PASSWORD_POLICY_MESSAGE;
+}
+
 export function normalizeMmUsername(value: string) {
   return value.trim().toLowerCase();
 }

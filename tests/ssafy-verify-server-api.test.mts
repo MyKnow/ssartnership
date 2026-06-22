@@ -84,7 +84,7 @@ test("SSAFY Verify Server API client caches client_credentials tokens per scope"
         access_token: "access-token-1",
         token_type: "Bearer",
         expires_in: 600,
-        scope: "ssafy.notify.dm",
+        scope: "ssafy.notify.mattermost.send",
       });
     }
 
@@ -141,7 +141,7 @@ test("SSAFY Verify Server API client caches client_credentials tokens per scope"
   assert.equal(tokenBody.get("grant_type"), "client_credentials");
   assert.equal(tokenBody.get("client_id"), "server-api-client");
   assert.equal(tokenBody.get("client_secret"), "server-secret");
-  assert.equal(tokenBody.get("scope"), "ssafy.notify.dm");
+  assert.equal(tokenBody.get("scope"), "ssafy.notify.mattermost.send");
 
   assert.equal(calls[1]?.url, "https://verify.example.com/v1/notifications/mattermost/batch");
   assert.equal(calls[1]?.authorization, "Bearer access-token-1");

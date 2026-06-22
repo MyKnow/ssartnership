@@ -36,7 +36,7 @@ export default async function SignupPage({
           <Card className="mx-auto max-w-lg p-6">
             <h1 className="text-2xl font-semibold text-foreground">회원가입</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              SSAFY Verify로 구성원 인증을 완료하면 싸트너십 계정에 연결합니다.
+              SSAFY Verify로 구성원 인증을 완료하면 가입 여부를 확인합니다.
             </p>
             <SsafyVerifyButton returnTo={returnTo} />
             <div className="mt-3 flex flex-col gap-3">

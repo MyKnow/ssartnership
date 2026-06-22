@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
-import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   delayMemberAuthAttempt,
@@ -9,12 +8,14 @@ import {
   getMemberAuthBlockingState,
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
-import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
+import { getSignedUserSession } from "@/lib/user-auth";
 import { getSsafyVerifyServerConfig } from "@/lib/ssafy-verify/config";
+import { findSsafyVerifiedMember } from "@/lib/ssafy-verify/member";
+import { resolveSsafySignupProfile } from "@/lib/ssafy-verify/signup-profile";
 import {
-  findSsafyVerifiedMember,
-  updateMemberSsafyVerification,
-} from "@/lib/ssafy-verify/member";
+  clearSsafySignupSession,
+  setSsafySignupSession,
+} from "@/lib/ssafy-verify/signup-session";
 import {
   exchangeSsafyVerificationCode,
   verifySsafyVerificationToken,
@@ -30,8 +31,16 @@ import {
 
 export const runtime = "nodejs";
 
-function publicError(errorCode: string, requestId: string | null, status = 400) {
-  return NextResponse.json({ ok: false, errorCode, requestId }, { status });
+function publicError(
+  errorCode: string,
+  requestId: string | null,
+  status = 400,
+  extra: Record<string, unknown> = {},
+) {
+  return NextResponse.json(
+    { ok: false, errorCode, requestId, ...extra },
+    { status },
+  );
 }
 
 export async function POST(request: Request) {
@@ -155,12 +164,32 @@ export async function POST(request: Request) {
     const currentSession = await getSignedUserSession();
     const supabase = getSupabaseAdminClient();
     const memberResult = await findSsafyVerifiedMember(supabase, {
-      currentMemberId: currentSession?.userId ?? null,
       sub: verified.claims.sub,
       mattermostUserId: verified.claims.mattermostUserId,
     });
 
-    if (!memberResult.ok) {
+    if (memberResult.ok || memberResult.errorCode === "SSAFY_MEMBER_CONFLICT") {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_ssafy_verify",
+        status: "blocked",
+        actorType: memberResult.ok ? "member" : "guest",
+        actorId: memberResult.ok ? memberResult.member.id : undefined,
+        identifier: verified.claims.sub,
+        properties: {
+          reason: memberResult.ok ? "already_registered" : memberResult.errorCode,
+          hasSession: Boolean(currentSession?.userId),
+        },
+      });
+      await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, false);
+      await delayMemberAuthAttempt("ssafy-verify");
+      await clearSsafySignupSession();
+      return publicError("MEMBER_ALREADY_REGISTERED", null, 409, {
+        redirectTo: "/auth/login",
+      });
+    }
+
+    if (memberResult.errorCode === "MEMBER_LOOKUP_FAILED") {
       await logAuthSecurity({
         ...context,
         eventName: "member_ssafy_verify",
@@ -171,70 +200,64 @@ export async function POST(request: Request) {
       });
       await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, false);
       await delayMemberAuthAttempt("ssafy-verify");
-      const status =
-        memberResult.errorCode === "SSAFY_MEMBER_CONFLICT"
-          ? 409
-          : memberResult.errorCode === "MEMBER_LOOKUP_FAILED"
-            ? 503
-            : 404;
-      return publicError(memberResult.errorCode, null, status);
+      return publicError(memberResult.errorCode, null, 503);
     }
 
-    const updateResult = await updateMemberSsafyVerification(
-      supabase,
-      memberResult.member.id,
-      {
-        ...verified.claims,
-        verificationId: exchanged.verificationId,
-        scope: exchanged.scope,
-      },
-    );
-    if (!updateResult.ok) {
+    const signupProfile = await resolveSsafySignupProfile({
+      claims: verified.claims,
+      verificationId: exchanged.verificationId,
+      scope: exchanged.scope,
+    });
+    if (!signupProfile.ok) {
       await logAuthSecurity({
         ...context,
         eventName: "member_ssafy_verify",
         status: "failure",
-        actorType: "member",
-        actorId: memberResult.member.id,
+        actorType: "guest",
         identifier: verified.claims.sub,
-        properties: { reason: updateResult.errorCode },
+        properties: { reason: signupProfile.errorCode },
       });
-      return publicError(updateResult.errorCode, null, 500);
+      await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, false);
+      await delayMemberAuthAttempt("ssafy-verify");
+      return publicError(
+        signupProfile.errorCode,
+        signupProfile.requestId,
+        signupProfile.status,
+      );
     }
 
-    const policyStatus = await getMemberRequiredPolicyStatus(memberResult.member.id);
-    await setUserSession(
-      memberResult.member.id,
-      Boolean(memberResult.member.must_change_password),
-    );
+    await setSsafySignupSession(signupProfile.session);
     await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, true);
     revalidatePath("/");
-    revalidatePath("/auth/consent");
-    revalidatePath("/auth/change-password");
-    revalidatePath("/certification");
+    revalidatePath("/auth/signup");
+    revalidatePath("/auth/signup/complete");
 
     await logAuthSecurity({
       ...context,
       eventName: "member_ssafy_verify",
       status: "success",
-      actorType: "member",
-      actorId: memberResult.member.id,
+      actorType: "guest",
       identifier: verified.claims.sub,
       properties: {
         cohort: verified.claims.cohort,
         campus: verified.claims.campus,
         hasMattermostUserId: Boolean(verified.claims.mattermostUserId),
-        requiresConsent: policyStatus.requiresConsent,
+        next: "signup_complete",
       },
     });
 
     return NextResponse.json({
       ok: true,
       verified: true,
-      cohort: verified.claims.cohort,
-      campus: verified.claims.campus,
+      status: "signup_required",
+      cohort:
+        signupProfile.session.cohort === null
+          ? null
+          : String(signupProfile.session.cohort),
+      campus: signupProfile.session.campus,
       authTime: verified.claims.authTime,
-      requiresConsent: policyStatus.requiresConsent,
+      requiresConsent: false,
+      nextPath: "/auth/signup/complete",
     });
   } catch {
     await logAuthSecurity({

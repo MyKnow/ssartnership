@@ -108,7 +108,7 @@ test("SSAFY Verify staff profiles preserve staff and source year signals", async
   });
 });
 
-test("SSAFY Verify Server API directory lookup uses profile sync scope", async () => {
+test("SSAFY Verify Server API directory lookup uses directory lookup scope", async () => {
   const { createSsafyVerifyServerApiClient } = await serverApiModulePromise;
   const calls: Array<{ url: string; method: string; body: string | null }> = [];
   const fetchImpl: typeof fetch = async (input, init) => {
@@ -149,7 +149,7 @@ test("SSAFY Verify Server API directory lookup uses profile sync scope", async (
   await client.findMattermostUsers({ username: "student.name", cohort: 15 });
 
   assert.equal(calls[0]?.method, "POST");
-  assert.equal(new URLSearchParams(calls[0]?.body ?? "").get("scope"), "ssafy.profile.sync");
+  assert.equal(new URLSearchParams(calls[0]?.body ?? "").get("scope"), "ssafy.directory.lookup");
   assert.equal(
     calls[1]?.url,
     "https://verify.example.com/v1/mattermost-users?username=student.name&cohort=15",

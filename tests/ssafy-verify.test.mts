@@ -6,6 +6,7 @@ type SchemaModule = typeof import("../src/lib/ssafy-verify/schema.ts");
 type MemberModule = typeof import("../src/lib/ssafy-verify/member.ts");
 type ScopesModule = typeof import("../src/lib/ssafy-verify/scopes.ts");
 type SecurityModule = typeof import("../src/lib/member-auth-security.ts");
+type SignupModule = typeof import("../src/lib/ssafy-verify/signup.ts");
 
 const claimsModulePromise = import(
   new URL("../src/lib/ssafy-verify/claims.ts", import.meta.url).href,
@@ -22,6 +23,9 @@ const scopesModulePromise = import(
 const securityModulePromise = import(
   new URL("../src/lib/member-auth-security.ts", import.meta.url).href,
 ) as Promise<SecurityModule>;
+const signupModulePromise = import(
+  new URL("../src/lib/ssafy-verify/signup.ts", import.meta.url).href,
+) as Promise<SignupModule>;
 
 const issuer = "https://verify.myknow.xyz";
 const clientId = "client_example_public";
@@ -212,6 +216,91 @@ test("SSAFY Verify member update payload stores minimal verification fields", as
     updated_at: payload.updated_at,
   });
   assert.match(payload.updated_at, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test("SSAFY Verify signup payload creates a member from verified profile and policies", async () => {
+  const { buildSsafySignupMemberInsertPayload } = await signupModulePromise;
+  const payload = buildSsafySignupMemberInsertPayload({
+    session: {
+      sub: "pairwise-subject",
+      mattermostUserId: "mm.user-123",
+      mattermostUsername: "student.name",
+      displayName: "김싸피",
+      cohort: 15,
+      campus: "서울",
+      isStaff: false,
+      sourceYears: [15],
+      authTime: 1_781_740_800,
+      verificationId: "verification-id",
+      scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
+    },
+    passwordRecord: { hash: "password-hash", salt: "password-salt" },
+    activePolicies: {
+      service: { id: "service-policy", version: 2 },
+      privacy: { id: "privacy-policy", version: 3 },
+    },
+    marketingPolicy: { id: "marketing-policy", version: 4 },
+    marketingPolicyChecked: true,
+    agreedAt: "2026-06-22T02:00:00.000Z",
+  });
+
+  assert.deepEqual(payload, {
+    mm_user_id: "mm.user-123",
+    mm_username: "student.name",
+    display_name: "김싸피",
+    year: 15,
+    staff_source_year: null,
+    campus: "서울",
+    password_hash: "password-hash",
+    password_salt: "password-salt",
+    must_change_password: false,
+    service_policy_version: 2,
+    service_policy_consented_at: "2026-06-22T02:00:00.000Z",
+    privacy_policy_version: 3,
+    privacy_policy_consented_at: "2026-06-22T02:00:00.000Z",
+    marketing_policy_version: 4,
+    marketing_policy_consented_at: "2026-06-22T02:00:00.000Z",
+    ssafy_sub: "pairwise-subject",
+    ssafy_verified_at: new Date(1_781_740_800 * 1000).toISOString(),
+    ssafy_auth_time: new Date(1_781_740_800 * 1000).toISOString(),
+    ssafy_verification_id: "verification-id",
+    ssafy_mattermost_user_id: "mm.user-123",
+    ssafy_last_scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
+    created_at: "2026-06-22T02:00:00.000Z",
+    updated_at: "2026-06-22T02:00:00.000Z",
+  });
+});
+
+test("SSAFY Verify signup payload maps staff to the staff year with source year", async () => {
+  const { buildSsafySignupMemberInsertPayload } = await signupModulePromise;
+  const payload = buildSsafySignupMemberInsertPayload({
+    session: {
+      sub: "staff-subject",
+      mattermostUserId: "staff.user",
+      mattermostUsername: "coach.name",
+      displayName: "박코치",
+      cohort: 15,
+      campus: null,
+      isStaff: true,
+      sourceYears: [0, 14, 15],
+      authTime: 1_781_740_800,
+      verificationId: null,
+      scope: null,
+    },
+    passwordRecord: { hash: "password-hash", salt: "password-salt" },
+    activePolicies: {
+      service: { id: "service-policy", version: 2 },
+      privacy: { id: "privacy-policy", version: 3 },
+    },
+    marketingPolicy: null,
+    marketingPolicyChecked: false,
+    agreedAt: "2026-06-22T02:00:00.000Z",
+  });
+
+  assert.equal(payload.year, 0);
+  assert.equal(payload.staff_source_year, 15);
+  assert.equal(payload.marketing_policy_version, null);
+  assert.equal(payload.marketing_policy_consented_at, null);
 });
 
 test("SSAFY Verify member lookup rejects duplicate subject linking", async () => {

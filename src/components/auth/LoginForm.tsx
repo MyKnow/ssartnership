@@ -72,6 +72,12 @@ export default function LoginForm({
     if (signupFlag) {
       sessionStorage.removeItem("signup:success");
       notify("회원가입이 완료되었습니다.");
+      return;
+    }
+    const alreadyRegisteredFlag = sessionStorage.getItem("signup:alreadyRegistered");
+    if (alreadyRegisteredFlag) {
+      sessionStorage.removeItem("signup:alreadyRegistered");
+      notify("이미 가입된 사용자입니다. 로그인해 주세요.");
     }
   }, [notify]);
 

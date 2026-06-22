@@ -1,9 +1,11 @@
 import type { SsafyVerifyServerApiConfig } from "./config";
 
 export const SSAFY_VERIFY_SERVER_API_SCOPES = {
+  profileRead: "ssafy.profile.read",
   profileSync: "ssafy.profile.sync",
-  notifyDm: "ssafy.notify.dm",
-  notifyEvent: "ssafy.notify.event",
+  directoryLookup: "ssafy.directory.lookup",
+  notifyMattermostSend: "ssafy.notify.mattermost.send",
+  notifyMattermostStatus: "ssafy.notify.mattermost.status",
 } as const;
 
 export type SsafyVerifyServerApiScope =
@@ -422,7 +424,7 @@ export function createSsafyVerifyServerApiClient(
       return requestJson({
         method: "GET",
         path: `/ssafy-members/${encodeURIComponent(normalizedSub)}/profile`,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.profileSync],
+        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.profileRead],
       });
     },
 
@@ -431,7 +433,10 @@ export function createSsafyVerifyServerApiClient(
       return requestJson({
         method: "GET",
         path: `/mattermost-users/${encodeURIComponent(normalizedMattermostUserId)}/profile`,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.profileSync],
+        scopes: [
+          SSAFY_VERIFY_SERVER_API_SCOPES.profileRead,
+          SSAFY_VERIFY_SERVER_API_SCOPES.directoryLookup,
+        ],
       });
     },
 
@@ -447,7 +452,7 @@ export function createSsafyVerifyServerApiClient(
         method: "GET",
         path: "/mattermost-users",
         query,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.profileSync],
+        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.directoryLookup],
       });
     },
 
@@ -456,7 +461,10 @@ export function createSsafyVerifyServerApiClient(
       return requestJson({
         method: "POST",
         path: `/mattermost-users/${encodeURIComponent(normalizedMattermostUserId)}/sync`,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.profileSync],
+        scopes: [
+          SSAFY_VERIFY_SERVER_API_SCOPES.profileSync,
+          SSAFY_VERIFY_SERVER_API_SCOPES.directoryLookup,
+        ],
       });
     },
 
@@ -474,7 +482,7 @@ export function createSsafyVerifyServerApiClient(
         method: "GET",
         path: "/profile-events",
         query,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.profileSync],
+        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.profileRead],
       });
     },
 
@@ -494,7 +502,7 @@ export function createSsafyVerifyServerApiClient(
         await requestJson({
           method: "POST",
           path: "/notifications/mattermost",
-          scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyDm],
+          scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostSend],
           body: payload,
           idempotencyKey: input.idempotencyKey,
         }),
@@ -526,7 +534,7 @@ export function createSsafyVerifyServerApiClient(
         await requestJson({
           method: "POST",
           path: "/notifications/mattermost/batch",
-          scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyDm],
+          scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostSend],
           body: payload,
           idempotencyKey: input.idempotencyKey,
         }),
@@ -538,7 +546,7 @@ export function createSsafyVerifyServerApiClient(
       return requestJson({
         method: "GET",
         path: `/notifications/${encodeURIComponent(normalizedNotificationId)}`,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyDm],
+        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostStatus],
       });
     },
 
@@ -550,7 +558,7 @@ export function createSsafyVerifyServerApiClient(
         method: "GET",
         path: "/notifications",
         query,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyDm],
+        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostStatus],
       });
     },
   };

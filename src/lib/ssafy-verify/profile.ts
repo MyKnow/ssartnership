@@ -224,6 +224,8 @@ export function extractSsafyVerifyMemberProfiles(
       const nested = value[key];
       if (Array.isArray(nested)) {
         candidates.push(...nested);
+      } else if (isRecord(nested)) {
+        candidates.push(nested);
       }
     }
     candidates.push(value);
