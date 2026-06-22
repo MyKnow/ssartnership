@@ -21,6 +21,20 @@ export type SsafySignupProfileResult =
       status: number;
       providerErrorCode?: string | null;
       lookup: "mattermost_user_id" | "sub";
+      diagnostic: {
+        cause:
+          | "local_lookup_error"
+          | "profile_mismatch"
+          | "profile_payload_unparseable"
+          | "server_api_error"
+          | "year_not_allowed";
+        message: string | null;
+        payloadShape?: {
+          topLevelKeys: string[];
+          dataKeys: string[];
+          profileKeys: string[];
+        };
+      };
     };
 
 function parseCohort(value: string | null) {
@@ -34,6 +48,36 @@ function parseCohort(value: string | null) {
 function sourceYearsFromClaims(claims: SsafyVerificationClaims) {
   const cohort = parseCohort(claims.cohort);
   return cohort === null ? [] : [cohort];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function safeKeys(value: unknown) {
+  return isRecord(value) ? Object.keys(value).sort().slice(0, 30) : [];
+}
+
+function describePayloadShape(payload: unknown) {
+  const data = isRecord(payload) && isRecord(payload.data) ? payload.data : null;
+  const profile = data && isRecord(data.profile) ? data.profile : null;
+
+  return {
+    topLevelKeys: safeKeys(payload),
+    dataKeys: safeKeys(data),
+    profileKeys: safeKeys(profile),
+  };
+}
+
+function safeDiagnosticMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return null;
+  }
+  const message = error.message.trim();
+  if (!message || message.length > 300) {
+    return null;
+  }
+  return message;
 }
 
 export async function resolveSsafySignupProfile(input: {
@@ -66,6 +110,11 @@ export async function resolveSsafySignupProfile(input: {
         status: 503,
         providerErrorCode: null,
         lookup,
+        diagnostic: {
+          cause: "profile_payload_unparseable",
+          message: "Verify Server API 응답에서 회원가입에 필요한 Mattermost profile을 추출하지 못했습니다.",
+          payloadShape: describePayloadShape(payload),
+        },
       };
     }
     if (
@@ -80,6 +129,10 @@ export async function resolveSsafySignupProfile(input: {
         status: 409,
         providerErrorCode: null,
         lookup,
+        diagnostic: {
+          cause: "profile_mismatch",
+          message: "Verify Server API profile이 인증 token claim과 일치하지 않습니다.",
+        },
       };
     }
 
@@ -97,6 +150,10 @@ export async function resolveSsafySignupProfile(input: {
         status: 403,
         providerErrorCode: null,
         lookup,
+        diagnostic: {
+          cause: "year_not_allowed",
+          message: "인증 profile의 기수가 현재 회원가입 허용 범위가 아닙니다.",
+        },
       };
     }
 
@@ -129,6 +186,10 @@ export async function resolveSsafySignupProfile(input: {
         status: error.status >= 400 && error.status < 500 ? error.status : 503,
         providerErrorCode: error.errorCode,
         lookup,
+        diagnostic: {
+          cause: "server_api_error",
+          message: error.message,
+        },
       };
     }
     return {
@@ -136,8 +197,12 @@ export async function resolveSsafySignupProfile(input: {
       errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
       requestId: null,
       status: 503,
-      providerErrorCode: null,
+      providerErrorCode: "LOCAL_PROFILE_LOOKUP_ERROR",
       lookup,
+      diagnostic: {
+        cause: "local_lookup_error",
+        message: safeDiagnosticMessage(error),
+      },
     };
   }
 }

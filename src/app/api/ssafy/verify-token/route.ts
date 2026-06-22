@@ -43,6 +43,14 @@ function publicError(
   );
 }
 
+function shouldExposeSsafyVerifyDebug() {
+  return (
+    process.env.SSAFY_VERIFY_DEBUG_ERRORS === "1" ||
+    process.env.VERCEL_ENV === "preview" ||
+    process.env.NODE_ENV !== "production"
+  );
+}
+
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   const throttleContext = {
@@ -209,6 +217,24 @@ export async function POST(request: Request) {
       scope: exchanged.scope,
     });
     if (!signupProfile.ok) {
+      const debug = shouldExposeSsafyVerifyDebug()
+        ? {
+            debug: {
+              errorCode: signupProfile.errorCode,
+              providerErrorCode: signupProfile.providerErrorCode ?? null,
+              providerRequestId: signupProfile.requestId,
+              profileLookup: signupProfile.lookup,
+              grantedScope: exchanged.scope,
+              claims: {
+                hasMattermostUserId: Boolean(verified.claims.mattermostUserId),
+                hasCohort: Boolean(verified.claims.cohort),
+                hasCampus: Boolean(verified.claims.campus),
+                hasName: Boolean(verified.claims.name),
+              },
+              diagnostic: signupProfile.diagnostic,
+            },
+          }
+        : {};
       await logAuthSecurity({
         ...context,
         eventName: "member_ssafy_verify",
@@ -224,6 +250,9 @@ export async function POST(request: Request) {
           profileLookup: signupProfile.lookup,
           providerErrorCode: signupProfile.providerErrorCode ?? null,
           providerRequestId: signupProfile.requestId,
+          diagnosticCause: signupProfile.diagnostic.cause,
+          diagnosticMessage: signupProfile.diagnostic.message,
+          payloadShape: signupProfile.diagnostic.payloadShape,
         },
       });
       await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, false);
@@ -232,6 +261,7 @@ export async function POST(request: Request) {
         signupProfile.errorCode,
         signupProfile.requestId,
         signupProfile.status,
+        debug,
       );
     }
 

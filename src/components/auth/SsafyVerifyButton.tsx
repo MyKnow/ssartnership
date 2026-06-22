@@ -28,7 +28,10 @@ type VerifyResult =
       requiresConsent: boolean;
       nextPath?: string;
     }
-  | (SsafyVerifyClientFailure & { redirectTo?: string });
+  | (SsafyVerifyClientFailure & {
+      redirectTo?: string;
+      debug?: Record<string, unknown>;
+    });
 
 declare global {
   interface Window {
@@ -62,6 +65,10 @@ function getErrorMessage(result: Extract<VerifyResult, { ok: false }>) {
     return "인증 요청이 너무 자주 시도되었습니다. 잠시 후 다시 시도해 주세요.";
   }
   return getSsafyVerifyClientErrorMessage(result.errorCode);
+}
+
+function formatDebugValue(value: unknown) {
+  return JSON.stringify(value, null, 2);
 }
 
 export default function SsafyVerifyButton({
@@ -182,6 +189,11 @@ export default function SsafyVerifyButton({
         <FormMessage variant="error">
           {getErrorMessage(error)}
           {error.requestId ? ` request_id: ${error.requestId}` : ""}
+          {error.debug ? (
+            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-red-200 bg-red-50 p-3 text-left text-xs leading-5 text-red-950">
+              {formatDebugValue(error.debug)}
+            </pre>
+          ) : null}
         </FormMessage>
       ) : null}
     </div>

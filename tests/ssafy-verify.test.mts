@@ -380,6 +380,10 @@ test("SSAFY Verify signup profile maps missing Verify profile to a specific erro
       status: 404,
       providerErrorCode: "PROFILE_NOT_FOUND",
       lookup: "sub",
+      diagnostic: {
+        cause: "server_api_error",
+        message: "프로필을 찾을 수 없습니다.",
+      },
     });
   } finally {
     if (originalEnv.issuer === undefined) delete process.env.SSAFY_VERIFY_ISSUER;
@@ -391,6 +395,65 @@ test("SSAFY Verify signup profile maps missing Verify profile to a specific erro
     if (originalEnv.apiBaseUrl === undefined) delete process.env.SSAFY_VERIFY_SERVER_API_BASE_URL;
     else process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = originalEnv.apiBaseUrl;
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("SSAFY Verify signup profile surfaces local Mattermost lookup errors", async () => {
+  const originalEnv = {
+    issuer: process.env.SSAFY_VERIFY_ISSUER,
+    serverClientId: process.env.SSAFY_VERIFY_SERVER_CLIENT_ID,
+    serverClientSecret: process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET,
+    apiBaseUrl: process.env.SSAFY_VERIFY_SERVER_API_BASE_URL,
+  };
+
+  try {
+    process.env.SSAFY_VERIFY_ISSUER = "https://verify.example.com";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = "server-api-client";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = "server-secret";
+    process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = "https://verify.example.com/v1";
+
+    const { resolveSsafySignupProfile } = await signupProfileModulePromise;
+    const result = await resolveSsafySignupProfile({
+      claims: {
+        sub: "pairwise-subject",
+        verified: true,
+        authTime: 1_781_740_800,
+        cohort: "15",
+        campus: "서울",
+        region: "서울",
+        name: "김싸피",
+        picture: null,
+        role: "member",
+        roleName: "교육생",
+        teamCode: null,
+        isStaff: false,
+        mattermostUserId: "bad id with spaces",
+      },
+      verificationId: "verification-id",
+      scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
+      requestId: null,
+      status: 503,
+      providerErrorCode: "LOCAL_PROFILE_LOOKUP_ERROR",
+      lookup: "mattermost_user_id",
+      diagnostic: {
+        cause: "local_lookup_error",
+        message: "Mattermost ID는 3~64자의 영문, 숫자, ., _, -만 사용할 수 있습니다.",
+      },
+    });
+  } finally {
+    if (originalEnv.issuer === undefined) delete process.env.SSAFY_VERIFY_ISSUER;
+    else process.env.SSAFY_VERIFY_ISSUER = originalEnv.issuer;
+    if (originalEnv.serverClientId === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_ID;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = originalEnv.serverClientId;
+    if (originalEnv.serverClientSecret === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = originalEnv.serverClientSecret;
+    if (originalEnv.apiBaseUrl === undefined) delete process.env.SSAFY_VERIFY_SERVER_API_BASE_URL;
+    else process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = originalEnv.apiBaseUrl;
   }
 });
 
