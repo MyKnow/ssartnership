@@ -32,6 +32,7 @@ export type MockPreviewMember = {
   }>;
   avatar_content_type: string | null;
   avatar_base64: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -87,6 +88,7 @@ export const mockPreviewMembers: MockPreviewMember[] = [
     ],
     avatar_content_type: null,
     avatar_base64: null,
+    avatar_url: null,
     created_at: "2026-04-01T09:00:00.000Z",
     updated_at: "2026-04-07T08:30:00.000Z",
   },
@@ -117,6 +119,7 @@ export const mockPreviewMembers: MockPreviewMember[] = [
     },
     avatar_content_type: null,
     avatar_base64: null,
+    avatar_url: null,
     created_at: "2026-04-01T09:10:00.000Z",
     updated_at: "2026-04-07T08:35:00.000Z",
   },
@@ -147,6 +150,7 @@ export const mockPreviewMembers: MockPreviewMember[] = [
     },
     avatar_content_type: null,
     avatar_base64: null,
+    avatar_url: null,
     created_at: "2026-04-01T09:20:00.000Z",
     updated_at: "2026-04-07T08:40:00.000Z",
   },
@@ -177,6 +181,7 @@ export const mockPreviewMembers: MockPreviewMember[] = [
     },
     avatar_content_type: null,
     avatar_base64: null,
+    avatar_url: null,
     created_at: "2026-04-01T09:30:00.000Z",
     updated_at: "2026-04-07T08:45:00.000Z",
   },
@@ -229,6 +234,7 @@ export const mockPreviewMembers: MockPreviewMember[] = [
     ],
     avatar_content_type: null,
     avatar_base64: null,
+    avatar_url: null,
     created_at: "2026-04-02T01:00:00.000Z",
     updated_at: "2026-04-07T01:20:00.000Z",
   },
@@ -258,6 +264,7 @@ export const mockPreviewMembers: MockPreviewMember[] = [
     },
     avatar_content_type: null,
     avatar_base64: null,
+    avatar_url: null,
     created_at: "2026-04-02T02:00:00.000Z",
     updated_at: "2026-04-07T02:20:00.000Z",
   },

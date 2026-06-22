@@ -1,6 +1,6 @@
-import { getBaseUrl, hasSenderCredentials, listConfiguredSenderYears } from "@/lib/mattermost/config";
 import { normalizeNotificationTargetUrl, type NotificationChannel } from "@/lib/notifications/shared";
 import { SITE_URL } from "@/lib/site";
+import { isSsafyVerifyServerApiConfigured } from "@/lib/ssafy-verify/config";
 import type {
   AdminNotificationChannelPreview,
   AdminNotificationChannelSelection,
@@ -145,9 +145,8 @@ export function computeOperationStatus(
 }
 
 export function assertMattermostConfigured() {
-  getBaseUrl();
-  if (listConfiguredSenderYears().length === 0) {
-    throw new Error("Mattermost 발송용 sender 계정이 설정되지 않았습니다.");
+  if (!isSsafyVerifyServerApiConfigured()) {
+    throw new Error("SSAFY Verify Server API credential이 설정되지 않았습니다.");
   }
 }
 
@@ -196,9 +195,7 @@ export function getMattermostSenderCandidateYears(member: AudienceMemberForMatte
 }
 
 export function hasMattermostSenderForMember(member: AudienceMemberForMattermost) {
-  return getMattermostSenderCandidateYears(member).some((year) =>
-    hasSenderCredentials(year, { allowDefaultFallback: false }),
-  );
+  return isSsafyVerifyServerApiConfigured() && getMattermostSenderCandidateYears(member).length > 0;
 }
 
 export function parseLogMetadata(

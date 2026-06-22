@@ -1,5 +1,5 @@
 import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
-import type { MMUser } from "@/lib/mattermost";
+import type { MMUser } from "@/lib/mattermost/types";
 
 export type MemberRow = {
   id: string;
@@ -11,6 +11,7 @@ export type MemberRow = {
   campus?: string | null;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
+  avatar_url?: string | null;
   updated_at?: string | null;
 };
 
@@ -18,7 +19,6 @@ export type MemberSyncField = "mmUsername" | "displayName" | "campus" | "avatar"
 
 export type SenderSession = {
   year: number;
-  token: string;
 };
 
 export type MemberSyncSnapshot = {
@@ -27,6 +27,7 @@ export type MemberSyncSnapshot = {
   displayName: string;
   campus: string | null;
   avatarFetched: boolean;
+  avatarUrl: string | null;
   avatarContentType: string | null;
   avatarBase64: string | null;
 };
@@ -72,6 +73,7 @@ export function makeSnapshot(
     displayName,
     campus: profile.campus ?? null,
     avatarFetched: Boolean(avatar),
+    avatarUrl: null,
     avatarContentType: avatar?.contentType ?? null,
     avatarBase64: avatar?.base64 ?? null,
   };

@@ -9,10 +9,8 @@ import {
   getMemberRequiredPolicyStatus,
 } from "@/lib/policy-documents";
 import {
-  MattermostApiError,
   resolveSelectableMemberByUsername,
-} from "@/lib/mattermost";
-import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
+} from "@/lib/ssafy-verify/directory";
 import {
   findMmUserDirectoryEntryByUsername,
   upsertMmUserDirectorySnapshot,
@@ -102,44 +100,17 @@ export async function POST(request: Request) {
         .maybeSingle();
       member = memberById ?? null;
     } else {
-      try {
-        const resolved = await resolveSelectableMemberByUsername(username);
-        if (resolved) {
-          const profile = parseSsafyProfileFromUser(resolved.user);
-          await upsertMmUserDirectorySnapshot({
-            mmUserId: resolved.user.id,
-            mmUsername: resolved.user.username,
-            displayName:
-              profile.displayName ?? resolved.user.nickname ?? resolved.user.username,
-            campus: profile.campus ?? null,
-            isStaff: Boolean(profile.isStaff),
-            sourceYears: [resolved.year],
-          });
-          const { data: memberById } = await supabase
-            .from("members")
-            .select(memberSelect)
-            .eq("mm_user_id", resolved.user.id)
-            .maybeSingle();
-          member = memberById ?? null;
+      const resolved = await resolveSelectableMemberByUsername(username);
+      if (resolved) {
+        if (resolved.directorySnapshot) {
+          await upsertMmUserDirectorySnapshot(resolved.directorySnapshot);
         }
-      } catch (error) {
-        if (error instanceof MattermostApiError) {
-          await logAuthSecurity({
-            ...context,
-            eventName: "member_login",
-            status: "failure",
-            actorType: "guest",
-            identifier: username,
-            properties: {
-              reason: "team_or_channel_inaccessible",
-              status: error.status,
-            },
-          });
-          await recordMemberAuthAttempt("login", throttleContext, false);
-          await delayMemberAuthAttempt("login");
-          return NextResponse.json({ error: "login_failed" }, { status: 403 });
-        }
-        throw error;
+        const { data: memberById } = await supabase
+          .from("members")
+          .select(memberSelect)
+          .eq("mm_user_id", resolved.user.id)
+          .maybeSingle();
+        member = memberById ?? null;
       }
     }
 

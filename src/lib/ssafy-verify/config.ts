@@ -10,12 +10,30 @@ export type SsafyVerifyServerConfig = {
   clientSecret: string | null;
 };
 
+export type SsafyVerifyServerApiConfig = {
+  issuer: string;
+  apiBaseUrl: string;
+  clientId: string;
+  clientSecret: string;
+};
+
 function readRequiredEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`${name} 환경 변수가 필요합니다.`);
   }
   return value;
+}
+
+function normalizeHttpBaseUrl(value: string, envName: string) {
+  const trimmed = value.trim();
+  const url = new URL(trimmed);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`${envName} 환경 변수는 http 또는 https URL이어야 합니다.`);
+  }
+  url.hash = "";
+  url.search = "";
+  return url.toString().replace(/\/$/, "");
 }
 
 function normalizeRedirectUri(value: string) {
@@ -69,4 +87,32 @@ export function getSsafyVerifyServerConfig(): SsafyVerifyServerConfig {
     redirectUris: readRedirectUris(),
     clientSecret: process.env.SSAFY_VERIFY_CLIENT_SECRET?.trim() || null,
   };
+}
+
+export function getSsafyVerifyServerApiConfig(): SsafyVerifyServerApiConfig {
+  const issuer = normalizeHttpBaseUrl(
+    readRequiredEnv("SSAFY_VERIFY_ISSUER"),
+    "SSAFY_VERIFY_ISSUER",
+  );
+  const apiBaseUrl = process.env.SSAFY_VERIFY_SERVER_API_BASE_URL?.trim()
+    ? normalizeHttpBaseUrl(
+        process.env.SSAFY_VERIFY_SERVER_API_BASE_URL,
+        "SSAFY_VERIFY_SERVER_API_BASE_URL",
+      )
+    : `${issuer}/v1`;
+
+  return {
+    issuer,
+    apiBaseUrl,
+    clientId: readRequiredEnv("SSAFY_VERIFY_SERVER_CLIENT_ID"),
+    clientSecret: readRequiredEnv("SSAFY_VERIFY_SERVER_CLIENT_SECRET"),
+  };
+}
+
+export function isSsafyVerifyServerApiConfigured() {
+  return Boolean(
+    process.env.SSAFY_VERIFY_ISSUER?.trim() &&
+      process.env.SSAFY_VERIFY_SERVER_CLIENT_ID?.trim() &&
+      process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET?.trim(),
+  );
 }

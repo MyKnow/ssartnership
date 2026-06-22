@@ -130,16 +130,20 @@
 
 16. [ ] SSAFY Verify 전환 후속
    대상: `src/app/api/ssafy/verify-token/route.ts`, `src/lib/ssafy-verify/**`, `src/app/auth/**`, `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/**`, `src/app/api/mm/change-password/route.ts`, `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`
-   이유: MM 코드 본인인증은 제거했지만, 기존 서비스 식별자는 여전히 MM ID 중심이다. SSAFY Verify가 반환하는 Mattermost 식별자가 기존 `members.mm_user_id`와 같은 안정 식별자인지 운영 검증해야 기존 회원 link와 신규 온보딩을 안전하게 설계할 수 있다.
+   이유: User Auth와 Server API 위임은 dev에서 동작하지만, 기존 서비스 식별자와 프로필 이미지 저장 모델은 여전히 MM ID/base64 중심이다. Verify가 제공하는 profile URL 계약과 SSARTNERSHIP 저장 방식을 맞춰 신규 가입 후 인증 카드/프로필 UX까지 완성해야 한다.
    세부 단계:
-   16-1. [ ] SSAFY Verify Mattermost ID 매핑 검증
-      목표: `ssafy.mattermost_id`가 Mattermost raw user id인지, username인지, 또는 issuer별 pairwise 값인지 확인하고 `members.mm_user_id`와의 매칭 기준을 문서화한다.
-   16-2. [ ] SSAFY Verify 기반 신규 회원 온보딩
-      목표: 기존 회원이 없을 때 Verify 클레임만으로 `members` row를 생성할지, 약관 동의와 표시명/캠퍼스 보정을 어떤 화면에서 처리할지 정한다.
+   16-1. [x] SSAFY Verify Mattermost ID 매핑 검증
+      완료: Server API profile의 `ssafy_mattermost_user_id`를 기존 `members.mm_user_id`와 매칭하는 기준으로 사용하고, sibling User Auth client scope 기준 profile 응답을 Verify 측에서 수정해 검증했다.
+   16-2. [x] SSAFY Verify 기반 신규 회원 온보딩
+      완료: 기존 회원이 없으면 Verify Server API profile로 가입 세션을 만들고, 비밀번호/약관 입력 후 `members` row를 생성한다. 이미 가입된 사용자는 로그인 페이지로 되돌린다.
    16-3. [ ] 기존 MM ID + 사이트 비밀번호 로그인 전환
       목표: `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경을 SSAFY Verify 로그인/세션 모델로 대체하고, 비밀번호 해시 보존/삭제 정책을 정한다.
-   16-4. [ ] Mattermost 알림 및 프로필 동기화 존치 판단
-      목표: Mattermost 알림, DM 발송, 프로필/아바타 동기화가 계속 필요한지 결정하고 필요 없으면 `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`, 관련 env를 제거한다.
+   16-4. [x] Mattermost 알림 및 프로필 동기화 Server API 위임
+      완료: DM 발송, 디렉터리 lookup, profile-events, 프로필/아바타 동기화를 SSAFY Verify Server API로 위임하고 직접 Mattermost env와 클라이언트 호출을 제거했다.
+   16-5. [x] Verify profile image URL 저장/렌더링 전환
+      완료: Verify profile의 `picture` URL을 absolute URL로 정규화해 `members.avatar_url`에 저장하고, 회원가입/인증 카드/관리자 회원 화면에서 기존 base64 fallback과 함께 렌더링한다.
+   16-6. [x] 임시 진단 UI 제거와 운영 로그 중심 디버깅 정착
+      완료: 일반 사용자 화면에는 stable error message만 보여주고, provider diagnostic은 서버 보안 로그와 명시적 `SSAFY_VERIFY_DEBUG_ERRORS=1` 환경에서만 확인한다.
 
 ## 유지 규칙
 

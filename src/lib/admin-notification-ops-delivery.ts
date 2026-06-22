@@ -1,8 +1,13 @@
 import { notificationRepository } from "@/lib/repositories";
-import { createDirectChannel, sendPost } from "@/lib/mattermost/channels";
-import { loginWithPassword } from "@/lib/mattermost/auth";
-import { getSenderCredentials, hasSenderCredentials } from "@/lib/mattermost/config";
 import { buildNotificationPayload } from "@/lib/push/payloads";
+import {
+  getSsafyVerifyServerApiConfig,
+} from "@/lib/ssafy-verify/config";
+import {
+  SsafyVerifyServerApiError,
+  createSsafyVerifyServerApiClient,
+  type SsafyVerifyNotificationTargetResult,
+} from "@/lib/ssafy-verify/server-api";
 import {
   createPushMessageLog,
   finalizePushMessageLog,
@@ -16,7 +21,6 @@ import type {
   AdminNotificationSource,
   AdminNotificationType,
 } from "@/lib/admin-notification-ops";
-import { buildMattermostMessage, getMattermostSenderCandidateYears } from "@/lib/admin-notification-ops-utils";
 
 type AudienceMember = {
   id: string;
@@ -64,6 +68,143 @@ async function runBookkeepingTasks(
       console.error(warning);
     }
   }
+}
+
+function chunkMembers<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function toVerifyDeliveryErrorMessage(error: unknown) {
+  if (error instanceof SsafyVerifyServerApiError) {
+    const requestSuffix = error.requestId ? ` (request_id: ${error.requestId})` : "";
+    return `${error.errorCode}: ${error.message}${requestSuffix}`;
+  }
+  return toErrorMessage(error, "SSAFY Verify Mattermost 알림 위임 실패");
+}
+
+function isVerifyDeliveryAccepted(status: string) {
+  const normalized = status.toLowerCase();
+  return normalized !== "failed" && normalized !== "skipped";
+}
+
+function toVerifyDeliveryStatus(status: string) {
+  if (status.toLowerCase() === "skipped") {
+    return "skipped" as const;
+  }
+  return isVerifyDeliveryAccepted(status) ? "sent" as const : "failed" as const;
+}
+
+function toVerifyTargetErrorMessage(
+  status: string,
+  result: SsafyVerifyNotificationTargetResult | undefined,
+) {
+  if (!result?.errorCode && !result?.errorMessage && !result?.requestId) {
+    return `SSAFY Verify Mattermost 알림 상태: ${status}`;
+  }
+  const code = result.errorCode ?? "VERIFY_NOTIFICATION_FAILED";
+  const message = result.errorMessage ?? `SSAFY Verify Mattermost 알림 상태: ${status}`;
+  const requestSuffix = result.requestId ? ` (request_id: ${result.requestId})` : "";
+  return `${code}: ${message}${requestSuffix}`;
+}
+
+async function sendMattermostCampaignDeliveriesViaVerify(params: {
+  notificationId: string;
+  notificationType: AdminNotificationType;
+  title: string;
+  body: string;
+  url?: string | null;
+  members: AudienceMember[];
+}): Promise<ChannelDeliveryResult> {
+  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  const bookkeepingErrors: string[] = [];
+  const chunks = chunkMembers(params.members, 25);
+
+  for (const [chunkIndex, members] of chunks.entries()) {
+    try {
+      const result = await client.sendMattermostNotificationBatch({
+        campaignId: params.notificationId,
+        purpose: params.notificationType,
+        templateKey: "ssartnership_admin_notification",
+        message: {
+          title: params.title,
+          body: params.body,
+          url: params.url ?? undefined,
+        },
+        recipients: members.map((member) => ({
+          mattermostUserId: member.mm_user_id,
+        })),
+        idempotencyKey: `ssartnership:${params.notificationId}:mm:${chunkIndex + 1}`,
+      });
+
+      const targetResults =
+        result.results.length === members.length ? result.results : [];
+
+      for (const [memberIndex, member] of members.entries()) {
+        const targetResult = targetResults[memberIndex];
+        const verifyStatus = targetResult?.status ?? result.status;
+        const deliveryStatus = toVerifyDeliveryStatus(verifyStatus);
+        if (deliveryStatus === "sent") {
+          sent += 1;
+        } else if (deliveryStatus === "skipped") {
+          skipped += 1;
+        } else {
+          failed += 1;
+        }
+
+        await runBookkeepingTasks(
+          [
+            notificationRepository.recordNotificationDelivery({
+              notificationId: params.notificationId,
+              memberId: member.id,
+              channel: "mm",
+              status: deliveryStatus,
+              errorMessage:
+                deliveryStatus === "sent"
+                  ? null
+                  : toVerifyTargetErrorMessage(verifyStatus, targetResult),
+            }),
+          ],
+          "mm",
+          member.id,
+          bookkeepingErrors,
+        );
+      }
+    } catch (error) {
+      const errorMessage = toVerifyDeliveryErrorMessage(error);
+      failed += members.length;
+      for (const member of members) {
+        await runBookkeepingTasks(
+          [
+            notificationRepository.recordNotificationDelivery({
+              notificationId: params.notificationId,
+              memberId: member.id,
+              channel: "mm",
+              status: "failed",
+              errorMessage,
+            }),
+          ],
+          "mm",
+          member.id,
+          bookkeepingErrors,
+        );
+      }
+    }
+  }
+
+  return {
+    targeted: params.members.length,
+    sent,
+    failed,
+    skipped,
+    bookkeepingErrors,
+  };
 }
 
 export async function sendPushCampaignDeliveries(params: {
@@ -183,116 +324,5 @@ export async function sendMattermostCampaignDeliveries(params: {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
-  const senderSessionByYear = new Map<number, Promise<{ token: string; user: { id: string } }>>();
-  let sent = 0;
-  let failed = 0;
-  const bookkeepingErrors: string[] = [];
-
-  for (const member of params.members) {
-    const candidateYears = getMattermostSenderCandidateYears(member);
-    if (candidateYears.length === 0) {
-      failed += 1;
-      await runBookkeepingTasks(
-        [
-          notificationRepository.recordNotificationDelivery({
-            notificationId: params.notificationId,
-            memberId: member.id,
-            channel: "mm",
-            status: "failed",
-            errorMessage: "발송 가능한 Mattermost sender 기수를 찾지 못했습니다.",
-          }),
-        ],
-        "mm",
-        member.id,
-        bookkeepingErrors,
-      );
-      continue;
-    }
-
-    let lastError: Error | null = null;
-
-    for (const year of candidateYears) {
-      if (!hasSenderCredentials(year, { allowDefaultFallback: false })) {
-        lastError = new Error(`${year}기 Mattermost sender 계정이 설정되지 않았습니다.`);
-        continue;
-      }
-
-      let sendSucceeded = false;
-      try {
-        let sessionPromise = senderSessionByYear.get(year);
-        if (!sessionPromise) {
-          const credentials = getSenderCredentials(year, { allowDefaultFallback: false });
-          sessionPromise = loginWithPassword(credentials.loginId, credentials.password);
-          senderSessionByYear.set(
-            year,
-            sessionPromise as Promise<{ token: string; user: { id: string } }>,
-          );
-        }
-        const session = await sessionPromise;
-        const channel = await createDirectChannel(session.token, session.user.id, member.mm_user_id);
-        await sendPost(
-          session.token,
-          channel.id,
-          buildMattermostMessage({
-            notificationType: params.notificationType,
-            title: params.title,
-            body: params.body,
-            url: params.url,
-          }),
-        );
-        sendSucceeded = true;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error("Mattermost 발송 실패");
-      }
-
-      if (!sendSucceeded) {
-        continue;
-      }
-
-      sent += 1;
-      await runBookkeepingTasks(
-        [
-          notificationRepository.recordNotificationDelivery({
-            notificationId: params.notificationId,
-            memberId: member.id,
-            channel: "mm",
-            status: "sent",
-          }),
-        ],
-        "mm",
-        member.id,
-        bookkeepingErrors,
-      );
-      lastError = null;
-      break;
-    }
-
-    if (!lastError) {
-      continue;
-    }
-
-    failed += 1;
-    await runBookkeepingTasks(
-      [
-        notificationRepository.recordNotificationDelivery({
-          notificationId: params.notificationId,
-          memberId: member.id,
-          channel: "mm",
-          status: "failed",
-          errorMessage: lastError.message,
-        }),
-      ],
-      "mm",
-      member.id,
-      bookkeepingErrors,
-    );
-  }
-
-  return {
-    targeted: params.members.length,
-    sent,
-    failed,
-    skipped: 0,
-    bookkeepingErrors,
-  };
+  return sendMattermostCampaignDeliveriesViaVerify(params);
 }

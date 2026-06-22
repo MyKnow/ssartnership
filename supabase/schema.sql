@@ -465,6 +465,7 @@ create table if not exists members (
   admin_permission_id text,
   avatar_content_type text,
   avatar_base64 text,
+  avatar_url text,
   ssafy_sub text,
   ssafy_verified_at timestamp with time zone,
   ssafy_auth_time timestamp with time zone,

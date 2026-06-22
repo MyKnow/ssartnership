@@ -53,6 +53,7 @@ export default async function CertificationVerifyPage({
         campus?: string | null;
         avatar_content_type?: string | null;
         avatar_base64?: string | null;
+        avatar_url?: string | null;
         must_change_password?: boolean | null;
       }
     | null = null;
@@ -62,7 +63,7 @@ export default async function CertificationVerifyPage({
     const { data } = await supabase
       .from("members")
       .select(
-        "id,display_name,year,campus,avatar_content_type,avatar_base64,must_change_password",
+        "id,display_name,year,campus,avatar_content_type,avatar_base64,avatar_url,must_change_password",
       )
       .eq("id", verification.payload.userId)
       .maybeSingle();
@@ -81,7 +82,7 @@ export default async function CertificationVerifyPage({
   const avatarSrc =
     member?.avatar_base64 && member.avatar_content_type
       ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
-      : "/avatar-default.svg";
+      : member?.avatar_url ?? "/avatar-default.svg";
   const name = profile?.displayName ?? member?.display_name ?? "이름 미지정";
 
   return (

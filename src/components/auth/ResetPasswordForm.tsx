@@ -159,7 +159,6 @@ export default function ResetPasswordForm() {
       {error ? (
         <FormMessage variant="error">
           {getErrorMessage(error)}
-          {error.requestId ? ` request_id: ${error.requestId}` : ""}
         </FormMessage>
       ) : null}
     </div>

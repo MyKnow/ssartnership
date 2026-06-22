@@ -1,11 +1,11 @@
 import {
   findMmUserDirectoryEntryByUsername,
+  upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
 import {
   resolveSelectableMemberByUsername,
-} from "@/lib/mattermost";
+} from "@/lib/ssafy-verify/directory";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { isMattermostApiError, upsertDirectorySnapshotFromMmUser } from "./mattermost";
 import type { MemberRow } from "@/lib/mm-member-sync";
 
 type DirectoryEntry = Awaited<ReturnType<typeof findMmUserDirectoryEntryByUsername>>;
@@ -30,7 +30,7 @@ export async function resolveResetPasswordMember(
 ): Promise<ResetPasswordMemberResolution> {
   const supabase = getSupabaseAdminClient();
   const memberSelect =
-    "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,updated_at";
+    "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,avatar_url,updated_at";
   const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
   let resolvedStudentYear: number | null = null;
   let member: MemberRow | null = null;
@@ -43,26 +43,18 @@ export async function resolveResetPasswordMember(
       .maybeSingle();
     member = (memberById as MemberRow | null) ?? null;
   } else {
-    try {
-      const resolved = await resolveSelectableMemberByUsername(username);
-      if (resolved) {
-        resolvedStudentYear = resolved.year;
-        await upsertDirectorySnapshotFromMmUser(resolved.user, [resolved.year]);
-        const { data: memberById } = await supabase
-          .from("members")
-          .select(memberSelect)
-          .eq("mm_user_id", resolved.user.id)
-          .maybeSingle();
-        member = (memberById as MemberRow | null) ?? null;
+    const resolved = await resolveSelectableMemberByUsername(username);
+    if (resolved) {
+      resolvedStudentYear = resolved.year;
+      if (resolved.directorySnapshot) {
+        await upsertMmUserDirectorySnapshot(resolved.directorySnapshot);
       }
-    } catch (error) {
-      if (isMattermostApiError(error)) {
-        return {
-          kind: "inaccessible",
-          status: error.status,
-        };
-      }
-      throw error;
+      const { data: memberById } = await supabase
+        .from("members")
+        .select(memberSelect)
+        .eq("mm_user_id", resolved.user.id)
+        .maybeSingle();
+      member = (memberById as MemberRow | null) ?? null;
     }
   }
 

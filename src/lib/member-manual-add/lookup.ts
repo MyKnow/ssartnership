@@ -1,11 +1,12 @@
-import {
-  findUserInChannelByUsername,
-  getSenderCredentials,
-  getStudentChannelConfig,
-  loginWithPassword,
-  type MMUser,
-} from "@/lib/mattermost";
 import type { MemberRow } from "@/lib/mm-member-sync";
+import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
+import {
+  extractSsafyVerifyMemberProfiles,
+  toSsafyVerifyMattermostUser,
+  type SsafyVerifyMattermostUser,
+  type SsafyVerifyMemberProfile,
+} from "@/lib/ssafy-verify/profile";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   MANUAL_MEMBER_ADD_YEAR_FALLBACKS,
@@ -15,14 +16,13 @@ import {
 } from "./shared";
 
 const MEMBER_SELECT =
-  "id,mm_user_id,mm_username,display_name,year,campus,password_hash,password_salt,must_change_password,avatar_content_type,avatar_base64,updated_at";
+  "id,mm_user_id,mm_username,display_name,year,campus,password_hash,password_salt,must_change_password,avatar_content_type,avatar_base64,avatar_url,updated_at";
 
 export type ManualMemberResolution = {
   requestedYear: ManualMemberAddYear;
   resolvedYear: number;
-  senderToken: string;
-  senderUserId: string;
-  user: MMUser;
+  user: SsafyVerifyMattermostUser;
+  profile: SsafyVerifyMemberProfile;
 };
 
 export type ExistingMemberRecord = MemberRow & {
@@ -41,11 +41,8 @@ export async function getSenderSession(
   }
 
   const promise = (async () => {
-    const credentials = getSenderCredentials(year);
-    const login = await loginWithPassword(credentials.loginId, credentials.password);
     return {
-      token: login.token,
-      userId: login.user.id,
+      year,
     };
   })();
 
@@ -70,26 +67,27 @@ export async function resolveManualMemberResolution(
 
   for (const year of yearsToTry) {
     try {
-      const sender = await getSenderSession(year, cache);
-      const channelConfig = getStudentChannelConfig(year);
-      const user = await findUserInChannelByUsername(
-        sender.token,
+      await getSenderSession(year, cache);
+      const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+      const payload = await client.findMattermostUsers({
         username,
-        channelConfig,
+        cohort: year,
+      });
+      const profile = extractSsafyVerifyMemberProfiles(payload).find((item) =>
+        requestedYear === 0 ? item.isStaff : !item.isStaff,
       );
-      if (!user) {
+      if (!profile) {
         continue;
       }
       return {
         requestedYear,
         resolvedYear: year,
-        senderToken: sender.token,
-        senderUserId: sender.userId,
-        user,
+        user: toSsafyVerifyMattermostUser(profile),
+        profile,
       };
     } catch (error) {
       const normalized =
-        error instanceof Error ? error : new Error("MM 사용자 조회 실패");
+        error instanceof Error ? error : new Error("SSAFY Verify 사용자 조회 실패");
       if (requestedYear !== 0) {
         throw normalized;
       }

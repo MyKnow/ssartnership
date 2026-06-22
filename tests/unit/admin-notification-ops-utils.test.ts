@@ -1,19 +1,29 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const getBaseUrl = vi.fn();
-const hasSenderCredentials = vi.fn();
-const listConfiguredSenderYears = vi.fn();
+const VERIFY_ENV_KEYS = [
+  "SSAFY_VERIFY_ISSUER",
+  "SSAFY_VERIFY_SERVER_CLIENT_ID",
+  "SSAFY_VERIFY_SERVER_CLIENT_SECRET",
+] as const;
 
-vi.mock("../../src/lib/mattermost/config", () => ({
-  getBaseUrl,
-  hasSenderCredentials,
-  listConfiguredSenderYears,
-}));
+function clearVerifyEnv() {
+  for (const key of VERIFY_ENV_KEYS) {
+    delete process.env[key];
+  }
+  delete process.env.SSAFY_VERIFY_SERVER_API_BASE_URL;
+}
+
+function setVerifyEnv() {
+  process.env.SSAFY_VERIFY_ISSUER = "https://verify.example.com";
+  process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = "server-client";
+  process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = "server-secret";
+}
 
 describe("admin-notification-ops-utils", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    clearVerifyEnv();
   });
 
   test("maps preview reason and notification labels", async () => {
@@ -94,14 +104,12 @@ describe("admin-notification-ops-utils", () => {
   test("handles mattermost configuration and sender availability", async () => {
     const utils = await import("../../src/lib/admin-notification-ops-utils");
 
-    getBaseUrl.mockImplementation(() => "https://mm.example.com");
-    listConfiguredSenderYears.mockReturnValue([]);
     expect(() => utils.assertMattermostConfigured()).toThrow(
-      "Mattermost 발송용 sender 계정이 설정되지 않았습니다.",
+      "SSAFY Verify Server API credential이 설정되지 않았습니다.",
     );
     expect(utils.isMattermostConfigured()).toBe(false);
 
-    listConfiguredSenderYears.mockReturnValue([15]);
+    setVerifyEnv();
     expect(utils.isMattermostConfigured()).toBe(true);
 
     expect(utils.normalizeSourceYears([15, "14", "bad", 15, null])).toEqual([15, 14]);
@@ -114,7 +122,6 @@ describe("admin-notification-ops-utils", () => {
       }),
     ).toEqual([16, 14]);
 
-    hasSenderCredentials.mockImplementation((year: number) => year === 16);
     expect(
       utils.hasMattermostSenderForMember({
         is_staff: true,

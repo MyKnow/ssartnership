@@ -1,10 +1,7 @@
-import {
-  createDirectChannel,
-  getUserImage,
-  sendPost,
-} from "@/lib/mattermost";
-import { parseSsafyProfileFromUser } from "@/lib/mm-profile";
+import { randomUUID } from "node:crypto";
 import { generateTempPassword, hashPassword } from "@/lib/password";
+import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { validateMmUsername } from "@/lib/validation";
 import {
@@ -21,14 +18,15 @@ import {
   wrapManualMemberAddDbError,
 } from "./shared";
 import type { MemberRow } from "@/lib/mm-member-sync";
-import type { MMUser } from "@/lib/mattermost";
+import type { SsafyVerifyMattermostUser } from "@/lib/ssafy-verify/profile";
 
 function buildMemberPayload(input: {
   member: MemberRow | null;
-  user: MMUser;
+  user: SsafyVerifyMattermostUser;
   displayName: string;
   campus: string | null;
   year: ManualMemberAddYear;
+  avatarUrl: string | null;
   avatarContentType: string | null;
   avatarBase64: string | null;
   passwordHash: string;
@@ -47,6 +45,7 @@ function buildMemberPayload(input: {
     avatar_content_type:
       input.avatarContentType ?? input.member?.avatar_content_type ?? null,
     avatar_base64: input.avatarBase64 ?? input.member?.avatar_base64 ?? null,
+    avatar_url: input.avatarUrl ?? input.member?.avatar_url ?? null,
     updated_at: input.now,
   };
 }
@@ -56,6 +55,7 @@ export async function provisionManualMembers(
   inputs: ManualMemberAddInput[],
 ): Promise<ManualMemberAddBatchResult> {
   const supabase = getSupabaseAdminClient();
+  const verifyClient = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
   const senderSessionCache = new Map<number, Promise<SenderSession>>();
   const items: ManualMemberAddItem[] = [];
   let success = 0;
@@ -109,14 +109,9 @@ export async function provisionManualMembers(
         continue;
       }
 
-      const profile = parseSsafyProfileFromUser(resolution.user);
-      const displayName =
-        profile.displayName ?? resolution.user.nickname ?? resolution.user.username;
-      const campus = profile.campus ?? null;
-      const avatar = await getUserImage(
-        resolution.senderToken,
-        resolution.user.id,
-      );
+      const displayName = resolution.profile.displayName;
+      const campus = resolution.profile.campus;
+      const avatar = resolution.profile.profileImage;
       const existingMember = await findExistingMemberByMmUser(resolution.user.id);
       const tempPassword = generateTempPassword(12);
       const { hash, salt } = hashPassword(tempPassword);
@@ -128,6 +123,7 @@ export async function provisionManualMembers(
         displayName,
         campus: nextCampus,
         year: requestedYear,
+        avatarUrl: avatar?.url ?? null,
         avatarContentType: avatar?.contentType ?? null,
         avatarBase64: avatar?.base64 ?? null,
         passwordHash: hash,
@@ -176,24 +172,26 @@ export async function provisionManualMembers(
       } as const;
 
       try {
-        const dmChannel = await createDirectChannel(
-          resolution.senderToken,
-          resolution.senderUserId,
-          resolution.user.id,
-        );
-        await sendPost(
-          resolution.senderToken,
-          dmChannel.id,
-          [
-            "SSARTNERSHIP 임시 비밀번호입니다.",
-            "",
-            "임시 비밀번호",
-            "```plaintext",
-            tempPassword,
-            "```",
-            "보안을 위해 로그인 후 반드시 변경해 주세요.",
-          ].join("\n"),
-        );
+        await verifyClient.sendMattermostNotification({
+          recipient: {
+            mattermostUserId: resolution.user.id,
+          },
+          purpose: "manual_member_temp_password",
+          templateKey: "ssartnership_manual_member_temp_password",
+          message: {
+            title: "SSARTNERSHIP 임시 비밀번호",
+            body: [
+              "SSARTNERSHIP 임시 비밀번호입니다.",
+              "",
+              "임시 비밀번호",
+              "```plaintext",
+              tempPassword,
+              "```",
+              "보안을 위해 로그인 후 반드시 변경해 주세요.",
+            ].join("\n"),
+          },
+          idempotencyKey: `manual-member:${resolution.user.id}:${randomUUID()}`,
+        });
 
         items.push({
           ...itemBase,

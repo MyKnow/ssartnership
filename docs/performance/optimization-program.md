@@ -351,7 +351,8 @@
   - `src/lib/mattermost/` 아래에 `types`, `config`, `client`, `auth`, `users`, `channels`, `resolver` 추가
   - Mattermost config 기본값 검증을 위해 helper 테스트 추가
 - Validation Result:
-  - `npx eslint src/lib/mattermost.ts src/lib/mattermost/types.ts src/lib/mattermost/config.ts src/lib/mattermost/client.ts src/lib/mattermost/auth.ts src/lib/mattermost/users.ts src/lib/mattermost/channels.ts src/lib/mattermost/resolver.ts tests/mattermost-mm-profile-helpers.test.mts`
+  - 2026-06-21 SSAFY Verify Server API 위임으로 직접 Mattermost client/config 파일은 제거됨
+  - `npx eslint src/lib/mattermost.ts src/lib/mattermost/types.ts src/lib/mattermost/resolver.ts src/lib/ssafy-verify/server-api.ts src/lib/ssafy-verify/directory.ts tests/mattermost-mm-profile-helpers.test.mts tests/ssafy-verify-full-delegation.test.mts`
   - `npx tsc --noEmit`
   - `node --test tests/mattermost-mm-profile-helpers.test.mts`
   - `git diff --check`

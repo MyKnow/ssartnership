@@ -21,12 +21,17 @@ type VerifyResult =
   | {
       ok: true;
       verified: true;
+      status?: "verified" | "signup_required";
       cohort: string | null;
       campus: string | null;
       authTime: number;
       requiresConsent: boolean;
+      nextPath?: string;
     }
-  | SsafyVerifyClientFailure;
+  | (SsafyVerifyClientFailure & {
+      redirectTo?: string;
+      debug?: Record<string, unknown>;
+    });
 
 declare global {
   interface Window {
@@ -41,13 +46,29 @@ function getErrorMessage(result: Extract<VerifyResult, { ok: false }>) {
   if (result.errorCode === "MEMBER_NOT_FOUND") {
     return "기존 회원 정보와 연결하지 못했습니다. 기존 로그인 후 다시 시도해 주세요.";
   }
+  if (result.errorCode === "MEMBER_ALREADY_REGISTERED") {
+    return "이미 가입된 사용자입니다. 로그인해 주세요.";
+  }
   if (result.errorCode === "SSAFY_MEMBER_CONFLICT") {
     return "이미 다른 계정에 연결된 SSAFY 인증입니다. 기존 계정으로 로그인해 주세요.";
+  }
+  if (result.errorCode === "SSAFY_SIGNUP_PROFILE_UNAVAILABLE") {
+    return "회원가입에 필요한 SSAFY 프로필 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (result.errorCode === "SSAFY_SIGNUP_PROFILE_NOT_FOUND") {
+    return "SSAFY Verify에서 인증된 프로필을 찾지 못했습니다. 운영 설정을 확인해 주세요.";
+  }
+  if (result.errorCode === "SSAFY_SIGNUP_YEAR_NOT_ALLOWED") {
+    return "현재 가입 대상 기수가 아닙니다.";
   }
   if (result.errorCode === "VERIFY_RATE_LIMITED") {
     return "인증 요청이 너무 자주 시도되었습니다. 잠시 후 다시 시도해 주세요.";
   }
   return getSsafyVerifyClientErrorMessage(result.errorCode);
+}
+
+function formatDebugValue(value: unknown) {
+  return JSON.stringify(value, null, 2);
 }
 
 export default function SsafyVerifyButton({
@@ -130,12 +151,27 @@ export default function SsafyVerifyButton({
     );
 
     if (!result.ok) {
+      if (result.errorCode === "MEMBER_ALREADY_REGISTERED") {
+        sessionStorage.setItem("signup:alreadyRegistered", "1");
+        router.replace(
+          "redirectTo" in result && result.redirectTo
+            ? result.redirectTo
+            : "/auth/login",
+        );
+        return;
+      }
       setStatus("failed");
       setError(result);
       return;
     }
 
     const safeReturnTo = sanitizeReturnTo(returnTo, "/");
+    if (result.status === "signup_required") {
+      const nextPath = result.nextPath ?? "/auth/signup/complete";
+      router.replace(`${nextPath}?returnTo=${encodeURIComponent(safeReturnTo)}`);
+      router.refresh();
+      return;
+    }
     const nextHref = result.requiresConsent
       ? `/auth/consent?returnTo=${encodeURIComponent(safeReturnTo)}`
       : safeReturnTo;
@@ -152,7 +188,16 @@ export default function SsafyVerifyButton({
       {error ? (
         <FormMessage variant="error">
           {getErrorMessage(error)}
-          {error.requestId ? ` request_id: ${error.requestId}` : ""}
+          {error.debug ? (
+            <details className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-left text-xs leading-5 text-red-950">
+              <summary className="cursor-pointer font-semibold">
+                진단 정보
+              </summary>
+              <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap">
+                {formatDebugValue(error.debug)}
+              </pre>
+            </details>
+          ) : null}
         </FormMessage>
       ) : null}
     </div>

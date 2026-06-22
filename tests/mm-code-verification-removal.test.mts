@@ -45,5 +45,5 @@ test("SSAFY Verify transition TODOs preserve unresolved decisions", () => {
 
   assert.match(todo, /SSAFY Verify 전환 후속/);
   assert.match(todo, /members\.mm_user_id/);
-  assert.match(todo, /Mattermost 알림/);
+  assert.match(todo, /Server API 위임/);
 });
