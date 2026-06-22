@@ -90,8 +90,25 @@ test("SSAFY Verify Server API client caches client_credentials tokens per scope"
 
     assert.equal(headers.get("authorization"), "Bearer access-token-1");
     return jsonResponse({
-      campaign_id: "campaign-1",
-      status: "sent",
+      ok: true,
+      data: {
+        campaign_id: "campaign-1",
+        summary: {
+          total: 1,
+          queued: 0,
+          sent: 1,
+          retrying: 0,
+          failed: 0,
+          skipped: 0,
+        },
+        results: [
+          {
+            idempotency_key: "campaign-1:mm:1",
+            notification_id: "notify-1",
+            status: "sent",
+          },
+        ],
+      },
       request_id: "req_123",
     });
   };
@@ -120,16 +137,52 @@ test("SSAFY Verify Server API client caches client_credentials tokens per scope"
   };
 
   assert.deepEqual(await client.sendMattermostNotificationBatch(input), {
-    notificationId: null,
+    notificationId: "notify-1",
     campaignId: "campaign-1",
     status: "sent",
     requestId: "req_123",
+    summary: {
+      total: 1,
+      queued: 0,
+      sent: 1,
+      retrying: 0,
+      failed: 0,
+      skipped: 0,
+    },
+    results: [
+      {
+        idempotencyKey: "campaign-1:mm:1",
+        notificationId: "notify-1",
+        status: "sent",
+        errorCode: null,
+        errorMessage: null,
+        requestId: null,
+      },
+    ],
   });
   assert.deepEqual(await client.sendMattermostNotificationBatch(input), {
-    notificationId: null,
+    notificationId: "notify-1",
     campaignId: "campaign-1",
     status: "sent",
     requestId: "req_123",
+    summary: {
+      total: 1,
+      queued: 0,
+      sent: 1,
+      retrying: 0,
+      failed: 0,
+      skipped: 0,
+    },
+    results: [
+      {
+        idempotencyKey: "campaign-1:mm:1",
+        notificationId: "notify-1",
+        status: "sent",
+        errorCode: null,
+        errorMessage: null,
+        requestId: null,
+      },
+    ],
   });
 
   assert.equal(calls.length, 3);
@@ -145,17 +198,26 @@ test("SSAFY Verify Server API client caches client_credentials tokens per scope"
 
   assert.equal(calls[1]?.url, "https://verify.example.com/v1/notifications/mattermost/batch");
   assert.equal(calls[1]?.authorization, "Bearer access-token-1");
-  assert.equal(calls[1]?.idempotencyKey, "campaign-1:mm");
+  assert.equal(calls[1]?.idempotencyKey, null);
   assert.deepEqual(JSON.parse(calls[1]?.body ?? "{}"), {
     campaign_id: "campaign-1",
     purpose: "announcement",
-    template_key: "ssartnership_admin_notification",
-    message: {
-      title: "운영 공지",
-      body: "본문",
-      url: "/notifications",
+    template: {
+      id: "ssartnership_admin_notification",
+      variables: {
+        title: "운영 공지",
+        body: "본문",
+        url: "/notifications",
+      },
     },
-    recipients: [{ mattermost_user_id: "mm.user_123-abc" }],
+    targets: [
+      {
+        idempotency_key: "campaign-1:mm:1",
+        target: {
+          ssafy_mattermost_user_id: "mm.user_123-abc",
+        },
+      },
+    ],
   });
   assert.equal(calls[2]?.url, "https://verify.example.com/v1/notifications/mattermost/batch");
   assert.equal(calls[2]?.authorization, "Bearer access-token-1");
@@ -167,7 +229,8 @@ test("SSAFY Verify Server API normalizes stable public errors", async () => {
     createSsafyVerifyServerApiClient,
   } = await serverApiModulePromise;
 
-  const fetchImpl: typeof fetch = async (input) => {
+  const requestBodies: string[] = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
     if (String(input).endsWith("/server/token")) {
       return jsonResponse({
         access_token: "access-token-1",
@@ -176,6 +239,7 @@ test("SSAFY Verify Server API normalizes stable public errors", async () => {
       });
     }
 
+    requestBodies.push(typeof init?.body === "string" ? init.body : "");
     return jsonResponse(
       {
         error_code: "IDEMPOTENCY_CONFLICT",
@@ -203,7 +267,14 @@ test("SSAFY Verify Server API normalizes stable public errors", async () => {
         recipient: { mattermostUserId: "mm.user_123" },
         purpose: "announcement",
         templateKey: "ssartnership_admin_notification",
-        message: { title: "제목", body: "본문" },
+        message: {
+          title: "제목",
+          body: "본문",
+          variables: {
+            temp_password: "Temp1234!",
+            login_url: "https://ssartnership.example.com/auth/login",
+          },
+        },
         idempotencyKey: "notice-1:mm",
       }),
     (error) => {
@@ -228,6 +299,23 @@ test("SSAFY Verify Server API normalizes stable public errors", async () => {
       return true;
     },
   );
+  assert.deepEqual(JSON.parse(requestBodies[0] ?? "{}"), {
+    idempotency_key: "notice-1:mm",
+    campaign_id: "notice-1:mm",
+    purpose: "announcement",
+    target: {
+      ssafy_mattermost_user_id: "mm.user_123",
+    },
+    template: {
+      id: "ssartnership_admin_notification",
+      variables: {
+        title: "제목",
+        body: "본문",
+        temp_password: "Temp1234!",
+        login_url: "https://ssartnership.example.com/auth/login",
+      },
+    },
+  });
 });
 
 test("SSAFY Verify Server API preserves nested profile error request ids", async () => {

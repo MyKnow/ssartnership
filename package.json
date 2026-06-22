@@ -24,6 +24,7 @@
     "test:mm-profile": "node --import ./tests/alias-register.mjs --test tests/mm-profile-csv.test.mts",
     "test:partner-portal": "node --import ./tests/alias-register.mjs --test tests/partner-portal.mock.test.mts",
     "test:ssafy-cycle": "node --import ./tests/alias-register.mjs --test tests/ssafy-cycle-simulation.test.mts",
+    "test:ssafy-verify:live": "sh -c 'if [ -f .env ]; then node --env-file=.env --import ./tests/alias-register.mjs --test tests/live/ssafy-verify-live-smoke.test.mts; else node --import ./tests/alias-register.mjs --test tests/live/ssafy-verify-live-smoke.test.mts; fi'",
     "validate:migrations": "node scripts/validate-supabase-migrations.mjs",
     "audit:security": "node scripts/security-audit.mjs",
     "bootstrap:super-admin": "node scripts/bootstrap-super-admin.mjs",

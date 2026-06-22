@@ -6,6 +6,7 @@ import {
 import {
   SsafyVerifyServerApiError,
   createSsafyVerifyServerApiClient,
+  type SsafyVerifyNotificationTargetResult,
 } from "@/lib/ssafy-verify/server-api";
 import {
   createPushMessageLog,
@@ -86,7 +87,28 @@ function toVerifyDeliveryErrorMessage(error: unknown) {
 }
 
 function isVerifyDeliveryAccepted(status: string) {
-  return status !== "failed";
+  const normalized = status.toLowerCase();
+  return normalized !== "failed" && normalized !== "skipped";
+}
+
+function toVerifyDeliveryStatus(status: string) {
+  if (status.toLowerCase() === "skipped") {
+    return "skipped" as const;
+  }
+  return isVerifyDeliveryAccepted(status) ? "sent" as const : "failed" as const;
+}
+
+function toVerifyTargetErrorMessage(
+  status: string,
+  result: SsafyVerifyNotificationTargetResult | undefined,
+) {
+  if (!result?.errorCode && !result?.errorMessage && !result?.requestId) {
+    return `SSAFY Verify Mattermost 알림 상태: ${status}`;
+  }
+  const code = result.errorCode ?? "VERIFY_NOTIFICATION_FAILED";
+  const message = result.errorMessage ?? `SSAFY Verify Mattermost 알림 상태: ${status}`;
+  const requestSuffix = result.requestId ? ` (request_id: ${result.requestId})` : "";
+  return `${code}: ${message}${requestSuffix}`;
 }
 
 async function sendMattermostCampaignDeliveriesViaVerify(params: {
@@ -100,6 +122,7 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
   const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
   let sent = 0;
   let failed = 0;
+  let skipped = 0;
   const bookkeepingErrors: string[] = [];
   const chunks = chunkMembers(params.members, 25);
 
@@ -120,37 +143,32 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
         idempotencyKey: `ssartnership:${params.notificationId}:mm:${chunkIndex + 1}`,
       });
 
-      if (!isVerifyDeliveryAccepted(result.status)) {
-        const errorMessage = `SSAFY Verify Mattermost 알림 상태: ${result.status}`;
-        failed += members.length;
-        for (const member of members) {
-          await runBookkeepingTasks(
-            [
-              notificationRepository.recordNotificationDelivery({
-                notificationId: params.notificationId,
-                memberId: member.id,
-                channel: "mm",
-                status: "failed",
-                errorMessage,
-              }),
-            ],
-            "mm",
-            member.id,
-            bookkeepingErrors,
-          );
-        }
-        continue;
-      }
+      const targetResults =
+        result.results.length === members.length ? result.results : [];
 
-      sent += members.length;
-      for (const member of members) {
+      for (const [memberIndex, member] of members.entries()) {
+        const targetResult = targetResults[memberIndex];
+        const verifyStatus = targetResult?.status ?? result.status;
+        const deliveryStatus = toVerifyDeliveryStatus(verifyStatus);
+        if (deliveryStatus === "sent") {
+          sent += 1;
+        } else if (deliveryStatus === "skipped") {
+          skipped += 1;
+        } else {
+          failed += 1;
+        }
+
         await runBookkeepingTasks(
           [
             notificationRepository.recordNotificationDelivery({
               notificationId: params.notificationId,
               memberId: member.id,
               channel: "mm",
-              status: "sent",
+              status: deliveryStatus,
+              errorMessage:
+                deliveryStatus === "sent"
+                  ? null
+                  : toVerifyTargetErrorMessage(verifyStatus, targetResult),
             }),
           ],
           "mm",
@@ -184,7 +202,7 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
     targeted: params.members.length,
     sent,
     failed,
-    skipped: 0,
+    skipped,
     bookkeepingErrors,
   };
 }

@@ -66,10 +66,11 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 ## 구현 메모
 
 - `SSAFY_VERIFY_SERVER_CLIENT_ID`, `SSAFY_VERIFY_SERVER_CLIENT_SECRET`이 설정된 경우 `src/lib/admin-notification-ops-delivery.ts`는 Verify Server API batch endpoint만 사용한다.
-- batch는 Verify 계약에 맞춰 최대 25명씩 나누고, `ssartnership:{notificationId}:mm:{chunk}` 형식의 idempotency key를 보낸다.
+- batch는 Verify 계약에 맞춰 최대 25명씩 나누고, target별로 `ssartnership:{notificationId}:mm:{chunk}:{targetIndex}` 형식의 idempotency key를 보낸다.
 - Verify Server API 에러는 `error_code`, `message`, `request_id`만 내부 delivery error message로 보존하며 raw Mattermost 응답은 소비하지 않는다.
 - 디렉터리 lookup, profile-events, 회원 프로필 동기화, 수동 회원 추가 임시 비밀번호 DM은 모두 Verify Server API를 호출한다.
 - 회원가입/재인증 UI는 일반 사용자에게 request id나 provider diagnostic을 직접 붙여 보여주지 않는다. 상세 진단은 `auth_security_logs.properties`와 명시적 `SSAFY_VERIFY_DEBUG_ERRORS=1` 환경에서만 확인한다.
+- 실제 SSAFY Verify Server API 점검은 `npm run test:ssafy-verify:live`로 분리한다. 기본 테스트와 CI는 외부 API나 Mattermost DM을 호출하지 않고, `SSAFY_VERIFY_LIVE_SMOKE=1`일 때만 directory lookup/profile/sync/profile-events를 호출한다. `SSAFY_VERIFY_SMOKE_SEND_MM=1`을 추가로 설정한 경우에만 `@myknow` lookup 결과의 Mattermost user id로 batch DM smoke test를 발송한다.
 
 ## 미결정 사항
 

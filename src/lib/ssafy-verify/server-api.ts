@@ -22,6 +22,7 @@ export type SsafyVerifyMattermostMessageInput = {
   title: string;
   body: string;
   url?: string | null;
+  variables?: Record<string, string | number | boolean | null | undefined>;
 };
 
 export type SsafyVerifyMattermostNotificationInput = {
@@ -42,11 +43,31 @@ export type SsafyVerifyMattermostNotificationBatchInput = {
   idempotencyKey?: string | null;
 };
 
+export type SsafyVerifyNotificationSummary = {
+  total: number;
+  queued: number;
+  sent: number;
+  retrying: number;
+  failed: number;
+  skipped: number;
+};
+
+export type SsafyVerifyNotificationTargetResult = {
+  idempotencyKey: string | null;
+  notificationId: string | null;
+  status: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  requestId: string | null;
+};
+
 export type SsafyVerifyNotificationResult = {
   notificationId: string | null;
   campaignId: string | null;
   status: string;
   requestId: string | null;
+  summary: SsafyVerifyNotificationSummary | null;
+  results: readonly SsafyVerifyNotificationTargetResult[];
 };
 
 export type SsafyVerifyServerApiClient = ReturnType<
@@ -208,6 +229,21 @@ function optionalText(value: string | number | null | undefined, label: string, 
   return normalized;
 }
 
+function readString(record: UnknownRecord, keys: readonly string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function readInteger(record: UnknownRecord, key: string) {
+  const value = record[key];
+  return typeof value === "number" && Number.isInteger(value) ? value : null;
+}
+
 export function isValidMattermostId(value: string) {
   return MATTERMOST_ID_PATTERN.test(value.trim());
 }
@@ -220,61 +256,158 @@ export function assertMattermostId(value: string, label = "Mattermost ID") {
   return normalized;
 }
 
-function toRecipientPayload(input: SsafyVerifyMattermostRecipientInput) {
-  const recipient: UnknownRecord = {};
+function toNotificationTargetPayload(input: SsafyVerifyMattermostRecipientInput) {
+  const target: UnknownRecord = {};
   const mattermostUserId = optionalText(input.mattermostUserId, "Mattermost ID", 64);
-  const username = optionalText(input.username, "Mattermost username", 64);
   const sub = optionalText(input.sub, "SSAFY subject", 200);
+  const username = optionalText(input.username, "Mattermost username", 64);
   const cohort = optionalText(input.cohort, "SSAFY cohort", 20);
 
   if (mattermostUserId) {
-    recipient.mattermost_user_id = assertMattermostId(mattermostUserId);
-  }
-  if (username) {
-    recipient.username = assertMattermostId(username, "Mattermost username");
+    target.ssafy_mattermost_user_id = assertMattermostId(mattermostUserId);
   }
   if (sub) {
-    recipient.sub = sub;
-  }
-  if (cohort) {
-    recipient.cohort = cohort;
+    target.sub = sub;
   }
 
-  if (!recipient.mattermost_user_id && !recipient.username && !recipient.sub) {
+  if (target.ssafy_mattermost_user_id && target.sub) {
+    throw new Error("Mattermost 알림 수신자는 Mattermost user id와 SSAFY subject를 동시에 사용할 수 없습니다.");
+  }
+  if (username || cohort) {
+    throw new Error("Mattermost 알림은 Mattermost user id 또는 SSAFY subject 기준으로만 발송할 수 있습니다.");
+  }
+
+  if (!target.ssafy_mattermost_user_id && !target.sub) {
     throw new Error("Mattermost 알림 수신자 식별자가 필요합니다.");
   }
 
-  return recipient;
+  return target;
 }
 
-function toMessagePayload(input: SsafyVerifyMattermostMessageInput) {
-  const payload: UnknownRecord = {
-    title: requiredText(input.title, "알림 제목", 160),
-    body: requiredText(input.body, "알림 본문", 2000),
+function toTemplatePayload(input: {
+  templateKey: string;
+  message: SsafyVerifyMattermostMessageInput;
+}) {
+  const variables: UnknownRecord = {
+    title: requiredText(input.message.title, "알림 제목", 160),
+    body: requiredText(input.message.body, "알림 본문", 2000),
   };
-  const url = optionalText(input.url, "알림 URL", 2000);
+  const url = optionalText(input.message.url, "알림 URL", 2000);
   if (url) {
-    payload.url = url;
+    variables.url = url;
   }
-  return payload;
+  for (const [rawKey, rawValue] of Object.entries(input.message.variables ?? {})) {
+    const key = requiredSafeKey(rawKey, "알림 변수 key");
+    if (key === "title" || key === "body" || key === "url") {
+      continue;
+    }
+    const value = optionalText(
+      typeof rawValue === "boolean" ? String(rawValue) : rawValue,
+      `알림 변수 ${key}`,
+      2000,
+    );
+    if (value !== null) {
+      variables[key] = value;
+    }
+  }
+
+  return {
+    id: requiredSafeKey(input.templateKey, "알림 template key"),
+    variables,
+  };
+}
+
+function readNotificationSummary(payload: unknown): SsafyVerifyNotificationSummary | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  const total = readInteger(payload, "total");
+  if (total === null) {
+    return null;
+  }
+  return {
+    total,
+    queued: readInteger(payload, "queued") ?? 0,
+    sent: readInteger(payload, "sent") ?? 0,
+    retrying: readInteger(payload, "retrying") ?? 0,
+    failed: readInteger(payload, "failed") ?? 0,
+    skipped: readInteger(payload, "skipped") ?? 0,
+  };
+}
+
+function readNotificationTargetResults(payload: unknown): SsafyVerifyNotificationTargetResult[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map((item) => {
+    const record = isRecord(item) ? item : {};
+    const error = isRecord(record.error) ? record.error : {};
+    const errorMessage =
+      typeof error.message === "string"
+        ? safePublicMessage(error.message, "") || null
+        : null;
+
+    return {
+      idempotencyKey: readString(record, ["idempotency_key", "idempotencyKey"]),
+      notificationId: readString(record, ["notification_id", "notificationId"]),
+      status: readString(record, ["status"]) ?? "accepted",
+      errorCode:
+        safeString(error.code, SAFE_CODE_PATTERN) ??
+        safeString(record.error_code, SAFE_CODE_PATTERN),
+      errorMessage,
+      requestId:
+        safeString(error.request_id, SAFE_REQUEST_ID_PATTERN) ??
+        safeString(record.request_id, SAFE_REQUEST_ID_PATTERN),
+    };
+  });
+}
+
+function deriveNotificationStatus(
+  summary: SsafyVerifyNotificationSummary | null,
+  results: readonly SsafyVerifyNotificationTargetResult[],
+) {
+  if (results.length === 1) {
+    return results[0]?.status ?? "accepted";
+  }
+  if (!summary || summary.total <= 0) {
+    return "accepted";
+  }
+  if (summary.failed >= summary.total) {
+    return "failed";
+  }
+  if (summary.sent >= summary.total) {
+    return "sent";
+  }
+  if (summary.retrying > 0) {
+    return "retrying";
+  }
+  if (summary.queued > 0) {
+    return "queued";
+  }
+  if (summary.skipped >= summary.total) {
+    return "skipped";
+  }
+  return summary.failed > 0 ? "retrying" : "accepted";
 }
 
 function toNotificationResult(payload: unknown): SsafyVerifyNotificationResult {
-  const record = isRecord(payload) ? payload : {};
+  const root = isRecord(payload) ? payload : {};
+  const record = isRecord(root.data) ? root.data : root;
+  const results = readNotificationTargetResults(record.results);
+  const summary = readNotificationSummary(record.summary);
+  const status = readString(record, ["status"]) ?? deriveNotificationStatus(summary, results);
   return {
     notificationId:
-      typeof record.notification_id === "string" && record.notification_id.trim()
-        ? record.notification_id
-        : null,
-    campaignId:
-      typeof record.campaign_id === "string" && record.campaign_id.trim()
-        ? record.campaign_id
-        : null,
-    status:
-      typeof record.status === "string" && record.status.trim()
-        ? record.status
-        : "accepted",
-    requestId: safeString(record.request_id, SAFE_REQUEST_ID_PATTERN),
+      readString(record, ["notification_id", "notificationId"]) ??
+      (results.length === 1 ? results[0]?.notificationId ?? null : null),
+    campaignId: readString(record, ["campaign_id", "campaignId"]),
+    status,
+    requestId:
+      safeString(record.request_id, SAFE_REQUEST_ID_PATTERN) ??
+      safeString(root.request_id, SAFE_REQUEST_ID_PATTERN),
+    summary,
+    results,
   };
 }
 
@@ -487,16 +620,21 @@ export function createSsafyVerifyServerApiClient(
     },
 
     async sendMattermostNotification(input: SsafyVerifyMattermostNotificationInput) {
-      const payload: UnknownRecord = {
-        recipient: toRecipientPayload(input.recipient),
-        purpose: requiredSafeKey(input.purpose, "알림 purpose"),
-        template_key: requiredSafeKey(input.templateKey, "알림 template key"),
-        message: toMessagePayload(input.message),
-      };
-      const campaignId = optionalSafeKey(input.campaignId, "campaign id");
-      if (campaignId) {
-        payload.campaign_id = campaignId;
+      const idempotencyKey = optionalSafeKey(input.idempotencyKey, "idempotency key");
+      if (!idempotencyKey) {
+        throw new Error("Mattermost 알림 idempotency key가 필요합니다.");
       }
+      const payload: UnknownRecord = {
+        idempotency_key: idempotencyKey,
+        campaign_id:
+          optionalSafeKey(input.campaignId, "campaign id") ?? idempotencyKey,
+        purpose: requiredSafeKey(input.purpose, "알림 purpose"),
+        target: toNotificationTargetPayload(input.recipient),
+        template: toTemplatePayload({
+          templateKey: input.templateKey,
+          message: input.message,
+        }),
+      };
 
       return toNotificationResult(
         await requestJson({
@@ -504,7 +642,6 @@ export function createSsafyVerifyServerApiClient(
           path: "/notifications/mattermost",
           scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostSend],
           body: payload,
-          idempotencyKey: input.idempotencyKey,
         }),
       );
     },
@@ -518,17 +655,27 @@ export function createSsafyVerifyServerApiClient(
       if (input.recipients.length > MAX_BATCH_RECIPIENTS) {
         throw new Error("Mattermost batch 알림은 최대 25명까지 발송할 수 있습니다.");
       }
+      const campaignId = optionalSafeKey(input.campaignId, "campaign id");
+      if (!campaignId) {
+        throw new Error("Mattermost batch 알림 campaign id가 필요합니다.");
+      }
+      const idempotencyPrefix = optionalSafeKey(input.idempotencyKey, "idempotency key") ?? campaignId;
 
       const payload: UnknownRecord = {
+        campaign_id: campaignId,
         purpose: requiredSafeKey(input.purpose, "알림 purpose"),
-        template_key: requiredSafeKey(input.templateKey, "알림 template key"),
-        message: toMessagePayload(input.message),
-        recipients: input.recipients.map(toRecipientPayload),
+        template: toTemplatePayload({
+          templateKey: input.templateKey,
+          message: input.message,
+        }),
+        targets: input.recipients.map((recipient, index) => ({
+          idempotency_key: requiredSafeKey(
+            `${idempotencyPrefix}:${index + 1}`,
+            "idempotency key",
+          ),
+          target: toNotificationTargetPayload(recipient),
+        })),
       };
-      const campaignId = optionalSafeKey(input.campaignId, "campaign id");
-      if (campaignId) {
-        payload.campaign_id = campaignId;
-      }
 
       return toNotificationResult(
         await requestJson({
@@ -536,7 +683,6 @@ export function createSsafyVerifyServerApiClient(
           path: "/notifications/mattermost/batch",
           scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostSend],
           body: payload,
-          idempotencyKey: input.idempotencyKey,
         }),
       );
     },
