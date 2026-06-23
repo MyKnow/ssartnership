@@ -35,6 +35,7 @@ test("playwright config can use the CI-hosted Chrome channel", () => {
 
   assert.match(config, /PLAYWRIGHT_CHROMIUM_CHANNEL/);
   assert.match(config, /channel: chromiumChannel/);
+  assert.match(config, /video: chromiumChannel \? "off" : "retain-on-failure"/);
 });
 
 test("public repository exposes a responsible disclosure security policy", () => {
