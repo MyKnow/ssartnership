@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import {
   delayMemberAuthAttempt,
   getMemberAuthAttemptScope,
@@ -49,6 +50,14 @@ function shouldExposeSsafyVerifyDebug() {
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  const tokenTrace = createSsafyVerifyApiTraceLogger({
+    ...context,
+    actorType: "guest",
+    properties: {
+      flow: "member_signup_verify",
+      route: "/api/ssafy/verify-token",
+    },
+  });
   const throttleContext = {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: null,
@@ -78,6 +87,13 @@ export async function POST(request: Request) {
     const config = getSsafyVerifyServerConfig();
     const rawBody = await readJson(request);
     if (!rawBody.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_ssafy_verify",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "invalid_json" },
+      });
       await recordMemberAuthAttempt("ssafy-verify", throttleContext, false);
       await delayMemberAuthAttempt("ssafy-verify");
       return publicError("INVALID_REQUEST", null, 400);
@@ -104,7 +120,9 @@ export async function POST(request: Request) {
       return publicError(parsedBody.errorCode, null, 400);
     }
 
-    const exchanged = await exchangeSsafyVerificationCode(parsedBody.data, config);
+    const exchanged = await exchangeSsafyVerificationCode(parsedBody.data, config, {
+      trace: tokenTrace,
+    });
     if (!exchanged.ok) {
       await logAuthSecurity({
         ...context,
@@ -211,6 +229,18 @@ export async function POST(request: Request) {
       claims: verified.claims,
       verificationId: exchanged.verificationId,
       scope: exchanged.scope,
+      trace: createSsafyVerifyApiTraceLogger({
+        ...context,
+        actorType: "guest",
+        identifier: verified.claims.sub,
+        properties: {
+          flow: "member_signup_profile",
+          route: "/api/ssafy/verify-token",
+          verificationId: exchanged.verificationId,
+          grantedScope: exchanged.scope,
+          hasMattermostUserId: Boolean(verified.claims.mattermostUserId),
+        },
+      }),
     });
     if (!signupProfile.ok) {
       const debug = shouldExposeSsafyVerifyDebug()

@@ -1,5 +1,6 @@
 import type { MemberRow } from "@/lib/mm-member-sync";
 import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 import {
   extractSsafyVerifyMemberProfiles,
@@ -68,7 +69,18 @@ export async function resolveManualMemberResolution(
   for (const year of yearsToTry) {
     try {
       await getSenderSession(year, cache);
-      const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+      const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
+        trace: createSsafyVerifyApiTraceLogger({
+          actorType: "system",
+          identifier: username,
+          properties: {
+            flow: "manual_member_add_lookup",
+            username,
+            requestedYear,
+            lookupYear: year,
+          },
+        }),
+      });
       const payload = await client.findMattermostUsers({
         username,
         cohort: year,

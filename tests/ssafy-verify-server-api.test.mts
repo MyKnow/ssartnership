@@ -374,6 +374,144 @@ test("SSAFY Verify Server API preserves nested profile error request ids", async
   );
 });
 
+test("SSAFY Verify Server API emits redacted request and response traces", async () => {
+  const {
+    createSsafyVerifyServerApiClient,
+  } = await serverApiModulePromise;
+  const traces: unknown[] = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/server/token")) {
+      return jsonResponse({
+        access_token: "access-token-secret",
+        token_type: "Bearer",
+        expires_in: 600,
+        scope: "ssafy.profile.read ssafy.directory.lookup",
+      });
+    }
+
+    assert.equal(
+      new Headers(init?.headers).get("authorization"),
+      "Bearer access-token-secret",
+    );
+    return jsonResponse({
+      ok: true,
+      data: {
+        profile: {
+          sub: "pairwise-subject",
+          mattermost_user_id: "mm.user_123",
+          name: "김싸피",
+        },
+      },
+      request_id: "req-profile-123",
+    });
+  };
+
+  const client = createSsafyVerifyServerApiClient(
+    {
+      issuer: "https://verify.example.com",
+      apiBaseUrl: "https://verify.example.com/v1",
+      clientId: "server-api-client",
+      clientSecret: "server-secret",
+    },
+    {
+      fetch: fetchImpl,
+      now: () => 1_000_000,
+      trace: (event) => {
+        traces.push(event);
+      },
+    },
+  );
+
+  await client.getMattermostUserProfile("mm.user_123");
+
+  assert.equal(traces.length, 2);
+  assert.deepEqual(
+    traces.map((event) => (event as { path: string }).path),
+    ["/server/token", "/mattermost-users/mm.user_123/profile"],
+  );
+  assert.deepEqual(
+    traces.map((event) => (event as { ok: boolean }).ok),
+    [true, true],
+  );
+  assert.equal(
+    (traces[1] as { response: { requestId: string | null } }).response.requestId,
+    "req-profile-123",
+  );
+
+  const serialized = JSON.stringify(traces);
+  assert.equal(serialized.includes("server-secret"), false);
+  assert.equal(serialized.includes("access-token-secret"), false);
+  assert.equal(serialized.includes("authorization"), false);
+  assert.equal(serialized.includes("verification_token"), false);
+});
+
+test("SSAFY Verify Server API failure traces keep provider error without raw payload leaks", async () => {
+  const {
+    createSsafyVerifyServerApiClient,
+  } = await serverApiModulePromise;
+  const traces: unknown[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    if (String(input).endsWith("/server/token")) {
+      return jsonResponse({
+        access_token: "access-token-secret",
+        token_type: "Bearer",
+        expires_in: 600,
+      });
+    }
+
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: "PROFILE_NOT_FOUND",
+          message: "프로필을 찾을 수 없습니다.",
+          request_id: "icn1::req-404",
+        },
+        raw_mattermost_response: {
+          opaque: "fixture-mm-sensitive-value",
+          body: "internal raw response",
+        },
+      },
+      404,
+    );
+  };
+
+  const client = createSsafyVerifyServerApiClient(
+    {
+      issuer: "https://verify.example.com",
+      apiBaseUrl: "https://verify.example.com/v1",
+      clientId: "server-api-client",
+      clientSecret: "server-secret",
+    },
+    {
+      fetch: fetchImpl,
+      trace: (event) => {
+        traces.push(event);
+      },
+    },
+  );
+
+  await assert.rejects(() => client.getSsafyMemberProfile("pairwise-subject"));
+
+  const failure = traces.at(-1) as {
+    ok: boolean;
+    status: number | null;
+    errorCode: string | null;
+    providerRequestId: string | null;
+    response: { keys: string[]; errorCode: string | null; requestId: string | null };
+  };
+  assert.equal(failure.ok, false);
+  assert.equal(failure.status, 404);
+  assert.equal(failure.errorCode, "PROFILE_NOT_FOUND");
+  assert.equal(failure.providerRequestId, "icn1::req-404");
+  assert.deepEqual(failure.response.keys, ["error", "ok", "raw_mattermost_response"]);
+
+  const serialized = JSON.stringify(traces);
+  assert.equal(serialized.includes("fixture-mm-sensitive-value"), false);
+  assert.equal(serialized.includes("internal raw response"), false);
+});
+
 test("SSAFY Verify Server API validates Mattermost IDs and batch size", async () => {
   const {
     createSsafyVerifyServerApiClient,
