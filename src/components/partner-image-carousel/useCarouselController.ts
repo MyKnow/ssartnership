@@ -7,14 +7,12 @@ import {
 } from "@/lib/image-cache";
 import {
   clampCarouselZoom,
-  getDesktopThumbPlacement,
   normalizeCarouselIndex,
 } from "./helpers";
 import type { CarouselOffset, CarouselThumbPlacement } from "./types";
 
 export function useCarouselController({
   images,
-  matchHeightSelector,
 }: {
   images: string[];
   matchHeightSelector?: string;
@@ -38,8 +36,7 @@ export function useCarouselController({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const activeThumbRef = useRef<HTMLButtonElement | null>(null);
   const thumbStripRef = useRef<HTMLDivElement | null>(null);
-  const [thumbPlacement, setThumbPlacement] =
-    useState<CarouselThumbPlacement>("side");
+  const thumbPlacement = useMemo<CarouselThumbPlacement>(() => "bottom", []);
   useEffect(() => {
     if (typeof document === "undefined") {
       return;
@@ -107,62 +104,6 @@ export function useCarouselController({
       inline: "center",
     });
   }, [activeIndex, thumbPlacement]);
-
-  useEffect(() => {
-    if (!matchHeightSelector || typeof window === "undefined") {
-      return;
-    }
-
-    const media = window.matchMedia("(min-width: 1280px)");
-    let observer: ResizeObserver | null = null;
-    let rootObserver: ResizeObserver | null = null;
-
-    const syncLayout = () => {
-      if (!media.matches) {
-        setThumbPlacement("side");
-        return;
-      }
-      const root = rootRef.current;
-      const target = document.querySelector(matchHeightSelector);
-      if (!(root instanceof HTMLElement) || !(target instanceof HTMLElement)) {
-        setThumbPlacement("side");
-        return;
-      }
-      setThumbPlacement(
-        getDesktopThumbPlacement({
-          containerWidth: root.getBoundingClientRect().width,
-          targetHeight: target.getBoundingClientRect().height,
-          imageCount,
-        }),
-      );
-    };
-
-    if (rootRef.current instanceof HTMLElement) {
-      rootObserver = new ResizeObserver(() => {
-        syncLayout();
-      });
-      rootObserver.observe(rootRef.current);
-    }
-
-    const target = document.querySelector(matchHeightSelector);
-    if (target instanceof HTMLElement) {
-      observer = new ResizeObserver(() => {
-        syncLayout();
-      });
-      observer.observe(target);
-    }
-
-    syncLayout();
-    media.addEventListener("change", syncLayout);
-    window.addEventListener("resize", syncLayout);
-
-    return () => {
-      observer?.disconnect();
-      rootObserver?.disconnect();
-      media.removeEventListener("change", syncLayout);
-      window.removeEventListener("resize", syncLayout);
-    };
-  }, [imageCount, matchHeightSelector]);
 
   const resetInteractiveState = () => {
     setZoom(1);

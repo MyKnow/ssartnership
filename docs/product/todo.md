@@ -2,7 +2,21 @@
 
 정렬 기준: 영향 범위 × 위험도 × 구현 효과. 위에 있는 항목일수록 먼저 처리한다.
 
-최종 점검: 2026-04-23
+최종 점검: 2026-06-23
+
+## 공개 readiness 보완 (Issue #55)
+
+- [x] SSAFY Verify Server API Production env 등록
+- [ ] Production 재배포 후 Verify profile-sync 라이브 스모크
+- [x] GitHub Actions 공개 readiness gate 추가
+- [x] 공개 저장소용 `SECURITY.md` responsible disclosure 정책 추가
+- [x] 파트너 상세 대표 이미지 LCP/CLS 개선
+- [x] `main` 브랜치 보호 규칙과 required status checks 적용
+- [ ] 관리자 edge perimeter hardening 값 확정: `ADMIN_ALLOWED_IPS` 또는 Basic Auth
+- [ ] Vercel legacy Mattermost env 제거: 명시 승인 후 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
+
+주의: 관리자 IP allowlist와 Basic Auth는 운영자 접속을 잠글 수 있어 값 확정 후 적용한다.
+legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없게 만들 수 있어 별도 승인 후 적용한다.
 
 1. [x] 공개 레이아웃의 세션 및 정책 조회 비용 줄이기
    대상: `src/app/(site)/layout.tsx`, `src/lib/user-auth.ts`, `src/lib/policy-documents.ts`
