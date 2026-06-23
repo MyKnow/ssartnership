@@ -101,6 +101,7 @@ export default function PartnerImageCarousel({
             fill
             sizes="(max-width: 1279px) 100vw, 50vw"
             className="object-cover"
+            fetchPriority={priority ? "high" : undefined}
             loading={priority ? undefined : "eager"}
             priority={priority}
             unoptimized={isProxiedCachedImageUrl(activeImage)}

@@ -38,15 +38,15 @@ npm run test-storybook
 npm run test-storybook:watch
 ```
 
-## 강제 게이트
+## 검증 게이트
 
-Chromatic 빌드 에러가 push 이후 이메일로만 발견되는 상황을 막기 위해 Storybook 검증을 릴리즈 게이트로 둡니다.
+Storybook 자체 검증은 로컬 릴리즈 게이트로 유지합니다.
 
 - `npm run release`는 커밋/푸시 전에 `npm run build-storybook`을 반드시 실행합니다.
 - `npm run release`는 커밋/푸시 전에 `npm run test-storybook`을 반드시 실행합니다.
 - 두 명령 중 하나라도 실패하면 버전 업데이트, 커밋, 푸시를 진행하지 않습니다.
-- GitHub Actions의 Chromatic workflow는 실패를 허용하지 않으므로, CI에서도 Storybook/Chromatic 실패가 명확히 실패로 남습니다.
-- 긴급 상황에서 `git push --no-verify`로 로컬 hook을 우회하더라도 release 스크립트와 CI 게이트는 우회하지 않는 것을 원칙으로 합니다.
+- GitHub Actions의 Chromatic publish workflow는 무료 한도 소진으로 인한 외부 `UI Tests` pending을 피하기 위해 수동 실행 전용입니다.
+- 긴급 상황에서 `git push --no-verify`로 로컬 hook을 우회하더라도 release 스크립트와 Public Readiness CI 게이트는 우회하지 않는 것을 원칙으로 합니다.
 
 ## 현재 포함된 스토리
 

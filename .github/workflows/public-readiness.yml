@@ -1,0 +1,54 @@
+name: Public Readiness
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Lint, Test, Build, Security, E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify lockfile
+        run: npm run check:lockfile
+
+      - name: Validate migrations
+        run: npm run validate:migrations
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit --pretty false
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Dependency audit
+        run: npm audit --omit=dev
+
+      - name: Security audit
+        run: npm run audit:security
+
+      - name: Production build
+        run: npm run build
+
+      - name: E2E tests
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+        run: npm run test:e2e
