@@ -13,6 +13,7 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "name: Public Readiness",
     "pull_request:",
     "workflow_dispatch:",
+    "node-version: 24",
     "npm ci",
     "npm run check:lockfile",
     "npm run validate:migrations",
