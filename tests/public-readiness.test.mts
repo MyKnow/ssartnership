@@ -23,14 +23,18 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "npm audit --omit=dev",
     "npm run audit:security",
     "npm run build",
-    "actions/cache@v4",
-    "key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}",
-    "timeout-minutes: 8",
-    "npx playwright install --only-shell chromium",
+    "PLAYWRIGHT_CHROMIUM_CHANNEL: chrome",
     "npm run test:e2e",
   ]) {
     assert.match(workflow, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+});
+
+test("playwright config can use the CI-hosted Chrome channel", () => {
+  const config = readRepoFile("playwright.config.ts");
+
+  assert.match(config, /PLAYWRIGHT_CHROMIUM_CHANNEL/);
+  assert.match(config, /channel: chromiumChannel/);
 });
 
 test("public repository exposes a responsible disclosure security policy", () => {

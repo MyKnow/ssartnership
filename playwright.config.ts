@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const e2ePort = process.env.E2E_PORT ?? "3100";
 const baseURL = process.env.BASE_URL ?? `http://127.0.0.1:${e2ePort}`;
+const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL === "chrome" ? "chrome" : undefined;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -23,7 +24,10 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        ...(chromiumChannel ? { channel: chromiumChannel } : {}),
+      },
     },
   ],
   webServer: process.env.BASE_URL
