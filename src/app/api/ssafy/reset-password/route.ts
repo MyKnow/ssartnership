@@ -26,6 +26,7 @@ import {
   resolveSsafyVerifyAllowedRedirectUris,
 } from "@/lib/ssafy-verify/redirect";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,14 @@ function publicError(errorCode: string, requestId: string | null, status = 400) 
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  const tokenTrace = createSsafyVerifyApiTraceLogger({
+    ...context,
+    actorType: "guest",
+    properties: {
+      flow: "member_password_reset_verify",
+      route: "/api/ssafy/reset-password",
+    },
+  });
   const throttleContext = {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: null,
@@ -64,6 +73,13 @@ export async function POST(request: Request) {
     const config = getSsafyVerifyServerConfig();
     const rawBody = await readJson(request);
     if (!rawBody.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_reset_ssafy",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "invalid_json" },
+      });
       await recordMemberAuthAttempt("ssafy-reset-password", throttleContext, false);
       await delayMemberAuthAttempt("ssafy-reset-password");
       return publicError("INVALID_REQUEST", null, 400);
@@ -90,7 +106,9 @@ export async function POST(request: Request) {
       return publicError(parsedBody.errorCode, null, 400);
     }
 
-    const exchanged = await exchangeSsafyVerificationCode(parsedBody.data, config);
+    const exchanged = await exchangeSsafyVerificationCode(parsedBody.data, config, {
+      trace: tokenTrace,
+    });
     if (!exchanged.ok) {
       await logAuthSecurity({
         ...context,

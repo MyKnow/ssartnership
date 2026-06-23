@@ -8,10 +8,10 @@ import {
 } from "@/lib/mm-member-sync";
 import {
   parseManualMemberAddInputList,
-  provisionManualMembers,
   type ManualMemberAddFormState,
   type ManualMemberAddYear,
 } from "@/lib/member-manual-add";
+import { provisionManualMembers } from "@/lib/member-manual-add/provision";
 import {
   parseMemberYearValue,
   validateMemberYear,

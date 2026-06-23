@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { generateTempPassword, hashPassword } from "@/lib/password";
 import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { validateMmUsername } from "@/lib/validation";
@@ -55,7 +56,15 @@ export async function provisionManualMembers(
   inputs: ManualMemberAddInput[],
 ): Promise<ManualMemberAddBatchResult> {
   const supabase = getSupabaseAdminClient();
-  const verifyClient = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+  const verifyClient = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
+    trace: createSsafyVerifyApiTraceLogger({
+      actorType: "system",
+      properties: {
+        flow: "manual_member_temp_password_notification",
+        requestedYear,
+      },
+    }),
+  });
   const senderSessionCache = new Map<number, Promise<SenderSession>>();
   const items: ManualMemberAddItem[] = [];
   let success = 0;

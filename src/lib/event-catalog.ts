@@ -91,6 +91,7 @@ export const AUTH_SECURITY_EVENT_NAMES = [
   'member_logout',
   'member_signup_complete',
   'member_ssafy_verify',
+  'ssafy_verify_api_trace',
   'member_policy_consent',
   'member_password_reset_ssafy',
   'member_password_reset_complete',
