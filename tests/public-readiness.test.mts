@@ -23,7 +23,7 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "npm audit --omit=dev",
     "npm run audit:security",
     "npm run build",
-    "npx playwright install chromium",
+    "npx playwright install --only-shell chromium",
     "npm run test:e2e",
   ]) {
     assert.match(workflow, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
