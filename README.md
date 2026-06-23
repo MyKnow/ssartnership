@@ -450,7 +450,7 @@ npm run build-storybook
 npm run test-storybook
 ```
 
-Chromatic 빌드 에러를 push 이후에 발견하지 않도록, 릴리즈 흐름에서는 `npm run build-storybook`과 `npm run test-storybook`을 커밋/푸시 전에 반드시 통과해야 합니다. Storybook 빌드가 실패하면 `npm run release`는 버전 업데이트, 커밋, 푸시를 진행하지 않습니다.
+릴리즈 흐름에서는 `npm run build-storybook`과 `npm run test-storybook`을 커밋/푸시 전에 반드시 통과해야 합니다. Storybook 빌드가 실패하면 `npm run release`는 버전 업데이트, 커밋, 푸시를 진행하지 않습니다. Chromatic publish GitHub Actions는 무료 한도 소진으로 인한 외부 `UI Tests` pending을 피하기 위해 수동 실행 전용입니다.
 
 ### release 스크립트
 
@@ -484,7 +484,7 @@ EOF
 - `main` 외 브랜치에서는 태그를 만들지 않습니다.
 - 작업 트리가 비어 있어도 `patch`, `minor`, `major`를 선택하면 버전 업데이트로 릴리즈할 수 있습니다.
 - 작업 트리가 비어 있는 상태에서 `no update`를 선택하면 종료됩니다.
-- Storybook build/test가 실패하면 Chromatic 이메일이 오기 전에 로컬 release 단계에서 차단되므로, 실패 원인을 먼저 수정한 뒤 다시 release를 실행해야 합니다.
+- Storybook build/test가 실패하면 로컬 release 단계에서 차단되므로, 실패 원인을 먼저 수정한 뒤 다시 release를 실행해야 합니다.
 
 ## 배포
 
