@@ -48,7 +48,14 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
       - name: Install Playwright browser
+        timeout-minutes: 8
         run: npx playwright install --only-shell chromium
 
       - name: E2E tests

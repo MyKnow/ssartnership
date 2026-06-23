@@ -23,6 +23,9 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "npm audit --omit=dev",
     "npm run audit:security",
     "npm run build",
+    "actions/cache@v4",
+    "key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}",
+    "timeout-minutes: 8",
     "npx playwright install --only-shell chromium",
     "npm run test:e2e",
   ]) {
