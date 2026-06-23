@@ -32,6 +32,13 @@ export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   const signupSession = await getSsafySignupSession();
   if (!signupSession) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_signup_complete",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "signup_session_expired" },
+    });
     return errorResponse("signup_session_expired", 401);
   }
 
@@ -39,6 +46,17 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     const parsed = parseSsafySignupCompleteInput(body);
     if (!parsed.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: signupSession.sub,
+        properties: {
+          reason: "invalid_request",
+          fieldNames: Object.keys(parsed.fieldErrors),
+        },
+      });
       return errorResponse("invalid_request", 400, {
         fieldErrors: parsed.fieldErrors,
       });
@@ -54,6 +72,17 @@ export async function POST(request: Request) {
       marketingPolicy,
     );
     if (policyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: signupSession.sub,
+        properties: {
+          reason: "policy_outdated",
+          message: policyError,
+        },
+      });
       return errorResponse("policy_outdated", 409, { message: policyError });
     }
 
@@ -63,12 +92,35 @@ export async function POST(request: Request) {
       mattermostUserId: signupSession.mattermostUserId,
     });
     if (duplicate.ok || duplicate.errorCode === "SSAFY_MEMBER_CONFLICT") {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "blocked",
+        actorType: duplicate.ok ? "member" : "guest",
+        actorId: duplicate.ok ? duplicate.member.id : null,
+        identifier: signupSession.sub,
+        properties: {
+          reason: duplicate.ok ? "already_registered" : duplicate.errorCode,
+          mattermostUserId: signupSession.mattermostUserId,
+        },
+      });
       await clearSsafySignupSession();
       return errorResponse("already_registered", 409, {
         redirectTo: "/auth/login",
       });
     }
     if (duplicate.errorCode === "MEMBER_LOOKUP_FAILED") {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "failure",
+        actorType: "guest",
+        identifier: signupSession.sub,
+        properties: {
+          reason: "signup_lookup_failed",
+          mattermostUserId: signupSession.mattermostUserId,
+        },
+      });
       return errorResponse("signup_lookup_failed", 503);
     }
 

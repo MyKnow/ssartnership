@@ -3,6 +3,7 @@ import { buildNotificationPayload } from "@/lib/push/payloads";
 import {
   getSsafyVerifyServerApiConfig,
 } from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import {
   SsafyVerifyServerApiError,
   createSsafyVerifyServerApiClient,
@@ -119,7 +120,18 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
   url?: string | null;
   members: AudienceMember[];
 }): Promise<ChannelDeliveryResult> {
-  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
+    trace: createSsafyVerifyApiTraceLogger({
+      actorType: "system",
+      identifier: params.notificationId,
+      properties: {
+        flow: "admin_notification_mattermost_delivery",
+        notificationId: params.notificationId,
+        notificationType: params.notificationType,
+        targetCount: params.members.length,
+      },
+    }),
+  });
   let sent = 0;
   let failed = 0;
   let skipped = 0;

@@ -10,4 +10,3 @@ export {
   type ManualMemberAddItemStatus,
   type ManualMemberAddYear,
 } from "./member-manual-add/shared";
-export { provisionManualMembers } from "./member-manual-add/provision";

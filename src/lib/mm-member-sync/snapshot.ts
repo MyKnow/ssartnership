@@ -11,6 +11,7 @@ import {
   wrapMmMemberSyncDbError,
 } from "./shared";
 import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import {
   SsafyVerifyServerApiError,
   createSsafyVerifyServerApiClient,
@@ -48,7 +49,16 @@ export async function getSenderSessionForYear(
 export async function fetchMemberSnapshotByUserId(
   userId: string,
 ): Promise<MemberSyncSnapshot | null> {
-  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
+    trace: createSsafyVerifyApiTraceLogger({
+      actorType: "system",
+      identifier: userId,
+      properties: {
+        flow: "member_profile_sync",
+        mattermostUserId: userId,
+      },
+    }),
+  });
   const payload = await client.getMattermostUserProfile(userId).catch((error) => {
     if (error instanceof SsafyVerifyServerApiError && error.status === 404) {
       return null;

@@ -5,6 +5,7 @@ import {
   createSsafyVerifyServerApiClient,
   SsafyVerifyServerApiError,
 } from "./server-api";
+import type { SsafyVerifyApiTraceHandler } from "./api-trace";
 import { extractSsafyVerifyMemberProfiles } from "./profile";
 import type { SsafySignupSessionData } from "./signup";
 
@@ -84,12 +85,14 @@ export async function resolveSsafySignupProfile(input: {
   claims: SsafyVerificationClaims;
   verificationId: string | null;
   scope: string | null;
+  trace?: SsafyVerifyApiTraceHandler | null;
 }): Promise<SsafySignupProfileResult> {
   const lookup = input.claims.mattermostUserId ? "mattermost_user_id" : "sub";
 
   try {
     const client = createSsafyVerifyServerApiClient(
       getSsafyVerifyServerApiConfig(),
+      { trace: input.trace ?? null },
     );
     const payload = input.claims.mattermostUserId
       ? await client.getMattermostUserProfile(input.claims.mattermostUserId)

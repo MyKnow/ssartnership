@@ -3,6 +3,7 @@ import { mergeDirectorySnapshot } from "./shared";
 import {
   getSsafyVerifyServerApiConfig,
 } from "@/lib/ssafy-verify/config";
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 import {
   extractSsafyVerifyMemberProfiles,
@@ -27,7 +28,14 @@ function createSnapshotBatch(): SelectableYearSnapshotBatch {
 }
 
 async function getVerifyProfileEventSnapshots(): Promise<SelectableYearSnapshotBatch> {
-  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
+  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
+    trace: createSsafyVerifyApiTraceLogger({
+      actorType: "system",
+      properties: {
+        flow: "profile_events_directory_sync",
+      },
+    }),
+  });
   const snapshots = new Map<string, MmUserDirectorySnapshot>();
   const failures: MmUserDirectorySyncResult["failures"] = [];
   let checked = 0;

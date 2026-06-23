@@ -1,4 +1,12 @@
 import type { SsafyVerifyServerApiConfig } from "./config";
+import {
+  emitSsafyVerifyApiTrace,
+  summarizeSsafyVerifyFormTraceRequest,
+  summarizeSsafyVerifyJsonTraceRequest,
+  summarizeSsafyVerifyTraceResponsePayload,
+  type SsafyVerifyApiTraceHandler,
+  type SsafyVerifyTraceRequestSummary,
+} from "./api-trace";
 
 export const SSAFY_VERIFY_SERVER_API_SCOPES = {
   profileRead: "ssafy.profile.read",
@@ -77,6 +85,7 @@ export type SsafyVerifyServerApiClient = ReturnType<
 type ClientOptions = {
   fetch?: typeof fetch;
   now?: () => number;
+  trace?: SsafyVerifyApiTraceHandler | null;
 };
 
 type CachedToken = {
@@ -417,35 +426,109 @@ export function createSsafyVerifyServerApiClient(
 ) {
   const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   const now = options.now ?? (() => Date.now());
+  const trace = options.trace ?? null;
   const tokenCache = new Map<string, CachedToken>();
 
   async function fetchJson(
     url: string,
     init: RequestInit,
     fallback: { status: number; errorCode: string; message: string },
+    traceInput: {
+      operation: string;
+      method: "GET" | "POST";
+      path: string;
+      scopes: readonly string[];
+      request: SsafyVerifyTraceRequestSummary;
+    },
   ) {
+    const startedAtMs = now();
     const response = await fetchImpl(url, init).then(
       (value) => value,
       () => null,
     );
     if (!response) {
+      await emitSsafyVerifyApiTrace(trace, {
+        source: "server-api",
+        operation: traceInput.operation,
+        method: traceInput.method,
+        path: traceInput.path,
+        scopes: traceInput.scopes,
+        startedAt: new Date(startedAtMs).toISOString(),
+        durationMs: Math.max(0, now() - startedAtMs),
+        status: null,
+        ok: false,
+        request: traceInput.request,
+        response: null,
+        errorCode: fallback.errorCode,
+        providerRequestId: null,
+      });
       throw new SsafyVerifyServerApiError(fallback);
     }
 
     const json = await readJson(response);
+    const responseSummary = json.ok
+      ? summarizeSsafyVerifyTraceResponsePayload(json.value)
+      : null;
     if (!response.ok) {
-      throw normalizeErrorPayload(json.ok ? json.value : null, {
+      const normalizedError = normalizeErrorPayload(json.ok ? json.value : null, {
         ...fallback,
         status: response.status,
       });
+      await emitSsafyVerifyApiTrace(trace, {
+        source: "server-api",
+        operation: traceInput.operation,
+        method: traceInput.method,
+        path: traceInput.path,
+        scopes: traceInput.scopes,
+        startedAt: new Date(startedAtMs).toISOString(),
+        durationMs: Math.max(0, now() - startedAtMs),
+        status: response.status,
+        ok: false,
+        request: traceInput.request,
+        response: responseSummary,
+        errorCode: normalizedError.errorCode,
+        providerRequestId: normalizedError.requestId,
+      });
+      throw normalizedError;
     }
     if (!json.ok) {
+      await emitSsafyVerifyApiTrace(trace, {
+        source: "server-api",
+        operation: traceInput.operation,
+        method: traceInput.method,
+        path: traceInput.path,
+        scopes: traceInput.scopes,
+        startedAt: new Date(startedAtMs).toISOString(),
+        durationMs: Math.max(0, now() - startedAtMs),
+        status: response.status,
+        ok: false,
+        request: traceInput.request,
+        response: null,
+        errorCode: "VERIFY_SERVER_API_INVALID_RESPONSE",
+        providerRequestId: null,
+      });
       throw new SsafyVerifyServerApiError({
         status: 502,
         errorCode: "VERIFY_SERVER_API_INVALID_RESPONSE",
         message: "SSAFY Verify Server API 응답을 확인하지 못했습니다.",
       });
     }
+
+    await emitSsafyVerifyApiTrace(trace, {
+      source: "server-api",
+      operation: traceInput.operation,
+      method: traceInput.method,
+      path: traceInput.path,
+      scopes: traceInput.scopes,
+      startedAt: new Date(startedAtMs).toISOString(),
+      durationMs: Math.max(0, now() - startedAtMs),
+      status: response.status,
+      ok: true,
+      request: traceInput.request,
+      response: responseSummary,
+      errorCode: null,
+      providerRequestId: responseSummary?.requestId ?? null,
+    });
 
     return json.value;
   }
@@ -481,6 +564,13 @@ export function createSsafyVerifyServerApiClient(
         status: 502,
         errorCode: "VERIFY_SERVER_TOKEN_FAILED",
         message: "SSAFY Verify Server API 토큰 발급에 실패했습니다.",
+      },
+      {
+        operation: "client_credentials_token",
+        method: "POST",
+        path: "/server/token",
+        scopes: scope ? scope.split(" ") : [],
+        request: summarizeSsafyVerifyFormTraceRequest(body),
       },
     );
 
@@ -547,6 +637,16 @@ export function createSsafyVerifyServerApiClient(
         status: 502,
         errorCode: "VERIFY_SERVER_API_FAILED",
         message: "SSAFY Verify Server API 요청에 실패했습니다.",
+      },
+      {
+        operation: "server_api_request",
+        method: input.method,
+        path: input.path,
+        scopes: input.scopes,
+        request: summarizeSsafyVerifyJsonTraceRequest(
+          input.body,
+          input.query,
+        ),
       },
     );
   }
