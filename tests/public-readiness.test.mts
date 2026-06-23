@@ -30,6 +30,16 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   }
 });
 
+test("Chromatic Storybook publish stays manual-only while free quota is exhausted", () => {
+  const workflow = readRepoFile(".github/workflows/storybook.yml");
+
+  assert.match(workflow, /name: Publish Storybook/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /chromaui\/action@latest/);
+  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
+  assert.doesNotMatch(workflow, /^\s+pull_request:\s*$/m);
+});
+
 test("playwright config can use the CI-hosted Chrome channel", () => {
   const config = readRepoFile("playwright.config.ts");
 
