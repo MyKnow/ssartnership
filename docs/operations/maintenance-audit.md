@@ -1,6 +1,6 @@
 # SSARTNERSHIP Maintenance Audit
 
-Last updated: 2026-06-22
+Last updated: 2026-06-24
 
 ## Scope
 
@@ -45,6 +45,9 @@ Last updated: 2026-06-22
 - Delegated SSAFY Verify signup, profile lookup, directory lookup, profile sync, and Mattermost notification sending through Verify Server API instead of direct Mattermost credentials.
 - Reduced SSAFY Verify auth UI diagnostic exposure so request ids and provider payload diagnostics stay in server logs unless explicit debug env is enabled.
 - Added `members.avatar_url` so Verify `picture` URLs can render on signup, certification cards, and admin member views while older base64 avatars remain supported.
+- Added `ssafy_verify_api_trace` auth/security logs for SSAFY Verify User Auth and Server API request/response summaries with secret redaction.
+- Confirmed Chromatic/Storybook publish is manual-only while the free quota is exhausted, leaving local Storybook build/test as the release gate.
+- Added the 2026-06-24 project completeness audit under `docs/operations/`.
 
 ## Remaining candidates
 
@@ -54,6 +57,9 @@ Last updated: 2026-06-22
 - Review remaining client components for possible server/client boundary simplification.
 - Consider moving `/api/mm/session` lookup behind a server-provided header/session model to remove client fetches entirely.
 - Re-measure public home, signup, certification, and partner detail routes after the Verify transition because auth/profile work moved to new server boundaries.
+- Decide and apply the production admin edge perimeter value: `ADMIN_ALLOWED_IPS` or Basic Auth.
+- Verify and remove legacy Mattermost env values from Vercel once rollback through direct Mattermost integration is no longer needed.
+- Sync SSAFY Verify notification status/recovery results back into SSARTNERSHIP delivery logs.
 
 ## Notes
 
