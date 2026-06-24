@@ -173,8 +173,13 @@ npm run ci:local
   - `USER_SESSION_SECRET`
   - `CERTIFICATION_QR_SECRET`
 - 제휴 제안 메일
-  - `NAVER_SMTP_USER`
-  - `NAVER_SMTP_PASS`
+  - `SMTP_HOST`
+  - `SMTP_PORT`
+  - `SMTP_SECURE`
+  - `SMTP_USER`
+  - `SMTP_PASS`
+  - `SMTP_FROM_EMAIL` (선택)
+  - `NAVER_SMTP_USER` / `NAVER_SMTP_PASS` (legacy fallback)
   - `SUGGEST_NOTIFY_EMAIL`
 - Web Push / Cron
   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
@@ -507,6 +512,7 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 - `npm run lint` 통과
 - `npm run test:mm-profile` 통과
 - 회원가입 / 로그인 / 재설정 / 약관 동의 / 운영진 가입 흐름은 `mm_user_id` 중심으로 정리되어 있습니다.
+- SSAFY Verify Server API 위임과 request-response trace 로깅은 [프로젝트 완성도 점검 문서](/Users/myknow/coding/ssartnership/docs/operations/project-completeness-audit-2026-06-24.md)에 현재 판단과 잔여 운영 TODO를 정리해 두었습니다.
 - 공개 제휴 페이지는 SEO, sitemap, RSS, robots를 포함합니다.
 
 ## 라이선스
