@@ -119,12 +119,12 @@ export default function PartnerNotificationCenter({
           {
             label: "전체 알림",
             value: `${data.summary.totalCount.toLocaleString("ko-KR")}건`,
-            hint: "협력사 계정에 연결된 모든 알림",
+            hint: data.summary.scopeLabel,
           },
           {
             label: "변경 요청",
             value: `${data.summary.requestCount.toLocaleString("ko-KR")}건`,
-            hint: "브랜드 수정 요청 알림",
+            hint: "최근 변경 요청 알림",
           },
           {
             label: "대기 요청",
@@ -139,12 +139,12 @@ export default function PartnerNotificationCenter({
           {
             label: "리뷰",
             value: `${data.summary.reviewCount.toLocaleString("ko-KR")}건`,
-            hint: "브랜드 리뷰 관련 알림",
+            hint: "최근 브랜드 리뷰 알림",
           },
           {
             label: "운영",
             value: `${data.summary.operationCount.toLocaleString("ko-KR")}건`,
-            hint: "관리자 운영 및 권한 알림",
+            hint: "최근 관리자 운영 및 권한 알림",
           },
         ]}
       />
@@ -154,7 +154,7 @@ export default function PartnerNotificationCenter({
           <div className="space-y-1">
             <p className="ui-kicker">필터</p>
             <p className="ui-body">
-              변경 요청, 리뷰, 운영 알림을 나눠서 볼 수 있습니다.
+              {data.summary.scopeDescription}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">

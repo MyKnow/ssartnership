@@ -32,6 +32,8 @@ import type {
   YearFilterOption,
 } from "@/components/admin/member-manager/selectors";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { CAMPUS_NAMES } from "@/lib/mm-profile/constants";
+import { getBackfillableSsafyYears } from "@/lib/ssafy-year";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +41,10 @@ const adminMembersErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
 
-const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100, 500] as const;
+const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 const DEFAULT_MEMBER_PAGE_SIZE = 50;
+const ADMIN_MEMBER_TREND_MAX_ROWS = 5000;
+const ADMIN_MEMBER_TREND_LOOKBACK_DAYS = 370;
 
 type AdminMemberSearchParams = {
   backfill?: string;
@@ -205,10 +209,9 @@ export default async function AdminMembersPage({
     marketingEnabledFilter: parseNotificationFilter(getOne(params, "marketingEnabled")),
   };
   const supabase = getSupabaseAdminClient();
-  const [activePolicies, activeMarketingPolicy, optionsResult, preferenceFilter] = await Promise.all([
+  const [activePolicies, activeMarketingPolicy, preferenceFilter] = await Promise.all([
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing").catch(() => null),
-    supabase.from("members").select("year,campus"),
     getPreferenceFilteredMemberIds(supabase, [
       { column: "enabled", value: filters.pushEnabledFilter, defaultEnabled: false },
       { column: "announcement_enabled", value: filters.announcementEnabledFilter, defaultEnabled: true },
@@ -278,7 +281,15 @@ export default async function AdminMembersPage({
     memberQuery = memberQuery.order("created_at", { ascending: false });
   }
 
-  let memberTrendQuery = supabase.from("members").select("created_at").order("created_at", { ascending: true });
+  const trendStartDate = new Date();
+  trendStartDate.setDate(trendStartDate.getDate() - ADMIN_MEMBER_TREND_LOOKBACK_DAYS);
+  const trendStartIso = trendStartDate.toISOString();
+  let memberTrendQuery = supabase
+    .from("members")
+    .select("created_at")
+    .gte("created_at", trendStartIso)
+    .order("created_at", { ascending: true })
+    .limit(ADMIN_MEMBER_TREND_MAX_ROWS);
   if (filters.searchValue) {
     const escaped = filters.searchValue.replaceAll("%", "\\%").replaceAll("_", "\\_");
     memberTrendQuery = memberTrendQuery.or(
@@ -334,22 +345,9 @@ export default async function AdminMembersPage({
   const memberTrendCreatedAts = (memberTrendResult.data ?? [])
     .map((row) => row.created_at)
     .filter((value): value is string => Boolean(value));
-  const optionRows = optionsResult.data ?? [];
   const options = {
-    campuses: Array.from(
-      new Set(
-        optionRows
-          .map((row) => (typeof row.campus === "string" ? row.campus.trim() : ""))
-          .filter(Boolean),
-      ),
-    ).sort((a, b) => a.localeCompare(b, "ko")),
-    years: Array.from(
-      new Set(
-        optionRows
-          .map((row) => row.year)
-          .filter((year): year is number => typeof year === "number"),
-      ),
-    ).sort((a, b) => b - a),
+    campuses: [...CAMPUS_NAMES].sort((a, b) => a.localeCompare(b, "ko")),
+    years: [...getBackfillableSsafyYears()].sort((a, b) => b - a),
   };
   const memberIds = safeMembers.map((member) => member.id);
   let preferenceRows: Array<{

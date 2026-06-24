@@ -58,6 +58,8 @@ export type PartnerNotificationEntry = {
 };
 
 export type PartnerNotificationCenterSummary = {
+  scopeLabel: string;
+  scopeDescription: string;
   totalCount: number;
   requestCount: number;
   pendingRequestCount: number;
@@ -571,6 +573,8 @@ export async function getPartnerNotificationCenter(
   if (uniqueCompanyIds.length === 0) {
     return {
       summary: {
+        scopeLabel: "최근 수집 알림 기준",
+        scopeDescription: "변경 요청, 리뷰, 운영 로그의 최근 수집 범위를 합산합니다.",
         totalCount: 0,
         requestCount: 0,
         pendingRequestCount: 0,

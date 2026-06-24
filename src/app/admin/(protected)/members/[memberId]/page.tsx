@@ -16,6 +16,56 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+const SECURITY_LOG_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const DEFAULT_SECURITY_LOG_PAGE_SIZE = 25;
+type SecurityLogStatusFilter = "all" | "success" | "failure" | "blocked";
+type SecurityLogSortFilter = "newest" | "oldest";
+
+type AdminMemberDetailSearchParams = {
+  logPage?: string;
+  logPageSize?: string;
+  logQ?: string;
+  logStatus?: string;
+  logSort?: string;
+};
+
+function getOne(params: AdminMemberDetailSearchParams, key: keyof AdminMemberDetailSearchParams) {
+  const value = params[key];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseSecurityLogPage(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function parseSecurityLogPageSize(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return SECURITY_LOG_PAGE_SIZE_OPTIONS.includes(
+    parsed as (typeof SECURITY_LOG_PAGE_SIZE_OPTIONS)[number],
+  )
+    ? (parsed as (typeof SECURITY_LOG_PAGE_SIZE_OPTIONS)[number])
+    : DEFAULT_SECURITY_LOG_PAGE_SIZE;
+}
+
+function parseSecurityLogStatus(value: string | undefined): SecurityLogStatusFilter {
+  return value === "success" || value === "failure" || value === "blocked"
+    ? value
+    : "all";
+}
+
+function parseSecurityLogSort(value: string | undefined): SecurityLogSortFilter {
+  return value === "oldest" ? "oldest" : "newest";
+}
+
+function normalizeSecurityLogSearch(value: string | undefined) {
+  return (value ?? "")
+    .replace(/[,%_(){}"']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
 function formatDate(value?: string | null) {
   if (!value) {
     return "-";
@@ -31,12 +81,44 @@ function getPolicyBadgeClass(value?: number | null) {
 
 export default async function AdminMemberDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ memberId: string }>;
+  searchParams?: Promise<AdminMemberDetailSearchParams>;
 }) {
   await requireAdminPermission("members", "read", { path: "/admin/members" });
   const { memberId } = await params;
+  const queryParams = (await searchParams) ?? {};
+  const securityLogPage = parseSecurityLogPage(getOne(queryParams, "logPage"));
+  const securityLogPageSize = parseSecurityLogPageSize(getOne(queryParams, "logPageSize"));
+  const securityLogSearchValue = normalizeSecurityLogSearch(getOne(queryParams, "logQ"));
+  const securityLogStatusFilter = parseSecurityLogStatus(getOne(queryParams, "logStatus"));
+  const securityLogSortFilter = parseSecurityLogSort(getOne(queryParams, "logSort"));
+  const securityLogFrom = (securityLogPage - 1) * securityLogPageSize;
   const supabase = getSupabaseAdminClient();
+  let securityLogQuery = supabase
+    .from("auth_security_logs")
+    .select("id,event_name,status,identifier,path,ip_address,properties,created_at", {
+      count: "exact",
+    })
+    .eq("actor_type", "member")
+    .eq("actor_id", memberId);
+
+  if (securityLogStatusFilter !== "all") {
+    securityLogQuery = securityLogQuery.eq("status", securityLogStatusFilter);
+  }
+  if (securityLogSearchValue) {
+    const escapedSearchValue = securityLogSearchValue
+      .replaceAll("\\", "\\\\")
+      .replaceAll("%", "\\%")
+      .replaceAll("_", "\\_");
+    securityLogQuery = securityLogQuery.or(
+      `event_name.ilike.%${escapedSearchValue}%,identifier.ilike.%${escapedSearchValue}%,path.ilike.%${escapedSearchValue}%,ip_address.ilike.%${escapedSearchValue}%`,
+    );
+  }
+  securityLogQuery = securityLogQuery.order("created_at", {
+    ascending: securityLogSortFilter === "oldest",
+  });
 
   const [memberResult, subscriptionsResult, securityLogsResult] = await Promise.all([
     supabase
@@ -51,13 +133,7 @@ export default async function AdminMemberDetailPage({
       .select("id", { count: "exact", head: true })
       .eq("member_id", memberId)
       .eq("is_active", true),
-    supabase
-      .from("auth_security_logs")
-      .select("id,event_name,status,identifier,path,ip_address,properties,created_at")
-      .eq("actor_type", "member")
-      .eq("actor_id", memberId)
-      .order("created_at", { ascending: false })
-      .range(0, 4999),
+    securityLogQuery.range(securityLogFrom, securityLogFrom + securityLogPageSize - 1),
   ]);
 
   if (memberResult.error || !memberResult.data) {
@@ -78,6 +154,7 @@ export default async function AdminMemberDetailPage({
         : null,
     createdAt: log.created_at,
   }));
+  const securityLogsTotalCount = securityLogsResult.count ?? securityLogs.length;
   const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
   const displayName = profile.displayName ?? member.display_name ?? member.mm_username ?? "회원 상세";
   const year = member.year ?? getCurrentSsafyYear();
@@ -159,7 +236,7 @@ export default async function AdminMemberDetailPage({
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>보안 로그</span>
-                  <span className="font-medium text-foreground">{securityLogs.length.toLocaleString()}건</span>
+                  <span className="font-medium text-foreground">{securityLogsTotalCount.toLocaleString()}건</span>
                 </div>
               </div>
             </Card>
@@ -189,7 +266,19 @@ export default async function AdminMemberDetailPage({
             </Card>
           </div>
 
-          <AdminMemberSecurityLogExplorer logs={securityLogs} />
+          <AdminMemberSecurityLogExplorer
+            logs={securityLogs}
+            pagination={{
+              totalCount: securityLogsTotalCount,
+              page: securityLogPage,
+              pageSize: securityLogPageSize,
+            }}
+            filters={{
+              searchValue: securityLogSearchValue,
+              statusFilter: securityLogStatusFilter,
+              sortFilter: securityLogSortFilter,
+            }}
+          />
         </div>
       </div>
     </AdminShell>

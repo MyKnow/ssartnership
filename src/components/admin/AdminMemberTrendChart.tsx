@@ -27,7 +27,7 @@ const GRANULARITY_OPTIONS: ReadonlyArray<{
   { value: "daily", label: "일별", description: "최근 7일" },
   { value: "weekly", label: "주별", description: "최근 1개월" },
   { value: "monthly", label: "월별", description: "최근 1년" },
-  { value: "yearly", label: "연별", description: "전체" },
+  { value: "yearly", label: "연별", description: "최근 1년" },
 ];
 
 function formatRangeLabel(date: Date) {
@@ -256,7 +256,7 @@ export default function AdminMemberTrendChart({
         <div className="grid gap-2">
           <SectionHeading
             title="회원 유입 추이"
-            description="현재 필터 기준 회원 생성 이력을 일·주·월·연 단위로 확인합니다."
+            description="현재 필터 기준 최근 1년 회원 생성 이력을 일·주·월·연 단위로 확인합니다."
           />
           <div className="xl:hidden">
             <Tabs

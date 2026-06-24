@@ -34,7 +34,7 @@ export default async function PartnerNotificationsPage() {
         <ShellHeader
           eyebrow="Partner Portal"
           title="알림센터"
-          description="협력사 계정에 연결된 브랜드 변경, 리뷰, 운영 알림을 한곳에서 확인합니다."
+          description="협력사 계정에 연결된 브랜드 변경, 리뷰, 운영 알림을 최근 수집 범위 기준으로 확인합니다."
         />
         <PartnerNotificationCenter data={data} />
       </div>

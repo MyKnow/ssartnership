@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
@@ -107,7 +107,7 @@ export default async function PartnerDetailPage({
     ? decodeURIComponent(resolvedParams.id).trim()
     : "";
   if (!rawId) {
-    redirect("/");
+    notFound();
   }
   const member = headerSession?.userId
     ? await getSupabaseAdminClient()
@@ -126,7 +126,7 @@ export default async function PartnerDetailPage({
     ),
   );
   if (!pageData) {
-    redirect("/");
+    notFound();
   }
   if (pageData.kind === "confidential-gate") {
     return (

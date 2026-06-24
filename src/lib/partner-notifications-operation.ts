@@ -323,6 +323,8 @@ export function buildSummary(
   const operationCount = items.filter((item) => item.category === "operation").length;
 
   return {
+    scopeLabel: "최근 수집 알림 기준",
+    scopeDescription: "변경 요청 20건, 리뷰 20건, 운영 로그 유형별 최근 20건을 합산합니다.",
     totalCount: items.length,
     requestCount,
     pendingRequestCount,

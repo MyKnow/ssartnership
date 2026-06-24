@@ -24,9 +24,12 @@
 - 해결: High #3 admin logs fallback bounded loading 및 500 row page size 제거.
 - 부분 해결: High #4 공개 홈 client boundary partner payload projection 축소. 초기 목록 pagination/server filtering과 lazy metrics는 후속으로 남긴다.
 - 해결: High #5 certification avatar base64 client boundary 노출 제거.
+- 해결: High #2 관리자 회원 화면 500 page size 제거, trend 조회 bounded loading, 회원 상세 보안 로그 서버 페이지네이션.
 - 해결: Medium #9 auth/security raw exception field redaction 및 CSV export sanitizer.
 - 해결: Medium #10 회원 session/account mutation route same-origin guard 적용.
-- 잔여 High: #2 관리자 회원 화면 query 구조 분리, 회원 상세 보안 로그 pagination.
+- 해결: Medium #6 파트너 알림센터 summary를 최근 수집 범위 기준으로 명시.
+- 해결: Medium #7 파트너 상세 접근 실패를 홈 redirect 대신 404/게이트로 분리.
+- 잔여 High: #4 공개 홈 초기 목록 pagination/server filtering 및 lazy metrics.
 
 ## Severity Findings
 
@@ -45,7 +48,7 @@
 2. 관리자 회원 화면이 page load마다 큰 범위의 회원/푸시 설정 데이터를 반복 조회한다.
    - [src/app/admin/(protected)/members/page.tsx](/Users/myknow/coding/ssartnership/src/app/admin/(protected)/members/page.tsx)는 옵션용 `members(year,campus)` 전체 조회, 알림 필터별 `push_preferences` 반복 조회, trend chart용 `members(created_at)` 전체 조회를 같은 요청에서 수행한다.
    - 페이지 크기도 `10, 50, 100, 500`을 허용해 운영 데이터가 늘면 관리자 화면 TTFB와 DB 부하가 빠르게 커진다.
-   - 조치: 옵션/차트/목록 query를 분리하고, trend는 DB-side aggregate 또는 bounded range로 바꾸며, 500 page size는 제거하거나 명시 export 기능으로 분리한다.
+   - 상태: 해결됨. 500 page size를 제거했고, option query는 상수/현재 기수 기반으로 바꿨으며, trend query는 최근 370일/5,000행 상한으로 제한했다. 회원 상세 보안 로그는 서버 페이지네이션으로 전환했다.
 
 3. 관리자 로그 화면 기본 진입이 `24h` 전체 로그를 그룹별 상한 없이 읽어 요약을 만든다.
    - [src/app/admin/(protected)/logs/page.tsx](/Users/myknow/coding/ssartnership/src/app/admin/(protected)/logs/page.tsx)는 기본 진입부터 `getAdminLogsPageData({ preset: "24h" })`를 호출한다.
@@ -88,15 +91,15 @@
 
 6. 파트너 알림센터 summary 문구와 실제 계산 범위가 다르다.
    - 변경 요청, 리뷰, 감사 로그를 최근 일부만 모아 summary를 만들지만 UI는 전체 알림처럼 읽힌다.
-   - 조치: 최근 N건 기준이라고 명시하거나, 실제 total aggregate를 별도 계산한다.
+   - 상태: 해결됨. summary 계약과 UI hint에 최근 수집 범위를 명시했다.
 
 7. 파트너 상세 접근 실패 UX가 홈 redirect로 흐른다.
    - 잘못된 ID나 접근 불가 대상에서 `notFound()` 또는 명시적 게이트 UI 대신 홈으로 이동하면 공유 링크 오류와 SEO/운영 분석이 흐려진다.
-   - 조치: public 404, 비공개/권한 제한 상태, 삭제 상태를 분리해 표시한다.
+   - 상태: 해결됨. 잘못된 ID/접근 불가 상세는 `notFound()`를 사용하고, 대외비 로그인 게이트는 전용 화면을 유지한다.
 
 8. 회원 상세 로그 조회가 계정 단위로 최대 5000건을 한 번에 전달한다.
    - 계정 활동이 누적되면 상세 페이지 payload와 클라이언트 탐색 비용이 커진다.
-   - 조치: 회원 상세 보안 로그도 pagination/filter를 기본값으로 둔다.
+   - 상태: 해결됨. 회원 상세 보안 로그는 `logPage`, `logPageSize`, `logQ`, `logStatus`, `logSort` query 기반 서버 페이지네이션으로 조회한다.
 
 9. `auth_security_logs`에 일부 raw exception message가 남고 CSV export로 전파될 수 있다.
    - SSAFY Verify trace 자체는 redaction되지만 다른 auth 흐름의 `error.message`가 그대로 properties에 저장되는 경로가 있다.
@@ -186,11 +189,11 @@
 
 1. `docs/project-completeness-audit`: 이 문서와 이벤트 로깅/운영 TODO 동기화.
 2. ~~`fix/reset-password-server-state`: reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.~~ 완료.
-3. `perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination.
+3. ~~`perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination.~~ 완료.
 4. `perf/public-home-boundary`: 홈 목록 초기 pagination/server filtering, favorite/popularity lazy hydration.
 5. ~~`perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.~~ 완료.
 6. ~~`fix/auth-log-redaction-origin-guard`: auth security raw exception redaction과 session mutation same-origin guard 적용.~~ 완료.
-7. `fix/partner-notification-summary`: 파트너 알림센터 summary를 최근 N건 기준으로 명시하거나 실제 total 집계와 분리.
+7. ~~`fix/partner-notification-summary`: 파트너 알림센터 summary를 최근 N건 기준으로 명시하거나 실제 total 집계와 분리.~~ 완료.
 8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
 9. `feat/ssafy-notification-status-sync`: Verify notification status/recovery 결과를 delivery log에 반영.
 10. `test/flow-coverage`: signup/login/reset/certification/notifications/admin login/partner login E2E와 핵심 integration 보강.

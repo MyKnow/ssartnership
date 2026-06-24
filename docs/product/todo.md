@@ -174,8 +174,9 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
 17. [ ] 공개 운영 성능 high-risk 보완
    근거: `docs/operations/project-completeness-audit-2026-06-24.md`
    세부 단계:
-   17-1. [ ] 관리자 회원 화면 query bounded loading
+   17-1. [x] 관리자 회원 화면 query bounded loading
       목표: 옵션/목록/추이/푸시 필터 query를 분리하고, 500명 page size와 전체 `created_at` 스캔을 제거하거나 DB-side aggregate로 대체한다. 회원 상세 보안 로그도 pagination으로 전환한다.
+      완료: 500명 page size를 제거하고, 기수/캠퍼스 옵션은 bounded 상수/현재 기수 기준으로 전환했다. 회원 유입 추이는 최근 370일/5,000행 상한을 적용했고, 회원 상세 보안 로그는 URL query 기반 서버 페이지네이션으로 전환했다.
    17-2. [x] 관리자 로그 기본 진입 bounded loading
       완료: 로그 fallback row 수집 상한을 `PAGE_MAX_LOG_ROWS_PER_GROUP=5000`, `SUMMARY_MAX_LOG_ROWS_PER_GROUP=3000`으로 고정하고, 500개 page size 옵션과 큰 페이지의 in-memory merge 경로를 제거했다. 요약 RPC는 기존 `get_admin_logs_summary`를 계속 사용한다.
    17-3. [ ] 공개 홈 server/client 경계 축소
@@ -183,10 +184,12 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       진행: `HomeContent`에서 client boundary로 넘기는 partner payload를 카드 렌더/검색/정렬에 필요한 projection으로 축소했다. 초기 목록 pagination/lazy metrics는 후속으로 남긴다.
    17-4. [x] 인증서 avatar payload 경량화
       완료: 인증서 페이지에서 `avatar_base64` select와 client data URL 조립을 제거하고, 본인 인증된 `/api/mm/avatar` route가 서버에서 base64/url fallback을 처리하도록 격리했다.
-   17-5. [ ] 파트너 알림센터 summary 의미 보정
+   17-5. [x] 파트너 알림센터 summary 의미 보정
       목표: summary가 최근 N건 기준이면 UI에 명시하고, 전체 통계가 필요하면 total aggregate를 별도로 계산한다.
-   17-6. [ ] 파트너 상세 접근 실패 UX 보정
+      완료: summary 계약에 최근 수집 범위 label/description을 추가하고, 협력사 알림센터 UI hint를 전체 누적이 아니라 최근 수집 범위 기준으로 수정했다.
+   17-6. [x] 파트너 상세 접근 실패 UX 보정
       목표: 잘못된 ID/비공개/삭제 상태를 홈 redirect가 아니라 명시적 404 또는 접근 제한 화면으로 구분한다.
+      완료: 잘못된 ID나 접근 불가 상세는 홈 redirect 대신 `notFound()`로 처리하고, 대외비 로그인 게이트는 기존 전용 화면을 유지한다.
 
 ## 유지 규칙
 

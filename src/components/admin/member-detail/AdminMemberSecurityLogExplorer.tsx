@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
@@ -20,9 +21,16 @@ export type AdminMemberSecurityLog = {
   createdAt: string;
 };
 
-type SortFilter = "newest" | "oldest" | "event" | "ip";
+type StatusFilter = "all" | "success" | "failure" | "blocked";
+type SortFilter = "newest" | "oldest";
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
+  { value: "all", label: "전체" },
+  { value: "success", label: "success" },
+  { value: "failure", label: "failure" },
+  { value: "blocked", label: "blocked" },
+];
 
 function formatDate(value?: string | null) {
   if (!value) {
@@ -44,17 +52,6 @@ function getStatusBadgeClass(status: string | null) {
   }
 }
 
-function stringifyProperties(properties: Record<string, unknown> | null) {
-  if (!properties) {
-    return "";
-  }
-  try {
-    return JSON.stringify(properties);
-  } catch {
-    return String(properties);
-  }
-}
-
 function getPropertyEntries(properties: Record<string, unknown> | null) {
   if (!properties) {
     return [];
@@ -64,81 +61,82 @@ function getPropertyEntries(properties: Record<string, unknown> | null) {
 
 export default function AdminMemberSecurityLogExplorer({
   logs,
+  pagination,
+  filters,
 }: {
   logs: AdminMemberSecurityLog[];
+  pagination: {
+    totalCount: number;
+    page: number;
+    pageSize: (typeof PAGE_SIZE_OPTIONS)[number];
+  };
+  filters: {
+    searchValue: string;
+    statusFilter: StatusFilter;
+    sortFilter: SortFilter;
+  };
 }) {
-  const [searchValue, setSearchValue] = useState("");
-  const [eventFilter, setEventFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [pathFilter, setPathFilter] = useState("all");
-  const [sortFilter, setSortFilter] = useState<SortFilter>("newest");
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(25);
-  const [currentPage, setCurrentPage] = useState(1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const [searchDraft, setSearchDraft] = useState({
+    sourceValue: filters.searchValue,
+    value: filters.searchValue,
+  });
 
-  const eventOptions = useMemo(
-    () => Array.from(new Set(logs.map((log) => log.eventName).filter(Boolean))).sort(),
-    [logs],
-  );
-  const statusOptions = useMemo(
-    () => Array.from(new Set(logs.map((log) => log.status).filter(Boolean) as string[])).sort(),
-    [logs],
-  );
-  const pathOptions = useMemo(
-    () => Array.from(new Set(logs.map((log) => log.path).filter(Boolean) as string[])).sort(),
-    [logs],
-  );
+  const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
+  const safeCurrentPage = Math.min(pagination.page, totalPages);
+  const pageStart = (safeCurrentPage - 1) * pagination.pageSize;
+  const searchValue =
+    searchDraft.sourceValue === filters.searchValue
+      ? searchDraft.value
+      : filters.searchValue;
+  const isSearchDirty = searchValue !== filters.searchValue;
+  const rangeLabel =
+    pagination.totalCount === 0
+      ? "0건"
+      : `${pageStart + 1}-${Math.min(pageStart + logs.length, pagination.totalCount)} / ${pagination.totalCount}`;
 
-  const filteredLogs = useMemo(() => {
-    const query = searchValue.trim().toLowerCase();
-
-    const nextLogs = logs.filter((log) => {
-      const searchText = [
-        log.eventName,
-        log.status,
-        log.identifier,
-        log.path,
-        log.ipAddress,
-        stringifyProperties(log.properties),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return (
-        (!query || searchText.includes(query)) &&
-        (eventFilter === "all" || log.eventName === eventFilter) &&
-        (statusFilter === "all" || log.status === statusFilter) &&
-        (pathFilter === "all" || log.path === pathFilter)
-      );
-    });
-
-    return [...nextLogs].sort((a, b) => {
-      switch (sortFilter) {
-        case "oldest":
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        case "event":
-          return a.eventName.localeCompare(b.eventName);
-        case "ip":
-          return (a.ipAddress ?? "").localeCompare(b.ipAddress ?? "");
-        case "newest":
-        default:
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  function updateQuery(updates: Record<string, string | number | null>) {
+    const next = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === "" || value === "all") {
+        next.delete(key);
+      } else {
+        next.set(key, String(value));
       }
     });
-  }, [eventFilter, logs, pathFilter, searchValue, sortFilter, statusFilter]);
+    const query = next.toString();
+    startTransition(() => {
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    });
+  }
 
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = (safeCurrentPage - 1) * pageSize;
-  const visibleLogs = filteredLogs.slice(pageStart, pageStart + pageSize);
-  const rangeLabel =
-    filteredLogs.length === 0
-      ? "0건"
-      : `${pageStart + 1}-${Math.min(pageStart + visibleLogs.length, filteredLogs.length)} / ${filteredLogs.length}`;
+  function updateFilter(updates: Record<string, string | number | null>) {
+    updateQuery({ ...updates, logPage: null });
+  }
 
-  function updateFilter(callback: () => void) {
-    callback();
-    setCurrentPage(1);
+  function applySearchFilter() {
+    const nextSearchValue = searchValue.trim();
+    setSearchDraft({
+      sourceValue: filters.searchValue,
+      value: nextSearchValue,
+    });
+    if (nextSearchValue === filters.searchValue) {
+      return;
+    }
+    updateFilter({ logQ: nextSearchValue });
+  }
+
+  function resetSearchFilter() {
+    setSearchDraft({ sourceValue: filters.searchValue, value: "" });
+    updateFilter({ logQ: null });
+  }
+
+  function syncPage(nextPage: number) {
+    const safePage = Math.min(Math.max(1, nextPage), totalPages);
+    updateQuery({ logPage: safePage });
   }
 
   return (
@@ -146,10 +144,11 @@ export default function AdminMemberSecurityLogExplorer({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <SectionHeading
           title="인증/보안 활동 로그"
-          description="로그 조회와 같은 방식으로 이벤트, 상태, 경로, 검색어를 조합해 이 회원의 보안 활동을 탐색합니다."
+          description="이 회원의 보안 활동을 서버 페이지 단위로 검색합니다. 이벤트명, 입력값, IP, 경로를 조합해 조회할 수 있습니다."
         />
         <Badge className="w-fit bg-surface text-muted-foreground">
-          필터 결과 {filteredLogs.length.toLocaleString()}건 / 전체 {logs.length.toLocaleString()}건
+          서버 결과 {pagination.totalCount.toLocaleString()}건
+          {isPending ? " · 갱신 중" : ""}
         </Badge>
       </div>
 
@@ -159,65 +158,61 @@ export default function AdminMemberSecurityLogExplorer({
             <p className="ui-kicker">탐색 필터</p>
             <h3 className="text-lg font-semibold text-foreground">검색과 정렬</h3>
             <p className="text-sm text-muted-foreground">
-              보안 이벤트명, 상태, 입력값, IP, 경로, 속성 값을 검색합니다.
+              로그 원본 전체를 브라우저로 받지 않고, 현재 조건의 결과 페이지만 불러옵니다.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2 xl:col-span-1">
               검색
-              <Input
-                value={searchValue}
-                onChange={(event) =>
-                  updateFilter(() => setSearchValue(event.target.value))
-                }
-                placeholder="이벤트, 상태, 입력값, IP, 경로, 속성으로 검색"
-              />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-foreground">
-              이벤트
-              <Select
-                value={eventFilter}
-                onChange={(event) =>
-                  updateFilter(() => setEventFilter(event.target.value))
-                }
-              >
-                <option value="all">전체</option>
-                {eventOptions.map((eventName) => (
-                  <option key={eventName} value={eventName}>
-                    {eventName}
-                  </option>
-                ))}
-              </Select>
+              <div className="grid gap-2">
+                <Input
+                  value={searchValue}
+                  onChange={(event) => {
+                    setSearchDraft({
+                      sourceValue: filters.searchValue,
+                      value: event.target.value,
+                    });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      applySearchFilter();
+                    }
+                  }}
+                  placeholder="이벤트, 입력값, IP, 경로로 검색"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={applySearchFilter}
+                    disabled={!isSearchDirty || isPending}
+                    className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    검색
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetSearchFilter}
+                    disabled={!filters.searchValue || isPending}
+                    className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    초기화
+                  </button>
+                </div>
+              </div>
             </label>
             <label className="grid gap-2 text-sm font-medium text-foreground">
               상태
               <Select
-                value={statusFilter}
-                onChange={(event) =>
-                  updateFilter(() => setStatusFilter(event.target.value))
-                }
+                value={filters.statusFilter}
+                onChange={(event) => {
+                  updateFilter({ logStatus: event.target.value });
+                }}
               >
-                <option value="all">전체</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-foreground">
-              경로
-              <Select
-                value={pathFilter}
-                onChange={(event) =>
-                  updateFilter(() => setPathFilter(event.target.value))
-                }
-              >
-                <option value="all">전체</option>
-                {pathOptions.map((path) => (
-                  <option key={path} value={path}>
-                    {path}
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </Select>
@@ -225,13 +220,13 @@ export default function AdminMemberSecurityLogExplorer({
             <label className="grid gap-2 text-sm font-medium text-foreground">
               정렬
               <Select
-                value={sortFilter}
-                onChange={(event) => setSortFilter(event.target.value as SortFilter)}
+                value={filters.sortFilter}
+                onChange={(event) => {
+                  updateFilter({ logSort: event.target.value });
+                }}
               >
                 <option value="newest">최신순</option>
                 <option value="oldest">오래된순</option>
-                <option value="event">이벤트순</option>
-                <option value="ip">IP순</option>
               </Select>
             </label>
           </div>
@@ -257,10 +252,11 @@ export default function AdminMemberSecurityLogExplorer({
               <label className="flex items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
                 <span>페이지당</span>
                 <Select
-                  value={String(pageSize)}
+                  value={String(pagination.pageSize)}
                   onChange={(event) => {
-                    setPageSize(Number(event.target.value) as (typeof PAGE_SIZE_OPTIONS)[number]);
-                    setCurrentPage(1);
+                    const value = Number(event.target.value) as
+                      | (typeof PAGE_SIZE_OPTIONS)[number];
+                    updateFilter({ logPageSize: value });
                   }}
                 >
                   {PAGE_SIZE_OPTIONS.map((option) => (
@@ -273,8 +269,8 @@ export default function AdminMemberSecurityLogExplorer({
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  disabled={safeCurrentPage === 1}
+                  onClick={() => syncPage(safeCurrentPage - 1)}
+                  disabled={safeCurrentPage === 1 || isPending}
                   className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   이전
@@ -284,8 +280,8 @@ export default function AdminMemberSecurityLogExplorer({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                  disabled={safeCurrentPage === totalPages}
+                  onClick={() => syncPage(safeCurrentPage + 1)}
+                  disabled={safeCurrentPage === totalPages || isPending}
                   className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   다음
@@ -294,7 +290,7 @@ export default function AdminMemberSecurityLogExplorer({
             </div>
           </div>
 
-          {visibleLogs.length === 0 ? (
+          {logs.length === 0 ? (
             <Card className="min-w-0 overflow-hidden bg-surface-elevated shadow-raised">
               <EmptyState
                 title="조건에 맞는 로그가 없습니다."
@@ -302,7 +298,7 @@ export default function AdminMemberSecurityLogExplorer({
               />
             </Card>
           ) : (
-            visibleLogs.map((log) => {
+            logs.map((log) => {
               const propertyEntries = getPropertyEntries(log.properties);
               return (
                 <Card
