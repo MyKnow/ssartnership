@@ -1,7 +1,7 @@
 import HomeView from "@/components/HomeView";
+import { toHomeViewPartner } from "@/components/home-view/selectors";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import { partnerFavoriteRepository, partnerRepository } from "@/lib/repositories";
-import { isWithinPeriod } from "@/lib/partner-utils";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
@@ -84,16 +84,7 @@ export default async function HomeContent({
       .map((partnerId) => [partnerId, true] as const),
   ) as Record<string, boolean>;
 
-  const viewPartners = partners.map((partner) => {
-    if (isWithinPeriod(partner.period.start, partner.period.end)) {
-      return partner;
-    }
-    return {
-      ...partner,
-      reservationLink: undefined,
-      inquiryLink: undefined,
-    };
-  });
+  const viewPartners = partners.map(toHomeViewPartner);
   return (
     <section id="partner-explore" className="scroll-mt-24">
       <HomeView

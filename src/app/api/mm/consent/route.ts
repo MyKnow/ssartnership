@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getUserSession, setUserSession } from "@/lib/user-auth";
 import {
   getActiveRequiredPolicies,
@@ -15,6 +16,21 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   try {
+    if (
+      !isTrustedSameOriginRequest(request, {
+        allowedContentTypes: ["application/json"],
+      })
+    ) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_policy_consent",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "untrusted_origin" },
+      });
+      return NextResponse.json({ error: "invalid_request" }, { status: 403 });
+    }
+
     const session = await getUserSession();
     if (!session?.userId) {
       await logAuthSecurity({

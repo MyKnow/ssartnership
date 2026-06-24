@@ -29,9 +29,11 @@ type CertificationMember = {
   display_name?: string | null;
   year?: number | null;
   campus?: string | null;
-  avatar_content_type?: string | null;
-  avatar_base64?: string | null;
   avatar_url?: string | null;
+};
+
+type CertificationMemberRow = CertificationMember & {
+  avatar_content_type?: string | null;
 };
 
 function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
@@ -66,7 +68,7 @@ export default async function CertificationPage({
   const { data: member } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,avatar_url",
+      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_url",
     )
     .eq("id", session.userId)
     .maybeSingle();
@@ -74,6 +76,18 @@ export default async function CertificationPage({
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
+
+  const memberRow = member as CertificationMemberRow;
+  const hasAvatar = Boolean(memberRow.avatar_url || memberRow.avatar_content_type);
+  const certificationMember: CertificationMember = {
+    id: member.id,
+    mm_user_id: member.mm_user_id,
+    mm_username: member.mm_username,
+    display_name: member.display_name,
+    year: member.year,
+    campus: member.campus,
+    avatar_url: hasAvatar ? "/api/mm/avatar" : null,
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,7 +102,7 @@ export default async function CertificationPage({
               className="mx-auto max-w-2xl"
             />
             <CertificationView
-              member={member as CertificationMember}
+              member={certificationMember}
               initialTimestamp={initialTimestamp}
             />
           </div>

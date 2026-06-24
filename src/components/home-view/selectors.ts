@@ -4,7 +4,7 @@ import {
   getPartnerLockKind,
   getPartnerVisibilityState,
 } from "../../lib/partner-visibility.ts";
-import { compareEndDate } from "../../lib/partner-utils.ts";
+import { compareEndDate, isWithinPeriod } from "../../lib/partner-utils.ts";
 import {
   calculatePartnerPopularityScore,
   type PartnerPopularityMetrics,
@@ -34,6 +34,34 @@ export function createHomeCategoryMap(categories: Category[]) {
       { label: category.label, color: category.color },
     ]),
   );
+}
+
+export function toHomeViewPartner(partner: Partner): Partner {
+  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
+  return {
+    id: partner.id,
+    createdAt: partner.createdAt,
+    name: partner.name,
+    location: partner.location,
+    category: partner.category,
+    visibility: partner.visibility,
+    benefitAccessStatus: partner.benefitAccessStatus,
+    mapUrl: partner.mapUrl,
+    benefitActionType: isActive ? partner.benefitActionType : undefined,
+    benefitActionLink: isActive ? partner.benefitActionLink : undefined,
+    reservationLink: isActive ? partner.reservationLink : undefined,
+    inquiryLink: isActive ? partner.inquiryLink : undefined,
+    period: {
+      start: partner.period.start,
+      end: partner.period.end,
+    },
+    conditions: [...partner.conditions],
+    benefits: [...partner.benefits],
+    appliesTo: [...partner.appliesTo],
+    thumbnail: partner.thumbnail ?? null,
+    images: partner.thumbnail ? [] : (partner.images ?? []).slice(0, 1),
+    tags: partner.tags ? [...partner.tags] : undefined,
+  };
 }
 
 export function normalizeHomePartners(

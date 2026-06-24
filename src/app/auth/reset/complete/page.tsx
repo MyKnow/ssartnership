@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Card from "@/components/ui/Card";
@@ -6,7 +7,11 @@ import Container from "@/components/ui/Container";
 import ResetPasswordCompleteForm from "@/components/auth/ResetPasswordCompleteForm";
 import { getHeaderSession } from "@/lib/header-session";
 import { SITE_NAME } from "@/lib/site";
-import { verifyResetPasswordCompletionToken } from "@/lib/reset-password-session";
+import {
+  RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+  decodeResetPasswordCompletionCookieValue,
+  verifyResetPasswordCompletionToken,
+} from "@/lib/reset-password-session";
 
 export const metadata: Metadata = {
   title: `새 비밀번호 설정 | ${SITE_NAME}`,
@@ -18,14 +23,11 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function ResetPasswordCompletePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string | string[] }>;
-}) {
-  const params = await searchParams;
-  const rawToken = Array.isArray(params.token) ? params.token[0] : params.token;
-  const token = typeof rawToken === "string" ? rawToken.trim() : "";
+export default async function ResetPasswordCompletePage() {
+  const cookieStore = await cookies();
+  const token = decodeResetPasswordCompletionCookieValue(
+    cookieStore.get(RESET_PASSWORD_COMPLETION_COOKIE_NAME)?.value,
+  );
   const payload = token ? verifyResetPasswordCompletionToken(token) : null;
   const headerSession = await getHeaderSession();
 
@@ -48,10 +50,7 @@ export default async function ResetPasswordCompletePage({
               </p>
             </div>
 
-            <ResetPasswordCompleteForm
-              token={token}
-              mmUsername={payload.mmUsername}
-            />
+            <ResetPasswordCompleteForm mmUsername={payload.mmUsername} />
           </Card>
         </div>
       </Container>

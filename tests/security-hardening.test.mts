@@ -85,6 +85,66 @@ test("reset password completion tokens are signed with the session secret", asyn
   }
 });
 
+test("reset password completion cookie stores only encoded signed tokens", async () => {
+  const originalSessionSecret = process.env.USER_SESSION_SECRET;
+
+  try {
+    process.env.USER_SESSION_SECRET = "s".repeat(32);
+
+    const {
+      RESET_PASSWORD_COMPLETION_COOKIE_MAX_AGE_SECONDS,
+      RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+      decodeResetPasswordCompletionCookieValue,
+      encodeResetPasswordCompletionCookieValue,
+      getResetPasswordCompletionCookieOptions,
+      readResetPasswordCompletionTokenFromCookieHeader,
+      issueResetPasswordCompletionToken,
+      verifyResetPasswordCompletionToken,
+    } = await resetPasswordSessionModulePromise;
+    const token = issueResetPasswordCompletionToken({
+      memberId: "member-id",
+      mmUserId: "mm-user-id",
+      mmUsername: "ssafy15.user",
+      memberUpdatedAt: "2026-06-19T10:00:00.000Z",
+    });
+    const encoded = encodeResetPasswordCompletionCookieValue(token);
+
+    assert.notEqual(encoded, token);
+    assert.equal(decodeResetPasswordCompletionCookieValue(encoded), token);
+    assert.equal(
+      decodeResetPasswordCompletionCookieValue(encodeURIComponent(encoded)),
+      token,
+    );
+    assert.equal(
+      readResetPasswordCompletionTokenFromCookieHeader(
+        `theme=light; ${RESET_PASSWORD_COMPLETION_COOKIE_NAME}=${encoded}; other=1`,
+      ),
+      token,
+    );
+    assert.equal(
+      verifyResetPasswordCompletionToken(
+        readResetPasswordCompletionTokenFromCookieHeader(
+          `${RESET_PASSWORD_COMPLETION_COOKIE_NAME}=${encoded}`,
+        ) ?? "",
+      )?.mmUserId,
+      "mm-user-id",
+    );
+    assert.deepStrictEqual(getResetPasswordCompletionCookieOptions(), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      maxAge: RESET_PASSWORD_COMPLETION_COOKIE_MAX_AGE_SECONDS,
+      path: "/",
+    });
+  } finally {
+    if (originalSessionSecret === undefined) {
+      delete process.env.USER_SESSION_SECRET;
+    } else {
+      process.env.USER_SESSION_SECRET = originalSessionSecret;
+    }
+  }
+});
+
 test("product event throttle rejects bursty repeated events", async () => {
   const { consumeProductEventQuota, resetProductEventThrottleForTests } =
     await productEventThrottleModulePromise;

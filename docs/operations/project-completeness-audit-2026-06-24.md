@@ -18,6 +18,16 @@
 - GitHub Actions의 Public Readiness gate는 lint, typecheck, test, build, audit, e2e를 포함한다.
 - Chromatic publish workflow는 Storybook 무료 한도 소진으로 자동 실행에서 제외되어 실패 루프가 멈춘 상태다.
 
+### 2026-06-24 Implementation Update
+
+- 해결: High #1 reset completion token URL query 노출 제거.
+- 해결: High #3 admin logs fallback bounded loading 및 500 row page size 제거.
+- 부분 해결: High #4 공개 홈 client boundary partner payload projection 축소. 초기 목록 pagination/server filtering과 lazy metrics는 후속으로 남긴다.
+- 해결: High #5 certification avatar base64 client boundary 노출 제거.
+- 해결: Medium #9 auth/security raw exception field redaction 및 CSV export sanitizer.
+- 해결: Medium #10 회원 session/account mutation route same-origin guard 적용.
+- 잔여 High: #2 관리자 회원 화면 query 구조 분리, 회원 상세 보안 로그 pagination.
+
 ## Severity Findings
 
 ### Blocker
@@ -175,11 +185,11 @@
 ## 남은 PR Split
 
 1. `docs/project-completeness-audit`: 이 문서와 이벤트 로깅/운영 TODO 동기화.
-2. `fix/reset-password-server-state`: reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
-3. `perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination, `/admin/logs` bounded loading 또는 DB-side aggregate 전환.
-4. `perf/public-home-boundary`: 홈 목록 server/client 경계 재설계, 초기 목록 pagination/server filtering, `(site)` layout/session/header read 경량화.
-5. `perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
-6. `fix/auth-log-redaction-origin-guard`: auth security raw exception redaction과 session mutation same-origin guard 적용.
+2. ~~`fix/reset-password-server-state`: reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.~~ 완료.
+3. `perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination.
+4. `perf/public-home-boundary`: 홈 목록 초기 pagination/server filtering, favorite/popularity lazy hydration.
+5. ~~`perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.~~ 완료.
+6. ~~`fix/auth-log-redaction-origin-guard`: auth security raw exception redaction과 session mutation same-origin guard 적용.~~ 완료.
 7. `fix/partner-notification-summary`: 파트너 알림센터 summary를 최근 N건 기준으로 명시하거나 실제 total 집계와 분리.
 8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
 9. `feat/ssafy-notification-status-sync`: Verify notification status/recovery 결과를 delivery log에 반영.

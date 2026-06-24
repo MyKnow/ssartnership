@@ -61,7 +61,7 @@ export type {
 export { iterateAdminLogsCsvRows } from './log-insights/csv';
 export { resolveLogRange } from './log-insights/range';
 
-const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
+const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
 
 function parsePage(value: string | number | null | undefined) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
@@ -101,9 +101,7 @@ function shouldUseSplitAdminLogLoading(options: GetAdminLogsPageDataOptions, pag
   if (hasComplexFilter || sort !== 'newest') {
     return false;
   }
-  return PAGE_MAX_LOG_ROWS_PER_GROUP === null
-    ? true
-    : page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
+  return page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP;
 }
 
 function resolvePartnerName(
@@ -182,8 +180,13 @@ function buildAggregateFilters(
   };
 }
 
-function canUseMergedNewestList(options: GetAdminLogsPageDataOptions) {
+function canUseMergedNewestList(
+  options: GetAdminLogsPageDataOptions,
+  page: number,
+  pageSize: number,
+) {
   return (
+    page * pageSize <= PAGE_MAX_LOG_ROWS_PER_GROUP &&
     !options.search?.trim() &&
     (!options.group || options.group === 'all') &&
     (!options.name || options.name === 'all') &&
@@ -370,7 +373,7 @@ export async function getAdminLogsPageData(
   const useDbPagedList = shouldUseDbPagedAdminLogList(options, page, pageSize);
 
   if (useDbPagedList) {
-    const useMergedNewestList = canUseMergedNewestList(options);
+    const useMergedNewestList = canUseMergedNewestList(options, page, pageSize);
     const [summaryAggregateData, listSourceData] = await Promise.all([
       loadAdminLogSummaryAggregates(options),
       useMergedNewestList

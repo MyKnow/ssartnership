@@ -7,7 +7,12 @@ import {
   getMemberAuthBlockingState,
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
-import { issueResetPasswordCompletionToken } from "@/lib/reset-password-session";
+import {
+  RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+  encodeResetPasswordCompletionCookieValue,
+  getResetPasswordCompletionCookieOptions,
+  issueResetPasswordCompletionToken,
+} from "@/lib/reset-password-session";
 import { getSsafyVerifyServerConfig } from "@/lib/ssafy-verify/config";
 import {
   findSsafyVerifiedMember,
@@ -269,13 +274,18 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       verified: true,
-      completionToken,
       mmUsername: memberResult.member.mm_username,
       authTime: verified.claims.authTime,
     });
+    response.cookies.set(
+      RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+      encodeResetPasswordCompletionCookieValue(completionToken),
+      getResetPasswordCompletionCookieOptions(),
+    );
+    return response;
   } catch {
     await logAuthSecurity({
       ...context,

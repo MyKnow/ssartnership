@@ -17,6 +17,7 @@ import {
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { getSignedUserSession } from '@/lib/user-auth';
 import { getPartnerSession } from '@/lib/partner-session';
+import { sanitizeAuthSecurityLogProperties } from '@/lib/auth-security-log-sanitizer';
 
 type HeaderSource = {
   get(name: string): string | null;
@@ -258,7 +259,9 @@ export async function logAuthSecurity(input: AuthSecurityInput) {
     actor_id: input.actorId ?? null,
     identifier: input.identifier ?? null,
     path: input.path ?? null,
-    properties: sanitizeProperties(input.properties),
+    properties: sanitizeProperties(
+      sanitizeAuthSecurityLogProperties(input.properties),
+    ),
     user_agent: input.userAgent ?? null,
     ip_address: input.ipAddress ?? null,
   });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   buildMemberSyncLogProperties,
   syncMemberById,
@@ -10,6 +11,13 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (!isTrustedSameOriginRequest(request)) {
+    return NextResponse.json(
+      { ok: false, updated: false, error: "invalid_request" },
+      { status: 403 },
+    );
+  }
+
   const session = await getSignedUserSession();
   if (!session?.userId) {
     return NextResponse.json({ ok: false, updated: false }, { status: 401 });

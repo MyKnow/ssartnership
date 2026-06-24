@@ -16,8 +16,8 @@
 - [ ] Vercel legacy Mattermost env 제거: 명시 승인 후 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
 - [ ] SSAFY Verify notification status/recovery 결과를 delivery log에 주기적으로 반영
 - [x] SSAFY Verify User Auth/Server API request-response trace 로그 추가
-- [ ] 비밀번호 재설정 completion token URL query 노출 제거
-- [ ] auth/security log raw exception redaction 및 session mutation same-origin guard 적용
+- [x] 비밀번호 재설정 completion token URL query 노출 제거
+- [x] auth/security log raw exception redaction 및 session mutation same-origin guard 적용
 
 주의: 관리자 IP allowlist와 Basic Auth는 운영자 접속을 잠글 수 있어 값 확정 후 적용한다.
 legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없게 만들 수 있어 별도 승인 후 적용한다.
@@ -166,22 +166,23 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       완료: User Auth token exchange와 Server API profile/directory/sync/profile-events/notification/status 호출을 `ssafy_verify_api_trace`로 요약 저장하고, token/code/secret/raw provider 응답은 redaction한다.
    16-8. [ ] Verify notification delivery status 동기화
       목표: `GET /v1/notifications/{notification_id}`와 campaign status 조회 결과를 SSARTNERSHIP delivery log/recovery view에 주기적으로 반영한다.
-   16-9. [ ] 비밀번호 재설정 completion token 서버 상태 전환
-      목표: `/auth/reset/complete?token=...` query 전달을 제거하고, HttpOnly short-lived cookie 또는 server-owned reset transaction id로 재설정 완료 권한을 전달한다.
-   16-10. [ ] auth/security log redaction 및 same-origin guard 정착
-      목표: auth/security logs에는 allowlisted error code/message만 남기고, 회원/파트너 session mutation route에는 공통 same-origin guard를 적용한다.
+   16-9. [x] 비밀번호 재설정 completion token 서버 상태 전환
+      완료: `/auth/reset/complete?token=...` query 전달을 제거하고, SSAFY Verify 재인증 성공 시 HttpOnly short-lived cookie로 completion state를 전달한다. 완료/무효/만료/회원 불일치 경로에서는 cookie를 폐기한다.
+   16-10. [x] auth/security log redaction 및 same-origin guard 정착
+      완료: auth/security log sink와 CSV export에 raw exception field sanitizer를 적용하고, 회원 session/account mutation route에 same-origin guard를 추가했다.
 
 17. [ ] 공개 운영 성능 high-risk 보완
    근거: `docs/operations/project-completeness-audit-2026-06-24.md`
    세부 단계:
    17-1. [ ] 관리자 회원 화면 query bounded loading
       목표: 옵션/목록/추이/푸시 필터 query를 분리하고, 500명 page size와 전체 `created_at` 스캔을 제거하거나 DB-side aggregate로 대체한다. 회원 상세 보안 로그도 pagination으로 전환한다.
-   17-2. [ ] 관리자 로그 기본 진입 bounded loading
-      목표: `/admin/logs` 기본 `24h` 진입에서 그룹별 무제한 row 수집을 막고, 요약은 DB-side aggregate 또는 lightweight endpoint로 분리한다.
+   17-2. [x] 관리자 로그 기본 진입 bounded loading
+      완료: 로그 fallback row 수집 상한을 `PAGE_MAX_LOG_ROWS_PER_GROUP=5000`, `SUMMARY_MAX_LOG_ROWS_PER_GROUP=3000`으로 고정하고, 500개 page size 옵션과 큰 페이지의 in-memory merge 경로를 제거했다. 요약 RPC는 기존 `get_admin_logs_summary`를 계속 사용한다.
    17-3. [ ] 공개 홈 server/client 경계 축소
       목표: 초기 노출 목록 기준 pagination/server filtering을 적용하고, favorite/popularity state를 전체 배열이 아니라 보이는 목록 중심으로 계산한다.
-   17-4. [ ] 인증서 avatar payload 경량화
-      목표: `avatar_base64` inline 전달을 URL/thumbnail 중심으로 바꾸고, base64 fallback은 서버 route 또는 migration cleanup으로 격리한다.
+      진행: `HomeContent`에서 client boundary로 넘기는 partner payload를 카드 렌더/검색/정렬에 필요한 projection으로 축소했다. 초기 목록 pagination/lazy metrics는 후속으로 남긴다.
+   17-4. [x] 인증서 avatar payload 경량화
+      완료: 인증서 페이지에서 `avatar_base64` select와 client data URL 조립을 제거하고, 본인 인증된 `/api/mm/avatar` route가 서버에서 base64/url fallback을 처리하도록 격리했다.
    17-5. [ ] 파트너 알림센터 summary 의미 보정
       목표: summary가 최근 N건 기준이면 UI에 명시하고, 전체 통계가 필요하면 total aggregate를 별도로 계산한다.
    17-6. [ ] 파트너 상세 접근 실패 UX 보정

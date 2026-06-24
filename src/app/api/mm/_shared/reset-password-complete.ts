@@ -1,6 +1,8 @@
 import { revalidatePath } from "next/cache";
+import type { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { hashPassword, isValidPassword } from "@/lib/password";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 import { parseResetPasswordCompleteBody } from "./parsers";
 import {
@@ -15,22 +17,59 @@ import {
   failResetPasswordCompleteException,
 } from "./reset-password-complete-failure";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { verifyResetPasswordCompletionToken } from "@/lib/reset-password-session";
+import {
+  RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+  getClearResetPasswordCompletionCookieOptions,
+  readResetPasswordCompletionTokenFromCookieHeader,
+  verifyResetPasswordCompletionToken,
+} from "@/lib/reset-password-session";
+
+function clearResetPasswordCompletionCookie(response: NextResponse) {
+  response.cookies.set(
+    RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+    "",
+    getClearResetPasswordCompletionCookieOptions(),
+  );
+  return response;
+}
+
+async function failResetPasswordCompleteAndClear(
+  input: Parameters<typeof failResetPasswordComplete>[0],
+) {
+  const response = await failResetPasswordComplete(input);
+  return clearResetPasswordCompletionCookie(response);
+}
 
 export async function handleResetPasswordCompletePost(request: Request) {
   const context = getRequestLogContext(request);
+  let throttleContext = createMemberAuthThrottleContext(
+    context.ipAddress ?? null,
+    null,
+  );
 
   try {
+    if (
+      !isTrustedSameOriginRequest(request, {
+        allowedContentTypes: ["application/json"],
+      })
+    ) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "invalid_request",
+        status: 403,
+        reason: "untrusted_origin",
+      });
+    }
+
     const payload = await parseResetPasswordCompleteBody(request);
-    const token = String(payload.token ?? "").trim();
+    const token = readResetPasswordCompletionTokenFromCookieHeader(
+      request.headers.get("cookie"),
+    );
     const nextPassword = String(payload.nextPassword ?? "");
     const nextPasswordConfirm = String(payload.nextPasswordConfirm ?? "");
-    let throttleContext = createMemberAuthThrottleContext(
-      context.ipAddress ?? null,
-      null,
-    );
 
-    if (!token || !nextPassword || !nextPasswordConfirm) {
+    if (!nextPassword || !nextPasswordConfirm) {
       return failResetPasswordComplete({
         context,
         throttleContext,
@@ -40,9 +79,11 @@ export async function handleResetPasswordCompletePost(request: Request) {
       });
     }
 
-    const tokenPayload = verifyResetPasswordCompletionToken(token);
+    const tokenPayload = token
+      ? verifyResetPasswordCompletionToken(token)
+      : null;
     if (!tokenPayload) {
-      return failResetPasswordComplete({
+      return failResetPasswordCompleteAndClear({
         context,
         throttleContext,
         error: "invalid_code",
@@ -108,7 +149,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
       .eq("mm_user_id", tokenPayload.mmUserId)
       .maybeSingle();
     if (memberFetchError || !memberRow) {
-      return failResetPasswordComplete({
+      return failResetPasswordCompleteAndClear({
         context,
         throttleContext,
         error: "reset_failed",
@@ -125,7 +166,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
       !Number.isFinite(tokenUpdatedAt) ||
       memberUpdatedAt !== tokenUpdatedAt
     ) {
-      return failResetPasswordComplete({
+      return failResetPasswordCompleteAndClear({
         context,
         throttleContext,
         error: "invalid_code",
@@ -192,7 +233,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
     revalidatePath("/auth/reset");
     revalidatePath("/auth/change-password");
 
-    return mmOkResponse();
+    return clearResetPasswordCompletionCookie(mmOkResponse());
   } catch (error) {
     return failResetPasswordCompleteException({ context, error });
   }

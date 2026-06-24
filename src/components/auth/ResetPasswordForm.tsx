@@ -19,7 +19,6 @@ type ResetPasswordVerifyResult =
   | {
       ok: true;
       verified: true;
-      completionToken: string;
       mmUsername: string;
       authTime: number;
     }
@@ -135,19 +134,7 @@ export default function ResetPasswordForm() {
       return;
     }
 
-    if (!result.completionToken) {
-      setStatus("failed");
-      setError({
-        ok: false,
-        errorCode: "VERIFY_RESPONSE_INVALID",
-        requestId: null,
-      });
-      return;
-    }
-
-    window.location.replace(
-      `/auth/reset/complete?token=${encodeURIComponent(result.completionToken)}`,
-    );
+    window.location.replace("/auth/reset/complete");
   }
 
   return (

@@ -7,6 +7,10 @@ import {
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
+export const RESET_PASSWORD_COMPLETION_COOKIE_NAME = "reset_password_completion";
+export const RESET_PASSWORD_COMPLETION_COOKIE_MAX_AGE_SECONDS =
+  TOKEN_TTL_MS / 1000;
+
 export type ResetPasswordCompletionTokenPayload = {
   version: 2;
   memberId: string;
@@ -93,4 +97,70 @@ export function issueResetPasswordCompletionToken(input: {
 
 export function verifyResetPasswordCompletionToken(token: string) {
   return parsePayload(token);
+}
+
+export function encodeResetPasswordCompletionCookieValue(token: string) {
+  return encodeURIComponent(token);
+}
+
+export function decodeResetPasswordCompletionCookieValue(
+  value: string | null | undefined,
+) {
+  if (!value) {
+    return "";
+  }
+  let decoded = value.trim();
+  try {
+    for (let index = 0; index < 3; index += 1) {
+      const nextDecoded = decodeURIComponent(decoded);
+      if (nextDecoded === decoded) {
+        return decoded;
+      }
+      decoded = nextDecoded;
+    }
+    return decoded;
+  } catch {
+    return "";
+  }
+}
+
+export function readResetPasswordCompletionTokenFromCookieHeader(
+  cookieHeader: string | null,
+) {
+  if (!cookieHeader) {
+    return null;
+  }
+
+  for (const part of cookieHeader.split(";")) {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex < 0) {
+      continue;
+    }
+    const name = part.slice(0, separatorIndex).trim();
+    if (name !== RESET_PASSWORD_COMPLETION_COOKIE_NAME) {
+      continue;
+    }
+    const value = part.slice(separatorIndex + 1);
+    const token = decodeResetPasswordCompletionCookieValue(value);
+    return token || null;
+  }
+
+  return null;
+}
+
+export function getResetPasswordCompletionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: RESET_PASSWORD_COMPLETION_COOKIE_MAX_AGE_SECONDS,
+    path: "/",
+  };
+}
+
+export function getClearResetPasswordCompletionCookieOptions() {
+  return {
+    ...getResetPasswordCompletionCookieOptions(),
+    maxAge: 0,
+  };
 }

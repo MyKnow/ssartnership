@@ -9,6 +9,7 @@ import type {
 } from './shared';
 import { ADMIN_LOGS_CSV_HEADER, uniqueLogGroups } from './shared';
 import { resolveActorMeta } from './data';
+import { sanitizeAuthSecurityLogProperties } from '@/lib/auth-security-log-sanitizer';
 
 function escapeCsvValue(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
@@ -113,7 +114,7 @@ function buildSecurityCsvRow(
     targetType: null,
     targetId: null,
     createdAt: log.created_at,
-    properties: log.properties,
+    properties: sanitizeAuthSecurityLogProperties(log.properties),
   };
 }
 

@@ -103,6 +103,70 @@ test("home selectors apply search before splitting visible and locked cards", as
   assert.deepStrictEqual(emptyResult.display.map((partner) => partner.id), []);
 });
 
+test("home selector trims partner payload for the public client boundary", async () => {
+  const { toHomeViewPartner } = await homeSelectorsPromise;
+
+  const partner = toHomeViewPartner({
+    id: "partner-public",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    name: "레코디드",
+    location: "역삼",
+    category: "food",
+    visibility: "public",
+    detailDescription: "상세 페이지에서만 필요한 긴 설명",
+    campusSlugs: ["seoul"],
+    mapUrl: "https://map.example.com",
+    benefitActionType: "external_link",
+    benefitActionLink: "https://booking.example.com",
+    reservationLink: "https://legacy.example.com",
+    inquiryLink: "https://chat.example.com",
+    period: { start: "2026-01-01", end: "2099-12-31" },
+    thumbnail: null,
+    images: ["https://cdn.example.com/1.jpg", "https://cdn.example.com/2.jpg"],
+    conditions: ["학생증"],
+    benefits: ["10% 할인"],
+    appliesTo: ["student"],
+    tags: ["삼겹살"],
+  });
+
+  assert.equal("detailDescription" in partner, false);
+  assert.equal("campusSlugs" in partner, false);
+  assert.deepStrictEqual(partner.images, ["https://cdn.example.com/1.jpg"]);
+  assert.equal(partner.benefitActionLink, "https://booking.example.com");
+  assert.equal(partner.reservationLink, "https://legacy.example.com");
+  assert.equal(partner.inquiryLink, "https://chat.example.com");
+});
+
+test("home selector drops action links for inactive public cards", async () => {
+  const { toHomeViewPartner } = await homeSelectorsPromise;
+
+  const partner = toHomeViewPartner({
+    id: "partner-expired",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    name: "어반짐",
+    location: "선릉",
+    category: "fitness",
+    visibility: "public",
+    mapUrl: "https://map.example.com",
+    benefitActionType: "external_link",
+    benefitActionLink: "https://booking.example.com",
+    reservationLink: "https://legacy.example.com",
+    inquiryLink: "https://chat.example.com",
+    period: { start: "2020-01-01", end: "2020-12-31" },
+    thumbnail: "https://cdn.example.com/thumb.jpg",
+    images: ["https://cdn.example.com/1.jpg"],
+    conditions: [],
+    benefits: [],
+    appliesTo: ["graduate"],
+    tags: [],
+  });
+
+  assert.equal(partner.benefitActionType, undefined);
+  assert.equal(partner.benefitActionLink, undefined);
+  assert.equal(partner.reservationLink, undefined);
+  assert.equal(partner.inquiryLink, undefined);
+});
+
 test("member selectors derive campus and filter must-change users first", async () => {
   const {
     normalizeAdminMembers,
