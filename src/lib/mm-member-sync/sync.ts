@@ -1,3 +1,5 @@
+import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
+import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   getMemberSyncCandidateYears,
@@ -13,6 +15,7 @@ import {
   type SenderSession,
   wrapMmMemberSyncDbError,
 } from "./shared";
+import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 
 function buildMemberSyncSummary(result: MemberSyncResult) {
   const summaryParts = [`@${result.snapshot.mmUsername}`];
@@ -144,6 +147,7 @@ export async function syncMemberSnapshot(
 async function syncMembersForYear(
   yearMembers: MemberRow[],
   senderSessionCache: Map<number, Promise<SenderSession>>,
+  ssafyVerifyClient: ReturnType<typeof createSsafyVerifyServerApiClient>,
 ): Promise<MemberSyncYearBatchResult> {
   const results: MemberSyncResult[] = [];
   const failures: Array<{ memberId: string; mmUserId: string; reason: string }> = [];
@@ -154,6 +158,7 @@ async function syncMembersForYear(
         member,
         getMemberSyncCandidateYears(member.year),
         senderSessionCache,
+        ssafyVerifyClient,
       );
       if (!resolved) {
         failures.push({
@@ -193,10 +198,22 @@ export async function syncMemberById(
   }
 
   const senderSessionCache = new Map<number, Promise<SenderSession>>();
+  const ssafyVerifyClient = createSsafyVerifyServerApiClient(
+    getSsafyVerifyServerApiConfig(),
+    {
+      trace: createSsafyVerifyApiTraceLogger({
+        actorType: "system",
+        properties: {
+          flow: "member_profile_sync",
+        },
+      }),
+    },
+  );
   const resolved = await resolveMemberSnapshotForYears(
     member,
     getMemberSyncCandidateYears(member.year),
     senderSessionCache,
+    ssafyVerifyClient,
   );
   if (!resolved) {
     return null;
@@ -227,10 +244,25 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
   });
 
   const senderSessionCache = new Map<number, Promise<SenderSession>>();
+  const ssafyVerifyClient = createSsafyVerifyServerApiClient(
+    getSsafyVerifyServerApiConfig(),
+    {
+      trace: createSsafyVerifyApiTraceLogger({
+        actorType: "system",
+        properties: {
+          flow: "member_profile_sync",
+        },
+      }),
+    },
+  );
   const orderedYears = [...years].sort((a, b) => b - a);
   const yearResults = await Promise.all(
     orderedYears.map((year) =>
-      syncMembersForYear(groupedMembers.get(year) ?? [], senderSessionCache),
+      syncMembersForYear(
+        groupedMembers.get(year) ?? [],
+        senderSessionCache,
+        ssafyVerifyClient,
+      ),
     ),
   );
 
