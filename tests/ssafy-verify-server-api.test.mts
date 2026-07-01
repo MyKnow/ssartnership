@@ -223,6 +223,63 @@ test("SSAFY Verify Server API client caches client_credentials tokens per scope"
   assert.equal(calls[2]?.authorization, "Bearer access-token-1");
 });
 
+test("SSAFY Verify Server API dedupes concurrent token requests", async () => {
+  const { createSsafyVerifyServerApiClient } = await serverApiModulePromise;
+  const calls: Array<string> = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.endsWith("/server/token")) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return jsonResponse({
+        access_token: "access-token-1",
+        token_type: "Bearer",
+        expires_in: 600,
+      });
+    }
+
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get("authorization"), "Bearer access-token-1");
+    return jsonResponse({
+      ok: true,
+      data: {
+        profile: {
+          mattermost_user_id: String(url.endsWith("/mattermost-users/mm.user_123-abc/profile")
+            ? "mm.user_123-abc"
+            : "mm.user_456-def"),
+          name: "김싸피",
+        },
+      },
+      request_id: "req_123",
+    });
+  };
+
+  const client = createSsafyVerifyServerApiClient(
+    {
+      issuer: "https://verify.example.com",
+      apiBaseUrl: "https://verify.example.com/v1",
+      clientId: "server-api-client",
+      clientSecret: "server-secret",
+    },
+    { fetch: fetchImpl },
+  );
+
+  const [first, second] = await Promise.all([
+    client.getMattermostUserProfile("mm.user_123-abc"),
+    client.getMattermostUserProfile("mm.user_456-def"),
+  ]);
+  const firstProfile = first.data?.profile?.mattermost_user_id;
+  const secondProfile = second.data?.profile?.mattermost_user_id;
+  assert.equal(firstProfile, "mm.user_123-abc");
+  assert.equal(secondProfile, "mm.user_456-def");
+
+  const tokenRequests = calls.filter((value) => value === "https://verify.example.com/v1/server/token");
+  assert.equal(tokenRequests.length, 1);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[1]?.startsWith("https://verify.example.com/v1/mattermost-users/"), true);
+  assert.equal(calls[2]?.startsWith("https://verify.example.com/v1/mattermost-users/"), true);
+});
+
 test("SSAFY Verify Server API normalizes stable public errors", async () => {
   const {
     SsafyVerifyServerApiError,

@@ -8,6 +8,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { trackProductEvent } from "@/lib/product-events";
 import type { PromotionSlide } from "@/lib/promotions/catalog";
 
 function isInlineImageSrc(src: string) {
@@ -123,8 +124,25 @@ export default function PromotionCarousel({
               href={slide.href}
               className="block min-w-full snap-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label={slide.title}
+              onClick={() =>
+                trackProductEvent({
+                  eventName: "home_banner_click",
+                  targetType: slide.adCampaignId ? "ad_campaign" : "home_banner",
+                  targetId: slide.adCampaignId ?? slide.id,
+                  properties: {
+                    slideId: slide.id,
+                    campaignId: slide.adCampaignId ?? null,
+                    sponsorLabel: slide.sponsorLabel ?? "",
+                  },
+                })
+              }
             >
               <div className="relative aspect-[21/9] w-full overflow-hidden rounded-overlay border border-border/70 bg-surface-muted shadow-raised">
+                {slide.sponsorLabel ? (
+                  <span className="absolute left-3 top-3 z-10 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 text-xs font-semibold text-white shadow-flat backdrop-blur-md">
+                    스폰서 · {slide.sponsorLabel}
+                  </span>
+                ) : null}
                 {isInlineImageSrc(slide.imageSrc) ? (
                   // eslint-disable-next-line @next/next/no-img-element -- live preview and blob URLs need plain img
                   <img

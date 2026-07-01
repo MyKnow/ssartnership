@@ -92,6 +92,7 @@ type CachedToken = {
   accessToken: string;
   expiresAtMs: number;
 };
+type InFlightToken = Promise<CachedToken>;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -428,6 +429,7 @@ export function createSsafyVerifyServerApiClient(
   const now = options.now ?? (() => Date.now());
   const trace = options.trace ?? null;
   const tokenCache = new Map<string, CachedToken>();
+  const inFlightToken = new Map<string, InFlightToken>();
 
   async function fetchJson(
     url: string,
@@ -540,68 +542,82 @@ export function createSsafyVerifyServerApiClient(
       return cached.accessToken;
     }
 
-    const body = new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
-    });
-    if (scope) {
-      body.set("scope", scope);
+    const inFlight = inFlightToken.get(scope);
+    if (inFlight) {
+      return (await inFlight).accessToken;
     }
 
-    const payload = await fetchJson(
-      joinUrl(config.apiBaseUrl, "/server/token"),
-      {
-        method: "POST",
-        headers: {
-          "cache-control": "no-store",
-          "content-type": "application/x-www-form-urlencoded",
+    const nextTokenRequest: InFlightToken = (async () => {
+      const body = new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+      });
+      if (scope) {
+        body.set("scope", scope);
+      }
+
+      const payload = await fetchJson(
+        joinUrl(config.apiBaseUrl, "/server/token"),
+        {
+          method: "POST",
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: body.toString(),
+          cache: "no-store",
         },
-        body: body.toString(),
-        cache: "no-store",
-      },
-      {
-        status: 502,
-        errorCode: "VERIFY_SERVER_TOKEN_FAILED",
-        message: "SSAFY Verify Server API 토큰 발급에 실패했습니다.",
-      },
-      {
-        operation: "client_credentials_token",
-        method: "POST",
-        path: "/server/token",
-        scopes: scope ? scope.split(" ") : [],
-        request: summarizeSsafyVerifyFormTraceRequest(body),
-      },
-    );
+        {
+          status: 502,
+          errorCode: "VERIFY_SERVER_TOKEN_FAILED",
+          message: "SSAFY Verify Server API 토큰 발급에 실패했습니다.",
+        },
+        {
+          operation: "client_credentials_token",
+          method: "POST",
+          path: "/server/token",
+          scopes: scope ? scope.split(" ") : [],
+          request: summarizeSsafyVerifyFormTraceRequest(body),
+        },
+      );
 
-    if (!isRecord(payload) || typeof payload.access_token !== "string") {
-      throw new SsafyVerifyServerApiError({
-        status: 502,
-        errorCode: "VERIFY_SERVER_TOKEN_INVALID",
-        message: "SSAFY Verify Server API 토큰 응답을 확인하지 못했습니다.",
-      });
+      if (!isRecord(payload) || typeof payload.access_token !== "string") {
+        throw new SsafyVerifyServerApiError({
+          status: 502,
+          errorCode: "VERIFY_SERVER_TOKEN_INVALID",
+          message: "SSAFY Verify Server API 토큰 응답을 확인하지 못했습니다.",
+        });
+      }
+      if (
+        typeof payload.token_type === "string" &&
+        payload.token_type.toLowerCase() !== "bearer"
+      ) {
+        throw new SsafyVerifyServerApiError({
+          status: 502,
+          errorCode: "VERIFY_SERVER_TOKEN_INVALID",
+          message: "SSAFY Verify Server API 토큰 응답을 확인하지 못했습니다.",
+        });
+      }
+
+      const expiresIn =
+        typeof payload.expires_in === "number" && Number.isFinite(payload.expires_in)
+          ? payload.expires_in
+          : DEFAULT_TOKEN_TTL_SECONDS;
+      const cachedToken = {
+        accessToken: payload.access_token,
+        expiresAtMs: now() + Math.max(0, expiresIn * 1000 - TOKEN_REFRESH_SKEW_MS),
+      };
+      tokenCache.set(scope, cachedToken);
+      return cachedToken;
+    })();
+    inFlightToken.set(scope, nextTokenRequest);
+
+    try {
+      return (await nextTokenRequest).accessToken;
+    } finally {
+      inFlightToken.delete(scope);
     }
-    if (
-      typeof payload.token_type === "string" &&
-      payload.token_type.toLowerCase() !== "bearer"
-    ) {
-      throw new SsafyVerifyServerApiError({
-        status: 502,
-        errorCode: "VERIFY_SERVER_TOKEN_INVALID",
-        message: "SSAFY Verify Server API 토큰 응답을 확인하지 못했습니다.",
-      });
-    }
-
-    const expiresIn =
-      typeof payload.expires_in === "number" && Number.isFinite(payload.expires_in)
-        ? payload.expires_in
-        : DEFAULT_TOKEN_TTL_SECONDS;
-    tokenCache.set(scope, {
-      accessToken: payload.access_token,
-      expiresAtMs: now() + Math.max(0, expiresIn * 1000 - TOKEN_REFRESH_SKEW_MS),
-    });
-
-    return payload.access_token;
   }
 
   async function requestJson(input: {

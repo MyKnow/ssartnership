@@ -32,6 +32,8 @@ function createSlide(options: {
     audiences: options.audiences,
     allowedCampuses: options.allowedCampuses ?? [],
     eventSlug: options.eventSlug ?? null,
+    adCampaignId: null,
+    sponsorLabel: "",
     createdAt: "2026-04-27T00:00:00.000Z",
     updatedAt: "2026-04-27T00:00:00.000Z",
   };

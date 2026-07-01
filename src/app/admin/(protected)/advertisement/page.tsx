@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminAdPackageManager from "@/components/admin/ad-packages/AdminAdPackageManager";
 import PromotionCarouselEditor from "@/components/admin/promotion-carousel-editor/PromotionCarouselEditor";
 import FormMessage from "@/components/ui/FormMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
+import {
+  createAdCampaignAction,
+  createAdCouponAction,
+  updateAdCampaignStatusAction,
+} from "@/app/admin/(protected)/_actions/ad-package-actions";
 import { savePromotionSlidesAction } from "@/app/admin/(protected)/_actions/promotion-actions";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { adPackageRepository, partnerRepository } from "@/lib/repositories";
 import {
   getPromotionCampaignState,
   listManagedEventCampaigns,
@@ -28,6 +35,15 @@ function statusMessage(status?: string) {
   if (status === "updated") {
     return "광고 카드를 저장했습니다.";
   }
+  if (status === "ad-campaign-created") {
+    return "광고 패키지 캠페인을 생성했습니다.";
+  }
+  if (status === "ad-campaign-updated") {
+    return "광고 패키지 캠페인 상태를 변경했습니다.";
+  }
+  if (status === "ad-coupon-created") {
+    return "쿠폰을 생성했습니다.";
+  }
   return null;
 }
 
@@ -39,9 +55,11 @@ export default async function AdminAdvertisementPage({
   await requireAdminPermission("home_ads", "read", { path: "/admin/advertisement" });
   const params = (await searchParams) ?? {};
   const message = statusMessage(params.status);
-  const [slides, eventCampaigns] = await Promise.all([
+  const [slides, eventCampaigns, adCampaigns, partners] = await Promise.all([
     listManagedPromotionSlides({ includeInactive: true }),
     listManagedEventCampaigns({ includeInactive: false }),
+    adPackageRepository.listAdminCampaigns(),
+    partnerRepository.getPartners({ authenticated: true }),
   ]);
   const eventPageOptions = eventCampaigns
     .filter((campaign) => getPromotionCampaignState(campaign).key === "active")
@@ -50,6 +68,10 @@ export default async function AdminAdvertisementPage({
       slug: campaign.slug,
       label: `${campaign.title} (${campaign.pagePath})`,
     }));
+  const adCampaignOptions = adCampaigns.map((campaign) => ({
+    id: campaign.id,
+    label: `${campaign.sponsorLabel || campaign.partnerName} · ${campaign.title}`,
+  }));
   const activeSlides = slides.filter((slide) => slide.isActive).length;
   const databaseSlides = slides.filter((slide) => slide.source === "database").length;
   const catalogSlides = slides.filter((slide) => slide.source === "catalog").length;
@@ -74,6 +96,15 @@ export default async function AdminAdvertisementPage({
         {message ? (
           <FormMessage variant="info">{message}</FormMessage>
         ) : null}
+        <AdminAdPackageManager
+          campaigns={adCampaigns}
+          partners={partners
+            .filter((partner) => partner.name)
+            .map((partner) => ({ id: partner.id, name: partner.name }))}
+          createCampaignAction={createAdCampaignAction}
+          updateCampaignStatusAction={updateAdCampaignStatusAction}
+          createCouponAction={createAdCouponAction}
+        />
         <section className="grid gap-4">
           <SectionHeading
             title="캐러셀 편집기"
@@ -82,6 +113,7 @@ export default async function AdminAdvertisementPage({
           <PromotionCarouselEditor
             initialSlides={slides}
             eventPageOptions={eventPageOptions}
+            adCampaignOptions={adCampaignOptions}
             saveAction={savePromotionSlidesAction}
           />
         </section>

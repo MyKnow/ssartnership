@@ -17,6 +17,7 @@ import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
+import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
 import {
   createWebpFile,
@@ -50,6 +51,8 @@ type SlideDraft = {
   audiences: PromotionAudience[];
   allowedCampuses: CampusSlug[];
   eventSlug: string | null;
+  adCampaignId: string | null;
+  sponsorLabel: string;
   source: "database" | "catalog";
 };
 
@@ -61,6 +64,11 @@ type PendingCrop = {
 export type PromotionEventPageOption = {
   href: string;
   slug: string;
+  label: string;
+};
+
+export type PromotionAdCampaignOption = {
+  id: string;
   label: string;
 };
 
@@ -116,6 +124,8 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
       slide.audiences.length > 0 ? [...slide.audiences] : [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses,
     eventSlug: slide.eventSlug,
+    adCampaignId: slide.adCampaignId,
+    sponsorLabel: slide.sponsorLabel,
     source: slide.source,
   };
 }
@@ -225,10 +235,12 @@ function toggleAudience(
 export default function PromotionCarouselEditor({
   initialSlides,
   eventPageOptions,
+  adCampaignOptions,
   saveAction,
 }: {
   initialSlides: ManagedPromotionSlide[];
   eventPageOptions: PromotionEventPageOption[];
+  adCampaignOptions: PromotionAdCampaignOption[];
   saveAction: (formData: FormData) => void | Promise<void>;
 }) {
   const [slides, setSlides] = useState<SlideDraft[]>(
@@ -266,6 +278,8 @@ export default function PromotionCarouselEditor({
           href: slide.href || "#",
           audiences: slide.audiences,
           allowedCampuses: slide.allowedCampuses,
+          adCampaignId: slide.adCampaignId,
+          sponsorLabel: slide.sponsorLabel,
         })),
     [slides],
   );
@@ -285,6 +299,8 @@ export default function PromotionCarouselEditor({
           audiences: slide.audiences,
           allowedCampuses: slide.allowedCampuses,
           eventSlug: slide.eventSlug,
+          adCampaignId: slide.adCampaignId,
+          sponsorLabel: slide.sponsorLabel,
         })),
       ),
     [slides],
@@ -311,6 +327,9 @@ export default function PromotionCarouselEditor({
       }
       if (slide.audiences.length === 0) {
         issues.push(`${label}: 노출 대상을 하나 이상 선택해 주세요.`);
+      }
+      if (slide.sponsorLabel.length > AD_PACKAGE_FORM_LIMITS.sponsorLabelMax) {
+        issues.push(`${label}: 스폰서 표기는 60자 이하로 입력해 주세요.`);
       }
     });
     return issues;
@@ -367,6 +386,8 @@ export default function PromotionCarouselEditor({
         audiences: [...DEFAULT_PROMOTION_AUDIENCES],
         allowedCampuses: [],
         eventSlug: null,
+        adCampaignId: null,
+        sponsorLabel: "",
         source: "database",
       },
     ]);
@@ -556,6 +577,8 @@ export default function PromotionCarouselEditor({
             const hrefInvalid = !slide.href.trim();
             const altInvalid = !slide.imageAlt.trim();
             const audienceInvalid = slide.audiences.length === 0;
+            const sponsorInvalid =
+              slide.sponsorLabel.length > AD_PACKAGE_FORM_LIMITS.sponsorLabelMax;
             return (
               <Card key={slide.id} tone="default" className="grid gap-5">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -564,6 +587,8 @@ export default function PromotionCarouselEditor({
                       <SlideBadge>순번 {index + 1}</SlideBadge>
                       <SlideBadge active={slide.isActive}>{slide.isActive ? "활성" : "비활성"}</SlideBadge>
                       <SlideBadge muted>{editable ? "DB" : "Catalog"}</SlideBadge>
+                      {slide.adCampaignId ? <SlideBadge active>제휴 캠페인</SlideBadge> : null}
+                      {slide.sponsorLabel ? <SlideBadge muted>{slide.sponsorLabel}</SlideBadge> : null}
                       {slide.audiences.map((audience) => (
                         <SlideBadge key={audience} muted>
                           {getAudienceLabel(audience)}
@@ -717,6 +742,57 @@ export default function PromotionCarouselEditor({
                         ))}
                       </Select>
                     </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium text-foreground" htmlFor={`ad-campaign-${slide.id}`}>
+                        제휴 캠페인 연결
+                      </label>
+                      <Select
+                        id={`ad-campaign-${slide.id}`}
+                        value={slide.adCampaignId ?? ""}
+                        disabled={!editable || adCampaignOptions.length === 0}
+                        onChange={(event) => {
+                          const campaignId = event.target.value || null;
+                          const option = adCampaignOptions.find((item) => item.id === campaignId);
+                          updateSlide(slide.id, (current) => ({
+                            ...current,
+                            adCampaignId: campaignId,
+                            sponsorLabel: current.sponsorLabel || option?.label.split(" · ")[0] || "",
+                          }));
+                        }}
+                      >
+                        <option value="">
+                          {adCampaignOptions.length > 0
+                            ? "연결 안 함"
+                            : "생성된 광고 캠페인 없음"}
+                        </option>
+                        {adCampaignOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    <label className="grid gap-2 text-sm font-medium text-foreground">
+                      스폰서 표기
+                      <Input
+                        value={slide.sponsorLabel}
+                        onChange={(event) =>
+                          updateSlide(slide.id, (current) => ({
+                            ...current,
+                            sponsorLabel: event.target.value,
+                          }))
+                        }
+                        placeholder="예: 역삼 국밥집 제공"
+                        disabled={!editable}
+                        maxLength={AD_PACKAGE_FORM_LIMITS.sponsorLabelMax}
+                        className={sponsorInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
+                      />
+                      <span className="text-xs font-normal leading-5 text-muted-foreground">
+                        홈 배너에 광고 표기로 함께 노출됩니다.
+                      </span>
+                    </label>
 
                     <label className="grid gap-2 text-sm font-medium text-foreground">
                       연결 페이지

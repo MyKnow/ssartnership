@@ -45,6 +45,8 @@ export type PromotionSlide = {
   href: string;
   audiences?: PromotionAudience[];
   allowedCampuses?: string[];
+  adCampaignId?: string | null;
+  sponsorLabel?: string;
 };
 
 export type EventConditionKey = "signup" | "mm" | "push" | "marketing" | "review";

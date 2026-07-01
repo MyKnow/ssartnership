@@ -48,17 +48,19 @@ export async function getSenderSessionForYear(
 
 export async function fetchMemberSnapshotByUserId(
   userId: string,
+  clientOverride?: ReturnType<typeof createSsafyVerifyServerApiClient>,
 ): Promise<MemberSyncSnapshot | null> {
-  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
-    trace: createSsafyVerifyApiTraceLogger({
-      actorType: "system",
-      identifier: userId,
-      properties: {
-        flow: "member_profile_sync",
-        mattermostUserId: userId,
-      },
-    }),
-  });
+  const client = clientOverride
+    ?? createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
+      trace: createSsafyVerifyApiTraceLogger({
+        actorType: "system",
+        identifier: userId,
+        properties: {
+          flow: "member_profile_sync",
+          mattermostUserId: userId,
+        },
+      }),
+    });
   const payload = await client.getMattermostUserProfile(userId).catch((error) => {
     if (error instanceof SsafyVerifyServerApiError && error.status === 404) {
       return null;
@@ -77,13 +79,17 @@ export async function resolveMemberSnapshotForYears(
   member: MemberRow,
   candidateYears: number[],
   cache: Map<number, Promise<SenderSession>>,
+  clientOverride?: ReturnType<typeof createSsafyVerifyServerApiClient>,
 ) {
   let lastError: Error | null = null;
 
   for (const senderYear of candidateYears) {
     try {
       await getSenderSessionForYear(senderYear, cache);
-      const snapshot = await fetchMemberSnapshotByUserId(member.mm_user_id);
+      const snapshot = await fetchMemberSnapshotByUserId(
+        member.mm_user_id,
+        clientOverride,
+      );
       if (!snapshot) {
         continue;
       }
