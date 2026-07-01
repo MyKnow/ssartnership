@@ -14,6 +14,7 @@ import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
+import PartnerDetailCoupons from "./_page/PartnerDetailCoupons";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
 import PartnerDetailSummaryCard from "./_page/PartnerDetailSummaryCard";
 import PartnerDetailReviews, {
@@ -156,7 +157,9 @@ export default async function PartnerDetailPage({
     metrics,
     isFavorited,
     currentUserId,
+    adCoupons,
   } = pageData;
+  const partnerReturnTo = `/partners/${encodeURIComponent(partner.id)}`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -239,6 +242,13 @@ export default async function PartnerDetailPage({
               inquiryDisplay={inquiryDisplay}
               normalizedLinks={normalizedLinks}
               partnerId={partner.id}
+            />
+
+            <PartnerDetailCoupons
+              coupons={adCoupons}
+              partnerId={partner.id}
+              currentUserId={currentUserId}
+              returnTo={partnerReturnTo}
             />
 
             <Suspense fallback={<PartnerDetailReviewsFallback />}>

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
   type PromotionAudience,
@@ -178,6 +179,8 @@ type PromotionSlideDraftPayload = {
   audiences: PromotionAudience[];
   allowedCampuses: string[];
   eventSlug: string | null;
+  adCampaignId: string | null;
+  sponsorLabel: string;
 };
 
 function normalizeStringArray(value: unknown) {
@@ -240,6 +243,11 @@ function parsePromotionSlideDrafts(formData: FormData) {
       derivedEventSlug && (!rawEventSlug || rawEventSlug === derivedEventSlug)
         ? derivedEventSlug
         : null;
+    const sponsorLabel =
+      typeof record.sponsorLabel === "string" ? record.sponsorLabel.trim() : "";
+    if (sponsorLabel.length > AD_PACKAGE_FORM_LIMITS.sponsorLabelMax) {
+      throw new Error("광고 카드의 스폰서 표기는 60자 이하로 입력해 주세요.");
+    }
     return {
       id,
       title: typeof record.title === "string" ? record.title.trim() : "",
@@ -251,6 +259,11 @@ function parsePromotionSlideDrafts(formData: FormData) {
       audiences: normalizePromotionAudiences(record.audiences),
       allowedCampuses: normalizeStringArray(record.allowedCampuses),
       eventSlug,
+      adCampaignId:
+        typeof record.adCampaignId === "string" && record.adCampaignId.trim()
+          ? record.adCampaignId.trim()
+          : null,
+      sponsorLabel,
     };
   });
   const ids = new Set(slides.map((slide) => slide.id));
@@ -399,6 +412,8 @@ export async function savePromotionSlidesAction(formData: FormData) {
     audiences: PromotionAudience[];
     allowed_campuses: string[];
     event_slug: string | null;
+    ad_campaign_id: string | null;
+    sponsor_label: string;
   }> = [];
   const removedImageUrls = new Set<string>();
   const nextImageUrls = new Set<string>();
@@ -440,6 +455,8 @@ export async function savePromotionSlidesAction(formData: FormData) {
       audiences: slide.audiences,
       allowed_campuses: slide.allowedCampuses,
       event_slug: slide.eventSlug,
+      ad_campaign_id: slide.adCampaignId,
+      sponsor_label: slide.sponsorLabel,
     });
     keepIds.add(slide.id);
     nextImageUrls.add(imageSrc);

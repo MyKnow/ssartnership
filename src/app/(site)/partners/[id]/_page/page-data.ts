@@ -10,6 +10,7 @@ import {
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import {
+  adPackageRepository,
   partnerFavoriteRepository,
   partnerRepository,
 } from "@/lib/repositories";
@@ -19,6 +20,7 @@ import {
   buildPartnerStructuredData,
 } from "@/lib/seo/partners";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
+import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
@@ -46,6 +48,26 @@ const getFavoriteCountsSafe = cache(async (partnerIds: string[]) => {
   } catch (error) {
     console.error("[partner-detail] favorite count fetch failed", error);
     return new Map<string, number>();
+  }
+});
+
+function isMissingAdCouponSchemaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("ad_coupons") &&
+    (message.includes("schema cache") || message.includes("does not exist"))
+  );
+}
+
+const getActiveCouponsSafe = cache(async (partnerId: string) => {
+  try {
+    return await adPackageRepository.listActiveCouponsForPartner(partnerId);
+  } catch (error) {
+    if (isMissingAdCouponSchemaError(error)) {
+      return [] as AdCoupon[];
+    }
+    console.error("[partner-detail] ad coupon fetch failed", error);
+    return [] as AdCoupon[];
   }
 });
 
@@ -124,6 +146,7 @@ export type PartnerDetailPageData = {
   metrics: PartnerPortalServiceMetrics;
   currentUserId: string | null;
   isFavorited: boolean;
+  adCoupons: AdCoupon[];
 };
 
 export type PartnerDetailAccessGateData = {
@@ -190,6 +213,7 @@ export async function getPartnerDetailPageData(
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
   const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
+  const adCoupons = await getActiveCouponsSafe(partner.id);
   const metrics = {
     ...createEmptyPartnerServiceMetrics(),
     favoriteCount: favoriteCounts.get(rawId) ?? 0,
@@ -246,5 +270,6 @@ export async function getPartnerDetailPageData(
     metrics,
     currentUserId: currentUserId ?? null,
     isFavorited: favoriteIds.has(rawId),
+    adCoupons,
   };
 }

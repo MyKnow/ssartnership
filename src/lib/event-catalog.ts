@@ -24,6 +24,11 @@ export const PRODUCT_EVENT_NAMES = [
   'partner_review_delete',
   'partner_review_recommend',
   'partner_review_disrecommend',
+  'home_banner_click',
+  'coupon_view',
+  'coupon_copy',
+  'coupon_redeem',
+  'ad_push_send',
 ] as const;
 
 export type ProductEventName = (typeof PRODUCT_EVENT_NAMES)[number];
@@ -77,6 +82,9 @@ export const ADMIN_AUDIT_ACTIONS = [
   'event_reward_draw_create',
   'event_reward_winner_notification_test_send',
   'event_reward_winner_notification_send',
+  'ad_campaign_create',
+  'ad_campaign_status_update',
+  'ad_coupon_create',
   'admin_account_create',
   'admin_account_setup_link_issue',
   'admin_account_status_update',

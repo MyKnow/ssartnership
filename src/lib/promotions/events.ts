@@ -47,6 +47,8 @@ type PromotionSlideRow = {
   audiences: unknown;
   allowed_campuses: unknown;
   event_slug: string | null;
+  ad_campaign_id: string | null;
+  sponsor_label: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -69,6 +71,8 @@ export type ManagedPromotionSlide = PromotionSlide & {
   audiences: PromotionAudience[];
   allowedCampuses: string[];
   eventSlug: string | null;
+  adCampaignId: string | null;
+  sponsorLabel: string;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -146,6 +150,8 @@ function mapStaticSlide(slide: PromotionSlide, index: number): ManagedPromotionS
     audiences: normalizePromotionAudiences(slide.audiences),
     allowedCampuses: slide.allowedCampuses ?? [],
     eventSlug: extractEventSlugFromHref(slide.href),
+    adCampaignId: slide.adCampaignId ?? null,
+    sponsorLabel: slide.sponsorLabel ?? "",
     createdAt: null,
     updatedAt: null,
   };
@@ -229,6 +235,8 @@ function mapSlideRow(row: PromotionSlideRow): ManagedPromotionSlide {
     audiences: normalizePromotionAudiences(row.audiences),
     allowedCampuses: normalizeStringArray(row.allowed_campuses),
     eventSlug: row.event_slug ?? extractEventSlugFromHref(row.href),
+    adCampaignId: row.ad_campaign_id,
+    sponsorLabel: row.sponsor_label ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -241,6 +249,15 @@ function extractEventSlugFromHref(href: string) {
 
 function canUseSupabase() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function isMissingPromotionSlideAdColumns(message: string) {
+  return (
+    message.includes("promotion_slides.ad_campaign_id") ||
+    message.includes("promotion_slides.sponsor_label") ||
+    message.includes("column ad_campaign_id does not exist") ||
+    message.includes("column sponsor_label does not exist")
+  );
 }
 
 function staticCampaigns() {
@@ -263,7 +280,7 @@ export async function listManagedPromotionSlides(options?: {
     let query = supabase
       .from("promotion_slides")
       .select(
-        "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,event_slug,created_at,updated_at",
+        "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,event_slug,ad_campaign_id,sponsor_label,created_at,updated_at",
       )
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: true });
@@ -272,6 +289,31 @@ export async function listManagedPromotionSlides(options?: {
     }
     const { data, error } = await query;
     if (error) {
+      if (isMissingPromotionSlideAdColumns(error.message)) {
+        let legacyQuery = supabase
+          .from("promotion_slides")
+          .select(
+            "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,event_slug,created_at,updated_at",
+          )
+          .order("display_order", { ascending: true })
+          .order("created_at", { ascending: true });
+        if (!options?.includeInactive) {
+          legacyQuery = legacyQuery.eq("is_active", true);
+        }
+        const { data: legacyData, error: legacyError } = await legacyQuery;
+        if (!legacyError) {
+          return ((legacyData ?? []) as Omit<
+            PromotionSlideRow,
+            "ad_campaign_id" | "sponsor_label"
+          >[]).map((row) =>
+            mapSlideRow({
+              ...row,
+              ad_campaign_id: null,
+              sponsor_label: "",
+            }),
+          );
+        }
+      }
       console.error("[promotions] promotion_slides query failed", error.message);
       return staticSlides();
     }
@@ -455,5 +497,7 @@ export async function getHomePromotionSlides(
       href: slide.href,
       audiences: slide.audiences,
       allowedCampuses: slide.allowedCampuses,
+      adCampaignId: slide.adCampaignId,
+      sponsorLabel: slide.sponsorLabel,
     }));
 }
