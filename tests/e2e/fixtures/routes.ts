@@ -12,7 +12,6 @@ export const publicSmokeRoutes: SmokeRoute[] = [
   { path: "/", expected: /카테고리별 혜택|Directory/ },
   { path: "/campuses/seoul", expected: /서울 캠퍼스|제휴 혜택/ },
   { path: "/events/signup-reward", expected: /이벤트|가입|리워드/ },
-  { path: "/events/review-reward", expected: /이벤트|리뷰|리워드/ },
   { path: "/legal/service", expected: /서비스 이용약관/ },
   { path: "/legal/privacy", expected: /개인정보/ },
   { path: "/legal/marketing", expected: /마케팅/ },

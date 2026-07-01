@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
@@ -18,6 +18,10 @@ import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { buildPartnerChangeRequestDiffItems } from "@/components/partner-change-request-ui/buildDiffItems";
 import { DiffCard } from "@/components/partner-change-request-ui/DiffPrimitives";
 import type { AdminPartnerMetricsResult } from "@/lib/admin-partner-metrics";
+import {
+  createAdminPartnerWorkspaceTabOptions,
+  type AdminPartnerWorkspaceTab,
+} from "@/components/admin/partner-workspace-tabs";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
@@ -291,6 +295,7 @@ export default function AdminPartnerWorkspace({
   partners,
   changeRequests,
   partnerMetrics,
+  initialTab = "partners",
   approveAction,
   rejectAction,
   createCategoryAction,
@@ -304,77 +309,77 @@ export default function AdminPartnerWorkspace({
     warningMessage?: AdminPartnerMetricsResult["warningMessage"];
     metricsByPartnerId: AdminPartnerMetricsResult["metricsByPartnerId"];
   };
+  initialTab?: AdminPartnerWorkspaceTab;
   approveAction: FormAction;
   rejectAction: FormAction;
   createCategoryAction: FormAction;
   updateCategoryAction: FormAction;
   deleteCategoryAction: FormAction;
 }) {
-  const [activeTab, setActiveTab] = useState<"brand" | "category">("brand");
+  const [activeTab, setActiveTab] =
+    useState<AdminPartnerWorkspaceTab>(initialTab);
   const safePartners = partners.map((partner) => ({
     ...partner,
     metrics: partnerMetrics.metricsByPartnerId.get(partner.id) ?? null,
   }));
+  const tabOptions = createAdminPartnerWorkspaceTabOptions({
+    partnerCount: safePartners.length,
+    requestCount: changeRequests.length,
+    categoryCount: categories.length,
+  });
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   return (
     <div className="grid gap-6">
       <Tabs
         value={activeTab}
         onChange={(value) => setActiveTab(value)}
-        options={[
-          {
-            value: "brand",
-            label: "브랜드 관리",
-            description: `브랜드 ${safePartners.length.toLocaleString()}개 · 승인 대기 ${changeRequests.length.toLocaleString()}건`,
-          },
-          {
-            value: "category",
-            label: "카테고리 관리",
-            description: `카테고리 ${categories.length.toLocaleString()}개`,
-          },
-        ]}
-        className="sm:grid-cols-2"
+        options={tabOptions}
+        className="sm:grid-cols-2 xl:grid-cols-3"
       />
 
-      {activeTab === "brand" ? (
-        <div className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.72fr)] 2xl:items-start">
-          <Card tone="elevated" className="min-w-0">
-            <SectionHeading
-              title="브랜드 관리"
-              description="협력사와 담당자 이메일을 함께 관리하고, 이용 조건/혜택/태그는 칩으로 다룹니다."
+      {activeTab === "partners" ? (
+        <Card tone="elevated" className="min-w-0">
+          <SectionHeading
+            title="제휴처(브랜드) 관리"
+            description="사용자에게 노출되는 제휴처 카드, 혜택, 공개 상태, 연결 파트너사를 관리합니다."
+          />
+          {partnerMetrics.warningMessage ? (
+            <InlineMessage
+              className="mt-6"
+              tone="warning"
+              title="제휴처 집계 일부를 불러오지 못했습니다."
+              description={partnerMetrics.warningMessage}
             />
-            {partnerMetrics.warningMessage ? (
-              <InlineMessage
-                className="mt-6"
-                tone="warning"
-                title="브랜드 집계 일부를 불러오지 못했습니다."
-                description={partnerMetrics.warningMessage}
-              />
-            ) : null}
-            <div className="mt-6">
-              <AdminPartnerManager
-                categories={categories}
-                partners={safePartners}
-              />
-            </div>
-          </Card>
-
-          <div className="grid min-w-0 gap-6 2xl:sticky 2xl:top-24">
-            <PartnerChangeRequestQueueSection
-              requests={changeRequests}
-              approveAction={approveAction}
-              rejectAction={rejectAction}
+          ) : null}
+          <div className="mt-6">
+            <AdminPartnerManager
+              categories={categories}
+              partners={safePartners}
             />
           </div>
-        </div>
-      ) : (
+        </Card>
+      ) : null}
+
+      {activeTab === "requests" ? (
+        <PartnerChangeRequestQueueSection
+          requests={changeRequests}
+          approveAction={approveAction}
+          rejectAction={rejectAction}
+        />
+      ) : null}
+
+      {activeTab === "categories" ? (
         <CategoryManagerSection
           categories={categories}
           createCategoryAction={createCategoryAction}
           updateCategoryAction={updateCategoryAction}
           deleteCategoryAction={deleteCategoryAction}
         />
-      )}
+      ) : null}
     </div>
   );
 }

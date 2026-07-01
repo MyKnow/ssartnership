@@ -265,7 +265,7 @@ export default function AdminMemberTrendChart({
                 setGranularity(value);
               }}
               options={GRANULARITY_OPTIONS}
-              className="xl:grid-cols-4"
+              className="sm:grid-cols-2 xl:grid-cols-4"
             />
           </div>
         </div>
