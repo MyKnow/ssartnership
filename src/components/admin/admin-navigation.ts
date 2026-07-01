@@ -105,15 +105,15 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       {
         href: "/admin/partners",
-        label: "브랜드 관리",
-        description: "브랜드와 카테고리 운영",
+        label: "제휴처/브랜드",
+        description: "노출 카드와 카테고리",
         iconKey: "tag",
         permission: { resource: "brands" },
       },
       {
         href: "/admin/companies",
-        label: "협력사 관리",
-        description: "협력사와 계정 연결",
+        label: "파트너사/계정",
+        description: "회사와 담당 계정 연결",
         iconKey: "building",
         permission: { resource: "companies" },
       },

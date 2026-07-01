@@ -19,9 +19,12 @@ test.describe("public partner discovery", () => {
     const initialCount = await cards.count();
     expect(initialCount).toBeGreaterThan(0);
 
-    await cards.first().locator('a[href^="/partners/"]').first().click();
+    const publicPartnerLink = page.locator('a[href="/partners/health-001"]').first();
+    await expect(publicPartnerLink).toBeVisible();
+    await publicPartnerLink.scrollIntoViewIfNeeded();
+    await publicPartnerLink.click();
 
-    await expect(page).toHaveURL(/\/partners\/[^/]+$/);
+    await expect(page).toHaveURL(/\/partners\/health-001$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 

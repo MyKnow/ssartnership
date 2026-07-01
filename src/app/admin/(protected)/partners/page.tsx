@@ -18,6 +18,7 @@ import {
 } from "@/app/admin/(protected)/actions";
 import { listPartnerChangeRequests } from "@/lib/partner-change-requests";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { normalizeAdminPartnerWorkspaceTab } from "@/components/admin/partner-workspace-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -55,12 +56,13 @@ function normalizePartnerCompany(
 export default async function AdminPartnersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<{ error?: string; tab?: string }>;
 }) {
   await requireAdminPermission("brands", "read", { path: "/admin/partners" });
   const supabase = getSupabaseAdminClient();
   const params = (await searchParams) ?? {};
   const partnerFormError = params.error ? adminPartnersErrorMessages[params.error] : null;
+  const initialTab = normalizeAdminPartnerWorkspaceTab(params.tab);
 
   const [
     categoriesResult,
@@ -92,21 +94,30 @@ export default async function AdminPartnersPage({
 
   return (
     <AdminShell
-      title="브랜드 관리"
+      title="제휴처(브랜드) 관리"
       backHref="/admin"
       backLabel="관리 홈"
     >
       <section className="grid gap-6">
         <AdminPartnerCreateToast />
         <ShellHeader
-          eyebrow="Partners"
-          title="브랜드와 변경 요청 관리"
-          description="카테고리, 브랜드, 승인 대기 요청을 같은 디자인 규칙 아래에서 관리합니다."
-          actions={<Button variant="soft" href="/admin/partners/new">브랜드 추가</Button>}
+          eyebrow="Partner Brands"
+          title="제휴처와 브랜드 운영"
+          description="고객에게 노출되는 제휴처 카드, 승인 대기 요청, 카테고리를 탭으로 나눠 관리합니다."
+          actions={
+            <>
+              <Button variant="secondary" href="/admin/companies">
+                파트너사/계정 관리
+              </Button>
+              <Button variant="soft" href="/admin/partners/new">
+                제휴처 추가
+              </Button>
+            </>
+          }
         />
         <StatsRow
           items={[
-            { label: "브랜드", value: `${normalizedPartners.length.toLocaleString()}개`, hint: "현재 등록된 전체 브랜드" },
+            { label: "제휴처", value: `${normalizedPartners.length.toLocaleString()}개`, hint: "현재 등록된 전체 브랜드" },
             { label: "카테고리", value: `${safeCategories.length.toLocaleString()}개`, hint: "운영 중인 분류 체계" },
             { label: "공개/대외비", value: `${publicCount.toLocaleString()} · ${confidentialCount.toLocaleString()}`, hint: "public · confidential" },
             { label: "비공개/요청", value: `${privateCount.toLocaleString()}개`, hint: `승인 대기 ${changeRequests.length.toLocaleString()}건` },
@@ -121,6 +132,7 @@ export default async function AdminPartnersPage({
           partners={normalizedPartners}
           changeRequests={changeRequests}
           partnerMetrics={partnerMetrics}
+          initialTab={initialTab}
           approveAction={approvePartnerChangeRequest}
           rejectAction={rejectPartnerChangeRequest}
           createCategoryAction={createCategory}

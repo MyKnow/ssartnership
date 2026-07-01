@@ -258,22 +258,22 @@ export default async function AdminCompaniesPage({
   });
 
   return (
-    <AdminShell title="협력사 관리" backHref="/admin" backLabel="관리 홈">
+    <AdminShell title="파트너사/계정 관리" backHref="/admin" backLabel="관리 홈">
       <section className="grid gap-6">
         <ShellHeader
-          eyebrow="Companies"
-          title="협력사와 계정 연결 관리"
-          description="협력사 등록, 계정 생성, 다대다 연결을 한 화면에서 정리합니다."
+          eyebrow="Partner Companies"
+          title="파트너사와 계정 연결 관리"
+          description="여러 제휴처를 보유한 회사 단위, 담당 계정, 다대다 연결을 한 화면에서 정리합니다."
         />
         {companyError ? (
           <FormMessage variant="error">{companyError}</FormMessage>
         ) : null}
         <StatsRow
           items={[
-            { label: "협력사", value: `${safeCompanies.length}개`, hint: `활성 ${activeCompanyCount}개` },
-            { label: "브랜드", value: `${safePartners.length}개`, hint: "협력사에 연결된 전체 브랜드" },
+            { label: "파트너사", value: `${safeCompanies.length}개`, hint: `활성 ${activeCompanyCount}개` },
+            { label: "제휴처", value: `${safePartners.length}개`, hint: "파트너사에 연결된 전체 브랜드" },
             { label: "계정", value: `${safeAccounts.length}개`, hint: `활성 ${activeAccountCount}개` },
-            { label: "연결", value: `${totalAccountLinks}건`, hint: "계정과 협력사 전체 연결 수" },
+            { label: "연결", value: `${totalAccountLinks}건`, hint: "계정과 파트너사 전체 연결 수" },
           ]}
           minItemWidth="13rem"
         />
