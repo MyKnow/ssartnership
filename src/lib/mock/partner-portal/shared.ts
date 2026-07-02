@@ -9,7 +9,6 @@ import type {
 import type {
   PartnerPortalServiceDashboard,
 } from "../../partner-dashboard.ts";
-import type { PartnerCompanyPlanTier } from "../../partner-company-plans.ts";
 
 export type MockPortalAccountRecord = {
   id: string;
@@ -32,7 +31,6 @@ export type MockPortalServiceRecord = Omit<
 >;
 
 export type MockPortalCompanyRecord = Omit<PartnerPortalCompanySummary, "services"> & {
-  planTier: PartnerCompanyPlanTier;
   services: MockPortalServiceRecord[];
 };
 
@@ -93,13 +91,13 @@ export const seededSetups: MockPortalSetupRecord[] = [
       name: "카페 해온",
       slug: "cafe-haeon",
       description: "역삼역 인근에서 세 개의 매장을 운영하는 카페 브랜드입니다.",
-      planTier: "basic",
       services: [
         {
           id: "mock-partner-service-cafe-haeon-main",
           name: "카페 해온 본점",
           location: "서울 강남구 역삼로 123",
           categoryLabel: "카페",
+          planTier: "basic",
           visibility: "public",
           metrics: {
             favoriteCount: 124,
@@ -118,6 +116,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           name: "카페 해온 스터디룸",
           location: "서울 강남구 테헤란로 222",
           categoryLabel: "공간제휴",
+          planTier: "partner",
           visibility: "public",
           metrics: {
             favoriteCount: 63,
@@ -136,6 +135,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           name: "카페 해온 디저트 바",
           location: "서울 강남구 논현로 45",
           categoryLabel: "카페",
+          planTier: "basic",
           visibility: "confidential",
           metrics: {
             favoriteCount: 18,
@@ -166,13 +166,13 @@ export const seededSetups: MockPortalSetupRecord[] = [
       name: "어반짐 역삼",
       slug: "urban-gym",
       description: "헬스와 PT 패키지를 운영하는 복합 피트니스 브랜드입니다.",
-      planTier: "boost",
       services: [
         {
           id: "mock-partner-service-urban-gym-pt",
           name: "어반짐 PT 패키지",
           location: "서울 강남구 봉은사로 11",
           categoryLabel: "헬스",
+          planTier: "boost",
           visibility: "public",
           metrics: {
             favoriteCount: 168,
@@ -191,6 +191,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
           name: "어반짐 사우나",
           location: "서울 강남구 봉은사로 11, B1",
           categoryLabel: "헬스",
+          planTier: "boost",
           visibility: "confidential",
           metrics: {
             favoriteCount: 29,

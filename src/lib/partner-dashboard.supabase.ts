@@ -26,7 +26,6 @@ type PartnerCompanyRow = {
   slug: string;
   description?: string | null;
   is_active?: boolean | null;
-  plan_tier?: string | null;
 };
 
 type PartnerServiceRow = {
@@ -34,6 +33,7 @@ type PartnerServiceRow = {
   company_id?: string | null;
   name: string;
   location: string;
+  plan_tier?: string | null;
   visibility?: string | null;
   categories?:
     | { label?: string | null }
@@ -115,11 +115,13 @@ function toServiceDashboard(
   metrics: PartnerPortalServiceMetrics,
   status: string | null | undefined,
 ): PartnerPortalServiceDashboard {
+  const planTier = normalizePartnerCompanyPlanTier(row.plan_tier);
   return {
     id: row.id,
     name: row.name,
     location: row.location,
     categoryLabel: extractCategoryLabel(row.categories),
+    planTier,
     visibility: normalizePartnerVisibility(row.visibility),
     status: normalizePartnerPortalServiceStatus(status),
     metrics,
@@ -130,13 +132,11 @@ function toCompanyDashboard(
   row: PartnerCompanyRow,
   services: PartnerPortalServiceDashboard[],
 ): PartnerPortalCompanyDashboard {
-  const planTier = normalizePartnerCompanyPlanTier(row.plan_tier);
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
     description: row.description ?? null,
-    planTier,
     services,
     totals: sumPartnerPortalMetrics(services.map((service) => service.metrics)),
   };
@@ -166,13 +166,13 @@ export async function getSupabasePartnerPortalDashboard(
   const [companyResult, serviceResult, changeRequestResult] = await Promise.all([
     supabase
       .from("partner_companies")
-      .select("id,name,slug,description,is_active,plan_tier")
+      .select("id,name,slug,description,is_active")
       .in("id", uniqueCompanyIds)
       .eq("is_active", true)
       .order("created_at", { ascending: true }),
     supabase
       .from("partners")
-      .select("id,company_id,name,location,visibility,categories(label)")
+      .select("id,company_id,name,location,plan_tier,visibility,categories(label)")
       .in("company_id", uniqueCompanyIds)
       .order("created_at", { ascending: true }),
     supabase
@@ -313,14 +313,13 @@ export async function getSupabasePartnerPortalDashboard(
   }
 
   const companies = companyRows.map((row) => {
-    const planTier = normalizePartnerCompanyPlanTier(row.plan_tier);
     const services = (servicesByCompanyId.get(row.id) ?? [])
       .map((serviceRow) =>
         toServiceDashboard(
           serviceRow,
           filterPartnerPortalMetricsForPlan(
             metricsByServiceId.get(serviceRow.id) ?? createEmptyMetrics(),
-            planTier,
+            normalizePartnerCompanyPlanTier(serviceRow.plan_tier),
           ),
           statusByPartnerId.get(serviceRow.id),
         ),

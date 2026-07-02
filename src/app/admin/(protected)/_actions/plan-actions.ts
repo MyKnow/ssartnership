@@ -6,7 +6,7 @@ import {
 } from "@/lib/partner-company-plans";
 import {
   reviewPartnerPlanUpgradeRequest,
-  updatePartnerCompanyPlanByAdmin,
+  updatePartnerBrandPlanByAdmin,
 } from "@/lib/partner-plan-service";
 import {
   logAdminAction,
@@ -15,7 +15,7 @@ import {
   revalidatePartnerPortalPaths,
 } from "./shared-helpers";
 
-const ADMIN_COMPANY_PLANS_PATH = "/admin/companies?tab=plans";
+const ADMIN_BRAND_PLANS_PATH = "/admin/partners?tab=plans";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -45,24 +45,24 @@ function parseNote(value: string) {
   return value;
 }
 
-export async function updatePartnerCompanyPlanAction(formData: FormData) {
-  const adminSession = await requireAdminPermission("companies", "update", {
-    path: "/admin/companies",
+export async function updatePartnerBrandPlanAction(formData: FormData) {
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: "/admin/partners",
   });
   let payload: {
-    companyId: string;
+    partnerId: string;
     nextPlanTier: PartnerCompanyPlanTier;
     planStartedAt: string | null;
     planExpiresAt: string | null;
     note: string;
   };
   try {
-    const companyId = getString(formData, "companyId");
-    if (!companyId) {
+    const partnerId = getString(formData, "partnerId");
+    if (!partnerId) {
       throw new Error("partner_company_plan_invalid_request");
     }
     payload = {
-      companyId,
+      partnerId,
       nextPlanTier: parsePlanTier(getString(formData, "planTier")),
       planStartedAt: parseNullableKstDate(getString(formData, "planStartedAt")),
       planExpiresAt: parseNullableKstDate(getString(formData, "planExpiresAt"), true),
@@ -70,26 +70,26 @@ export async function updatePartnerCompanyPlanAction(formData: FormData) {
     };
   } catch (error) {
     redirectAdminActionError(
-      ADMIN_COMPANY_PLANS_PATH,
+      ADMIN_BRAND_PLANS_PATH,
       error instanceof Error ? error.message : "partner_company_plan_invalid_request",
     );
   }
 
   try {
-    await updatePartnerCompanyPlanByAdmin({
+    await updatePartnerBrandPlanByAdmin({
       ...payload,
       adminId: adminSession.adminId,
     });
   } catch (error) {
     redirectAdminActionError(
-      ADMIN_COMPANY_PLANS_PATH,
+      ADMIN_BRAND_PLANS_PATH,
       error instanceof Error ? error.message : "partner_company_plan_invalid_request",
     );
   }
 
-  await logAdminAction("partner_company_plan_update", {
-    targetType: "partner_company",
-    targetId: payload.companyId,
+  await logAdminAction("partner_brand_plan_update", {
+    targetType: "partner_brand",
+    targetId: payload.partnerId,
     properties: {
       planTier: payload.nextPlanTier,
       planStartedAt: payload.planStartedAt,
@@ -98,19 +98,19 @@ export async function updatePartnerCompanyPlanAction(formData: FormData) {
   });
   revalidatePartnerCompanyData();
   revalidatePartnerPortalPaths();
-  redirect(ADMIN_COMPANY_PLANS_PATH);
+  redirect(ADMIN_BRAND_PLANS_PATH);
 }
 
 async function reviewPartnerPlanRequestAction(
   formData: FormData,
   nextStatus: "approved" | "rejected",
 ) {
-  const adminSession = await requireAdminPermission("companies", "update", {
-    path: "/admin/companies",
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: "/admin/partners",
   });
   const requestId = getString(formData, "requestId");
   if (!requestId) {
-    redirectAdminActionError(ADMIN_COMPANY_PLANS_PATH, "partner_company_plan_missing_request");
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request");
   }
   try {
     await reviewPartnerPlanUpgradeRequest({
@@ -126,7 +126,7 @@ async function reviewPartnerPlanRequestAction(
         : error instanceof Error
           ? error.message
           : "partner_company_plan_invalid_request";
-    redirectAdminActionError(ADMIN_COMPANY_PLANS_PATH, message);
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, message);
   }
 
   await logAdminAction(`partner_plan_upgrade_${nextStatus}`, {
@@ -138,7 +138,7 @@ async function reviewPartnerPlanRequestAction(
   });
   revalidatePartnerCompanyData();
   revalidatePartnerPortalPaths();
-  redirect(ADMIN_COMPANY_PLANS_PATH);
+  redirect(ADMIN_BRAND_PLANS_PATH);
 }
 
 export async function approvePartnerPlanUpgradeRequestAction(formData: FormData) {

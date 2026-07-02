@@ -3,6 +3,8 @@ import type { AdChannel } from "@/lib/ad-packages";
 export const PARTNER_COMPANY_PLAN_TIERS = ["basic", "partner", "boost"] as const;
 
 export type PartnerCompanyPlanTier = (typeof PARTNER_COMPANY_PLAN_TIERS)[number];
+export const PARTNER_BRAND_PLAN_TIERS = PARTNER_COMPANY_PLAN_TIERS;
+export type PartnerBrandPlanTier = PartnerCompanyPlanTier;
 
 export type PartnerMetricKey =
   | "favoriteCount"
@@ -84,6 +86,7 @@ const PLAN_TIER_SET = new Set<string>(PARTNER_COMPANY_PLAN_TIERS);
 export const PARTNER_COMPANY_PLAN_DEFINITIONS = PARTNER_COMPANY_PLAN_TIERS.map(
   (tier) => PARTNER_COMPANY_PLAN_DEFINITION_MAP[tier],
 );
+export const PARTNER_BRAND_PLAN_DEFINITIONS = PARTNER_COMPANY_PLAN_DEFINITIONS;
 
 export function isPartnerCompanyPlanTier(
   value: string,
@@ -101,6 +104,10 @@ export function normalizePartnerCompanyPlanTier(
 
 export function getPartnerCompanyPlanDefinition(tier: PartnerCompanyPlanTier) {
   return PARTNER_COMPANY_PLAN_DEFINITION_MAP[tier];
+}
+
+export function getPartnerBrandPlanDefinition(tier: PartnerBrandPlanTier) {
+  return getPartnerCompanyPlanDefinition(tier);
 }
 
 export function getPlanAllowedAdChannels(tier: PartnerCompanyPlanTier): AdChannel[] {
@@ -123,4 +130,35 @@ export function canUsePartnerPlanNotificationFeature(
   const notificationFeatures: readonly PartnerCompanyPlanDefinition["notificationFeatures"][number][] =
     getPartnerCompanyPlanDefinition(tier).notificationFeatures;
   return notificationFeatures.includes(feature);
+}
+
+function dateToKstTimestamp(value: string | null | undefined, endOfDay = false) {
+  const date = value?.trim();
+  if (!date) {
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return `${date}T${endOfDay ? "23:59:59" : "00:00:00"}+09:00`;
+  }
+  return date;
+}
+
+export function resolvePartnerBrandPlanWindow(input: {
+  planTier: PartnerBrandPlanTier;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  planStartedAt?: string | null;
+  planExpiresAt?: string | null;
+}) {
+  if (input.planTier === "basic") {
+    return {
+      planStartedAt: dateToKstTimestamp(input.periodStart),
+      planExpiresAt: dateToKstTimestamp(input.periodEnd, true),
+    };
+  }
+
+  return {
+    planStartedAt: input.planStartedAt ?? null,
+    planExpiresAt: input.planExpiresAt ?? null,
+  };
 }

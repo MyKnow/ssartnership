@@ -11,7 +11,7 @@ create table if not exists categories (
   description text,
   color text,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
 );
 
 alter table categories add column if not exists color text;
@@ -35,14 +35,8 @@ create table if not exists partner_companies (
   slug text not null unique,
   description text,
   is_active boolean not null default true,
-  plan_tier text not null default 'basic',
-  plan_started_at timestamp with time zone,
-  plan_expires_at timestamp with time zone,
-  plan_updated_at timestamp with time zone not null default now(),
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now(),
-  constraint partner_companies_plan_tier_check
-    check (plan_tier in ('basic', 'partner', 'boost'))
+  updated_at timestamp with time zone default now()
 );
 
 create table if not exists partners (
@@ -62,6 +56,10 @@ create table if not exists partners (
   inquiry_link text,
   period_start date,
   period_end date,
+  plan_tier text not null default 'basic',
+  plan_started_at timestamp with time zone,
+  plan_expires_at timestamp with time zone,
+  plan_updated_at timestamp with time zone not null default now(),
   conditions text[] not null default '{}',
   benefits text[] not null default '{}',
   applies_to text[] not null default '{staff,student,graduate}',
@@ -70,6 +68,8 @@ create table if not exists partners (
   tags text[] not null default '{}',
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
+  constraint partners_plan_tier_check
+    check (plan_tier in ('basic', 'partner', 'boost'))
 );
 
 create or replace function public.infer_partner_campus_slugs(input_location text)
@@ -165,8 +165,15 @@ alter table partners add column if not exists benefit_action_type text not null 
 alter table partners add column if not exists benefit_action_link text;
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;
+alter table partners add column if not exists plan_tier text not null default 'basic';
+alter table partners add column if not exists plan_started_at timestamp with time zone;
+alter table partners add column if not exists plan_expires_at timestamp with time zone;
+alter table partners add column if not exists plan_updated_at timestamp with time zone not null default now();
 alter table partners add column if not exists updated_at timestamp with time zone default now();
 alter table partners drop column if exists contact;
+alter table partners drop constraint if exists partners_plan_tier_check;
+alter table partners add constraint partners_plan_tier_check
+  check (plan_tier in ('basic', 'partner', 'boost'));
 
 update partners
 set
@@ -208,6 +215,31 @@ language plpgsql
 as $$
 begin
   new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.sync_basic_partner_plan_dates()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.plan_tier = 'basic' then
+    new.plan_started_at = case
+      when new.period_start is null then null
+      else (new.period_start::text || 'T00:00:00+09:00')::timestamp with time zone
+    end;
+    new.plan_expires_at = case
+      when new.period_end is null then null
+      else (new.period_end::text || 'T23:59:59+09:00')::timestamp with time zone
+    end;
+  end if;
+
+  if TG_OP = 'UPDATE' then
+    new.plan_updated_at = now();
+  else
+    new.plan_updated_at = coalesce(new.plan_updated_at, now());
+  end if;
   return new;
 end;
 $$;
@@ -257,6 +289,12 @@ create trigger partners_set_partnership_updated_at
   before update on partners
   for each row
   execute function set_partnership_updated_at();
+
+drop trigger if exists partners_sync_basic_plan_dates on partners;
+create trigger partners_sync_basic_plan_dates
+  before insert or update of plan_tier, period_start, period_end, plan_started_at, plan_expires_at on partners
+  for each row
+  execute function public.sync_basic_partner_plan_dates();
 
 drop trigger if exists categories_set_partnership_updated_at on categories;
 create trigger categories_set_partnership_updated_at
@@ -2034,6 +2072,7 @@ create table if not exists admin_permission_templates (
 
 create table if not exists partner_plan_upgrade_requests (
   id uuid primary key default uuid_generate_v4(),
+  partner_id uuid references partners(id) on delete cascade,
   company_id uuid not null references partner_companies(id) on delete cascade,
   requested_by_account_id uuid not null references partner_accounts(id) on delete cascade,
   current_plan_tier text not null,
@@ -2057,8 +2096,9 @@ create table if not exists partner_plan_upgrade_requests (
     check (payment_amount_krw >= 0)
 );
 
-create table if not exists partner_company_plan_events (
+create table if not exists partner_brand_plan_events (
   id uuid primary key default uuid_generate_v4(),
+  partner_id uuid references partners(id) on delete cascade,
   company_id uuid not null references partner_companies(id) on delete cascade,
   upgrade_request_id uuid references partner_plan_upgrade_requests(id) on delete set null,
   previous_plan_tier text,
@@ -2071,11 +2111,11 @@ create table if not exists partner_company_plan_events (
   note text not null default '',
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamp with time zone not null default now(),
-  constraint partner_company_plan_events_previous_plan_check
+  constraint partner_brand_plan_events_previous_plan_check
     check (previous_plan_tier is null or previous_plan_tier in ('basic', 'partner', 'boost')),
-  constraint partner_company_plan_events_next_plan_check
+  constraint partner_brand_plan_events_next_plan_check
     check (next_plan_tier in ('basic', 'partner', 'boost')),
-  constraint partner_company_plan_events_source_check
+  constraint partner_brand_plan_events_source_check
     check (source in ('admin', 'partner_upgrade', 'expiration', 'system'))
 );
 
@@ -2257,17 +2297,21 @@ create index if not exists member_auth_attempts_identifier_idx on member_auth_at
 create index if not exists partner_accounts_login_id_idx on partner_accounts(login_id);
 create index if not exists partner_account_companies_account_id_idx on partner_account_companies(account_id);
 create index if not exists partner_account_companies_company_id_idx on partner_account_companies(company_id);
-create unique index if not exists partner_plan_upgrade_requests_pending_company_idx
-  on partner_plan_upgrade_requests(company_id)
-  where status = 'pending';
+create unique index if not exists partner_plan_upgrade_requests_pending_partner_idx
+  on partner_plan_upgrade_requests(partner_id)
+  where status = 'pending' and partner_id is not null;
+create index if not exists partner_plan_upgrade_requests_partner_created_idx
+  on partner_plan_upgrade_requests(partner_id, created_at desc);
 create index if not exists partner_plan_upgrade_requests_company_created_idx
   on partner_plan_upgrade_requests(company_id, created_at desc);
 create index if not exists partner_plan_upgrade_requests_account_created_idx
   on partner_plan_upgrade_requests(requested_by_account_id, created_at desc);
-create index if not exists partner_company_plan_events_company_created_idx
-  on partner_company_plan_events(company_id, created_at desc);
-create index if not exists partner_company_plan_events_upgrade_request_idx
-  on partner_company_plan_events(upgrade_request_id);
+create index if not exists partner_brand_plan_events_partner_created_idx
+  on partner_brand_plan_events(partner_id, created_at desc);
+create index if not exists partner_brand_plan_events_company_created_idx
+  on partner_brand_plan_events(company_id, created_at desc);
+create index if not exists partner_brand_plan_events_upgrade_request_idx
+  on partner_brand_plan_events(upgrade_request_id);
 create index if not exists partner_auth_attempts_identifier_idx on partner_auth_attempts(identifier);
 create index if not exists partner_change_requests_company_id_idx on partner_change_requests(company_id);
 create index if not exists partner_change_requests_partner_id_idx on partner_change_requests(partner_id);
@@ -2950,7 +2994,7 @@ alter table partners enable row level security;
 alter table partner_accounts enable row level security;
 alter table partner_account_companies enable row level security;
 alter table partner_plan_upgrade_requests enable row level security;
-alter table partner_company_plan_events enable row level security;
+alter table partner_brand_plan_events enable row level security;
 alter table partner_auth_attempts enable row level security;
 alter table admin_login_attempts enable row level security;
 alter table suggestion_attempts enable row level security;
@@ -3025,8 +3069,8 @@ revoke all on table partner_account_companies from anon;
 revoke all on table partner_account_companies from authenticated;
 revoke all on table partner_plan_upgrade_requests from anon;
 revoke all on table partner_plan_upgrade_requests from authenticated;
-revoke all on table partner_company_plan_events from anon;
-revoke all on table partner_company_plan_events from authenticated;
+revoke all on table partner_brand_plan_events from anon;
+revoke all on table partner_brand_plan_events from authenticated;
 revoke all on table partner_auth_attempts from anon;
 revoke all on table partner_auth_attempts from authenticated;
 revoke all on table partner_change_requests from anon;

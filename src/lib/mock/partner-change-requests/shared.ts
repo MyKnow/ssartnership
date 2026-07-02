@@ -11,7 +11,7 @@ export type MockChangeRequestServiceRecord = {
   companyId: string;
   companyName: string;
   companySlug: string;
-  companyPlanTier: PartnerCompanyPlanTier;
+  brandPlanTier: PartnerCompanyPlanTier;
   partnerId: string;
   partnerName: string;
   partnerCreatedAt: string;
@@ -65,7 +65,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-cafe-haeon",
     companyName: "카페 해온",
     companySlug: "cafe-haeon",
-    companyPlanTier: "basic",
+    brandPlanTier: "basic",
     partnerId: "mock-partner-service-cafe-haeon-main",
     partnerName: "카페 해온 본점",
     partnerCreatedAt: "2026-03-01T00:00:00.000Z",
@@ -93,7 +93,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-cafe-haeon",
     companyName: "카페 해온",
     companySlug: "cafe-haeon",
-    companyPlanTier: "basic",
+    brandPlanTier: "basic",
     partnerId: "mock-partner-service-cafe-haeon-dessert",
     partnerName: "카페 해온 디저트 바",
     partnerCreatedAt: "2026-03-01T00:00:00.000Z",
@@ -121,7 +121,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-urban-gym",
     companyName: "어반짐 역삼",
     companySlug: "urban-gym",
-    companyPlanTier: "boost",
+    brandPlanTier: "boost",
     partnerId: "mock-partner-service-urban-gym-pt",
     partnerName: "어반짐 PT 패키지",
     partnerCreatedAt: "2026-03-10T00:00:00.000Z",
@@ -149,7 +149,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     companyId: "mock-partner-company-urban-gym",
     companyName: "어반짐 역삼",
     companySlug: "urban-gym",
-    companyPlanTier: "boost",
+    brandPlanTier: "boost",
     partnerId: "mock-partner-service-urban-gym-sauna",
     partnerName: "어반짐 사우나",
     partnerCreatedAt: "2026-03-10T00:00:00.000Z",
