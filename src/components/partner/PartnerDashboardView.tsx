@@ -54,7 +54,7 @@ function ServiceMetric({
   );
 }
 
-function CompanyPlanBadge({ planTier }: { planTier: PartnerCompanyPlanTier }) {
+function BrandPlanBadge({ planTier }: { planTier: PartnerCompanyPlanTier }) {
   const definition = getPartnerCompanyPlanDefinition(planTier);
   return (
     <Badge
@@ -95,10 +95,8 @@ function getPartnerPortalServiceStatusLabel(
 
 function ServiceCard({
   service,
-  planTier,
 }: {
   service: PartnerPortalDashboard["companies"][number]["services"][number];
-  planTier: PartnerCompanyPlanTier;
 }) {
   const isOnlineService = isOnlinePartnerLocation(service.location);
   const visibleMetrics = [
@@ -125,6 +123,7 @@ function ServiceCard({
             <Badge variant={getServiceStatusBadgeVariant(service.status)}>
               {getPartnerPortalServiceStatusLabel(service.status)}
             </Badge>
+            <BrandPlanBadge planTier={service.planTier} />
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
               {service.categoryLabel}
             </span>
@@ -146,7 +145,7 @@ function ServiceCard({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {visibleMetrics
-          .filter((metric) => canAccessPartnerMetric(planTier, metric.key))
+          .filter((metric) => canAccessPartnerMetric(service.planTier, metric.key))
           .map((metric) => (
             <ServiceMetric
               key={metric.key}
@@ -156,6 +155,15 @@ function ServiceCard({
           ))}
       </div>
     </Link>
+  );
+}
+
+function canAnyCompanyServiceAccessMetric(
+  company: PartnerPortalCompanyDashboard,
+  metricKey: Parameters<typeof canAccessPartnerMetric>[1],
+) {
+  return company.services.some((service) =>
+    canAccessPartnerMetric(service.planTier, metricKey),
   );
 }
 
@@ -237,13 +245,12 @@ function CompanyHeader({
         <Badge className="bg-surface-muted text-foreground">
           {company.services.length}개 브랜드
         </Badge>
-        <CompanyPlanBadge planTier={company.planTier} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
         <ServiceMetric label="브랜드 수" value={company.services.length} />
         {visibleMetrics
-          .filter((metric) => canAccessPartnerMetric(company.planTier, metric.key))
+          .filter((metric) => canAnyCompanyServiceAccessMetric(company, metric.key))
           .map((metric) => (
             <ServiceMetric
               key={metric.key}
@@ -284,7 +291,6 @@ function CompanyBrandList({
             <ServiceCard
               key={service.id}
               service={service}
-              planTier={company.planTier}
             />
           ))}
         </div>

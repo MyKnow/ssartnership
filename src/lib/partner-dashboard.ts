@@ -26,6 +26,7 @@ export type PartnerPortalServiceMetrics = {
 };
 
 export type PartnerPortalServiceDashboard = PartnerPortalServiceSummary & {
+  planTier: PartnerCompanyPlanTier;
   status: PartnerPortalServiceStatus;
   metrics: PartnerPortalServiceMetrics;
 };
@@ -34,7 +35,6 @@ export type PartnerPortalCompanyDashboard = Omit<
   PartnerPortalCompanySummary,
   "services"
 > & {
-  planTier: PartnerCompanyPlanTier;
   services: PartnerPortalServiceDashboard[];
   totals: PartnerPortalServiceMetrics;
 };

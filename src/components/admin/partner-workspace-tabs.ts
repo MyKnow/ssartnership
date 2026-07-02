@@ -1,10 +1,11 @@
 import type { TabOption } from "@/components/ui/Tabs";
 
-export type AdminPartnerWorkspaceTab = "partners" | "requests" | "categories";
+export type AdminPartnerWorkspaceTab = "partners" | "requests" | "plans" | "categories";
 
 type AdminPartnerWorkspaceTabCounts = {
   partnerCount: number;
   requestCount: number;
+  planRequestCount: number;
   categoryCount: number;
 };
 
@@ -18,6 +19,9 @@ export function normalizeAdminPartnerWorkspaceTab(
   if (value === "requests") {
     return "requests";
   }
+  if (value === "plans") {
+    return "plans";
+  }
   if (value === "categories" || value === "category") {
     return "categories";
   }
@@ -27,6 +31,7 @@ export function normalizeAdminPartnerWorkspaceTab(
 export function createAdminPartnerWorkspaceTabOptions({
   partnerCount,
   requestCount,
+  planRequestCount,
   categoryCount,
 }: AdminPartnerWorkspaceTabCounts): ReadonlyArray<TabOption<AdminPartnerWorkspaceTab>> {
   return [
@@ -39,6 +44,11 @@ export function createAdminPartnerWorkspaceTabOptions({
       value: "requests",
       label: "변경 요청",
       description: `승인 대기 ${formatCount(requestCount)}건`,
+    },
+    {
+      value: "plans",
+      label: "플랜/과금",
+      description: `플랜 요청 ${formatCount(planRequestCount)}건`,
     },
     {
       value: "categories",

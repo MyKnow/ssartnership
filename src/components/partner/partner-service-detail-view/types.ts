@@ -19,7 +19,7 @@ export type PartnerServiceDetailViewProps = {
   createAction: (formData: FormData) => void | Promise<void>;
   cancelAction: (formData: FormData) => void | Promise<void>;
   reviewSummary: PartnerReviewSummary;
-  companyPlanTier: PartnerCompanyPlanTier;
+  brandPlanTier: PartnerCompanyPlanTier;
   serviceMetrics: PartnerPortalServiceMetrics;
   metricTimeseries: PartnerMetricTimeseriesSnapshot;
   serviceMetricsWarningMessage?: string | null;

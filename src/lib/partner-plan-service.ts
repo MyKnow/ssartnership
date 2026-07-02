@@ -1,6 +1,7 @@
 import {
   getPartnerCompanyPlanDefinition,
   normalizePartnerCompanyPlanTier,
+  resolvePartnerBrandPlanWindow,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
 import {
@@ -18,12 +19,16 @@ import {
 } from "@/lib/operational-notifications";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
-export type PartnerCompanyPlanRecord = {
+export type PartnerBrandPlanRecord = {
   id: string;
   name: string;
-  slug: string;
-  description: string | null;
-  isActive: boolean;
+  companyId: string;
+  companyName: string;
+  companySlug: string;
+  location: string;
+  visibility: string;
+  periodStart: string | null;
+  periodEnd: string | null;
   planTier: PartnerCompanyPlanTier;
   planStartedAt: string | null;
   planExpiresAt: string | null;
@@ -32,6 +37,8 @@ export type PartnerCompanyPlanRecord = {
 
 export type PartnerPlanUpgradeRequestRecord = {
   id: string;
+  partnerId: string;
+  brandName: string;
   companyId: string;
   companyName: string;
   requestedByAccountId: string;
@@ -49,8 +56,10 @@ export type PartnerPlanUpgradeRequestRecord = {
   updatedAt: string;
 };
 
-export type PartnerCompanyPlanEventRecord = {
+export type PartnerBrandPlanEventRecord = {
   id: string;
+  partnerId: string;
+  brandName: string | null;
   companyId: string;
   previousPlanTier: PartnerCompanyPlanTier | null;
   nextPlanTier: PartnerCompanyPlanTier;
@@ -60,25 +69,35 @@ export type PartnerCompanyPlanEventRecord = {
 };
 
 export type PartnerPlanPortalData = {
-  companies: PartnerCompanyPlanRecord[];
+  brands: PartnerBrandPlanRecord[];
   requests: PartnerPlanUpgradeRequestRecord[];
-  events: PartnerCompanyPlanEventRecord[];
+  events: PartnerBrandPlanEventRecord[];
 };
 
-type CompanyRow = {
+type CompanyRelation = {
   id: string;
   name: string;
-  slug: string;
-  description?: string | null;
-  is_active?: boolean | null;
+  slug?: string | null;
+};
+
+type BrandRow = {
+  id: string;
+  company_id?: string | null;
+  name: string;
+  location?: string | null;
+  visibility?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
   plan_tier?: string | null;
   plan_started_at?: string | null;
   plan_expires_at?: string | null;
   plan_updated_at?: string | null;
+  company?: CompanyRelation | CompanyRelation[] | null;
 };
 
 type UpgradeRequestRow = {
   id: string;
+  partner_id?: string | null;
   company_id: string;
   requested_by_account_id: string;
   current_plan_tier: string;
@@ -92,18 +111,21 @@ type UpgradeRequestRow = {
   reviewed_at?: string | null;
   created_at: string;
   updated_at: string;
+  brand?: { id: string; name: string } | { id: string; name: string }[] | null;
   company?: { id: string; name: string } | { id: string; name: string }[] | null;
   requested_by?: { id: string; display_name: string | null } | { id: string; display_name: string | null }[] | null;
 };
 
 type PlanEventRow = {
   id: string;
+  partner_id?: string | null;
   company_id: string;
   previous_plan_tier?: string | null;
   next_plan_tier: string;
   source: "admin" | "partner_upgrade" | "expiration" | "system";
   note: string;
   created_at: string;
+  brand?: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
 function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -117,25 +139,42 @@ function normalizeCompanyIds(companyIds: string[]) {
   return [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
 }
 
-function mapCompany(row: CompanyRow): PartnerCompanyPlanRecord {
+function mapBrand(row: BrandRow): PartnerBrandPlanRecord {
+  const company = getSingleRelation(row.company);
+  const planTier = normalizePartnerCompanyPlanTier(row.plan_tier);
+  const planWindow = resolvePartnerBrandPlanWindow({
+    planTier,
+    periodStart: row.period_start ?? null,
+    periodEnd: row.period_end ?? null,
+    planStartedAt: row.plan_started_at ?? null,
+    planExpiresAt: row.plan_expires_at ?? null,
+  });
+
   return {
     id: row.id,
     name: row.name,
-    slug: row.slug,
-    description: row.description ?? null,
-    isActive: row.is_active !== false,
-    planTier: normalizePartnerCompanyPlanTier(row.plan_tier),
-    planStartedAt: row.plan_started_at ?? null,
-    planExpiresAt: row.plan_expires_at ?? null,
+    companyId: row.company_id ?? company?.id ?? "",
+    companyName: company?.name ?? "미지정",
+    companySlug: company?.slug ?? "",
+    location: row.location ?? "",
+    visibility: row.visibility ?? "public",
+    periodStart: row.period_start ?? null,
+    periodEnd: row.period_end ?? null,
+    planTier,
+    planStartedAt: planWindow.planStartedAt,
+    planExpiresAt: planWindow.planExpiresAt,
     planUpdatedAt: row.plan_updated_at ?? null,
   };
 }
 
 function mapUpgradeRequest(row: UpgradeRequestRow): PartnerPlanUpgradeRequestRecord {
+  const brand = getSingleRelation(row.brand);
   const company = getSingleRelation(row.company);
   const requestedBy = getSingleRelation(row.requested_by);
   return {
     id: row.id,
+    partnerId: row.partner_id ?? brand?.id ?? "",
+    brandName: brand?.name ?? "미지정 브랜드",
     companyId: row.company_id,
     companyName: company?.name ?? "미지정",
     requestedByAccountId: row.requested_by_account_id,
@@ -154,9 +193,12 @@ function mapUpgradeRequest(row: UpgradeRequestRow): PartnerPlanUpgradeRequestRec
   };
 }
 
-function mapPlanEvent(row: PlanEventRow): PartnerCompanyPlanEventRecord {
+function mapPlanEvent(row: PlanEventRow): PartnerBrandPlanEventRecord {
+  const brand = getSingleRelation(row.brand);
   return {
     id: row.id,
+    partnerId: row.partner_id ?? brand?.id ?? "",
+    brandName: brand?.name ?? null,
     companyId: row.company_id,
     previousPlanTier: row.previous_plan_tier
       ? normalizePartnerCompanyPlanTier(row.previous_plan_tier)
@@ -174,34 +216,34 @@ export async function getPartnerPlanPortalData(
 ): Promise<PartnerPlanPortalData> {
   const normalizedCompanyIds = normalizeCompanyIds(companyIds);
   if (normalizedCompanyIds.length === 0) {
-    return { companies: [], requests: [], events: [] };
+    return { brands: [], requests: [], events: [] };
   }
 
   const supabase = getSupabaseAdminClient();
-  const [companiesResult, requestsResult, eventsResult] = await Promise.all([
+  const [brandsResult, requestsResult, eventsResult] = await Promise.all([
     supabase
-      .from("partner_companies")
-      .select("id,name,slug,description,is_active,plan_tier,plan_started_at,plan_expires_at,plan_updated_at")
-      .in("id", normalizedCompanyIds)
+      .from("partners")
+      .select("id,company_id,name,location,visibility,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,company:partner_companies(id,name,slug)")
+      .in("company_id", normalizedCompanyIds)
       .order("name", { ascending: true }),
     supabase
       .from("partner_plan_upgrade_requests")
       .select(
-        "id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_by_admin_id,reviewed_at,created_at,updated_at,company:partner_companies(id,name),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
+        "id,partner_id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_by_admin_id,reviewed_at,created_at,updated_at,brand:partners!partner_plan_upgrade_requests_partner_id_fkey(id,name),company:partner_companies(id,name),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
       )
       .in("company_id", normalizedCompanyIds)
       .order("created_at", { ascending: false })
       .limit(30),
     supabase
-      .from("partner_company_plan_events")
-      .select("id,company_id,previous_plan_tier,next_plan_tier,source,note,created_at")
+      .from("partner_brand_plan_events")
+      .select("id,partner_id,company_id,previous_plan_tier,next_plan_tier,source,note,created_at,brand:partners(id,name)")
       .in("company_id", normalizedCompanyIds)
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
 
-  if (companiesResult.error) {
-    throw new Error(companiesResult.error.message);
+  if (brandsResult.error) {
+    throw new Error(brandsResult.error.message);
   }
   if (requestsResult.error) {
     throw new Error(requestsResult.error.message);
@@ -215,54 +257,60 @@ export async function getPartnerPlanPortalData(
     .filter((request) => !accountId || request.requestedByAccountId === accountId || normalizedCompanyIds.includes(request.companyId));
 
   return {
-    companies: ((companiesResult.data ?? []) as CompanyRow[]).map(mapCompany),
+    brands: ((brandsResult.data ?? []) as BrandRow[]).map(mapBrand),
     requests,
     events: ((eventsResult.data ?? []) as PlanEventRow[]).map(mapPlanEvent),
   };
 }
 
-async function loadCompanyPlanOrThrow(companyId: string) {
+async function loadBrandPlanOrThrow(partnerId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
-    .from("partner_companies")
-    .select("id,name,slug,description,is_active,plan_tier,plan_started_at,plan_expires_at,plan_updated_at")
-    .eq("id", companyId)
+    .from("partners")
+    .select("id,company_id,name,location,visibility,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,company:partner_companies(id,name,slug)")
+    .eq("id", partnerId)
     .maybeSingle();
 
   if (error || !data) {
-    throw new Error("파트너사를 찾을 수 없습니다.");
+    throw new Error("브랜드를 찾을 수 없습니다.");
   }
-  return mapCompany(data as CompanyRow);
+  return mapBrand(data as BrandRow);
 }
 
-async function assertPartnerCompanyAccess(accountId: string, companyId: string) {
+async function assertPartnerBrandAccess(accountId: string, partnerId: string) {
+  const brand = await loadBrandPlanOrThrow(partnerId);
+  if (!brand.companyId) {
+    throw new Error("파트너사 접근 권한이 없습니다.");
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("partner_account_companies")
     .select("id")
     .eq("account_id", accountId)
-    .eq("company_id", companyId)
+    .eq("company_id", brand.companyId)
     .eq("is_active", true)
     .maybeSingle();
 
   if (error || !data) {
     throw new Error("파트너사 접근 권한이 없습니다.");
   }
+
+  return brand;
 }
 
 export async function createPartnerPlanUpgradeRequest(input: {
-  companyId: string;
+  partnerId: string;
   accountId: string;
   requestedPlanTier: string;
   paymentAmountKrw: string;
   payerName: string;
   memo: string;
 }) {
-  await assertPartnerCompanyAccess(input.accountId, input.companyId);
-  const company = await loadCompanyPlanOrThrow(input.companyId);
+  const brand = await assertPartnerBrandAccess(input.accountId, input.partnerId);
   const requestedPlanTier = normalizeRequestedPlanTier(
     input.requestedPlanTier,
-    company.planTier,
+    brand.planTier,
   );
   const paymentAmountKrw = normalizePlanUpgradeAmount(input.paymentAmountKrw);
   const payerName = normalizePlanUpgradePayerName(input.payerName);
@@ -272,16 +320,17 @@ export async function createPartnerPlanUpgradeRequest(input: {
   const { data, error } = await supabase
     .from("partner_plan_upgrade_requests")
     .insert({
-      company_id: company.id,
+      partner_id: brand.id,
+      company_id: brand.companyId,
       requested_by_account_id: input.accountId,
-      current_plan_tier: company.planTier,
+      current_plan_tier: brand.planTier,
       requested_plan_tier: requestedPlanTier,
       payment_amount_krw: paymentAmountKrw,
       payer_name: payerName,
       memo,
     })
     .select(
-      "id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_by_admin_id,reviewed_at,created_at,updated_at,company:partner_companies(id,name),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
+      "id,partner_id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_by_admin_id,reviewed_at,created_at,updated_at,brand:partners!partner_plan_upgrade_requests_partner_id_fkey(id,name),company:partner_companies(id,name),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
     )
     .single();
 
@@ -296,21 +345,21 @@ export async function createPartnerPlanUpgradeRequest(input: {
   await Promise.all([
     createAdminOperationalNotification({
       type: "partner_change_request",
-      title: `${company.name} 플랜 업그레이드 요청`,
-      body: `${getPartnerCompanyPlanDefinition(company.planTier).label}에서 ${getPartnerCompanyPlanDefinition(requestedPlanTier).label}로 변경 요청이 접수되었습니다.`,
-      targetUrl: "/admin/companies?tab=plans",
-      metadata: { requestId: request.id, companyId: company.id, requestedPlanTier },
+      title: `${brand.name} 플랜 업그레이드 요청`,
+      body: `${getPartnerCompanyPlanDefinition(brand.planTier).label}에서 ${getPartnerCompanyPlanDefinition(requestedPlanTier).label}로 변경 요청이 접수되었습니다.`,
+      targetUrl: "/admin/partners?tab=plans",
+      metadata: { requestId: request.id, partnerId: brand.id, companyId: brand.companyId, requestedPlanTier },
     }).catch((error) => {
       console.error("[partner-plan-service] admin upgrade notification failed", error);
     }),
     createPartnerOperationalNotification({
       type: "plan_upgrade_requested",
-      companyId: company.id,
+      companyId: brand.companyId,
       accountIds: [input.accountId],
       title: "플랜 업그레이드 요청이 접수되었습니다",
-      body: `${company.name}의 ${getPartnerCompanyPlanDefinition(requestedPlanTier).label} 업그레이드 요청을 관리자가 확인합니다.`,
+      body: `${brand.name}의 ${getPartnerCompanyPlanDefinition(requestedPlanTier).label} 업그레이드 요청을 관리자가 확인합니다.`,
       targetUrl: "/partner/plans",
-      metadata: { requestId: request.id, companyId: company.id, requestedPlanTier },
+      metadata: { requestId: request.id, partnerId: brand.id, companyId: brand.companyId, requestedPlanTier },
     }).catch((error) => {
       console.error("[partner-plan-service] partner upgrade notification failed", error);
     }),
@@ -326,7 +375,7 @@ export async function cancelPartnerPlanUpgradeRequest(input: {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("partner_plan_upgrade_requests")
-    .select("id,company_id,requested_by_account_id,status")
+    .select("id,requested_by_account_id,status")
     .eq("id", input.requestId)
     .maybeSingle();
 
@@ -347,39 +396,50 @@ export async function cancelPartnerPlanUpgradeRequest(input: {
   }
 }
 
-export async function updatePartnerCompanyPlanByAdmin(input: {
-  companyId: string;
+export async function updatePartnerBrandPlanByAdmin(input: {
+  partnerId: string;
   nextPlanTier: PartnerCompanyPlanTier;
   planStartedAt: string | null;
   planExpiresAt: string | null;
   adminId: string | null;
   note: string;
 }) {
-  const company = await loadCompanyPlanOrThrow(input.companyId);
+  const brand = await loadBrandPlanOrThrow(input.partnerId);
+  if (!brand.companyId) {
+    throw new Error("파트너사가 연결된 브랜드만 플랜을 변경할 수 있습니다.");
+  }
   const now = new Date().toISOString();
+  const planWindow = resolvePartnerBrandPlanWindow({
+    planTier: input.nextPlanTier,
+    periodStart: brand.periodStart,
+    periodEnd: brand.periodEnd,
+    planStartedAt: input.planStartedAt,
+    planExpiresAt: input.planExpiresAt,
+  });
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase
-    .from("partner_companies")
+    .from("partners")
     .update({
       plan_tier: input.nextPlanTier,
-      plan_started_at: input.planStartedAt,
-      plan_expires_at: input.planExpiresAt,
+      plan_started_at: planWindow.planStartedAt,
+      plan_expires_at: planWindow.planExpiresAt,
       plan_updated_at: now,
       updated_at: now,
     })
-    .eq("id", input.companyId);
+    .eq("id", input.partnerId);
   if (error) {
     throw new Error(error.message);
   }
 
-  const { error: eventError } = await supabase.from("partner_company_plan_events").insert({
-    company_id: input.companyId,
-    previous_plan_tier: company.planTier,
+  const { error: eventError } = await supabase.from("partner_brand_plan_events").insert({
+    partner_id: input.partnerId,
+    company_id: brand.companyId,
+    previous_plan_tier: brand.planTier,
     next_plan_tier: input.nextPlanTier,
     source: "admin",
     actor_admin_id: input.adminId,
-    plan_started_at: input.planStartedAt,
-    plan_expires_at: input.planExpiresAt,
+    plan_started_at: planWindow.planStartedAt,
+    plan_expires_at: planWindow.planExpiresAt,
     note: input.note,
   });
   if (eventError) {
@@ -388,11 +448,11 @@ export async function updatePartnerCompanyPlanByAdmin(input: {
 
   await createPartnerOperationalNotification({
     type: "plan_changed",
-    companyId: input.companyId,
-    title: `${company.name} 플랜이 변경되었습니다`,
-    body: `${getPartnerCompanyPlanDefinition(company.planTier).label}에서 ${getPartnerCompanyPlanDefinition(input.nextPlanTier).label}로 변경되었습니다.`,
+    companyId: brand.companyId,
+    title: `${brand.name} 플랜이 변경되었습니다`,
+    body: `${getPartnerCompanyPlanDefinition(brand.planTier).label}에서 ${getPartnerCompanyPlanDefinition(input.nextPlanTier).label}로 변경되었습니다.`,
     targetUrl: "/partner/plans",
-    metadata: { companyId: input.companyId, nextPlanTier: input.nextPlanTier },
+    metadata: { partnerId: input.partnerId, companyId: brand.companyId, nextPlanTier: input.nextPlanTier },
   }).catch((error) => {
     console.error("[partner-plan-service] plan change notification failed", error);
   });
@@ -408,7 +468,7 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
   const { data, error } = await supabase
     .from("partner_plan_upgrade_requests")
     .select(
-      "id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_by_admin_id,reviewed_at,created_at,updated_at,company:partner_companies(id,name),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
+      "id,partner_id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_by_admin_id,reviewed_at,created_at,updated_at,brand:partners!partner_plan_upgrade_requests_partner_id_fkey(id,name),company:partner_companies(id,name),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
     )
     .eq("id", input.requestId)
     .maybeSingle();
@@ -417,6 +477,9 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
   }
 
   const request = mapUpgradeRequest(data as UpgradeRequestRow);
+  if (!request.partnerId) {
+    throw new Error("브랜드를 찾을 수 없습니다.");
+  }
   assertPartnerPlanUpgradeTransition(request.status, input.nextStatus);
   const reviewedAt = new Date().toISOString();
   const adminNote = normalizePlanUpgradeMemo(input.adminNote);
@@ -436,20 +499,27 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
   }
 
   if (input.nextStatus === "approved") {
-    const { error: companyUpdateError } = await supabase
-      .from("partner_companies")
+    const planWindow = resolvePartnerBrandPlanWindow({
+      planTier: request.requestedPlanTier,
+      planStartedAt: reviewedAt,
+      planExpiresAt: null,
+    });
+    const { error: brandUpdateError } = await supabase
+      .from("partners")
       .update({
         plan_tier: request.requestedPlanTier,
-        plan_started_at: reviewedAt,
+        plan_started_at: planWindow.planStartedAt,
+        plan_expires_at: planWindow.planExpiresAt,
         plan_updated_at: reviewedAt,
         updated_at: reviewedAt,
       })
-      .eq("id", request.companyId);
-    if (companyUpdateError) {
-      throw new Error(companyUpdateError.message);
+      .eq("id", request.partnerId);
+    if (brandUpdateError) {
+      throw new Error(brandUpdateError.message);
     }
 
-    const { error: eventError } = await supabase.from("partner_company_plan_events").insert({
+    const { error: eventError } = await supabase.from("partner_brand_plan_events").insert({
+      partner_id: request.partnerId,
       company_id: request.companyId,
       upgrade_request_id: request.id,
       previous_plan_tier: request.currentPlanTier,
@@ -457,7 +527,8 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
       source: "partner_upgrade",
       actor_admin_id: input.adminId,
       actor_partner_account_id: request.requestedByAccountId,
-      plan_started_at: reviewedAt,
+      plan_started_at: planWindow.planStartedAt,
+      plan_expires_at: planWindow.planExpiresAt,
       note: adminNote,
     });
     if (eventError) {
@@ -472,10 +543,10 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
     accountIds: [request.requestedByAccountId],
     title: approved ? "플랜 업그레이드가 승인되었습니다" : "플랜 업그레이드 요청이 반려되었습니다",
     body: approved
-      ? `${request.companyName}의 ${getPartnerCompanyPlanDefinition(request.requestedPlanTier).label} 플랜이 적용되었습니다.`
-      : `${request.companyName}의 플랜 업그레이드 요청이 반려되었습니다.${adminNote ? ` 사유: ${adminNote}` : ""}`,
+      ? `${request.brandName}의 ${getPartnerCompanyPlanDefinition(request.requestedPlanTier).label} 플랜이 적용되었습니다.`
+      : `${request.brandName}의 플랜 업그레이드 요청이 반려되었습니다.${adminNote ? ` 사유: ${adminNote}` : ""}`,
     targetUrl: "/partner/plans",
-    metadata: { requestId: request.id, companyId: request.companyId },
+    metadata: { requestId: request.id, partnerId: request.partnerId, companyId: request.companyId },
   }).catch((notificationError) => {
     console.error("[partner-plan-service] review notification failed", notificationError);
   });

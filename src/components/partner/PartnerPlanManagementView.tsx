@@ -55,11 +55,11 @@ export default function PartnerPlanManagementView({
 }: {
   data: PartnerPlanPortalData;
 }) {
-  if (data.companies.length === 0) {
+  if (data.brands.length === 0) {
     return (
       <EmptyState
-        title="연결된 파트너사가 없습니다."
-        description="관리자에서 담당 계정과 파트너사를 먼저 연결해야 합니다."
+        title="연결된 브랜드가 없습니다."
+        description="관리자에서 담당 계정과 브랜드가 속한 파트너사를 먼저 연결해야 합니다."
       />
     );
   }
@@ -85,31 +85,33 @@ export default function PartnerPlanManagementView({
 
       <section className="grid gap-4">
         <SectionHeading
-          title="회사별 현재 플랜"
+          title="브랜드별 현재 플랜"
           description="오프라인 결제 후 입금 정보를 남기면 관리자가 확인 후 플랜을 적용합니다."
         />
         <div className="grid gap-3">
-          {data.companies.map((company) => {
+          {data.brands.map((brand) => {
             const pendingRequest = data.requests.find(
-              (request) => request.companyId === company.id && request.status === "pending",
+              (request) => request.partnerId === brand.id && request.status === "pending",
             );
             const upgradeOptions = PARTNER_COMPANY_PLAN_DEFINITIONS.filter(
-              (definition) => planRank[definition.tier] > planRank[company.planTier],
+              (definition) => planRank[definition.tier] > planRank[brand.planTier],
             );
 
             return (
-              <Card key={company.id} tone="default" padding="md" className="grid gap-5">
+              <Card key={brand.id} tone="default" padding="md" className="grid gap-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <PlanBadge tier={company.planTier} />
-                      <Badge variant="neutral">{company.isActive ? "활성" : "비활성"}</Badge>
+                      <PlanBadge tier={brand.planTier} />
+                      <Badge variant="neutral">{brand.companyName}</Badge>
+                      <Badge variant="neutral">{brand.visibility}</Badge>
                     </div>
                     <div>
-                      <h3 className="text-xl font-semibold text-foreground">{company.name}</h3>
+                      <h3 className="text-xl font-semibold text-foreground">{brand.name}</h3>
                       <p className="text-sm text-muted-foreground">
-                        플랜 수정 {formatDateTime(company.planUpdatedAt)}
-                        {company.planExpiresAt ? ` · 만료 ${formatDateTime(company.planExpiresAt)}` : ""}
+                        플랜 수정 {formatDateTime(brand.planUpdatedAt)}
+                        {brand.planStartedAt ? ` · 시작 ${formatDateTime(brand.planStartedAt)}` : ""}
+                        {brand.planExpiresAt ? ` · 만료 ${formatDateTime(brand.planExpiresAt)}` : ""}
                       </p>
                     </div>
                   </div>
@@ -139,7 +141,7 @@ export default function PartnerPlanManagementView({
                   </Card>
                 ) : (
                   <form action={requestPartnerPlanUpgradeAction} className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
-                    <input type="hidden" name="companyId" value={company.id} />
+                    <input type="hidden" name="partnerId" value={brand.id} />
                     <div className="grid gap-3 md:grid-cols-3">
                       <label className="grid gap-2 text-sm font-medium text-foreground">
                         요청 플랜
@@ -191,7 +193,8 @@ export default function PartnerPlanManagementView({
                   <Badge variant={request.status === "pending" ? "warning" : request.status === "approved" ? "success" : "neutral"}>
                     {getRequestStatusLabel(request.status)}
                   </Badge>
-                  <span className="text-sm font-semibold text-foreground">{request.companyName}</span>
+                  <span className="text-sm font-semibold text-foreground">{request.brandName}</span>
+                  <span className="text-xs text-muted-foreground">{request.companyName}</span>
                   <PlanBadge tier={request.currentPlanTier} />
                   <span className="text-sm text-muted-foreground">→</span>
                   <PlanBadge tier={request.requestedPlanTier} />

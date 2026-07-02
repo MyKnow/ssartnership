@@ -80,7 +80,7 @@ export function normalizeServiceRecord(
     companyId: string;
     companyName: string;
     companySlug: string;
-    companyPlanTier?: MockChangeRequestServiceRecord["companyPlanTier"];
+    brandPlanTier?: MockChangeRequestServiceRecord["brandPlanTier"];
     partnerId: string;
     partnerName: string;
     partnerCreatedAt: string;
@@ -92,7 +92,7 @@ export function normalizeServiceRecord(
     companyId: service.companyId,
     companyName: service.companyName,
     companySlug: service.companySlug,
-    companyPlanTier: service.companyPlanTier ?? "basic",
+    brandPlanTier: service.brandPlanTier ?? "basic",
     partnerId: service.partnerId,
     partnerName: service.partnerName,
     partnerCreatedAt: service.partnerCreatedAt,

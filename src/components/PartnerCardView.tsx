@@ -119,7 +119,7 @@ export default function PartnerCardView({
         canNavigate={canNavigate}
         mapLink={mapLink}
         onCategoryClick={onCategoryClick}
-        onTitleClick={() =>
+        onTitleClick={(event) => {
           trackProductEvent({
             eventName: "partner_card_click",
             targetType: "partner",
@@ -128,8 +128,20 @@ export default function PartnerCardView({
               ...trackingProperties,
               source: "title_link",
             },
-          })
-        }
+          });
+          if (
+            event.defaultPrevented ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey ||
+            event.button !== 0
+          ) {
+            return;
+          }
+          event.preventDefault();
+          router.push(detailHref);
+        }}
         onMapClick={() =>
           trackProductEvent({
             eventName: "partner_map_click",

@@ -76,24 +76,24 @@ function toDashboardCompany(
     name: record.company.name,
     slug: record.company.slug,
     description: record.company.description ?? null,
-    planTier: record.company.planTier,
     services: record.company.services.map((service) => ({
       id: service.id,
       name: service.name,
       location: service.location,
       categoryLabel: service.categoryLabel,
+      planTier: service.planTier,
       visibility: service.visibility,
       status: statusByPartnerId.get(service.id) ?? "approved",
       metrics: filterPartnerPortalMetricsForPlan(
         cloneMetrics(normalizeMetrics(service.metrics)),
-        record.company.planTier,
+        service.planTier,
       ),
     })),
     totals: sumMetrics(
       record.company.services.map((service) =>
         filterPartnerPortalMetricsForPlan(
           normalizeMetrics(service.metrics),
-          record.company.planTier,
+          service.planTier,
         ),
       ),
     ),

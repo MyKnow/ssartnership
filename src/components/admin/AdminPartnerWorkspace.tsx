@@ -10,6 +10,11 @@ import Tabs from "@/components/ui/Tabs";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
+import AdminCompanyPlanManager, {
+  type AdminBrandPlanBrand,
+  type AdminCompanyPlanEvent,
+  type AdminCompanyPlanRequest,
+} from "@/components/admin/AdminCompanyPlanManager";
 import { ADMIN_COPY } from "@/lib/content";
 import { cn } from "@/lib/cn";
 import type { AdminCategory, AdminPartner } from "@/components/admin/partner-manager/types";
@@ -294,6 +299,9 @@ export default function AdminPartnerWorkspace({
   categories,
   partners,
   changeRequests,
+  planBrands,
+  planRequests,
+  planEvents,
   partnerMetrics,
   initialTab = "partners",
   approveAction,
@@ -305,6 +313,9 @@ export default function AdminPartnerWorkspace({
   categories: AdminCategory[];
   partners: AdminPartner[];
   changeRequests: PartnerChangeRequestSummary[];
+  planBrands: AdminBrandPlanBrand[];
+  planRequests: AdminCompanyPlanRequest[];
+  planEvents: AdminCompanyPlanEvent[];
   partnerMetrics: {
     warningMessage?: AdminPartnerMetricsResult["warningMessage"];
     metricsByPartnerId: AdminPartnerMetricsResult["metricsByPartnerId"];
@@ -325,6 +336,7 @@ export default function AdminPartnerWorkspace({
   const tabOptions = createAdminPartnerWorkspaceTabOptions({
     partnerCount: safePartners.length,
     requestCount: changeRequests.length,
+    planRequestCount: planRequests.filter((request) => request.status === "pending").length,
     categoryCount: categories.length,
   });
 
@@ -338,7 +350,7 @@ export default function AdminPartnerWorkspace({
         value={activeTab}
         onChange={(value) => setActiveTab(value)}
         options={tabOptions}
-        className="sm:grid-cols-2 xl:grid-cols-3"
+        className="sm:grid-cols-2 xl:grid-cols-4"
       />
 
       {activeTab === "partners" ? (
@@ -370,6 +382,20 @@ export default function AdminPartnerWorkspace({
           approveAction={approveAction}
           rejectAction={rejectAction}
         />
+      ) : null}
+
+      {activeTab === "plans" ? (
+        <section className="grid gap-4">
+          <SectionHeading
+            title="브랜드 플랜과 과금"
+            description="브랜드별 플랜, 오프라인 결제 요청, 변경 이력을 한 화면에서 관리합니다."
+          />
+          <AdminCompanyPlanManager
+            brands={planBrands}
+            requests={planRequests}
+            events={planEvents}
+          />
+        </section>
       ) : null}
 
       {activeTab === "categories" ? (
