@@ -14,6 +14,7 @@ import {
   getPartnerChangeRequestContext,
   updatePartnerImmediateFields,
 } from "@/lib/partner-change-requests";
+import { createAdminOperationalNotification } from "@/lib/operational-notifications";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
 import { resolvePartnerMediaPayload } from "./media";
 import { getReturnUrl, parseList, revalidatePartnerServicePaths } from "./shared";
@@ -123,6 +124,26 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         reservationLinkChanged: context.reservationLink !== reservationLink,
         inquiryLinkChanged: context.inquiryLink !== inquiryLink,
       },
+    });
+    await createAdminOperationalNotification({
+      type: "partner_immediate_update",
+      title: "파트너 즉시 수정 반영",
+      body: `${context.companyName} · ${context.partnerName} 기본 정보가 수정되었습니다.`,
+      targetUrl: `/admin/partners/${encodeURIComponent(partnerId)}`,
+      metadata: {
+        partnerId,
+        partnerName: context.partnerName,
+        companyId: result.companyId,
+        companyName: context.companyName,
+        actorAccountId: session.accountId,
+        tagCount: tags.length,
+        imageCount: media.images.length,
+      },
+    }).catch((notificationError) => {
+      console.error(
+        "[partner-immediate-update] admin notification failed",
+        notificationError,
+      );
     });
   } catch (error) {
     if (media) {

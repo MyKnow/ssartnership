@@ -14,7 +14,7 @@ import {
 
 describe("ad packages", () => {
   it("defines the initial direct-sold package tiers", () => {
-    assert.deepEqual(AD_PACKAGE_TIERS, ["basic", "partner", "boost", "sponsor"]);
+    assert.deepEqual(AD_PACKAGE_TIERS, ["basic", "partner", "boost"]);
 
     assert.equal(getAdPackageDefinition("basic").monthlyPriceKrw, 0);
     assert.deepEqual(getAdPackageDefinition("basic").includedChannels, ["coupon"]);
@@ -22,20 +22,26 @@ describe("ad packages", () => {
       "coupon",
       "home_banner",
       "push",
+      "mm",
+      "ad_banner",
     ]);
-    assert.equal(getAdPackageDefinition("sponsor").priority, 40);
+    assert.equal(getAdPackageDefinition("boost").priority, 30);
   });
 
-  it("keeps future channels out of initial package defaults", () => {
+  it("normalizes package channels by tier", () => {
     assert.deepEqual(
-      normalizeAdChannelsForTier("sponsor", [
+      normalizeAdChannelsForTier("boost", [
         "coupon",
         "home_banner",
         "push",
         "mm",
         "ad_banner",
       ]),
-      ["coupon", "home_banner", "push"],
+      ["coupon", "home_banner", "push", "mm", "ad_banner"],
+    );
+    assert.deepEqual(
+      normalizeAdChannelsForTier("partner", ["coupon", "home_banner", "push"]),
+      ["coupon"],
     );
   });
 

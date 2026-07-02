@@ -3,8 +3,14 @@ import { redirect } from "next/navigation";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
 import PartnerNotificationCenter from "@/components/partner/partner-notifications/PartnerNotificationCenter";
+import PartnerNotificationSettingsPanel from "@/components/partner/partner-notifications/PartnerNotificationSettingsPanel";
+import {
+  getPartnerOperationalNotificationPreferences,
+  listOperationalPushSubscriptionDevices,
+} from "@/lib/operational-notifications";
 import { getPartnerNotificationCenter } from "@/lib/partner-notifications";
 import { getPartnerSession } from "@/lib/partner-session";
+import { getPushPublicKey, isPushConfigured } from "@/lib/push";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -26,7 +32,14 @@ export default async function PartnerNotificationsPage() {
     redirect("/partner/change-password");
   }
 
-  const data = await getPartnerNotificationCenter(session.companyIds, session.accountId);
+  const [data, preferences, devices] = await Promise.all([
+    getPartnerNotificationCenter(session.companyIds, session.accountId),
+    getPartnerOperationalNotificationPreferences(session.accountId),
+    listOperationalPushSubscriptionDevices({
+      ownerType: "partner",
+      ownerId: session.accountId,
+    }),
+  ]);
 
   return (
     <Container size="wide" className="pb-16 pt-6 lg:pt-8">
@@ -35,6 +48,12 @@ export default async function PartnerNotificationsPage() {
           eyebrow="Partner Portal"
           title="알림센터"
           description="협력사 계정에 연결된 브랜드 변경, 리뷰, 운영 알림을 한곳에서 확인합니다."
+        />
+        <PartnerNotificationSettingsPanel
+          pushConfigured={isPushConfigured()}
+          publicKey={getPushPublicKey()}
+          preferences={preferences}
+          deviceCount={devices.length}
         />
         <PartnerNotificationCenter data={data} />
       </div>

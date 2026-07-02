@@ -4,6 +4,7 @@ import type {
   PartnerBenefitActionType,
   PartnerVisibility,
 } from "../types.ts";
+import type { PartnerCompanyPlanTier } from "../partner-company-plans.ts";
 import { PartnerChangeRequestError } from "../partner-change-request-errors.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
@@ -85,6 +86,7 @@ export type PartnerChangeRequestContext = {
   companyId: string;
   companyName: string;
   companySlug: string;
+  companyPlanTier: PartnerCompanyPlanTier;
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
@@ -197,6 +199,7 @@ export type PartnerCompanyRow = {
   id: string;
   name: string;
   slug: string;
+  plan_tier?: string | null;
 };
 
 export type PartnerCategoryRow = {

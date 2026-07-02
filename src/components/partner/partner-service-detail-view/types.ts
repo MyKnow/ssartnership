@@ -1,5 +1,6 @@
 import type { PartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
+import type { PartnerCompanyPlanTier } from "@/lib/partner-company-plans";
 import type { PartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import type { PartnerSession } from "@/lib/partner-session";
 import type {
@@ -18,6 +19,7 @@ export type PartnerServiceDetailViewProps = {
   createAction: (formData: FormData) => void | Promise<void>;
   cancelAction: (formData: FormData) => void | Promise<void>;
   reviewSummary: PartnerReviewSummary;
+  companyPlanTier: PartnerCompanyPlanTier;
   serviceMetrics: PartnerPortalServiceMetrics;
   metricTimeseries: PartnerMetricTimeseriesSnapshot;
   serviceMetricsWarningMessage?: string | null;

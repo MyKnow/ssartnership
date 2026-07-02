@@ -12,11 +12,13 @@ import {
   type PartnerPortalDashboard,
   type PartnerPortalServiceDashboard,
   type PartnerPortalServiceMetrics,
+  filterPartnerPortalMetricsForPlan,
   normalizePartnerPortalServiceStatus,
   sumPartnerPortalMetrics,
 } from "./partner-dashboard.ts";
 import { partnerFavoriteRepository } from "./repositories/index.ts";
 import { normalizePartnerVisibility } from "./partner-visibility.ts";
+import { normalizePartnerCompanyPlanTier } from "./partner-company-plans.ts";
 
 type PartnerCompanyRow = {
   id: string;
@@ -24,6 +26,7 @@ type PartnerCompanyRow = {
   slug: string;
   description?: string | null;
   is_active?: boolean | null;
+  plan_tier?: string | null;
 };
 
 type PartnerServiceRow = {
@@ -127,11 +130,13 @@ function toCompanyDashboard(
   row: PartnerCompanyRow,
   services: PartnerPortalServiceDashboard[],
 ): PartnerPortalCompanyDashboard {
+  const planTier = normalizePartnerCompanyPlanTier(row.plan_tier);
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
     description: row.description ?? null,
+    planTier,
     services,
     totals: sumPartnerPortalMetrics(services.map((service) => service.metrics)),
   };
@@ -161,7 +166,7 @@ export async function getSupabasePartnerPortalDashboard(
   const [companyResult, serviceResult, changeRequestResult] = await Promise.all([
     supabase
       .from("partner_companies")
-      .select("id,name,slug,description,is_active")
+      .select("id,name,slug,description,is_active,plan_tier")
       .in("id", uniqueCompanyIds)
       .eq("is_active", true)
       .order("created_at", { ascending: true }),
@@ -308,11 +313,15 @@ export async function getSupabasePartnerPortalDashboard(
   }
 
   const companies = companyRows.map((row) => {
+    const planTier = normalizePartnerCompanyPlanTier(row.plan_tier);
     const services = (servicesByCompanyId.get(row.id) ?? [])
       .map((serviceRow) =>
         toServiceDashboard(
           serviceRow,
-          metricsByServiceId.get(serviceRow.id) ?? createEmptyMetrics(),
+          filterPartnerPortalMetricsForPlan(
+            metricsByServiceId.get(serviceRow.id) ?? createEmptyMetrics(),
+            planTier,
+          ),
           statusByPartnerId.get(serviceRow.id),
         ),
       );

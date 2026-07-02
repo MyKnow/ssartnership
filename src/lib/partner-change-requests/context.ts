@@ -1,5 +1,6 @@
 import { normalizePartnerVisibility } from "../partner-visibility.ts";
 import { normalizePartnerBenefitActionType } from "../partner-benefit-action.ts";
+import { normalizePartnerCompanyPlanTier } from "../partner-company-plans.ts";
 import { resolvePartnerCampusSlugs } from "../campuses.ts";
 import { sanitizePartnerLinkValue } from "../validation.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
@@ -40,7 +41,7 @@ export async function getSupabaseRequestContext(
   const { data: partner, error } = await supabase
     .from("partners")
     .select(
-      "id,company_id,created_at,name,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
+      "id,company_id,created_at,name,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug,plan_tier)",
     )
     .eq("id", partnerId)
     .maybeSingle();
@@ -74,6 +75,7 @@ export async function getSupabaseRequestContext(
     companyId: company.id,
     companyName: company.name,
     companySlug: company.slug,
+    companyPlanTier: normalizePartnerCompanyPlanTier(company.plan_tier),
     partnerId: row.id,
     partnerName: row.name,
     partnerLocation: row.location,

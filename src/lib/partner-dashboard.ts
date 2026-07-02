@@ -2,6 +2,8 @@ import type {
   PartnerPortalCompanySummary,
   PartnerPortalServiceSummary,
 } from "./partner-portal.ts";
+import type { PartnerCompanyPlanTier } from "./partner-company-plans.ts";
+import { canAccessPartnerMetric } from "./partner-company-plans.ts";
 import { isPartnerPortalMock } from "./partner-portal.ts";
 import { getMockPartnerPortalDashboard } from "./mock/partner-portal.ts";
 import { getSupabasePartnerPortalDashboard } from "./partner-dashboard.supabase.ts";
@@ -32,6 +34,7 @@ export type PartnerPortalCompanyDashboard = Omit<
   PartnerPortalCompanySummary,
   "services"
 > & {
+  planTier: PartnerCompanyPlanTier;
   services: PartnerPortalServiceDashboard[];
   totals: PartnerPortalServiceMetrics;
 };
@@ -83,6 +86,41 @@ export function sumPartnerPortalMetrics(
     }),
     zeroMetrics(),
   );
+}
+
+export function filterPartnerPortalMetricsForPlan(
+  metrics: PartnerPortalServiceMetrics,
+  planTier: PartnerCompanyPlanTier,
+): PartnerPortalServiceMetrics {
+  return {
+    favoriteCount: canAccessPartnerMetric(planTier, "favoriteCount")
+      ? metrics.favoriteCount
+      : 0,
+    detailViews: canAccessPartnerMetric(planTier, "detailViews")
+      ? metrics.detailViews
+      : 0,
+    detailUv: canAccessPartnerMetric(planTier, "detailUv")
+      ? metrics.detailUv
+      : 0,
+    cardClicks: canAccessPartnerMetric(planTier, "cardClicks")
+      ? metrics.cardClicks
+      : 0,
+    mapClicks: canAccessPartnerMetric(planTier, "mapClicks")
+      ? metrics.mapClicks
+      : 0,
+    reservationClicks: canAccessPartnerMetric(planTier, "reservationClicks")
+      ? metrics.reservationClicks
+      : 0,
+    inquiryClicks: canAccessPartnerMetric(planTier, "inquiryClicks")
+      ? metrics.inquiryClicks
+      : 0,
+    reviewCount: canAccessPartnerMetric(planTier, "reviewCount")
+      ? metrics.reviewCount
+      : 0,
+    totalClicks: canAccessPartnerMetric(planTier, "totalClicks")
+      ? metrics.totalClicks
+      : 0,
+  };
 }
 
 function createEmptyDashboard(): PartnerPortalDashboard {

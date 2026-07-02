@@ -46,6 +46,11 @@ import {
   updatePartnerAction,
 } from "./_actions/partner-actions";
 import {
+  approvePartnerPlanUpgradeRequestAction,
+  rejectPartnerPlanUpgradeRequestAction,
+  updatePartnerCompanyPlanAction,
+} from "./_actions/plan-actions";
+import {
   deletePartnerReviewAction,
   hidePartnerReviewAction,
   restorePartnerReviewAction,
@@ -119,6 +124,18 @@ export async function updatePartnerCompany(formData: FormData) {
 
 export async function deletePartnerCompany(formData: FormData) {
   return deletePartnerCompanyAction(formData);
+}
+
+export async function updatePartnerCompanyPlan(formData: FormData) {
+  return updatePartnerCompanyPlanAction(formData);
+}
+
+export async function approvePartnerPlanUpgradeRequest(formData: FormData) {
+  return approvePartnerPlanUpgradeRequestAction(formData);
+}
+
+export async function rejectPartnerPlanUpgradeRequest(formData: FormData) {
+  return rejectPartnerPlanUpgradeRequestAction(formData);
 }
 
 export async function createPartnerFormAction(

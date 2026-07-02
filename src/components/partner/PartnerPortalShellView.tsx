@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
+  CreditCard,
   ExternalLink,
   Gauge,
   Home,
@@ -37,6 +38,12 @@ const primaryNavItems = [
     label: "알림센터",
     description: "운영 알림",
     icon: Bell,
+  },
+  {
+    href: "/partner/plans",
+    label: "플랜 관리",
+    description: "요금제와 요청",
+    icon: CreditCard,
   },
   {
     href: "/partner/change-password",

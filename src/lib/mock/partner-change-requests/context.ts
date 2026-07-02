@@ -40,6 +40,7 @@ export async function getMockPartnerChangeRequestContext(
     companyId: normalizedService.companyId,
     companyName: normalizedService.companyName,
     companySlug: normalizedService.companySlug,
+    companyPlanTier: normalizedService.companyPlanTier,
     partnerId: normalizedService.partnerId,
     partnerName: normalizedService.partnerName,
     partnerLocation: normalizedService.partnerLocation,

@@ -35,8 +35,14 @@ create table if not exists partner_companies (
   slug text not null unique,
   description text,
   is_active boolean not null default true,
+  plan_tier text not null default 'basic',
+  plan_started_at timestamp with time zone,
+  plan_expires_at timestamp with time zone,
+  plan_updated_at timestamp with time zone not null default now(),
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
+  constraint partner_companies_plan_tier_check
+    check (plan_tier in ('basic', 'partner', 'boost'))
 );
 
 create table if not exists partners (
@@ -2026,6 +2032,197 @@ create table if not exists admin_permission_templates (
   updated_at timestamp with time zone default now()
 );
 
+create table if not exists partner_plan_upgrade_requests (
+  id uuid primary key default uuid_generate_v4(),
+  company_id uuid not null references partner_companies(id) on delete cascade,
+  requested_by_account_id uuid not null references partner_accounts(id) on delete cascade,
+  current_plan_tier text not null,
+  requested_plan_tier text not null,
+  status text not null default 'pending',
+  payment_amount_krw integer not null default 0,
+  payer_name text not null default '',
+  memo text not null default '',
+  admin_note text not null default '',
+  reviewed_by_admin_id uuid references members(id) on delete set null,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint partner_plan_upgrade_requests_current_plan_check
+    check (current_plan_tier in ('basic', 'partner', 'boost')),
+  constraint partner_plan_upgrade_requests_requested_plan_check
+    check (requested_plan_tier in ('basic', 'partner', 'boost')),
+  constraint partner_plan_upgrade_requests_status_check
+    check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  constraint partner_plan_upgrade_requests_amount_check
+    check (payment_amount_krw >= 0)
+);
+
+create table if not exists partner_company_plan_events (
+  id uuid primary key default uuid_generate_v4(),
+  company_id uuid not null references partner_companies(id) on delete cascade,
+  upgrade_request_id uuid references partner_plan_upgrade_requests(id) on delete set null,
+  previous_plan_tier text,
+  next_plan_tier text not null,
+  source text not null default 'admin',
+  actor_admin_id uuid references members(id) on delete set null,
+  actor_partner_account_id uuid references partner_accounts(id) on delete set null,
+  plan_started_at timestamp with time zone,
+  plan_expires_at timestamp with time zone,
+  note text not null default '',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  constraint partner_company_plan_events_previous_plan_check
+    check (previous_plan_tier is null or previous_plan_tier in ('basic', 'partner', 'boost')),
+  constraint partner_company_plan_events_next_plan_check
+    check (next_plan_tier in ('basic', 'partner', 'boost')),
+  constraint partner_company_plan_events_source_check
+    check (source in ('admin', 'partner_upgrade', 'expiration', 'system'))
+);
+
+create table if not exists admin_notification_preferences (
+  admin_id uuid primary key references members(id) on delete cascade,
+  enabled boolean not null default true,
+  portal_enabled boolean not null default true,
+  push_enabled boolean not null default true,
+  security_enabled boolean not null default true,
+  partner_request_enabled boolean not null default true,
+  expiring_partner_enabled boolean not null default true,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+create table if not exists admin_push_subscriptions (
+  id uuid primary key default uuid_generate_v4(),
+  admin_id uuid not null references members(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  expiration_time timestamp with time zone,
+  user_agent text,
+  is_active boolean not null default true,
+  failure_reason text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  last_success_at timestamp with time zone,
+  last_failure_at timestamp with time zone
+);
+
+create table if not exists admin_notifications (
+  id uuid primary key default uuid_generate_v4(),
+  type text not null,
+  title text not null,
+  body text not null,
+  target_url text not null default '/admin',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  constraint admin_notifications_type_check
+    check (type in ('partner_change_request', 'partner_immediate_update', 'expiring_partner', 'security_alert'))
+);
+
+create table if not exists admin_notification_recipients (
+  id uuid primary key default uuid_generate_v4(),
+  notification_id uuid not null references admin_notifications(id) on delete cascade,
+  admin_id uuid not null references members(id) on delete cascade,
+  read_at timestamp with time zone,
+  deleted_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique (notification_id, admin_id)
+);
+
+create table if not exists admin_notification_deliveries (
+  id uuid primary key default uuid_generate_v4(),
+  notification_id uuid not null references admin_notifications(id) on delete cascade,
+  admin_id uuid references members(id) on delete cascade,
+  channel text not null,
+  status text not null,
+  error_message text,
+  delivered_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  constraint admin_notification_deliveries_channel_check
+    check (channel in ('portal', 'push')),
+  constraint admin_notification_deliveries_status_check
+    check (status in ('pending', 'sent', 'failed', 'skipped'))
+);
+
+create table if not exists partner_notification_preferences (
+  account_id uuid primary key references partner_accounts(id) on delete cascade,
+  enabled boolean not null default true,
+  portal_enabled boolean not null default true,
+  push_enabled boolean not null default true,
+  email_enabled boolean not null default true,
+  plan_enabled boolean not null default true,
+  expiring_partner_enabled boolean not null default true,
+  metrics_enabled boolean not null default true,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+create table if not exists partner_push_subscriptions (
+  id uuid primary key default uuid_generate_v4(),
+  account_id uuid not null references partner_accounts(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  expiration_time timestamp with time zone,
+  user_agent text,
+  is_active boolean not null default true,
+  failure_reason text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  last_success_at timestamp with time zone,
+  last_failure_at timestamp with time zone
+);
+
+create table if not exists partner_notifications (
+  id uuid primary key default uuid_generate_v4(),
+  company_id uuid references partner_companies(id) on delete cascade,
+  type text not null,
+  title text not null,
+  body text not null,
+  target_url text not null default '/partner/notifications',
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default now(),
+  constraint partner_notifications_type_check
+    check (type in ('expiring_partner', 'plan_changed', 'plan_upgrade_requested', 'plan_upgrade_approved', 'plan_upgrade_rejected', 'metrics_digest'))
+);
+
+create table if not exists partner_notification_recipients (
+  id uuid primary key default uuid_generate_v4(),
+  notification_id uuid not null references partner_notifications(id) on delete cascade,
+  account_id uuid not null references partner_accounts(id) on delete cascade,
+  read_at timestamp with time zone,
+  deleted_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  unique (notification_id, account_id)
+);
+
+create table if not exists partner_notification_deliveries (
+  id uuid primary key default uuid_generate_v4(),
+  notification_id uuid not null references partner_notifications(id) on delete cascade,
+  account_id uuid references partner_accounts(id) on delete cascade,
+  channel text not null,
+  status text not null,
+  error_message text,
+  delivered_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  constraint partner_notification_deliveries_channel_check
+    check (channel in ('portal', 'push', 'email')),
+  constraint partner_notification_deliveries_status_check
+    check (status in ('pending', 'sent', 'failed', 'skipped'))
+);
+
+create table if not exists operational_notification_dedupes (
+  dedupe_key text primary key,
+  audience text not null,
+  notification_type text not null,
+  target_id text not null,
+  created_at timestamp with time zone not null default now(),
+  constraint operational_notification_dedupes_audience_check
+    check (audience in ('admin', 'partner'))
+);
+
 alter table members
   drop constraint if exists members_admin_permission_id_fkey;
 alter table members
@@ -2060,6 +2257,17 @@ create index if not exists member_auth_attempts_identifier_idx on member_auth_at
 create index if not exists partner_accounts_login_id_idx on partner_accounts(login_id);
 create index if not exists partner_account_companies_account_id_idx on partner_account_companies(account_id);
 create index if not exists partner_account_companies_company_id_idx on partner_account_companies(company_id);
+create unique index if not exists partner_plan_upgrade_requests_pending_company_idx
+  on partner_plan_upgrade_requests(company_id)
+  where status = 'pending';
+create index if not exists partner_plan_upgrade_requests_company_created_idx
+  on partner_plan_upgrade_requests(company_id, created_at desc);
+create index if not exists partner_plan_upgrade_requests_account_created_idx
+  on partner_plan_upgrade_requests(requested_by_account_id, created_at desc);
+create index if not exists partner_company_plan_events_company_created_idx
+  on partner_company_plan_events(company_id, created_at desc);
+create index if not exists partner_company_plan_events_upgrade_request_idx
+  on partner_company_plan_events(upgrade_request_id);
 create index if not exists partner_auth_attempts_identifier_idx on partner_auth_attempts(identifier);
 create index if not exists partner_change_requests_company_id_idx on partner_change_requests(company_id);
 create index if not exists partner_change_requests_partner_id_idx on partner_change_requests(partner_id);
@@ -2090,6 +2298,22 @@ create index if not exists notification_deliveries_member_id_idx
   on notification_deliveries(member_id);
 create index if not exists notification_deliveries_created_at_idx
   on notification_deliveries(created_at desc);
+create index if not exists admin_push_subscriptions_admin_active_idx
+  on admin_push_subscriptions(admin_id)
+  where is_active = true;
+create index if not exists admin_notification_recipients_admin_created_idx
+  on admin_notification_recipients(admin_id, created_at desc);
+create index if not exists admin_notification_deliveries_notification_idx
+  on admin_notification_deliveries(notification_id);
+create index if not exists partner_push_subscriptions_account_active_idx
+  on partner_push_subscriptions(account_id)
+  where is_active = true;
+create index if not exists partner_notifications_company_created_idx
+  on partner_notifications(company_id, created_at desc);
+create index if not exists partner_notification_recipients_account_created_idx
+  on partner_notification_recipients(account_id, created_at desc);
+create index if not exists partner_notification_deliveries_notification_idx
+  on partner_notification_deliveries(notification_id);
 create index if not exists members_year_created_at_idx
   on members(year desc, created_at desc);
 create index if not exists members_created_at_idx
@@ -2249,7 +2473,7 @@ create table if not exists ad_campaigns (
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
   constraint ad_campaigns_package_tier_check
-    check (package_tier in ('basic', 'partner', 'boost', 'sponsor')),
+    check (package_tier in ('basic', 'partner', 'boost')),
   constraint ad_campaigns_status_check
     check (status in ('draft', 'active', 'paused', 'ended')),
   constraint ad_campaigns_period_check
@@ -2258,7 +2482,7 @@ create table if not exists ad_campaigns (
     check (monthly_price_krw >= 0),
   constraint ad_campaigns_channels_check
     check (
-      channels <@ array['coupon', 'home_banner', 'push']::text[]
+      channels <@ array['coupon', 'home_banner', 'push', 'mm', 'ad_banner']::text[]
       and array_length(channels, 1) is not null
     )
 );
@@ -2528,6 +2752,48 @@ create trigger admin_permission_templates_set_partnership_updated_at
   for each row
   execute function set_partnership_updated_at();
 
+drop trigger if exists partner_plan_upgrade_requests_set_updated_at on partner_plan_upgrade_requests;
+create trigger partner_plan_upgrade_requests_set_updated_at
+  before update on partner_plan_upgrade_requests
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists admin_notification_preferences_set_updated_at on admin_notification_preferences;
+create trigger admin_notification_preferences_set_updated_at
+  before update on admin_notification_preferences
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists admin_push_subscriptions_set_updated_at on admin_push_subscriptions;
+create trigger admin_push_subscriptions_set_updated_at
+  before update on admin_push_subscriptions
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists admin_notification_recipients_set_updated_at on admin_notification_recipients;
+create trigger admin_notification_recipients_set_updated_at
+  before update on admin_notification_recipients
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partner_notification_preferences_set_updated_at on partner_notification_preferences;
+create trigger partner_notification_preferences_set_updated_at
+  before update on partner_notification_preferences
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partner_push_subscriptions_set_updated_at on partner_push_subscriptions;
+create trigger partner_push_subscriptions_set_updated_at
+  before update on partner_push_subscriptions
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partner_notification_recipients_set_updated_at on partner_notification_recipients;
+create trigger partner_notification_recipients_set_updated_at
+  before update on partner_notification_recipients
+  for each row
+  execute function set_partnership_updated_at();
+
 create or replace function bump_admin_permission_version()
 returns trigger
 language plpgsql
@@ -2683,6 +2949,8 @@ alter table partner_companies enable row level security;
 alter table partners enable row level security;
 alter table partner_accounts enable row level security;
 alter table partner_account_companies enable row level security;
+alter table partner_plan_upgrade_requests enable row level security;
+alter table partner_company_plan_events enable row level security;
 alter table partner_auth_attempts enable row level security;
 alter table admin_login_attempts enable row level security;
 alter table suggestion_attempts enable row level security;
@@ -2716,6 +2984,17 @@ alter table event_reward_winners enable row level security;
 alter table admin_accounts enable row level security;
 alter table admin_permissions enable row level security;
 alter table admin_permission_templates enable row level security;
+alter table admin_notification_preferences enable row level security;
+alter table admin_push_subscriptions enable row level security;
+alter table admin_notifications enable row level security;
+alter table admin_notification_recipients enable row level security;
+alter table admin_notification_deliveries enable row level security;
+alter table partner_notification_preferences enable row level security;
+alter table partner_push_subscriptions enable row level security;
+alter table partner_notifications enable row level security;
+alter table partner_notification_recipients enable row level security;
+alter table partner_notification_deliveries enable row level security;
+alter table operational_notification_dedupes enable row level security;
 alter table admin_audit_logs enable row level security;
 alter table auth_security_logs enable row level security;
 
@@ -2744,6 +3023,10 @@ revoke all on table partner_accounts from anon;
 revoke all on table partner_accounts from authenticated;
 revoke all on table partner_account_companies from anon;
 revoke all on table partner_account_companies from authenticated;
+revoke all on table partner_plan_upgrade_requests from anon;
+revoke all on table partner_plan_upgrade_requests from authenticated;
+revoke all on table partner_company_plan_events from anon;
+revoke all on table partner_company_plan_events from authenticated;
 revoke all on table partner_auth_attempts from anon;
 revoke all on table partner_auth_attempts from authenticated;
 revoke all on table partner_change_requests from anon;
@@ -2804,6 +3087,28 @@ revoke all on table admin_permissions from anon;
 revoke all on table admin_permissions from authenticated;
 revoke all on table admin_permission_templates from anon;
 revoke all on table admin_permission_templates from authenticated;
+revoke all on table admin_notification_preferences from anon;
+revoke all on table admin_notification_preferences from authenticated;
+revoke all on table admin_push_subscriptions from anon;
+revoke all on table admin_push_subscriptions from authenticated;
+revoke all on table admin_notifications from anon;
+revoke all on table admin_notifications from authenticated;
+revoke all on table admin_notification_recipients from anon;
+revoke all on table admin_notification_recipients from authenticated;
+revoke all on table admin_notification_deliveries from anon;
+revoke all on table admin_notification_deliveries from authenticated;
+revoke all on table partner_notification_preferences from anon;
+revoke all on table partner_notification_preferences from authenticated;
+revoke all on table partner_push_subscriptions from anon;
+revoke all on table partner_push_subscriptions from authenticated;
+revoke all on table partner_notifications from anon;
+revoke all on table partner_notifications from authenticated;
+revoke all on table partner_notification_recipients from anon;
+revoke all on table partner_notification_recipients from authenticated;
+revoke all on table partner_notification_deliveries from anon;
+revoke all on table partner_notification_deliveries from authenticated;
+revoke all on table operational_notification_dedupes from anon;
+revoke all on table operational_notification_dedupes from authenticated;
 revoke all on table admin_audit_logs from anon;
 revoke all on table admin_audit_logs from authenticated;
 revoke all on table auth_security_logs from anon;

@@ -32,6 +32,7 @@ export default function PartnerServiceDetailViewContent({
   createAction,
   cancelAction,
   reviewSummary,
+  companyPlanTier,
   serviceMetrics,
   metricTimeseries,
   serviceMetricsWarningMessage,
@@ -128,6 +129,7 @@ export default function PartnerServiceDetailViewContent({
 
               <PartnerServiceMetricsPanel
                 metrics={serviceMetrics}
+                planTier={companyPlanTier}
                 reviewSummary={reviewSummary}
                 warningMessage={serviceMetricsWarningMessage}
               />
