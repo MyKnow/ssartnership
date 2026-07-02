@@ -103,3 +103,47 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
     `,
   });
 }
+
+export async function sendPartnerOperationalNotificationEmail(input: {
+  to: string;
+  displayName: string;
+  title: string;
+  body: string;
+  targetUrl: string;
+}) {
+  const smtpConfig = getSmtpConfig();
+  const transporter = createSmtpTransport(smtpConfig);
+
+  const safeDisplayName = toHtml(input.displayName || "담당자");
+  const safeTitle = toHtml(input.title);
+  const safeBody = toHtml(input.body);
+  const safeTargetUrl = escapeHtml(input.targetUrl);
+
+  await transporter.sendMail({
+    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+    to: input.to,
+    subject: `[${SITE_NAME}] ${input.title}`,
+    text: [
+      `${input.displayName || "담당자"}님,`,
+      "",
+      input.title,
+      input.body,
+      "",
+      input.targetUrl,
+    ].join("\n"),
+    html: `
+      <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
+        <h2 style="margin: 0 0 12px;">${safeTitle}</h2>
+        <p style="margin: 0 0 16px; color: #334155;">
+          안녕하세요 ${safeDisplayName}님,
+        </p>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc;">
+          <p style="margin: 0;">${safeBody}</p>
+        </div>
+        <p style="margin: 16px 0 0;">
+          <a href="${safeTargetUrl}" style="color: #2563eb; word-break: break-all;">알림 확인하기</a>
+        </p>
+      </div>
+    `,
+  });
+}

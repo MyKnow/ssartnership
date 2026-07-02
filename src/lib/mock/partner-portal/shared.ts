@@ -9,6 +9,7 @@ import type {
 import type {
   PartnerPortalServiceDashboard,
 } from "../../partner-dashboard.ts";
+import type { PartnerCompanyPlanTier } from "../../partner-company-plans.ts";
 
 export type MockPortalAccountRecord = {
   id: string;
@@ -31,6 +32,7 @@ export type MockPortalServiceRecord = Omit<
 >;
 
 export type MockPortalCompanyRecord = Omit<PartnerPortalCompanySummary, "services"> & {
+  planTier: PartnerCompanyPlanTier;
   services: MockPortalServiceRecord[];
 };
 
@@ -91,6 +93,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
       name: "카페 해온",
       slug: "cafe-haeon",
       description: "역삼역 인근에서 세 개의 매장을 운영하는 카페 브랜드입니다.",
+      planTier: "basic",
       services: [
         {
           id: "mock-partner-service-cafe-haeon-main",
@@ -163,6 +166,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
       name: "어반짐 역삼",
       slug: "urban-gym",
       description: "헬스와 PT 패키지를 운영하는 복합 피트니스 브랜드입니다.",
+      planTier: "boost",
       services: [
         {
           id: "mock-partner-service-urban-gym-pt",

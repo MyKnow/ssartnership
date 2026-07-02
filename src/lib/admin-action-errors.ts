@@ -18,6 +18,10 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_exists: "이미 존재하는 로그인 아이디입니다.",
   partner_account_company_missing: "연결할 계정과 회사를 찾을 수 없습니다.",
   partner_account_company_invalid_request: "연결 상태 입력값을 확인해 주세요.",
+  partner_company_plan_invalid_request: "플랜 입력값을 확인해 주세요.",
+  partner_company_plan_missing_request: "플랜 요청을 찾을 수 없습니다.",
+  partner_company_plan_pending_exists: "이미 처리 대기 중인 업그레이드 요청이 있습니다.",
+  partner_company_plan_processed: "이미 처리된 업그레이드 요청입니다.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",
   review_not_found: "대상을 찾을 수 없습니다.",
 };

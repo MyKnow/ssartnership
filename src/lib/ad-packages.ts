@@ -2,7 +2,6 @@ export const AD_PACKAGE_TIERS = [
   "basic",
   "partner",
   "boost",
-  "sponsor",
 ] as const;
 
 export type AdPackageTier = (typeof AD_PACKAGE_TIERS)[number];
@@ -21,6 +20,8 @@ export const INITIAL_AD_CHANNELS = [
   "coupon",
   "home_banner",
   "push",
+  "mm",
+  "ad_banner",
 ] as const satisfies readonly AdChannel[];
 
 export type InitialAdChannel = (typeof INITIAL_AD_CHANNELS)[number];
@@ -81,18 +82,10 @@ const AD_PACKAGE_DEFINITIONS = {
   boost: {
     tier: "boost",
     label: "Boost",
-    description: "홈 스폰서 배너와 광고성 푸시를 묶어 단기 방문 전환을 만듭니다.",
+    description: "홈 배너, 광고성 푸시/MM, 애드배너를 묶어 단기 방문 전환을 만듭니다.",
     monthlyPriceKrw: 150_000,
-    includedChannels: ["coupon", "home_banner", "push"],
+    includedChannels: ["coupon", "home_banner", "push", "mm", "ad_banner"],
     priority: 30,
-  },
-  sponsor: {
-    tier: "sponsor",
-    label: "Sponsor",
-    description: "스폰서십 캠페인에 홈 배너, 쿠폰, 광고성 푸시를 통합합니다.",
-    monthlyPriceKrw: 500_000,
-    includedChannels: ["coupon", "home_banner", "push"],
-    priority: 40,
   },
 } as const satisfies Record<AdPackageTier, AdPackageDefinition>;
 

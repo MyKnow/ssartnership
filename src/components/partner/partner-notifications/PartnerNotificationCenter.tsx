@@ -23,6 +23,7 @@ const filterOptions: Array<{
 }> = [
   { value: "all", label: "전체" },
   { value: "request", label: "변경 요청" },
+  { value: "plan", label: "플랜" },
   { value: "review", label: "리뷰" },
   { value: "operation", label: "운영" },
 ];
@@ -35,6 +36,8 @@ function getCategoryLabel(category: PartnerNotificationCategory) {
       return "리뷰";
     case "operation":
       return "운영";
+    case "plan":
+      return "플랜";
     default:
       return "알림";
   }

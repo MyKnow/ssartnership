@@ -5,7 +5,12 @@ import Tabs from "@/components/ui/Tabs";
 import SectionHeading from "@/components/ui/SectionHeading";
 import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
 import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
+import AdminCompanyPlanManager, {
+  type AdminCompanyPlanEvent,
+  type AdminCompanyPlanRequest,
+} from "@/components/admin/AdminCompanyPlanManager";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { PartnerCompanyPlanTier } from "@/lib/partner-company-plans";
 
 type AdminCompanyWorkspaceProps = {
   companies: Array<{
@@ -16,16 +21,22 @@ type AdminCompanyWorkspaceProps = {
     is_active?: boolean | null;
     created_at?: string | null;
     updated_at?: string | null;
+    planTier: PartnerCompanyPlanTier;
+    planStartedAt: string | null;
+    planExpiresAt: string | null;
+    planUpdatedAt: string | null;
     brandCount: number;
     accountCount: number;
   }>;
   accounts: AdminPartnerAccount[];
+  planRequests: AdminCompanyPlanRequest[];
+  planEvents: AdminCompanyPlanEvent[];
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
   initialTab?: AdminCompanyTab;
 };
 
-type AdminCompanyTab = "companies" | "accounts";
+type AdminCompanyTab = "companies" | "accounts" | "plans";
 
 const companyTabOptions = [
   {
@@ -38,11 +49,18 @@ const companyTabOptions = [
     label: "파트너 계정",
     description: "담당자 계정과 초기 설정 링크를 관리합니다.",
   },
+  {
+    value: "plans",
+    label: "플랜/과금",
+    description: "회사별 플랜과 업그레이드 요청을 관리합니다.",
+  },
 ] as const;
 
 export default function AdminCompanyWorkspace({
   companies,
   accounts,
+  planRequests,
+  planEvents,
   generatedSetupUrl,
   generatedSetupAccountId,
   initialTab = "companies",
@@ -66,7 +84,7 @@ export default function AdminCompanyWorkspace({
           />
           <AdminCompanyManager companies={companies} accounts={accounts} />
         </section>
-      ) : (
+      ) : activeTab === "accounts" ? (
         <section className="grid gap-4">
           <SectionHeading
             eyebrow="Accounts"
@@ -80,7 +98,20 @@ export default function AdminCompanyWorkspace({
             generatedSetupAccountId={generatedSetupAccountId}
           />
         </section>
-      )}
+      ) : activeTab === "plans" ? (
+        <section className="grid gap-4">
+          <SectionHeading
+            eyebrow="Plans"
+            title="플랜과 과금"
+            description="파트너사 플랜, 수동 결제 확인, 업그레이드 요청을 관리합니다."
+          />
+          <AdminCompanyPlanManager
+            companies={companies}
+            requests={planRequests}
+            events={planEvents}
+          />
+        </section>
+      ) : null}
     </section>
   );
 }

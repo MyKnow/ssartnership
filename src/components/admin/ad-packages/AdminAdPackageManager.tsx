@@ -7,6 +7,7 @@ import StatsRow from "@/components/ui/StatsRow";
 import Textarea from "@/components/ui/Textarea";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
+  INITIAL_AD_CHANNELS,
   getAdPackageDefinition,
   listAdPackageDefinitions,
   type AdCampaignStatus,
@@ -26,6 +27,8 @@ const channelLabels: Record<InitialAdChannel, string> = {
   coupon: "쿠폰",
   home_banner: "홈 배너",
   push: "광고성 푸시",
+  mm: "Mattermost",
+  ad_banner: "일반 애드배너",
 };
 
 const statusLabels: Record<AdCampaignStatus, string> = {
@@ -255,7 +258,7 @@ export default function AdminAdPackageManager({
             <div className="grid gap-2">
               <p className="text-sm font-medium text-foreground">채널</p>
               <div className="grid gap-2 sm:grid-cols-3">
-                {(["coupon", "home_banner", "push"] as const).map((channel) => (
+                {INITIAL_AD_CHANNELS.map((channel) => (
                   <label
                     key={channel}
                     className="flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"

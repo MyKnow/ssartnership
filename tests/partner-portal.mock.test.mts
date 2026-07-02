@@ -205,9 +205,12 @@ test("builds a company dashboard with aggregate metrics and service statuses", a
   assert.equal(dashboard.totals.detailViews, 3750);
   assert.equal(dashboard.totals.totalClicks, 1460);
   assert.equal(dashboard.totals.reviewCount, 65);
+  assert.equal(dashboard.companies[0]?.planTier, "basic");
+  assert.equal(dashboard.companies[1]?.planTier, "boost");
   assert.equal(dashboard.companies[0]?.services.length, 3);
   assert.equal(dashboard.companies[1]?.services.length, 2);
   assert.equal(dashboard.companies[0]?.totals.detailViews, 1950);
+  assert.equal(dashboard.companies[0]?.totals.detailUv, 0);
   assert.equal(dashboard.companies[1]?.totals.totalClicks, 718);
   assert.equal(dashboard.companies[0]?.totals.reviewCount, 40);
   assert.equal(dashboard.companies[1]?.totals.reviewCount, 25);

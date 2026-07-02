@@ -9,6 +9,7 @@ import {
   createPartnerChangeRequest,
   getPartnerChangeRequestContext,
 } from "@/lib/partner-change-requests";
+import { createAdminOperationalNotification } from "@/lib/operational-notifications";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import { normalizePartnerDetailDescription } from "@/lib/partner-detail-description";
 import { sanitizeHttpUrl, validateDateRange } from "@/lib/validation";
@@ -128,6 +129,25 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
         actorLoginId: session.loginId,
         actorDisplayName: session.displayName,
       },
+    });
+    await createAdminOperationalNotification({
+      type: "partner_change_request",
+      title: "파트너 변경 요청 접수",
+      body: `${request.companyName} · ${request.partnerName} 변경 요청이 접수되었습니다.`,
+      targetUrl: "/admin/partners?tab=requests",
+      metadata: {
+        requestId: request.id,
+        partnerId,
+        partnerName: request.partnerName,
+        companyId: request.companyId,
+        companyName: request.companyName,
+        actorAccountId: session.accountId,
+      },
+    }).catch((notificationError) => {
+      console.error(
+        "[partner-change-request] admin notification failed",
+        notificationError,
+      );
     });
   } catch (error) {
     if (error instanceof PartnerChangeRequestError) {

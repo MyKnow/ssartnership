@@ -4,6 +4,7 @@ import type {
   PartnerPortalServiceMetrics,
   PartnerPortalServiceStatus,
 } from "../../partner-dashboard.ts";
+import { filterPartnerPortalMetricsForPlan } from "../../partner-dashboard.ts";
 import { getMockPartnerChangeRequestPartnerStatuses } from "../partner-change-requests.ts";
 import type { MockPortalSetupRecord } from "./shared.ts";
 import { listMockPartnerPortalCompanySetups } from "./store.ts";
@@ -75,6 +76,7 @@ function toDashboardCompany(
     name: record.company.name,
     slug: record.company.slug,
     description: record.company.description ?? null,
+    planTier: record.company.planTier,
     services: record.company.services.map((service) => ({
       id: service.id,
       name: service.name,
@@ -82,10 +84,18 @@ function toDashboardCompany(
       categoryLabel: service.categoryLabel,
       visibility: service.visibility,
       status: statusByPartnerId.get(service.id) ?? "approved",
-      metrics: cloneMetrics(normalizeMetrics(service.metrics)),
+      metrics: filterPartnerPortalMetricsForPlan(
+        cloneMetrics(normalizeMetrics(service.metrics)),
+        record.company.planTier,
+      ),
     })),
     totals: sumMetrics(
-      record.company.services.map((service) => normalizeMetrics(service.metrics)),
+      record.company.services.map((service) =>
+        filterPartnerPortalMetricsForPlan(
+          normalizeMetrics(service.metrics),
+          record.company.planTier,
+        ),
+      ),
     ),
   };
 }

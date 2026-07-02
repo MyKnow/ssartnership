@@ -14,6 +14,11 @@ import type {
   PartnerPortalCompanyDashboard,
   PartnerPortalDashboard,
 } from "@/lib/partner-dashboard";
+import {
+  canAccessPartnerMetric,
+  getPartnerCompanyPlanDefinition,
+  type PartnerCompanyPlanTier,
+} from "@/lib/partner-company-plans";
 import type { PartnerSession } from "@/lib/partner-session";
 import {
   getPartnerVisibilityBadgeClass,
@@ -49,6 +54,19 @@ function ServiceMetric({
   );
 }
 
+function CompanyPlanBadge({ planTier }: { planTier: PartnerCompanyPlanTier }) {
+  const definition = getPartnerCompanyPlanDefinition(planTier);
+  return (
+    <Badge
+      variant={
+        planTier === "boost" ? "primary" : planTier === "partner" ? "success" : "neutral"
+      }
+    >
+      {definition.label}
+    </Badge>
+  );
+}
+
 function getServiceStatusBadgeVariant(
   status: PartnerPortalDashboard["companies"][number]["services"][number]["status"],
 ) {
@@ -77,10 +95,19 @@ function getPartnerPortalServiceStatusLabel(
 
 function ServiceCard({
   service,
+  planTier,
 }: {
   service: PartnerPortalDashboard["companies"][number]["services"][number];
+  planTier: PartnerCompanyPlanTier;
 }) {
   const isOnlineService = isOnlinePartnerLocation(service.location);
+  const visibleMetrics = [
+    { key: "favoriteCount", label: "즐겨찾기", value: service.metrics.favoriteCount },
+    { key: "reviewCount", label: "리뷰", value: service.metrics.reviewCount },
+    { key: "detailViews", label: "PV", value: service.metrics.detailViews },
+    { key: "detailUv", label: "UV", value: service.metrics.detailUv },
+    { key: "totalClicks", label: "총 클릭", value: service.metrics.totalClicks },
+  ] as const;
 
   return (
     <Link
@@ -118,11 +145,15 @@ function ServiceCard({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <ServiceMetric label="즐겨찾기" value={service.metrics.favoriteCount} />
-        <ServiceMetric label="리뷰" value={service.metrics.reviewCount} />
-        <ServiceMetric label="PV" value={service.metrics.detailViews} />
-        <ServiceMetric label="UV" value={service.metrics.detailUv} />
-        <ServiceMetric label="총 클릭" value={service.metrics.totalClicks} />
+        {visibleMetrics
+          .filter((metric) => canAccessPartnerMetric(planTier, metric.key))
+          .map((metric) => (
+            <ServiceMetric
+              key={metric.key}
+              label={metric.label}
+              value={metric.value}
+            />
+          ))}
       </div>
     </Link>
   );
@@ -178,6 +209,14 @@ function CompanyHeader({
   company: PartnerPortalCompanyDashboard;
   showKicker: boolean;
 }) {
+  const visibleMetrics = [
+    { key: "favoriteCount", label: "즐겨찾기", value: company.totals.favoriteCount },
+    { key: "reviewCount", label: "리뷰 수", value: company.totals.reviewCount },
+    { key: "detailViews", label: "PV", value: company.totals.detailViews },
+    { key: "detailUv", label: "UV", value: company.totals.detailUv },
+    { key: "totalClicks", label: "총 클릭", value: company.totals.totalClicks },
+  ] as const;
+
   return (
     <Card tone="default" padding="md" className="space-y-5 xl:sticky xl:top-24">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -198,15 +237,20 @@ function CompanyHeader({
         <Badge className="bg-surface-muted text-foreground">
           {company.services.length}개 브랜드
         </Badge>
+        <CompanyPlanBadge planTier={company.planTier} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
         <ServiceMetric label="브랜드 수" value={company.services.length} />
-        <ServiceMetric label="즐겨찾기" value={company.totals.favoriteCount} />
-        <ServiceMetric label="리뷰 수" value={company.totals.reviewCount} />
-        <ServiceMetric label="PV" value={company.totals.detailViews} />
-        <ServiceMetric label="UV" value={company.totals.detailUv} />
-        <ServiceMetric label="총 클릭" value={company.totals.totalClicks} />
+        {visibleMetrics
+          .filter((metric) => canAccessPartnerMetric(company.planTier, metric.key))
+          .map((metric) => (
+            <ServiceMetric
+              key={metric.key}
+              label={metric.label}
+              value={metric.value}
+            />
+          ))}
       </div>
     </Card>
   );
@@ -237,7 +281,11 @@ function CompanyBrandList({
       ) : (
         <div className="space-y-3">
           {company.services.map((service) => (
-            <ServiceCard key={service.id} service={service} />
+            <ServiceCard
+              key={service.id}
+              service={service}
+              planTier={company.planTier}
+            />
           ))}
         </div>
       )}

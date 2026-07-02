@@ -20,7 +20,7 @@ import {
   sortEntries,
 } from "@/lib/partner-notifications-operation";
 
-export type PartnerNotificationCategory = "request" | "review" | "operation";
+export type PartnerNotificationCategory = "request" | "review" | "operation" | "plan";
 
 export type PartnerNotificationTone =
   | "neutral"
@@ -39,7 +39,8 @@ export type PartnerNotificationStatus =
   | "deleted"
   | "hidden"
   | "restored"
-  | "granted";
+  | "granted"
+  | "notified";
 
 export type PartnerNotificationEntry = {
   id: string;
@@ -158,6 +159,32 @@ type PartnerAuditLogRow = {
   created_at: string;
 };
 
+type StoredPartnerNotificationRow = {
+  id: string;
+  read_at: string | null;
+  created_at: string;
+  notification?:
+    | {
+        id: string;
+        type: string;
+        title: string;
+        body: string;
+        target_url: string;
+        company_id: string | null;
+        created_at: string;
+      }
+    | {
+        id: string;
+        type: string;
+        title: string;
+        body: string;
+        target_url: string;
+        company_id: string | null;
+        created_at: string;
+      }[]
+    | null;
+};
+
 function normalizeIds(ids: string[]) {
   return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
 }
@@ -167,6 +194,32 @@ function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
     return null;
   }
   return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function createStoredNotificationEntry(
+  row: StoredPartnerNotificationRow,
+  companyMap: Map<string, PartnerCompanyRow>,
+): PartnerNotificationEntry | null {
+  const notification = getSingleRelation(row.notification);
+  if (!notification) {
+    return null;
+  }
+  const company = notification.company_id ? companyMap.get(notification.company_id) ?? null : null;
+  return {
+    id: `stored:${notification.id}`,
+    category: "plan",
+    status: "notified",
+    tone: row.read_at ? "neutral" : "primary",
+    badgeLabel: row.read_at ? "확인됨" : "새 알림",
+    title: notification.title,
+    body: notification.body,
+    companyId: notification.company_id,
+    companyName: company?.name ?? "협력사",
+    partnerId: null,
+    partnerName: null,
+    href: notification.target_url,
+    createdAt: notification.created_at,
+  };
 }
 
 
@@ -474,7 +527,31 @@ async function loadSupabasePartnerNotificationCenter(
       }),
   ].filter((item): item is PartnerNotificationEntry => Boolean(item));
 
-  const items = sortEntries([...requestItems, ...reviewItems, ...operationItems]);
+  const storedNotificationResult = accountId
+    ? await supabase
+        .from("partner_notification_recipients")
+        .select(
+          "id,read_at,created_at,notification:partner_notifications(id,type,title,body,target_url,company_id,created_at)",
+        )
+        .eq("account_id", accountId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(30)
+    : { data: [], error: null as null | { message: string } };
+
+  if (storedNotificationResult.error) {
+    markPartialFailure();
+    console.error(
+      "[partner-notifications] stored notification query failed",
+      storedNotificationResult.error.message,
+    );
+  }
+
+  const storedItems = ((storedNotificationResult.data ?? []) as StoredPartnerNotificationRow[])
+    .map((row) => createStoredNotificationEntry(row, companyMap))
+    .filter((item): item is PartnerNotificationEntry => Boolean(item));
+
+  const items = sortEntries([...storedItems, ...requestItems, ...reviewItems, ...operationItems]);
   return {
     summary: buildSummary(items, companies.length, services.length),
     items,

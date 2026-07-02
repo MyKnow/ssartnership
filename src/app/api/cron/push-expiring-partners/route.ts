@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminSession } from "@/lib/auth";
-import { isPushOpsConfigured, filterExpiringPartnersForPush, getKstDateString, runExpiringPartnerPushBatch } from "@/lib/push/ops";
+import {
+  isPushOpsConfigured,
+  filterExpiringPartnersForPush,
+  getKstDateString,
+  runExpiringPartnerPushBatch,
+  runOperationalExpiringPartnerNotifications,
+} from "@/lib/push/ops";
+import { getExpiringPartnershipOffsets } from "@/lib/partner-notification-routing";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -19,31 +26,72 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isPushOpsConfigured()) {
-    return NextResponse.json(
-      { message: "Web Push 환경 변수가 설정되지 않았습니다." },
-      { status: 503 },
-    );
-  }
-
   const today = getKstDateString();
-  const targetDate = getKstDateString(7);
+  const offsets = getExpiringPartnershipOffsets();
+  const targetDateByOffset = new Map(
+    offsets.map((offset) => [offset, getKstDateString(offset)]),
+  );
+  const targetDates = [...targetDateByOffset.values()];
   const supabase = getSupabaseAdminClient();
   const { data: partners, error } = await supabase
     .from("partners")
-    .select("id,name,period_start,period_end,visibility")
-    .eq("period_end", targetDate);
+    .select("id,company_id,name,period_start,period_end,visibility")
+    .in("period_end", targetDates);
 
   if (error) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 
   const activePartners = filterExpiringPartnersForPush(partners ?? [], today);
-  const result = await runExpiringPartnerPushBatch(activePartners);
+  const sevenDayPartners = activePartners.filter(
+    (partner) => partner.period_end === targetDateByOffset.get(7),
+  );
+  const memberPushResult = isPushOpsConfigured()
+    ? await runExpiringPartnerPushBatch(sevenDayPartners)
+    : {
+        ok: true,
+        partialFailure: false,
+        skipped: true,
+        reason: "Web Push 환경 변수가 설정되지 않았습니다.",
+        summary: {
+          processedPartners: sevenDayPartners.length,
+          targeted: 0,
+          delivered: 0,
+          failed: 0,
+        },
+        failures: [],
+      };
+  const operationalResults = await Promise.all(
+    offsets.map((offset) =>
+      runOperationalExpiringPartnerNotifications(
+        activePartners.filter(
+          (partner) => partner.period_end === targetDateByOffset.get(offset),
+        ),
+        offset,
+      ),
+    ),
+  );
 
-  result.failures.forEach((failure) => {
+  memberPushResult.failures.forEach((failure) => {
     console.error("[push-expiring-partners] partner push failed", failure);
   });
+  operationalResults.forEach((result) => {
+    result.failures.forEach((failure) => {
+      console.error("[push-expiring-partners] operational notification failed", failure);
+    });
+  });
 
-  return NextResponse.json({ ...result, targetDate });
+  return NextResponse.json({
+    ok:
+      memberPushResult.ok &&
+      operationalResults.every((result) => result.ok),
+    today,
+    targetDates,
+    memberPush: memberPushResult,
+    operational: offsets.map((offset, index) => ({
+      daysBefore: offset,
+      targetDate: targetDateByOffset.get(offset),
+      ...operationalResults[index],
+    })),
+  });
 }

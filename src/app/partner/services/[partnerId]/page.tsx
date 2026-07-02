@@ -9,6 +9,11 @@ import type { PartnerChangeRequestErrorCode } from "@/lib/partner-change-request
 import { getPartnerSession } from "@/lib/partner-session";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { getPartnerServiceMetrics } from "@/lib/partner-service-metrics";
+import {
+  canAccessPartnerMetric,
+  getPartnerCompanyPlanDefinition,
+} from "@/lib/partner-company-plans";
+import { filterPartnerPortalMetricsForPlan } from "@/lib/partner-dashboard";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import {
@@ -78,6 +83,10 @@ export default async function PartnerServiceDetailPage({
     notFound();
   }
 
+  const canViewTimeseries = canAccessPartnerMetric(
+    context.companyPlanTier,
+    "timeseries",
+  );
   const [reviewData, publicReviewSummary, serviceMetricsSnapshot, metricTimeseries] =
     await Promise.all([
       partnerReviewRepository.listPartnerReviews({
@@ -89,8 +98,31 @@ export default async function PartnerServiceDetailPage({
       }),
       partnerReviewRepository.getPartnerReviewSummary(partnerId),
       getPartnerServiceMetrics(partnerId),
-      getPartnerMetricTimeseriesSnapshot(partnerId, context.partnerCreatedAt),
+      canViewTimeseries
+        ? getPartnerMetricTimeseriesSnapshot(partnerId, context.partnerCreatedAt)
+        : Promise.resolve({
+            periodLabel: "",
+            hour: {
+              granularity: "hour" as const,
+              labels: [],
+              points: [],
+              maxAverage: 0,
+              hasData: false,
+            },
+            weekday: {
+              granularity: "weekday" as const,
+              labels: [],
+              points: [],
+              maxAverage: 0,
+              hasData: false,
+            },
+            warningMessage: `${getPartnerCompanyPlanDefinition(context.companyPlanTier).label} 플랜에서는 시계열 상세 지표가 제공되지 않습니다.`,
+          }),
     ]);
+  const filteredServiceMetrics = filterPartnerPortalMetricsForPlan(
+    serviceMetricsSnapshot.metrics,
+    context.companyPlanTier,
+  );
 
   const paramsData = (await searchParams) ?? {};
   const mode = readSearchParam(paramsData.mode) === "edit" ? "edit" : "view";
@@ -119,7 +151,8 @@ export default async function PartnerServiceDetailPage({
       createAction={submitPartnerChangeRequest}
       cancelAction={cancelPartnerChangeRequestAction}
       reviewSummary={publicReviewSummary}
-      serviceMetrics={serviceMetricsSnapshot.metrics}
+      companyPlanTier={context.companyPlanTier}
+      serviceMetrics={filteredServiceMetrics}
       metricTimeseries={metricTimeseries}
       serviceMetricsWarningMessage={serviceMetricsSnapshot.warningMessage}
       initialReviews={reviewData.items}

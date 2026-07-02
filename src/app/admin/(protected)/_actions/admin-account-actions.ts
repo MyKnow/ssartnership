@@ -8,11 +8,28 @@ import {
   updateAdminAccountStatus as updateAdminAccountStatusRecord,
 } from "@/lib/admin-accounts";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { createAdminOperationalNotification } from "@/lib/operational-notifications";
 import { logAdminAction } from "./shared-helpers";
 
 function adminManagementPathWithStatus(status: string, extra?: Record<string, string>) {
   const params = new URLSearchParams({ status, ...extra });
   return `/admin/admins?${params.toString()}`;
+}
+
+async function notifyAdminSecurityAlert(input: {
+  title: string;
+  body: string;
+  metadata: Record<string, unknown>;
+}) {
+  await createAdminOperationalNotification({
+    type: "security_alert",
+    title: input.title,
+    body: input.body,
+    targetUrl: "/admin/admins",
+    metadata: input.metadata,
+  }).catch((error) => {
+    console.error("[admin-account-actions] security alert notification failed", error);
+  });
 }
 
 export async function grantMemberAdminPermissionAction(formData: FormData) {
@@ -34,6 +51,15 @@ export async function grantMemberAdminPermissionAction(formData: FormData) {
       properties: {
         memberUsername: account.loginId,
         templateKey: account.permissionId,
+      },
+    });
+    await notifyAdminSecurityAlert({
+      title: "관리자 권한 부여",
+      body: `${account.loginId} 계정에 ${account.permissionId} 권한이 부여되었습니다.`,
+      metadata: {
+        targetAdminId: account.id,
+        targetLoginId: account.loginId,
+        permissionId: account.permissionId,
       },
     });
     revalidatePath("/admin/admins");
@@ -77,6 +103,15 @@ export async function updateAdminAccountStatusAction(formData: FormData) {
       targetId: adminId,
       properties: { isActive },
     });
+    await notifyAdminSecurityAlert({
+      title: isActive ? "관리자 권한 활성화" : "관리자 권한 회수",
+      body: `관리자 계정 ${adminId}의 권한 상태가 변경되었습니다.`,
+      metadata: {
+        targetAdminId: adminId,
+        isActive,
+        actorAdminId: actor.adminId,
+      },
+    });
     revalidatePath("/admin/admins");
   } catch (error) {
     redirectPath = adminManagementPathWithStatus("error", {
@@ -104,6 +139,15 @@ export async function applyAdminPermissionTemplateAction(formData: FormData) {
       targetType: "member_admin_permission",
       targetId: adminId,
       properties: { templateKey },
+    });
+    await notifyAdminSecurityAlert({
+      title: "관리자 권한 템플릿 변경",
+      body: `관리자 계정 ${adminId}에 ${templateKey} 권한 템플릿이 적용되었습니다.`,
+      metadata: {
+        targetAdminId: adminId,
+        templateKey,
+        actorAdminId: actor.adminId,
+      },
     });
     revalidatePath("/admin/admins");
   } catch (error) {

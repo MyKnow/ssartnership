@@ -3,6 +3,10 @@ import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
 import SectionTitle from "@/components/partner/partner-service-detail-view/SectionTitle";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
+import {
+  canAccessPartnerMetric,
+  type PartnerCompanyPlanTier,
+} from "@/lib/partner-company-plans";
 import type { PartnerReviewSummary } from "@/lib/partner-reviews";
 
 function formatCount(value: number) {
@@ -11,15 +15,55 @@ function formatCount(value: number) {
 
 export default function PartnerServiceMetricsPanel({
   metrics,
+  planTier,
   reviewSummary,
   warningMessage,
 }: {
   metrics: PartnerPortalServiceMetrics;
+  planTier: PartnerCompanyPlanTier;
   reviewSummary: PartnerReviewSummary;
   warningMessage?: string | null;
 }) {
   const averageRating =
     reviewSummary.totalCount > 0 ? `${reviewSummary.averageRating.toFixed(1)} / 5` : "-";
+  const planMetricItems = [
+    {
+      key: "favoriteCount",
+      label: "즐겨찾기",
+      value: formatCount(metrics.favoriteCount),
+      hint: "브랜드 즐겨찾기 수",
+    },
+    {
+      key: "detailViews",
+      label: "PV",
+      value: formatCount(metrics.detailViews),
+      hint: "브랜드 상세 페이지 총 조회 수",
+    },
+    {
+      key: "detailUv",
+      label: "UV",
+      value: formatCount(metrics.detailUv),
+      hint: "브랜드 상세 페이지 고유 방문자 수",
+    },
+    {
+      key: "totalClicks",
+      label: "CTA",
+      value: formatCount(metrics.totalClicks),
+      hint: "카드 · 지도 · 예약 · 문의 클릭 수 총합",
+    },
+    {
+      key: "reservationClicks",
+      label: "예약 클릭 수",
+      value: formatCount(metrics.reservationClicks),
+      hint: "혜택 이용 클릭 수",
+    },
+    {
+      key: "inquiryClicks",
+      label: "문의 클릭 수",
+      value: formatCount(metrics.inquiryClicks),
+      hint: "문의 링크 클릭 수",
+    },
+  ] as const;
 
   return (
     <Card className="space-y-4">
@@ -50,36 +94,9 @@ export default function PartnerServiceMetricsPanel({
             value: formatCount(reviewSummary.totalCount),
             hint: "공개 상태 리뷰 수",
           },
-          {
-            label: "즐겨찾기",
-            value: formatCount(metrics.favoriteCount),
-            hint: "브랜드 즐겨찾기 수",
-          },
-          {
-            label: "PV",
-            value: formatCount(metrics.detailViews),
-            hint: "브랜드 상세 페이지 총 조회 수",
-          },
-          {
-            label: "UV",
-            value: formatCount(metrics.detailUv),
-            hint: "브랜드 상세 페이지 고유 방문자 수",
-          },
-          {
-            label: "CTA",
-            value: formatCount(metrics.totalClicks),
-            hint: "카드 · 지도 · 예약 · 문의 클릭 수 총합",
-          },
-          {
-            label: "예약 클릭 수",
-            value: formatCount(metrics.reservationClicks),
-            hint: "혜택 이용 클릭 수",
-          },
-          {
-            label: "문의 클릭 수",
-            value: formatCount(metrics.inquiryClicks),
-            hint: "문의 링크 클릭 수",
-          },
+          ...planMetricItems.filter((item) =>
+            canAccessPartnerMetric(planTier, item.key),
+          ),
         ]}
       />
     </Card>
