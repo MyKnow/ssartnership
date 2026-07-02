@@ -101,17 +101,48 @@ export default function PartnerNotificationSettingsPanel({
     });
   }
 
-  const toggles: Array<{
+  const channelToggles: Array<{
     key: keyof PartnerNotificationPreferenceState;
     label: string;
   }> = [
     { key: "portalEnabled", label: "포털 알림" },
     { key: "emailEnabled", label: "이메일" },
     { key: "pushEnabled", label: "웹푸시" },
+  ];
+
+  const typeToggles: Array<{
+    key: keyof PartnerNotificationPreferenceState;
+    label: string;
+  }> = [
     { key: "planEnabled", label: "플랜 변경" },
     { key: "expiringPartnerEnabled", label: "제휴 종료 임박" },
     { key: "metricsEnabled", label: "지표 알림" },
   ];
+
+  function renderToggle(toggle: {
+    key: keyof PartnerNotificationPreferenceState;
+    label: string;
+  }) {
+    return (
+      <label
+        key={toggle.key}
+        className="flex items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground"
+      >
+        {toggle.label}
+        <input
+          type="checkbox"
+          checked={Boolean(state[toggle.key])}
+          disabled={isPending || !state.enabled}
+          onChange={(event) =>
+            updatePreference({
+              [toggle.key]: event.target.checked,
+            } as Partial<PartnerNotificationPreferenceState>)
+          }
+          className="h-4 w-4 accent-primary"
+        />
+      </label>
+    );
+  }
 
   return (
     <Card tone="default" padding="md" className="grid gap-4">
@@ -142,25 +173,18 @@ export default function PartnerNotificationSettingsPanel({
             className="h-4 w-4 accent-primary"
           />
         </label>
-        {toggles.map((toggle) => (
-          <label
-            key={toggle.key}
-            className="flex items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground"
-          >
-            {toggle.label}
-            <input
-              type="checkbox"
-              checked={Boolean(state[toggle.key])}
-              disabled={isPending || !state.enabled}
-              onChange={(event) =>
-                updatePreference({
-                  [toggle.key]: event.target.checked,
-                } as Partial<PartnerNotificationPreferenceState>)
-              }
-              className="h-4 w-4 accent-primary"
-            />
-          </label>
-        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="grid gap-3">
+          <p className="text-sm font-semibold text-foreground">알림 채널</p>
+          <div className="grid gap-3">{channelToggles.map(renderToggle)}</div>
+        </section>
+
+        <section className="grid gap-3">
+          <p className="text-sm font-semibold text-foreground">알림 종류</p>
+          <div className="grid gap-3">{typeToggles.map(renderToggle)}</div>
+        </section>
       </div>
 
       <div className="flex justify-end">

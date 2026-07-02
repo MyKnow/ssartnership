@@ -84,7 +84,7 @@ export default async function PartnerServiceDetailPage({
   }
 
   const canViewTimeseries = canAccessPartnerMetric(
-    context.companyPlanTier,
+    context.brandPlanTier,
     "timeseries",
   );
   const [reviewData, publicReviewSummary, serviceMetricsSnapshot, metricTimeseries] =
@@ -116,12 +116,12 @@ export default async function PartnerServiceDetailPage({
               maxAverage: 0,
               hasData: false,
             },
-            warningMessage: `${getPartnerCompanyPlanDefinition(context.companyPlanTier).label} 플랜에서는 시계열 상세 지표가 제공되지 않습니다.`,
+            warningMessage: `${getPartnerCompanyPlanDefinition(context.brandPlanTier).label} 플랜에서는 시계열 상세 지표가 제공되지 않습니다.`,
           }),
     ]);
   const filteredServiceMetrics = filterPartnerPortalMetricsForPlan(
     serviceMetricsSnapshot.metrics,
-    context.companyPlanTier,
+    context.brandPlanTier,
   );
 
   const paramsData = (await searchParams) ?? {};
@@ -151,7 +151,7 @@ export default async function PartnerServiceDetailPage({
       createAction={submitPartnerChangeRequest}
       cancelAction={cancelPartnerChangeRequestAction}
       reviewSummary={publicReviewSummary}
-      companyPlanTier={context.companyPlanTier}
+      brandPlanTier={context.brandPlanTier}
       serviceMetrics={filteredServiceMetrics}
       metricTimeseries={metricTimeseries}
       serviceMetricsWarningMessage={serviceMetricsSnapshot.warningMessage}

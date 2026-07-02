@@ -16,23 +16,27 @@ import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
   approvePartnerPlanUpgradeRequest,
   rejectPartnerPlanUpgradeRequest,
-  updatePartnerCompanyPlan,
+  updatePartnerBrandPlan,
 } from "@/app/admin/(protected)/actions";
 
-export type AdminCompanyPlanCompany = {
+export type AdminBrandPlanBrand = {
   id: string;
   name: string;
-  slug: string;
+  companyId: string;
+  companyName: string;
+  location: string;
+  periodStart: string | null;
+  periodEnd: string | null;
   planTier: PartnerCompanyPlanTier;
   planStartedAt: string | null;
   planExpiresAt: string | null;
   planUpdatedAt: string | null;
-  brandCount: number;
-  accountCount: number;
 };
 
 export type AdminCompanyPlanRequest = {
   id: string;
+  partnerId: string;
+  brandName: string;
   companyId: string;
   companyName: string;
   requestedByDisplayName: string | null;
@@ -49,6 +53,8 @@ export type AdminCompanyPlanRequest = {
 
 export type AdminCompanyPlanEvent = {
   id: string;
+  partnerId: string;
+  brandName: string | null;
   companyId: string;
   previousPlanTier: PartnerCompanyPlanTier | null;
   nextPlanTier: PartnerCompanyPlanTier;
@@ -107,11 +113,11 @@ function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
 }
 
 export default function AdminCompanyPlanManager({
-  companies,
+  brands,
   requests,
   events,
 }: {
-  companies: AdminCompanyPlanCompany[];
+  brands: AdminBrandPlanBrand[];
   requests: AdminCompanyPlanRequest[];
   events: AdminCompanyPlanEvent[];
 }) {
@@ -121,7 +127,7 @@ export default function AdminCompanyPlanManager({
     <div className="grid gap-5">
       <div className="grid gap-3 md:grid-cols-3">
         {PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => {
-          const count = companies.filter((company) => company.planTier === definition.tier).length;
+          const count = brands.filter((brand) => brand.planTier === definition.tier).length;
           return (
             <Card key={definition.tier} tone="muted" padding="sm" className="grid gap-3">
               <div className="flex items-start justify-between gap-3">
@@ -129,7 +135,7 @@ export default function AdminCompanyPlanManager({
                   <p className="text-sm font-semibold text-foreground">{definition.label}</p>
                   <p className="text-xs leading-5 text-muted-foreground">{definition.description}</p>
                 </div>
-                <Badge variant="neutral">{count}개</Badge>
+                <Badge variant="neutral">{count}개 브랜드</Badge>
               </div>
               <p className="text-lg font-semibold text-foreground">
                 {definition.monthlyPriceKrw === 0 ? "무료" : `월 ${formatCurrency(definition.monthlyPriceKrw)}`}
@@ -161,9 +167,9 @@ export default function AdminCompanyPlanManager({
                       <PlanBadge tier={request.requestedPlanTier} />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-foreground">{request.companyName}</h3>
+                      <h3 className="text-lg font-semibold text-foreground">{request.brandName}</h3>
                       <p className="text-sm text-muted-foreground">
-                        요청자 {request.requestedByDisplayName ?? "담당자"} · {formatDateTime(request.createdAt)}
+                        {request.companyName} · 요청자 {request.requestedByDisplayName ?? "담당자"} · {formatDateTime(request.createdAt)}
                       </p>
                     </div>
                   </div>
@@ -201,36 +207,40 @@ export default function AdminCompanyPlanManager({
 
       <section className="grid gap-4">
         <SectionHeading
-          title="회사별 플랜"
-          description="관리자가 직접 플랜과 유효기간을 조정합니다."
+          title="브랜드별 플랜"
+          description="Basic은 제휴기간과 동일하게 적용되고, Partner/Boost는 별도 계약 기간을 입력합니다."
         />
         <div className="grid gap-3">
-          {companies.map((company) => {
-            const formId = `company-plan-${company.id}`;
+          {brands.map((brand) => {
+            const formId = `brand-plan-${brand.id}`;
             return (
-              <Card key={company.id} tone="default" padding="md" className="grid gap-4">
+              <Card key={brand.id} tone="default" padding="md" className="grid gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <PlanBadge tier={company.planTier} />
-                      <Badge variant="neutral">브랜드 {company.brandCount}개</Badge>
-                      <Badge variant="neutral">계정 {company.accountCount}개</Badge>
+                      <PlanBadge tier={brand.planTier} />
+                      <Badge variant="neutral">{brand.companyName}</Badge>
+                      {brand.periodStart || brand.periodEnd ? (
+                        <Badge variant="neutral">
+                          제휴 {brand.periodStart ?? "미정"} ~ {brand.periodEnd ?? "미정"}
+                        </Badge>
+                      ) : null}
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-foreground">{company.name}</h3>
-                      <p className="break-all text-sm text-muted-foreground">slug · {company.slug}</p>
+                      <h3 className="text-lg font-semibold text-foreground">{brand.name}</h3>
+                      <p className="text-sm text-muted-foreground">{brand.location || "위치 미입력"}</p>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    플랜 수정 {formatDateTime(company.planUpdatedAt)}
+                    플랜 수정 {formatDateTime(brand.planUpdatedAt)}
                   </p>
                 </div>
 
-                <form id={formId} action={updatePartnerCompanyPlan} className="grid gap-3 md:grid-cols-5 md:items-end">
-                  <input type="hidden" name="companyId" value={company.id} />
+                <form id={formId} action={updatePartnerBrandPlan} className="grid gap-3 md:grid-cols-5 md:items-end">
+                  <input type="hidden" name="partnerId" value={brand.id} />
                   <label className="grid gap-2 text-sm font-medium text-foreground">
                     플랜
-                    <Select name="planTier" defaultValue={company.planTier}>
+                    <Select name="planTier" defaultValue={brand.planTier}>
                       {PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => (
                         <option key={definition.tier} value={definition.tier}>
                           {definition.label}
@@ -240,11 +250,11 @@ export default function AdminCompanyPlanManager({
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-foreground">
                     시작일
-                    <Input name="planStartedAt" type="date" defaultValue={toDateInputValue(company.planStartedAt)} />
+                    <Input name="planStartedAt" type="date" defaultValue={toDateInputValue(brand.planStartedAt)} />
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-foreground">
                     만료일
-                    <Input name="planExpiresAt" type="date" defaultValue={toDateInputValue(company.planExpiresAt)} />
+                    <Input name="planExpiresAt" type="date" defaultValue={toDateInputValue(brand.planExpiresAt)} />
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                     메모
@@ -258,7 +268,7 @@ export default function AdminCompanyPlanManager({
                 </form>
               </Card>
             );
-          })}
+            })}
         </div>
       </section>
 
@@ -271,11 +281,11 @@ export default function AdminCompanyPlanManager({
         ) : (
           <div className="grid gap-2">
             {events.slice(0, 20).map((event) => {
-              const company = companies.find((item) => item.id === event.companyId);
+              const brand = brands.find((item) => item.id === event.partnerId);
               return (
                 <Card key={event.id} tone="muted" padding="sm" className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">{company?.name ?? "파트너사"}</span>
+                    <span className="text-sm font-semibold text-foreground">{brand?.name ?? event.brandName ?? "브랜드"}</span>
                     {event.previousPlanTier ? <PlanBadge tier={event.previousPlanTier} /> : null}
                     <span className="text-sm text-muted-foreground">→</span>
                     <PlanBadge tier={event.nextPlanTier} />

@@ -28,7 +28,7 @@ export default function PartnerCardMeta({
   canNavigate: boolean;
   mapLink?: string | null;
   onCategoryClick?: (categoryKey: CategoryKey) => void;
-  onTitleClick: () => void;
+  onTitleClick: (event: MouseEvent<HTMLAnchorElement>) => void;
   onMapClick: () => void;
   headerAction?: React.ReactNode;
   media: React.ReactNode;

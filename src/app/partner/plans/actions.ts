@@ -31,14 +31,14 @@ export async function requestPartnerPlanUpgradeAction(formData: FormData) {
     redirect("/partner/change-password");
   }
 
-  const companyId = getString(formData, "companyId");
-  if (!companyId || !session.companyIds.includes(companyId)) {
-    redirectPartnerPlanError(new Error("파트너사 접근 권한이 없습니다."));
+  const partnerId = getString(formData, "partnerId");
+  if (!partnerId) {
+    redirectPartnerPlanError(new Error("브랜드 접근 권한이 없습니다."));
   }
 
   try {
     await createPartnerPlanUpgradeRequest({
-      companyId,
+      partnerId,
       accountId: session.accountId,
       requestedPlanTier: getString(formData, "requestedPlanTier"),
       paymentAmountKrw: getString(formData, "paymentAmountKrw"),

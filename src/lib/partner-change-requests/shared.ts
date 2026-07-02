@@ -86,7 +86,7 @@ export type PartnerChangeRequestContext = {
   companyId: string;
   companyName: string;
   companySlug: string;
-  companyPlanTier: PartnerCompanyPlanTier;
+  brandPlanTier: PartnerCompanyPlanTier;
   partnerId: string;
   partnerName: string;
   partnerLocation: string;
@@ -199,7 +199,6 @@ export type PartnerCompanyRow = {
   id: string;
   name: string;
   slug: string;
-  plan_tier?: string | null;
 };
 
 export type PartnerCategoryRow = {
@@ -223,6 +222,7 @@ export type PartnerRow = {
   inquiry_link?: string | null;
   period_start?: string | null;
   period_end?: string | null;
+  plan_tier?: string | null;
   conditions?: string[] | null;
   benefits?: string[] | null;
   applies_to?: string[] | null;
