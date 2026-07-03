@@ -36,7 +36,6 @@ export const authSmokeRoutes: SmokeRoute[] = [
     path: "/partner/setup/mock-partner-setup-cafe-haeon",
     expected: /카페해온|초기 설정/,
   },
-  { path: "/partner/support", expected: /문의|지원|협력사/ },
   { path: "/admin/login", expected: /로그인/ },
 ];
 
@@ -48,6 +47,12 @@ export const memberProtectedRoutes: RedirectRoute[] = [
 export const partnerProtectedRoutes: RedirectRoute[] = [
   { path: "/partner", expectedPath: "/partner/login" },
   { path: "/partner/notifications", expectedPath: "/partner/login" },
+  { path: "/partner/plans", expectedPath: "/partner/login" },
+  { path: "/partner/support", expectedPath: "/partner/login" },
+  {
+    path: "/partner/companies/mock-partner-company-cafe-haeon",
+    expectedPath: "/partner/login",
+  },
   {
     path: "/partner/services/mock-partner-service-cafe-haeon-main",
     expectedPath: "/partner/login",

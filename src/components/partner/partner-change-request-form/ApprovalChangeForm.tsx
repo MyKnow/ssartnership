@@ -18,6 +18,7 @@ import type {
 import { cn } from "@/lib/cn";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH } from "@/lib/partner-detail-description";
+import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import { FieldGroup } from "./FieldGroup";
 import FloatingSubmitButton from "./FloatingSubmitButton";
 
@@ -58,6 +59,7 @@ export function ApprovalChangeForm({
       onSubmit={handleSubmit}
       className="space-y-6 pb-24 sm:pb-28"
     >
+      <input type="hidden" name="companyId" value={context.companyId} />
       <input type="hidden" name="partnerId" value={context.partnerId} />
 
       <InlineMessage
@@ -235,7 +237,11 @@ export function ApprovalChangeForm({
             승인 대기 중에는 새 요청을 제출할 수 없습니다. 기존 요청을 취소해 주세요.
           </Badge>
         ) : null}
-        <Button href="/partner" variant="secondary" className="w-full sm:w-auto">
+        <Button
+          href={getCompanyScopedPortalHref(context.companyId)}
+          variant="secondary"
+          className="w-full sm:w-auto"
+        >
           포털로 돌아가기
         </Button>
       </div>

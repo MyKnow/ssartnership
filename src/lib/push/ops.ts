@@ -16,6 +16,7 @@ import {
 import {
   createExpiringPartnershipDedupeKey,
 } from "@/lib/partner-notification-routing";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
 import type {
   DeliveryResult,
   PushAudience,
@@ -265,7 +266,7 @@ export async function runOperationalExpiringPartnerNotifications(
           companyId: partner.company_id,
           title: `제휴 종료 ${daysBefore}일 전`,
           body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
-          targetUrl: `/partner/services/${encodeURIComponent(partner.id)}`,
+          targetUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
           metadata: {
             partnerId: partner.id,
             companyId: partner.company_id,

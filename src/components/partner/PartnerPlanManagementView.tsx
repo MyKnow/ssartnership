@@ -52,8 +52,10 @@ function getRequestStatusLabel(status: string) {
 
 export default function PartnerPlanManagementView({
   data,
+  companyId,
 }: {
   data: PartnerPlanPortalData;
+  companyId: string;
 }) {
   if (data.brands.length === 0) {
     return (
@@ -128,6 +130,7 @@ export default function PartnerPlanManagementView({
                         </p>
                       </div>
                       <form action={cancelPartnerPlanUpgradeRequestAction}>
+                        <input type="hidden" name="companyId" value={companyId} />
                         <input type="hidden" name="requestId" value={pendingRequest.id} />
                         <SubmitButton variant="secondary" pendingText="취소 중">
                           요청 취소
@@ -141,6 +144,7 @@ export default function PartnerPlanManagementView({
                   </Card>
                 ) : (
                   <form action={requestPartnerPlanUpgradeAction} className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+                    <input type="hidden" name="companyId" value={companyId} />
                     <input type="hidden" name="partnerId" value={brand.id} />
                     <div className="grid gap-3 md:grid-cols-3">
                       <label className="grid gap-2 text-sm font-medium text-foreground">

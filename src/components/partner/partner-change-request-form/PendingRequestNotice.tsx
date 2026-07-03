@@ -32,6 +32,7 @@ export function PendingRequestNotice({
 
         {canCancelPendingRequest ? (
           <form action={cancelAction}>
+            <input type="hidden" name="companyId" value={pendingRequest.companyId} />
             <input type="hidden" name="requestId" value={pendingRequest.id} />
             <input type="hidden" name="partnerId" value={pendingRequest.partnerId} />
             <SubmitButton variant="danger" pendingText="취소 중">
