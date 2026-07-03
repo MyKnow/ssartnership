@@ -11,7 +11,7 @@ import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `계정 정보 | ${SITE_NAME}`,
+  title: `프로필 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,
@@ -48,11 +48,11 @@ export default async function PartnerCompanyAccountPage({
   });
   const statusMessage =
     paramsData.status === "created"
-      ? "계정 정보가 저장되었습니다."
+      ? "프로필이 저장되었습니다."
       : paramsData.status === "defaulted"
-        ? "기본 계정 정보가 변경되었습니다."
+        ? "기본 증빙 프로필이 변경되었습니다."
         : paramsData.status === "archived"
-          ? "계정 정보가 삭제되었습니다."
+          ? "증빙 프로필이 삭제되었습니다."
           : null;
   const errorMessage = paramsData.error
     ? decodeURIComponent(paramsData.error)
@@ -63,14 +63,20 @@ export default async function PartnerCompanyAccountPage({
       <div className="space-y-6">
         <ShellHeader
           eyebrow="Partner Portal"
-          title="계정 정보"
-          description={`${scope.name}에서 사용할 입금자와 세금계산서 발급 정보를 관리합니다.`}
+          title="프로필"
+          description="담당자 계정, 비밀번호, 입금자와 세금계산서 정보를 전체 협력사 공통으로 관리합니다."
         />
-        {statusMessage ? <FormMessage variant="info">{statusMessage}</FormMessage> : null}
-        {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
+        {statusMessage ? (
+          <FormMessage variant="info">{statusMessage}</FormMessage>
+        ) : null}
+        {errorMessage ? (
+          <FormMessage variant="error">{errorMessage}</FormMessage>
+        ) : null}
         <PartnerAccountInfoView
           companyId={scope.id}
           companyName={scope.name}
+          displayName={session.displayName}
+          loginId={session.loginId}
           profiles={profiles}
         />
       </div>
