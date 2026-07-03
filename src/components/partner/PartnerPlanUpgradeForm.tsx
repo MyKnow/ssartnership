@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { CheckCircle2, Landmark, ReceiptText, TrendingUp } from "lucide-react";
-import Button from "@/components/ui/Button";
+import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
+import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
@@ -226,13 +227,14 @@ export default function PartnerPlanUpgradeForm({
               프로필 탭에서 입금자와 세금계산서 정보를 먼저 저장해 주세요.
             </p>
           </div>
-          <Button
+          <PartnerPendingButtonLink
             href={profileHref}
             variant="secondary"
             className="w-full sm:w-auto"
+            showSpinner
           >
             프로필 추가
-          </Button>
+          </PartnerPendingButtonLink>
         </div>
       ) : (
         <div className="grid gap-3 rounded-[0.9rem] border border-border bg-surface-control p-4">
@@ -274,9 +276,9 @@ export default function PartnerPlanUpgradeForm({
           ) : null}
 
           <div className="flex justify-end">
-            <Button href={profileHref} variant="secondary" size="sm">
+            <PartnerPendingButtonLink href={profileHref} variant="secondary" size="sm">
               프로필 관리
-            </Button>
+            </PartnerPendingButtonLink>
           </div>
         </div>
       )}
@@ -291,7 +293,8 @@ export default function PartnerPlanUpgradeForm({
         />
       </label>
 
-      <div className="flex justify-end">
+      <div className="grid gap-2 sm:justify-items-end">
+        <PartnerFormPendingNotice message="업그레이드 요청을 접수하는 중입니다." />
         <SubmitButton
           pendingText="요청 중"
           disabled={billingProfiles.length === 0}

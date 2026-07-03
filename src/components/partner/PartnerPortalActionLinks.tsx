@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import Button from "@/components/ui/Button";
+import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
 import type { PartnerSession } from "@/lib/partner-session";
 
@@ -36,9 +37,9 @@ export default function PartnerPortalActionLinks({
       <>
         {supportLink}
         {showPublicHome ? (
-          <Button variant="ghost" href="/" className="hidden sm:inline-flex">
+          <PartnerPendingButtonLink variant="ghost" href="/" className="hidden sm:inline-flex">
             공개 홈
-          </Button>
+          </PartnerPendingButtonLink>
         ) : null}
       </>
     );
@@ -49,30 +50,30 @@ export default function PartnerPortalActionLinks({
   return (
     <>
       {isDashboardRoute ? null : (
-        <Button variant="ghost" href="/partner">
+        <PartnerPendingButtonLink variant="ghost" href="/partner">
           대시보드
-        </Button>
+        </PartnerPendingButtonLink>
       )}
-      <Button
+      <PartnerPendingButtonLink
         variant={isNotificationsRoute ? "soft" : "ghost"}
         href="/partner/notifications"
       >
         알림센터
-      </Button>
+      </PartnerPendingButtonLink>
       {isMock ? (
-        <Button variant="ghost" href="/partner/setup">
+        <PartnerPendingButtonLink variant="ghost" href="/partner/setup">
           초기 설정
-        </Button>
+        </PartnerPendingButtonLink>
       ) : null}
-      <Button
+      <PartnerPendingButtonLink
         variant={isProfileRoute ? "soft" : "ghost"}
         href="/partner/account"
       >
         프로필
-      </Button>
+      </PartnerPendingButtonLink>
       {supportLink}
       {logoutIconOnly ? (
-        <Button
+        <PartnerPendingButtonLink
           variant="danger"
           size="icon"
           href={authHref}
@@ -81,16 +82,16 @@ export default function PartnerPortalActionLinks({
           title="로그아웃"
         >
           <LogOut className="h-5 w-5" />
-        </Button>
+        </PartnerPendingButtonLink>
       ) : (
-        <Button variant="danger" href={authHref} prefetch={false}>
+        <PartnerPendingButtonLink variant="danger" href={authHref} prefetch={false}>
           로그아웃
-        </Button>
+        </PartnerPendingButtonLink>
       )}
       {showPublicHome ? (
-        <Button variant="ghost" href="/" className="hidden sm:inline-flex">
+        <PartnerPendingButtonLink variant="ghost" href="/" className="hidden sm:inline-flex">
           공개 홈
-        </Button>
+        </PartnerPendingButtonLink>
       ) : null}
     </>
   );

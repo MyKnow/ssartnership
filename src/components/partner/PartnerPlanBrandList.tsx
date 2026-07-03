@@ -7,6 +7,7 @@ import {
   Clock3,
   ReceiptText,
 } from "lucide-react";
+import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
 import PartnerPlanUpgradeForm from "@/components/partner/PartnerPlanUpgradeForm";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -143,6 +144,7 @@ export default function PartnerPlanBrandList({
 }) {
   const [selectedFilter, setSelectedFilter] = useState<PartnerPlanFilter>("all");
   const [expandedBrandId, setExpandedBrandId] = useState<string | null>(null);
+  const selectedFilterLabel = getPartnerPlanFilterLabel(selectedFilter);
 
   const brandItems = useMemo(
     () =>
@@ -235,7 +237,7 @@ export default function PartnerPlanBrandList({
                 className={cn(
                   "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[0.85rem] px-3 text-sm font-semibold transition-surface",
                   selected
-                    ? "bg-primary text-primary-foreground shadow-flat"
+                    ? "bg-primary text-primary-foreground shadow-raised ring-2 ring-primary/15"
                     : "text-muted-foreground hover:bg-surface-control hover:text-foreground",
                 )}
               >
@@ -252,7 +254,12 @@ export default function PartnerPlanBrandList({
             );
           })}
         </div>
-        <p className="px-2 text-xs font-semibold text-muted-foreground">
+        <p
+          className="px-2 text-xs font-semibold text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          {selectedFilterLabel} 필터 적용됨 ·{" "}
           {visibleItems.length.toLocaleString("ko-KR")}개 브랜드
         </p>
       </div>
@@ -423,9 +430,10 @@ export default function PartnerPlanBrandList({
                           {formatPartnerPlanCurrency(pendingRequest.paymentAmountKrw)}
                         </span>
                       </div>
-                      <form action={cancelPartnerPlanUpgradeRequestAction}>
+                      <form action={cancelPartnerPlanUpgradeRequestAction} className="grid gap-2">
                         <input type="hidden" name="companyId" value={companyId} />
                         <input type="hidden" name="requestId" value={pendingRequest.id} />
+                        <PartnerFormPendingNotice message="플랜 요청 취소를 처리 중입니다." />
                         <SubmitButton
                           variant="secondary"
                           pendingText="취소 중"

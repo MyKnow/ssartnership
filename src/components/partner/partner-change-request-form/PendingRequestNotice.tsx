@@ -1,5 +1,6 @@
 import Badge from "@/components/ui/Badge";
 import InlineMessage from "@/components/ui/InlineMessage";
+import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
@@ -31,10 +32,11 @@ export function PendingRequestNotice({
         </div>
 
         {canCancelPendingRequest ? (
-          <form action={cancelAction}>
+          <form action={cancelAction} className="grid gap-2">
             <input type="hidden" name="companyId" value={pendingRequest.companyId} />
             <input type="hidden" name="requestId" value={pendingRequest.id} />
             <input type="hidden" name="partnerId" value={pendingRequest.partnerId} />
+            <PartnerFormPendingNotice message="변경 요청 취소를 처리 중입니다." />
             <SubmitButton variant="danger" pendingText="취소 중">
               요청 취소
             </SubmitButton>

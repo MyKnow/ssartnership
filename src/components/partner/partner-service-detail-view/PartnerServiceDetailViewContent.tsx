@@ -1,9 +1,9 @@
 "use client";
 
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
+import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import PartnerChangeRequestForm from "@/components/partner/PartnerChangeRequestForm";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import PartnerReviewSection from "@/components/partner-reviews/PartnerReviewSection";
@@ -67,16 +67,22 @@ export default function PartnerServiceDetailViewContent({
         <div className="w-full min-w-0 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Button href={portalHref} variant="ghost">
+              <PartnerPendingButtonLink
+                href={portalHref}
+                variant="ghost"
+              >
                 포털로 돌아가기
-              </Button>
+              </PartnerPendingButtonLink>
               {!isEditMode ? (
                 <ShareLinkButton targetType="partner" targetId={context.partnerId} />
               ) : null}
             </div>
 
             {isEditMode ? (
-              <Button href={viewHref} variant="primary">
+              <PartnerPendingButtonLink
+                href={viewHref}
+                showSpinner
+              >
                 <span className="inline-flex items-center gap-2">
                   <svg
                     width={16}
@@ -94,7 +100,7 @@ export default function PartnerServiceDetailViewContent({
                   </svg>
                   보기로 전환
                 </span>
-              </Button>
+              </PartnerPendingButtonLink>
             ) : null}
           </div>
 
@@ -155,12 +161,15 @@ export default function PartnerServiceDetailViewContent({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button href={publicHref} variant="secondary">
+                    <PartnerPendingButtonLink href={publicHref} variant="secondary" showSpinner>
                       사용자 화면
-                    </Button>
-                    <Button href={editHref} variant="primary">
+                    </PartnerPendingButtonLink>
+                    <PartnerPendingButtonLink
+                      href={editHref}
+                      showSpinner
+                    >
                       수정 요청
-                    </Button>
+                    </PartnerPendingButtonLink>
                   </div>
                 </div>
               </Card>

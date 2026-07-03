@@ -43,6 +43,7 @@ export default function PartnerNotificationSettingsPanel({
   const [state, setState] = useState(preferences);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const mountedRef = useRef(false);
 
@@ -59,12 +60,16 @@ export default function PartnerNotificationSettingsPanel({
     "serviceWorker" in navigator &&
     "PushManager" in window;
 
-  function updatePreference(next: Partial<PartnerNotificationPreferenceState>) {
+  function updatePreference(
+    next: Partial<PartnerNotificationPreferenceState>,
+    label: string,
+  ) {
     const previousState = state;
     const optimistic = { ...state, ...next };
     setState(optimistic);
     setError(null);
     setMessage(null);
+    setPendingLabel(label);
     startTransition(async () => {
       try {
         const data = await postJson("/api/partner/notifications/preferences", next);
@@ -74,13 +79,21 @@ export default function PartnerNotificationSettingsPanel({
         if (data.preferences) {
           setState(data.preferences);
         }
-        setMessage("알림 설정을 저장했습니다.");
+        setMessage(`${label} 설정을 저장했습니다.`);
       } catch (caught) {
         if (!mountedRef.current) {
           return;
         }
         setState(previousState);
-        setError(caught instanceof Error ? caught.message : "알림 설정 저장에 실패했습니다.");
+        setError(
+          `${label} 설정 저장 실패: ${
+            caught instanceof Error ? caught.message : "알림 설정 저장에 실패했습니다."
+          }`,
+        );
+      } finally {
+        if (mountedRef.current) {
+          setPendingLabel(null);
+        }
       }
     });
   }
@@ -88,6 +101,7 @@ export default function PartnerNotificationSettingsPanel({
   function subscribePush() {
     setError(null);
     setMessage(null);
+    setPendingLabel("이 기기 푸시 구독");
     startTransition(async () => {
       try {
         if (!canUsePush || !publicKey) {
@@ -117,6 +131,10 @@ export default function PartnerNotificationSettingsPanel({
           return;
         }
         setError(caught instanceof Error ? caught.message : "푸시 구독에 실패했습니다.");
+      } finally {
+        if (mountedRef.current) {
+          setPendingLabel(null);
+        }
       }
     });
   }
@@ -154,9 +172,12 @@ export default function PartnerNotificationSettingsPanel({
           checked={Boolean(state[toggle.key])}
           disabled={isPending || !state.enabled}
           onChange={(event) =>
-            updatePreference({
-              [toggle.key]: event.target.checked,
-            } as Partial<PartnerNotificationPreferenceState>)
+            updatePreference(
+              {
+                [toggle.key]: event.target.checked,
+              } as Partial<PartnerNotificationPreferenceState>,
+              toggle.label,
+            )
           }
           className="h-4 w-4 shrink-0 accent-primary"
         />
@@ -181,6 +202,13 @@ export default function PartnerNotificationSettingsPanel({
 
       {message ? <FormMessage variant="info">{message}</FormMessage> : null}
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
+      {isPending && pendingLabel ? (
+        <div role="status" aria-live="polite">
+          <FormMessage variant="info">
+            {pendingLabel} 설정을 저장하는 중입니다.
+          </FormMessage>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <label className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground">
@@ -189,7 +217,9 @@ export default function PartnerNotificationSettingsPanel({
             type="checkbox"
             checked={state.enabled}
             disabled={isPending}
-            onChange={(event) => updatePreference({ enabled: event.target.checked })}
+            onChange={(event) =>
+              updatePreference({ enabled: event.target.checked }, "전체 알림")
+            }
             className="h-4 w-4 shrink-0 accent-primary"
           />
         </label>
@@ -212,6 +242,8 @@ export default function PartnerNotificationSettingsPanel({
           type="button"
           variant="secondary"
           disabled={isPending || !pushConfigured}
+          loading={isPending && pendingLabel === "이 기기 푸시 구독"}
+          loadingText="구독 중"
           onClick={subscribePush}
         >
           이 기기에서 푸시 받기
