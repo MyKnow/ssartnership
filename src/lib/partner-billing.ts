@@ -165,11 +165,13 @@ export function calculatePartnerPlanUpgradeCharge(input: {
     getPartnerCompanyPlanDefinition(input.currentPlanTier).monthlyPriceKrw;
   const requestedPrice =
     getPartnerCompanyPlanDefinition(input.requestedPlanTier).monthlyPriceKrw;
-  const remainingDays = calculateRemainingDays(input);
   const hasPaidPlanPeriod =
     input.currentPlanTier !== "basic" &&
     Boolean(parseTime(input.currentPeriodStart)) &&
     Boolean(parseTime(input.currentPeriodEnd));
+  const remainingDays = hasPaidPlanPeriod
+    ? calculateRemainingDays(input)
+    : PARTNER_BILLING_POLICY.firstBillingCycleDays;
   const monthlyDifference = hasPaidPlanPeriod
     ? Math.max(0, requestedPrice - currentPrice)
     : requestedPrice;

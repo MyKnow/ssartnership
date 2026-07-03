@@ -91,6 +91,20 @@ describe("partner billing policy", () => {
     assert.equal(charge.totalAmountKrw, 50_000);
   });
 
+  it("charges one full month for Basic upgrades even when Basic mirrors the partnership period", () => {
+    const charge = calculatePartnerPlanUpgradeCharge({
+      currentPlanTier: "basic",
+      requestedPlanTier: "partner",
+      effectiveAt: "2026-07-03T00:00:00+09:00",
+      currentPeriodStart: "2026-07-01T00:00:00+09:00",
+      currentPeriodEnd: "2026-11-01T00:00:00+09:00",
+    });
+
+    assert.equal(charge.policy, "first_month_full_amount");
+    assert.equal(charge.remainingDays, 30);
+    assert.equal(charge.totalAmountKrw, 50_000);
+  });
+
   it("marks paid-plan invoices as downgrade candidates after the grace period", () => {
     assert.equal(PARTNER_BILLING_POLICY.unpaidDowngradeGraceDays, 7);
 

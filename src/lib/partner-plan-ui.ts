@@ -11,6 +11,17 @@ export const PARTNER_PLAN_RANK: Record<PartnerCompanyPlanTier, number> = {
   boost: 30,
 };
 
+export const PARTNER_PLAN_FILTERS = [
+  "all",
+  "pending",
+  "expiring",
+  "basic",
+  "partner",
+  "boost",
+] as const;
+
+export type PartnerPlanFilter = (typeof PARTNER_PLAN_FILTERS)[number];
+
 const PLAN_PROGRESS: Record<PartnerCompanyPlanTier, string> = {
   basic: "1/3 단계",
   partner: "2/3 단계",
@@ -25,6 +36,15 @@ const AD_CHANNEL_LABELS = {
   ad_banner: "일반 애드배너",
 } as const satisfies Record<AdChannel, string>;
 
+const FILTER_LABELS = {
+  all: "전체",
+  pending: "대기 요청",
+  expiring: "만료 임박",
+  basic: "Basic",
+  partner: "Partner",
+  boost: "Boost",
+} as const satisfies Record<PartnerPlanFilter, string>;
+
 export function getPartnerPlanUpgradeOptions(currentTier: PartnerCompanyPlanTier) {
   const currentRank = PARTNER_PLAN_RANK[currentTier];
   return PARTNER_COMPANY_PLAN_DEFINITIONS.filter(
@@ -38,6 +58,53 @@ export function getPartnerPlanProgressLabel(tier: PartnerCompanyPlanTier) {
 
 export function getPartnerPlanChannelLabel(channel: AdChannel) {
   return AD_CHANNEL_LABELS[channel];
+}
+
+export function getPartnerPlanFilterLabel(filter: PartnerPlanFilter) {
+  return FILTER_LABELS[filter];
+}
+
+export function matchesPartnerPlanFilter(
+  brand: {
+    planTier: PartnerCompanyPlanTier;
+    hasPendingRequest: boolean;
+    daysUntil: number | null;
+  },
+  filter: PartnerPlanFilter,
+) {
+  switch (filter) {
+    case "all":
+      return true;
+    case "pending":
+      return brand.hasPendingRequest;
+    case "expiring":
+      return brand.daysUntil !== null && brand.daysUntil >= 0 && brand.daysUntil <= 30;
+    default:
+      return brand.planTier === filter;
+  }
+}
+
+export function getPartnerPlanExpiryStatus(
+  tier: PartnerCompanyPlanTier,
+  daysUntil: number | null,
+) {
+  const prefix = tier === "basic" ? "제휴 종료" : "플랜 만료";
+  if (daysUntil === null) {
+    return {
+      label: tier === "basic" ? "제휴 기간 없음" : "플랜 기간 없음",
+      tone: "neutral" as const,
+    };
+  }
+  if (daysUntil < 0) {
+    return {
+      label: prefix,
+      tone: "warning" as const,
+    };
+  }
+  return {
+    label: `${prefix} D-${daysUntil}`,
+    tone: daysUntil <= 30 ? ("warning" as const) : ("neutral" as const),
+  };
 }
 
 export function formatPartnerPlanCurrency(value: number) {

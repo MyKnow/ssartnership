@@ -64,14 +64,16 @@ export default function PartnerPlanUpgradeForm({
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-foreground">업그레이드 요청</p>
+            <p className="text-sm font-semibold text-foreground">
+              1. 목표 플랜과 결제 예정액
+            </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              목표 플랜을 고르면 VAT 포함 청구 금액이 자동 계산됩니다.
+              VAT 포함가 기준으로 월 플랜가와 이번 계좌이체 금액을 분리해 확인합니다.
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
             <TrendingUp className="h-3.5 w-3.5" />
-            {formatPartnerPlanMonthlyPrice(selectedOption.tier)}
+            월 플랜가 {formatPartnerPlanMonthlyPrice(selectedOption.tier).replace(/^월 /, "")}
           </span>
         </div>
 
@@ -123,6 +125,9 @@ export default function PartnerPlanUpgradeForm({
                       {getPartnerPlanChannelLabel(channel)}
                     </span>
                   ))}
+                  <span className="rounded-full border border-current/15 px-2 py-0.5 text-[11px] font-semibold">
+                    결제 {formatPartnerPlanCurrency(definition.billingCharge.totalAmountKrw)}
+                  </span>
                 </span>
               </button>
             );
@@ -137,14 +142,15 @@ export default function PartnerPlanUpgradeForm({
           </span>
           <div className="min-w-0">
             <p className="font-semibold text-foreground">
-              청구 금액 {formatPartnerPlanCurrency(selectedCharge.totalAmountKrw)}
+              이번 결제 예정액 {formatPartnerPlanCurrency(selectedCharge.totalAmountKrw)}
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               공급가액 {formatPartnerPlanCurrency(selectedCharge.supplyAmountKrw)} ·
               VAT {formatPartnerPlanCurrency(selectedCharge.vatAmountKrw)} ·
+              산정 기준:
               {selectedCharge.policy === "remaining_period_difference"
                 ? ` 남은 ${selectedCharge.remainingDays}일 차액`
-                : " 최초 1개월 기준"}
+                : " 최초 1개월"}
             </p>
           </div>
         </div>
@@ -163,6 +169,15 @@ export default function PartnerPlanUpgradeForm({
             )}
           </div>
         </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-foreground">
+          2. 입금자와 세금계산서 정보
+        </p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          계좌이체 입금 확인과 기본 세금계산서 발급에 사용할 정보를 입력합니다.
+        </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
