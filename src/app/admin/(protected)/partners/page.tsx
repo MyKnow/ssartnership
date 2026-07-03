@@ -14,6 +14,7 @@ import {
   resolvePartnerBrandPlanWindow,
 } from "@/lib/partner-company-plans";
 import { normalizePartnerPlanUpgradeRequestStatus } from "@/lib/partner-plan-upgrades";
+import { getPartnerBillingInvoiceSummariesForUpgradeRequests } from "@/lib/partner-plan-service";
 import {
   createCategory,
   approvePartnerChangeRequest,
@@ -182,7 +183,7 @@ export default async function AdminPartnersPage({
       planUpdatedAt: (partner as { plan_updated_at?: string | null }).plan_updated_at ?? null,
     };
   });
-  const planRequests = ((planRequestsResult.data ?? []) as PartnerPlanUpgradeRequestRow[]).map((request) => {
+  const mappedPlanRequests = ((planRequestsResult.data ?? []) as PartnerPlanUpgradeRequestRow[]).map((request) => {
     const brand = normalizeRelation(request.brand);
     const company = normalizeRelation(request.company);
     const requestedBy = normalizeRelation(request.requested_by);
@@ -202,8 +203,17 @@ export default async function AdminPartnersPage({
       adminNote: request.admin_note ?? "",
       reviewedAt: request.reviewed_at ?? null,
       createdAt: request.created_at,
+      billingInvoice: null,
     };
   });
+  const billingByRequestId =
+    await getPartnerBillingInvoiceSummariesForUpgradeRequests(
+      mappedPlanRequests.map((request) => request.id),
+    );
+  const planRequests = mappedPlanRequests.map((request) => ({
+    ...request,
+    billingInvoice: billingByRequestId.get(request.id) ?? null,
+  }));
   const planEvents = ((planEventsResult.data ?? []) as PartnerPlanEventRow[]).map((event) => {
     const brand = normalizeRelation(event.brand);
     return {

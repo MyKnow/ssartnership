@@ -5,6 +5,7 @@ import {
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
 import {
+  confirmPartnerPlanBankTransferPayment,
   reviewPartnerPlanUpgradeRequest,
   updatePartnerBrandPlanByAdmin,
 } from "@/lib/partner-plan-service";
@@ -101,6 +102,57 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
   redirect(ADMIN_BRAND_PLANS_PATH);
 }
 
+function parseTaxDocumentStatus(value: string) {
+  if (value === "issued" || value === "pending_issue") {
+    return value;
+  }
+  throw new Error("partner_company_plan_invalid_request");
+}
+
+export async function confirmPartnerPlanBankTransferPaymentAction(formData: FormData) {
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: "/admin/partners",
+  });
+  const requestId = getString(formData, "requestId");
+  if (!requestId) {
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request");
+  }
+
+  let taxDocumentStatus: "pending_issue" | "issued";
+  try {
+    taxDocumentStatus = parseTaxDocumentStatus(getString(formData, "taxDocumentStatus"));
+  } catch (error) {
+    redirectAdminActionError(
+      ADMIN_BRAND_PLANS_PATH,
+      error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+    );
+  }
+
+  try {
+    await confirmPartnerPlanBankTransferPayment({
+      requestId,
+      adminId: adminSession.adminId,
+      taxDocumentStatus,
+    });
+  } catch (error) {
+    redirectAdminActionError(
+      ADMIN_BRAND_PLANS_PATH,
+      error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+    );
+  }
+
+  await logAdminAction("partner_plan_bank_transfer_confirmed", {
+    targetType: "partner_plan_upgrade_request",
+    targetId: requestId,
+    properties: {
+      taxDocumentStatus,
+    },
+  });
+  revalidatePartnerCompanyData();
+  revalidatePartnerPortalPaths();
+  redirect(ADMIN_BRAND_PLANS_PATH);
+}
+
 async function reviewPartnerPlanRequestAction(
   formData: FormData,
   nextStatus: "approved" | "rejected",
@@ -123,6 +175,8 @@ async function reviewPartnerPlanRequestAction(
     const message =
       error instanceof Error && error.message.includes("이미 처리된")
         ? "partner_company_plan_processed"
+        : error instanceof Error && error.message.includes("입금 확인")
+          ? "partner_company_plan_payment_unconfirmed"
         : error instanceof Error
           ? error.message
           : "partner_company_plan_invalid_request";

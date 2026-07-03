@@ -61,9 +61,17 @@ export async function requestPartnerPlanUpgradeAction(formData: FormData) {
       companyId,
       accountId: session.accountId,
       requestedPlanTier: getString(formData, "requestedPlanTier"),
-      paymentAmountKrw: getString(formData, "paymentAmountKrw"),
       payerName: getString(formData, "payerName"),
       memo: getString(formData, "memo"),
+      billingProfile: {
+        businessRegistrationNumber: getString(formData, "businessRegistrationNumber"),
+        businessName: getString(formData, "businessName"),
+        representativeName: getString(formData, "representativeName"),
+        businessAddress: getString(formData, "businessAddress"),
+        businessType: getString(formData, "businessType"),
+        businessItem: getString(formData, "businessItem"),
+        taxInvoiceEmail: getString(formData, "taxInvoiceEmail"),
+      },
     });
   } catch (error) {
     redirectPartnerPlanError(companyId, error);

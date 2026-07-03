@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/archive-expired-promotions",
       "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/partner-billing",
+      "schedule": "10 0 * * *"
     }
   ]
 }

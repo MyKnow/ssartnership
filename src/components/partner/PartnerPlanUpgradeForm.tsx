@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, CircleDollarSign, TrendingUp } from "lucide-react";
+import { CheckCircle2, Landmark, ReceiptText, TrendingUp } from "lucide-react";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
+import type { PartnerPlanUpgradeCharge } from "@/lib/partner-billing";
+import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import type {
   PartnerCompanyPlanDefinition,
   PartnerCompanyPlanTier,
@@ -21,7 +23,10 @@ type PartnerPlanUpgradeFormProps = {
   companyId: string;
   partnerId: string;
   currentPlanTier: PartnerCompanyPlanTier;
-  upgradeOptions: PartnerCompanyPlanDefinition[];
+  upgradeOptions: Array<
+    PartnerCompanyPlanDefinition & { billingCharge: PartnerPlanUpgradeCharge }
+  >;
+  bankTransferAccount: PartnerBankTransferAccount;
 };
 
 export default function PartnerPlanUpgradeForm({
@@ -29,6 +34,7 @@ export default function PartnerPlanUpgradeForm({
   partnerId,
   currentPlanTier,
   upgradeOptions,
+  bankTransferAccount,
 }: PartnerPlanUpgradeFormProps) {
   const initialTier = upgradeOptions[0]?.tier ?? currentPlanTier;
   const [selectedTier, setSelectedTier] =
@@ -40,13 +46,11 @@ export default function PartnerPlanUpgradeForm({
       null,
     [selectedTier, upgradeOptions],
   );
-  const [paymentAmount, setPaymentAmount] = useState(
-    String(selectedOption?.monthlyPriceKrw ?? 0),
-  );
 
   if (!selectedOption) {
     return null;
   }
+  const selectedCharge = selectedOption.billingCharge;
 
   return (
     <form
@@ -62,7 +66,7 @@ export default function PartnerPlanUpgradeForm({
           <div>
             <p className="text-sm font-semibold text-foreground">업그레이드 요청</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              목표 플랜을 고르면 기준 금액이 자동으로 채워집니다.
+              목표 플랜을 고르면 VAT 포함 청구 금액이 자동 계산됩니다.
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
@@ -86,7 +90,6 @@ export default function PartnerPlanUpgradeForm({
                 aria-checked={selected}
                 onClick={() => {
                   setSelectedTier(definition.tier);
-                  setPaymentAmount(String(definition.monthlyPriceKrw));
                 }}
                 className={cn(
                   "grid min-h-28 gap-3 rounded-[1rem] border p-4 text-left transition-surface",
@@ -127,32 +130,85 @@ export default function PartnerPlanUpgradeForm({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          결제 금액
-          <span className="relative">
-            <CircleDollarSign className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              name="paymentAmountKrw"
-              type="number"
-              min={0}
-              step={1000}
-              value={paymentAmount}
-              onChange={(event) => setPaymentAmount(event.target.value)}
-              className="pl-9"
-              required
-            />
+      <div className="grid gap-3 rounded-[0.9rem] border border-border bg-surface-control p-4 text-sm">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.8rem] border border-primary/15 bg-primary-soft text-primary">
+            <ReceiptText className="h-4 w-4" />
           </span>
-          <span className="text-xs font-normal text-muted-foreground">
-            기준 금액 {formatPartnerPlanCurrency(selectedOption.monthlyPriceKrw)}
-          </span>
-        </label>
+          <div className="min-w-0">
+            <p className="font-semibold text-foreground">
+              청구 금액 {formatPartnerPlanCurrency(selectedCharge.totalAmountKrw)}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              공급가액 {formatPartnerPlanCurrency(selectedCharge.supplyAmountKrw)} ·
+              VAT {formatPartnerPlanCurrency(selectedCharge.vatAmountKrw)} ·
+              {selectedCharge.policy === "remaining_period_difference"
+                ? ` 남은 ${selectedCharge.remainingDays}일 차액`
+                : " 최초 1개월 기준"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 rounded-[0.8rem] bg-surface-inset p-3">
+          <Landmark className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 text-xs leading-5 text-muted-foreground">
+            {bankTransferAccount.configured ? (
+              <p>
+                {bankTransferAccount.bankName} {bankTransferAccount.accountNumber} ·
+                예금주 {bankTransferAccount.accountHolder}
+              </p>
+            ) : (
+              <p>
+                계좌 정보가 아직 설정되지 않았습니다. 요청 접수 후 관리자가 입금 계좌를 안내합니다.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-foreground">
           입금자명
           <Input name="payerName" maxLength={80} required />
           <span className="text-xs font-normal text-muted-foreground">
             실제 입금 내역과 같은 이름을 입력해 주세요.
           </span>
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          세금계산서 이메일
+          <Input name="taxInvoiceEmail" type="email" maxLength={254} required />
+        </label>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          사업자등록번호
+          <Input
+            name="businessRegistrationNumber"
+            inputMode="numeric"
+            placeholder="000-00-00000"
+            maxLength={12}
+            required
+          />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          상호
+          <Input name="businessName" maxLength={120} required />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          대표자명
+          <Input name="representativeName" maxLength={80} required />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          사업장 주소
+          <Input name="businessAddress" maxLength={300} required />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          업태
+          <Input name="businessType" maxLength={80} required />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          종목
+          <Input name="businessItem" maxLength={120} required />
         </label>
       </div>
 

@@ -10,6 +10,8 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import { calculatePartnerPlanUpgradeCharge } from "@/lib/partner-billing";
+import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import { getPartnerPortalMetricAccessItems } from "@/lib/partner-portal-metric-access";
 import type { PartnerPlanPortalData } from "@/lib/partner-plan-service";
 import {
@@ -99,9 +101,11 @@ function RequestStatusBadge({ status }: { status: string }) {
 export default function PartnerPlanManagementView({
   data,
   companyId,
+  bankTransferAccount,
 }: {
   data: PartnerPlanPortalData;
   companyId: string;
+  bankTransferAccount: PartnerBankTransferAccount;
 }) {
   if (data.brands.length === 0) {
     return (
@@ -125,6 +129,7 @@ export default function PartnerPlanManagementView({
       data.brands.filter((brand) => brand.planTier === definition.tier).length,
     ]),
   ) as Record<PartnerCompanyPlanTier, number>;
+  const nowIso = new Date().toISOString();
 
   return (
     <div className="grid gap-6">
@@ -197,7 +202,18 @@ export default function PartnerPlanManagementView({
             const pendingRequest = data.requests.find(
               (request) => request.partnerId === brand.id && request.status === "pending",
             );
-            const upgradeOptions = getPartnerPlanUpgradeOptions(brand.planTier);
+            const upgradeOptions = getPartnerPlanUpgradeOptions(brand.planTier).map(
+              (definition) => ({
+                ...definition,
+                billingCharge: calculatePartnerPlanUpgradeCharge({
+                  currentPlanTier: brand.planTier,
+                  requestedPlanTier: definition.tier,
+                  effectiveAt: nowIso,
+                  currentPeriodStart: brand.planStartedAt,
+                  currentPeriodEnd: brand.planExpiresAt,
+                }),
+              }),
+            );
             const metricAccessItems = getPartnerPortalMetricAccessItems(brand.planTier);
             const accessibleMetricCount = metricAccessItems.filter(
               (item) => !item.locked,
@@ -303,8 +319,8 @@ export default function PartnerPlanManagementView({
                             <p className="text-sm font-semibold text-foreground">
                               승인 대기 중
                             </p>
-                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                              관리자가 오프라인 결제 내역을 확인하면 플랜이 반영됩니다.
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                              계좌이체 입금 확인 후 관리자가 플랜을 반영합니다.
                             </p>
                           </div>
                         </div>
@@ -315,6 +331,20 @@ export default function PartnerPlanManagementView({
                           <span className="font-semibold text-foreground">
                             {formatPartnerPlanCurrency(pendingRequest.paymentAmountKrw)}
                           </span>
+                          {pendingRequest.billingInvoice ? (
+                            <>
+                              <RequestStatusBadge
+                                status={
+                                  pendingRequest.billingInvoice.invoiceStatus === "paid"
+                                    ? "approved"
+                                    : "pending"
+                                }
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                납부기한 {formatDateTime(pendingRequest.billingInvoice.dueAt)}
+                              </span>
+                            </>
+                          ) : null}
                         </div>
                         <form action={cancelPartnerPlanUpgradeRequestAction}>
                           <input type="hidden" name="companyId" value={companyId} />
@@ -348,6 +378,7 @@ export default function PartnerPlanManagementView({
                         partnerId={brand.id}
                         currentPlanTier={brand.planTier}
                         upgradeOptions={upgradeOptions}
+                        bankTransferAccount={bankTransferAccount}
                       />
                     )}
                   </div>

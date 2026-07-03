@@ -172,6 +172,10 @@ npm run ci:local
 - 사용자 세션 / QR
   - `USER_SESSION_SECRET`
   - `CERTIFICATION_QR_SECRET`
+- 파트너 계좌이체 결제
+  - `PARTNER_BILLING_BANK_NAME`
+  - `PARTNER_BILLING_BANK_ACCOUNT`
+  - `PARTNER_BILLING_ACCOUNT_HOLDER`
 - 제휴 제안 메일
   - `SMTP_HOST`
   - `SMTP_PORT`

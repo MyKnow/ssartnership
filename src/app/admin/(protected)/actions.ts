@@ -47,6 +47,7 @@ import {
 } from "./_actions/partner-actions";
 import {
   approvePartnerPlanUpgradeRequestAction,
+  confirmPartnerPlanBankTransferPaymentAction,
   rejectPartnerPlanUpgradeRequestAction,
   updatePartnerBrandPlanAction,
 } from "./_actions/plan-actions";
@@ -132,6 +133,10 @@ export async function updatePartnerBrandPlan(formData: FormData) {
 
 export async function approvePartnerPlanUpgradeRequest(formData: FormData) {
   return approvePartnerPlanUpgradeRequestAction(formData);
+}
+
+export async function confirmPartnerPlanBankTransferPayment(formData: FormData) {
+  return confirmPartnerPlanBankTransferPaymentAction(formData);
 }
 
 export async function rejectPartnerPlanUpgradeRequest(formData: FormData) {

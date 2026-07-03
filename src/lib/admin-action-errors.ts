@@ -22,6 +22,7 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_company_plan_missing_request: "플랜 요청을 찾을 수 없습니다.",
   partner_company_plan_pending_exists: "이미 처리 대기 중인 업그레이드 요청이 있습니다.",
   partner_company_plan_processed: "이미 처리된 업그레이드 요청입니다.",
+  partner_company_plan_payment_unconfirmed: "입금 확인 후 플랜을 승인할 수 있습니다.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",
   review_not_found: "대상을 찾을 수 없습니다.",
 };
