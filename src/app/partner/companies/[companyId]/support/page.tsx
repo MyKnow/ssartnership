@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import SupportTemplateCard from "@/components/support/SupportTemplateCard";
+import PartnerSupportRequestPanel from "@/components/partner/PartnerSupportRequestPanel";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
@@ -8,7 +8,6 @@ import { getPartnerPortalDashboard } from "@/lib/partner-dashboard";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { BUG_REPORT_EMAIL, SITE_NAME } from "@/lib/site";
-import { buildSupportMailTemplate } from "@/lib/support-mail";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 
 export const metadata: Metadata = {
@@ -45,18 +44,6 @@ export default async function PartnerCompanySupportPage({
     dashboard.companies[0]?.services.map((service) => service.name).join(", ") ||
     "미지정";
   const supportPath = getCompanyScopedPortalHref(scope.id, "support");
-  const template = buildSupportMailTemplate({
-    to: BUG_REPORT_EMAIL,
-    subject: `[${SITE_NAME} 협력사 포털] ${scope.name} 기술 지원 요청`,
-    bodyLines: [
-      `1. 업체명 / 브랜드명: ${scope.name} / ${brandNames}`,
-      `2. 담당자명: ${session.displayName}`,
-      `3. 로그인 이메일: ${session.loginId}`,
-      "4. 연락 가능한 전화번호:",
-      `5. 문제가 발생한 화면 URL: ${supportPath}`,
-      "6. 필요한 지원 내용:",
-    ],
-  });
 
   return (
     <Container size="wide" className="pb-16 pt-6 lg:pt-8">
@@ -74,9 +61,14 @@ export default async function PartnerCompanySupportPage({
           </div>
         </Card>
         <div className="min-w-0 xl:col-span-2">
-          <SupportTemplateCard
-            template={template}
-            description="메일 앱이 열리지 않으면 템플릿을 복사해 사용 중인 메일 서비스에 붙여넣어 보내 주세요."
+          <PartnerSupportRequestPanel
+            to={BUG_REPORT_EMAIL}
+            siteName={SITE_NAME}
+            companyName={scope.name}
+            brandNames={brandNames}
+            displayName={session.displayName}
+            loginId={session.loginId}
+            currentUrl={supportPath}
           />
         </div>
       </div>

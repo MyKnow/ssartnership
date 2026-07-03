@@ -32,6 +32,17 @@ function formatCurrency(value: number) {
   return `${value.toLocaleString("ko-KR")}원`;
 }
 
+function getDaysUntil(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return Math.ceil((date.getTime() - Date.now()) / 86_400_000);
+}
+
 function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
   const definition = getPartnerCompanyPlanDefinition(tier);
   return <Badge variant={tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral"}>{definition.label}</Badge>;
@@ -65,9 +76,40 @@ export default function PartnerPlanManagementView({
       />
     );
   }
+  const pendingRequestCount = data.requests.filter(
+    (request) => request.status === "pending",
+  ).length;
+  const expiringBrandCount = data.brands.filter((brand) => {
+    const daysUntil = getDaysUntil(brand.planExpiresAt);
+    return daysUntil !== null && daysUntil >= 0 && daysUntil <= 30;
+  }).length;
 
   return (
     <div className="grid gap-6">
+      <Card tone="default" padding="md" className="grid gap-4 md:grid-cols-3">
+        <div>
+          <p className="ui-kicker">브랜드</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">
+            {data.brands.length.toLocaleString("ko-KR")}개
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">현재 관리 대상</p>
+        </div>
+        <div>
+          <p className="ui-kicker">승인 대기</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">
+            {pendingRequestCount.toLocaleString("ko-KR")}건
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">오프라인 결제 확인 필요</p>
+        </div>
+        <div>
+          <p className="ui-kicker">만료 임박</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">
+            {expiringBrandCount.toLocaleString("ko-KR")}건
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">30일 이내 종료 예정</p>
+        </div>
+      </Card>
+
       <div className="grid gap-3 md:grid-cols-3">
         {PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => (
           <Card key={definition.tier} tone="muted" padding="sm" className="grid gap-3">
@@ -139,9 +181,14 @@ export default function PartnerPlanManagementView({
                     </div>
                   </div>
                 ) : upgradeOptions.length === 0 ? (
-                  <Card tone="muted" padding="sm">
-                    <p className="text-sm text-muted-foreground">현재 이용 가능한 최상위 플랜입니다.</p>
-                  </Card>
+                  <div className="rounded-[1rem] border border-success/15 bg-success/10 px-4 py-3">
+                    <p className="text-sm font-semibold text-success">
+                      현재 이용 가능한 최상위 플랜입니다.
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      상세 지표와 광고 채널 접근이 모두 열려 있습니다.
+                    </p>
+                  </div>
                 ) : (
                   <form action={requestPartnerPlanUpgradeAction} className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
                     <input type="hidden" name="companyId" value={companyId} />

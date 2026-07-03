@@ -4,7 +4,9 @@ import {
   resolvePartnerBrandPlanWindow,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import { listMockPartnerPortalCompanySetups } from "@/lib/mock/partner-portal/store";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import { isPartnerPortalMock } from "@/lib/partner-portal";
 import {
   assertPartnerPlanUpgradeTransition,
   normalizePartnerPlanUpgradeRequestStatus,
@@ -211,6 +213,46 @@ function mapPlanEvent(row: PlanEventRow): PartnerBrandPlanEventRecord {
   };
 }
 
+function loadMockPartnerPlanPortalData(
+  companyIds: string[],
+): PartnerPlanPortalData {
+  const setups = listMockPartnerPortalCompanySetups(companyIds);
+  const brands = setups.flatMap((setup) =>
+    setup.company.services.map((service) => {
+      const planTier = normalizePartnerCompanyPlanTier(service.planTier);
+      const planWindow = resolvePartnerBrandPlanWindow({
+        planTier,
+        periodStart: null,
+        periodEnd: null,
+        planStartedAt: null,
+        planExpiresAt: null,
+      });
+
+      return {
+        id: service.id,
+        name: service.name,
+        companyId: setup.company.id,
+        companyName: setup.company.name,
+        companySlug: setup.company.slug,
+        location: service.location,
+        visibility: service.visibility,
+        periodStart: null,
+        periodEnd: null,
+        planTier,
+        planStartedAt: planWindow.planStartedAt,
+        planExpiresAt: planWindow.planExpiresAt,
+        planUpdatedAt: null,
+      } satisfies PartnerBrandPlanRecord;
+    }),
+  );
+
+  return {
+    brands,
+    requests: [],
+    events: [],
+  };
+}
+
 export async function getPartnerPlanPortalData(
   companyIds: string[],
   accountId?: string | null,
@@ -218,6 +260,10 @@ export async function getPartnerPlanPortalData(
   const normalizedCompanyIds = normalizeCompanyIds(companyIds);
   if (normalizedCompanyIds.length === 0) {
     return { brands: [], requests: [], events: [] };
+  }
+
+  if (isPartnerPortalMock) {
+    return loadMockPartnerPlanPortalData(normalizedCompanyIds);
   }
 
   const supabase = getSupabaseAdminClient();

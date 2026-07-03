@@ -19,6 +19,7 @@ import type { SubscriptionInput, WebPushModule } from "@/lib/push/types";
 import { PushError } from "@/lib/push/types";
 import { sanitizeHttpUrl } from "@/lib/validation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { isPartnerPortalMock } from "@/lib/partner-portal";
 
 type DeliveryStatus = "pending" | "sent" | "failed" | "skipped";
 
@@ -171,6 +172,10 @@ export async function getAdminOperationalNotificationPreferences(adminId: string
 }
 
 export async function getPartnerOperationalNotificationPreferences(accountId: string) {
+  if (isPartnerPortalMock) {
+    return getDefaultPartnerNotificationPreferences();
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("partner_notification_preferences")
@@ -216,6 +221,13 @@ export async function upsertPartnerOperationalNotificationPreferences(
   accountId: string,
   preferences: Partial<PartnerNotificationPreferenceState>,
 ) {
+  if (isPartnerPortalMock) {
+    return {
+      ...getDefaultPartnerNotificationPreferences(),
+      ...preferences,
+    } satisfies PartnerNotificationPreferenceState;
+  }
+
   const current = await getPartnerOperationalNotificationPreferences(accountId);
   const next = { ...current, ...preferences };
   const supabase = getSupabaseAdminClient();
@@ -246,6 +258,13 @@ export async function upsertOperationalPushSubscription(input: {
   userAgent?: string | null;
 }) {
   const validated = validateSubscription(input.subscription);
+  if (input.ownerType === "partner" && isPartnerPortalMock) {
+    return upsertPartnerOperationalNotificationPreferences(input.ownerId, {
+      enabled: true,
+      pushEnabled: true,
+    });
+  }
+
   const supabase = getSupabaseAdminClient();
   const table =
     input.ownerType === "admin" ? "admin_push_subscriptions" : "partner_push_subscriptions";
@@ -288,6 +307,10 @@ export async function deactivateOperationalPushSubscription(input: {
   subscriptionId?: string | null;
   all?: boolean;
 }) {
+  if (input.ownerType === "partner" && isPartnerPortalMock) {
+    return;
+  }
+
   const supabase = getSupabaseAdminClient();
   const table =
     input.ownerType === "admin" ? "admin_push_subscriptions" : "partner_push_subscriptions";
@@ -314,6 +337,10 @@ export async function listOperationalPushSubscriptionDevices(input: {
   ownerId: string;
   currentEndpoint?: string | null;
 }): Promise<PushSubscriptionDevice[]> {
+  if (input.ownerType === "partner" && isPartnerPortalMock) {
+    return [];
+  }
+
   const supabase = getSupabaseAdminClient();
   const table =
     input.ownerType === "admin" ? "admin_push_subscriptions" : "partner_push_subscriptions";

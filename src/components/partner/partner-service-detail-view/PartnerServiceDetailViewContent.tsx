@@ -13,6 +13,7 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
+import { getPartnerCompanyPlanDefinition } from "@/lib/partner-company-plans";
 import PartnerServiceMetricsPanel from "@/components/partner/partner-service-detail-view/PartnerServiceMetricsPanel";
 import PartnerPendingRequestSection from "@/components/partner/partner-service-detail-view/PartnerPendingRequestSection";
 import PartnerServiceContacts from "@/components/partner/partner-service-detail-view/PartnerServiceContacts";
@@ -50,6 +51,8 @@ export default function PartnerServiceDetailViewContent({
   const portalHref = getCompanyScopedPortalHref(context.companyId);
   const viewHref = getCompanyScopedPartnerServiceHref(context.companyId, context.partnerId);
   const editHref = getCompanyScopedPartnerServiceEditHref(context.companyId, context.partnerId);
+  const publicHref = `/partners/${encodeURIComponent(context.partnerId)}`;
+  const planHref = getCompanyScopedPortalHref(context.companyId, "plans");
   const isEditMode = mode === "edit";
   const pendingRequest = context.pendingRequest;
   const pendingDiffItems = buildPartnerChangeRequestDiffItems(pendingRequest);
@@ -72,34 +75,27 @@ export default function PartnerServiceDetailViewContent({
               ) : null}
             </div>
 
-            <Button href={mode === "edit" ? viewHref : editHref} variant="primary">
-              <span className="inline-flex items-center gap-2">
-                <svg
-                  width={16}
-                  height={16}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  {mode === "edit" ? (
-                    <>
-                      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </>
-                  ) : (
-                    <>
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </>
-                  )}
-                </svg>
-                {mode === "edit" ? "보기로 전환" : "수정 요청"}
-              </span>
-            </Button>
+            {isEditMode ? (
+              <Button href={viewHref} variant="primary">
+                <span className="inline-flex items-center gap-2">
+                  <svg
+                    width={16}
+                    height={16}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  보기로 전환
+                </span>
+              </Button>
+            ) : null}
           </div>
 
           {isEditMode ? (
@@ -109,27 +105,63 @@ export default function PartnerServiceDetailViewContent({
                 {context.partnerName}
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그는 즉시 반영되고,
-                브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자
-                승인 후 반영됩니다.
+                변경 방식이 다른 항목을 분리했습니다. 즉시 반영 항목은 저장 직후 공개 화면에
+                적용되고, 승인 필요 항목은 관리자 검토 후 반영됩니다.
               </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-[1rem] border border-success/15 bg-success/10 p-4">
+                  <p className="text-sm font-semibold text-success">즉시 반영</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-warning/20 bg-warning/10 p-4">
+                  <p className="text-sm font-semibold text-warning">승인 필요</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상
+                  </p>
+                </div>
+              </div>
             </Card>
           ) : (
             <>
               <Card className="space-y-4 p-6 sm:p-8">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-primary/10 text-primary">브랜드</Badge>
-                  <Badge className="bg-surface text-muted-foreground">
-                    {context.companyName}
-                  </Badge>
-                  <Badge className={getPartnerVisibilityBadgeClass(context.visibility)}>
-                    {getPartnerVisibilityLabel(context.visibility)}
-                  </Badge>
-                  {pendingRequest ? (
-                    <Badge className="bg-amber-500/10 text-amber-700">
-                      승인 대기 중
-                    </Badge>
-                  ) : null}
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="bg-primary/10 text-primary">브랜드</Badge>
+                      <Badge className="bg-surface text-muted-foreground">
+                        {context.companyName}
+                      </Badge>
+                      <Badge className={getPartnerVisibilityBadgeClass(context.visibility)}>
+                        {getPartnerVisibilityLabel(context.visibility)}
+                      </Badge>
+                      <Badge variant={brandPlanTier === "boost" ? "primary" : brandPlanTier === "partner" ? "success" : "neutral"}>
+                        {getPartnerCompanyPlanDefinition(brandPlanTier).label}
+                      </Badge>
+                      {pendingRequest ? (
+                        <Badge className="bg-amber-500/10 text-amber-700">
+                          승인 대기 중
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+                        {context.partnerName}
+                      </h1>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                        공개 상태, 플랜, 수정 요청 상태를 기준으로 브랜드 운영 신뢰도를 확인합니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button href={publicHref} variant="secondary">
+                      사용자 화면
+                    </Button>
+                    <Button href={editHref} variant="primary">
+                      수정 요청
+                    </Button>
+                  </div>
                 </div>
               </Card>
 
@@ -138,6 +170,7 @@ export default function PartnerServiceDetailViewContent({
                 planTier={brandPlanTier}
                 reviewSummary={reviewSummary}
                 warningMessage={serviceMetricsWarningMessage}
+                planHref={planHref}
               />
 
               <PartnerMetricTimeseriesPanel data={metricTimeseries} />

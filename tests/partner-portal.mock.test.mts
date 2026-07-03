@@ -3,6 +3,8 @@ import test, { beforeEach } from "node:test";
 
 type MockPartnerPortalModule = typeof import("../src/lib/mock/partner-portal");
 type MockPartnerChangeRequestModule = typeof import("../src/lib/mock/partner-change-requests");
+type OperationalNotificationsModule = typeof import("../src/lib/operational-notifications");
+type PartnerPlanServiceModule = typeof import("../src/lib/partner-plan-service");
 type PartnerPortalModule = typeof import("../src/lib/partner-portal");
 type PartnerAuthModule = typeof import("../src/lib/partner-auth");
 
@@ -19,6 +21,12 @@ const partnerPortalModulePromise = import(
 const mockPartnerChangeRequestModulePromise = import(
   new URL("../src/lib/mock/partner-change-requests.ts", import.meta.url).href
 ) as Promise<MockPartnerChangeRequestModule>;
+const operationalNotificationsModulePromise = import(
+  new URL("../src/lib/operational-notifications.ts", import.meta.url).href
+) as Promise<OperationalNotificationsModule>;
+const partnerPlanServiceModulePromise = import(
+  new URL("../src/lib/partner-plan-service.ts", import.meta.url).href
+) as Promise<PartnerPlanServiceModule>;
 const partnerAuthModulePromise = import(
   new URL("../src/lib/partner-auth.ts", import.meta.url).href
 ) as Promise<PartnerAuthModule>;
@@ -251,6 +259,52 @@ test("builds a company dashboard with aggregate metrics and service statuses", a
   assert.equal(dashboard.companies[0]?.totals.reviewCount, 40);
   assert.equal(dashboard.companies[1]?.totals.reviewCount, 25);
   assert.equal(dashboard.companies[1]?.services[1]?.status, "pending");
+});
+
+test("loads mock partner plan portal data without Supabase UUID queries", async () => {
+  const { getPartnerPlanPortalData } = await partnerPlanServiceModulePromise;
+  const data = await getPartnerPlanPortalData(
+    ["mock-partner-company-cafe-haeon"],
+    "mock-partner-account-cafe-haeon",
+  );
+
+  assert.equal(data.brands.length, 3);
+  assert.deepStrictEqual(
+    data.brands.map((brand) => brand.planTier),
+    ["basic", "partner", "basic"],
+  );
+  assert.equal(data.brands[0]?.companyId, "mock-partner-company-cafe-haeon");
+  assert.deepStrictEqual(data.requests, []);
+  assert.deepStrictEqual(data.events, []);
+});
+
+test("uses default partner notification preferences in mock mode", async () => {
+  const {
+    getPartnerOperationalNotificationPreferences,
+    listOperationalPushSubscriptionDevices,
+    upsertPartnerOperationalNotificationPreferences,
+  } = await operationalNotificationsModulePromise;
+
+  const defaults = await getPartnerOperationalNotificationPreferences(
+    "mock-partner-account-cafe-haeon",
+  );
+  const updated = await upsertPartnerOperationalNotificationPreferences(
+    "mock-partner-account-cafe-haeon",
+    { pushEnabled: false, planEnabled: false },
+  );
+
+  assert.equal(defaults.enabled, true);
+  assert.equal(defaults.pushEnabled, true);
+  assert.equal(updated.pushEnabled, false);
+  assert.equal(updated.planEnabled, false);
+  assert.equal(updated.portalEnabled, true);
+  assert.deepStrictEqual(
+    await listOperationalPushSubscriptionDevices({
+      ownerType: "partner",
+      ownerId: "mock-partner-account-cafe-haeon",
+    }),
+    [],
+  );
 });
 
 test("updates immediate partner fields without approval", async () => {

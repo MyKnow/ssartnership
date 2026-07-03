@@ -1,7 +1,10 @@
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
 import SectionTitle from "@/components/partner/partner-service-detail-view/SectionTitle";
+import { getPartnerPortalMetricAccessItems } from "@/lib/partner-portal-metric-access";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import {
   canAccessPartnerMetric,
@@ -18,11 +21,13 @@ export default function PartnerServiceMetricsPanel({
   planTier,
   reviewSummary,
   warningMessage,
+  planHref,
 }: {
   metrics: PartnerPortalServiceMetrics;
   planTier: PartnerCompanyPlanTier;
   reviewSummary: PartnerReviewSummary;
   warningMessage?: string | null;
+  planHref?: string | null;
 }) {
   const averageRating =
     reviewSummary.totalCount > 0 ? `${reviewSummary.averageRating.toFixed(1)} / 5` : "-";
@@ -64,6 +69,9 @@ export default function PartnerServiceMetricsPanel({
       hint: "문의 링크 클릭 수",
     },
   ] as const;
+  const lockedMetricItems = getPartnerPortalMetricAccessItems(planTier)
+    .filter((item) => item.locked)
+    .slice(0, 4);
 
   return (
     <Card className="space-y-4">
@@ -99,6 +107,33 @@ export default function PartnerServiceMetricsPanel({
           ),
         ]}
       />
+
+      {lockedMetricItems.length > 0 ? (
+        <div className="rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="neutral">플랜 제한</Badge>
+                <span className="text-sm font-semibold text-foreground">
+                  상위 플랜에서 상세 지표를 확인할 수 있습니다.
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {lockedMetricItems.map((item) => (
+                  <Badge key={item.key} variant="neutral">
+                    {item.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            {planHref ? (
+              <Button href={planHref} variant="secondary" size="sm">
+                플랜 보기
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }

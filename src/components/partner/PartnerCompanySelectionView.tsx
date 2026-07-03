@@ -39,40 +39,64 @@ export default function PartnerCompanySelectionView({
             />
           ) : (
             <MotionReveal delay={0.08}>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {companies.map((company) => (
-                  <Link
-                    key={company.id}
-                    href={getCompanyScopedPortalHref(company.id)}
-                    className="group block"
-                  >
-                    <Card
-                      tone="default"
-                      padding="md"
-                      className="flex h-full flex-col gap-5 transition-surface-transform duration-200 ease-out group-hover:-translate-y-1 group-hover:border-strong group-hover:shadow-raised"
+              <div className="grid gap-4">
+                <div className="grid gap-3 rounded-panel border border-border/70 bg-surface-elevated/95 p-4 shadow-flat sm:grid-cols-3">
+                  <div>
+                    <p className="ui-kicker">로그인 계정</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                      {session.loginId}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="ui-kicker">협력사</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {companies.length.toLocaleString("ko-KR")}개 연결
+                    </p>
+                  </div>
+                  <div>
+                    <p className="ui-kicker">브랜드</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {companies
+                        .reduce((sum, company) => sum + company.serviceCount, 0)
+                        .toLocaleString("ko-KR")}개 관리
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {companies.map((company) => (
+                    <Link
+                      key={company.id}
+                      href={getCompanyScopedPortalHref(company.id)}
+                      className="group block"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-border bg-surface-control text-primary">
-                          <Building2 className="h-5 w-5" />
-                        </span>
-                        <Badge variant="neutral">{company.serviceCount}개 브랜드</Badge>
-                      </div>
-                      <div className="min-w-0 space-y-2">
-                        <h2 className="truncate text-xl font-semibold text-foreground">
-                          {company.name}
-                        </h2>
-                        <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                          {company.description?.trim() ||
-                            "연결된 브랜드 현황과 운영 알림을 확인합니다."}
-                        </p>
-                      </div>
-                      <div className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                        선택하기
-                        <ArrowRight className="h-4 w-4" />
-                      </div>
-                    </Card>
-                  </Link>
-                ))}
+                      <Card
+                        tone="default"
+                        padding="md"
+                        className="flex h-full flex-col gap-5 transition-surface-transform duration-200 ease-out group-hover:-translate-y-1 group-hover:border-strong group-hover:shadow-raised"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-border bg-surface-control text-primary">
+                            <Building2 className="h-5 w-5" />
+                          </span>
+                          <Badge variant="neutral">{company.serviceCount}개 브랜드</Badge>
+                        </div>
+                        <div className="min-w-0 space-y-2">
+                          <h2 className="truncate text-xl font-semibold text-foreground">
+                            {company.name}
+                          </h2>
+                          <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+                            {company.description?.trim() ||
+                              "연결된 브랜드 현황과 운영 알림을 확인합니다."}
+                          </p>
+                        </div>
+                        <div className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                          선택하기
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
               </div>
             </MotionReveal>
           )}
