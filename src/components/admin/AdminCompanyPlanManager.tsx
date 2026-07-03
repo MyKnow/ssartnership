@@ -12,9 +12,11 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import type { PartnerBillingInvoiceRecord } from "@/lib/partner-plan-service";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
   approvePartnerPlanUpgradeRequest,
+  confirmPartnerPlanBankTransferPayment,
   rejectPartnerPlanUpgradeRequest,
   updatePartnerBrandPlan,
 } from "@/app/admin/(protected)/actions";
@@ -47,6 +49,7 @@ export type AdminCompanyPlanRequest = {
   payerName: string;
   memo: string;
   adminNote: string;
+  billingInvoice: PartnerBillingInvoiceRecord | null;
   reviewedAt: string | null;
   createdAt: string;
 };
@@ -107,6 +110,34 @@ function getStatusLabel(status: AdminCompanyPlanRequest["status"]) {
   }
 }
 
+function getInvoiceStatusLabel(status?: PartnerBillingInvoiceRecord["invoiceStatus"] | null) {
+  switch (status) {
+    case "paid":
+      return "입금 확인";
+    case "overdue":
+      return "미납";
+    case "cancelled":
+      return "청구 취소";
+    default:
+      return "입금 대기";
+  }
+}
+
+function getTaxDocumentStatusLabel(
+  status?: PartnerBillingInvoiceRecord["taxDocumentStatus"],
+) {
+  switch (status) {
+    case "issued":
+      return "세금계산서 발급";
+    case "pending_issue":
+      return "발급 대기";
+    case "cancelled":
+      return "증빙 취소";
+    default:
+      return "발급 요청";
+  }
+}
+
 function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
   const definition = getPartnerCompanyPlanDefinition(tier);
   return <Badge variant={tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral"}>{definition.label}</Badge>;
@@ -156,51 +187,86 @@ export default function AdminCompanyPlanManager({
           </Card>
         ) : (
           <div className="grid gap-3">
-            {pendingRequests.map((request) => (
-              <Card key={request.id} tone="elevated" padding="md" className="grid gap-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={getStatusBadgeVariant(request.status)}>{getStatusLabel(request.status)}</Badge>
-                      <PlanBadge tier={request.currentPlanTier} />
-                      <span className="text-sm text-muted-foreground">→</span>
-                      <PlanBadge tier={request.requestedPlanTier} />
+            {pendingRequests.map((request) => {
+              const billing = request.billingInvoice;
+              const isPaid = billing?.invoiceStatus === "paid";
+              return (
+                <Card key={request.id} tone="elevated" padding="md" className="grid gap-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={getStatusBadgeVariant(request.status)}>{getStatusLabel(request.status)}</Badge>
+                        <Badge variant={isPaid ? "success" : "warning"}>
+                          {getInvoiceStatusLabel(billing?.invoiceStatus)}
+                        </Badge>
+                        <Badge variant={billing?.taxDocumentStatus === "issued" ? "success" : "neutral"}>
+                          {getTaxDocumentStatusLabel(billing?.taxDocumentStatus)}
+                        </Badge>
+                        <PlanBadge tier={request.currentPlanTier} />
+                        <span className="text-sm text-muted-foreground">→</span>
+                        <PlanBadge tier={request.requestedPlanTier} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">{request.brandName}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {request.companyName} · 요청자 {request.requestedByDisplayName ?? "담당자"} · {formatDateTime(request.createdAt)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">{request.brandName}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {request.companyName} · 요청자 {request.requestedByDisplayName ?? "담당자"} · {formatDateTime(request.createdAt)}
-                      </p>
-                    </div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatCurrency(billing?.totalAmountKrw ?? request.paymentAmountKrw)}
+                    </p>
                   </div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {formatCurrency(request.paymentAmountKrw)}
-                  </p>
-                </div>
 
-                <div className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4 text-sm md:grid-cols-2">
-                  <p><span className="font-semibold text-foreground">입금자명</span><br />{request.payerName}</p>
-                  <p><span className="font-semibold text-foreground">요청 메모</span><br />{request.memo || "없음"}</p>
-                </div>
+                  <div className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4 text-sm md:grid-cols-3">
+                    <p><span className="font-semibold text-foreground">입금자명</span><br />{request.payerName}</p>
+                    <p><span className="font-semibold text-foreground">청구번호</span><br />{billing?.invoiceNumber ?? "미생성"}</p>
+                    <p><span className="font-semibold text-foreground">납부기한</span><br />{formatDateTime(billing?.dueAt)}</p>
+                    <p>
+                      <span className="font-semibold text-foreground">공급가액 / VAT</span><br />
+                      {billing ? `${formatCurrency(billing.supplyAmountKrw)} / ${formatCurrency(billing.vatAmountKrw)}` : "미생성"}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-foreground">청구 기간</span><br />
+                      {billing ? `${formatDateTime(billing.servicePeriodStart)} - ${formatDateTime(billing.servicePeriodEnd)}` : "미생성"}
+                    </p>
+                    <p><span className="font-semibold text-foreground">요청 메모</span><br />{request.memo || "없음"}</p>
+                  </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <form action={approvePartnerPlanUpgradeRequest} className="grid gap-3">
-                    <input type="hidden" name="requestId" value={request.id} />
-                    <Textarea name="adminNote" rows={3} placeholder="승인 메모" />
-                    <SubmitButton pendingText="승인 중" className="w-full justify-center">
-                      승인하고 플랜 적용
-                    </SubmitButton>
-                  </form>
-                  <form action={rejectPartnerPlanUpgradeRequest} className="grid gap-3">
-                    <input type="hidden" name="requestId" value={request.id} />
-                    <Textarea name="adminNote" rows={3} placeholder="반려 사유" />
-                    <SubmitButton variant="danger" pendingText="반려 중" className="w-full justify-center">
-                      요청 반려
-                    </SubmitButton>
-                  </form>
-                </div>
-              </Card>
-            ))}
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    <form action={confirmPartnerPlanBankTransferPayment} className="grid gap-3">
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <Select name="taxDocumentStatus" defaultValue="pending_issue" disabled={isPaid}>
+                        <option value="pending_issue">입금 확인 · 세금계산서 발급 대기</option>
+                        <option value="issued">입금 확인 · 세금계산서 발급 완료</option>
+                      </Select>
+                      <SubmitButton
+                        pendingText="확인 중"
+                        variant="secondary"
+                        disabled={isPaid || !billing}
+                        className="w-full justify-center"
+                      >
+                        입금 확인 저장
+                      </SubmitButton>
+                    </form>
+                    <form action={approvePartnerPlanUpgradeRequest} className="grid gap-3">
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <Textarea name="adminNote" rows={3} placeholder="승인 메모" />
+                      <SubmitButton pendingText="승인 중" disabled={!isPaid} className="w-full justify-center">
+                        승인하고 플랜 적용
+                      </SubmitButton>
+                    </form>
+                    <form action={rejectPartnerPlanUpgradeRequest} className="grid gap-3">
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <Textarea name="adminNote" rows={3} placeholder="반려 사유" />
+                      <SubmitButton variant="danger" pendingText="반려 중" className="w-full justify-center">
+                        요청 반려
+                      </SubmitButton>
+                    </form>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>

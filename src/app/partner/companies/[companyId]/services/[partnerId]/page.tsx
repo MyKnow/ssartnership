@@ -6,6 +6,7 @@ import {
   getPartnerChangeRequestErrorMessage,
 } from "@/lib/partner-change-requests";
 import type { PartnerChangeRequestErrorCode } from "@/lib/partner-change-request-errors";
+import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
@@ -66,15 +67,15 @@ export default async function PartnerCompanyServiceDetailPage({
   params: Promise<{ companyId: string; partnerId: string }>;
   searchParams?: Promise<PartnerServiceDetailPageSearchParams>;
 }) {
+  const { companyId, partnerId } = await params;
   const session = await getPartnerSession();
   if (!session) {
     redirect("/partner/login");
   }
   if (session.mustChangePassword) {
-    redirect("/partner/change-password");
+    redirect(getPartnerPasswordChangeHref(companyId));
   }
 
-  const { companyId, partnerId } = await params;
   const scope = await assertPartnerPortalCompanyAccess(session, companyId);
   if (!scope) {
     notFound();

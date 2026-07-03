@@ -1,35 +1,33 @@
+import { CalendarClock, CheckCircle2, Clock3 } from "lucide-react";
+import PartnerPlanUpgradeForm from "@/components/partner/PartnerPlanUpgradeForm";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
-import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
-import Textarea from "@/components/ui/Textarea";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import { calculatePartnerPlanUpgradeCharge } from "@/lib/partner-billing";
+import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
+import { getPartnerPortalMetricAccessItems } from "@/lib/partner-portal-metric-access";
 import type { PartnerPlanPortalData } from "@/lib/partner-plan-service";
+import {
+  formatPartnerPlanCurrency,
+  formatPartnerPlanMonthlyPrice,
+  getPartnerPlanChannelLabel,
+  getPartnerPlanProgressLabel,
+  getPartnerPlanUpgradeOptions,
+} from "@/lib/partner-plan-ui";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
   cancelPartnerPlanUpgradeRequestAction,
-  requestPartnerPlanUpgradeAction,
 } from "@/app/partner/plans/actions";
-
-const planRank: Record<PartnerCompanyPlanTier, number> = {
-  basic: 10,
-  partner: 20,
-  boost: 30,
-};
 
 function formatDateTime(value?: string | null) {
   return value ? formatKoreanDateTimeToMinute(value) : "없음";
-}
-
-function formatCurrency(value: number) {
-  return `${value.toLocaleString("ko-KR")}원`;
 }
 
 function getDaysUntil(value?: string | null) {
@@ -43,9 +41,30 @@ function getDaysUntil(value?: string | null) {
   return Math.ceil((date.getTime() - Date.now()) / 86_400_000);
 }
 
+function getVisibilityLabel(value: string) {
+  switch (value) {
+    case "public":
+    case "visible":
+      return "공개";
+    case "confidential":
+      return "검토용";
+    case "private":
+    case "hidden":
+      return "비공개";
+    default:
+      return value;
+  }
+}
+
 function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
   const definition = getPartnerCompanyPlanDefinition(tier);
-  return <Badge variant={tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral"}>{definition.label}</Badge>;
+  return (
+    <Badge
+      variant={tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral"}
+    >
+      {definition.label}
+    </Badge>
+  );
 }
 
 function getRequestStatusLabel(status: string) {
@@ -61,12 +80,32 @@ function getRequestStatusLabel(status: string) {
   }
 }
 
+function RequestStatusBadge({ status }: { status: string }) {
+  return (
+    <Badge
+      variant={
+        status === "pending"
+          ? "warning"
+          : status === "approved"
+            ? "success"
+            : status === "rejected"
+              ? "danger"
+              : "neutral"
+      }
+    >
+      {getRequestStatusLabel(status)}
+    </Badge>
+  );
+}
+
 export default function PartnerPlanManagementView({
   data,
   companyId,
+  bankTransferAccount,
 }: {
   data: PartnerPlanPortalData;
   companyId: string;
+  bankTransferAccount: PartnerBankTransferAccount;
 }) {
   if (data.brands.length === 0) {
     return (
@@ -76,6 +115,7 @@ export default function PartnerPlanManagementView({
       />
     );
   }
+
   const pendingRequestCount = data.requests.filter(
     (request) => request.status === "pending",
   ).length;
@@ -83,147 +123,266 @@ export default function PartnerPlanManagementView({
     const daysUntil = getDaysUntil(brand.planExpiresAt);
     return daysUntil !== null && daysUntil >= 0 && daysUntil <= 30;
   }).length;
+  const brandCountByTier = Object.fromEntries(
+    PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => [
+      definition.tier,
+      data.brands.filter((brand) => brand.planTier === definition.tier).length,
+    ]),
+  ) as Record<PartnerCompanyPlanTier, number>;
+  const nowIso = new Date().toISOString();
 
   return (
     <div className="grid gap-6">
-      <Card tone="default" padding="md" className="grid gap-4 md:grid-cols-3">
-        <div>
-          <p className="ui-kicker">브랜드</p>
-          <p className="mt-1 text-2xl font-semibold text-foreground">
-            {data.brands.length.toLocaleString("ko-KR")}개
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">현재 관리 대상</p>
+      <Card tone="default" padding="md" className="grid gap-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="ui-kicker">플랜 운영 요약</p>
+            <h2 className="mt-2 text-xl font-semibold text-foreground">
+              브랜드별 현재 플랜과 요청 상태를 한 번에 확인합니다.
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={pendingRequestCount > 0 ? "warning" : "neutral"}>
+              승인 대기 {pendingRequestCount.toLocaleString("ko-KR")}건
+            </Badge>
+            <Badge variant={expiringBrandCount > 0 ? "warning" : "neutral"}>
+              만료 임박 {expiringBrandCount.toLocaleString("ko-KR")}건
+            </Badge>
+          </div>
         </div>
-        <div>
-          <p className="ui-kicker">승인 대기</p>
-          <p className="mt-1 text-2xl font-semibold text-foreground">
-            {pendingRequestCount.toLocaleString("ko-KR")}건
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">오프라인 결제 확인 필요</p>
-        </div>
-        <div>
-          <p className="ui-kicker">만료 임박</p>
-          <p className="mt-1 text-2xl font-semibold text-foreground">
-            {expiringBrandCount.toLocaleString("ko-KR")}건
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">30일 이내 종료 예정</p>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => (
+            <div
+              key={definition.tier}
+              className="rounded-[1rem] border border-border/70 bg-surface-inset p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <PlanBadge tier={definition.tier} />
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {getPartnerPlanProgressLabel(definition.tier)}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-lg font-semibold text-foreground">
+                    {formatPartnerPlanMonthlyPrice(definition.tier)}
+                  </p>
+                </div>
+                <span className="text-2xl font-semibold text-foreground">
+                  {brandCountByTier[definition.tier]}
+                </span>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                {definition.description}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {definition.allowedAdChannels.map((channel) => (
+                  <span
+                    key={channel}
+                    className="rounded-full border border-border bg-surface-control px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
+                  >
+                    {getPartnerPlanChannelLabel(channel)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => (
-          <Card key={definition.tier} tone="muted" padding="sm" className="grid gap-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{definition.label}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">{definition.description}</p>
-              </div>
-              <Badge variant="neutral">{definition.allowedAdChannels.length}채널</Badge>
-            </div>
-            <p className="text-lg font-semibold text-foreground">
-              {definition.monthlyPriceKrw === 0 ? "무료" : `월 ${formatCurrency(definition.monthlyPriceKrw)}`}
-            </p>
-          </Card>
-        ))}
-      </div>
-
       <section className="grid gap-4">
         <SectionHeading
-          title="브랜드별 현재 플랜"
-          description="오프라인 결제 후 입금 정보를 남기면 관리자가 확인 후 플랜을 적용합니다."
+          title="브랜드별 플랜"
+          description="브랜드마다 현재 플랜, 이용 가능 기능, 업그레이드 요청 상태를 확인합니다."
         />
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           {data.brands.map((brand) => {
+            const planDefinition = getPartnerCompanyPlanDefinition(brand.planTier);
             const pendingRequest = data.requests.find(
               (request) => request.partnerId === brand.id && request.status === "pending",
             );
-            const upgradeOptions = PARTNER_COMPANY_PLAN_DEFINITIONS.filter(
-              (definition) => planRank[definition.tier] > planRank[brand.planTier],
+            const upgradeOptions = getPartnerPlanUpgradeOptions(brand.planTier).map(
+              (definition) => ({
+                ...definition,
+                billingCharge: calculatePartnerPlanUpgradeCharge({
+                  currentPlanTier: brand.planTier,
+                  requestedPlanTier: definition.tier,
+                  effectiveAt: nowIso,
+                  currentPeriodStart: brand.planStartedAt,
+                  currentPeriodEnd: brand.planExpiresAt,
+                }),
+              }),
             );
+            const metricAccessItems = getPartnerPortalMetricAccessItems(brand.planTier);
+            const accessibleMetricCount = metricAccessItems.filter(
+              (item) => !item.locked,
+            ).length;
+            const daysUntil = getDaysUntil(brand.planExpiresAt);
+            const planWindowTone =
+              daysUntil !== null && daysUntil >= 0 && daysUntil <= 30
+                ? "warning"
+                : "neutral";
 
             return (
-              <Card key={brand.id} tone="default" padding="md" className="grid gap-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <PlanBadge tier={brand.planTier} />
-                      <Badge variant="neutral">{brand.companyName}</Badge>
-                      <Badge variant="neutral">{brand.visibility}</Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-foreground">{brand.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        플랜 수정 {formatDateTime(brand.planUpdatedAt)}
-                        {brand.planStartedAt ? ` · 시작 ${formatDateTime(brand.planStartedAt)}` : ""}
-                        {brand.planExpiresAt ? ` · 만료 ${formatDateTime(brand.planExpiresAt)}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {pendingRequest ? (
-                  <div className="grid gap-3 rounded-[1rem] border border-amber-500/30 bg-amber-500/10 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-foreground">승인 대기 중인 요청</p>
-                        <p className="text-sm text-muted-foreground">
-                          <PlanBadge tier={pendingRequest.currentPlanTier} /> → <PlanBadge tier={pendingRequest.requestedPlanTier} />
-                          {" "}· {formatCurrency(pendingRequest.paymentAmountKrw)}
+              <Card key={brand.id} tone="default" padding="none" className="overflow-hidden">
+                <div className="grid gap-5 p-5 sm:p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <PlanBadge tier={brand.planTier} />
+                        <Badge variant="neutral">{brand.companyName}</Badge>
+                        <Badge variant="neutral">
+                          {getVisibilityLabel(brand.visibility)}
+                        </Badge>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-foreground">
+                          {brand.name}
+                        </h3>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          플랜 변경 {formatDateTime(brand.planUpdatedAt)}
                         </p>
                       </div>
-                      <form action={cancelPartnerPlanUpgradeRequestAction}>
-                        <input type="hidden" name="companyId" value={companyId} />
-                        <input type="hidden" name="requestId" value={pendingRequest.id} />
-                        <SubmitButton variant="secondary" pendingText="취소 중">
-                          요청 취소
-                        </SubmitButton>
-                      </form>
                     </div>
+                    <Badge variant={planWindowTone}>
+                      {daysUntil === null
+                        ? "만료일 없음"
+                        : daysUntil < 0
+                          ? "플랜 만료"
+                          : `D-${daysUntil}`}
+                    </Badge>
                   </div>
-                ) : upgradeOptions.length === 0 ? (
-                  <div className="rounded-[1rem] border border-success/15 bg-success/10 px-4 py-3">
-                    <p className="text-sm font-semibold text-success">
-                      현재 이용 가능한 최상위 플랜입니다.
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      상세 지표와 광고 채널 접근이 모두 열려 있습니다.
-                    </p>
+
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                    <div className="grid gap-4 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] border border-primary/15 bg-primary-soft text-primary">
+                          <CalendarClock className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            현재 플랜
+                          </p>
+                          <p className="mt-1 text-2xl font-semibold text-foreground">
+                            {planDefinition.label}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {formatPartnerPlanMonthlyPrice(brand.planTier)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <dl className="grid gap-3 text-sm">
+                        <div>
+                          <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                            이용 기간
+                          </dt>
+                          <dd className="mt-1 leading-6 text-foreground">
+                            {formatDateTime(brand.planStartedAt)} -{" "}
+                            {formatDateTime(brand.planExpiresAt)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                            이용 가능 지표
+                          </dt>
+                          <dd className="mt-1 text-foreground">
+                            {accessibleMetricCount}/{metricAccessItems.length}개 지표
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-semibold uppercase text-muted-foreground">
+                            광고/운영 채널
+                          </dt>
+                          <dd className="mt-2 flex flex-wrap gap-1.5">
+                            {planDefinition.allowedAdChannels.map((channel) => (
+                              <span
+                                key={channel}
+                                className="rounded-full border border-border bg-surface-control px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
+                              >
+                                {getPartnerPlanChannelLabel(channel)}
+                              </span>
+                            ))}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+
+                    {pendingRequest ? (
+                      <div className="grid gap-4 rounded-[1rem] border border-warning/25 bg-warning/10 p-4">
+                        <div className="flex items-start gap-3">
+                          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] border border-warning/20 bg-warning/10 text-warning">
+                            <Clock3 className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">
+                              승인 대기 중
+                            </p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                              계좌이체 입금 확인 후 관리자가 플랜을 반영합니다.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                          <PlanBadge tier={pendingRequest.currentPlanTier} />
+                          <span className="text-muted-foreground">→</span>
+                          <PlanBadge tier={pendingRequest.requestedPlanTier} />
+                          <span className="font-semibold text-foreground">
+                            {formatPartnerPlanCurrency(pendingRequest.paymentAmountKrw)}
+                          </span>
+                          {pendingRequest.billingInvoice ? (
+                            <>
+                              <RequestStatusBadge
+                                status={
+                                  pendingRequest.billingInvoice.invoiceStatus === "paid"
+                                    ? "approved"
+                                    : "pending"
+                                }
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                납부기한 {formatDateTime(pendingRequest.billingInvoice.dueAt)}
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
+                        <form action={cancelPartnerPlanUpgradeRequestAction}>
+                          <input type="hidden" name="companyId" value={companyId} />
+                          <input type="hidden" name="requestId" value={pendingRequest.id} />
+                          <SubmitButton
+                            variant="secondary"
+                            pendingText="취소 중"
+                            className="w-full sm:w-auto"
+                          >
+                            요청 취소
+                          </SubmitButton>
+                        </form>
+                      </div>
+                    ) : upgradeOptions.length === 0 ? (
+                      <div className="grid content-start gap-3 rounded-[1rem] border border-success/15 bg-success/10 p-4">
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-[0.9rem] border border-success/15 bg-success/10 text-success">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-success">
+                            최상위 플랜 이용 중
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                            홈 배너, 앱 푸시/MM, 일반 애드배너와 상세 지표를 모두 이용할 수 있습니다.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <PartnerPlanUpgradeForm
+                        companyId={companyId}
+                        partnerId={brand.id}
+                        currentPlanTier={brand.planTier}
+                        upgradeOptions={upgradeOptions}
+                        bankTransferAccount={bankTransferAccount}
+                      />
+                    )}
                   </div>
-                ) : (
-                  <form action={requestPartnerPlanUpgradeAction} className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
-                    <input type="hidden" name="companyId" value={companyId} />
-                    <input type="hidden" name="partnerId" value={brand.id} />
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <label className="grid gap-2 text-sm font-medium text-foreground">
-                        요청 플랜
-                        <Select name="requestedPlanTier" defaultValue={upgradeOptions[0]?.tier}>
-                          {upgradeOptions.map((definition) => (
-                            <option key={definition.tier} value={definition.tier}>
-                              {definition.label} ({formatCurrency(definition.monthlyPriceKrw)})
-                            </option>
-                          ))}
-                        </Select>
-                      </label>
-                      <label className="grid gap-2 text-sm font-medium text-foreground">
-                        결제 금액
-                        <Input name="paymentAmountKrw" type="number" min={0} step={1000} defaultValue={upgradeOptions[0]?.monthlyPriceKrw ?? 0} required />
-                      </label>
-                      <label className="grid gap-2 text-sm font-medium text-foreground">
-                        입금자명
-                        <Input name="payerName" maxLength={80} required />
-                      </label>
-                    </div>
-                    <label className="grid gap-2 text-sm font-medium text-foreground">
-                      요청 메모
-                      <Textarea name="memo" rows={3} maxLength={1000} placeholder="입금 일시, 계약 조건, 세금계산서 요청 등" />
-                    </label>
-                    <div className="flex justify-end">
-                      <SubmitButton pendingText="요청 중" className="w-full sm:w-auto">
-                        업그레이드 요청
-                      </SubmitButton>
-                    </div>
-                  </form>
-                )}
+                </div>
               </Card>
             );
           })}
@@ -234,24 +393,39 @@ export default function PartnerPlanManagementView({
         <SectionHeading title="요청 이력" description="최근 업그레이드 요청 처리 상태입니다." />
         {data.requests.length === 0 ? (
           <Card tone="muted" padding="md">
-            <EmptyState title="요청 이력이 없습니다." description="업그레이드 요청을 남기면 처리 상태가 표시됩니다." />
+            <EmptyState
+              title="요청 이력이 없습니다."
+              description="업그레이드 요청을 남기면 처리 상태가 표시됩니다."
+            />
           </Card>
         ) : (
           <div className="grid gap-2">
             {data.requests.map((request) => (
-              <Card key={request.id} tone="muted" padding="sm" className="flex flex-wrap items-center justify-between gap-3">
+              <Card
+                key={request.id}
+                tone="muted"
+                padding="sm"
+                className="flex flex-wrap items-center justify-between gap-3"
+              >
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={request.status === "pending" ? "warning" : request.status === "approved" ? "success" : "neutral"}>
-                    {getRequestStatusLabel(request.status)}
-                  </Badge>
-                  <span className="text-sm font-semibold text-foreground">{request.brandName}</span>
-                  <span className="text-xs text-muted-foreground">{request.companyName}</span>
+                  <RequestStatusBadge status={request.status} />
+                  <span className="text-sm font-semibold text-foreground">
+                    {request.brandName}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {request.companyName}
+                  </span>
                   <PlanBadge tier={request.currentPlanTier} />
                   <span className="text-sm text-muted-foreground">→</span>
                   <PlanBadge tier={request.requestedPlanTier} />
-                  <span className="text-sm text-muted-foreground">{formatCurrency(request.paymentAmountKrw)}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {formatPartnerPlanCurrency(request.paymentAmountKrw)}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground">{formatDateTime(request.createdAt)}</span>
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  {formatDateTime(request.createdAt)}
+                </span>
               </Card>
             ))}
           </div>

@@ -4,6 +4,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
+import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
@@ -17,11 +18,28 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function PartnerPasswordChangePage() {
+function getSingleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function PartnerPasswordChangePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ companyId?: string | string[] }>;
+}) {
   const session = await getPartnerSession();
   if (!session) {
     redirect("/partner/login");
   }
+
+  const params = (await searchParams) ?? {};
+  const requestedCompanyId = getSingleSearchParam(params.companyId)?.trim() ?? "";
+  const returnCompanyId = session.companyIds.includes(requestedCompanyId)
+    ? requestedCompanyId
+    : null;
+  const successRedirectHref = returnCompanyId
+    ? getCompanyScopedPortalHref(returnCompanyId)
+    : "/partner";
 
   return (
     <div className="bg-background">
@@ -51,7 +69,10 @@ export default async function PartnerPasswordChangePage() {
               </p>
             </div>
 
-            <PartnerPasswordChangeForm mustChangePassword={session.mustChangePassword} />
+            <PartnerPasswordChangeForm
+              mustChangePassword={session.mustChangePassword}
+              successRedirectHref={successRedirectHref}
+            />
           </Card>
         </div>
       </Container>

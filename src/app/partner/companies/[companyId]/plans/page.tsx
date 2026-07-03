@@ -4,7 +4,9 @@ import Container from "@/components/ui/Container";
 import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import PartnerPlanManagementView from "@/components/partner/PartnerPlanManagementView";
+import { getPartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import { getPartnerPlanPortalData } from "@/lib/partner-plan-service";
+import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
@@ -26,15 +28,15 @@ export default async function PartnerCompanyPlansPage({
   params: Promise<{ companyId: string }>;
   searchParams?: Promise<{ status?: string; error?: string }>;
 }) {
+  const { companyId } = await params;
   const session = await getPartnerSession();
   if (!session) {
     redirect("/partner/login");
   }
   if (session.mustChangePassword) {
-    redirect("/partner/change-password");
+    redirect(getPartnerPasswordChangeHref(companyId));
   }
 
-  const { companyId } = await params;
   const scope = await assertPartnerPortalCompanyAccess(session, companyId);
   if (!scope) {
     notFound();
@@ -42,6 +44,7 @@ export default async function PartnerCompanyPlansPage({
 
   const paramsData = (await searchParams) ?? {};
   const data = await getPartnerPlanPortalData([scope.id], session.accountId);
+  const bankTransferAccount = getPartnerBankTransferAccount();
   const statusMessage =
     paramsData.status === "requested"
       ? "업그레이드 요청이 접수되었습니다."
@@ -62,7 +65,11 @@ export default async function PartnerCompanyPlansPage({
         />
         {statusMessage ? <FormMessage variant="info">{statusMessage}</FormMessage> : null}
         {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
-        <PartnerPlanManagementView data={data} companyId={scope.id} />
+        <PartnerPlanManagementView
+          data={data}
+          companyId={scope.id}
+          bankTransferAccount={bankTransferAccount}
+        />
       </div>
     </Container>
   );

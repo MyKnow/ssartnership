@@ -87,6 +87,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'ad_coupon_create',
   'partner_brand_plan_update',
   'partner_company_plan_update',
+  'partner_plan_bank_transfer_confirmed',
   'partner_plan_upgrade_approved',
   'partner_plan_upgrade_rejected',
   'admin_account_create',
