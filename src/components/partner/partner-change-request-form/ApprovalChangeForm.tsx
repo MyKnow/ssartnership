@@ -2,10 +2,11 @@
 
 import { type FormEvent, useState } from "react";
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
+import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
+import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import Textarea from "@/components/ui/Textarea";
 import TokenChipField from "@/components/admin/TokenChipField";
 import PartnerCampusSlugField from "@/components/partner-card-form/PartnerCampusSlugField";
@@ -237,35 +238,39 @@ export function ApprovalChangeForm({
             승인 대기 중에는 새 요청을 제출할 수 없습니다. 기존 요청을 취소해 주세요.
           </Badge>
         ) : null}
-        <Button
+        <PartnerPendingButtonLink
           href={getCompanyScopedPortalHref(context.companyId)}
           variant="secondary"
           className="w-full sm:w-auto"
+          showSpinner
         >
           포털로 돌아가기
-        </Button>
+        </PartnerPendingButtonLink>
       </div>
 
       {!pendingRequest ? (
-        <FloatingSubmitButton pendingText="요청 중">
-          <span className="inline-flex items-center gap-2">
-            <svg
-              width={18}
-              height={18}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m22 2-7 20-4-9-9-4Z" />
-              <path d="M22 2 11 13" />
-            </svg>
-            변경 요청
-          </span>
-        </FloatingSubmitButton>
+        <>
+          <PartnerFormPendingNotice message="변경 요청을 접수하는 중입니다." />
+          <FloatingSubmitButton pendingText="요청 중">
+            <span className="inline-flex items-center gap-2">
+              <svg
+                width={18}
+                height={18}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m22 2-7 20-4-9-9-4Z" />
+                <path d="M22 2 11 13" />
+              </svg>
+              변경 요청
+            </span>
+          </FloatingSubmitButton>
+        </>
       ) : null}
     </form>
   );

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Container from "@/components/ui/Container";
 import BrandWordmark from "@/components/BrandWordmark";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -7,6 +6,7 @@ import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import PartnerPortalActionLinks from "@/components/partner/PartnerPortalActionLinks";
+import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 
 export default async function PartnerPortalFooter() {
   const session = await getPartnerSession();
@@ -15,13 +15,13 @@ export default async function PartnerPortalFooter() {
     <footer className="border-t border-border/70 bg-surface-overlay/92 py-6 backdrop-blur-xl">
       <Container size="wide" className="flex flex-col gap-4 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Link
+          <PartnerPendingLink
             href="/partner"
             aria-label="협력사 포털 홈"
             className="inline-flex items-center text-foreground hover:opacity-80"
           >
             <BrandWordmark className="text-base sm:text-lg" />
-          </Link>
+          </PartnerPendingLink>
 
           <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />

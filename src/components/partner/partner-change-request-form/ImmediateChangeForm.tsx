@@ -1,6 +1,7 @@
 import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
+import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
 import Select from "@/components/ui/Select";
 import TokenChipField from "@/components/admin/TokenChipField";
 import {
@@ -87,6 +88,8 @@ export function ImmediateChangeForm({
           />
         </FormSection>
       </div>
+
+      <PartnerFormPendingNotice message="즉시 반영 항목을 저장하는 중입니다." />
 
       <FloatingSubmitButton pendingText="저장 중">
         <span className="inline-flex items-center gap-2">

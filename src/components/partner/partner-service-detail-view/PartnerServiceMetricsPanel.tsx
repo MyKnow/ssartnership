@@ -1,8 +1,8 @@
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
+import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import SectionTitle from "@/components/partner/partner-service-detail-view/SectionTitle";
 import { getPartnerPortalMetricAccessItems } from "@/lib/partner-portal-metric-access";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
@@ -127,9 +127,9 @@ export default function PartnerServiceMetricsPanel({
               </div>
             </div>
             {planHref ? (
-              <Button href={planHref} variant="secondary" size="sm">
+              <PartnerPendingButtonLink href={planHref} variant="secondary" size="sm">
                 플랜 보기
-              </Button>
+              </PartnerPendingButtonLink>
             ) : null}
           </div>
         </div>
