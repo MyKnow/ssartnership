@@ -5,6 +5,7 @@ export type PartnerPortalSection =
   | "support";
 
 const COMPANY_SCOPE_PREFIX = "/partner/companies/";
+export const PARTNER_PASSWORD_CHANGE_PATH = "/partner/change-password";
 
 export function getCompanyScopedPortalHref(
   companyId: string,
@@ -51,6 +52,25 @@ export function getPartnerCompanyIdFromPathname(pathname: string) {
   } catch {
     return null;
   }
+}
+
+function normalizePartnerCompanyId(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function getPartnerCompanyIdFromSearchParams(
+  searchParams: Pick<URLSearchParams, "get"> | null | undefined,
+) {
+  return normalizePartnerCompanyId(searchParams?.get("companyId"));
+}
+
+export function getPartnerPasswordChangeHref(companyId: string | null | undefined) {
+  const normalizedCompanyId = normalizePartnerCompanyId(companyId);
+  if (!normalizedCompanyId) {
+    return PARTNER_PASSWORD_CHANGE_PATH;
+  }
+  return `${PARTNER_PASSWORD_CHANGE_PATH}?companyId=${encodeURIComponent(normalizedCompanyId)}`;
 }
 
 export function getPartnerScopedHrefFromLegacyTarget(

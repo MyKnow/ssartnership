@@ -5,6 +5,8 @@ import {
   getCompanyScopedPartnerServiceHref,
   getCompanyScopedPortalHref,
   getPartnerCompanyIdFromPathname,
+  getPartnerCompanyIdFromSearchParams,
+  getPartnerPasswordChangeHref,
 } from "../src/lib/partner-portal-paths.ts";
 import {
   isPartnerPortalCompanyAllowed,
@@ -61,6 +63,11 @@ describe("partner portal company scope", () => {
       getCompanyScopedPartnerServiceHref("company-a", "partner/b"),
       "/partner/companies/company-a/services/partner%2Fb",
     );
+    assert.equal(
+      getPartnerPasswordChangeHref("company-a"),
+      "/partner/change-password?companyId=company-a",
+    );
+    assert.equal(getPartnerPasswordChangeHref(null), "/partner/change-password");
   });
 
   it("extracts company id from scoped portal paths", () => {
@@ -70,5 +77,19 @@ describe("partner portal company scope", () => {
     );
     assert.equal(getPartnerCompanyIdFromPathname("/partner"), null);
     assert.equal(getPartnerCompanyIdFromPathname("/partner/companies"), null);
+  });
+
+  it("extracts company id from password change search params", () => {
+    assert.equal(
+      getPartnerCompanyIdFromSearchParams(
+        new URLSearchParams("companyId=company%20a"),
+      ),
+      "company a",
+    );
+    assert.equal(
+      getPartnerCompanyIdFromSearchParams(new URLSearchParams("companyId=+")),
+      null,
+    );
+    assert.equal(getPartnerCompanyIdFromSearchParams(null), null);
   });
 });

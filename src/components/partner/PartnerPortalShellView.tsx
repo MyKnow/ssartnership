@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Bell,
   Building2,
@@ -21,7 +21,10 @@ import Container from "@/components/ui/Container";
 import { cn } from "@/lib/cn";
 import {
   getCompanyScopedPortalHref,
+  getPartnerCompanyIdFromSearchParams,
   getPartnerCompanyIdFromPathname,
+  getPartnerPasswordChangeHref,
+  PARTNER_PASSWORD_CHANGE_PATH,
   type PartnerPortalSection,
 } from "@/lib/partner-portal-paths";
 import {
@@ -59,7 +62,7 @@ const primaryNavItems = [
     icon: CreditCard,
   },
   {
-    href: "/partner/change-password",
+    href: PARTNER_PASSWORD_CHANGE_PATH,
     label: "비밀번호 변경",
     description: "계정 보안",
     icon: KeyRound,
@@ -83,6 +86,9 @@ type PrimaryNavItem = (typeof primaryNavItems)[number];
 
 function getPrimaryNavHref(item: PrimaryNavItem, companyId: string | null) {
   if (!("section" in item)) {
+    if (item.href === PARTNER_PASSWORD_CHANGE_PATH) {
+      return getPartnerPasswordChangeHref(companyId);
+    }
     return item.href;
   }
   if (!companyId) {
@@ -389,9 +395,13 @@ export default function PartnerPortalShellView({
   isMock,
 }: PartnerPortalShellViewProps) {
   const pathname = usePathname();
-  const currentCompanyId = getPartnerCompanyIdFromPathname(pathname);
+  const searchParams = useSearchParams();
+  const candidateCompanyId =
+    getPartnerCompanyIdFromPathname(pathname) ??
+    getPartnerCompanyIdFromSearchParams(searchParams);
   const currentCompany =
-    companies.find((company) => company.id === currentCompanyId) ?? null;
+    companies.find((company) => company.id === candidateCompanyId) ?? null;
+  const currentCompanyId = currentCompany?.id ?? null;
   const showMobileNavigation = shouldShowPartnerPortalMobileNavigation({
     pathname,
     hasSession: Boolean(session),

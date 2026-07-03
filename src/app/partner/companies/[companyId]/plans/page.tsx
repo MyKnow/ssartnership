@@ -5,6 +5,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
 import PartnerPlanManagementView from "@/components/partner/PartnerPlanManagementView";
 import { getPartnerPlanPortalData } from "@/lib/partner-plan-service";
+import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
@@ -26,15 +27,15 @@ export default async function PartnerCompanyPlansPage({
   params: Promise<{ companyId: string }>;
   searchParams?: Promise<{ status?: string; error?: string }>;
 }) {
+  const { companyId } = await params;
   const session = await getPartnerSession();
   if (!session) {
     redirect("/partner/login");
   }
   if (session.mustChangePassword) {
-    redirect("/partner/change-password");
+    redirect(getPartnerPasswordChangeHref(companyId));
   }
 
-  const { companyId } = await params;
   const scope = await assertPartnerPortalCompanyAccess(session, companyId);
   if (!scope) {
     notFound();

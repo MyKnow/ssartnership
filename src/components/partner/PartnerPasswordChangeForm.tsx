@@ -19,8 +19,10 @@ import {
 
 export default function PartnerPasswordChangeForm({
   mustChangePassword,
+  successRedirectHref = "/partner",
 }: {
   mustChangePassword: boolean;
+  successRedirectHref?: string;
 }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [nextPassword, setNextPassword] = useState("");
@@ -100,7 +102,7 @@ export default function PartnerPasswordChangeForm({
       setFieldErrors({});
       setFormError(null);
       notify("비밀번호가 변경되었습니다.");
-      window.location.replace("/partner");
+      window.location.replace(successRedirectHref);
     } finally {
       setPending(false);
     }
@@ -189,7 +191,7 @@ export default function PartnerPasswordChangeForm({
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">변경 완료</p>
               <p className="text-sm leading-6 text-muted-foreground">
-                저장하면 협력사 포털 홈으로 이동합니다.
+                저장하면 이전 협력사 화면으로 돌아갑니다.
               </p>
             </div>
             <Button
