@@ -53,6 +53,18 @@ function getProfileDescription(profile: PartnerBillingProfileRecord) {
     .join(" · ");
 }
 
+function getBusinessStatusTone(
+  businessStatusCode: string | undefined,
+): "success" | "warning" | "neutral" {
+  if (businessStatusCode === "01") {
+    return "success";
+  }
+  if (businessStatusCode === "02" || businessStatusCode === "03") {
+    return "warning";
+  }
+  return "neutral";
+}
+
 function BusinessStatusMessage({ state }: { state: BusinessStatusState }) {
   if (state.status === "idle" || state.status === "loading") {
     return null;
@@ -138,10 +150,13 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
 
     const businessStatusLabel = payload.businessStatus || "상태 정보 없음";
     const taxTypeLabel = payload.taxType || "과세 유형 정보 없음";
+    const statusCodeLabel = payload.businessStatusCode
+      ? `국세청 코드 ${payload.businessStatusCode}`
+      : "국세청 코드 없음";
     setBusinessStatus({
       status: "success",
-      tone: payload.businessStatusCode === "01" ? "success" : "warning",
-      message: `${businessStatusLabel} · ${taxTypeLabel}`,
+      tone: getBusinessStatusTone(payload.businessStatusCode),
+      message: `${businessStatusLabel} · ${taxTypeLabel} · ${statusCodeLabel}`,
     });
   }
 
