@@ -69,9 +69,10 @@ jobs:
         run: npm run validate:migrations
 
       - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v2
         with:
           version: latest
+          github-token: ${{ github.token }}
 
       - name: Check preview database connection
         id: preview-db
