@@ -68,18 +68,18 @@ function NotificationCard({ item }: { item: PartnerNotificationEntry }) {
             <Badge variant={getToneBadgeVariant(item.tone)}>{item.badgeLabel}</Badge>
           </div>
 
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
+          <div className="min-w-0 space-y-1">
+            <h3 className="truncate text-lg font-semibold tracking-[-0.02em] text-foreground">
               {item.title}
             </h3>
-            <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+            <p className="line-clamp-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">
               {item.body}
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span>{createdAt}</span>
-            <span>대상 {targetLabel}</span>
+            <span className="min-w-0 truncate">대상 {targetLabel}</span>
           </div>
         </div>
 

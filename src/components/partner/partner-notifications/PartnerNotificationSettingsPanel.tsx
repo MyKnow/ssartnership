@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -44,6 +44,14 @@ export default function PartnerNotificationSettingsPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const canUsePush =
     pushConfigured &&
@@ -60,11 +68,17 @@ export default function PartnerNotificationSettingsPanel({
     startTransition(async () => {
       try {
         const data = await postJson("/api/partner/notifications/preferences", next);
+        if (!mountedRef.current) {
+          return;
+        }
         if (data.preferences) {
           setState(data.preferences);
         }
         setMessage("알림 설정을 저장했습니다.");
       } catch (caught) {
+        if (!mountedRef.current) {
+          return;
+        }
         setState(previousState);
         setError(caught instanceof Error ? caught.message : "알림 설정 저장에 실패했습니다.");
       }
@@ -91,11 +105,17 @@ export default function PartnerNotificationSettingsPanel({
         const data = await postJson("/api/partner/push/subscribe", {
           subscription: subscription.toJSON(),
         });
+        if (!mountedRef.current) {
+          return;
+        }
         if (data.preferences) {
           setState(data.preferences);
         }
         setMessage("이 기기에서 푸시 알림을 받습니다.");
       } catch (caught) {
+        if (!mountedRef.current) {
+          return;
+        }
         setError(caught instanceof Error ? caught.message : "푸시 구독에 실패했습니다.");
       }
     });
@@ -126,9 +146,9 @@ export default function PartnerNotificationSettingsPanel({
     return (
       <label
         key={toggle.key}
-        className="flex items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground"
+        className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground"
       >
-        {toggle.label}
+        <span className="min-w-0 truncate">{toggle.label}</span>
         <input
           type="checkbox"
           checked={Boolean(state[toggle.key])}
@@ -138,7 +158,7 @@ export default function PartnerNotificationSettingsPanel({
               [toggle.key]: event.target.checked,
             } as Partial<PartnerNotificationPreferenceState>)
           }
-          className="h-4 w-4 accent-primary"
+          className="h-4 w-4 shrink-0 accent-primary"
         />
       </label>
     );
@@ -163,14 +183,14 @@ export default function PartnerNotificationSettingsPanel({
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <label className="flex items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground">
-          전체 알림
+        <label className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground">
+          <span className="min-w-0 truncate">전체 알림</span>
           <input
             type="checkbox"
             checked={state.enabled}
             disabled={isPending}
             onChange={(event) => updatePreference({ enabled: event.target.checked })}
-            className="h-4 w-4 accent-primary"
+            className="h-4 w-4 shrink-0 accent-primary"
           />
         </label>
       </div>

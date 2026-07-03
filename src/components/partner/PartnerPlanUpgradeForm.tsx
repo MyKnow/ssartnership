@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { CheckCircle2, Landmark, ReceiptText, TrendingUp } from "lucide-react";
-import Input from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
 import type { PartnerPlanUpgradeCharge } from "@/lib/partner-billing";
+import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import type {
   PartnerCompanyPlanDefinition,
@@ -17,6 +19,7 @@ import {
   formatPartnerPlanMonthlyPrice,
   getPartnerPlanChannelLabel,
 } from "@/lib/partner-plan-ui";
+import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import { requestPartnerPlanUpgradeAction } from "@/app/partner/plans/actions";
 
 type PartnerPlanUpgradeFormProps = {
@@ -27,6 +30,7 @@ type PartnerPlanUpgradeFormProps = {
     PartnerCompanyPlanDefinition & { billingCharge: PartnerPlanUpgradeCharge }
   >;
   bankTransferAccount: PartnerBankTransferAccount;
+  billingProfiles: PartnerBillingProfileRecord[];
 };
 
 export default function PartnerPlanUpgradeForm({
@@ -35,10 +39,16 @@ export default function PartnerPlanUpgradeForm({
   currentPlanTier,
   upgradeOptions,
   bankTransferAccount,
+  billingProfiles,
 }: PartnerPlanUpgradeFormProps) {
   const initialTier = upgradeOptions[0]?.tier ?? currentPlanTier;
   const [selectedTier, setSelectedTier] =
     useState<PartnerCompanyPlanTier>(initialTier);
+  const initialProfileId =
+    billingProfiles.find((profile) => profile.isDefault)?.id ??
+    billingProfiles[0]?.id ??
+    "";
+  const [selectedProfileId, setSelectedProfileId] = useState(initialProfileId);
   const selectedOption = useMemo(
     () =>
       upgradeOptions.find((definition) => definition.tier === selectedTier) ??
@@ -46,11 +56,20 @@ export default function PartnerPlanUpgradeForm({
       null,
     [selectedTier, upgradeOptions],
   );
+  const selectedBillingProfile = useMemo(
+    () =>
+      billingProfiles.find((profile) => profile.id === selectedProfileId) ??
+      billingProfiles.find((profile) => profile.isDefault) ??
+      billingProfiles[0] ??
+      null,
+    [billingProfiles, selectedProfileId],
+  );
 
   if (!selectedOption) {
     return null;
   }
   const selectedCharge = selectedOption.billingCharge;
+  const accountInfoHref = getCompanyScopedPortalHref(companyId, "account");
 
   return (
     <form
@@ -63,11 +82,11 @@ export default function PartnerPlanUpgradeForm({
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">
+          <div className="min-w-0">
+            <p className="break-keep text-sm font-semibold text-foreground">
               1. 목표 플랜과 결제 예정액
             </p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            <p className="mt-1 line-clamp-2 break-keep text-xs leading-5 text-muted-foreground">
               VAT 포함가 기준으로 월 플랜가와 이번 계좌이체 금액을 분리해 확인합니다.
             </p>
           </div>
@@ -100,14 +119,14 @@ export default function PartnerPlanUpgradeForm({
                     : "border-border bg-surface-control text-foreground hover:border-strong hover:bg-surface-elevated",
                 )}
               >
-                <span className="flex items-start justify-between gap-3">
-                  <span>
-                    <span className="block text-sm font-semibold">
+                <span className="flex min-w-0 items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">
                       {definition.label}
                     </span>
                     <span
                       className={cn(
-                        "mt-1 block text-xs leading-5",
+                        "mt-1 line-clamp-2 break-keep text-xs leading-5",
                         selected ? "text-primary/80" : "text-muted-foreground",
                       )}
                     >
@@ -141,7 +160,7 @@ export default function PartnerPlanUpgradeForm({
             <ReceiptText className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <p className="font-semibold text-foreground">
+            <p className="break-keep font-semibold text-foreground">
               이번 결제 예정액 {formatPartnerPlanCurrency(selectedCharge.totalAmountKrw)}
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -173,59 +192,72 @@ export default function PartnerPlanUpgradeForm({
 
       <div>
         <p className="text-sm font-semibold text-foreground">
-          2. 입금자와 세금계산서 정보
+          2. 계정 정보 선택
         </p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          계좌이체 입금 확인과 기본 세금계산서 발급에 사용할 정보를 입력합니다.
+          계정 정보 탭에 저장된 입금자와 세금계산서 정보를 이번 요청에 사용합니다.
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          입금자명
-          <Input name="payerName" maxLength={80} required />
-          <span className="text-xs font-normal text-muted-foreground">
-            실제 입금 내역과 같은 이름을 입력해 주세요.
-          </span>
-        </label>
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          세금계산서 이메일
-          <Input name="taxInvoiceEmail" type="email" maxLength={254} required />
-        </label>
-      </div>
+      {billingProfiles.length === 0 ? (
+        <div className="grid gap-3 rounded-[0.9rem] border border-warning/25 bg-warning/10 p-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              저장된 계정 정보가 없습니다.
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              계정 정보 탭에서 입금자와 세금계산서 정보를 먼저 저장해 주세요.
+            </p>
+          </div>
+          <Button href={accountInfoHref} variant="secondary" className="w-full sm:w-auto">
+            계정 정보 추가
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-3 rounded-[0.9rem] border border-border bg-surface-control p-4">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
+            사용할 계정 정보
+            <Select
+              name="billingProfileId"
+              required
+              value={selectedBillingProfile?.id ?? ""}
+              onChange={(event) => {
+                setSelectedProfileId(event.target.value);
+              }}
+            >
+              {billingProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.label}
+                  {profile.isDefault ? " · 기본" : ""} · {profile.payerName}
+                </option>
+              ))}
+            </Select>
+          </label>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          사업자등록번호
-          <Input
-            name="businessRegistrationNumber"
-            inputMode="numeric"
-            placeholder="000-00-00000"
-            maxLength={12}
-            required
-          />
-        </label>
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          상호
-          <Input name="businessName" maxLength={120} required />
-        </label>
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          대표자명
-          <Input name="representativeName" maxLength={80} required />
-        </label>
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          사업장 주소
-          <Input name="businessAddress" maxLength={300} required />
-        </label>
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          업태
-          <Input name="businessType" maxLength={80} required />
-        </label>
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          종목
-          <Input name="businessItem" maxLength={120} required />
-        </label>
-      </div>
+          {selectedBillingProfile ? (
+            <div className="grid gap-2 rounded-[0.8rem] bg-surface-inset p-3 text-xs leading-5 text-muted-foreground">
+              <p className="font-semibold text-foreground">
+                {selectedBillingProfile.businessName} · 입금자{" "}
+                {selectedBillingProfile.payerName}
+              </p>
+              <p>
+                사업자등록번호 {selectedBillingProfile.businessRegistrationNumber} ·
+                대표자 {selectedBillingProfile.representativeName}
+              </p>
+              <p className="break-all">
+                세금계산서 이메일 {selectedBillingProfile.taxInvoiceEmail}
+              </p>
+              <p>{selectedBillingProfile.businessAddress}</p>
+            </div>
+          ) : null}
+
+          <div className="flex justify-end">
+            <Button href={accountInfoHref} variant="secondary" size="sm">
+              계정 정보 관리
+            </Button>
+          </div>
+        </div>
+      )}
 
       <label className="grid gap-2 text-sm font-medium text-foreground">
         요청 메모
@@ -238,7 +270,11 @@ export default function PartnerPlanUpgradeForm({
       </label>
 
       <div className="flex justify-end">
-        <SubmitButton pendingText="요청 중" className="w-full sm:w-auto">
+        <SubmitButton
+          pendingText="요청 중"
+          disabled={billingProfiles.length === 0}
+          className="w-full sm:w-auto"
+        >
           업그레이드 요청
         </SubmitButton>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -35,6 +35,14 @@ export default function PartnerPasswordChangeForm({
   const { notify } = useToast();
   const currentPasswordRef = useRef<HTMLInputElement>(null);
   const nextPasswordRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const handleGeneratePassword = async () => {
     if (pending) {
@@ -46,8 +54,14 @@ export default function PartnerPasswordChangeForm({
     setFormError(null);
     try {
       await copyPasswordToClipboard(generatedPassword);
+      if (!mountedRef.current) {
+        return;
+      }
       notify("랜덤 비밀번호를 복사했습니다.");
     } catch {
+      if (!mountedRef.current) {
+        return;
+      }
       notify("랜덤 비밀번호를 입력했습니다.");
     }
   };
@@ -76,6 +90,9 @@ export default function PartnerPasswordChangeForm({
         body: JSON.stringify({ currentPassword, nextPassword }),
       });
       const data = await response.json().catch(() => ({}));
+      if (!mountedRef.current) {
+        return;
+      }
       if (!response.ok) {
         const message =
           typeof data.error === "string"
@@ -104,7 +121,9 @@ export default function PartnerPasswordChangeForm({
       notify("비밀번호가 변경되었습니다.");
       window.location.replace(successRedirectHref);
     } finally {
-      setPending(false);
+      if (mountedRef.current) {
+        setPending(false);
+      }
     }
   };
 
