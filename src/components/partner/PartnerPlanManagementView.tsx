@@ -9,6 +9,7 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import type { PartnerPlanPortalData } from "@/lib/partner-plan-service";
 import {
@@ -80,10 +81,12 @@ export default function PartnerPlanManagementView({
   data,
   companyId,
   bankTransferAccount,
+  billingProfiles,
 }: {
   data: PartnerPlanPortalData;
   companyId: string;
   bankTransferAccount: PartnerBankTransferAccount;
+  billingProfiles: PartnerBillingProfileRecord[];
 }) {
   if (data.brands.length === 0) {
     return (
@@ -110,12 +113,12 @@ export default function PartnerPlanManagementView({
   const nowIso = new Date().toISOString();
 
   return (
-    <div className="grid gap-6">
-      <Card tone="default" padding="md" className="grid gap-5">
+    <div className="flex min-w-0 flex-col gap-6">
+      <Card tone="default" padding="md" className="flex flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="ui-kicker">플랜 운영 요약</p>
-            <h2 className="mt-2 text-xl font-semibold text-foreground">
+            <h2 className="mt-2 break-keep text-lg font-semibold leading-7 text-foreground sm:text-xl">
               브랜드별 플랜, 요청 상태, 결제 예정액을 한 화면에서 관리합니다.
             </h2>
           </div>
@@ -129,11 +132,11 @@ export default function PartnerPlanManagementView({
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid min-w-0 gap-3 md:grid-cols-3">
           {PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => (
             <div
               key={definition.tier}
-              className="rounded-[1rem] border border-border/70 bg-surface-inset p-4"
+              className="min-w-0 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -169,20 +172,21 @@ export default function PartnerPlanManagementView({
         </div>
       </Card>
 
-      <section className="grid gap-4">
+      <section className="flex min-w-0 flex-col gap-4">
         <SectionHeading
           title="브랜드별 플랜"
-          description="필요한 브랜드만 펼쳐 업그레이드 요청과 세금계산서 정보를 입력합니다."
+          description="필요한 브랜드만 펼쳐 업그레이드 요청과 결제 예정액을 확인합니다."
         />
         <PartnerPlanBrandList
           data={data}
           companyId={companyId}
           bankTransferAccount={bankTransferAccount}
+          billingProfiles={billingProfiles}
           nowIso={nowIso}
         />
       </section>
 
-      <section className="grid gap-4">
+      <section className="flex min-w-0 flex-col gap-4">
         <SectionHeading title="요청 이력" description="최근 업그레이드 요청 처리 상태입니다." />
         {data.requests.length === 0 ? (
           <Card tone="muted" padding="md">

@@ -35,7 +35,7 @@ export default function Card({
   return (
     <div
       className={cn(
-        "rounded-panel border",
+        "w-full max-w-full min-w-0 rounded-panel border",
         tones[tone],
         paddings[padding],
         className,

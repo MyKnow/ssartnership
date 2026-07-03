@@ -9,11 +9,10 @@ import {
   calculatePartnerPlanUpgradeCharge,
   getOverdueDowngradeCandidate,
   getPaymentDueAt,
-  normalizePartnerBillingProfileInput,
   type PartnerBillingInvoiceStatus,
-  type PartnerBillingProfileInput,
   type PartnerTaxDocumentStatus,
 } from "@/lib/partner-billing";
+import { resolvePartnerBillingProfileForPlanRequest } from "@/lib/partner-billing-profiles";
 import { listMockPartnerPortalCompanySetups } from "@/lib/mock/partner-portal/store";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
@@ -543,9 +542,8 @@ export async function createPartnerPlanUpgradeRequest(input: {
   companyId?: string | null;
   accountId: string;
   requestedPlanTier: string;
-  payerName: string;
   memo: string;
-  billingProfile: PartnerBillingProfileInput;
+  billingProfileId: string;
 }) {
   const brand = await assertPartnerBrandAccess(input.accountId, input.partnerId);
   if (input.companyId && brand.companyId !== input.companyId) {
@@ -555,9 +553,16 @@ export async function createPartnerPlanUpgradeRequest(input: {
     input.requestedPlanTier,
     brand.planTier,
   );
-  const payerName = normalizePlanUpgradePayerName(input.payerName);
   const memo = normalizePlanUpgradeMemo(input.memo);
-  const billingProfile = normalizePartnerBillingProfileInput(input.billingProfile);
+  const resolvedBillingProfile = await resolvePartnerBillingProfileForPlanRequest({
+    accountId: input.accountId,
+    companyId: brand.companyId,
+    billingProfileId: input.billingProfileId,
+  });
+  const payerName = normalizePlanUpgradePayerName(
+    resolvedBillingProfile.payerName,
+  );
+  const billingProfile = resolvedBillingProfile.billingProfile;
   const nowIso = new Date().toISOString();
   const charge = calculatePartnerPlanUpgradeCharge({
     currentPlanTier: brand.planTier,
@@ -575,26 +580,6 @@ export async function createPartnerPlanUpgradeRequest(input: {
   const dueAt = getPaymentDueAt(nowIso);
   const supabase = getSupabaseAdminClient();
   let insertedRequestId: string | null = null;
-
-  const { error: profileError } = await supabase
-    .from("partner_billing_profiles")
-    .upsert(
-      {
-        company_id: brand.companyId,
-        business_registration_number: billingProfile.businessRegistrationNumber,
-        business_name: billingProfile.businessName,
-        representative_name: billingProfile.representativeName,
-        business_address: billingProfile.businessAddress,
-        business_type: billingProfile.businessType,
-        business_item: billingProfile.businessItem,
-        tax_invoice_email: billingProfile.taxInvoiceEmail,
-        tax_document_type: "tax_invoice",
-      },
-      { onConflict: "company_id" },
-    );
-  if (profileError) {
-    throw new Error(profileError.message);
-  }
 
   const { data, error } = await supabase
     .from("partner_plan_upgrade_requests")

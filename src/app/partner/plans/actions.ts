@@ -54,6 +54,13 @@ export async function requestPartnerPlanUpgradeAction(formData: FormData) {
   if (!partnerId) {
     redirectPartnerPlanError(companyId, new Error("브랜드 접근 권한이 없습니다."));
   }
+  const billingProfileId = getString(formData, "billingProfileId");
+  if (!billingProfileId) {
+    redirectPartnerPlanError(
+      companyId,
+      new Error("계정 정보 탭에서 입금자와 세금계산서 정보를 먼저 저장해 주세요."),
+    );
+  }
 
   try {
     await createPartnerPlanUpgradeRequest({
@@ -61,17 +68,8 @@ export async function requestPartnerPlanUpgradeAction(formData: FormData) {
       companyId,
       accountId: session.accountId,
       requestedPlanTier: getString(formData, "requestedPlanTier"),
-      payerName: getString(formData, "payerName"),
       memo: getString(formData, "memo"),
-      billingProfile: {
-        businessRegistrationNumber: getString(formData, "businessRegistrationNumber"),
-        businessName: getString(formData, "businessName"),
-        representativeName: getString(formData, "representativeName"),
-        businessAddress: getString(formData, "businessAddress"),
-        businessType: getString(formData, "businessType"),
-        businessItem: getString(formData, "businessItem"),
-        taxInvoiceEmail: getString(formData, "taxInvoiceEmail"),
-      },
+      billingProfileId,
     });
   } catch (error) {
     redirectPartnerPlanError(companyId, error);
