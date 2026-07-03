@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import BrandWordmark from "@/components/BrandWordmark";
 import ThemeToggle from "@/components/ThemeToggle";
+import Badge from "@/components/ui/Badge";
 import Container from "@/components/ui/Container";
 import { cn } from "@/lib/cn";
 import {
@@ -23,6 +24,10 @@ import {
   getPartnerCompanyIdFromPathname,
   type PartnerPortalSection,
 } from "@/lib/partner-portal-paths";
+import {
+  shouldShowPartnerPortalMobileNavigation,
+  shouldUsePartnerPortalDashboardShell,
+} from "@/lib/partner-portal-layout";
 import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
 import type { PartnerSession } from "@/lib/partner-session";
 import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
@@ -131,10 +136,12 @@ function MobileTopBar({
   session,
   isMock,
   currentCompanyId,
+  showNavigation,
 }: {
   session: PartnerSession | null;
   isMock: boolean;
   currentCompanyId: string | null;
+  showNavigation: boolean;
 }) {
   return (
     <header className="border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:hidden">
@@ -166,7 +173,7 @@ function MobileTopBar({
             </Link>
           )}
         </div>
-        {session ? (
+        {session && showNavigation ? (
           <nav className="flex w-full gap-2 overflow-x-auto pb-1">
             {[...primaryNavItems, ...(isMock ? [setupNavItem] : [])].map((item) => {
               const Icon = item.icon;
@@ -236,6 +243,26 @@ function DashboardSidebar({
             </span>
           </span>
         </Link>
+
+        {currentCompany ? (
+          <div className="hidden rounded-[1rem] border border-border bg-surface-control p-3 shadow-flat xl:block">
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="primary">선택됨</Badge>
+              <Link
+                href="/partner"
+                className="text-xs font-semibold text-primary hover:opacity-80"
+              >
+                변경
+              </Link>
+            </div>
+            <p className="mt-3 truncate text-sm font-semibold text-foreground">
+              {currentCompany.name}
+            </p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              {currentCompany.serviceCount}개 브랜드 관리 중
+            </p>
+          </div>
+        ) : null}
 
         <nav className="space-y-1">
           <p className="hidden px-2 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground xl:block">
@@ -365,12 +392,14 @@ export default function PartnerPortalShellView({
   const currentCompanyId = getPartnerCompanyIdFromPathname(pathname);
   const currentCompany =
     companies.find((company) => company.id === currentCompanyId) ?? null;
-  const isSetupRoute = pathname.startsWith("/partner/setup");
-  const isAuthRoute =
-    pathname === "/partner/login" ||
-    pathname === "/partner/reset" ||
-    pathname.startsWith("/partner/setup");
-  const useDashboardShell = Boolean(session) && !isAuthRoute && !isSetupRoute;
+  const showMobileNavigation = shouldShowPartnerPortalMobileNavigation({
+    pathname,
+    hasSession: Boolean(session),
+  });
+  const useDashboardShell = shouldUsePartnerPortalDashboardShell({
+    pathname,
+    hasSession: Boolean(session),
+  });
 
   if (!useDashboardShell || !session) {
     return (
@@ -379,6 +408,7 @@ export default function PartnerPortalShellView({
           session={session}
           isMock={isMock}
           currentCompanyId={currentCompanyId}
+          showNavigation={showMobileNavigation}
         />
         <div className="hidden border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:block">
           <Container size="wide" className="flex min-h-16 items-center justify-between gap-4 py-3">
@@ -415,6 +445,7 @@ export default function PartnerPortalShellView({
         session={session}
         isMock={isMock}
         currentCompanyId={currentCompanyId}
+        showNavigation={showMobileNavigation}
       />
       <DashboardSidebar
         pathname={pathname}

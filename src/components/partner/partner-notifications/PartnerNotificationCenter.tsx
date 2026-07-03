@@ -7,6 +7,7 @@ import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
+import { cn } from "@/lib/cn";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type {
   PartnerNotificationCategory,
@@ -96,6 +97,25 @@ function NotificationCard({ item }: { item: PartnerNotificationEntry }) {
   );
 }
 
+function PriorityNotificationRow({ item }: { item: PartnerNotificationEntry }) {
+  const createdAt = formatKoreanDateTimeToMinute(item.createdAt);
+  return (
+    <div className="grid gap-3 rounded-[1rem] border border-border/80 bg-surface-inset px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+      <Badge variant={getToneBadgeVariant(item.tone)}>{item.badgeLabel}</Badge>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+        <p className="line-clamp-1 text-sm text-muted-foreground">{item.body}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{createdAt}</p>
+      </div>
+      {item.href ? (
+        <Button href={item.href} variant="secondary" size="sm">
+          확인
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 export default function PartnerNotificationCenter({
   data,
 }: {
@@ -109,11 +129,40 @@ export default function PartnerNotificationCenter({
     }
     return data.items.filter((item) => item.category === filter);
   }, [data.items, filter]);
+  const attentionItems = useMemo(
+    () =>
+      data.items
+        .filter((item) => item.tone === "danger" || item.tone === "warning" || item.tone === "primary")
+        .slice(0, 3),
+    [data.items],
+  );
 
   return (
     <div className="grid min-w-0 gap-6">
       {data.warningMessage ? (
         <FormMessage variant="info">{data.warningMessage}</FormMessage>
+      ) : null}
+
+      {attentionItems.length > 0 ? (
+        <Card tone="default" padding="md" className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="ui-kicker">Priority</p>
+              <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
+                중요/미확인 알림
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                먼저 확인해야 하는 운영 알림을 최근순으로 모았습니다.
+              </p>
+            </div>
+            <Badge variant="primary">{attentionItems.length}건</Badge>
+          </div>
+          <div className="grid gap-2">
+            {attentionItems.map((item) => (
+              <PriorityNotificationRow key={`priority:${item.id}`} item={item} />
+            ))}
+          </div>
+        </Card>
       ) : null}
 
       <StatsRow
@@ -160,7 +209,7 @@ export default function PartnerNotificationCenter({
               변경 요청, 리뷰, 운영 알림을 나눠서 볼 수 있습니다.
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-1 rounded-[1rem] border border-border bg-surface-inset p-1 sm:grid-cols-2 xl:grid-cols-1">
             {filterOptions.map((option) => {
               const active = filter === option.value;
 
@@ -172,7 +221,10 @@ export default function PartnerNotificationCenter({
                   size="sm"
                   ariaPressed={active}
                   onClick={() => setFilter(option.value)}
-                  className="justify-start"
+                  className={cn(
+                    "justify-start border-transparent shadow-none",
+                    active ? "bg-surface-control" : "bg-transparent text-muted-foreground",
+                  )}
                 >
                   {option.label}
                 </Button>

@@ -24,7 +24,6 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
-import { isOnlinePartnerLocation } from "@/lib/partner-service-mode";
 import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
 
 const partnerPortalDataSource =
@@ -93,14 +92,13 @@ function getPartnerPortalServiceStatusLabel(
   }
 }
 
-function ServiceCard({
+function ServiceListRow({
   companyId,
   service,
 }: {
   companyId: string;
   service: PartnerPortalDashboard["companies"][number]["services"][number];
 }) {
-  const isOnlineService = isOnlinePartnerLocation(service.location);
   const visibleMetrics = [
     { key: "favoriteCount", label: "즐겨찾기", value: service.metrics.favoriteCount },
     { key: "reviewCount", label: "리뷰", value: service.metrics.reviewCount },
@@ -108,53 +106,55 @@ function ServiceCard({
     { key: "detailUv", label: "UV", value: service.metrics.detailUv },
     { key: "totalClicks", label: "총 클릭", value: service.metrics.totalClicks },
   ] as const;
+  const highlightedMetrics = visibleMetrics
+    .filter((metric) => canAccessPartnerMetric(service.planTier, metric.key))
+    .slice(0, 3);
 
   return (
     <Link
       href={getCompanyScopedPartnerServiceHref(companyId, service.id)}
       prefetch={false}
       aria-label={`${service.name} 상세 보기`}
-      className="group block rounded-card border border-border/80 bg-surface-elevated p-5 shadow-flat transition-surface-transform duration-200 ease-out hover:-translate-y-1 hover:border-strong hover-shadow-raised"
+      className="group grid gap-4 rounded-[1rem] border border-border/80 bg-surface-elevated px-4 py-4 shadow-flat transition-surface hover:border-strong hover:bg-surface-muted/55 lg:grid-cols-[minmax(12rem,1.2fr)_minmax(16rem,1fr)_auto] lg:items-center"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className={getPartnerVisibilityBadgeClass(service.visibility)}>
-              {getPartnerVisibilityLabel(service.visibility)}
-            </Badge>
-            <Badge variant={getServiceStatusBadgeVariant(service.status)}>
-              {getPartnerPortalServiceStatusLabel(service.status)}
-            </Badge>
-            <BrandPlanBadge planTier={service.planTier} />
-            <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              {service.categoryLabel}
-            </span>
-          </div>
-          <div className="space-y-1">
-            <p className="text-lg font-semibold text-foreground">{service.name}</p>
-            {!isOnlineService ? (
-              <p className="text-sm leading-6 text-muted-foreground">
-                {service.location}
-              </p>
-            ) : null}
-          </div>
+      <div className="min-w-0 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={getServiceStatusBadgeVariant(service.status)}>
+            {getPartnerPortalServiceStatusLabel(service.status)}
+          </Badge>
+          <BrandPlanBadge planTier={service.planTier} />
         </div>
-
-        <div className="rounded-full border border-border bg-surface-control px-3 py-1 text-xs font-medium text-muted-foreground">
-          상세 보기
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-foreground">{service.name}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            {service.categoryLabel} · {service.location || "위치 미지정"}
+          </p>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {visibleMetrics
-          .filter((metric) => canAccessPartnerMetric(service.planTier, metric.key))
-          .map((metric) => (
-            <ServiceMetric
-              key={metric.key}
-              label={metric.label}
-              value={metric.value}
-            />
-          ))}
+      <div className="grid grid-cols-3 gap-2">
+        {highlightedMetrics.map((metric) => (
+          <div
+            key={metric.key}
+            className="rounded-[0.85rem] border border-border/60 bg-surface-inset px-3 py-2"
+          >
+            <p className="text-[11px] font-semibold text-muted-foreground">
+              {metric.label}
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-foreground">
+              {formatCount(metric.value)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
+        <Badge className={getPartnerVisibilityBadgeClass(service.visibility)}>
+          {getPartnerVisibilityLabel(service.visibility)}
+        </Badge>
+        <span className="rounded-full border border-border bg-surface-control px-3 py-1 text-xs font-semibold text-foreground">
+          상세
+        </span>
       </div>
     </Link>
   );
@@ -174,6 +174,9 @@ function CompanyHeader({
 }: {
   company: PartnerPortalCompanyDashboard;
 }) {
+  const needsReview = company.services.some(
+    (service) => service.status === "pending" || service.status === "rejected",
+  );
   const visibleMetrics = [
     { key: "favoriteCount", label: "즐겨찾기", value: company.totals.favoriteCount },
     { key: "reviewCount", label: "리뷰 수", value: company.totals.reviewCount },
@@ -183,10 +186,10 @@ function CompanyHeader({
   ] as const;
 
   return (
-    <Card tone="default" padding="md" className="space-y-5 xl:sticky xl:top-24">
+    <Card tone="default" padding="md" className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <p className="ui-kicker">선택된 협력사</p>
+          <p className="ui-kicker">운영 상태</p>
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
               {company.name}
@@ -199,8 +202,8 @@ function CompanyHeader({
           </div>
         </div>
 
-        <Badge className="bg-surface-muted text-foreground">
-          {company.services.length}개 브랜드
+        <Badge variant={needsReview ? "warning" : "success"}>
+          {needsReview ? "검토 진행 중" : "정상 운영"}
         </Badge>
       </div>
 
@@ -230,7 +233,7 @@ function CompanyBrandList({
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 pb-4">
         <div className="space-y-1">
           <p className="ui-kicker">Brands</p>
-          <h3 className="text-lg font-semibold text-foreground">소유 브랜드</h3>
+          <h3 className="text-lg font-semibold text-foreground">브랜드 운영 현황</h3>
         </div>
         <p className="text-sm text-muted-foreground">
           {company.services.length}개 브랜드
@@ -245,7 +248,7 @@ function CompanyBrandList({
       ) : (
         <div className="space-y-3">
           {company.services.map((service) => (
-            <ServiceCard
+            <ServiceListRow
               key={service.id}
               companyId={company.id}
               service={service}
@@ -275,8 +278,8 @@ export default function PartnerDashboardView({
           <MotionReveal>
             <ShellHeader
               eyebrow="Partner Portal"
-              title="브랜드 현황"
-              description={`${selectedCompany.name}의 소유 브랜드와 핵심 지표를 확인합니다.`}
+              title="운영 대시보드"
+              description={`${selectedCompany.name}의 브랜드 상태와 핵심 지표를 한 화면에서 확인합니다.`}
               actions={
                 <Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>
               }
@@ -299,7 +302,9 @@ export default function PartnerDashboardView({
               {activeCompany ? (
                 <MotionReveal delay={0.08}>
                   <div className="grid min-w-0 gap-5 xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
-                    <CompanyHeader company={activeCompany} />
+                    <div className="grid gap-5 xl:sticky xl:top-24">
+                      <CompanyHeader company={activeCompany} />
+                    </div>
                     <CompanyBrandList company={activeCompany} />
                   </div>
                 </MotionReveal>
