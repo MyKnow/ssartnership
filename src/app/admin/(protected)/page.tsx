@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  BellAlertIcon,
   BuildingOffice2Icon,
   ChartBarSquareIcon,
   ClockIcon,
@@ -183,6 +184,14 @@ export default async function AdminPage() {
           meta: `회사 ${dashboardCounts.companyCount.toLocaleString()}개`,
           icon: BuildingOffice2Icon,
           permission: "companies",
+        },
+        {
+          href: "/admin/notifications",
+          title: "내 알림",
+          description: "파트너 요청, 종료 임박, 보안 이벤트 수신함을 확인합니다.",
+          meta: "관리자 수신함",
+          icon: BellAlertIcon,
+          permission: "notifications",
         },
         {
           href: "/admin/push",

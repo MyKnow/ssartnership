@@ -5,6 +5,22 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+async function getUnreadCount(adminId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { count, error } = await supabase
+    .from("admin_notification_recipients")
+    .select("id", { count: "exact", head: true })
+    .eq("admin_id", adminId)
+    .is("deleted_at", null)
+    .is("read_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -12,7 +28,6 @@ export async function PATCH(
   if (
     !isTrustedSameOriginRequest(request, {
       expectedOrigin: request.nextUrl.origin,
-      allowedContentTypes: ["application/json"],
     })
   ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
@@ -23,16 +38,29 @@ export async function PATCH(
   }
   const { id } = await params;
   const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("admin_notification_recipients")
-    .update({ read_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("admin_id", session.adminId)
-    .eq("notification_id", id)
-    .is("deleted_at", null);
-  if (error) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+  try {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("admin_notification_recipients")
+      .update({ read_at: now, updated_at: now })
+      .eq("admin_id", session.adminId)
+      .eq("notification_id", id)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
+    }
+    const unreadCount = await getUnreadCount(session.adminId);
+    return NextResponse.json({ ok: true, summary: { unreadCount } });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "알림을 처리하지 못했습니다.";
+    return NextResponse.json({ message }, { status: 400 });
   }
-  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(
@@ -42,7 +70,6 @@ export async function DELETE(
   if (
     !isTrustedSameOriginRequest(request, {
       expectedOrigin: request.nextUrl.origin,
-      allowedContentTypes: ["application/json"],
     })
   ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
@@ -53,13 +80,27 @@ export async function DELETE(
   }
   const { id } = await params;
   const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("admin_notification_recipients")
-    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("admin_id", session.adminId)
-    .eq("notification_id", id);
-  if (error) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+  try {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("admin_notification_recipients")
+      .update({ deleted_at: now, updated_at: now })
+      .eq("admin_id", session.adminId)
+      .eq("notification_id", id)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) {
+      return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
+    }
+    const unreadCount = await getUnreadCount(session.adminId);
+    return NextResponse.json({ ok: true, summary: { unreadCount } });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.";
+    return NextResponse.json({ message }, { status: 400 });
   }
-  return NextResponse.json({ ok: true });
 }
