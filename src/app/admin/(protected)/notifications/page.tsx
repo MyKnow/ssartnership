@@ -1,12 +1,14 @@
-import AdminOperationalNotificationCenter, {
-  type AdminOperationalNotificationItem,
-} from "@/components/admin/AdminOperationalNotificationCenter";
+import AdminNotificationInbox from "@/components/admin/AdminNotificationInbox";
 import AdminOperationalNotificationSettingsPanel from "@/components/admin/AdminOperationalNotificationSettingsPanel";
 import AdminShell from "@/components/admin/AdminShell";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { requireAdminPermission } from "@/lib/admin-access";
+import {
+  buildAdminNotificationListResult,
+  type AdminNotificationRecipientRow,
+} from "@/lib/admin-notification-inbox";
 import {
   getAdminOperationalNotificationPreferences,
   listOperationalPushSubscriptionDevices,
@@ -15,50 +17,6 @@ import { getPushPublicKey, isPushConfigured } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-type AdminNotificationRelation = {
-  id?: string | null;
-  type?: string | null;
-  title?: string | null;
-  body?: string | null;
-  target_url?: string | null;
-  created_at?: string | null;
-};
-
-type AdminNotificationRecipientRow = {
-  id?: string | null;
-  read_at?: string | null;
-  created_at?: string | null;
-  notification?: AdminNotificationRelation | AdminNotificationRelation[] | null;
-};
-
-function normalizeNotificationRelation(
-  value: AdminNotificationRecipientRow["notification"],
-) {
-  if (!value) {
-    return null;
-  }
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
-
-function mapNotificationItem(
-  row: AdminNotificationRecipientRow,
-): AdminOperationalNotificationItem | null {
-  const notification = normalizeNotificationRelation(row.notification);
-  if (!row.id || !notification?.id) {
-    return null;
-  }
-  return {
-    recipientId: row.id,
-    notificationId: notification.id,
-    type: notification.type ?? "notification",
-    title: notification.title ?? "운영 알림",
-    body: notification.body ?? "",
-    targetUrl: notification.target_url ?? "/admin",
-    readAt: row.read_at ?? null,
-    createdAt: notification.created_at ?? row.created_at ?? new Date(0).toISOString(),
-  };
-}
 
 export default async function AdminNotificationsPage() {
   const session = await requireAdminPermission("notifications", "read", {
@@ -76,12 +34,12 @@ export default async function AdminNotificationsPage() {
     supabase
       .from("admin_notification_recipients")
       .select(
-        "id,read_at,created_at,notification:admin_notifications(id,type,title,body,target_url,created_at)",
+        "id,read_at,deleted_at,created_at,updated_at,notification:admin_notifications(id,type,title,body,target_url,metadata,created_at)",
       )
       .eq("admin_id", session.adminId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(50),
+      .range(0, 10),
     getAdminOperationalNotificationPreferences(session.adminId),
     listOperationalPushSubscriptionDevices({
       ownerType: "admin",
@@ -96,30 +54,32 @@ export default async function AdminNotificationsPage() {
     throw new Error(inboxResult.error.message);
   }
 
-  const items = ((inboxResult.data ?? []) as AdminNotificationRecipientRow[])
-    .map(mapNotificationItem)
-    .filter((item): item is AdminOperationalNotificationItem => item !== null);
-  const unreadCount = unreadResult.count ?? 0;
+  const notificationResult = buildAdminNotificationListResult({
+    unreadCount: unreadResult.count ?? 0,
+    rows: (inboxResult.data ?? []) as AdminNotificationRecipientRow[],
+    offset: 0,
+    limit: 10,
+  });
 
   return (
-    <AdminShell title="운영 알림" backHref="/admin" backLabel="관리 홈">
+    <AdminShell title="내 알림" backHref="/admin" backLabel="관리 홈">
       <div className="grid gap-6">
         <ShellHeader
-          eyebrow="Operational Notifications"
-          title="운영 알림"
-          description="파트너 변경 요청, 종료 임박, 보안 이벤트를 회원 알림과 분리해 관리합니다."
+          eyebrow="Admin Notifications"
+          title="내 알림"
+          description="관리자 계정으로 수신한 변경 요청, 종료 임박, 보안 알림을 확인합니다."
         />
         <StatsRow
           items={[
             {
               label: "읽지 않음",
-              value: `${unreadCount.toLocaleString("ko-KR")}건`,
+              value: `${notificationResult.unreadCount.toLocaleString("ko-KR")}건`,
               hint: "현재 관리자 수신함",
             },
             {
-              label: "최근 알림",
-              value: `${items.length.toLocaleString("ko-KR")}건`,
-              hint: "최대 50건 표시",
+              label: "표시 중",
+              value: `${notificationResult.items.length.toLocaleString("ko-KR")}건`,
+              hint: notificationResult.hasMore ? "더보기 가능" : "현재 목록 전체",
             },
             {
               label: "푸시 기기",
@@ -133,13 +93,10 @@ export default async function AdminNotificationsPage() {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,0.75fr)] xl:items-start">
           <section className="grid gap-4">
             <SectionHeading
-              title="수신함"
-              description="운영 이벤트별 알림을 확인하고 필요한 작업 화면으로 이동합니다."
+              title="관리자 수신함"
+              description="사용자 알림 페이지와 같은 방식으로 읽음, 삭제, 이동 작업을 처리합니다."
             />
-            <AdminOperationalNotificationCenter
-              items={items}
-              unreadCount={unreadCount}
-            />
+            <AdminNotificationInbox initialState={notificationResult} />
           </section>
           <section className="grid gap-4 xl:sticky xl:top-24">
             <SectionHeading

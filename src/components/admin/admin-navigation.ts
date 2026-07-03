@@ -1,5 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 import {
+  BellAlertIcon,
   BuildingOffice2Icon,
   ChartBarSquareIcon,
   ClockIcon,
@@ -20,6 +21,7 @@ import {
 
 export type AdminNavIcon = ComponentType<SVGProps<SVGSVGElement>>;
 export type AdminNavIconKey =
+  | "bell"
   | "building"
   | "chart"
   | "clock"
@@ -48,6 +50,7 @@ export type AdminNavGroup = {
 };
 
 export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
+  bell: BellAlertIcon,
   building: BuildingOffice2Icon,
   chart: ChartBarSquareIcon,
   clock: ClockIcon,
@@ -122,6 +125,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     label: "메시지/노출",
     items: [
+      {
+        href: "/admin/notifications",
+        label: "내 알림",
+        description: "관리자 수신함과 수신 설정",
+        iconKey: "bell",
+        permission: { resource: "notifications" },
+      },
       {
         href: "/admin/push",
         label: "알림 운영",
