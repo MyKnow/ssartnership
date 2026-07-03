@@ -56,6 +56,10 @@ describe("partner portal company scope", () => {
       "/partner/companies/company-a/plans",
     );
     assert.equal(
+      getCompanyScopedPortalHref("company-a", "account"),
+      "/partner/companies/company-a/account",
+    );
+    assert.equal(
       getCompanyScopedPortalHref("company-a", "support"),
       "/partner/companies/company-a/support",
     );

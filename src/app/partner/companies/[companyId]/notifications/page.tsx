@@ -63,13 +63,13 @@ export default async function PartnerCompanyNotificationsPage({
           title="알림센터"
           description={`${scope.name}의 브랜드 변경, 리뷰, 운영 알림을 확인합니다. 수신 설정은 계정 전체에 적용됩니다.`}
         />
+        <PartnerNotificationCenter data={data} />
         <PartnerNotificationSettingsPanel
           pushConfigured={isPushConfigured()}
           publicKey={getPushPublicKey()}
           preferences={preferences}
           deviceCount={devices.length}
         />
-        <PartnerNotificationCenter data={data} />
       </div>
     </Container>
   );

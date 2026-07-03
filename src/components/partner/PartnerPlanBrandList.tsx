@@ -15,6 +15,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { cancelPartnerPlanUpgradeRequestAction } from "@/app/partner/plans/actions";
 import { calculatePartnerPlanUpgradeCharge } from "@/lib/partner-billing";
+import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import {
   getPartnerCompanyPlanDefinition,
@@ -38,6 +39,24 @@ import { cn } from "@/lib/cn";
 
 function formatDateTime(value?: string | null) {
   return value ? formatKoreanDateTimeToMinute(value) : "없음";
+}
+
+function getPeriodLines({
+  startedAt,
+  expiresAt,
+  emptyLabel,
+}: {
+  startedAt?: string | null;
+  expiresAt?: string | null;
+  emptyLabel: string;
+}) {
+  if (!startedAt && !expiresAt) {
+    return [emptyLabel];
+  }
+  return [
+    `시작일 ${startedAt ? formatDateTime(startedAt) : "없음"}`,
+    `만료일 ${expiresAt ? formatDateTime(expiresAt) : "없음"}`,
+  ];
 }
 
 function getDaysUntil(value: string | null | undefined, nowIso: string) {
@@ -113,11 +132,13 @@ export default function PartnerPlanBrandList({
   data,
   companyId,
   bankTransferAccount,
+  billingProfiles,
   nowIso,
 }: {
   data: PartnerPlanPortalData;
   companyId: string;
   bankTransferAccount: PartnerBankTransferAccount;
+  billingProfiles: PartnerBillingProfileRecord[];
   nowIso: string;
 }) {
   const [selectedFilter, setSelectedFilter] = useState<PartnerPlanFilter>("all");
@@ -195,11 +216,11 @@ export default function PartnerPlanBrandList({
   );
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-col gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex max-w-full min-w-0 flex-col gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-2 sm:flex-row sm:items-center sm:justify-between">
         <div
           aria-label="브랜드 플랜 필터"
-          className="flex gap-1 overflow-x-auto"
+          className="flex max-w-full min-w-0 gap-1 overflow-x-auto"
         >
           {PARTNER_PLAN_FILTERS.map((filter) => {
             const selected = selectedFilter === filter;
@@ -244,7 +265,7 @@ export default function PartnerPlanBrandList({
           />
         </Card>
       ) : (
-        <div className="grid gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
           {visibleItems.map((item) => {
             const {
               brand,
@@ -256,10 +277,16 @@ export default function PartnerPlanBrandList({
               expiryStatus,
             } = item;
             const expanded = expandedBrandId === brand.id;
+            const periodLabel = brand.planTier === "basic" ? "제휴 기간" : "플랜 기간";
+            const periodLines = getPeriodLines({
+              startedAt: brand.planStartedAt,
+              expiresAt: brand.planExpiresAt,
+              emptyLabel: `${periodLabel} 없음`,
+            });
 
             return (
               <Card key={brand.id} tone="default" padding="none" className="overflow-hidden">
-                <div className="grid gap-4 p-4 sm:p-5">
+                <div className="flex min-w-0 flex-col gap-4 p-4 sm:p-5">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
@@ -314,8 +341,8 @@ export default function PartnerPlanBrandList({
                     )}
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
+                  <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="min-w-0 rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
                       <p className="text-xs font-semibold text-muted-foreground">
                         현재 플랜
                       </p>
@@ -326,17 +353,19 @@ export default function PartnerPlanBrandList({
                         {formatPartnerPlanMonthlyPrice(brand.planTier)}
                       </p>
                     </div>
-                    <div className="rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
+                    <div className="min-w-0 rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
                       <p className="text-xs font-semibold text-muted-foreground">
-                        {brand.planTier === "basic" ? "제휴 기간" : "플랜 기간"}
+                        {periodLabel}
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-foreground">
-                        {formatDateTime(brand.planStartedAt)}
-                        <br />
-                        {formatDateTime(brand.planExpiresAt)}
-                      </p>
+                      <div className="mt-2 grid gap-1 text-sm leading-6 text-foreground">
+                        {periodLines.map((line) => (
+                          <p key={line} className="truncate">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
                     </div>
-                    <div className="rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
+                    <div className="min-w-0 rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
                       <p className="text-xs font-semibold text-muted-foreground">
                         이용 가능 지표
                       </p>
@@ -347,7 +376,7 @@ export default function PartnerPlanBrandList({
                         플랜 기준 지표 범위
                       </p>
                     </div>
-                    <div className="rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
+                    <div className="min-w-0 rounded-[0.9rem] border border-border/70 bg-surface-inset p-3">
                       <p className="text-xs font-semibold text-muted-foreground">
                         광고/운영 채널
                       </p>
@@ -448,6 +477,7 @@ export default function PartnerPlanBrandList({
                           currentPlanTier={brand.planTier}
                           upgradeOptions={upgradeOptions}
                           bankTransferAccount={bankTransferAccount}
+                          billingProfiles={billingProfiles}
                         />
                       ) : null}
                     </div>

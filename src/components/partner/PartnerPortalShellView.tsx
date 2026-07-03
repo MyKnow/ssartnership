@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Gauge,
   Home,
+  IdCard,
   KeyRound,
   LifeBuoy,
   LogOut,
@@ -62,6 +63,12 @@ const primaryNavItems = [
     icon: CreditCard,
   },
   {
+    section: "account",
+    label: "계정 정보",
+    description: "결제와 증빙",
+    icon: IdCard,
+  },
+  {
     href: PARTNER_PASSWORD_CHANGE_PATH,
     label: "비밀번호 변경",
     description: "계정 보안",
@@ -83,6 +90,7 @@ const setupNavItem = {
 } as const;
 
 type PrimaryNavItem = (typeof primaryNavItems)[number];
+type PortalNavItem = PrimaryNavItem | typeof setupNavItem;
 
 function getPrimaryNavHref(item: PrimaryNavItem, companyId: string | null) {
   if (!("section" in item)) {
@@ -98,6 +106,16 @@ function getPrimaryNavHref(item: PrimaryNavItem, companyId: string | null) {
     companyId,
     item.section as PartnerPortalSection,
   );
+}
+
+function getPortalNavHref(item: PortalNavItem, companyId: string | null) {
+  if ("section" in item) {
+    return getPrimaryNavHref(item, companyId);
+  }
+  if (item.href === PARTNER_PASSWORD_CHANGE_PATH) {
+    return getPartnerPasswordChangeHref(companyId);
+  }
+  return item.href;
 }
 
 function isActivePath(pathname: string, href: string) {
@@ -125,6 +143,17 @@ function isActivePrimaryPath(
   return pathname === scopedHref || pathname.startsWith(`${scopedHref}/`);
 }
 
+function isActivePortalNavPath(
+  pathname: string,
+  item: PortalNavItem,
+  companyId: string | null,
+) {
+  if ("section" in item) {
+    return isActivePrimaryPath(pathname, item, companyId);
+  }
+  return isActivePath(pathname, item.href);
+}
+
 function getCurrentNavLabel(
   pathname: string,
   isMock: boolean,
@@ -132,18 +161,18 @@ function getCurrentNavLabel(
 ) {
   const navItems = isMock ? [...primaryNavItems, setupNavItem] : primaryNavItems;
   return navItems.find((item) =>
-    "section" in item
-      ? isActivePrimaryPath(pathname, item, companyId)
-      : isActivePath(pathname, item.href),
+    isActivePortalNavPath(pathname, item, companyId),
   )?.label ?? "협력사 포털";
 }
 
 function MobileTopBar({
+  pathname,
   session,
   isMock,
   currentCompanyId,
   showNavigation,
 }: {
+  pathname: string;
   session: PartnerSession | null;
   isMock: boolean;
   currentCompanyId: string | null;
@@ -180,18 +209,26 @@ function MobileTopBar({
           )}
         </div>
         {session && showNavigation ? (
-          <nav className="flex w-full gap-2 overflow-x-auto pb-1">
+          <div className="relative w-full min-w-0 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-8 after:bg-gradient-to-l after:from-surface-overlay/95 after:to-transparent">
+          <nav
+            aria-label="협력사 포털 주요 메뉴"
+            className="flex w-full min-w-0 max-w-full snap-x gap-2 overflow-x-auto scroll-px-3 pb-1 pr-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             {[...primaryNavItems, ...(isMock ? [setupNavItem] : [])].map((item) => {
               const Icon = item.icon;
-              const href =
-                "section" in item
-                  ? getPrimaryNavHref(item, currentCompanyId)
-                  : item.href;
+              const href = getPortalNavHref(item, currentCompanyId);
+              const active = isActivePortalNavPath(pathname, item, currentCompanyId);
               return (
                 <Link
                   key={"section" in item ? item.section : item.href}
                   href={href}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-[0.95rem] border border-border bg-surface-control px-3 py-2 text-xs font-semibold text-foreground shadow-flat"
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "inline-flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-[0.95rem] border px-3 py-2 text-xs font-semibold shadow-flat transition-surface",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-surface-control text-foreground",
+                  )}
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
@@ -199,6 +236,7 @@ function MobileTopBar({
               );
             })}
           </nav>
+          </div>
         ) : null}
       </Container>
     </header>
@@ -276,14 +314,8 @@ function DashboardSidebar({
           </p>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const href =
-              "section" in item
-                ? getPrimaryNavHref(item, currentCompanyId)
-                : item.href;
-            const active =
-              "section" in item
-                ? isActivePrimaryPath(pathname, item, currentCompanyId)
-                : isActivePath(pathname, item.href);
+            const href = getPortalNavHref(item, currentCompanyId);
+            const active = isActivePortalNavPath(pathname, item, currentCompanyId);
             return (
               <Link
                 key={"section" in item ? item.section : item.href}
@@ -415,6 +447,7 @@ export default function PartnerPortalShellView({
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <MobileTopBar
+          pathname={pathname}
           session={session}
           isMock={isMock}
           currentCompanyId={currentCompanyId}
@@ -452,6 +485,7 @@ export default function PartnerPortalShellView({
   return (
     <div className="min-h-screen bg-background md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)]">
       <MobileTopBar
+        pathname={pathname}
         session={session}
         isMock={isMock}
         currentCompanyId={currentCompanyId}

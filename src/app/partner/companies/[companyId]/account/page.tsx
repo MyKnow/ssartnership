@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import PartnerAccountInfoView from "@/components/partner/PartnerAccountInfoView";
 import Container from "@/components/ui/Container";
 import FormMessage from "@/components/ui/FormMessage";
 import ShellHeader from "@/components/ui/ShellHeader";
-import PartnerPlanManagementView from "@/components/partner/PartnerPlanManagementView";
 import { getPartnerBillingProfiles } from "@/lib/partner-billing-profiles";
-import { getPartnerBankTransferAccount } from "@/lib/partner-billing-config";
-import { getPartnerPlanPortalData } from "@/lib/partner-plan-service";
 import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `플랜 관리 | ${SITE_NAME}`,
+  title: `계정 정보 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,
@@ -22,7 +20,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function PartnerCompanyPlansPage({
+export default async function PartnerCompanyAccountPage({
   params,
   searchParams,
 }: {
@@ -44,20 +42,18 @@ export default async function PartnerCompanyPlansPage({
   }
 
   const paramsData = (await searchParams) ?? {};
-  const [data, billingProfiles] = await Promise.all([
-    getPartnerPlanPortalData([scope.id], session.accountId),
-    getPartnerBillingProfiles({
-      accountId: session.accountId,
-      companyId: scope.id,
-    }),
-  ]);
-  const bankTransferAccount = getPartnerBankTransferAccount();
+  const profiles = await getPartnerBillingProfiles({
+    accountId: session.accountId,
+    companyId: scope.id,
+  });
   const statusMessage =
-    paramsData.status === "requested"
-      ? "업그레이드 요청이 접수되었습니다."
-      : paramsData.status === "cancelled"
-        ? "업그레이드 요청이 취소되었습니다."
-        : null;
+    paramsData.status === "created"
+      ? "계정 정보가 저장되었습니다."
+      : paramsData.status === "defaulted"
+        ? "기본 계정 정보가 변경되었습니다."
+        : paramsData.status === "archived"
+          ? "계정 정보가 삭제되었습니다."
+          : null;
   const errorMessage = paramsData.error
     ? decodeURIComponent(paramsData.error)
     : null;
@@ -67,16 +63,15 @@ export default async function PartnerCompanyPlansPage({
       <div className="space-y-6">
         <ShellHeader
           eyebrow="Partner Portal"
-          title="플랜 관리"
-          description={`${scope.name} 소유 브랜드의 플랜과 업그레이드 요청 상태를 확인합니다.`}
+          title="계정 정보"
+          description={`${scope.name}에서 사용할 입금자와 세금계산서 발급 정보를 관리합니다.`}
         />
         {statusMessage ? <FormMessage variant="info">{statusMessage}</FormMessage> : null}
         {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
-        <PartnerPlanManagementView
-          data={data}
+        <PartnerAccountInfoView
           companyId={scope.id}
-          bankTransferAccount={bankTransferAccount}
-          billingProfiles={billingProfiles}
+          companyName={scope.name}
+          profiles={profiles}
         />
       </div>
     </Container>

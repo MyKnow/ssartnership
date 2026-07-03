@@ -2,6 +2,7 @@ export type PartnerPortalSection =
   | "dashboard"
   | "notifications"
   | "plans"
+  | "account"
   | "support";
 
 const COMPANY_SCOPE_PREFIX = "/partner/companies/";
@@ -17,6 +18,8 @@ export function getCompanyScopedPortalHref(
       return `${base}/notifications`;
     case "plans":
       return `${base}/plans`;
+    case "account":
+      return `${base}/account`;
     case "support":
       return `${base}/support`;
     default:
@@ -90,6 +93,9 @@ export function getPartnerScopedHrefFromLegacyTarget(
   }
   if (trimmedTarget === "/partner/plans") {
     return getCompanyScopedPortalHref(companyId, "plans");
+  }
+  if (trimmedTarget === "/partner/account") {
+    return getCompanyScopedPortalHref(companyId, "account");
   }
   if (trimmedTarget === "/partner/support") {
     return getCompanyScopedPortalHref(companyId, "support");

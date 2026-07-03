@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 type Toast = {
@@ -20,16 +28,37 @@ const noopToastContext: ToastContextValue = {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const shouldReduceMotion = useReducedMotion();
+  const mountedRef = useRef(true);
+  const removalTimersRef = useRef<number[]>([]);
 
-  const notify = (message: string) => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      removalTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      removalTimersRef.current = [];
+    };
+  }, []);
+
+  const notify = useCallback((message: string) => {
+    if (!mountedRef.current) {
+      return;
+    }
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setToasts((prev) => [...prev, { id, message }]);
-    setTimeout(() => {
+    const timer = window.setTimeout(() => {
+      if (!mountedRef.current) {
+        return;
+      }
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      removalTimersRef.current = removalTimersRef.current.filter(
+        (timerId) => timerId !== timer,
+      );
     }, 2500);
-  };
+    removalTimersRef.current = [...removalTimersRef.current, timer];
+  }, []);
 
-  const value = useMemo(() => ({ notify }), []);
+  const value = useMemo(() => ({ notify }), [notify]);
 
   return (
     <ToastContext.Provider value={value}>

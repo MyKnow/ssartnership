@@ -2122,6 +2122,9 @@ create table if not exists partner_brand_plan_events (
 create table if not exists partner_billing_profiles (
   id uuid primary key default uuid_generate_v4(),
   company_id uuid not null references partner_companies(id) on delete cascade,
+  account_id uuid references partner_accounts(id) on delete cascade,
+  label text not null default '기본 세금계산서 정보',
+  payer_name text not null default '',
   business_registration_number text not null,
   business_name text not null,
   representative_name text not null,
@@ -2130,9 +2133,15 @@ create table if not exists partner_billing_profiles (
   business_item text not null,
   tax_invoice_email text not null,
   tax_document_type text not null default 'tax_invoice',
+  is_default boolean not null default false,
+  last_used_at timestamp with time zone,
+  archived_at timestamp with time zone,
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
-  unique (company_id),
+  constraint partner_billing_profiles_label_check
+    check (char_length(label) between 1 and 80),
+  constraint partner_billing_profiles_payer_name_check
+    check (char_length(payer_name) between 1 and 80),
   constraint partner_billing_profiles_brn_check
     check (business_registration_number ~ '^[0-9]{10}$'),
   constraint partner_billing_profiles_email_check
@@ -2443,6 +2452,15 @@ create unique index if not exists partner_plan_upgrade_requests_billing_invoice_
   where billing_invoice_id is not null;
 create index if not exists partner_billing_profiles_company_idx
   on partner_billing_profiles(company_id);
+create index if not exists partner_billing_profiles_account_company_idx
+  on partner_billing_profiles(account_id, company_id, archived_at, updated_at desc);
+create index if not exists partner_billing_profiles_company_active_idx
+  on partner_billing_profiles(company_id, archived_at, updated_at desc);
+create unique index if not exists partner_billing_profiles_default_account_company_idx
+  on partner_billing_profiles(account_id, company_id)
+  where is_default
+    and archived_at is null
+    and account_id is not null;
 create index if not exists partner_billing_invoices_company_status_due_idx
   on partner_billing_invoices(company_id, status, due_at);
 create index if not exists partner_billing_invoices_partner_created_idx
