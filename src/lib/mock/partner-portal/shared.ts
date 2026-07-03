@@ -15,6 +15,7 @@ export type MockPortalAccountRecord = {
   loginId: string;
   displayName: string;
   email: string;
+  linkedCompanyIds?: string[];
   mustChangePassword: boolean;
   emailVerifiedAt: string | null;
   initialSetupCompletedAt: string | null;
@@ -210,10 +211,20 @@ export const seededSetups: MockPortalSetupRecord[] = [
   },
 ];
 
+seededSetups[0].account.linkedCompanyIds = [
+  seededSetups[0].company.id,
+  seededSetups[1].company.id,
+];
+
 export function cloneSetupRecord(setup: MockPortalSetupRecord): MockPortalSetupRecord {
   return {
     token: setup.token,
-    account: { ...setup.account },
+    account: {
+      ...setup.account,
+      linkedCompanyIds: setup.account.linkedCompanyIds
+        ? [...setup.account.linkedCompanyIds]
+        : undefined,
+    },
     company: {
       ...setup.company,
       services: setup.company.services.map((service) => ({

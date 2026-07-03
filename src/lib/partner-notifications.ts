@@ -19,6 +19,7 @@ import {
   createReviewEntry,
   sortEntries,
 } from "@/lib/partner-notifications-operation";
+import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-portal-paths";
 
 export type PartnerNotificationCategory = "request" | "review" | "operation" | "plan";
 
@@ -204,6 +205,9 @@ function createStoredNotificationEntry(
   if (!notification) {
     return null;
   }
+  if (notification.company_id && !companyMap.has(notification.company_id)) {
+    return null;
+  }
   const company = notification.company_id ? companyMap.get(notification.company_id) ?? null : null;
   return {
     id: `stored:${notification.id}`,
@@ -217,7 +221,10 @@ function createStoredNotificationEntry(
     companyName: company?.name ?? "협력사",
     partnerId: null,
     partnerName: null,
-    href: notification.target_url,
+    href: getPartnerScopedHrefFromLegacyTarget(
+      notification.target_url,
+      notification.company_id,
+    ),
     createdAt: notification.created_at,
   };
 }

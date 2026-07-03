@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
+  Building2,
   CreditCard,
   ExternalLink,
   Gauge,
@@ -17,30 +18,37 @@ import BrandWordmark from "@/components/BrandWordmark";
 import ThemeToggle from "@/components/ThemeToggle";
 import Container from "@/components/ui/Container";
 import { cn } from "@/lib/cn";
+import {
+  getCompanyScopedPortalHref,
+  getPartnerCompanyIdFromPathname,
+  type PartnerPortalSection,
+} from "@/lib/partner-portal-paths";
+import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
 import type { PartnerSession } from "@/lib/partner-session";
 import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
 
 type PartnerPortalShellViewProps = {
   children: React.ReactNode;
   session: PartnerSession | null;
+  companies: PartnerPortalCompanyScope[];
   isMock: boolean;
 };
 
 const primaryNavItems = [
   {
-    href: "/partner",
+    section: "dashboard",
     label: "대시보드",
     description: "브랜드 현황",
     icon: Gauge,
   },
   {
-    href: "/partner/notifications",
+    section: "notifications",
     label: "알림센터",
     description: "운영 알림",
     icon: Bell,
   },
   {
-    href: "/partner/plans",
+    section: "plans",
     label: "플랜 관리",
     description: "요금제와 요청",
     icon: CreditCard,
@@ -52,7 +60,7 @@ const primaryNavItems = [
     icon: KeyRound,
   },
   {
-    href: "/partner/support",
+    section: "support",
     label: "기술 지원",
     description: "문의 템플릿",
     icon: LifeBuoy,
@@ -66,24 +74,67 @@ const setupNavItem = {
   icon: Settings,
 } as const;
 
-function isActivePath(pathname: string, href: string) {
-  if (href === "/partner") {
-    return pathname === href || pathname.startsWith("/partner/services/");
+type PrimaryNavItem = (typeof primaryNavItems)[number];
+
+function getPrimaryNavHref(item: PrimaryNavItem, companyId: string | null) {
+  if (!("section" in item)) {
+    return item.href;
   }
+  if (!companyId) {
+    return "/partner";
+  }
+  return getCompanyScopedPortalHref(
+    companyId,
+    item.section as PartnerPortalSection,
+  );
+}
+
+function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getCurrentNavLabel(pathname: string, isMock: boolean) {
+function isActivePrimaryPath(
+  pathname: string,
+  item: PrimaryNavItem,
+  companyId: string | null,
+) {
+  if (!("section" in item)) {
+    return isActivePath(pathname, item.href);
+  }
+  if (!companyId) {
+    return pathname === "/partner" && item.section === "dashboard";
+  }
+  const scopedHref = getCompanyScopedPortalHref(
+    companyId,
+    item.section as PartnerPortalSection,
+  );
+  if (item.section === "dashboard") {
+    return pathname === scopedHref || pathname.startsWith(`${scopedHref}/services/`);
+  }
+  return pathname === scopedHref || pathname.startsWith(`${scopedHref}/`);
+}
+
+function getCurrentNavLabel(
+  pathname: string,
+  isMock: boolean,
+  companyId: string | null,
+) {
   const navItems = isMock ? [...primaryNavItems, setupNavItem] : primaryNavItems;
-  return navItems.find((item) => isActivePath(pathname, item.href))?.label ?? "협력사 포털";
+  return navItems.find((item) =>
+    "section" in item
+      ? isActivePrimaryPath(pathname, item, companyId)
+      : isActivePath(pathname, item.href),
+  )?.label ?? "협력사 포털";
 }
 
 function MobileTopBar({
   session,
   isMock,
+  currentCompanyId,
 }: {
   session: PartnerSession | null;
   isMock: boolean;
+  currentCompanyId: string | null;
 }) {
   return (
     <header className="border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:hidden">
@@ -119,10 +170,14 @@ function MobileTopBar({
           <nav className="flex w-full gap-2 overflow-x-auto pb-1">
             {[...primaryNavItems, ...(isMock ? [setupNavItem] : [])].map((item) => {
               const Icon = item.icon;
+              const href =
+                "section" in item
+                  ? getPrimaryNavHref(item, currentCompanyId)
+                  : item.href;
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={"section" in item ? item.section : item.href}
+                  href={href}
                   className="inline-flex shrink-0 items-center gap-2 rounded-[0.95rem] border border-border bg-surface-control px-3 py-2 text-xs font-semibold text-foreground shadow-flat"
                 >
                   <Icon className="h-4 w-4" />
@@ -153,9 +208,13 @@ function SimpleFooter() {
 function DashboardSidebar({
   pathname,
   isMock,
+  currentCompanyId,
+  currentCompany,
 }: {
   pathname: string;
   isMock: boolean;
+  currentCompanyId: string | null;
+  currentCompany: PartnerPortalCompanyScope | null;
 }) {
   const navItems = isMock ? [...primaryNavItems, setupNavItem] : primaryNavItems;
 
@@ -184,11 +243,18 @@ function DashboardSidebar({
           </p>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = isActivePath(pathname, item.href);
+            const href =
+              "section" in item
+                ? getPrimaryNavHref(item, currentCompanyId)
+                : item.href;
+            const active =
+              "section" in item
+                ? isActivePrimaryPath(pathname, item, currentCompanyId)
+                : isActivePath(pathname, item.href);
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={"section" in item ? item.section : item.href}
+                href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex min-h-12 items-center justify-center gap-3 rounded-[1rem] border px-3 text-sm font-semibold transition-surface xl:justify-start",
@@ -215,6 +281,15 @@ function DashboardSidebar({
         </nav>
 
         <div className="mt-auto space-y-2">
+          {currentCompany ? (
+            <Link
+              href="/partner"
+              className="flex min-h-11 items-center justify-center gap-3 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat transition-interactive hover:-translate-y-px xl:justify-start"
+            >
+              <Building2 className="h-4 w-4" />
+              <span className="hidden min-w-0 truncate xl:inline">협력사 선택</span>
+            </Link>
+          ) : null}
           <Link
             href="/"
             className="flex min-h-11 items-center justify-center gap-3 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat transition-interactive hover:-translate-y-px xl:justify-start"
@@ -240,12 +315,16 @@ function DashboardTopBar({
   pathname,
   session,
   isMock,
+  currentCompanyId,
+  currentCompany,
 }: {
   pathname: string;
   session: PartnerSession;
   isMock: boolean;
+  currentCompanyId: string | null;
+  currentCompany: PartnerPortalCompanyScope | null;
 }) {
-  const currentLabel = getCurrentNavLabel(pathname, isMock);
+  const currentLabel = getCurrentNavLabel(pathname, isMock, currentCompanyId);
 
   return (
     <header className="sticky top-0 z-30 hidden border-b border-border/70 bg-background/88 backdrop-blur-xl md:block">
@@ -253,8 +332,13 @@ function DashboardTopBar({
         <div className="min-w-0">
           <p className="ui-kicker">협력사 포털 · {currentLabel}</p>
           <h1 className="truncate text-lg font-semibold tracking-[-0.03em] text-foreground">
-            {session.displayName}
+            {currentCompany?.name ?? session.displayName}
           </h1>
+          {currentCompany ? (
+            <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
+              담당자 · {session.displayName}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -274,9 +358,13 @@ function DashboardTopBar({
 export default function PartnerPortalShellView({
   children,
   session,
+  companies,
   isMock,
 }: PartnerPortalShellViewProps) {
   const pathname = usePathname();
+  const currentCompanyId = getPartnerCompanyIdFromPathname(pathname);
+  const currentCompany =
+    companies.find((company) => company.id === currentCompanyId) ?? null;
   const isSetupRoute = pathname.startsWith("/partner/setup");
   const isAuthRoute =
     pathname === "/partner/login" ||
@@ -287,7 +375,11 @@ export default function PartnerPortalShellView({
   if (!useDashboardShell || !session) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <MobileTopBar session={session} isMock={isMock} />
+        <MobileTopBar
+          session={session}
+          isMock={isMock}
+          currentCompanyId={currentCompanyId}
+        />
         <div className="hidden border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:block">
           <Container size="wide" className="flex min-h-16 items-center justify-between gap-4 py-3">
             <Link
@@ -319,10 +411,25 @@ export default function PartnerPortalShellView({
 
   return (
     <div className="min-h-screen bg-background md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)]">
-      <MobileTopBar session={session} isMock={isMock} />
-      <DashboardSidebar pathname={pathname} isMock={isMock} />
+      <MobileTopBar
+        session={session}
+        isMock={isMock}
+        currentCompanyId={currentCompanyId}
+      />
+      <DashboardSidebar
+        pathname={pathname}
+        isMock={isMock}
+        currentCompanyId={currentCompanyId}
+        currentCompany={currentCompany}
+      />
       <div className="min-w-0">
-        <DashboardTopBar pathname={pathname} session={session} isMock={isMock} />
+        <DashboardTopBar
+          pathname={pathname}
+          session={session}
+          isMock={isMock}
+          currentCompanyId={currentCompanyId}
+          currentCompany={currentCompany}
+        />
         <main className="min-w-0">{children}</main>
       </div>
     </div>

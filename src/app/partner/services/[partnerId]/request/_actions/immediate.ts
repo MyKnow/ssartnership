@@ -17,7 +17,12 @@ import {
 import { createAdminOperationalNotification } from "@/lib/operational-notifications";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
 import { resolvePartnerMediaPayload } from "./media";
-import { getReturnUrl, parseList, revalidatePartnerServicePaths } from "./shared";
+import {
+  getAuthorizedCompanyIdsForPartnerAction,
+  getReturnUrl,
+  parseList,
+  revalidatePartnerServicePaths,
+} from "./shared";
 
 export async function savePartnerImmediateChangesAction(formData: FormData) {
   const session = await getPartnerSession();
@@ -29,13 +34,17 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
   }
 
   const partnerId = String(formData.get("partnerId") || "").trim();
+  const { companyId, companyIds } = getAuthorizedCompanyIdsForPartnerAction(
+    session,
+    formData,
+  );
   if (!partnerId) {
     redirect("/partner?error=invalid_request");
   }
 
-  const context = await getPartnerChangeRequestContext(session.companyIds, partnerId);
+  const context = await getPartnerChangeRequestContext(companyIds, partnerId);
   if (!context) {
-    redirect(`${getReturnUrl(partnerId)}?mode=edit&error=forbidden`);
+    redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&error=forbidden`);
   }
 
   const tags = parseList(String(formData.get("tags") || ""));
@@ -87,7 +96,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     media = await resolvePartnerMediaPayload(formData, partnerId);
 
     const result = await updatePartnerImmediateFields({
-      companyIds: session.companyIds,
+      companyIds,
       partnerId,
       thumbnail: media.thumbnail,
       images: media.images,
@@ -105,7 +114,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     ).catch(() => undefined);
 
     await logAdminAudit({
-      ...(await getServerActionLogContext(getReturnUrl(partnerId))),
+      ...(await getServerActionLogContext(getReturnUrl(partnerId, companyId))),
       actorId: session.accountId,
       action: "partner_portal_immediate_update",
       targetType: "partner",
@@ -150,11 +159,11 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
       await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     }
     if (error instanceof PartnerChangeRequestError) {
-      redirect(`${getReturnUrl(partnerId)}?mode=edit&error=${error.code}`);
+      redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&error=${error.code}`);
     }
     throw error;
   }
 
-  revalidatePartnerServicePaths(partnerId);
-  redirect(`${getReturnUrl(partnerId)}?mode=edit&success=saved`);
+  revalidatePartnerServicePaths(partnerId, companyId);
+  redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&success=saved`);
 }

@@ -20,6 +20,11 @@ import PartnerServiceSummaryCard from "@/components/partner/partner-service-deta
 import PartnerRequestHistorySection from "@/components/partner/partner-service-detail-view/PartnerRequestHistorySection";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { getPartnerServiceVisualState } from "@/components/partner/partner-service-detail-view/helpers";
+import {
+  getCompanyScopedPartnerServiceEditHref,
+  getCompanyScopedPartnerServiceHref,
+  getCompanyScopedPortalHref,
+} from "@/lib/partner-portal-paths";
 import type { PartnerServiceDetailViewProps } from "@/components/partner/partner-service-detail-view/types";
 
 export default function PartnerServiceDetailViewContent({
@@ -42,8 +47,9 @@ export default function PartnerServiceDetailViewContent({
   initialReviewHasMore,
 }: PartnerServiceDetailViewProps) {
   const visualState = getPartnerServiceVisualState(context);
-  const viewHref = `/partner/services/${encodeURIComponent(context.partnerId)}`;
-  const editHref = `${viewHref}?mode=edit`;
+  const portalHref = getCompanyScopedPortalHref(context.companyId);
+  const viewHref = getCompanyScopedPartnerServiceHref(context.companyId, context.partnerId);
+  const editHref = getCompanyScopedPartnerServiceEditHref(context.companyId, context.partnerId);
   const isEditMode = mode === "edit";
   const pendingRequest = context.pendingRequest;
   const pendingDiffItems = buildPartnerChangeRequestDiffItems(pendingRequest);
@@ -58,7 +64,7 @@ export default function PartnerServiceDetailViewContent({
         <div className="w-full min-w-0 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Button href="/partner" variant="ghost">
+              <Button href={portalHref} variant="ghost">
                 포털로 돌아가기
               </Button>
               {!isEditMode ? (

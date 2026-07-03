@@ -13,7 +13,12 @@ import { createAdminOperationalNotification } from "@/lib/operational-notificati
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import { normalizePartnerDetailDescription } from "@/lib/partner-detail-description";
 import { sanitizeHttpUrl, validateDateRange } from "@/lib/validation";
-import { getReturnUrl, parseList, revalidatePartnerServicePaths } from "./shared";
+import {
+  getAuthorizedCompanyIdsForPartnerAction,
+  getReturnUrl,
+  parseList,
+  revalidatePartnerServicePaths,
+} from "./shared";
 
 export async function submitPartnerChangeRequestAction(formData: FormData) {
   const session = await getPartnerSession();
@@ -25,6 +30,10 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
   }
 
   const partnerId = String(formData.get("partnerId") || "").trim();
+  const { companyId, companyIds } = getAuthorizedCompanyIdsForPartnerAction(
+    session,
+    formData,
+  );
   if (!partnerId) {
     redirect("/partner?error=invalid_request");
   }
@@ -47,7 +56,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
   const periodEnd = String(formData.get("periodEnd") || "").trim();
 
   if (!appliesTo) {
-    redirect(`${getReturnUrl(partnerId)}?mode=edit&error=invalid_request`);
+    redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&error=invalid_request`);
   }
 
   try {
@@ -86,13 +95,13 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       );
     }
 
-    const context = await getPartnerChangeRequestContext(session.companyIds, partnerId);
+    const context = await getPartnerChangeRequestContext(companyIds, partnerId);
     if (!context) {
-      redirect(`${getReturnUrl(partnerId)}?mode=edit&error=forbidden`);
+      redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&error=forbidden`);
     }
 
     const request = await createPartnerChangeRequest({
-      companyIds: session.companyIds,
+      companyIds,
       partnerId,
       requestedByAccountId: session.accountId,
       requestedByLoginId: session.loginId,
@@ -115,7 +124,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
     });
 
     await logAdminAudit({
-      ...(await getServerActionLogContext(getReturnUrl(partnerId))),
+      ...(await getServerActionLogContext(getReturnUrl(partnerId, companyId))),
       actorId: session.accountId,
       action: "partner_portal_change_request_submit",
       targetType: "partner",
@@ -151,11 +160,11 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof PartnerChangeRequestError) {
-      redirect(`${getReturnUrl(partnerId)}?mode=edit&error=${error.code}`);
+      redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&error=${error.code}`);
     }
     throw error;
   }
 
-  revalidatePartnerServicePaths(partnerId);
-  redirect(`${getReturnUrl(partnerId)}?mode=edit&success=submitted`);
+  revalidatePartnerServicePaths(partnerId, companyId);
+  redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&success=submitted`);
 }

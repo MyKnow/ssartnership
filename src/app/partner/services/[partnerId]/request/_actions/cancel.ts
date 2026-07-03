@@ -6,7 +6,11 @@ import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import { cancelPartnerChangeRequest } from "@/lib/partner-change-requests";
 import { getPartnerSession } from "@/lib/partner-session";
-import { getReturnUrl } from "./shared";
+import {
+  getAuthorizedCompanyIdsForPartnerAction,
+  getReturnUrl,
+  revalidatePartnerServicePaths,
+} from "./shared";
 
 export async function cancelPartnerChangeRequestActionImpl(formData: FormData) {
   const session = await getPartnerSession();
@@ -19,6 +23,10 @@ export async function cancelPartnerChangeRequestActionImpl(formData: FormData) {
 
   const requestId = String(formData.get("requestId") || "").trim();
   const partnerId = String(formData.get("partnerId") || "").trim();
+  const { companyId, companyIds } = getAuthorizedCompanyIdsForPartnerAction(
+    session,
+    formData,
+  );
   if (!requestId || !partnerId) {
     redirect("/partner?error=invalid_request");
   }
@@ -27,10 +35,10 @@ export async function cancelPartnerChangeRequestActionImpl(formData: FormData) {
     const cancelled = await cancelPartnerChangeRequest({
       requestId,
       accountId: session.accountId,
-      companyIds: session.companyIds,
+      companyIds,
     });
     await logAdminAudit({
-      ...(await getServerActionLogContext(getReturnUrl(partnerId))),
+      ...(await getServerActionLogContext(getReturnUrl(partnerId, companyId))),
       actorId: session.accountId,
       action: "partner_portal_change_request_cancel",
       targetType: "partner",
@@ -47,13 +55,12 @@ export async function cancelPartnerChangeRequestActionImpl(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof PartnerChangeRequestError) {
-      redirect(`${getReturnUrl(partnerId)}?mode=edit&error=${error.code}`);
+      redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&error=${error.code}`);
     }
     throw error;
   }
 
-  revalidatePath("/partner");
   revalidatePath("/admin/partners");
-  revalidatePath(`/partner/services/${encodeURIComponent(partnerId)}`);
-  redirect(`${getReturnUrl(partnerId)}?mode=edit&success=cancelled`);
+  revalidatePartnerServicePaths(partnerId, companyId);
+  redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&success=cancelled`);
 }

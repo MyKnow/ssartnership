@@ -8,6 +8,8 @@ const dirname =
   typeof __dirname !== "undefined"
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
+const chromiumChannel =
+  process.env.PLAYWRIGHT_CHROMIUM_CHANNEL === "chrome" ? "chrome" : undefined;
 
 export default defineConfig({
   resolve: {
@@ -48,7 +50,9 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            provider: playwright({
+              launchOptions: chromiumChannel ? { channel: chromiumChannel } : {},
+            }),
             instances: [{ browser: "chromium" }],
           },
         },

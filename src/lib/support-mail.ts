@@ -22,7 +22,7 @@ function buildMailtoHref({
   )}`;
 }
 
-function buildSupportMailTemplate({
+export function buildSupportMailTemplate({
   to,
   subject,
   bodyLines,

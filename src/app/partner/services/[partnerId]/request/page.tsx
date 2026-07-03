@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { getCompanyScopedPartnerServiceEditHref } from "@/lib/partner-portal-paths";
+import { resolvePartnerPortalCompanyIdForService } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 
 export const dynamic = "force-dynamic";
@@ -17,5 +19,9 @@ export default async function PartnerServiceRequestRedirectPage({
   }
 
   const { partnerId } = await params;
-  redirect(`/partner/services/${encodeURIComponent(partnerId)}?mode=edit`);
+  const companyId = await resolvePartnerPortalCompanyIdForService(session, partnerId);
+  if (!companyId) {
+    redirect("/partner");
+  }
+  redirect(getCompanyScopedPartnerServiceEditHref(companyId, partnerId));
 }
