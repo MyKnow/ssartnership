@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
@@ -33,14 +34,26 @@ export default async function PartnerPasswordChangePage({
   }
 
   const params = (await searchParams) ?? {};
-  const requestedCompanyId = getSingleSearchParam(params.companyId)?.trim() ?? "";
+  const requestedCompanyId =
+    getSingleSearchParam(params.companyId)?.trim() ?? "";
   const returnCompanyId = session.companyIds.includes(requestedCompanyId)
     ? requestedCompanyId
     : null;
+  const companies = returnCompanyId
+    ? []
+    : await getPartnerPortalCompanySummaries(session.companyIds);
+  const profileCompanyId = returnCompanyId ?? companies[0]?.id ?? null;
   const successRedirectHref = returnCompanyId
     ? getCompanyScopedPortalHref(returnCompanyId)
     : "/partner";
   const mustChangePassword = session.mustChangePassword;
+  if (!mustChangePassword) {
+    redirect(
+      profileCompanyId
+        ? `${getCompanyScopedPortalHref(profileCompanyId, "account")}#security`
+        : "/partner",
+    );
+  }
   const heroTitle = mustChangePassword
     ? "포털 이용 전 비밀번호를 설정합니다."
     : "비밀번호를 변경합니다.";

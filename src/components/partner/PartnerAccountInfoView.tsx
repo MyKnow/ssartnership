@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Landmark, Search, Trash2 } from "lucide-react";
+import {
+  CheckCircle2,
+  KeyRound,
+  Landmark,
+  Search,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import {
   archivePartnerBillingProfileAction,
   createPartnerBillingProfileAction,
@@ -14,13 +21,18 @@ import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
+import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import { cn } from "@/lib/cn";
 
 type BusinessStatusState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; message: string; tone: "success" | "warning" | "neutral" }
+  | {
+      status: "success";
+      message: string;
+      tone: "success" | "warning" | "neutral";
+    }
   | { status: "error"; message: string };
 
 function formatBusinessRegistrationNumber(value: string) {
@@ -65,7 +77,8 @@ function BusinessStatusMessage({ state }: { state: BusinessStatusState }) {
 }
 
 function BillingProfileCreateForm({ companyId }: { companyId: string }) {
-  const [businessRegistrationNumber, setBusinessRegistrationNumber] = useState("");
+  const [businessRegistrationNumber, setBusinessRegistrationNumber] =
+    useState("");
   const [businessStatus, setBusinessStatus] = useState<BusinessStatusState>({
     status: "idle",
   });
@@ -135,8 +148,8 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
   return (
     <Card tone="default" padding="md" className="grid gap-5">
       <SectionHeading
-        title="새 계정 정보 추가"
-        description="플랜 요청에서 재사용할 입금자와 세금계산서 발급 정보를 저장합니다."
+        title="새 프로필 추가"
+        description="플랜 요청에서 전체 협력사에 재사용할 입금자와 세금계산서 정보를 저장합니다."
       />
       <form action={createPartnerBillingProfileAction} className="grid gap-4">
         <input type="hidden" name="companyId" value={companyId} />
@@ -144,7 +157,11 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
         <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-2 text-sm font-medium text-foreground">
             프로필 이름
-            <Input name="label" maxLength={80} placeholder="예: 본점 세금계산서" />
+            <Input
+              name="label"
+              maxLength={80}
+              placeholder="예: 본점 세금계산서"
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             입금자명
@@ -181,7 +198,8 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
         </div>
         <BusinessStatusMessage state={businessStatus} />
         <p className="text-xs leading-5 text-muted-foreground">
-          국세청 사업자등록 상태조회는 휴폐업 상태와 과세 유형만 확인합니다. 상호, 대표자, 주소는 직접 입력해 주세요.
+          국세청 사업자등록 상태조회는 휴폐업 상태와 과세 유형만 확인합니다.
+          상호, 대표자, 주소는 직접 입력해 주세요.
         </p>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -207,7 +225,12 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
             세금계산서 이메일
-            <Input name="taxInvoiceEmail" type="email" maxLength={254} required />
+            <Input
+              name="taxInvoiceEmail"
+              type="email"
+              maxLength={254}
+              required
+            />
           </label>
         </div>
 
@@ -217,12 +240,12 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
             name="isDefault"
             className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
           />
-          기본 계정 정보로 사용
+          기본 프로필로 사용
         </label>
 
         <div className="flex justify-end">
           <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">
-            계정 정보 저장
+            프로필 저장
           </SubmitButton>
         </div>
       </form>
@@ -247,7 +270,11 @@ function BillingProfileCard({
               {profile.label}
             </h3>
             {profile.isDefault ? <Badge variant="primary">기본</Badge> : null}
-            {isLegacyProfile ? <Badge variant="neutral">기존 정보</Badge> : null}
+            {isLegacyProfile ? (
+              <Badge variant="neutral">기존 협력사 정보</Badge>
+            ) : (
+              <Badge variant="success">전체 협력사</Badge>
+            )}
           </div>
           <p className="mt-1 line-clamp-2 break-words text-sm leading-6 text-muted-foreground">
             {getProfileDescription(profile)}
@@ -279,7 +306,9 @@ function BillingProfileCard({
 
       <div className="grid gap-3 text-sm md:grid-cols-2">
         <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-3">
-          <p className="text-xs font-semibold text-muted-foreground">입금자명</p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            입금자명
+          </p>
           <p className="mt-1 truncate font-semibold text-foreground">
             {profile.payerName}
           </p>
@@ -293,18 +322,24 @@ function BillingProfileCard({
           </p>
         </div>
         <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-3 md:col-span-2">
-          <p className="text-xs font-semibold text-muted-foreground">사업장 주소</p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            사업장 주소
+          </p>
           <p className="mt-1 line-clamp-2 break-words text-foreground">
             {profile.businessAddress}
           </p>
         </div>
         <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-3">
           <p className="text-xs font-semibold text-muted-foreground">업태</p>
-          <p className="mt-1 truncate text-foreground">{profile.businessType}</p>
+          <p className="mt-1 truncate text-foreground">
+            {profile.businessType}
+          </p>
         </div>
         <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-3">
           <p className="text-xs font-semibold text-muted-foreground">종목</p>
-          <p className="mt-1 truncate text-foreground">{profile.businessItem}</p>
+          <p className="mt-1 truncate text-foreground">
+            {profile.businessItem}
+          </p>
         </div>
       </div>
     </Card>
@@ -314,54 +349,91 @@ function BillingProfileCard({
 export default function PartnerAccountInfoView({
   companyId,
   companyName,
+  displayName,
+  loginId,
   profiles,
 }: {
   companyId: string;
   companyName: string;
+  displayName: string;
+  loginId: string;
   profiles: PartnerBillingProfileRecord[];
 }) {
   const defaultProfile = useMemo(
     () => profiles.find((profile) => profile.isDefault) ?? profiles[0] ?? null,
     [profiles],
   );
+  const successRedirectHref = `/partner/companies/${encodeURIComponent(companyId)}/account`;
 
   return (
     <div className="grid gap-6">
       <Card tone="default" padding="md" className="grid gap-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="ui-kicker">계정 정보</p>
+            <p className="ui-kicker">프로필</p>
             <h2 className="mt-2 break-keep text-xl font-semibold leading-tight text-foreground">
-              {companyName}의 결제 및 증빙 정보를 관리합니다.
+              모든 협력사에서 동일하게 쓰는 계정 프로필입니다.
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              저장한 정보는 플랜 업그레이드 요청에서 선택해 재사용할 수 있습니다.
+              로그인 정보, 비밀번호, 입금자와 세금계산서 정보를 한 곳에서
+              관리합니다.
             </p>
           </div>
           {defaultProfile ? (
-            <div className="rounded-[1rem] border border-primary/15 bg-primary-soft p-4 text-sm">
+            <div className="min-w-0 rounded-[1rem] border border-primary/15 bg-primary-soft p-4 text-sm">
               <div className="flex items-center gap-2 font-semibold text-primary">
                 <Landmark className="h-4 w-4" />
-                기본 정보
+                기본 증빙 프로필
               </div>
-              <p className="mt-2 truncate text-foreground">{defaultProfile.label}</p>
+              <p className="mt-2 truncate text-foreground">
+                {defaultProfile.label}
+              </p>
               <p className="mt-1 break-all text-xs text-muted-foreground">
                 {defaultProfile.payerName} · {defaultProfile.taxInvoiceEmail}
               </p>
             </div>
           ) : null}
         </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <UserRound className="h-4 w-4 text-primary" />
+              담당자
+            </div>
+            <p className="mt-2 truncate text-sm text-muted-foreground">
+              {displayName}
+            </p>
+          </div>
+          <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <KeyRound className="h-4 w-4 text-primary" />
+              로그인 ID
+            </div>
+            <p className="mt-2 break-all text-sm text-muted-foreground">
+              {loginId}
+            </p>
+          </div>
+          <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Landmark className="h-4 w-4 text-primary" />
+              현재 진입 협력사
+            </div>
+            <p className="mt-2 truncate text-sm text-muted-foreground">
+              {companyName}
+            </p>
+          </div>
+        </div>
       </Card>
 
       <section className="grid gap-4">
         <SectionHeading
-          title="저장된 계정 정보"
-          description="입금자와 세금계산서 정보를 여러 개 저장해 플랜 요청 때 선택합니다."
+          title="저장된 증빙 프로필"
+          description="입금자와 세금계산서 정보를 여러 개 저장해 모든 협력사의 플랜 요청에서 재사용합니다."
         />
         {profiles.length === 0 ? (
           <Card tone="muted" padding="md">
             <EmptyState
-              title="저장된 계정 정보가 없습니다."
+              title="저장된 증빙 프로필이 없습니다."
               description="먼저 세금계산서 발급 정보를 저장한 뒤 플랜 업그레이드를 요청해 주세요."
             />
           </Card>
@@ -379,6 +451,17 @@ export default function PartnerAccountInfoView({
       </section>
 
       <BillingProfileCreateForm companyId={companyId} />
+
+      <section id="security" className="grid gap-4 scroll-mt-24">
+        <SectionHeading
+          title="비밀번호 변경"
+          description="현재 비밀번호를 확인한 뒤 새 비밀번호로 계정 보안을 업데이트합니다."
+        />
+        <PartnerPasswordChangeForm
+          mustChangePassword={false}
+          successRedirectHref={successRedirectHref}
+        />
+      </section>
     </div>
   );
 }

@@ -92,7 +92,9 @@ export function normalizePartnerBillingProfileFormInput(
   };
 }
 
-function mapBillingProfileRow(row: BillingProfileRow): PartnerBillingProfileRecord {
+function mapBillingProfileRow(
+  row: BillingProfileRow,
+): PartnerBillingProfileRecord {
   return {
     id: row.id,
     companyId: row.company_id,
@@ -126,6 +128,22 @@ function sortBillingProfiles(
     const bTime = new Date(b.lastUsedAt ?? b.updatedAt).getTime();
     return bTime - aTime;
   });
+}
+
+export function isPartnerBillingProfileVisibleInCompanyScope(
+  profile: Pick<
+    PartnerBillingProfileRecord,
+    "accountId" | "companyId" | "archivedAt"
+  >,
+  input: { accountId: string; companyId: string },
+) {
+  if (profile.archivedAt) {
+    return false;
+  }
+  if (profile.accountId === input.accountId) {
+    return true;
+  }
+  return profile.accountId === null && profile.companyId === input.companyId;
 }
 
 function createMockSeedProfiles() {
@@ -211,31 +229,47 @@ export async function getPartnerBillingProfiles(input: {
 }) {
   if (isPartnerPortalMock) {
     return sortBillingProfiles(
-      getMockBillingProfiles().filter(
-        (profile) =>
-          profile.companyId === input.companyId &&
-          !profile.archivedAt &&
-          (profile.accountId === input.accountId || profile.accountId === null),
+      getMockBillingProfiles().filter((profile) =>
+        isPartnerBillingProfileVisibleInCompanyScope(profile, input),
       ),
     );
   }
 
   await assertSupabaseAccountCompanyAccess(input);
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("partner_billing_profiles")
-    .select(
-      "id,company_id,account_id,label,payer_name,business_registration_number,business_name,representative_name,business_address,business_type,business_item,tax_invoice_email,tax_document_type,is_default,last_used_at,archived_at,created_at,updated_at",
-    )
-    .eq("company_id", input.companyId)
-    .is("archived_at", null)
-    .or(`account_id.eq.${input.accountId},account_id.is.null`);
+  const selectColumns =
+    "id,company_id,account_id,label,payer_name,business_registration_number,business_name,representative_name,business_address,business_type,business_item,tax_invoice_email,tax_document_type,is_default,last_used_at,archived_at,created_at,updated_at";
+  const [accountProfilesResult, legacyCompanyProfilesResult] =
+    await Promise.all([
+      supabase
+        .from("partner_billing_profiles")
+        .select(selectColumns)
+        .eq("account_id", input.accountId)
+        .is("archived_at", null),
+      supabase
+        .from("partner_billing_profiles")
+        .select(selectColumns)
+        .eq("company_id", input.companyId)
+        .is("account_id", null)
+        .is("archived_at", null),
+    ]);
 
-  if (error) {
-    throw new Error(error.message);
+  if (accountProfilesResult.error) {
+    throw new Error(accountProfilesResult.error.message);
+  }
+  if (legacyCompanyProfilesResult.error) {
+    throw new Error(legacyCompanyProfilesResult.error.message);
   }
 
-  return sortBillingProfiles(((data ?? []) as BillingProfileRow[]).map(mapBillingProfileRow));
+  const profileRows = [
+    ...((accountProfilesResult.data ?? []) as BillingProfileRow[]),
+    ...((legacyCompanyProfilesResult.data ?? []) as BillingProfileRow[]),
+  ];
+  const profilesById = new Map(
+    profileRows.map((row) => [row.id, mapBillingProfileRow(row)]),
+  );
+
+  return sortBillingProfiles([...profilesById.values()]);
 }
 
 async function unsetOtherDefaultProfiles(input: {
@@ -247,7 +281,6 @@ async function unsetOtherDefaultProfiles(input: {
     updateMockBillingProfiles((profiles) =>
       profiles.map((profile) =>
         profile.accountId === input.accountId &&
-        profile.companyId === input.companyId &&
         !profile.archivedAt &&
         profile.id !== input.exceptProfileId
           ? { ...profile, isDefault: false }
@@ -262,7 +295,6 @@ async function unsetOtherDefaultProfiles(input: {
     .from("partner_billing_profiles")
     .update({ is_default: false })
     .eq("account_id", input.accountId)
-    .eq("company_id", input.companyId)
     .is("archived_at", null);
   if (input.exceptProfileId) {
     query = query.neq("id", input.exceptProfileId);
@@ -333,7 +365,7 @@ export async function createPartnerBillingProfile(input: {
     )
     .single();
   if (error || !data) {
-    throw new Error(error?.message ?? "계정 정보를 저장하지 못했습니다.");
+    throw new Error(error?.message ?? "프로필을 저장하지 못했습니다.");
   }
   return mapBillingProfileRow(data as BillingProfileRow);
 }
@@ -346,7 +378,7 @@ async function getAccessibleProfile(input: {
   const profiles = await getPartnerBillingProfiles(input);
   const profile = profiles.find((item) => item.id === input.profileId) ?? null;
   if (!profile) {
-    throw new Error("계정 정보를 찾을 수 없습니다.");
+    throw new Error("프로필을 찾을 수 없습니다.");
   }
   return profile;
 }
@@ -358,7 +390,9 @@ export async function setDefaultPartnerBillingProfile(input: {
 }) {
   const profile = await getAccessibleProfile(input);
   if (profile.accountId !== input.accountId) {
-    throw new Error("기존 공용 정보는 기본값으로 지정할 수 없습니다. 새 계정 정보로 저장해 주세요.");
+    throw new Error(
+      "기존 협력사 정보는 기본값으로 지정할 수 없습니다. 새 프로필로 저장해 주세요.",
+    );
   }
 
   await unsetOtherDefaultProfiles({
@@ -385,7 +419,6 @@ export async function setDefaultPartnerBillingProfile(input: {
     .update({ is_default: true })
     .eq("id", input.profileId)
     .eq("account_id", input.accountId)
-    .eq("company_id", input.companyId)
     .is("archived_at", null);
   if (error) {
     throw new Error(error.message);
@@ -399,7 +432,7 @@ export async function archivePartnerBillingProfile(input: {
 }) {
   const profile = await getAccessibleProfile(input);
   if (profile.accountId !== input.accountId) {
-    throw new Error("기존 공용 정보는 삭제할 수 없습니다.");
+    throw new Error("기존 협력사 정보는 삭제할 수 없습니다.");
   }
   const archivedAt = nowIso();
 
@@ -425,7 +458,6 @@ export async function archivePartnerBillingProfile(input: {
     .update({ archived_at: archivedAt, is_default: false })
     .eq("id", input.profileId)
     .eq("account_id", input.accountId)
-    .eq("company_id", input.companyId)
     .is("archived_at", null);
   if (error) {
     throw new Error(error.message);
@@ -454,12 +486,19 @@ export async function resolvePartnerBillingProfileForPlanRequest(input: {
     );
   } else {
     const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
+    let query = supabase
       .from("partner_billing_profiles")
       .update({ last_used_at: lastUsedAt })
       .eq("id", input.billingProfileId)
-      .eq("company_id", input.companyId)
       .is("archived_at", null);
+
+    if (profile.accountId === input.accountId) {
+      query = query.eq("account_id", input.accountId);
+    } else {
+      query = query.eq("company_id", input.companyId).is("account_id", null);
+    }
+
+    const { error } = await query;
     if (error) {
       throw new Error(error.message);
     }

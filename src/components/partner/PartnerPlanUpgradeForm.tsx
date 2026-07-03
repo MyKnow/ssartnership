@@ -69,7 +69,7 @@ export default function PartnerPlanUpgradeForm({
     return null;
   }
   const selectedCharge = selectedOption.billingCharge;
-  const accountInfoHref = getCompanyScopedPortalHref(companyId, "account");
+  const profileHref = getCompanyScopedPortalHref(companyId, "account");
 
   return (
     <form
@@ -78,7 +78,11 @@ export default function PartnerPlanUpgradeForm({
     >
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="partnerId" value={partnerId} />
-      <input type="hidden" name="requestedPlanTier" value={selectedOption.tier} />
+      <input
+        type="hidden"
+        name="requestedPlanTier"
+        value={selectedOption.tier}
+      />
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -87,12 +91,16 @@ export default function PartnerPlanUpgradeForm({
               1. 목표 플랜과 결제 예정액
             </p>
             <p className="mt-1 line-clamp-2 break-keep text-xs leading-5 text-muted-foreground">
-              VAT 포함가 기준으로 월 플랜가와 이번 계좌이체 금액을 분리해 확인합니다.
+              VAT 포함가 기준으로 월 플랜가와 이번 계좌이체 금액을 분리해
+              확인합니다.
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
-            <TrendingUp className="h-3.5 w-3.5" />
-            월 플랜가 {formatPartnerPlanMonthlyPrice(selectedOption.tier).replace(/^월 /, "")}
+            <TrendingUp className="h-3.5 w-3.5" />월 플랜가{" "}
+            {formatPartnerPlanMonthlyPrice(selectedOption.tier).replace(
+              /^월 /,
+              "",
+            )}
           </span>
         </div>
 
@@ -133,7 +141,9 @@ export default function PartnerPlanUpgradeForm({
                       {definition.description}
                     </span>
                   </span>
-                  {selected ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : null}
+                  {selected ? (
+                    <CheckCircle2 className="h-5 w-5 shrink-0" />
+                  ) : null}
                 </span>
                 <span className="flex flex-wrap gap-1.5">
                   {definition.allowedAdChannels.slice(0, 3).map((channel) => (
@@ -145,7 +155,10 @@ export default function PartnerPlanUpgradeForm({
                     </span>
                   ))}
                   <span className="rounded-full border border-current/15 px-2 py-0.5 text-[11px] font-semibold">
-                    결제 {formatPartnerPlanCurrency(definition.billingCharge.totalAmountKrw)}
+                    결제{" "}
+                    {formatPartnerPlanCurrency(
+                      definition.billingCharge.totalAmountKrw,
+                    )}
                   </span>
                 </span>
               </button>
@@ -161,12 +174,14 @@ export default function PartnerPlanUpgradeForm({
           </span>
           <div className="min-w-0">
             <p className="break-keep font-semibold text-foreground">
-              이번 결제 예정액 {formatPartnerPlanCurrency(selectedCharge.totalAmountKrw)}
+              이번 결제 예정액{" "}
+              {formatPartnerPlanCurrency(selectedCharge.totalAmountKrw)}
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              공급가액 {formatPartnerPlanCurrency(selectedCharge.supplyAmountKrw)} ·
-              VAT {formatPartnerPlanCurrency(selectedCharge.vatAmountKrw)} ·
-              산정 기준:
+              공급가액{" "}
+              {formatPartnerPlanCurrency(selectedCharge.supplyAmountKrw)} · VAT{" "}
+              {formatPartnerPlanCurrency(selectedCharge.vatAmountKrw)} · 산정
+              기준:
               {selectedCharge.policy === "remaining_period_difference"
                 ? ` 남은 ${selectedCharge.remainingDays}일 차액`
                 : " 최초 1개월"}
@@ -178,12 +193,14 @@ export default function PartnerPlanUpgradeForm({
           <div className="min-w-0 text-xs leading-5 text-muted-foreground">
             {bankTransferAccount.configured ? (
               <p>
-                {bankTransferAccount.bankName} {bankTransferAccount.accountNumber} ·
-                예금주 {bankTransferAccount.accountHolder}
+                {bankTransferAccount.bankName}{" "}
+                {bankTransferAccount.accountNumber} · 예금주{" "}
+                {bankTransferAccount.accountHolder}
               </p>
             ) : (
               <p>
-                계좌 정보가 아직 설정되지 않았습니다. 요청 접수 후 관리자가 입금 계좌를 안내합니다.
+                계좌 정보가 아직 설정되지 않았습니다. 요청 접수 후 관리자가 입금
+                계좌를 안내합니다.
               </p>
             )}
           </div>
@@ -192,10 +209,10 @@ export default function PartnerPlanUpgradeForm({
 
       <div>
         <p className="text-sm font-semibold text-foreground">
-          2. 계정 정보 선택
+          2. 증빙 프로필 선택
         </p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          계정 정보 탭에 저장된 입금자와 세금계산서 정보를 이번 요청에 사용합니다.
+          프로필 탭에 저장된 입금자와 세금계산서 정보를 이번 요청에 사용합니다.
         </p>
       </div>
 
@@ -203,20 +220,24 @@ export default function PartnerPlanUpgradeForm({
         <div className="grid gap-3 rounded-[0.9rem] border border-warning/25 bg-warning/10 p-4">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              저장된 계정 정보가 없습니다.
+              저장된 증빙 프로필이 없습니다.
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              계정 정보 탭에서 입금자와 세금계산서 정보를 먼저 저장해 주세요.
+              프로필 탭에서 입금자와 세금계산서 정보를 먼저 저장해 주세요.
             </p>
           </div>
-          <Button href={accountInfoHref} variant="secondary" className="w-full sm:w-auto">
-            계정 정보 추가
+          <Button
+            href={profileHref}
+            variant="secondary"
+            className="w-full sm:w-auto"
+          >
+            프로필 추가
           </Button>
         </div>
       ) : (
         <div className="grid gap-3 rounded-[0.9rem] border border-border bg-surface-control p-4">
           <label className="grid gap-2 text-sm font-medium text-foreground">
-            사용할 계정 정보
+            사용할 증빙 프로필
             <Select
               name="billingProfileId"
               required
@@ -241,8 +262,9 @@ export default function PartnerPlanUpgradeForm({
                 {selectedBillingProfile.payerName}
               </p>
               <p>
-                사업자등록번호 {selectedBillingProfile.businessRegistrationNumber} ·
-                대표자 {selectedBillingProfile.representativeName}
+                사업자등록번호{" "}
+                {selectedBillingProfile.businessRegistrationNumber} · 대표자{" "}
+                {selectedBillingProfile.representativeName}
               </p>
               <p className="break-all">
                 세금계산서 이메일 {selectedBillingProfile.taxInvoiceEmail}
@@ -252,8 +274,8 @@ export default function PartnerPlanUpgradeForm({
           ) : null}
 
           <div className="flex justify-end">
-            <Button href={accountInfoHref} variant="secondary" size="sm">
-              계정 정보 관리
+            <Button href={profileHref} variant="secondary" size="sm">
+              프로필 관리
             </Button>
           </div>
         </div>
