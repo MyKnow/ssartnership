@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  isPartnerBillingProfileVisibleInCompanyScope,
   normalizePartnerBillingProfileFormInput,
   normalizePartnerBillingProfileLabel,
   toPartnerBillingProfileFormValues,
@@ -9,8 +10,14 @@ import {
 
 describe("partner billing profiles", () => {
   it("normalizes reusable billing profile labels and form values", () => {
-    assert.equal(normalizePartnerBillingProfileLabel("  본점 세금계산서  "), "본점 세금계산서");
-    assert.equal(normalizePartnerBillingProfileLabel(""), "기본 세금계산서 정보");
+    assert.equal(
+      normalizePartnerBillingProfileLabel("  본점 세금계산서  "),
+      "본점 세금계산서",
+    );
+    assert.equal(
+      normalizePartnerBillingProfileLabel(""),
+      "기본 세금계산서 정보",
+    );
 
     assert.deepEqual(
       normalizePartnerBillingProfileFormInput({
@@ -77,6 +84,42 @@ describe("partner billing profiles", () => {
         taxInvoiceEmail: "tax@example.com",
         isDefault: true,
       },
+    );
+  });
+
+  it("treats account-owned billing profiles as visible across company scopes", () => {
+    assert.equal(
+      isPartnerBillingProfileVisibleInCompanyScope(
+        {
+          accountId: "account-1",
+          companyId: "company-a",
+          archivedAt: null,
+        },
+        { accountId: "account-1", companyId: "company-b" },
+      ),
+      true,
+    );
+    assert.equal(
+      isPartnerBillingProfileVisibleInCompanyScope(
+        {
+          accountId: null,
+          companyId: "company-a",
+          archivedAt: null,
+        },
+        { accountId: "account-1", companyId: "company-b" },
+      ),
+      false,
+    );
+    assert.equal(
+      isPartnerBillingProfileVisibleInCompanyScope(
+        {
+          accountId: "account-1",
+          companyId: "company-a",
+          archivedAt: "2026-07-03T00:00:00.000Z",
+        },
+        { accountId: "account-1", companyId: "company-b" },
+      ),
+      false,
     );
   });
 });

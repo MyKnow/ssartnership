@@ -177,6 +177,7 @@ npm run ci:local
   - `PARTNER_BILLING_BANK_ACCOUNT`
   - `PARTNER_BILLING_ACCOUNT_HOLDER`
   - `NTS_BUSINESS_STATUS_SERVICE_KEY` (선택, 사업자등록 상태조회)
+  - `DATA_GO_KR_SERVICE_KEY` (선택, `NTS_BUSINESS_STATUS_SERVICE_KEY` fallback)
 - 제휴 제안 메일
   - `SMTP_HOST`
   - `SMTP_PORT`
@@ -197,6 +198,31 @@ npm run ci:local
   - `NEXT_PUBLIC_DATA_SOURCE=mock` (선택)
 
 환경 변수 예시는 [.env.example](/Users/myknow/coding/ssartnership/.env.example)에 있습니다.
+
+## 파트너 결제 운영 설정
+
+### 사업자 상태조회 API 키 등록
+
+사업자 상태조회는 공공데이터포털의 `국세청_사업자등록정보 진위확인 및 상태조회 서비스`를 사용합니다.
+
+1. 공공데이터포털에 로그인합니다.
+2. `국세청_사업자등록정보 진위확인 및 상태조회 서비스` 상세 페이지에서 활용신청을 진행합니다.
+3. 승인 후 `마이페이지 > 데이터활용 > Open API > 활용신청 현황`에서 일반 인증키를 확인합니다.
+4. 로컬은 `.env`, Vercel은 Project Settings의 Environment Variables에 `NTS_BUSINESS_STATUS_SERVICE_KEY`로 등록합니다.
+5. Preview/Production에 각각 등록한 뒤 재배포합니다.
+
+인코딩/디코딩 인증키는 모두 사용할 수 있습니다. 앱은 값에 `%`가 포함되어 있지 않으면 호출 시 URL 인코딩합니다. 이 API의 상태조회 응답은 휴업/폐업 상태와 과세유형 확인용입니다. 상호, 대표자명, 주소, 업태, 종목은 자동 채움 대상이 아니므로 파트너가 직접 입력해야 합니다.
+
+### 관리자 입금 계좌 등록
+
+계좌이체 플랜 결제에서 파트너에게 보여줄 관리자 입금 계좌는 서버 전용 환경변수로 관리합니다.
+
+1. 로컬은 `.env`, Vercel은 Project Settings의 Environment Variables를 엽니다.
+2. `PARTNER_BILLING_BANK_NAME`, `PARTNER_BILLING_BANK_ACCOUNT`, `PARTNER_BILLING_ACCOUNT_HOLDER`를 등록합니다.
+3. 계좌 변경 시 Preview와 Production 값을 모두 갱신하고 재배포합니다.
+4. 값이 비어 있으면 파트너 포털은 계좌를 노출하지 않고 “관리자가 입금 계좌를 안내”하는 문구를 표시합니다.
+
+계좌번호와 API 키는 `NEXT_PUBLIC_` 접두사를 붙이지 않습니다. 파트너 포털의 인증된 서버 렌더링 화면에서만 필요한 값만 내려줍니다.
 
 ## Supabase 설정
 

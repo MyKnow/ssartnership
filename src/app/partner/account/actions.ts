@@ -84,7 +84,7 @@ export async function setDefaultPartnerBillingProfileAction(formData: FormData) 
   const { session, companyId } = await readAuthorizedSessionCompany(formData);
   const profileId = getString(formData, "profileId");
   if (!profileId) {
-    redirectAccountInfoError(companyId, new Error("계정 정보를 찾을 수 없습니다."));
+    redirectAccountInfoError(companyId, new Error("프로필을 찾을 수 없습니다."));
   }
 
   try {
@@ -104,7 +104,7 @@ export async function archivePartnerBillingProfileAction(formData: FormData) {
   const { session, companyId } = await readAuthorizedSessionCompany(formData);
   const profileId = getString(formData, "profileId");
   if (!profileId) {
-    redirectAccountInfoError(companyId, new Error("계정 정보를 찾을 수 없습니다."));
+    redirectAccountInfoError(companyId, new Error("프로필을 찾을 수 없습니다."));
   }
 
   try {

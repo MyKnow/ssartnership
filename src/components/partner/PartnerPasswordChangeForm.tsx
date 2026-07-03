@@ -6,16 +6,17 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Surface from "@/components/ui/Surface";
-import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
+import {
+  focusField,
+  getFieldErrorClass,
+} from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 import {
   copyPasswordToClipboard,
   generateBrowserPassword,
 } from "@/lib/browser-password";
-import {
-  getPartnerPortalPasswordChangeErrorMessage,
-} from "@/lib/partner-password-errors";
+import { getPartnerPortalPasswordChangeErrorMessage } from "@/lib/partner-password-errors";
 
 export default function PartnerPasswordChangeForm({
   mustChangePassword,
@@ -72,7 +73,9 @@ export default function PartnerPasswordChangeForm({
     }
     if (!currentPassword || !nextPassword) {
       setFieldErrors({
-        currentPassword: currentPassword ? undefined : "현재 비밀번호를 입력해 주세요.",
+        currentPassword: currentPassword
+          ? undefined
+          : "현재 비밀번호를 입력해 주세요.",
         nextPassword: nextPassword ? undefined : "새 비밀번호를 입력해 주세요.",
       });
       setFormError(null);
@@ -97,7 +100,9 @@ export default function PartnerPasswordChangeForm({
         const message =
           typeof data.error === "string"
             ? getPartnerPortalPasswordChangeErrorMessage(
-                data.error as Parameters<typeof getPartnerPortalPasswordChangeErrorMessage>[0],
+                data.error as Parameters<
+                  typeof getPartnerPortalPasswordChangeErrorMessage
+                >[0],
               )
             : "비밀번호 변경에 실패했습니다.";
         if (data.error === "wrong_password") {
@@ -131,14 +136,14 @@ export default function PartnerPasswordChangeForm({
     <div className="space-y-5">
       {mustChangePassword ? (
         <FormMessage>
-          임시 비밀번호로 로그인한 상태입니다. 지금 새 비밀번호를 설정해야
-          계속 이용할 수 있습니다.
+          임시 비밀번호로 로그인한 상태입니다. 지금 새 비밀번호를 설정해야 계속
+          이용할 수 있습니다.
         </FormMessage>
       ) : null}
 
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         <Surface level="inset" padding="md" className="space-y-3">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+          <h2 className="truncate text-lg font-semibold tracking-tight text-foreground">
             현재 비밀번호
           </h2>
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
@@ -158,10 +163,14 @@ export default function PartnerPasswordChangeForm({
               autoComplete="current-password"
               disabled={pending}
               aria-invalid={Boolean(fieldErrors.currentPassword) || undefined}
-              className={getFieldErrorClass(Boolean(fieldErrors.currentPassword))}
+              className={getFieldErrorClass(
+                Boolean(fieldErrors.currentPassword),
+              )}
             />
             {fieldErrors.currentPassword ? (
-              <FormMessage variant="error">{fieldErrors.currentPassword}</FormMessage>
+              <FormMessage variant="error">
+                {fieldErrors.currentPassword}
+              </FormMessage>
             ) : null}
           </label>
         </Surface>
@@ -169,7 +178,7 @@ export default function PartnerPasswordChangeForm({
         <Surface level="elevated" padding="md" className="space-y-4">
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             <span className="flex items-center justify-between gap-3">
-              <span className="text-lg font-semibold tracking-tight text-foreground">
+              <span className="min-w-0 truncate text-lg font-semibold tracking-tight text-foreground">
                 새 비밀번호
               </span>
               <Button
@@ -187,7 +196,10 @@ export default function PartnerPasswordChangeForm({
               value={nextPassword}
               onChange={(event) => {
                 setNextPassword(event.target.value);
-                setFieldErrors((prev) => ({ ...prev, nextPassword: undefined }));
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  nextPassword: undefined,
+                }));
                 setFormError(null);
               }}
               placeholder="영문/숫자/특수문자 포함 8자 이상"
@@ -197,20 +209,24 @@ export default function PartnerPasswordChangeForm({
               className={getFieldErrorClass(Boolean(fieldErrors.nextPassword))}
             />
             {fieldErrors.nextPassword ? (
-              <FormMessage variant="error">{fieldErrors.nextPassword}</FormMessage>
+              <FormMessage variant="error">
+                {fieldErrors.nextPassword}
+              </FormMessage>
             ) : null}
           </label>
 
           <div className="space-y-2">
-            {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
+            {formError ? (
+              <FormMessage variant="error">{formError}</FormMessage>
+            ) : null}
             <FormMessage>{PASSWORD_POLICY_MESSAGE}</FormMessage>
           </div>
 
           <div className="border-t border-border pt-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <p className="text-sm font-semibold text-foreground">변경 완료</p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                저장하면 이전 협력사 화면으로 돌아갑니다.
+              <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+                저장하면 설정된 프로필 화면으로 이동합니다.
               </p>
             </div>
             <Button

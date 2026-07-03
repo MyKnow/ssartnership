@@ -23,6 +23,7 @@ export default function PartnerPortalActionLinks({
   const isSetupRoute = pathname.startsWith("/partner/setup");
   const isDashboardRoute = pathname === "/partner";
   const isNotificationsRoute = pathname === "/partner/notifications";
+  const isProfileRoute = pathname.includes("/account");
 
   const supportLink = (
     <Button variant="ghost" href={TECH_SUPPORT_HREF}>
@@ -63,8 +64,11 @@ export default function PartnerPortalActionLinks({
           초기 설정
         </Button>
       ) : null}
-      <Button variant="ghost" href="/partner/change-password">
-        비밀번호 변경
+      <Button
+        variant={isProfileRoute ? "soft" : "ghost"}
+        href="/partner/account"
+      >
+        프로필
       </Button>
       {supportLink}
       {logoutIconOnly ? (
