@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
+import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import StatsRow from "@/components/ui/StatsRow";
 import { cn } from "@/lib/cn";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
@@ -84,13 +85,14 @@ function NotificationCard({ item }: { item: PartnerNotificationEntry }) {
         </div>
 
         {item.href ? (
-          <Button
+          <PartnerPendingButtonLink
             href={item.href}
             variant="secondary"
             className="w-full sm:w-auto sm:shrink-0"
+            showSpinner
           >
             바로 보기
-          </Button>
+          </PartnerPendingButtonLink>
         ) : null}
       </div>
     </Card>
@@ -108,9 +110,9 @@ function PriorityNotificationRow({ item }: { item: PartnerNotificationEntry }) {
         <p className="mt-1 text-xs text-muted-foreground">{createdAt}</p>
       </div>
       {item.href ? (
-        <Button href={item.href} variant="secondary" size="sm">
+        <PartnerPendingButtonLink href={item.href} variant="secondary" size="sm">
           확인
-        </Button>
+        </PartnerPendingButtonLink>
       ) : null}
     </div>
   );
@@ -122,6 +124,8 @@ export default function PartnerNotificationCenter({
   data: PartnerNotificationCenterData;
 }) {
   const [filter, setFilter] = useState<NotificationFilter>("all");
+  const activeFilterLabel =
+    filterOptions.find((option) => option.value === filter)?.label ?? "전체";
 
   const visibleItems = useMemo(() => {
     if (filter === "all") {
@@ -232,10 +236,12 @@ export default function PartnerNotificationCenter({
             })}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="status" aria-live="polite">
             <Badge variant="primary">{data.summary.companyCount}개 협력사</Badge>
             <Badge variant="neutral">{data.summary.serviceCount}개 브랜드</Badge>
-            <Badge variant="neutral">{visibleItems.length}건 표시</Badge>
+            <Badge variant="neutral">
+              {activeFilterLabel} 필터 · {visibleItems.length}건 표시
+            </Badge>
           </div>
         </Card>
 
@@ -243,7 +249,11 @@ export default function PartnerNotificationCenter({
           <EmptyState
             title="표시할 알림이 없습니다."
             description="다른 필터를 선택하거나 잠시 후 다시 확인해 주세요."
-            action={<Button href="/partner" variant="secondary">대시보드로 이동</Button>}
+            action={
+              <PartnerPendingButtonLink href="/partner" variant="secondary">
+                대시보드로 이동
+              </PartnerPendingButtonLink>
+            }
           />
         ) : (
           <div className="grid min-w-0 gap-3">

@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import MotionReveal from "@/components/ui/MotionReveal";
+import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
+import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 import ShellHeader from "@/components/ui/ShellHeader";
 import type {
   PartnerPortalCompanyDashboard,
@@ -111,11 +111,12 @@ function ServiceListRow({
     .slice(0, 3);
 
   return (
-    <Link
+    <PartnerPendingLink
       href={getCompanyScopedPartnerServiceHref(companyId, service.id)}
       prefetch={false}
       aria-label={`${service.name} 상세 보기`}
       className="group grid gap-4 rounded-[1rem] border border-border/80 bg-surface-elevated px-4 py-4 shadow-flat transition-surface hover:border-strong hover:bg-surface-muted/55 lg:grid-cols-[minmax(12rem,1.2fr)_minmax(16rem,1fr)_auto] lg:items-center"
+      showSpinner
     >
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -156,7 +157,7 @@ function ServiceListRow({
           상세
         </span>
       </div>
-    </Link>
+    </PartnerPendingLink>
   );
 }
 
@@ -314,9 +315,9 @@ export default function PartnerDashboardView({
 
           {isPartnerPortalMock ? (
             <div className="flex flex-wrap items-center gap-3">
-              <Button href="/partner/setup" variant="secondary">
+              <PartnerPendingButtonLink href="/partner/setup" variant="secondary">
                 초기 설정 데모
-              </Button>
+              </PartnerPendingButtonLink>
             </div>
           ) : null}
         </div>

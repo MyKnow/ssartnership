@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Bell,
@@ -15,6 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import BrandWordmark from "@/components/BrandWordmark";
+import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 import ThemeToggle from "@/components/ThemeToggle";
 import Badge from "@/components/ui/Badge";
 import Container from "@/components/ui/Container";
@@ -172,31 +172,31 @@ function MobileTopBar({
         size="wide"
         className="flex flex-wrap items-center justify-between gap-3 py-4"
       >
-        <Link
+        <PartnerPendingLink
           href="/partner"
           aria-label="협력사 포털 홈"
           className="inline-flex items-center text-foreground hover:opacity-80"
         >
           <BrandWordmark className="text-lg" />
-        </Link>
+        </PartnerPendingLink>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {session ? (
-            <Link
+            <PartnerPendingLink
               href="/partner/logout"
               prefetch={false}
               aria-label="로그아웃"
               className="inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-danger/20 bg-danger/10 text-danger shadow-flat transition-interactive hover:-translate-y-px hover:bg-danger/12"
             >
               <LogOut className="h-5 w-5" />
-            </Link>
+            </PartnerPendingLink>
           ) : (
-            <Link
+            <PartnerPendingLink
               href="/"
               className="inline-flex h-11 items-center rounded-[1rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground shadow-flat"
             >
               공개 홈
-            </Link>
+            </PartnerPendingLink>
           )}
         </div>
         {session && showNavigation ? (
@@ -215,7 +215,7 @@ function MobileTopBar({
                     currentCompanyId,
                   );
                   return (
-                    <Link
+                    <PartnerPendingLink
                       key={"section" in item ? item.section : item.href}
                       href={href}
                       aria-current={active ? "page" : undefined}
@@ -228,7 +228,7 @@ function MobileTopBar({
                     >
                       <Icon className="h-4 w-4" />
                       {item.label}
-                    </Link>
+                    </PartnerPendingLink>
                   );
                 },
               )}
@@ -277,7 +277,7 @@ function DashboardSidebar({
   return (
     <aside className="sticky top-0 hidden h-screen border-r border-border/70 bg-surface-overlay/95 backdrop-blur-xl md:block">
       <div className="flex h-full flex-col gap-6 px-3 py-4 xl:px-4">
-        <Link
+        <PartnerPendingLink
           href="/partner"
           aria-label="협력사 포털 홈"
           className="flex h-14 items-center gap-3 rounded-[1.1rem] border border-border bg-surface-control px-3 shadow-flat"
@@ -291,18 +291,18 @@ function DashboardSidebar({
               Partner Portal
             </span>
           </span>
-        </Link>
+        </PartnerPendingLink>
 
         {currentCompany ? (
           <div className="hidden rounded-[1rem] border border-border bg-surface-control p-3 shadow-flat xl:block">
             <div className="flex items-center justify-between gap-2">
               <Badge variant="primary">선택됨</Badge>
-              <Link
+              <PartnerPendingLink
                 href="/partner"
                 className="text-xs font-semibold text-primary hover:opacity-80"
               >
                 변경
-              </Link>
+              </PartnerPendingLink>
             </div>
             <p className="mt-3 truncate text-sm font-semibold text-foreground">
               {currentCompany.name}
@@ -326,7 +326,7 @@ function DashboardSidebar({
               currentCompanyId,
             );
             return (
-              <Link
+              <PartnerPendingLink
                 key={"section" in item ? item.section : item.href}
                 href={href}
                 aria-current={active ? "page" : undefined}
@@ -351,14 +351,14 @@ function DashboardSidebar({
                     {item.description}
                   </span>
                 </span>
-              </Link>
+              </PartnerPendingLink>
             );
           })}
         </nav>
 
         <div className="mt-auto space-y-2">
           {currentCompany ? (
-            <Link
+            <PartnerPendingLink
               href="/partner"
               className="flex min-h-11 items-center justify-center gap-3 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat transition-interactive hover:-translate-y-px xl:justify-start"
             >
@@ -366,23 +366,23 @@ function DashboardSidebar({
               <span className="hidden min-w-0 truncate xl:inline">
                 협력사 선택
               </span>
-            </Link>
+            </PartnerPendingLink>
           ) : null}
-          <Link
+          <PartnerPendingLink
             href="/"
             className="flex min-h-11 items-center justify-center gap-3 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat transition-interactive hover:-translate-y-px xl:justify-start"
           >
             <ExternalLink className="h-4 w-4" />
             <span className="hidden xl:inline">사용자 화면</span>
-          </Link>
-          <Link
+          </PartnerPendingLink>
+          <PartnerPendingLink
             href="/partner/logout"
             prefetch={false}
             className="flex min-h-11 items-center justify-center gap-3 rounded-[1rem] border border-danger/20 bg-danger/10 px-3 text-sm font-semibold text-danger shadow-flat transition-interactive hover:-translate-y-px xl:justify-start"
           >
             <LogOut className="h-4 w-4" />
             <span className="hidden xl:inline">로그아웃</span>
-          </Link>
+          </PartnerPendingLink>
         </div>
       </div>
     </aside>
@@ -422,13 +422,13 @@ function DashboardTopBar({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <Link
+          <PartnerPendingLink
             href="/"
             className="inline-flex h-10 items-center gap-2 rounded-[0.95rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat transition-interactive hover:-translate-y-px"
           >
             사용자 화면
             <ExternalLink className="h-4 w-4" />
-          </Link>
+          </PartnerPendingLink>
           <ThemeToggle />
         </div>
       </Container>
@@ -474,7 +474,7 @@ export default function PartnerPortalShellView({
             size="wide"
             className="flex min-h-16 items-center justify-between gap-4 py-3"
           >
-            <Link
+            <PartnerPendingLink
               href="/partner"
               aria-label="협력사 포털 홈"
               className="inline-flex items-center gap-3 text-foreground hover:opacity-80"
@@ -483,15 +483,15 @@ export default function PartnerPortalShellView({
               <span className="rounded-full border border-border bg-surface-muted/80 px-3 py-1 text-xs font-medium text-muted-foreground">
                 협력사 포털
               </span>
-            </Link>
+            </PartnerPendingLink>
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <Link
+              <PartnerPendingLink
                 href="/"
                 className="inline-flex h-10 items-center rounded-[0.95rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat"
               >
                 공개 홈
-              </Link>
+              </PartnerPendingLink>
             </div>
           </Container>
         </div>

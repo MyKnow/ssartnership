@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Select from "@/components/ui/Select";
+import Skeleton from "@/components/ui/Skeleton";
 import type {
   PartnerReview,
   PartnerReviewReaction,
@@ -15,6 +16,11 @@ import type {
 } from "@/lib/partner-reviews";
 import { applyPartnerReviewReaction } from "@/lib/partner-reviews";
 import {
+  getPartnerReviewPendingMessage,
+  isPartnerReviewListRefreshing,
+  type PartnerReviewPendingMode,
+} from "@/lib/partner-review-pending";
+import {
   appendPartnerReviewList,
   getPartnerReviewRatingLabel,
   getPartnerReviewRatingOptions,
@@ -23,6 +29,32 @@ import PartnerReviewCard from "./PartnerReviewCard";
 import PartnerReviewSummaryCard from "./PartnerReviewSummaryCard";
 
 const PartnerReviewForm = dynamic(() => import("./PartnerReviewForm"));
+
+function PartnerReviewListPendingRows() {
+  return (
+    <div
+      className="grid gap-3 rounded-[1rem] border border-primary/10 bg-primary-soft/45 p-3"
+      aria-hidden
+    >
+      {Array.from({ length: 2 }).map((_, index) => (
+        <div
+          key={index}
+          className="rounded-[0.9rem] border border-border/70 bg-surface-overlay p-4"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-24 rounded-lg" />
+              <Skeleton className="h-5 w-full max-w-xs" />
+              <Skeleton className="h-4 w-full max-w-md" />
+            </div>
+            <Skeleton className="h-9 w-20 rounded-full" />
+          </div>
+          <Skeleton className="mt-4 h-4 w-full max-w-2xl" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function PartnerReviewSection({
   partnerId,
@@ -56,7 +88,8 @@ export default function PartnerReviewSection({
   const [onlyWithImages, setOnlyWithImages] = useState(false);
   const [nextOffset, setNextOffset] = useState(initialOffset);
   const [hasMore, setHasMore] = useState(initialHasMore);
-  const [pending, setPending] = useState(false);
+  const [pendingMode, setPendingMode] =
+    useState<PartnerReviewPendingMode>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
@@ -65,6 +98,10 @@ export default function PartnerReviewSection({
   const [reactingReviewId, setReactingReviewId] = useState<string | null>(null);
 
   const includeHiddenReviews = accessMode === "partner";
+  const listRefreshing = isPartnerReviewListRefreshing(pendingMode);
+  const listBusy = pendingMode !== "idle" && pendingMode !== "react";
+  const loadingMore = pendingMode === "loadMore";
+  const pendingMessage = getPartnerReviewPendingMessage(pendingMode);
 
   function showSubmittedReview(result: {
     review: PartnerReview;
@@ -129,8 +166,9 @@ export default function PartnerReviewSection({
     nextSort = sort,
     nextRating = rating,
     nextOnlyWithImages = onlyWithImages,
+    mode: PartnerReviewPendingMode = "refresh",
   ) {
-    setPending(true);
+    setPendingMode(mode);
     setErrorMessage(null);
     try {
       const response = await fetch(buildListUrl(nextSort, nextRating, nextOnlyWithImages), {
@@ -151,15 +189,15 @@ export default function PartnerReviewSection({
         setRating(nextRating);
       });
     } finally {
-      setPending(false);
+      setPendingMode("idle");
     }
   }
 
   async function loadMore() {
-    if (pending || !hasMore) {
+    if (listBusy || !hasMore) {
       return;
     }
-    setPending(true);
+    setPendingMode("loadMore");
     setErrorMessage(null);
     try {
       const response = await fetch(buildListUrl(sort, rating, onlyWithImages, nextOffset), {
@@ -178,7 +216,7 @@ export default function PartnerReviewSection({
         setHasMore(data.hasMore);
       });
     } finally {
-      setPending(false);
+      setPendingMode("idle");
     }
   }
 
@@ -195,7 +233,7 @@ export default function PartnerReviewSection({
         setErrorMessage(data.message ?? "리뷰 삭제에 실패했습니다.");
         return;
       }
-      await refreshList(sort);
+      await refreshList(sort, rating, onlyWithImages, "delete");
     } finally {
       setDeletingReviewId(null);
     }
@@ -221,7 +259,7 @@ export default function PartnerReviewSection({
         setErrorMessage(data.message ?? "리뷰 상태 변경에 실패했습니다.");
         return;
       }
-      await refreshList(sort);
+      await refreshList(sort, rating, onlyWithImages, "moderate");
     } finally {
       setModeratingReviewId(null);
     }
@@ -238,6 +276,7 @@ export default function PartnerReviewSection({
     }
 
     setReactingReviewId(reviewId);
+    setPendingMode("react");
     setErrorMessage(null);
     startTransition(() => {
       setReviews((current) =>
@@ -273,6 +312,7 @@ export default function PartnerReviewSection({
       });
     } finally {
       setReactingReviewId(null);
+      setPendingMode("idle");
     }
   }
 
@@ -331,17 +371,24 @@ export default function PartnerReviewSection({
       <PartnerReviewSummaryCard summary={summary} />
 
       {hasAnyReviews ? (
-        <Card padding="md">
+        <Card padding="md" aria-busy={listBusy || undefined}>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_10rem] lg:items-end">
             <div className="grid gap-1">
               <span className="ui-caption">목록</span>
-              <p className="text-sm font-medium text-foreground">{listDescription}</p>
+              <p
+                className="text-sm font-medium text-foreground"
+                role="status"
+                aria-live="polite"
+              >
+                {pendingMessage ?? `${listDescription} 표시`}
+              </p>
             </div>
 
             <label className="grid gap-1">
               <span className="ui-caption">별점</span>
               <Select
                 value={rating}
+                disabled={listBusy}
                 onChange={(event) => {
                   const nextRating = event.target.value as PartnerReviewRatingFilter;
                   setComposerOpen(false);
@@ -361,6 +408,7 @@ export default function PartnerReviewSection({
               <span className="ui-caption">정렬</span>
               <Select
                 value={sort}
+                disabled={listBusy}
                 onChange={(event) => {
                   const nextSort = event.target.value as PartnerReviewSort;
                   setComposerOpen(false);
@@ -375,10 +423,11 @@ export default function PartnerReviewSection({
               </Select>
             </label>
 
-            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface-control px-3 text-sm font-medium text-foreground">
+            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface-control px-3 text-sm font-medium text-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
               <input
                 type="checkbox"
                 checked={onlyWithImages}
+                disabled={listBusy}
                 onChange={(event) => {
                   const nextOnlyWithImages = event.target.checked;
                   setComposerOpen(false);
@@ -395,6 +444,12 @@ export default function PartnerReviewSection({
       ) : null}
 
       {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
+      {pendingMessage ? (
+        <div role="status" aria-live="polite">
+          <FormMessage variant="info">{pendingMessage}</FormMessage>
+        </div>
+      ) : null}
+      {listRefreshing ? <PartnerReviewListPendingRows /> : null}
 
       {emptyState ? (
         <Card padding="md" className="grid gap-2">
@@ -441,10 +496,25 @@ export default function PartnerReviewSection({
       )}
 
       {hasMore ? (
-        <div className="flex justify-center">
-          <Button variant="secondary" onClick={() => void loadMore()} loading={pending} loadingText="불러오는 중">
+        <div
+          className="flex flex-col items-center justify-center gap-2 text-center"
+          role={loadingMore ? "status" : undefined}
+          aria-live="polite"
+        >
+          <Button
+            variant="secondary"
+            onClick={() => void loadMore()}
+            disabled={listBusy && !loadingMore}
+            loading={loadingMore}
+            loadingText="불러오는 중"
+          >
             더보기
           </Button>
+          <p className="text-xs font-medium text-muted-foreground">
+            {loadingMore
+              ? `현재 ${reviews.length}개 표시 중, 다음 리뷰를 불러오는 중입니다.`
+              : `현재 ${reviews.length}개 표시 중입니다.`}
+          </p>
         </div>
       ) : null}
     </section>

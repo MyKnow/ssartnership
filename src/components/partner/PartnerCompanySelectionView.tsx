@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { ArrowRight, Building2 } from "lucide-react";
+import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
@@ -64,10 +64,11 @@ export default function PartnerCompanySelectionView({
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {companies.map((company) => (
-                    <Link
+                    <PartnerPendingLink
                       key={company.id}
                       href={getCompanyScopedPortalHref(company.id)}
                       className="group block"
+                      showSpinner
                     >
                       <Card
                         tone="default"
@@ -94,7 +95,7 @@ export default function PartnerCompanySelectionView({
                           <ArrowRight className="h-4 w-4" />
                         </div>
                       </Card>
-                    </Link>
+                    </PartnerPendingLink>
                   ))}
                 </div>
               </div>

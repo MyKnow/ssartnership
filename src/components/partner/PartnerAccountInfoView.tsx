@@ -21,6 +21,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
+import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
 import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import { cn } from "@/lib/cn";
@@ -32,8 +33,9 @@ type BusinessStatusState =
       status: "success";
       message: string;
       tone: "success" | "warning" | "neutral";
+      checkedAt: string;
     }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; checkedAt: string };
 
 function formatBusinessRegistrationNumber(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -53,15 +55,34 @@ function getProfileDescription(profile: PartnerBillingProfileRecord) {
     .join(" · ");
 }
 
+function formatBusinessStatusCheckedAt(date: Date) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getBusinessStatusTone(
+  businessStatusCode: string | undefined,
+): "success" | "warning" | "neutral" {
+  if (businessStatusCode === "01") {
+    return "success";
+  }
+  if (businessStatusCode === "02" || businessStatusCode === "03") {
+    return "warning";
+  }
+  return "neutral";
+}
+
 function BusinessStatusMessage({ state }: { state: BusinessStatusState }) {
   if (state.status === "idle" || state.status === "loading") {
     return null;
   }
 
   return (
-    <p
+    <div
       className={cn(
-        "text-xs font-medium leading-5",
+        "grid gap-0.5 text-xs font-medium leading-5",
         state.status === "error"
           ? "text-danger"
           : state.tone === "success"
@@ -70,9 +91,12 @@ function BusinessStatusMessage({ state }: { state: BusinessStatusState }) {
               ? "text-warning"
               : "text-muted-foreground",
       )}
+      role="status"
+      aria-live="polite"
     >
-      {state.message}
-    </p>
+      <p>{state.message}</p>
+      <p className="text-muted-foreground">마지막 확인 {state.checkedAt}</p>
+    </div>
   );
 }
 
@@ -112,6 +136,7 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
       setBusinessStatus({
         status: "error",
         message: "사업자 상태를 확인하지 못했습니다.",
+        checkedAt: formatBusinessStatusCheckedAt(new Date()),
       });
       return;
     }
@@ -132,16 +157,21 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
       setBusinessStatus({
         status: "error",
         message: payload.message ?? "사업자 상태를 확인하지 못했습니다.",
+        checkedAt: formatBusinessStatusCheckedAt(new Date()),
       });
       return;
     }
 
     const businessStatusLabel = payload.businessStatus || "상태 정보 없음";
     const taxTypeLabel = payload.taxType || "과세 유형 정보 없음";
+    const statusCodeLabel = payload.businessStatusCode
+      ? `국세청 코드 ${payload.businessStatusCode}`
+      : "국세청 코드 없음";
     setBusinessStatus({
       status: "success",
-      tone: payload.businessStatusCode === "01" ? "success" : "warning",
-      message: `${businessStatusLabel} · ${taxTypeLabel}`,
+      tone: getBusinessStatusTone(payload.businessStatusCode),
+      message: `${businessStatusLabel} · ${taxTypeLabel} · ${statusCodeLabel}`,
+      checkedAt: formatBusinessStatusCheckedAt(new Date()),
     });
   }
 
@@ -189,11 +219,13 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
             type="button"
             variant="secondary"
             disabled={!canLookup || businessStatus.status === "loading"}
+            loading={businessStatus.status === "loading"}
+            loadingText="확인 중"
             onClick={lookupBusinessStatus}
             className="w-full md:w-auto"
           >
             <Search className="h-4 w-4" />
-            {businessStatus.status === "loading" ? "확인 중" : "상태 확인"}
+            상태 확인
           </Button>
         </div>
         <BusinessStatusMessage state={businessStatus} />
@@ -243,7 +275,8 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
           기본 프로필로 사용
         </label>
 
-        <div className="flex justify-end">
+        <div className="grid gap-2 sm:justify-items-end">
+          <PartnerFormPendingNotice message="증빙 프로필을 저장하는 중입니다." />
           <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">
             프로필 저장
           </SubmitButton>
@@ -282,9 +315,10 @@ function BillingProfileCard({
         </div>
         <div className="flex flex-wrap gap-2">
           {!profile.isDefault && !isLegacyProfile ? (
-            <form action={setDefaultPartnerBillingProfileAction}>
+            <form action={setDefaultPartnerBillingProfileAction} className="grid gap-2">
               <input type="hidden" name="companyId" value={companyId} />
               <input type="hidden" name="profileId" value={profile.id} />
+              <PartnerFormPendingNotice message="기본 프로필로 변경하는 중입니다." />
               <SubmitButton variant="secondary" pendingText="변경 중">
                 <CheckCircle2 className="h-4 w-4" />
                 기본값
@@ -292,9 +326,10 @@ function BillingProfileCard({
             </form>
           ) : null}
           {!isLegacyProfile ? (
-            <form action={archivePartnerBillingProfileAction}>
+            <form action={archivePartnerBillingProfileAction} className="grid gap-2">
               <input type="hidden" name="companyId" value={companyId} />
               <input type="hidden" name="profileId" value={profile.id} />
+              <PartnerFormPendingNotice message="증빙 프로필을 삭제하는 중입니다." />
               <SubmitButton variant="danger" pendingText="삭제 중">
                 <Trash2 className="h-4 w-4" />
                 삭제

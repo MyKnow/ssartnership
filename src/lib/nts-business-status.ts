@@ -3,6 +3,12 @@ import { normalizeBusinessRegistrationNumber } from "@/lib/partner-billing";
 const NTS_BUSINESS_STATUS_ENDPOINT =
   "https://api.odcloud.kr/api/nts-businessman/v1/status";
 
+const NTS_BUSINESS_STATUS_LABEL_BY_CODE: Record<string, string> = {
+  "01": "계속사업자",
+  "02": "휴업자",
+  "03": "폐업자",
+};
+
 export type NtsBusinessStatusLookupResult =
   | {
       ok: true;
@@ -32,6 +38,10 @@ function getStringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getBusinessStatusLabel(rawStatus: string, statusCode: string) {
+  return NTS_BUSINESS_STATUS_LABEL_BY_CODE[statusCode] ?? rawStatus;
+}
+
 function getServiceKeyQueryValue(serviceKey: string) {
   return serviceKey.includes("%") ? serviceKey : encodeURIComponent(serviceKey);
 }
@@ -57,7 +67,7 @@ export async function lookupNtsBusinessStatus(
 
   try {
     const response = await fetch(
-      `${NTS_BUSINESS_STATUS_ENDPOINT}?serviceKey=${getServiceKeyQueryValue(serviceKey)}`,
+      `${NTS_BUSINESS_STATUS_ENDPOINT}?serviceKey=${getServiceKeyQueryValue(serviceKey)}&returnType=JSON`,
       {
         method: "POST",
         headers: {
@@ -77,8 +87,17 @@ export async function lookupNtsBusinessStatus(
     }
 
     const payload = (await response.json().catch(() => null)) as
-      | { data?: unknown }
+      | { status_code?: unknown; data?: unknown }
       | null;
+    const apiStatusCode = getStringValue(payload?.status_code);
+    if (apiStatusCode && apiStatusCode !== "OK") {
+      return {
+        ok: false,
+        code: "invalid_response",
+        message: `사업자 상태조회 API 응답을 확인해 주세요. (${apiStatusCode})`,
+      };
+    }
+
     const [rawStatus] = Array.isArray(payload?.data) ? payload.data : [];
     if (!rawStatus || typeof rawStatus !== "object") {
       return {
@@ -89,11 +108,13 @@ export async function lookupNtsBusinessStatus(
     }
 
     const raw = rawStatus as Record<string, unknown>;
+    const businessStatusCode = getStringValue(raw.b_stt_cd);
+    const rawBusinessStatus = getStringValue(raw.b_stt);
     return {
       ok: true,
       businessRegistrationNumber: normalizedBusinessRegistrationNumber,
-      businessStatus: getStringValue(raw.b_stt),
-      businessStatusCode: getStringValue(raw.b_stt_cd),
+      businessStatus: getBusinessStatusLabel(rawBusinessStatus, businessStatusCode),
+      businessStatusCode,
       taxType: getStringValue(raw.tax_type),
       taxTypeCode: getStringValue(raw.tax_type_cd),
       closedAt: getStringValue(raw.end_dt) || null,
