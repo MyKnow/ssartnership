@@ -138,8 +138,9 @@ test("authenticates a completed partner setup", async () => {
   );
 
   assert.equal(result.account.loginId, mockPartnerPortalSetupTokens[0].loginId);
-  assert.equal(result.companyIds.length, 1);
+  assert.equal(result.companyIds.length, 2);
   assert.equal(result.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(result.companyIds[1], "mock-partner-company-urban-gym");
 });
 
 test("resets a partner password and forces change on the next login", async () => {
@@ -174,6 +175,7 @@ test("resets a partner password and forces change on the next login", async () =
   );
   assert.equal(tempLoginResult.account.mustChangePassword, true);
   assert.equal(tempLoginResult.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(tempLoginResult.companyIds[1], "mock-partner-company-urban-gym");
 
   const changeResult = await changeMockPartnerPortalPassword({
     accountId: resetResult.account.id,
@@ -183,6 +185,7 @@ test("resets a partner password and forces change on the next login", async () =
 
   assert.equal(changeResult.account.mustChangePassword, false);
   assert.equal(changeResult.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(changeResult.companyIds[1], "mock-partner-company-urban-gym");
 
   const finalLogin = await authenticatePartnerPortalLogin(
     setup.loginId,
@@ -191,6 +194,36 @@ test("resets a partner password and forces change on the next login", async () =
 
   assert.equal(finalLogin.account.mustChangePassword, false);
   assert.equal(finalLogin.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(finalLogin.companyIds[1], "mock-partner-company-urban-gym");
+});
+
+test("supports one partner account linked to multiple companies", async () => {
+  const { authenticatePartnerPortalLogin } = await partnerAuthModulePromise;
+  const {
+    completeMockPartnerPortalInitialSetup,
+    getMockPartnerPortalDashboard,
+    mockPartnerPortalSetupTokens,
+  } = await mockPartnerPortalModulePromise;
+
+  await completeMockPartnerPortalInitialSetup({
+    token: mockPartnerPortalSetupTokens[0].token,
+    password: "Partner!123",
+    confirmPassword: "Partner!123",
+  });
+
+  const result = await authenticatePartnerPortalLogin(
+    mockPartnerPortalSetupTokens[0].loginId,
+    "Partner!123",
+  );
+  const dashboard = await getMockPartnerPortalDashboard([result.companyIds[1] ?? ""]);
+
+  assert.deepEqual(result.companyIds, [
+    "mock-partner-company-cafe-haeon",
+    "mock-partner-company-urban-gym",
+  ]);
+  assert.equal(dashboard.totals.companyCount, 1);
+  assert.equal(dashboard.companies[0]?.id, "mock-partner-company-urban-gym");
+  assert.equal(dashboard.companies[0]?.services.length, 2);
 });
 
 test("builds a company dashboard with aggregate metrics and service statuses", async () => {

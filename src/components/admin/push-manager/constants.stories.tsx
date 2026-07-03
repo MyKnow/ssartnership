@@ -78,7 +78,7 @@ export const Summary: Story = {
     await expect(canvas.getByText("partner-relative:partner-1")).toBeInTheDocument();
     await expect(canvas.getByText("partner-absolute:partner-2")).toBeInTheDocument();
     await expect(canvas.getByText("partner-invalid:")).toBeInTheDocument();
-    await expect(canvas.getByText("member-label:김싸피 (@ssafy15) · 15기 · 1학기 · 서울")).toBeInTheDocument();
+    await expect(canvas.getByText("member-label:김싸피 (@ssafy15) · 15기 · 2학기 · 서울")).toBeInTheDocument();
     await expect(canvas.getByText("member-label-fallback:ops15 (@ops15) · 기수 미지정 · 캠퍼스 미지정")).toBeInTheDocument();
   },
 };

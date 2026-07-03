@@ -20,6 +20,7 @@ export function ImmediateChangeForm({
 }) {
   return (
     <form action={saveImmediateAction} className="space-y-5 pb-24 sm:pb-28">
+      <input type="hidden" name="companyId" value={context.companyId} />
       <input type="hidden" name="partnerId" value={context.partnerId} />
 
       <InlineMessage

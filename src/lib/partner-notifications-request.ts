@@ -7,6 +7,7 @@ import type {
   PartnerNotificationEntry,
   PartnerNotificationTone,
 } from "@/lib/partner-notifications";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
 
 function formatPeriod(
   start: string | null | undefined,
@@ -90,7 +91,7 @@ export function createRequestEntry(summary: PartnerChangeRequestSummary): Partne
     companyName: summary.companyName,
     partnerId: summary.partnerId,
     partnerName: summary.requestedPartnerName,
-    href: `/partner/services/${encodeURIComponent(summary.partnerId)}`,
+    href: getCompanyScopedPartnerServiceHref(summary.companyId, summary.partnerId),
     createdAt: resolvedAt,
   };
 }

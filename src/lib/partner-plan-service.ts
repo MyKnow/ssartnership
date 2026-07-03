@@ -4,6 +4,7 @@ import {
   resolvePartnerBrandPlanWindow,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import {
   assertPartnerPlanUpgradeTransition,
   normalizePartnerPlanUpgradeRequestStatus,
@@ -301,6 +302,7 @@ async function assertPartnerBrandAccess(accountId: string, partnerId: string) {
 
 export async function createPartnerPlanUpgradeRequest(input: {
   partnerId: string;
+  companyId?: string | null;
   accountId: string;
   requestedPlanTier: string;
   paymentAmountKrw: string;
@@ -308,6 +310,9 @@ export async function createPartnerPlanUpgradeRequest(input: {
   memo: string;
 }) {
   const brand = await assertPartnerBrandAccess(input.accountId, input.partnerId);
+  if (input.companyId && brand.companyId !== input.companyId) {
+    throw new Error("브랜드 접근 권한이 없습니다.");
+  }
   const requestedPlanTier = normalizeRequestedPlanTier(
     input.requestedPlanTier,
     brand.planTier,
@@ -358,7 +363,7 @@ export async function createPartnerPlanUpgradeRequest(input: {
       accountIds: [input.accountId],
       title: "플랜 업그레이드 요청이 접수되었습니다",
       body: `${brand.name}의 ${getPartnerCompanyPlanDefinition(requestedPlanTier).label} 업그레이드 요청을 관리자가 확인합니다.`,
-      targetUrl: "/partner/plans",
+      targetUrl: getCompanyScopedPortalHref(brand.companyId, "plans"),
       metadata: { requestId: request.id, partnerId: brand.id, companyId: brand.companyId, requestedPlanTier },
     }).catch((error) => {
       console.error("[partner-plan-service] partner upgrade notification failed", error);
@@ -371,15 +376,19 @@ export async function createPartnerPlanUpgradeRequest(input: {
 export async function cancelPartnerPlanUpgradeRequest(input: {
   requestId: string;
   accountId: string;
+  companyId?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("partner_plan_upgrade_requests")
-    .select("id,requested_by_account_id,status")
+    .select("id,company_id,requested_by_account_id,status")
     .eq("id", input.requestId)
     .maybeSingle();
 
   if (error || !data || data.requested_by_account_id !== input.accountId) {
+    throw new Error("업그레이드 요청을 찾을 수 없습니다.");
+  }
+  if (input.companyId && data.company_id !== input.companyId) {
     throw new Error("업그레이드 요청을 찾을 수 없습니다.");
   }
   assertPartnerPlanUpgradeTransition(
@@ -451,7 +460,7 @@ export async function updatePartnerBrandPlanByAdmin(input: {
     companyId: brand.companyId,
     title: `${brand.name} 플랜이 변경되었습니다`,
     body: `${getPartnerCompanyPlanDefinition(brand.planTier).label}에서 ${getPartnerCompanyPlanDefinition(input.nextPlanTier).label}로 변경되었습니다.`,
-    targetUrl: "/partner/plans",
+    targetUrl: getCompanyScopedPortalHref(brand.companyId, "plans"),
     metadata: { partnerId: input.partnerId, companyId: brand.companyId, nextPlanTier: input.nextPlanTier },
   }).catch((error) => {
     console.error("[partner-plan-service] plan change notification failed", error);
@@ -545,7 +554,7 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
     body: approved
       ? `${request.brandName}의 ${getPartnerCompanyPlanDefinition(request.requestedPlanTier).label} 플랜이 적용되었습니다.`
       : `${request.brandName}의 플랜 업그레이드 요청이 반려되었습니다.${adminNote ? ` 사유: ${adminNote}` : ""}`,
-    targetUrl: "/partner/plans",
+    targetUrl: getCompanyScopedPortalHref(request.companyId, "plans"),
     metadata: { requestId: request.id, partnerId: request.partnerId, companyId: request.companyId },
   }).catch((notificationError) => {
     console.error("[partner-plan-service] review notification failed", notificationError);

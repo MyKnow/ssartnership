@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import PartnerDashboardView from "@/components/partner/PartnerDashboardView";
-import { getPartnerPortalDashboard } from "@/lib/partner-dashboard";
+import PartnerCompanySelectionView from "@/components/partner/PartnerCompanySelectionView";
+import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { redirect } from "next/navigation";
@@ -24,7 +25,10 @@ export default async function PartnerHomePage() {
     redirect("/partner/change-password");
   }
 
-  const dashboard = await getPartnerPortalDashboard(session.companyIds);
+  const companies = await getPartnerPortalCompanySummaries(session.companyIds);
+  if (companies.length === 1 && companies[0]) {
+    redirect(getCompanyScopedPortalHref(companies[0].id));
+  }
 
-  return <PartnerDashboardView session={session} dashboard={dashboard} />;
+  return <PartnerCompanySelectionView session={session} companies={companies} />;
 }

@@ -2,6 +2,10 @@ import type {
   PartnerNotificationCenterSummary,
   PartnerNotificationEntry,
 } from "@/lib/partner-notifications";
+import {
+  getCompanyScopedPartnerServiceHref,
+  getCompanyScopedPortalHref,
+} from "@/lib/partner-portal-paths";
 
 function truncateText(value: string, limit = 80) {
   const trimmed = value.trim();
@@ -57,7 +61,9 @@ export function createReviewEntry(review: {
     companyName: review.companyName ?? "미지정",
     partnerId: review.partnerId,
     partnerName: review.partnerName,
-    href: `/partner/services/${encodeURIComponent(review.partnerId)}`,
+    href: review.companyId
+      ? getCompanyScopedPartnerServiceHref(review.companyId, review.partnerId)
+      : `/partner/services/${encodeURIComponent(review.partnerId)}`,
     createdAt: review.createdAt,
   };
 }
@@ -89,7 +95,9 @@ export function createOperationEntry(input: {
         companyName: input.companyName,
         partnerId: input.partnerId,
         partnerName: input.partnerName,
-        href: "/partner",
+        href: input.companyId
+          ? getCompanyScopedPortalHref(input.companyId)
+          : "/partner",
         createdAt: input.createdAt,
       };
     case "partner_company_update":
@@ -105,7 +113,9 @@ export function createOperationEntry(input: {
         companyName: input.companyName,
         partnerId: input.partnerId,
         partnerName: input.partnerName,
-        href: "/partner",
+        href: input.companyId
+          ? getCompanyScopedPortalHref(input.companyId)
+          : "/partner",
         createdAt: input.createdAt,
       };
     case "partner_company_delete":
@@ -121,7 +131,9 @@ export function createOperationEntry(input: {
         companyName: input.companyName,
         partnerId: input.partnerId,
         partnerName: input.partnerName,
-        href: "/partner",
+        href: input.companyId
+          ? getCompanyScopedPortalHref(input.companyId)
+          : "/partner",
         createdAt: input.createdAt,
       };
     case "partner_create":
@@ -140,7 +152,9 @@ export function createOperationEntry(input: {
         partnerId: input.partnerId,
         partnerName: input.partnerName,
         href: input.partnerId
-          ? `/partner/services/${encodeURIComponent(input.partnerId)}`
+          ? input.companyId
+            ? getCompanyScopedPartnerServiceHref(input.companyId, input.partnerId)
+            : `/partner/services/${encodeURIComponent(input.partnerId)}`
           : "/partner",
         createdAt: input.createdAt,
       };
@@ -158,7 +172,9 @@ export function createOperationEntry(input: {
         partnerId: input.partnerId,
         partnerName: input.partnerName,
         href: input.partnerId
-          ? `/partner/services/${encodeURIComponent(input.partnerId)}`
+          ? input.companyId
+            ? getCompanyScopedPartnerServiceHref(input.companyId, input.partnerId)
+            : `/partner/services/${encodeURIComponent(input.partnerId)}`
           : "/partner",
         createdAt: input.createdAt,
       };
@@ -175,7 +191,9 @@ export function createOperationEntry(input: {
         companyName: input.companyName,
         partnerId: input.partnerId,
         partnerName: input.partnerName,
-        href: "/partner",
+        href: input.companyId
+          ? getCompanyScopedPortalHref(input.companyId)
+          : "/partner",
         createdAt: input.createdAt,
       };
     case "partner_review_hide":
@@ -192,7 +210,9 @@ export function createOperationEntry(input: {
         partnerId: input.partnerId,
         partnerName: input.partnerName,
         href: input.partnerId
-          ? `/partner/services/${encodeURIComponent(input.partnerId)}`
+          ? input.companyId
+            ? getCompanyScopedPartnerServiceHref(input.companyId, input.partnerId)
+            : `/partner/services/${encodeURIComponent(input.partnerId)}`
           : "/partner",
         createdAt: input.createdAt,
       };
@@ -210,7 +230,9 @@ export function createOperationEntry(input: {
         partnerId: input.partnerId,
         partnerName: input.partnerName,
         href: input.partnerId
-          ? `/partner/services/${encodeURIComponent(input.partnerId)}`
+          ? input.companyId
+            ? getCompanyScopedPartnerServiceHref(input.companyId, input.partnerId)
+            : `/partner/services/${encodeURIComponent(input.partnerId)}`
           : "/partner",
         createdAt: input.createdAt,
       };
@@ -228,7 +250,9 @@ export function createOperationEntry(input: {
         partnerId: input.partnerId,
         partnerName: input.partnerName,
         href: input.partnerId
-          ? `/partner/services/${encodeURIComponent(input.partnerId)}`
+          ? input.companyId
+            ? getCompanyScopedPartnerServiceHref(input.companyId, input.partnerId)
+            : `/partner/services/${encodeURIComponent(input.partnerId)}`
           : "/partner",
         createdAt: input.createdAt,
       };
@@ -246,7 +270,9 @@ export function createOperationEntry(input: {
         partnerId: input.partnerId,
         partnerName: input.partnerName,
         href: input.partnerId
-          ? `/partner/services/${encodeURIComponent(input.partnerId)}`
+          ? input.companyId
+            ? getCompanyScopedPartnerServiceHref(input.companyId, input.partnerId)
+            : `/partner/services/${encodeURIComponent(input.partnerId)}`
           : "/partner",
         createdAt: input.createdAt,
       };

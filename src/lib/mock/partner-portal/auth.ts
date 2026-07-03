@@ -33,7 +33,7 @@ function toLoginResult(setup: NonNullable<ReturnType<typeof findMockPartnerPorta
       initialSetupCompletedAt: setup.account.initialSetupCompletedAt,
       isActive: setup.account.isActive,
     },
-    companyIds: [setup.company.id],
+    companyIds: setup.account.linkedCompanyIds ?? [setup.company.id],
   };
 }
 

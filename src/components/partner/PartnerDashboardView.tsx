@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -19,13 +18,14 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
 import type { PartnerSession } from "@/lib/partner-session";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
 import { isOnlinePartnerLocation } from "@/lib/partner-service-mode";
-import { cn } from "@/lib/cn";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
 
 const partnerPortalDataSource =
   process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??
@@ -94,8 +94,10 @@ function getPartnerPortalServiceStatusLabel(
 }
 
 function ServiceCard({
+  companyId,
   service,
 }: {
+  companyId: string;
   service: PartnerPortalDashboard["companies"][number]["services"][number];
 }) {
   const isOnlineService = isOnlinePartnerLocation(service.location);
@@ -109,7 +111,7 @@ function ServiceCard({
 
   return (
     <Link
-      href={`/partner/services/${encodeURIComponent(service.id)}`}
+      href={getCompanyScopedPartnerServiceHref(companyId, service.id)}
       prefetch={false}
       aria-label={`${service.name} 상세 보기`}
       className="group block rounded-card border border-border/80 bg-surface-elevated p-5 shadow-flat transition-surface-transform duration-200 ease-out hover:-translate-y-1 hover:border-strong hover-shadow-raised"
@@ -167,55 +169,10 @@ function canAnyCompanyServiceAccessMetric(
   );
 }
 
-function CompanyTabs({
-  companies,
-  activeCompanyId,
-  onChange,
-}: {
-  companies: PartnerPortalCompanyDashboard[];
-  activeCompanyId: string;
-  onChange: (companyId: string) => void;
-}) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-      {companies.map((company) => {
-        const active = company.id === activeCompanyId;
-
-        return (
-          <button
-            key={company.id}
-            type="button"
-            onClick={() => onChange(company.id)}
-            className={cn(
-              "rounded-[1.1rem] border px-4 py-3 text-left transition-surface duration-200 ease-out",
-              active
-                ? "border-primary bg-primary text-primary-foreground shadow-raised"
-                : "border-border/80 bg-surface-control text-foreground shadow-flat hover:border-strong hover:bg-surface-elevated",
-            )}
-            aria-pressed={active}
-          >
-            <p className="text-sm font-semibold">{company.name}</p>
-            <p
-              className={cn(
-                "mt-1 text-xs",
-                active ? "text-primary-foreground/80" : "text-muted-foreground",
-              )}
-            >
-              {company.services.length}개 브랜드
-            </p>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function CompanyHeader({
   company,
-  showKicker,
 }: {
   company: PartnerPortalCompanyDashboard;
-  showKicker: boolean;
 }) {
   const visibleMetrics = [
     { key: "favoriteCount", label: "즐겨찾기", value: company.totals.favoriteCount },
@@ -229,7 +186,7 @@ function CompanyHeader({
     <Card tone="default" padding="md" className="space-y-5 xl:sticky xl:top-24">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          {showKicker ? <p className="ui-kicker">선택된 협력사</p> : null}
+          <p className="ui-kicker">선택된 협력사</p>
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
               {company.name}
@@ -290,6 +247,7 @@ function CompanyBrandList({
           {company.services.map((service) => (
             <ServiceCard
               key={service.id}
+              companyId={company.id}
               service={service}
             />
           ))}
@@ -302,19 +260,13 @@ function CompanyBrandList({
 export default function PartnerDashboardView({
   session,
   dashboard,
+  selectedCompany,
 }: {
   session: PartnerSession;
   dashboard: PartnerPortalDashboard;
+  selectedCompany: PartnerPortalCompanyScope;
 }) {
-  const [activeCompanyId, setActiveCompanyId] = useState(
-    dashboard.companies[0]?.id ?? "",
-  );
-
-  const activeCompany =
-    dashboard.companies.find((company) => company.id === activeCompanyId) ??
-    dashboard.companies[0] ??
-    null;
-  const showCompanyTabs = dashboard.companies.length > 1;
+  const activeCompany = dashboard.companies[0] ?? null;
 
   return (
     <div className="bg-background">
@@ -324,11 +276,7 @@ export default function PartnerDashboardView({
             <ShellHeader
               eyebrow="Partner Portal"
               title="브랜드 현황"
-              description={
-                showCompanyTabs
-                  ? "협력사를 선택하면 해당 협력사의 정보와 브랜드 목록을 볼 수 있습니다."
-                  : "연결된 브랜드와 핵심 지표를 한 화면에서 확인할 수 있습니다."
-              }
+              description={`${selectedCompany.name}의 소유 브랜드와 핵심 지표를 확인합니다.`}
               actions={
                 <Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>
               }
@@ -348,31 +296,10 @@ export default function PartnerDashboardView({
             />
           ) : (
             <>
-              {showCompanyTabs ? (
-                <MotionReveal delay={0.08}>
-                  <Card tone="default" padding="md" className="space-y-4">
-                    <div className="space-y-1">
-                      <p className="ui-kicker">Companies</p>
-                      <p className="text-sm text-muted-foreground">
-                        협력사 이름을 눌러 해당 브랜드 현황으로 전환합니다.
-                      </p>
-                    </div>
-                    <CompanyTabs
-                      companies={dashboard.companies}
-                      activeCompanyId={activeCompany?.id ?? ""}
-                      onChange={setActiveCompanyId}
-                    />
-                  </Card>
-                </MotionReveal>
-              ) : null}
-
               {activeCompany ? (
-                <MotionReveal delay={showCompanyTabs ? 0.11 : 0.08}>
+                <MotionReveal delay={0.08}>
                   <div className="grid min-w-0 gap-5 xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
-                    <CompanyHeader
-                      company={activeCompany}
-                      showKicker={showCompanyTabs}
-                    />
+                    <CompanyHeader company={activeCompany} />
                     <CompanyBrandList company={activeCompany} />
                   </div>
                 </MotionReveal>
