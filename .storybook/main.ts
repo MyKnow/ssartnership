@@ -4,6 +4,8 @@ import type { StorybookConfig } from "@storybook/nextjs-vite";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextImageMockPath = path.resolve(dirname, "next-image.mock.tsx");
+const nextScriptMockPath = path.resolve(dirname, "next-script.mock.tsx");
+const nextThemesMockPath = path.resolve(dirname, "next-themes.mock.tsx");
 
 const config: StorybookConfig = {
   stories: [
@@ -32,22 +34,40 @@ const config: StorybookConfig = {
       find: /^next\/image$/,
       replacement: nextImageMockPath,
     };
+    const nextScriptAlias = {
+      find: /^next\/script$/,
+      replacement: nextScriptMockPath,
+    };
+    const nextThemesAlias = {
+      find: /^next-themes$/,
+      replacement: nextThemesMockPath,
+    };
 
     return {
       ...viteConfig,
       resolve: {
         ...viteConfig.resolve,
         alias: Array.isArray(existingAlias)
-          ? [nextImageAlias, ...existingAlias]
+          ? [nextImageAlias, nextScriptAlias, nextThemesAlias, ...existingAlias]
           : {
               ...existingAlias,
               "next/image": nextImageMockPath,
+              "next/script": nextScriptMockPath,
+              "next-themes": nextThemesMockPath,
             },
       },
       optimizeDeps: {
         ...viteConfig.optimizeDeps,
-        include: viteConfig.optimizeDeps?.include?.filter((item) => item !== "next/image"),
-        exclude: [...(viteConfig.optimizeDeps?.exclude ?? []), "next/image"],
+        include: viteConfig.optimizeDeps?.include?.filter(
+          (item) =>
+            item !== "next/image" && item !== "next/script" && item !== "next-themes",
+        ),
+        exclude: [
+          ...(viteConfig.optimizeDeps?.exclude ?? []),
+          "next/image",
+          "next/script",
+          "next-themes",
+        ],
       },
     };
   },
