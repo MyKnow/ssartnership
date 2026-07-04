@@ -22,7 +22,7 @@ test("returns seeded metrics for a mock partner service", async () => {
 
   resetMockPartnerPortalStore();
 
-  const snapshot = await getPartnerServiceMetrics("mock-partner-service-cafe-haeon-main");
+  const snapshot = await getPartnerServiceMetrics("mock-partner-service-cafe-ssafy-yeoksam");
 
   assert.equal(snapshot.warningMessage, null);
   assert.equal(snapshot.metrics.detailViews, 1240);

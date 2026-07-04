@@ -150,6 +150,9 @@ export default function PartnerBasicInfoSection({
               aria-invalid={Boolean(fieldErrors?.categoryId) || undefined}
               className={getPartnerCardInvalidClass(Boolean(fieldErrors?.categoryId))}
             >
+              <option value="" disabled>
+                카테고리를 선택해 주세요
+              </option>
               {(categoryOptions ?? []).map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.label}

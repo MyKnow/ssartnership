@@ -22,9 +22,9 @@ describe("partner billing profiles", () => {
     assert.deepEqual(
       normalizePartnerBillingProfileFormInput({
         label: "  본점  ",
-        payerName: "  카페해온  ",
+        payerName: "  카페싸피  ",
         businessRegistrationNumber: "220-81-62517",
-        businessName: "카페해온",
+        businessName: "카페싸피",
         representativeName: "김도연",
         businessAddress: "서울 강남구 테헤란로 212",
         businessType: "음식점업",
@@ -34,10 +34,10 @@ describe("partner billing profiles", () => {
       }),
       {
         label: "본점",
-        payerName: "카페해온",
+        payerName: "카페싸피",
         billingProfile: {
           businessRegistrationNumber: "2208162517",
-          businessName: "카페해온",
+          businessName: "카페싸피",
           representativeName: "김도연",
           businessAddress: "서울 강남구 테헤란로 212",
           businessType: "음식점업",
@@ -56,9 +56,9 @@ describe("partner billing profiles", () => {
         companyId: "company-1",
         accountId: "account-1",
         label: "본점",
-        payerName: "카페해온",
+        payerName: "카페싸피",
         businessRegistrationNumber: "2208162517",
-        businessName: "카페해온",
+        businessName: "카페싸피",
         representativeName: "김도연",
         businessAddress: "서울 강남구",
         businessType: "음식점업",
@@ -74,9 +74,9 @@ describe("partner billing profiles", () => {
       {
         id: "profile-1",
         label: "본점",
-        payerName: "카페해온",
+        payerName: "카페싸피",
         businessRegistrationNumber: "2208162517",
-        businessName: "카페해온",
+        businessName: "카페싸피",
         representativeName: "김도연",
         businessAddress: "서울 강남구",
         businessType: "음식점업",

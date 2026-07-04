@@ -33,8 +33,8 @@ export const authSmokeRoutes: SmokeRoute[] = [
   { path: "/partner/change-password", expected: /협력사|로그인|비밀번호/ },
   { path: "/partner/setup", expected: /초기 설정|협력사|포털/ },
   {
-    path: "/partner/setup/mock-partner-setup-cafe-haeon",
-    expected: /카페해온|초기 설정/,
+    path: "/partner/setup/mock-partner-setup-cafe-ssafy",
+    expected: /카페\s*싸피|초기 설정/,
   },
   { path: "/admin/login", expected: /로그인/ },
 ];
@@ -50,15 +50,15 @@ export const partnerProtectedRoutes: RedirectRoute[] = [
   { path: "/partner/plans", expectedPath: "/partner/login" },
   { path: "/partner/support", expectedPath: "/partner/login" },
   {
-    path: "/partner/companies/mock-partner-company-cafe-haeon",
+    path: "/partner/companies/mock-partner-company-cafe-ssafy",
     expectedPath: "/partner/login",
   },
   {
-    path: "/partner/services/mock-partner-service-cafe-haeon-main",
+    path: "/partner/services/mock-partner-service-cafe-ssafy-yeoksam",
     expectedPath: "/partner/login",
   },
   {
-    path: "/partner/services/mock-partner-service-cafe-haeon-main/request",
+    path: "/partner/services/mock-partner-service-cafe-ssafy-yeoksam/request",
     expectedPath: "/partner/login",
   },
 ];
@@ -76,7 +76,7 @@ export const adminProtectedRoutes: RedirectRoute[] = [
   { path: "/admin/notifications", expectedPath: "/auth/login" },
   { path: "/admin/partners", expectedPath: "/auth/login" },
   {
-    path: "/admin/partners/mock-partner-service-cafe-haeon-main",
+    path: "/admin/partners/mock-partner-service-cafe-ssafy-yeoksam",
     expectedPath: "/auth/login",
   },
   { path: "/admin/partners/new", expectedPath: "/auth/login" },

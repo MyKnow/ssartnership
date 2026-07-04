@@ -175,3 +175,10 @@ export const SUGGEST_RATE_LIMIT: RateLimitConfig = {
   maxAttempts: 5,
   blockMs: 30 * 60 * 1000,
 };
+
+export const PARTNER_REGISTRATION_RATE_LIMIT: RateLimitConfig = {
+  table: "partner_registration_attempts",
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 5,
+  blockMs: 30 * 60 * 1000,
+};

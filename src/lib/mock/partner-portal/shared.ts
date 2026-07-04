@@ -45,6 +45,8 @@ export type MockPortalStore = {
   setups: MockPortalSetupRecord[];
 };
 
+const CAFE_SSAFY_SETUP_ID = "mock-partner-setup-cafe-ssafy";
+
 function createMockPortalAccountRecord({
   id,
   loginId,
@@ -79,23 +81,23 @@ function createMockPortalAccountRecord({
 
 export const seededSetups: MockPortalSetupRecord[] = [
   {
-    token: "mock-partner-setup-cafe-haeon",
+    token: CAFE_SSAFY_SETUP_ID,
     account: createMockPortalAccountRecord({
-      id: "mock-partner-account-cafe-haeon",
-      loginId: "partner@cafehaeon.example",
+      id: "mock-partner-account-cafe-ssafy",
+      loginId: "partner@cafessafy.example",
       displayName: "김도연",
-      email: "partner@cafehaeon.example",
-      setupToken: "mock-partner-setup-cafe-haeon",
+      email: "partner@cafessafy.example",
+      setupToken: CAFE_SSAFY_SETUP_ID,
     }),
     company: {
-      id: "mock-partner-company-cafe-haeon",
-      name: "카페 해온",
-      slug: "cafe-haeon",
-      description: "역삼역 인근에서 세 개의 매장을 운영하는 카페 브랜드입니다.",
+      id: "mock-partner-company-cafe-ssafy",
+      name: "카페 싸피",
+      slug: "cafe-ssafy",
+      description: "서울 주요 학습권역에서 여러 지점을 운영하는 가상 프랜차이즈 카페입니다.",
       services: [
         {
-          id: "mock-partner-service-cafe-haeon-main",
-          name: "카페 해온 본점",
+          id: "mock-partner-service-cafe-ssafy-yeoksam",
+          name: "카페 싸피 역삼본점",
           location: "서울 강남구 역삼로 123",
           categoryLabel: "카페",
           planTier: "basic",
@@ -113,10 +115,10 @@ export const seededSetups: MockPortalSetupRecord[] = [
           },
         },
         {
-          id: "mock-partner-service-cafe-haeon-station",
-          name: "카페 해온 스터디룸",
-          location: "서울 강남구 테헤란로 222",
-          categoryLabel: "공간제휴",
+          id: "mock-partner-service-cafe-ssafy-gangnam",
+          name: "카페 싸피 강남역점",
+          location: "서울 강남구 테헤란로 212",
+          categoryLabel: "카페",
           planTier: "partner",
           visibility: "public",
           metrics: {
@@ -132,9 +134,66 @@ export const seededSetups: MockPortalSetupRecord[] = [
           },
         },
         {
-          id: "mock-partner-service-cafe-haeon-dessert",
-          name: "카페 해온 디저트 바",
-          location: "서울 강남구 논현로 45",
+          id: "mock-partner-service-cafe-ssafy-seolleung",
+          name: "카페 싸피 선릉점",
+          location: "서울 강남구 선릉로 521",
+          categoryLabel: "카페",
+          planTier: "basic",
+          visibility: "public",
+          metrics: {
+            favoriteCount: 52,
+            detailViews: 430,
+            detailUv: 265,
+            cardClicks: 96,
+            mapClicks: 18,
+            reservationClicks: 12,
+            inquiryClicks: 5,
+            reviewCount: 9,
+            totalClicks: 131,
+          },
+        },
+        {
+          id: "mock-partner-service-cafe-ssafy-samseong",
+          name: "카페 싸피 삼성점",
+          location: "서울 강남구 영동대로 513",
+          categoryLabel: "카페",
+          planTier: "boost",
+          visibility: "public",
+          metrics: {
+            favoriteCount: 88,
+            detailViews: 860,
+            detailUv: 544,
+            cardClicks: 212,
+            mapClicks: 41,
+            reservationClicks: 49,
+            inquiryClicks: 13,
+            reviewCount: 16,
+            totalClicks: 315,
+          },
+        },
+        {
+          id: "mock-partner-service-cafe-ssafy-seocho",
+          name: "카페 싸피 서초점",
+          location: "서울 서초구 서초대로 398",
+          categoryLabel: "카페",
+          planTier: "partner",
+          visibility: "public",
+          metrics: {
+            favoriteCount: 70,
+            detailViews: 610,
+            detailUv: 402,
+            cardClicks: 132,
+            mapClicks: 26,
+            reservationClicks: 24,
+            inquiryClicks: 8,
+            reviewCount: 14,
+            totalClicks: 190,
+          },
+        },
+        {
+          id: "mock-partner-service-cafe-ssafy-jamsil",
+          name: "카페 싸피 잠실점",
+          location: "서울 송파구 올림픽로 300",
           categoryLabel: "카페",
           planTier: "basic",
           visibility: "confidential",

@@ -46,7 +46,7 @@ test("lists seeded partner portal demo setups", async () => {
   assert.equal(setups.length, 2);
   assert.deepStrictEqual(
     setups.map((setup) => setup.companyName),
-    ["카페 해온", "어반짐 역삼"],
+    ["카페 싸피", "어반짐 역삼"],
   );
 });
 
@@ -60,9 +60,9 @@ test("returns setup context for a seeded token", async () => {
   );
 
   assert.ok(context);
-  assert.equal(context?.company.name, "카페 해온");
-  assert.equal(context?.account.loginId, "partner@cafehaeon.example");
-  assert.equal(context?.company.services.length, 3);
+  assert.equal(context?.company.name, "카페 싸피");
+  assert.equal(context?.account.loginId, "partner@cafessafy.example");
+  assert.equal(context?.company.services.length, 6);
   assert.equal(context?.isSetupComplete, false);
 });
 
@@ -80,7 +80,7 @@ test("completes initial setup with a password only", async () => {
   });
 
   assert.equal(result.token, token);
-  assert.equal(result.companyId, "mock-partner-company-cafe-haeon");
+  assert.equal(result.companyId, "mock-partner-company-cafe-ssafy");
 
   const updatedContext = await getMockPartnerPortalSetupContext(token);
   assert.equal(updatedContext?.isSetupComplete, true);
@@ -147,7 +147,7 @@ test("authenticates a completed partner setup", async () => {
 
   assert.equal(result.account.loginId, mockPartnerPortalSetupTokens[0].loginId);
   assert.equal(result.companyIds.length, 2);
-  assert.equal(result.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(result.companyIds[0], "mock-partner-company-cafe-ssafy");
   assert.equal(result.companyIds[1], "mock-partner-company-urban-gym");
 });
 
@@ -182,7 +182,7 @@ test("resets a partner password and forces change on the next login", async () =
     resetResult.temporaryPassword,
   );
   assert.equal(tempLoginResult.account.mustChangePassword, true);
-  assert.equal(tempLoginResult.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(tempLoginResult.companyIds[0], "mock-partner-company-cafe-ssafy");
   assert.equal(tempLoginResult.companyIds[1], "mock-partner-company-urban-gym");
 
   const changeResult = await changeMockPartnerPortalPassword({
@@ -192,7 +192,7 @@ test("resets a partner password and forces change on the next login", async () =
   });
 
   assert.equal(changeResult.account.mustChangePassword, false);
-  assert.equal(changeResult.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(changeResult.companyIds[0], "mock-partner-company-cafe-ssafy");
   assert.equal(changeResult.companyIds[1], "mock-partner-company-urban-gym");
 
   const finalLogin = await authenticatePartnerPortalLogin(
@@ -201,7 +201,7 @@ test("resets a partner password and forces change on the next login", async () =
   );
 
   assert.equal(finalLogin.account.mustChangePassword, false);
-  assert.equal(finalLogin.companyIds[0], "mock-partner-company-cafe-haeon");
+  assert.equal(finalLogin.companyIds[0], "mock-partner-company-cafe-ssafy");
   assert.equal(finalLogin.companyIds[1], "mock-partner-company-urban-gym");
 });
 
@@ -226,7 +226,7 @@ test("supports one partner account linked to multiple companies", async () => {
   const dashboard = await getMockPartnerPortalDashboard([result.companyIds[1] ?? ""]);
 
   assert.deepEqual(result.companyIds, [
-    "mock-partner-company-cafe-haeon",
+    "mock-partner-company-cafe-ssafy",
     "mock-partner-company-urban-gym",
   ]);
   assert.equal(dashboard.totals.companyCount, 1);
@@ -237,26 +237,26 @@ test("supports one partner account linked to multiple companies", async () => {
 test("builds a company dashboard with aggregate metrics and service statuses", async () => {
   const { getMockPartnerPortalDashboard } = await mockPartnerPortalModulePromise;
   const dashboard = await getMockPartnerPortalDashboard([
-    "mock-partner-company-cafe-haeon",
+    "mock-partner-company-cafe-ssafy",
     "mock-partner-company-urban-gym",
   ]);
 
   assert.equal(dashboard.totals.companyCount, 2);
-  assert.equal(dashboard.totals.serviceCount, 5);
-  assert.equal(dashboard.totals.detailViews, 3750);
-  assert.equal(dashboard.totals.totalClicks, 1460);
-  assert.equal(dashboard.totals.reviewCount, 65);
-  assert.equal(dashboard.companies[0]?.services.length, 3);
+  assert.equal(dashboard.totals.serviceCount, 8);
+  assert.equal(dashboard.totals.detailViews, 5650);
+  assert.equal(dashboard.totals.totalClicks, 2096);
+  assert.equal(dashboard.totals.reviewCount, 104);
+  assert.equal(dashboard.companies[0]?.services.length, 6);
   assert.equal(dashboard.companies[1]?.services.length, 2);
-  assert.equal(dashboard.companies[0]?.totals.detailViews, 1950);
-  assert.equal(dashboard.companies[0]?.totals.detailUv, 338);
+  assert.equal(dashboard.companies[0]?.totals.detailViews, 3850);
+  assert.equal(dashboard.companies[0]?.totals.detailUv, 1284);
   assert.equal(dashboard.companies[0]?.services[0]?.planTier, "basic");
   assert.equal(dashboard.companies[0]?.services[0]?.metrics.detailUv, 0);
   assert.equal(dashboard.companies[0]?.services[1]?.planTier, "partner");
   assert.equal(dashboard.companies[0]?.services[1]?.metrics.detailUv, 338);
   assert.equal(dashboard.companies[1]?.services[0]?.planTier, "boost");
   assert.equal(dashboard.companies[1]?.totals.totalClicks, 718);
-  assert.equal(dashboard.companies[0]?.totals.reviewCount, 40);
+  assert.equal(dashboard.companies[0]?.totals.reviewCount, 79);
   assert.equal(dashboard.companies[1]?.totals.reviewCount, 25);
   assert.equal(dashboard.companies[1]?.services[1]?.status, "pending");
 });
@@ -264,16 +264,16 @@ test("builds a company dashboard with aggregate metrics and service statuses", a
 test("loads mock partner plan portal data without Supabase UUID queries", async () => {
   const { getPartnerPlanPortalData } = await partnerPlanServiceModulePromise;
   const data = await getPartnerPlanPortalData(
-    ["mock-partner-company-cafe-haeon"],
-    "mock-partner-account-cafe-haeon",
+    ["mock-partner-company-cafe-ssafy"],
+    "mock-partner-account-cafe-ssafy",
   );
 
-  assert.equal(data.brands.length, 3);
+  assert.equal(data.brands.length, 6);
   assert.deepStrictEqual(
     data.brands.map((brand) => brand.planTier),
-    ["basic", "partner", "basic"],
+    ["basic", "partner", "basic", "boost", "partner", "basic"],
   );
-  assert.equal(data.brands[0]?.companyId, "mock-partner-company-cafe-haeon");
+  assert.equal(data.brands[0]?.companyId, "mock-partner-company-cafe-ssafy");
   assert.deepStrictEqual(data.requests, []);
   assert.deepStrictEqual(data.events, []);
 });
@@ -286,10 +286,10 @@ test("uses default partner notification preferences in mock mode", async () => {
   } = await operationalNotificationsModulePromise;
 
   const defaults = await getPartnerOperationalNotificationPreferences(
-    "mock-partner-account-cafe-haeon",
+    "mock-partner-account-cafe-ssafy",
   );
   const updated = await upsertPartnerOperationalNotificationPreferences(
-    "mock-partner-account-cafe-haeon",
+    "mock-partner-account-cafe-ssafy",
     { pushEnabled: false, planEnabled: false },
   );
 
@@ -301,7 +301,7 @@ test("uses default partner notification preferences in mock mode", async () => {
   assert.deepStrictEqual(
     await listOperationalPushSubscriptionDevices({
       ownerType: "partner",
-      ownerId: "mock-partner-account-cafe-haeon",
+      ownerId: "mock-partner-account-cafe-ssafy",
     }),
     [],
   );
@@ -314,34 +314,34 @@ test("updates immediate partner fields without approval", async () => {
   } = await mockPartnerChangeRequestModulePromise;
 
   const result = await updateMockPartnerImmediateFields({
-    companyIds: ["mock-partner-company-cafe-haeon"],
-    partnerId: "mock-partner-service-cafe-haeon-main",
-    thumbnail: "https://example.com/cafe-haeon-thumb.webp",
+    companyIds: ["mock-partner-company-cafe-ssafy"],
+    partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+    thumbnail: "https://example.com/cafe-ssafy-thumb.webp",
     images: [
-      "https://example.com/cafe-haeon-1.webp",
-      "https://example.com/cafe-haeon-2.webp",
+      "https://example.com/cafe-ssafy-1.webp",
+      "https://example.com/cafe-ssafy-2.webp",
     ],
     tags: ["모임", "디저트"],
-    reservationLink: "https://booking.example.com/cafe-haeon",
+    reservationLink: "https://booking.example.com/cafe-ssafy",
     inquiryLink: "02-999-1111",
   });
 
-  assert.equal(result.partnerId, "mock-partner-service-cafe-haeon-main");
-  assert.equal(result.companyId, "mock-partner-company-cafe-haeon");
+  assert.equal(result.partnerId, "mock-partner-service-cafe-ssafy-yeoksam");
+  assert.equal(result.companyId, "mock-partner-company-cafe-ssafy");
   assert.equal(result.currentMediaUrls.length, 3);
 
   const updatedContext = await getMockPartnerChangeRequestContext(
-    ["mock-partner-company-cafe-haeon"],
-    "mock-partner-service-cafe-haeon-main",
+    ["mock-partner-company-cafe-ssafy"],
+    "mock-partner-service-cafe-ssafy-yeoksam",
   );
 
-  assert.equal(updatedContext?.thumbnail, "https://example.com/cafe-haeon-thumb.webp");
+  assert.equal(updatedContext?.thumbnail, "https://example.com/cafe-ssafy-thumb.webp");
   assert.deepStrictEqual(updatedContext?.images, [
-    "https://example.com/cafe-haeon-1.webp",
-    "https://example.com/cafe-haeon-2.webp",
+    "https://example.com/cafe-ssafy-1.webp",
+    "https://example.com/cafe-ssafy-2.webp",
   ]);
   assert.deepStrictEqual(updatedContext?.tags, ["모임", "디저트"]);
-  assert.equal(updatedContext?.reservationLink, "https://booking.example.com/cafe-haeon");
+  assert.equal(updatedContext?.reservationLink, "https://booking.example.com/cafe-ssafy");
   assert.equal(updatedContext?.inquiryLink, "02-999-1111");
 });
 
@@ -354,34 +354,34 @@ test("creates and approves partner change requests for approval-required fields 
   } = await mockPartnerChangeRequestModulePromise;
 
   await updateMockPartnerImmediateFields({
-    companyIds: ["mock-partner-company-cafe-haeon"],
-    partnerId: "mock-partner-service-cafe-haeon-main",
-    thumbnail: "https://example.com/cafe-haeon-thumb.webp",
+    companyIds: ["mock-partner-company-cafe-ssafy"],
+    partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+    thumbnail: "https://example.com/cafe-ssafy-thumb.webp",
     images: [
-      "https://example.com/cafe-haeon-1.webp",
-      "https://example.com/cafe-haeon-2.webp",
+      "https://example.com/cafe-ssafy-1.webp",
+      "https://example.com/cafe-ssafy-2.webp",
     ],
     tags: ["모임", "디저트"],
-    reservationLink: "https://booking.example.com/cafe-haeon",
+    reservationLink: "https://booking.example.com/cafe-ssafy",
     inquiryLink: "02-999-1111",
   });
 
   const currentContext = await getMockPartnerChangeRequestContext(
-    ["mock-partner-company-cafe-haeon"],
-    "mock-partner-service-cafe-haeon-main",
+    ["mock-partner-company-cafe-ssafy"],
+    "mock-partner-service-cafe-ssafy-yeoksam",
   );
 
   assert.ok(currentContext);
 
   const request = await createMockPartnerChangeRequest({
-    companyIds: ["mock-partner-company-cafe-haeon"],
-    partnerId: "mock-partner-service-cafe-haeon-main",
-    requestedByAccountId: "mock-partner-account-cafe-haeon",
-    requestedByLoginId: "partner@cafehaeon.example",
+    companyIds: ["mock-partner-company-cafe-ssafy"],
+    partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+    requestedByAccountId: "mock-partner-account-cafe-ssafy",
+    requestedByLoginId: "partner@cafessafy.example",
     requestedByDisplayName: "김도연",
-    requestedPartnerName: "카페 해온 본점 리뉴얼",
+    requestedPartnerName: "카페 싸피 역삼본점 리뉴얼",
     requestedPartnerLocation: "서울 강남구 역삼로 125",
-    requestedMapUrl: "https://map.example.com/cafe-haeon-renewal",
+    requestedMapUrl: "https://map.example.com/cafe-ssafy-renewal",
     requestedCampusSlugs: ["seoul", "gumi"],
     requestedConditions: [...(currentContext?.currentConditions ?? []), "평일만 사용"],
     requestedBenefits: [...(currentContext?.currentBenefits ?? []), "추가 혜택"],
@@ -395,9 +395,9 @@ test("creates and approves partner change requests for approval-required fields 
     requestedPeriodEnd: "2026-10-31",
   });
 
-  assert.equal(request.requestedPartnerName, "카페 해온 본점 리뉴얼");
+  assert.equal(request.requestedPartnerName, "카페 싸피 역삼본점 리뉴얼");
   assert.equal(request.requestedPartnerLocation, "서울 강남구 역삼로 125");
-  assert.equal(request.requestedMapUrl, "https://map.example.com/cafe-haeon-renewal");
+  assert.equal(request.requestedMapUrl, "https://map.example.com/cafe-ssafy-renewal");
   assert.deepStrictEqual(request.requestedCampusSlugs, ["seoul", "gumi"]);
   assert.deepStrictEqual(request.requestedConditions, [
     ...(currentContext?.currentConditions ?? []),
@@ -417,13 +417,13 @@ test("creates and approves partner change requests for approval-required fields 
   });
 
   const updatedContext = await getMockPartnerChangeRequestContext(
-    ["mock-partner-company-cafe-haeon"],
-    "mock-partner-service-cafe-haeon-main",
+    ["mock-partner-company-cafe-ssafy"],
+    "mock-partner-service-cafe-ssafy-yeoksam",
   );
 
-  assert.equal(updatedContext?.partnerName, "카페 해온 본점 리뉴얼");
+  assert.equal(updatedContext?.partnerName, "카페 싸피 역삼본점 리뉴얼");
   assert.equal(updatedContext?.partnerLocation, "서울 강남구 역삼로 125");
-  assert.equal(updatedContext?.mapUrl, "https://map.example.com/cafe-haeon-renewal");
+  assert.equal(updatedContext?.mapUrl, "https://map.example.com/cafe-ssafy-renewal");
   assert.deepStrictEqual(updatedContext?.currentCampusSlugs, ["seoul", "gumi"]);
   assert.deepStrictEqual(updatedContext?.currentConditions, [
     ...(currentContext?.currentConditions ?? []),
@@ -436,23 +436,23 @@ test("creates and approves partner change requests for approval-required fields 
   assert.deepStrictEqual(updatedContext?.currentAppliesTo, ["staff", "student", "graduate"]);
   assert.equal(updatedContext?.periodStart, "2026-04-01");
   assert.equal(updatedContext?.periodEnd, "2026-10-31");
-  assert.equal(updatedContext?.thumbnail, "https://example.com/cafe-haeon-thumb.webp");
+  assert.equal(updatedContext?.thumbnail, "https://example.com/cafe-ssafy-thumb.webp");
   assert.deepStrictEqual(updatedContext?.images, [
-    "https://example.com/cafe-haeon-1.webp",
-    "https://example.com/cafe-haeon-2.webp",
+    "https://example.com/cafe-ssafy-1.webp",
+    "https://example.com/cafe-ssafy-2.webp",
   ]);
   assert.deepStrictEqual(updatedContext?.tags, ["모임", "디저트"]);
-  assert.equal(updatedContext?.reservationLink, "https://booking.example.com/cafe-haeon");
+  assert.equal(updatedContext?.reservationLink, "https://booking.example.com/cafe-ssafy");
   assert.equal(updatedContext?.inquiryLink, "02-999-1111");
 });
 
 test("splits signed tokens from the last dot", async () => {
   const { splitSignedToken } = await import("../src/lib/hmac.js");
-  const token = `{"loginId":"partner@cafehaeon.example"}.abcdef123456`;
+  const token = `{"loginId":"partner@cafessafy.example"}.abcdef123456`;
   const parts = splitSignedToken(token);
 
   assert.deepStrictEqual(parts, [
-    '{"loginId":"partner@cafehaeon.example"}',
+    '{"loginId":"partner@cafessafy.example"}',
     "abcdef123456",
   ]);
 });

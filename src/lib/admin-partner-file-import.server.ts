@@ -43,7 +43,8 @@ const URL_INPUT_HEADERS = new Set([
 
 const SAMPLE_GUIDE_ROWS = [
   ["브랜드명", "필수", "사용자에게 노출되는 브랜드 이름"],
-  ["카테고리", "필수", "카테고리 이름을 그대로 입력"],
+  ["카테고리", "필수", "드롭다운에서 선택하거나 새 카테고리명을 직접 입력"],
+  ["브랜드 전화번호", "선택", "협력사 담당자 번호가 아닌 브랜드/지점 연락처"],
   ["상세 설명", "선택", "구성원이 브랜드를 이해할 수 있도록 1200자 이내로 입력"],
   ["혜택", "선택", "여러 개면 | 로 구분. 예: 아메리카노 할인|베이커리 할인"],
   ["이용 조건", "선택", "여러 개면 | 로 구분. 예: 싸트너십 인증|현장 제시"],
@@ -206,28 +207,27 @@ function delimitedTextFormula(address: string) {
 function getInputExample(
   header: string,
   options: AdminPartnerFileTemplateOptions,
-  categories: AdminPartnerFileCategory[],
 ) {
-  const firstCategory = categories[0]?.label ?? "카페";
   const examples: Record<string, string> = {
-    브랜드명: "레뽀드라라 역삼 GS타워점",
-    카테고리: firstCategory,
+    브랜드명: "카페 싸피 역삼본점",
+    카테고리: "카페",
     시작일: "2026-05-01",
     종료일: "2026-12-31",
-    "문의 링크": "https://pf.kakao.com/_example",
-    "상세 설명": "교육장 근처에서 빠르게 방문하기 좋은 제휴 매장입니다.",
-    협력사명: "샘플 협력사",
-    담당자명: "홍길동",
-    "담당자 이메일": "partner@example.com",
-    "담당자 전화번호": "010-1234-5678",
-    "협력사 설명": "역삼역 인근 제휴 매장",
-    혜택: "아메리카노 할인|베이커리 할인",
+    "문의 링크": "https://pf.kakao.com/_cafessafy",
+    "브랜드 전화번호": "02-3429-5100",
+    "상세 설명": "SSAFY 서울캠퍼스 인근에서 이용하기 좋은 가상의 프랜차이즈 카페입니다.",
+    협력사명: "카페 싸피",
+    담당자명: "김싸피",
+    "담당자 이메일": "partner@cafessafy.example",
+    "담당자 전화번호": "010-1500-1234",
+    "협력사 설명": "여러 지점을 운영하는 가상의 프랜차이즈 카페",
+    혜택: "아메리카노 10% 할인|시그니처 라떼 500원 할인",
     "이용 조건": "싸트너십 인증|현장 제시",
-    태그: "카페|역삼",
-    위치: "서울 강남구 논현로 508 1층",
-    "지도 URL": "https://map.naver.com/example",
-    "사이트 링크": "https://service.example.com",
-    "혜택 이용 링크": "https://benefit.example.com",
+    태그: "카페|역삼|프랜차이즈",
+    위치: "서울 강남구 테헤란로 212 1층",
+    "지도 URL": "https://map.naver.com/v5/search/카페%20싸피%20역삼본점",
+    "사이트 링크": "https://cafessafy.example.com",
+    "혜택 이용 링크": "https://cafessafy.example.com/coupon",
   };
 
   if (header === "혜택 이용 링크" && options.benefitActionType !== "external_link") {
@@ -239,10 +239,12 @@ function getInputExample(
 function getInputGuide(header: string, options: AdminPartnerFileTemplateOptions) {
   const guides: Record<string, string> = {
     브랜드명: "필수. 사용자에게 노출되는 브랜드 이름입니다.",
-    카테고리: "필수. 드롭다운에서 선택합니다.",
+    카테고리:
+      "필수. 드롭다운에서 선택합니다. 목록에 없으면 새 카테고리명을 직접 입력합니다.",
     시작일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     종료일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     "문의 링크": "선택. 문의 채널 URL을 입력합니다.",
+    "브랜드 전화번호": "선택. 협력사 담당자 번호와 다른 브랜드/지점 연락처입니다.",
     "상세 설명": "선택. 상세 페이지에 표시할 브랜드 설명입니다. 1200자 이내로 입력합니다.",
     협력사명: "선택. 기존 협력사명과 정확히 같으면 자동 연결됩니다.",
     담당자명: "선택. 협력사 담당자 이름입니다.",
@@ -472,7 +474,7 @@ export async function createAdminPartnerXlsxTemplate(
   for (const header of headers) {
     input.addRow([
       header,
-      getInputExample(header, options, categories),
+      getInputExample(header, options),
       "",
       getInputGuide(header, options),
     ]);
@@ -527,12 +529,10 @@ export async function createAdminPartnerXlsxTemplate(
       type: "list",
       allowBlank: false,
       formulae: [`='${LIST_SHEET_NAME}'!$A$2:$A$${categories.length + 1}`],
-      showErrorMessage: true,
-      errorTitle: "카테고리 확인",
-      error: "목록 시트에 있는 카테고리 중 하나를 선택해 주세요.",
+      showErrorMessage: false,
       showInputMessage: true,
       promptTitle: "카테고리",
-      prompt: "드롭다운에서 카테고리를 선택해 주세요.",
+      prompt: "드롭다운에서 선택하거나, 목록에 없으면 새 카테고리명을 직접 입력해 주세요.",
     };
   }
 
@@ -637,10 +637,12 @@ export async function parseAdminPartnerXlsxDraft({
 
   const row = inputRows;
   const name = getValue(row, "브랜드명");
-  const category = resolveCategory(getValue(row, "카테고리"), categories);
+  const categoryLabelRaw = getValue(row, "카테고리");
+  const category = resolveCategory(categoryLabelRaw, categories);
   const periodStart = getValue(row, "시작일");
   const periodEnd = getValue(row, "종료일");
-  const inquiryLinkRaw = getValue(row, "문의 링크");
+  const brandPhoneRaw = getValue(row, "브랜드 전화번호");
+  const inquiryLinkRaw = getValue(row, "문의 링크") || brandPhoneRaw;
   const detailDescription = getValue(row, "상세 설명");
   const companyNameRaw = getValue(row, "협력사명");
   const company = resolveCompanyByName(companyNameRaw, companies);
@@ -658,8 +660,8 @@ export async function parseAdminPartnerXlsxDraft({
   if (!name) {
     errors.push("브랜드명이 필요합니다.");
   }
-  if (!category) {
-    errors.push("카테고리를 찾을 수 없습니다.");
+  if (!categoryLabelRaw) {
+    errors.push("카테고리가 필요합니다.");
   }
   if (detailDescription.length > 1200) {
     errors.push("상세 설명은 1,200자 이내로 입력해 주세요.");
@@ -686,6 +688,10 @@ export async function parseAdminPartnerXlsxDraft({
   if (inquiryLinkRaw && !inquiryLink) {
     errors.push("문의 링크가 올바르지 않습니다.");
   }
+  const brandPhone = sanitizePartnerLinkValue(brandPhoneRaw);
+  if (brandPhoneRaw && !brandPhone) {
+    errors.push("브랜드 전화번호가 올바르지 않습니다.");
+  }
   const companyContactEmail = getValue(row, "담당자 이메일");
   if (!company && companyContactEmail && !isValidEmail(companyContactEmail)) {
     errors.push("담당자 이메일이 올바르지 않습니다.");
@@ -703,6 +709,7 @@ export async function parseAdminPartnerXlsxDraft({
     ok: true,
     draft: {
       categoryId: category?.id ?? "",
+      categoryLabel: category?.label ?? categoryLabelRaw,
       partner: {
         name,
         visibility: "public",
