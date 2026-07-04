@@ -2,6 +2,7 @@ import {
   ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS,
   ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS,
   isAdminPartnerFileTemplateOptions,
+  type AdminPartnerFileDraft,
   type AdminPartnerFileBenefitActionType,
   type AdminPartnerFileCategory,
   type AdminPartnerFileTemplateOptions,
@@ -47,10 +48,22 @@ export type PartnerRegistrationFieldErrors = Partial<
   Record<PartnerRegistrationFieldName, string>
 >;
 
+export type PartnerRegistrationSource =
+  | "public_web"
+  | "public_excel"
+  | "partner_portal";
+
 export type PartnerRegistrationActionState = {
   status: "idle" | "success" | "error";
   message: string | null;
   fieldErrors?: PartnerRegistrationFieldErrors;
+  requestId?: string;
+};
+
+export type PartnerRegistrationExcelActionState = {
+  status: "idle" | "success" | "error";
+  message: string | null;
+  fileError?: string;
   requestId?: string;
 };
 
@@ -76,6 +89,12 @@ export const PARTNER_REGISTRATION_INITIAL_ACTION_STATE: PartnerRegistrationActio
   status: "idle",
   message: null,
 };
+
+export const PARTNER_REGISTRATION_INITIAL_EXCEL_ACTION_STATE: PartnerRegistrationExcelActionState =
+  {
+    status: "idle",
+    message: null,
+  };
 
 export const partnerRegistrationInitialFormState: PartnerRegistrationFormState = {
   serviceMode: "offline",
@@ -198,6 +217,33 @@ export const PARTNER_REGISTRATION_STATUS_OPTIONS = [
   "archived",
 ] as const satisfies PartnerRegistrationRequestStatus[];
 
+export const PARTNER_REGISTRATION_SOURCE_LABELS: Record<
+  PartnerRegistrationSource,
+  string
+> = {
+  public_web: "공개 웹 입력",
+  public_excel: "공개 엑셀 입력",
+  partner_portal: "파트너 포털",
+};
+
+export const PARTNER_REGISTRATION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const PARTNER_REGISTRATION_GALLERY_MAX_FILES = 5;
+export const PARTNER_REGISTRATION_IMAGE_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/avif";
+export const PARTNER_REGISTRATION_ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+]);
+export const PARTNER_REGISTRATION_ALLOWED_IMAGE_EXTENSIONS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".avif",
+] as const;
+
 export function isPartnerRegistrationRequestStatus(
   value: string,
 ): value is PartnerRegistrationRequestStatus {
@@ -240,6 +286,65 @@ function parseDelimitedInput(value: string) {
         .filter(Boolean),
     ),
   );
+}
+
+export function isPartnerRegistrationImageFile(file: File) {
+  const extension = file.name
+    .toLowerCase()
+    .match(/\.[^.]+$/)?.[0];
+  return (
+    PARTNER_REGISTRATION_ALLOWED_IMAGE_TYPES.has(file.type) &&
+    Boolean(
+      extension &&
+        PARTNER_REGISTRATION_ALLOWED_IMAGE_EXTENSIONS.includes(
+          extension as (typeof PARTNER_REGISTRATION_ALLOWED_IMAGE_EXTENSIONS)[number],
+        ),
+    )
+  );
+}
+
+export function validatePartnerRegistrationImageFile(file: File) {
+  if (file.size <= 0) {
+    return "이미지 파일을 확인해 주세요.";
+  }
+  if (file.size > PARTNER_REGISTRATION_IMAGE_MAX_BYTES) {
+    return "이미지는 파일당 5MB 이하만 업로드할 수 있습니다.";
+  }
+  if (!isPartnerRegistrationImageFile(file)) {
+    return "이미지는 JPG, PNG, WebP, AVIF 파일만 업로드할 수 있습니다.";
+  }
+  return null;
+}
+
+export function createPartnerRegistrationInputFromDraft(
+  draft: AdminPartnerFileDraft,
+): Partial<Record<PartnerRegistrationFieldName, string>> {
+  const serviceMode =
+    draft.partner.location === ONLINE_PARTNER_LOCATION ? "online" : "offline";
+  return {
+    serviceMode,
+    benefitActionType: draft.partner.benefitActionType,
+    brandName: draft.partner.name,
+    categoryLabel: draft.categoryLabel,
+    periodStart: draft.partner.period.start,
+    periodEnd: draft.partner.period.end,
+    inquiryLink: draft.partner.inquiryLink,
+    brandPhone: draft.partner.brandPhone ?? "",
+    detailDescription: draft.partner.detailDescription,
+    companyName: draft.partner.company?.name ?? "",
+    contactName: draft.partner.company?.contactName ?? "",
+    contactEmail: draft.partner.company?.contactEmail ?? "",
+    contactPhone: draft.partner.company?.contactPhone ?? "",
+    companyDescription: draft.partner.company?.description ?? "",
+    benefits: draft.partner.benefits.join("\n"),
+    conditions: draft.partner.conditions.join("\n"),
+    tags: draft.partner.tags.join("\n"),
+    location: serviceMode === "offline" ? draft.partner.location : "",
+    mapUrl: serviceMode === "offline" ? draft.partner.mapUrl : "",
+    siteLink: serviceMode === "online" ? draft.partner.mapUrl : "",
+    benefitActionLink: draft.partner.benefitActionLink,
+    memo: "",
+  };
 }
 
 export function getPartnerRegistrationTemplateHref(

@@ -23,11 +23,15 @@ export default function useMediaFieldController({
   aspectRatio,
   initial,
   multiple,
+  maxItems,
+  validateFile,
 }: {
   role: MediaRole;
   aspectRatio: number;
   initial?: string[] | null;
   multiple: boolean;
+  maxItems?: number;
+  validateFile?: (file: File) => string | null;
 }) {
   const [items, setItems] = useState<MediaItem[]>(() =>
     (initial ?? []).filter(Boolean).map((url) => createPreviewEntryFromExisting(url)),
@@ -128,13 +132,31 @@ export default function useMediaFieldController({
     }
 
     const picked = Array.from(files);
-    if (picked.some((file) => !isImageFile(file))) {
-      setError("이미지 파일만 추가할 수 있습니다.");
+    const invalidFile = picked.find((file) =>
+      validateFile ? validateFile(file) : !isImageFile(file),
+    );
+    if (invalidFile) {
+      setError(
+        validateFile?.(invalidFile) ?? "이미지 파일만 추가할 수 있습니다.",
+      );
       return false;
     }
 
-    setError(null);
-    picked.forEach((file, index) =>
+    const currentCount = multiple ? items.length + pendingCrops.length : 0;
+    const remainingCount =
+      typeof maxItems === "number" ? Math.max(0, maxItems - currentCount) : picked.length;
+    if (multiple && remainingCount <= 0) {
+      setError(`이미지는 최대 ${maxItems?.toLocaleString("ko-KR")}장까지 추가할 수 있습니다.`);
+      return false;
+    }
+    const acceptedFiles = multiple ? picked.slice(0, remainingCount) : picked.slice(0, 1);
+    if (multiple && acceptedFiles.length < picked.length) {
+      setError(`이미지는 최대 ${maxItems?.toLocaleString("ko-KR")}장까지 추가할 수 있습니다.`);
+    } else {
+      setError(null);
+    }
+
+    acceptedFiles.forEach((file, index) =>
       queueFile(file, index, typeof insertAt === "number" ? insertAt + index : undefined),
     );
     if (fileInputRef.current) {

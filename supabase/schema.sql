@@ -492,6 +492,9 @@ create table if not exists partner_registration_attempts (
 create table if not exists partner_registration_requests (
   id uuid primary key default uuid_generate_v4(),
   status text not null default 'pending',
+  source text not null default 'public_web',
+  company_id uuid references partner_companies(id) on delete set null,
+  requested_by_partner_account_id uuid references partner_accounts(id) on delete set null,
   service_mode text not null,
   benefit_action_type text not null,
   brand_name text not null,
@@ -514,6 +517,8 @@ create table if not exists partner_registration_requests (
   map_url text,
   site_link text,
   benefit_action_link text,
+  thumbnail_url text,
+  image_urls text[] not null default '{}',
   memo text,
   reviewed_by_admin_id text,
   reviewed_at timestamp with time zone,
@@ -522,6 +527,8 @@ create table if not exists partner_registration_requests (
   updated_at timestamp with time zone default now(),
   constraint partner_registration_requests_status_check
     check (status in ('pending', 'in_review', 'converted', 'rejected', 'archived')),
+  constraint partner_registration_requests_source_check
+    check (source in ('public_web', 'public_excel', 'partner_portal')),
   constraint partner_registration_requests_service_mode_check
     check (service_mode in ('offline', 'online')),
   constraint partner_registration_requests_benefit_action_type_check
@@ -2493,6 +2500,14 @@ create index if not exists partner_registration_requests_status_created_idx
   on partner_registration_requests(status, created_at desc);
 create index if not exists partner_registration_requests_category_created_idx
   on partner_registration_requests(category_id, created_at desc);
+create index if not exists partner_registration_requests_source_created_idx
+  on partner_registration_requests(source, created_at desc);
+create index if not exists partner_registration_requests_company_created_idx
+  on partner_registration_requests(company_id, created_at desc)
+  where company_id is not null;
+create index if not exists partner_registration_requests_requested_account_created_idx
+  on partner_registration_requests(requested_by_partner_account_id, created_at desc)
+  where requested_by_partner_account_id is not null;
 create index if not exists member_auth_attempts_identifier_idx on member_auth_attempts(identifier);
 create index if not exists partner_accounts_login_id_idx on partner_accounts(login_id);
 create index if not exists partner_account_companies_account_id_idx on partner_account_companies(account_id);

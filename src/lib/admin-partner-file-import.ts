@@ -39,6 +39,7 @@ export type AdminPartnerFileDraft = {
     detailDescription: string;
     campusSlugs: CampusSlug[];
     mapUrl: string;
+    brandPhone?: string;
     benefitActionType: PartnerBenefitActionType;
     benefitActionLink: string;
     reservationLink: string;

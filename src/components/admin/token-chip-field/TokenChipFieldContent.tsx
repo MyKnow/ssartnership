@@ -7,17 +7,23 @@ import { useTokenChipField } from "@/components/admin/token-chip-field/useTokenC
 
 export default function TokenChipFieldContent({
   name,
+  id,
   initialValues,
   placeholder,
   helpText,
   emptyText = "아직 등록된 항목이 없습니다.",
+  error,
+  inputRef,
   className,
 }: {
   name: string;
+  id?: string;
   initialValues?: string[];
   placeholder: string;
   helpText?: string;
   emptyText?: string;
+  error?: string | null;
+  inputRef?: (element: HTMLInputElement | null) => void;
   className?: string;
 }) {
   const tokenField = useTokenChipField(initialValues);
@@ -49,10 +55,13 @@ export default function TokenChipFieldContent({
       )}
 
       <TokenChipComposer
+        id={id}
         draft={tokenField.draft}
         placeholder={placeholder}
         helpText={helpText}
         editingIndex={tokenField.editingIndex}
+        ariaInvalid={Boolean(error)}
+        inputRef={inputRef}
         onDraftChange={tokenField.setDraft}
         onCommitDraft={tokenField.commitDraft}
         onScheduleCommitAfterComposition={tokenField.scheduleCommitAfterComposition}
@@ -71,6 +80,11 @@ export default function TokenChipFieldContent({
           }
         }}
       />
+      {error ? (
+        <span className="text-xs font-medium leading-5 text-danger" role="alert">
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }

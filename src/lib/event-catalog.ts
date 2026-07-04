@@ -16,6 +16,8 @@ export const PRODUCT_EVENT_NAMES = [
   'push_preference_change',
   'suggest_submit',
   'partner_registration_submit',
+  'partner_registration_xlsx_submit',
+  'partner_portal_brand_registration_submit',
   'pwa_install_click',
   'certification_view',
   'certification_qr_open',

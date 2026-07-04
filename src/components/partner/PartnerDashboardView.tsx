@@ -24,7 +24,10 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
-import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
+import {
+  getCompanyScopedPartnerServiceHref,
+  getCompanyScopedPartnerServiceNewHref,
+} from "@/lib/partner-portal-paths";
 
 const partnerPortalDataSource =
   process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??
@@ -236,15 +239,32 @@ function CompanyBrandList({
           <p className="ui-kicker">Brands</p>
           <h3 className="text-lg font-semibold text-foreground">브랜드 운영 현황</h3>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {company.services.length}개 브랜드
-        </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <p className="text-sm text-muted-foreground">
+            {company.services.length}개 브랜드
+          </p>
+          <PartnerPendingButtonLink
+            href={getCompanyScopedPartnerServiceNewHref(company.id)}
+            variant="secondary"
+            size="sm"
+          >
+            브랜드 추가
+          </PartnerPendingButtonLink>
+        </div>
       </div>
 
       {company.services.length === 0 ? (
         <EmptyState
           title="연결된 브랜드가 없습니다."
           description="관리자에서 협력사 브랜드를 연결하면 여기에서 조회할 수 있습니다."
+          action={
+            <PartnerPendingButtonLink
+              href={getCompanyScopedPartnerServiceNewHref(company.id)}
+              variant="primary"
+            >
+              브랜드 추가 신청
+            </PartnerPendingButtonLink>
+          }
         />
       ) : (
         <div className="space-y-3">

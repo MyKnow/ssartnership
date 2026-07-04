@@ -6,10 +6,13 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
 export default function TokenChipComposer({
+  id,
   draft,
   placeholder,
   helpText,
   editingIndex,
+  ariaInvalid,
+  inputRef,
   onDraftChange,
   onCommitDraft,
   onScheduleCommitAfterComposition,
@@ -19,10 +22,13 @@ export default function TokenChipComposer({
   onCompositionEnd,
   onFocus,
 }: {
+  id?: string;
   draft: string;
   placeholder: string;
   helpText?: string;
   editingIndex: number | null;
+  ariaInvalid?: boolean;
+  inputRef?: (element: HTMLInputElement | null) => void;
   onDraftChange: (value: string) => void;
   onCommitDraft: () => void;
   onScheduleCommitAfterComposition: () => void;
@@ -36,7 +42,10 @@ export default function TokenChipComposer({
     <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-3">
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <Input
+          id={id}
+          ref={inputRef}
           value={draft}
+          aria-invalid={ariaInvalid || undefined}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

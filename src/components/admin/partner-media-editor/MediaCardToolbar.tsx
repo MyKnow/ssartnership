@@ -8,11 +8,15 @@ import Textarea from "@/components/ui/Textarea";
 
 export default function MediaCardToolbar({
   multiple,
+  allowUrl = true,
+  accept = "image/*",
   onAddUrl,
   onAddUrls,
   onAddFiles,
 }: {
   multiple: boolean;
+  allowUrl?: boolean;
+  accept?: string;
   onAddUrl: (url: string) => boolean;
   onAddUrls?: (urls: string[]) => boolean;
   onAddFiles: (files: FileList | File[] | null) => boolean;
@@ -40,38 +44,46 @@ export default function MediaCardToolbar({
   return (
     <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-2.5">
       <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-0">
-          {multiple ? (
-            <Textarea
-              value={draftUrl}
-              onChange={(event) => setDraftUrl(event.target.value)}
-              placeholder="이미지 링크를 여러 개 붙여넣으세요. 줄바꿈 또는 | 로 구분합니다."
-              className="min-h-24"
-            />
-          ) : (
-            <Input
-              value={draftUrl}
-              onChange={(event) => setDraftUrl(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitUrl();
-                }
-              }}
-              placeholder="이미지 링크를 붙여넣으세요"
-            />
-          )}
-        </div>
+        {allowUrl ? (
+          <div className="min-w-0">
+            {multiple ? (
+              <Textarea
+                value={draftUrl}
+                onChange={(event) => setDraftUrl(event.target.value)}
+                placeholder="이미지 링크를 여러 개 붙여넣으세요. 줄바꿈 또는 | 로 구분합니다."
+                className="min-h-24"
+              />
+            ) : (
+              <Input
+                value={draftUrl}
+                onChange={(event) => setDraftUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitUrl();
+                  }
+                }}
+                placeholder="이미지 링크를 붙여넣으세요"
+              />
+            )}
+          </div>
+        ) : (
+          <p className="min-w-0 text-sm leading-6 text-muted-foreground">
+            JPG, PNG, WebP, AVIF 파일을 선택하면 구도를 조정한 뒤 저장됩니다.
+          </p>
+        )}
         <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={submitUrl}
-            className="w-auto"
-          >
-            <LinkIcon className="h-4 w-4" />
-            추가
-          </Button>
+          {allowUrl ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={submitUrl}
+              className="w-auto"
+            >
+              <LinkIcon className="h-4 w-4" />
+              추가
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -87,7 +99,7 @@ export default function MediaCardToolbar({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept={accept}
         multiple={multiple}
         className="hidden"
         onChange={(event) => {

@@ -718,6 +718,7 @@ export async function parseAdminPartnerXlsxDraft({
         detailDescription,
         campusSlugs: [],
         mapUrl: mapUrl ?? "",
+        brandPhone: brandPhone ?? "",
         benefitActionType,
         benefitActionLink: benefitActionLink ?? "",
         reservationLink: benefitActionLink ?? "",

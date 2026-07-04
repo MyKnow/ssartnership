@@ -16,9 +16,11 @@ import {
 } from "@/lib/admin-partner-file-import";
 import {
   isPartnerRegistrationRequestStatus,
+  PARTNER_REGISTRATION_SOURCE_LABELS,
   PARTNER_REGISTRATION_STATUS_LABELS,
   PARTNER_REGISTRATION_STATUS_OPTIONS,
   type PartnerRegistrationRequestStatus,
+  type PartnerRegistrationSource,
 } from "@/lib/partner-registration";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -27,6 +29,9 @@ export const dynamic = "force-dynamic";
 type RegistrationRow = {
   id: string;
   status: string;
+  source?: PartnerRegistrationSource | null;
+  company_id?: string | null;
+  requested_by_partner_account_id?: string | null;
   service_mode: "offline" | "online";
   benefit_action_type: keyof typeof ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS;
   brand_name: string;
@@ -49,6 +54,8 @@ type RegistrationRow = {
   map_url?: string | null;
   site_link?: string | null;
   benefit_action_link?: string | null;
+  thumbnail_url?: string | null;
+  image_urls?: string[] | null;
   memo?: string | null;
   admin_note?: string | null;
   reviewed_at?: string | null;
@@ -91,6 +98,13 @@ function getStatusBadgeVariant(status: PartnerRegistrationRequestStatus) {
     return "neutral" as const;
   }
   return "warning" as const;
+}
+
+function getSourceLabel(source?: string | null) {
+  if (source && source in PARTNER_REGISTRATION_SOURCE_LABELS) {
+    return PARTNER_REGISTRATION_SOURCE_LABELS[source as PartnerRegistrationSource];
+  }
+  return PARTNER_REGISTRATION_SOURCE_LABELS.public_web;
 }
 
 function ValueList({
@@ -241,6 +255,7 @@ export default async function AdminPartnerRegistrationsPage({
                         <Badge variant={getStatusBadgeVariant(rowStatus)}>
                           {PARTNER_REGISTRATION_STATUS_LABELS[rowStatus]}
                         </Badge>
+                        <Badge variant="neutral">{getSourceLabel(row.source)}</Badge>
                         {!row.category_id ? (
                           <Badge variant="warning">신규 카테고리</Badge>
                         ) : null}
@@ -310,6 +325,37 @@ export default async function AdminPartnerRegistrationsPage({
                       </div>
                     </div>
                   </div>
+
+                  {row.thumbnail_url || (row.image_urls ?? []).length > 0 ? (
+                    <div className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-3">
+                      <p className="truncate text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        첨부 이미지
+                      </p>
+                      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                        {[row.thumbnail_url, ...(row.image_urls ?? [])]
+                          .filter((url): url is string => Boolean(url))
+                          .map((url, index) => (
+                            <a
+                              key={`${url}-${index}`}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group relative aspect-square min-w-0 overflow-hidden rounded-[0.85rem] border border-border bg-surface-muted"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element -- admin review needs arbitrary storage URL preview */}
+                              <img
+                                src={url}
+                                alt={`첨부 이미지 ${index + 1}`}
+                                className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                              />
+                              <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-[11px] font-semibold text-white">
+                                {index === 0 && row.thumbnail_url ? "대표" : index + 1}
+                              </span>
+                            </a>
+                          ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {row.detail_description || row.company_description || row.memo ? (
                     <div className="grid min-w-0 gap-3 text-sm leading-6 text-muted-foreground">
