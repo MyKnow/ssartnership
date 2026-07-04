@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
@@ -29,6 +29,24 @@ import PartnerReviewCard from "./PartnerReviewCard";
 import PartnerReviewSummaryCard from "./PartnerReviewSummaryCard";
 
 const PartnerReviewForm = dynamic(() => import("./PartnerReviewForm"));
+
+type PartnerReviewListResponse = {
+  summary: PartnerReviewSummary;
+  items: PartnerReview[];
+  nextOffset: number;
+  hasMore: boolean;
+};
+
+async function fetchPartnerReviewList(url: string, fallbackMessage: string) {
+  const response = await fetch(url, { cache: "no-store" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      typeof data.message === "string" ? data.message : fallbackMessage,
+    );
+  }
+  return data as PartnerReviewListResponse;
+}
 
 function PartnerReviewListPendingRows() {
   return (
@@ -96,6 +114,10 @@ export default function PartnerReviewSection({
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(null);
   const [reactingReviewId, setReactingReviewId] = useState<string | null>(null);
+  const prefetchedNextPageRef = useRef<{
+    url: string;
+    promise: Promise<PartnerReviewListResponse>;
+  } | null>(null);
 
   const includeHiddenReviews = accessMode === "partner";
   const listRefreshing = isPartnerReviewListRefreshing(pendingMode);
@@ -162,6 +184,31 @@ export default function PartnerReviewSection({
     return `/api/partners/${encodeURIComponent(partnerId)}/reviews?${params.toString()}`;
   }
 
+  const nextPageUrl = hasMore
+    ? buildListUrl(sort, rating, onlyWithImages, nextOffset)
+    : null;
+
+  useEffect(() => {
+    if (!nextPageUrl || listBusy) {
+      return;
+    }
+    if (prefetchedNextPageRef.current?.url === nextPageUrl) {
+      return;
+    }
+
+    const promise = fetchPartnerReviewList(
+      nextPageUrl,
+      "다음 리뷰를 미리 불러오지 못했습니다.",
+    ).catch((error) => {
+      if (prefetchedNextPageRef.current?.url === nextPageUrl) {
+        prefetchedNextPageRef.current = null;
+      }
+      throw error;
+    });
+    prefetchedNextPageRef.current = { url: nextPageUrl, promise };
+    void promise.catch(() => undefined);
+  }, [listBusy, nextPageUrl]);
+
   async function refreshList(
     nextSort = sort,
     nextRating = rating,
@@ -170,15 +217,12 @@ export default function PartnerReviewSection({
   ) {
     setPendingMode(mode);
     setErrorMessage(null);
+    prefetchedNextPageRef.current = null;
     try {
-      const response = await fetch(buildListUrl(nextSort, nextRating, nextOnlyWithImages), {
-        cache: "no-store",
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setErrorMessage(data.message ?? "리뷰를 불러오지 못했습니다.");
-        return;
-      }
+      const data = await fetchPartnerReviewList(
+        buildListUrl(nextSort, nextRating, nextOnlyWithImages),
+        "리뷰를 불러오지 못했습니다.",
+      );
 
       startTransition(() => {
         setSummary(data.summary);
@@ -188,6 +232,12 @@ export default function PartnerReviewSection({
         setSort(nextSort);
         setRating(nextRating);
       });
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : "리뷰를 불러오지 못했습니다.",
+      );
     } finally {
       setPendingMode("idle");
     }
@@ -200,21 +250,27 @@ export default function PartnerReviewSection({
     setPendingMode("loadMore");
     setErrorMessage(null);
     try {
-      const response = await fetch(buildListUrl(sort, rating, onlyWithImages, nextOffset), {
-        cache: "no-store",
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setErrorMessage(data.message ?? "리뷰를 더 불러오지 못했습니다.");
-        return;
-      }
+      const url = buildListUrl(sort, rating, onlyWithImages, nextOffset);
+      const prefetched =
+        prefetchedNextPageRef.current?.url === url
+          ? prefetchedNextPageRef.current.promise
+          : null;
+      prefetchedNextPageRef.current = null;
+      const data = await (
+        prefetched ??
+        fetchPartnerReviewList(url, "리뷰를 더 불러오지 못했습니다.")
+      );
 
-      startTransition(() => {
-        setSummary(data.summary);
-        setReviews((current) => appendPartnerReviewList(current, data.items));
-        setNextOffset(data.nextOffset);
-        setHasMore(data.hasMore);
-      });
+      setSummary(data.summary);
+      setReviews((current) => appendPartnerReviewList(current, data.items));
+      setNextOffset(data.nextOffset);
+      setHasMore(data.hasMore);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : "리뷰를 더 불러오지 못했습니다.",
+      );
     } finally {
       setPendingMode("idle");
     }
@@ -380,7 +436,7 @@ export default function PartnerReviewSection({
                 role="status"
                 aria-live="polite"
               >
-                {pendingMessage ?? `${listDescription} 표시`}
+                {pendingMessage || `${listDescription} 표시`}
               </p>
             </div>
 
