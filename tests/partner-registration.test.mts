@@ -76,3 +76,67 @@ test("partner registration template href normalizes selected options", async () 
     "/partner-registration/template?serviceMode=offline&benefitActionType=certification",
   );
 });
+
+test("partner registration image validation allows raster files only", async () => {
+  const { validatePartnerRegistrationImageFile } = await modulePromise;
+
+  const webp = new File(["image"], "thumbnail.webp", { type: "image/webp" });
+  const svg = new File(["<svg />"], "icon.svg", { type: "image/svg+xml" });
+  const noExtension = new File(["image"], "thumbnail", { type: "image/png" });
+
+  assert.equal(validatePartnerRegistrationImageFile(webp), null);
+  assert.equal(
+    validatePartnerRegistrationImageFile(svg),
+    "이미지는 JPG, PNG, WebP, AVIF 파일만 업로드할 수 있습니다.",
+  );
+  assert.equal(
+    validatePartnerRegistrationImageFile(noExtension),
+    "이미지는 JPG, PNG, WebP, AVIF 파일만 업로드할 수 있습니다.",
+  );
+});
+
+test("partner registration draft conversion preserves online site link and brand phone", async () => {
+  const {
+    createPartnerRegistrationInputFromDraft,
+    validatePartnerRegistrationInput,
+  } = await modulePromise;
+
+  const input = createPartnerRegistrationInputFromDraft({
+    categoryId: "",
+    categoryLabel: "카페",
+    partner: {
+      name: "카페 싸피 멤버십몰",
+      visibility: "public",
+      benefitVisibility: "public",
+      location: "온라인",
+      detailDescription: "온라인 쿠폰을 제공하는 카페 싸피 멤버십몰",
+      campusSlugs: [],
+      mapUrl: "https://cafessafy.example.com",
+      brandPhone: "02-3429-5100",
+      benefitActionType: "external_link",
+      benefitActionLink: "https://cafessafy.example.com/coupon",
+      reservationLink: "https://cafessafy.example.com/coupon",
+      inquiryLink: "https://pf.kakao.com/_cafessafy",
+      period: { start: "2026-05-01", end: "2026-12-31" },
+      conditions: ["싸트너십 인증"],
+      benefits: ["아메리카노 10% 할인"],
+      appliesTo: [],
+      thumbnail: null,
+      images: [],
+      tags: ["카페", "온라인"],
+      company: {
+        name: "카페 싸피",
+        contactName: "김싸피",
+        contactEmail: "partner@cafessafy.example",
+      },
+    },
+  });
+
+  assert.equal(input.serviceMode, "online");
+  assert.equal(input.siteLink, "https://cafessafy.example.com");
+  assert.equal(input.brandPhone, "02-3429-5100");
+
+  const result = validatePartnerRegistrationInput(input);
+  assert.equal(result.fieldErrors.siteLink, undefined);
+  assert.equal(result.values.safeSiteLink, "https://cafessafy.example.com/");
+});

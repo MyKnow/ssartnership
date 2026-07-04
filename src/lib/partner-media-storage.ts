@@ -28,6 +28,29 @@ export async function uploadPartnerMediaFile(
   return data.publicUrl;
 }
 
+export async function uploadPartnerRegistrationMediaFile(
+  requestId: string,
+  role: "thumbnail" | "gallery",
+  file: File,
+  index: number,
+) {
+  const supabase = getSupabaseAdminClient();
+  const storagePath = `registration-requests/${requestId.trim()}/${role}/${index}-${randomUUID()}.webp`;
+
+  const { error } = await supabase.storage.from(PARTNER_MEDIA_BUCKET).upload(storagePath, file, {
+    contentType: file.type || "image/webp",
+    cacheControl: "31536000",
+    upsert: false,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const { data } = supabase.storage.from(PARTNER_MEDIA_BUCKET).getPublicUrl(storagePath);
+  return data.publicUrl;
+}
+
 export async function deletePartnerMediaUrls(urls: Array<string | null | undefined>) {
   const supabase = getSupabaseAdminClient();
   const paths = urls

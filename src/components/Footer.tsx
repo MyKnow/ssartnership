@@ -87,6 +87,14 @@ export default function Footer() {
             </Button>
             <Button
               variant="secondary"
+              href="/partner-registration"
+              className="w-full justify-start gap-2"
+            >
+              <BuildingOfficeIcon className="h-5 w-5" />
+              신규 파트너사 등록
+            </Button>
+            <Button
+              variant="secondary"
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"

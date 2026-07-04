@@ -25,6 +25,10 @@ export default function MediaField({
   initial,
   className,
   multiple = false,
+  allowUrl = true,
+  accept = "image/*",
+  maxItems,
+  validateFile,
 }: {
   role: MediaRole;
   title: string;
@@ -33,6 +37,10 @@ export default function MediaField({
   initial?: string[] | null;
   className?: string;
   multiple?: boolean;
+  allowUrl?: boolean;
+  accept?: string;
+  maxItems?: number;
+  validateFile?: (file: File) => string | null;
 }) {
   const {
     items,
@@ -56,12 +64,19 @@ export default function MediaField({
     aspectRatio,
     initial,
     multiple,
+    maxItems,
+    validateFile,
   });
 
   const hasItems = items.length > 0;
-  const emptyMessage = multiple
-    ? "여러 URL을 한 번에 추가하거나 이미지 파일을 끌어오세요."
-    : "썸네일을 선택하거나 이미지를 끌어오세요.";
+  const canAddMore = !multiple || typeof maxItems !== "number" || items.length < maxItems;
+  const emptyMessage = allowUrl
+    ? multiple
+      ? "여러 URL을 한 번에 추가하거나 이미지 파일을 끌어오세요."
+      : "썸네일을 선택하거나 이미지를 끌어오세요."
+    : multiple
+      ? "이미지 파일을 선택하거나 끌어오세요."
+      : "대표 이미지 파일을 선택하거나 끌어오세요.";
   const addDraftUrls = () => {
     if (!multiple) {
       return handleAddUrl();
@@ -80,7 +95,7 @@ export default function MediaField({
         ref={fileInputRef}
         type="file"
         name={multiple ? "galleryFiles" : "thumbnailFile"}
-        accept="image/*"
+        accept={accept}
         multiple={multiple}
         className="hidden"
         onChange={(event) => ingestFiles(event.target.files)}
@@ -96,7 +111,7 @@ export default function MediaField({
           </div>
         </div>
 
-        {multiple || !hasItems ? (
+        {(multiple || !hasItems) && canAddMore ? (
           <div
             className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-2.5"
             onDragOver={(event) => event.preventDefault()}
@@ -106,35 +121,43 @@ export default function MediaField({
             }}
           >
             <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              {multiple ? (
-                <Textarea
-                  value={draftUrl}
-                  onChange={(event) => setDraftUrl(event.target.value)}
-                  placeholder="이미지 링크를 여러 개 붙여넣으세요. 줄바꿈 또는 | 로 구분합니다."
-                  className="min-h-24"
-                />
+              {allowUrl ? (
+                multiple ? (
+                  <Textarea
+                    value={draftUrl}
+                    onChange={(event) => setDraftUrl(event.target.value)}
+                    placeholder="이미지 링크를 여러 개 붙여넣으세요. 줄바꿈 또는 | 로 구분합니다."
+                    className="min-h-24"
+                  />
+                ) : (
+                  <Input
+                    value={draftUrl}
+                    onChange={(event) => setDraftUrl(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddUrl();
+                      }
+                    }}
+                    placeholder="이미지 링크를 붙여넣으세요"
+                  />
+                )
               ) : (
-                <Input
-                  value={draftUrl}
-                  onChange={(event) => setDraftUrl(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleAddUrl();
-                    }
-                  }}
-                  placeholder="이미지 링크를 붙여넣으세요"
-                />
+                <p className="min-w-0 text-sm leading-6 text-muted-foreground">
+                  JPG, PNG, WebP, AVIF 파일을 선택하면 구도를 조정한 뒤 저장됩니다.
+                </p>
               )}
               <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={addDraftUrls}
-                  className="w-auto"
-                >
-                  추가
-                </Button>
+                {allowUrl ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={addDraftUrls}
+                    className="w-auto"
+                  >
+                    추가
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="ghost"
@@ -148,6 +171,7 @@ export default function MediaField({
 
             <div className="rounded-2xl border border-border bg-surface-inset/80 px-4 py-2.5 text-xs leading-6 text-muted-foreground">
               {emptyMessage}
+              {typeof maxItems === "number" ? ` 최대 ${maxItems.toLocaleString("ko-KR")}장.` : ""}
             </div>
           </div>
         ) : null}
@@ -264,6 +288,8 @@ export default function MediaField({
                   <div className="grid gap-2.5">
                     <MediaCardToolbar
                       multiple={false}
+                      allowUrl={allowUrl}
+                      accept={accept}
                       onAddUrl={(url) => handleAddUrl(url, 0)}
                       onAddFiles={(files) => ingestFiles(files, 0)}
                     />
