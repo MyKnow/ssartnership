@@ -103,7 +103,7 @@ function ServiceListRow({
   service: PartnerPortalDashboard["companies"][number]["services"][number];
 }) {
   const visibleMetrics = [
-    { key: "favoriteCount", label: "즐겨찾기", value: service.metrics.favoriteCount },
+    { key: "favoriteCount", label: "저장", value: service.metrics.favoriteCount },
     { key: "reviewCount", label: "리뷰", value: service.metrics.reviewCount },
     { key: "detailViews", label: "PV", value: service.metrics.detailViews },
     { key: "detailUv", label: "UV", value: service.metrics.detailUv },
@@ -130,22 +130,22 @@ function ServiceListRow({
         </div>
         <div className="min-w-0">
           <p className="truncate text-base font-semibold text-foreground">{service.name}</p>
-          <p className="truncate text-sm text-muted-foreground">
+          <p className="line-clamp-1 text-sm text-muted-foreground">
             {service.categoryLabel} · {service.location || "위치 미지정"}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 min-[390px]:grid-cols-3">
         {highlightedMetrics.map((metric) => (
           <div
             key={metric.key}
             className="rounded-[0.85rem] border border-border/60 bg-surface-inset px-3 py-2"
           >
-            <p className="text-[11px] font-semibold text-muted-foreground">
+            <p className="line-clamp-1 text-[11px] font-semibold text-muted-foreground">
               {metric.label}
             </p>
-            <p className="mt-0.5 text-sm font-semibold text-foreground">
+            <p className="mt-0.5 line-clamp-1 text-sm font-semibold text-foreground">
               {formatCount(metric.value)}
             </p>
           </div>
@@ -233,7 +233,7 @@ function CompanyBrandList({
   company: PartnerPortalCompanyDashboard;
 }) {
   return (
-    <Card tone="default" padding="md" className="space-y-4">
+    <Card id="brands" tone="default" padding="md" className="scroll-mt-24 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 pb-4">
         <div className="space-y-1">
           <p className="ui-kicker">Brands</p>
@@ -277,6 +277,86 @@ function CompanyBrandList({
           ))}
         </div>
       )}
+    </Card>
+  );
+}
+
+function CompanyOperationsSummary({
+  company,
+}: {
+  company: PartnerPortalCompanyDashboard;
+}) {
+  const pendingCount = company.services.filter(
+    (service) => service.status === "pending",
+  ).length;
+  const rejectedCount = company.services.filter(
+    (service) => service.status === "rejected",
+  ).length;
+  const hiddenCount = company.services.filter(
+    (service) => service.visibility !== "public",
+  ).length;
+  const boostCount = company.services.filter(
+    (service) => service.planTier === "boost",
+  ).length;
+  const attentionCount = pendingCount + rejectedCount + hiddenCount;
+  const operationItems = [
+    {
+      label: "검토 필요",
+      value: `${attentionCount.toLocaleString("ko-KR")}건`,
+      description:
+        attentionCount > 0
+          ? "승인 대기, 반려, 검토용 공개 상태를 확인하세요."
+          : "승인/공개 상태가 안정적으로 유지되고 있습니다.",
+      tone: attentionCount > 0 ? "warning" : "success",
+    },
+    {
+      label: "공개 브랜드",
+      value: `${(company.services.length - hiddenCount).toLocaleString("ko-KR")}개`,
+      description: "사용자 화면에서 노출 중인 브랜드 수입니다.",
+      tone: "neutral",
+    },
+    {
+      label: "Boost 운영",
+      value: `${boostCount.toLocaleString("ko-KR")}개`,
+      description: "상세 지표와 광고 성과 제공",
+      tone: boostCount > 0 ? "primary" : "neutral",
+    },
+  ] as const;
+
+  return (
+    <Card tone="elevated" padding="md" className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="ui-kicker">운영 요약</p>
+          <h2 className="truncate text-lg font-semibold text-foreground">
+            먼저 확인할 상태
+          </h2>
+          <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+            브랜드 운영 상태, 노출 상태, 플랜 구성을 빠르게 점검합니다.
+          </p>
+        </div>
+        <Badge variant={attentionCount > 0 ? "warning" : "success"}>
+          {attentionCount > 0 ? "확인 필요" : "정상 운영"}
+        </Badge>
+      </div>
+      <div className="grid min-w-0 gap-3 md:grid-cols-3">
+        {operationItems.map((item) => (
+          <div
+            key={item.label}
+            className="min-w-0 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-semibold text-foreground">
+                {item.label}
+              </p>
+              <Badge variant={item.tone}>{item.value}</Badge>
+            </div>
+            <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
+              {item.description}
+            </p>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -331,7 +411,10 @@ export default function PartnerDashboardView({
                     <div className="grid gap-5 xl:sticky xl:top-24">
                       <CompanyHeader company={activeCompany} />
                     </div>
-                    <CompanyBrandList company={activeCompany} />
+                    <div className="grid min-w-0 gap-5">
+                      <CompanyOperationsSummary company={activeCompany} />
+                      <CompanyBrandList company={activeCompany} />
+                    </div>
                   </div>
                 </MotionReveal>
               ) : null}

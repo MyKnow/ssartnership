@@ -12,6 +12,7 @@ import {
   LifeBuoy,
   LogOut,
   Settings,
+  Store,
 } from "lucide-react";
 import BrandWordmark from "@/components/BrandWordmark";
 import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
@@ -45,12 +46,18 @@ const primaryNavItems = [
   {
     section: "dashboard",
     label: "대시보드",
-    description: "브랜드 현황",
+    description: "운영 요약",
     icon: Gauge,
   },
   {
+    section: "brands",
+    label: "브랜드",
+    description: "목록과 상세",
+    icon: Store,
+  },
+  {
     section: "notifications",
-    label: "알림센터",
+    label: "알림",
     description: "운영 알림",
     icon: Bell,
   },
@@ -83,14 +90,24 @@ const setupNavItem = {
 
 type PrimaryNavItem = (typeof primaryNavItems)[number];
 type PortalNavItem = PrimaryNavItem | typeof setupNavItem;
+type PrimaryNavSection = PrimaryNavItem["section"];
+
+function isCompanyScopedSection(
+  section: PrimaryNavSection,
+): section is PartnerPortalSection {
+  return section !== "brands";
+}
 
 function getPrimaryNavHref(item: PrimaryNavItem, companyId: string | null) {
   if (!companyId) {
     return "/partner";
   }
+  if (item.section === "brands") {
+    return `${getCompanyScopedPortalHref(companyId)}#brands`;
+  }
   return getCompanyScopedPortalHref(
     companyId,
-    item.section as PartnerPortalSection,
+    item.section,
   );
 }
 
@@ -115,12 +132,13 @@ function isActivePrimaryPath(
   }
   const scopedHref = getCompanyScopedPortalHref(
     companyId,
-    item.section as PartnerPortalSection,
+    isCompanyScopedSection(item.section) ? item.section : "dashboard",
   );
   if (item.section === "dashboard") {
-    return (
-      pathname === scopedHref || pathname.startsWith(`${scopedHref}/services/`)
-    );
+    return pathname === scopedHref;
+  }
+  if (item.section === "brands") {
+    return pathname.startsWith(`${scopedHref}/services/`);
   }
   return pathname === scopedHref || pathname.startsWith(`${scopedHref}/`);
 }

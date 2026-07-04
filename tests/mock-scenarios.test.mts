@@ -171,10 +171,10 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
 
   assert.equal(summary.totalRoutes, 61);
   assert.equal(summary.scenarioCount, 45);
-  assert.equal(summary.storybookStoryCount, 14);
-  assert.equal(summary.storybookCompleteRoutes, 11);
+  assert.equal(summary.storybookStoryCount, 26);
+  assert.equal(summary.storybookCompleteRoutes, 22);
   assert.equal(summary.storybookPartialRoutes, 0);
-  assert.equal(summary.storybookMissingRoutes, 17);
+  assert.equal(summary.storybookMissingRoutes, 6);
   assert.equal(summary.routeInventoryOnlyRoutes, 33);
 
   const partnerSelection = matrix.find((row) => row.routePath === "/partner");
@@ -193,11 +193,15 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
     (row) => row.routePath === "/partner-registration",
   );
   assert.ok(registration);
-  assert.equal(registration.coverageLevel, "storybook-missing");
-  assert.deepStrictEqual(registration.missingStorybookScenarioIds, [
-    "public.partner.registration.web-input",
-    "public.partner.registration.excel-upload",
-  ]);
+  assert.equal(registration.coverageLevel, "storybook-complete");
+  assert.deepStrictEqual(registration.missingStorybookScenarioIds, []);
+  assert.deepStrictEqual(
+    registration.storybookStories.map((story) => story.storyId),
+    [
+      "domains-partner-pagestates-core--registration-web-input",
+      "domains-partner-pagestates-core--registration-excel-upload",
+    ],
+  );
 
   const adminCompanyBilling = matrix.find(
     (row) => row.routePath === "/admin/companies",
@@ -219,6 +223,19 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
     adminNotificationInbox.storybookStories.map((story) => story.storyId),
     ["domains-admin-pagestates--notifications-inbox"],
   );
+
+  const partnerNotifications = matrix.find(
+    (row) => row.routePath === "/partner/companies/[companyId]/notifications",
+  );
+  assert.ok(partnerNotifications);
+  assert.equal(partnerNotifications.coverageLevel, "storybook-complete");
+  assert.deepStrictEqual(partnerNotifications.missingStorybookScenarioIds, []);
+
+  const partnerSetup = matrix.find(
+    (row) => row.routePath === "/partner/setup/[token]",
+  );
+  assert.ok(partnerSetup);
+  assert.equal(partnerSetup.coverageLevel, "storybook-complete");
 
   for (const story of listMockStorybookScenarioCoverage()) {
     const row = matrix.find((item) => item.routePath === story.routePath);

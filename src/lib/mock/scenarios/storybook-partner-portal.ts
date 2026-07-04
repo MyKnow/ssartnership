@@ -34,7 +34,7 @@ const cafeSsafyCompany: PartnerPortalCompanyScope = {
   id: "mock-partner-company-cafe-ssafy",
   name: "카페 싸피",
   slug: "cafe-ssafy",
-  description: "서울 주요 학습권역에서 여러 지점을 운영하는 가상 프랜차이즈 카페입니다.",
+  description: "서울 학습권역의 가상 프랜차이즈 카페입니다.",
   serviceCount: 6,
 };
 

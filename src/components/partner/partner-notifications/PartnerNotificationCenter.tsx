@@ -70,7 +70,7 @@ function NotificationCard({ item }: { item: PartnerNotificationEntry }) {
           </div>
 
           <div className="min-w-0 space-y-1">
-            <h3 className="truncate text-lg font-semibold tracking-[-0.02em] text-foreground">
+            <h3 className="line-clamp-2 text-lg font-semibold tracking-[-0.02em] text-foreground">
               {item.title}
             </h3>
             <p className="line-clamp-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">
@@ -105,7 +105,9 @@ function PriorityNotificationRow({ item }: { item: PartnerNotificationEntry }) {
     <div className="grid gap-3 rounded-[1rem] border border-border/80 bg-surface-inset px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
       <Badge variant={getToneBadgeVariant(item.tone)}>{item.badgeLabel}</Badge>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+        <p className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">
+          {item.title}
+        </p>
         <p className="line-clamp-1 text-sm text-muted-foreground">{item.body}</p>
         <p className="mt-1 text-xs text-muted-foreground">{createdAt}</p>
       </div>

@@ -94,7 +94,7 @@ function Field({
             *
           </span>
         ) : (
-          <span className="shrink-0 font-medium tracking-normal text-muted-foreground/80">
+          <span className="shrink-0 rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[11px] font-semibold leading-none tracking-normal text-muted-foreground">
             선택
           </span>
         )}
