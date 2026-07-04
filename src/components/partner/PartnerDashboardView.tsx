@@ -302,7 +302,12 @@ export default function PartnerDashboardView({
               title="운영 대시보드"
               description={`${selectedCompany.name}의 브랜드 상태와 핵심 지표를 한 화면에서 확인합니다.`}
               actions={
-                <Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>
+                <Badge
+                  variant="primary"
+                  className="max-w-full whitespace-normal break-all text-left leading-snug tracking-normal"
+                >
+                  로그인 아이디 · {session.loginId}
+                </Badge>
               }
             />
           </MotionReveal>
