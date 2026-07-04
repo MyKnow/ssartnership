@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowDownIcon, ArrowUpIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ArrowUpTrayIcon,
+  PencilIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -16,6 +22,58 @@ import type { MediaRole } from "@/components/admin/partner-media-editor/types";
 import MediaCardToolbar from "@/components/admin/partner-media-editor/MediaCardToolbar";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
 import useMediaFieldController from "@/components/admin/partner-media-editor/useMediaFieldController";
+
+function MediaStatusBadge({ kind }: { kind: "existing" | "file" }) {
+  return (
+    <Badge
+      className={cn(
+        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-flat backdrop-blur-sm",
+        kind === "existing"
+          ? "border-border bg-surface-control/95 text-foreground"
+          : "border-primary/50 bg-primary text-primary-foreground",
+      )}
+    >
+      {kind === "existing" ? "기존 이미지" : "새 이미지"}
+    </Badge>
+  );
+}
+
+function MediaIconButton({
+  label,
+  title,
+  children,
+  onClick,
+  disabled,
+  variant = "ghost",
+}: {
+  label: string;
+  title: string;
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: "ghost" | "danger";
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.9rem] border text-foreground shadow-flat transition-interactive duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        variant === "danger"
+          ? "border-danger/20 bg-danger/10 text-danger hover:-translate-y-px hover:border-danger/35 hover:bg-danger/12"
+          : "border-border bg-surface-control hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
+        disabled
+          ? "cursor-default border-border/50 bg-surface-muted/60 text-muted-foreground/50 opacity-45 shadow-none hover:translate-y-0 hover:border-border/50 hover:bg-surface-muted/60"
+          : "cursor-pointer",
+      )}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={title}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function MediaField({
   role,
@@ -193,7 +251,7 @@ export default function MediaField({
             className={cn(
               "grid gap-3",
               multiple
-                ? "grid-cols-[repeat(auto-fit,minmax(min(100%,10.5rem),1fr))]"
+                ? "grid-cols-[repeat(auto-fit,minmax(min(100%,11.25rem),1fr))]"
                 : null,
             )}
           >
@@ -213,72 +271,55 @@ export default function MediaField({
                       alt=""
                       className="h-full w-full object-cover"
                     />
-                    <Badge
-                      className={cn(
-                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-flat backdrop-blur-sm",
-                        item.kind === "existing"
-                          ? "border-border bg-surface-control/95 text-foreground"
-                          : "border-primary/40 bg-primary/90 text-white dark:text-black",
-                      )}
-                    >
-                      {item.kind === "existing" ? "기존 이미지" : "새 이미지"}
-                    </Badge>
+                    <MediaStatusBadge kind={item.kind} />
                   </div>
 
-                  <div className="grid grid-cols-4 gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
+                  <div className="flex min-w-0 items-center justify-end gap-1">
+                    <MediaIconButton
                       onClick={() => moveItem(index, -1)}
-                      ariaLabel="위로"
+                      label="위로"
                       title="위로"
-                      className="h-9 w-full min-h-9 min-w-0 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
+                      disabled={index === 0}
                     >
                       <ArrowUpIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
+                    </MediaIconButton>
+                    <MediaIconButton
                       onClick={() => moveItem(index, 1)}
-                      ariaLabel="아래로"
+                      label="아래로"
                       title="아래로"
-                      className="h-9 w-full min-h-9 min-w-0 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
+                      disabled={index === items.length - 1}
                     >
                       <ArrowDownIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
+                    </MediaIconButton>
+                    <MediaIconButton
                       onClick={() => replaceItemAt(index)}
-                      ariaLabel="구도 수정"
+                      label="구도 수정"
                       title="구도 수정"
-                      className="h-9 w-full min-h-9 min-w-0"
                     >
                       <PencilIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="icon"
+                    </MediaIconButton>
+                    <MediaIconButton
                       onClick={() => removeItem(index)}
-                      ariaLabel="삭제"
+                      label="삭제"
                       title="삭제"
-                      className="h-9 w-full min-h-9 min-w-0"
+                      variant="danger"
                     >
                       <TrashIcon className="h-4 w-4" />
-                    </Button>
+                    </MediaIconButton>
                   </div>
                 </div>
               ) : (
                 <div
                   key={item.id}
-                  className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3 rounded-2xl border border-border bg-surface-inset p-3"
+                  className={cn(
+                    "grid min-w-0 gap-3 rounded-2xl border border-border bg-surface-inset p-3",
+                    allowUrl
+                      ? "grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))]"
+                      : "sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:items-center",
+                  )}
                 >
                   <div
-                    className="relative overflow-hidden rounded-[18px] border border-border bg-surface-muted"
+                    className="relative min-w-0 overflow-hidden rounded-[18px] border border-border bg-surface-muted"
                     style={{ aspectRatio: PARTNER_THUMBNAIL_ASPECT_RATIO }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- preview may use blob/object URL */}
@@ -287,49 +328,65 @@ export default function MediaField({
                       alt=""
                       className="h-full w-full object-cover"
                     />
-                    <Badge
-                      className={cn(
-                        "pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[11px] font-semibold shadow-flat backdrop-blur-sm",
-                        item.kind === "existing"
-                          ? "border-border bg-surface-control/95 text-foreground"
-                          : "border-primary/40 bg-primary/90 text-white dark:text-black",
-                      )}
-                    >
-                      {item.kind === "existing" ? "기존 이미지" : "새 이미지"}
-                    </Badge>
+                    <MediaStatusBadge kind={item.kind} />
                   </div>
 
-                  <div className="grid gap-2.5">
-                    <MediaCardToolbar
-                      multiple={false}
-                      allowUrl={allowUrl}
-                      accept={accept}
-                      onAddUrl={(url) => handleAddUrl(url, 0)}
-                      onAddFiles={(files) => ingestFiles(files, 0)}
-                    />
+                  <div className="grid min-w-0 content-start gap-3">
+                    {allowUrl ? (
+                      <MediaCardToolbar
+                        multiple={false}
+                        allowUrl={allowUrl}
+                        accept={accept}
+                        onAddUrl={(url) => handleAddUrl(url, 0)}
+                        onAddFiles={(files) => ingestFiles(files, 0)}
+                      />
+                    ) : (
+                      <div className="grid min-w-0 gap-1">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          대표 이미지가 등록되었습니다.
+                        </p>
+                        <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                          새 파일로 교체하거나 구도를 다시 조정할 수 있습니다.
+                        </p>
+                      </div>
+                    )}
 
-                    <div className="flex flex-wrap items-center justify-end gap-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+                      {!allowUrl ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="min-w-0"
+                        >
+                          <ArrowUpTrayIcon className="h-4 w-4" />
+                          파일 교체
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         variant="ghost"
-                        size="icon"
+                        size={allowUrl ? "icon" : "sm"}
                         onClick={() => replaceItemAt(index)}
                         ariaLabel="구도 수정"
                         title="구도 수정"
-                        className="h-10 w-10 min-h-10 min-w-10"
+                        className={cn(allowUrl ? "h-10 w-10 min-h-10 min-w-10" : "min-w-0")}
                       >
                         <PencilIcon className="h-4 w-4" />
+                        {!allowUrl ? "구도 수정" : null}
                       </Button>
                       <Button
                         type="button"
                         variant="danger"
-                        size="icon"
+                        size={allowUrl ? "icon" : "sm"}
                         onClick={() => removeItem(index)}
                         ariaLabel="삭제"
                         title="삭제"
-                        className="h-10 w-10 min-h-10 min-w-10"
+                        className={cn(allowUrl ? "h-10 w-10 min-h-10 min-w-10" : "min-w-0")}
                       >
                         <TrashIcon className="h-4 w-4" />
+                        {!allowUrl ? "삭제" : null}
                       </Button>
                     </div>
                   </div>

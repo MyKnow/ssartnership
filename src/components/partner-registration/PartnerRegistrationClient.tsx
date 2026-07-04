@@ -740,7 +740,7 @@ export default function PartnerRegistrationClient({
                     대표 이미지와 상세 이미지는 JPG, PNG, WebP, AVIF만 업로드할 수 있습니다.
                   </p>
                 </div>
-                <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                <div className="grid min-w-0 gap-5">
                   <PartnerThumbnailField
                     title="대표 이미지"
                     subtitle="카드 목록에서 보일 1:1 이미지입니다."
