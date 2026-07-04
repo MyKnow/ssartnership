@@ -5,6 +5,7 @@ import { ArrowUpTrayIcon, LinkIcon } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import { cn } from "@/lib/cn";
 
 export default function MediaCardToolbar({
   multiple,
@@ -42,8 +43,13 @@ export default function MediaCardToolbar({
   };
 
   return (
-    <div className="grid gap-2 rounded-2xl border border-dashed border-border bg-surface-inset px-3 py-2.5">
-      <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+    <div className="grid min-w-0 gap-3 rounded-2xl border border-dashed border-border bg-surface-inset p-3">
+      <div
+        className={cn(
+          "grid min-w-0 gap-3",
+          allowUrl ? "lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center" : null,
+        )}
+      >
         {allowUrl ? (
           <div className="min-w-0">
             {multiple ? (
@@ -72,7 +78,12 @@ export default function MediaCardToolbar({
             JPG, PNG, WebP, AVIF 파일을 선택하면 구도를 조정한 뒤 저장됩니다.
           </p>
         )}
-        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
+        <div
+          className={cn(
+            "flex w-full shrink-0 flex-wrap items-center gap-2",
+            allowUrl ? "justify-end lg:w-auto" : "justify-start",
+          )}
+        >
           {allowUrl ? (
             <Button
               type="button"
@@ -88,7 +99,7 @@ export default function MediaCardToolbar({
             type="button"
             variant="ghost"
             onClick={() => fileInputRef.current?.click()}
-            className="w-auto"
+            className={cn(allowUrl ? "w-auto" : "w-full sm:w-auto")}
           >
             <ArrowUpTrayIcon className="h-4 w-4" />
             {uploadLabel}

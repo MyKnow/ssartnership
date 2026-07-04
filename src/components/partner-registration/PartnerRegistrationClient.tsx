@@ -87,14 +87,17 @@ function Field({
 }) {
   return (
     <label className="grid min-w-0 gap-2" htmlFor={`partner-registration-${name}`}>
-      <span className="ui-caption inline-flex min-w-0 items-center gap-1">
+      <span className="ui-caption inline-flex min-w-0 items-center gap-1.5">
         <span className="truncate">{label}</span>
         {required ? (
           <span className="shrink-0 text-danger" aria-label="필수 입력">
             *
           </span>
         ) : (
-          <span className="shrink-0 font-medium tracking-normal text-muted-foreground/80">
+          <span
+            aria-label="선택 입력"
+            className="inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-surface-control px-1.5 text-[10px] font-semibold leading-none tracking-normal text-muted-foreground"
+          >
             선택
           </span>
         )}
@@ -737,7 +740,7 @@ export default function PartnerRegistrationClient({
                     대표 이미지와 상세 이미지는 JPG, PNG, WebP, AVIF만 업로드할 수 있습니다.
                   </p>
                 </div>
-                <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                <div className="grid min-w-0 gap-4 lg:grid-cols-2">
                   <PartnerThumbnailField
                     title="대표 이미지"
                     subtitle="카드 목록에서 보일 1:1 이미지입니다."
