@@ -7,7 +7,7 @@ import {
 } from "@/lib/partner-service-mode";
 import type { PartnerVisibility } from "@/lib/types";
 
-export const ADMIN_PARTNER_FILE_TEMPLATE_VERSION = "1";
+export const ADMIN_PARTNER_FILE_TEMPLATE_VERSION = "2";
 export const ADMIN_PARTNER_FILE_MAX_BYTES = 1024 * 1024;
 
 export type AdminPartnerFileBenefitActionType = PartnerBenefitActionType;
@@ -30,6 +30,7 @@ export type AdminPartnerFileCompany = {
 
 export type AdminPartnerFileDraft = {
   categoryId: string;
+  categoryLabel: string;
   partner: {
     name: string;
     visibility: PartnerVisibility;
@@ -97,6 +98,7 @@ const BASE_HEADERS = [
   "시작일",
   "종료일",
   "문의 링크",
+  "브랜드 전화번호",
   "상세 설명",
   "협력사명",
   "담당자명",

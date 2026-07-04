@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import ReviewImageUploader from "./ReviewImageUploader";
 import type { ReviewImageItem } from "./shared";
 
@@ -148,8 +148,15 @@ export const UploadAndApplyCrop: Story = {
 
       const body = within(document.body);
       await expect(await body.findByText("사진 조정")).toBeInTheDocument();
+      await waitFor(() => {
+        const cropImage = document.body.querySelector<HTMLImageElement>('img[src^="blob:"]');
+        expect(cropImage).not.toBeNull();
+        expect(cropImage!.clientWidth).toBeGreaterThan(0);
+      });
       await userEvent.click(body.getByRole("button", { name: "적용" }));
-      await expect(args.onChange).toHaveBeenCalled();
+      await waitFor(async () => {
+        await expect(args.onChange).toHaveBeenCalled();
+      });
       await expect(
         await within(canvasElement).findByAltText("리뷰 사진 1"),
       ).toBeInTheDocument();

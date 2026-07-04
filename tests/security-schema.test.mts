@@ -7,6 +7,8 @@ const schemaSql = readFileSync(new URL("../supabase/schema.sql", import.meta.url
 const sensitiveTables = [
   "admin_login_attempts",
   "suggestion_attempts",
+  "partner_registration_attempts",
+  "partner_registration_requests",
   "member_auth_attempts",
   "public_cache_versions",
   "partner_companies",

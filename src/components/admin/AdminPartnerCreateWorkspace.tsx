@@ -128,6 +128,10 @@ export default function AdminPartnerCreateWorkspace({
       ) : (
         <AdminPartnerFileImportForm
           onApplyDraft={(draft: AdminPartnerFileDraft) => {
+            const categoryNotice =
+              draft.categoryLabel && !draft.categoryId
+                ? `파일의 신규 카테고리 "${draft.categoryLabel}"는 아직 등록되어 있지 않습니다. 브랜드 관리 > 카테고리 탭에서 먼저 추가한 뒤 이 브랜드 폼에서 선택하세요.`
+                : null;
             setPartnerDraft((current) => ({
               ...draft.partner,
               visibility: current.visibility,
@@ -135,10 +139,11 @@ export default function AdminPartnerCreateWorkspace({
               campusSlugs: current.campusSlugs,
               appliesTo: current.appliesTo,
             }));
-            setDraftCategoryId(draft.categoryId || categoryId);
+            setDraftCategoryId(draft.categoryId || "");
             setDraftRevision((current) => current + 1);
             setDraftNotice(
-              "파일 값이 반영되었습니다. 검토 후 브랜드 추가를 눌러 저장하세요.",
+              categoryNotice ??
+                "파일 값이 반영되었습니다. 검토 후 브랜드 추가를 눌러 저장하세요.",
             );
             setMode("single");
           }}

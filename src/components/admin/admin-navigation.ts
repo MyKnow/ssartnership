@@ -114,6 +114,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "brands" },
       },
       {
+        href: "/admin/partner-registrations",
+        label: "등록 신청",
+        description: "공개 신청 검토 큐",
+        iconKey: "queue",
+        permission: { resource: "brands" },
+      },
+      {
         href: "/admin/companies",
         label: "파트너사/계정",
         description: "회사와 담당 계정 연결",
