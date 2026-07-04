@@ -50,7 +50,7 @@ export function InsightListCard({
               key={`${title}-${item.label}`}
               className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm"
             >
-              <span className="min-w-0 flex-1 break-all text-left font-medium text-foreground">
+              <span className="min-w-0 flex-1 text-token text-left font-medium text-foreground">
                 {item.label}
               </span>
               <span className="shrink-0 text-muted-foreground">{item.value}</span>

@@ -58,7 +58,7 @@ export default function AdminLogsManagerContent({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="grid gap-1">
                 <p className="text-sm font-semibold text-foreground">현재 조회 범위</p>
-                <p className="break-all text-sm text-muted-foreground">{logs.data.range.label}</p>
+                <p className="text-token text-sm text-muted-foreground">{logs.data.range.label}</p>
               </div>
               <Badge className="bg-surface-muted text-muted-foreground">
                 {logs.data.range.bucketLabel}

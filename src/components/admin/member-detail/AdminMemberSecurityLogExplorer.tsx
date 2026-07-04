@@ -323,9 +323,9 @@ export default function AdminMemberSecurityLogExplorer({
                         {log.eventName}
                       </h3>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span className="max-w-full break-all">입력 ID: {log.identifier ?? "-"}</span>
-                        <span className="max-w-full break-all">IP: {log.ipAddress ?? "-"}</span>
-                        <span className="max-w-full break-all">경로: {log.path ?? "-"}</span>
+                        <span className="max-w-full text-token">입력 ID: {log.identifier ?? "-"}</span>
+                        <span className="max-w-full text-token">IP: {log.ipAddress ?? "-"}</span>
+                        <span className="max-w-full text-token">경로: {log.path ?? "-"}</span>
                       </div>
                     </div>
                   </div>
@@ -339,7 +339,7 @@ export default function AdminMemberSecurityLogExplorer({
                         {propertyEntries.map(([key, value]) => (
                           <Badge
                             key={key}
-                            className="max-w-full break-all whitespace-normal bg-surface-muted text-foreground"
+                            className="max-w-full text-token whitespace-normal bg-surface-muted text-foreground"
                           >
                             {key}: {Array.isArray(value) ? value.join(", ") : String(value)}
                           </Badge>
