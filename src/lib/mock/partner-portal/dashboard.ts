@@ -100,16 +100,18 @@ function toDashboardCompany(
   };
 }
 
-export async function getMockPartnerPortalDashboard(
-  companyIds: string[],
-): Promise<PartnerPortalDashboard> {
-  const uniqueCompanyIds = [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
-  const statusByPartnerId = getMockPartnerChangeRequestPartnerStatuses();
-  const companies = listMockPartnerPortalCompanySetups(uniqueCompanyIds).map((setup) =>
+export function buildMockPartnerPortalDashboardFromSetups(
+  setups: MockPortalSetupRecord[],
+): PartnerPortalDashboard {
+  const partnerIds = setups.flatMap((setup) =>
+    setup.company.services.map((service) => service.id),
+  );
+  const statusByPartnerId = getMockPartnerChangeRequestPartnerStatuses(partnerIds);
+  const companies = setups.map((setup) =>
     toDashboardCompany(setup, statusByPartnerId),
   );
-
   const totals = sumMetrics(companies.map((company) => company.totals));
+
   return {
     companies,
     totals: {
@@ -121,4 +123,13 @@ export async function getMockPartnerPortalDashboard(
       ),
     },
   };
+}
+
+export async function getMockPartnerPortalDashboard(
+  companyIds: string[],
+): Promise<PartnerPortalDashboard> {
+  const uniqueCompanyIds = [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
+  return buildMockPartnerPortalDashboardFromSetups(
+    listMockPartnerPortalCompanySetups(uniqueCompanyIds),
+  );
 }
