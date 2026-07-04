@@ -144,7 +144,7 @@ export default function AdminMemberManager({
         description="이름, 기수, 캠퍼스, 현재 활성 버전 기준 약관 상태로 회원 목록을 빠르게 좁힙니다."
         tone="elevated"
       >
-        <div className="grid min-w-[18rem] flex-1 gap-1">
+        <div className="grid min-w-0 flex-1 gap-1 lg:min-w-[18rem]">
           <span className="ui-caption">검색</span>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
             <Input

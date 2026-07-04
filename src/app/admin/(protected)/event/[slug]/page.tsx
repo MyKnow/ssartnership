@@ -186,9 +186,9 @@ function SignupRewardOverviewSection({
   }));
 
   return (
-    <section className="grid gap-5" aria-label="추첨권 현황">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+    <section className="grid min-w-0 gap-5" aria-label="추첨권 현황">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <p className="ui-kicker">Rewards</p>
           <h3 className="mt-2 text-xl font-semibold text-foreground">
             추첨권 현황
@@ -222,9 +222,9 @@ function SignupRewardOverviewSection({
         <FormMessage variant="error">{warningMessage}</FormMessage>
       ) : null}
 
-      <Card tone="elevated" className="grid gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+      <Card tone="elevated" className="grid min-w-0 gap-4 overflow-hidden">
+        <div className="flex min-w-0 w-full max-w-full flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <p className="ui-kicker">Draw</p>
             <h3 className="mt-2 text-xl font-semibold text-foreground">
               가중 추첨
@@ -242,7 +242,7 @@ function SignupRewardOverviewSection({
 
         <form
           action={sendEventRewardWinnerTestNotificationAction}
-          className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
+          className="grid min-w-0 w-full max-w-full gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
         >
           <input type="hidden" name="slug" value="signup-reward" />
           {draw ? <input type="hidden" name="drawId" value={draw.id} /> : null}
@@ -283,7 +283,7 @@ function SignupRewardOverviewSection({
         </form>
 
         {draw ? (
-          <div className="grid gap-4">
+          <div className="grid min-w-0 w-full max-w-full gap-4">
             <StatsRow
               items={[
                 { label: "당첨자", value: `${draw.winners.length.toLocaleString()}명`, hint: "확정 결과" },
@@ -335,7 +335,7 @@ function SignupRewardOverviewSection({
             {!draw.sentAt ? (
               <form
                 action={sendEventRewardWinnerNotificationsAction}
-                className="grid gap-3 rounded-[1rem] border border-primary/20 bg-primary-soft p-4"
+                className="grid min-w-0 w-full max-w-full gap-3 rounded-[1rem] border border-primary/20 bg-primary-soft p-4"
               >
                 <input type="hidden" name="slug" value="signup-reward" />
                 <input type="hidden" name="drawId" value={draw.id} />
@@ -503,8 +503,8 @@ function SignupRewardOverviewSection({
         </div>
       </Card>
 
-      <Card tone="elevated" padding="none" className="overflow-hidden">
-        <div className="overflow-x-auto">
+      <Card tone="elevated" padding="none" className="min-w-0 overflow-hidden">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="min-w-[960px] w-full text-left text-sm">
             <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
