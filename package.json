@@ -1,6 +1,6 @@
 {
   "name": "ssartnership",
-  "version": "1.10.7",
+  "version": "1.11.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -46,6 +46,7 @@
     "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-easy-crop": "^6.1.0",
     "react-icons": "^5.6.0",
     "recharts": "^3.8.1",
     "web-push": "^3.6.7",

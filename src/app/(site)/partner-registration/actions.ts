@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import {
@@ -8,12 +9,24 @@ import {
   resolveCurrentActor,
 } from "@/lib/activity-logs";
 import {
+  ADMIN_PARTNER_FILE_MAX_BYTES,
+  type AdminPartnerFileCompany,
+} from "@/lib/admin-partner-file-import";
+import { parseAdminPartnerXlsxDraft } from "@/lib/admin-partner-file-import.server";
+import {
+  createPartnerRegistrationInputFromDraft,
   hasPartnerRegistrationFieldErrors,
+  PARTNER_REGISTRATION_INITIAL_EXCEL_ACTION_STATE,
   PARTNER_REGISTRATION_INITIAL_ACTION_STATE,
-  resolvePartnerRegistrationCategory,
   validatePartnerRegistrationInput,
   type PartnerRegistrationActionState,
+  type PartnerRegistrationExcelActionState,
 } from "@/lib/partner-registration";
+import {
+  insertPartnerRegistrationRequest,
+  loadPartnerRegistrationCategories,
+  resolvePartnerRegistrationMediaPayload,
+} from "@/lib/partner-registration-submit.server";
 import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -50,13 +63,10 @@ export async function createPartnerRegistrationRequestAction(
     };
   }
 
-  const supabase = getSupabaseAdminClient();
-  const categoriesResult = await supabase
-    .from("categories")
-    .select("id,key,label")
-    .order("created_at", { ascending: true });
-
-  if (categoriesResult.error) {
+  let categories;
+  try {
+    categories = await loadPartnerRegistrationCategories();
+  } catch {
     return {
       status: "error",
       message: "카테고리 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -64,46 +74,26 @@ export async function createPartnerRegistrationRequestAction(
   }
 
   const values = validation.values;
-  const matchedCategory = resolvePartnerRegistrationCategory(
-    values.categoryLabel,
-    categoriesResult.data ?? [],
-  );
-
-  const insertResult = await supabase
-    .from("partner_registration_requests")
-    .insert({
-      service_mode: values.serviceMode,
-      benefit_action_type: values.benefitActionType,
-      brand_name: values.brandName,
-      category_id: matchedCategory?.id ?? null,
-      category_label: matchedCategory?.label ?? values.categoryLabel,
-      period_start: values.periodStart || null,
-      period_end: values.periodEnd || null,
-      inquiry_link: values.safeInquiryLink,
-      brand_phone: values.safeBrandPhone,
-      detail_description: values.detailDescription || null,
-      company_name: values.companyName,
-      contact_name: values.contactName,
-      contact_email: values.contactEmail,
-      contact_phone: values.contactPhone || null,
-      company_description: values.companyDescription || null,
-      benefits: values.parsedBenefits,
-      conditions: values.parsedConditions,
-      tags: values.parsedTags,
-      location: values.location,
-      map_url: values.safeMapUrl,
-      site_link: values.safeSiteLink,
-      benefit_action_link: values.safeBenefitActionLink,
-      memo: values.memo || null,
-    })
-    .select("id")
-    .single();
-
-  if (insertResult.error) {
-    console.error("[partner-registration] insert failed", insertResult.error.message);
+  const requestId = randomUUID();
+  let insertedRequest;
+  try {
+    const media = await resolvePartnerRegistrationMediaPayload(formData, requestId);
+    insertedRequest = await insertPartnerRegistrationRequest({
+      requestId,
+      values,
+      categories,
+      context: { source: "public_web" },
+      media,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    console.error("[partner-registration] insert failed", message);
     return {
       status: "error",
-      message: "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      message,
     };
   }
 
@@ -119,13 +109,14 @@ export async function createPartnerRegistrationRequestAction(
     actorType: actor.actorType,
     actorId: actor.actorId,
     targetType: "partner_registration_request",
-    targetId: insertResult.data.id,
+    targetId: insertedRequest.requestId,
     properties: {
+      source: "public_web",
       serviceMode: values.serviceMode,
       benefitActionType: values.benefitActionType,
       brandName: values.brandName,
-      categoryLabel: matchedCategory?.label ?? values.categoryLabel,
-      categoryMatched: Boolean(matchedCategory),
+      categoryLabel: insertedRequest.categoryLabel,
+      categoryMatched: insertedRequest.categoryMatched,
     },
   });
 
@@ -134,6 +125,152 @@ export async function createPartnerRegistrationRequestAction(
   return {
     status: "success",
     message: "신청이 접수되었습니다. 담당자가 확인 후 안내드리겠습니다.",
-    requestId: insertResult.data.id,
+    requestId: insertedRequest.requestId,
+  };
+}
+
+function getXlsxFile(formData: FormData) {
+  const file = formData.get("xlsxFile");
+  return file instanceof File && file.size > 0 ? file : null;
+}
+
+function validateXlsxFile(file: File | null) {
+  if (!file) {
+    return "XLSX 파일을 업로드해 주세요.";
+  }
+  if (file.size > ADMIN_PARTNER_FILE_MAX_BYTES) {
+    return "XLSX 파일은 1MB 이하만 업로드할 수 있습니다.";
+  }
+  if (!/\.xlsx$/i.test(file.name)) {
+    return "엑셀 입력은 .xlsx 파일만 업로드할 수 있습니다.";
+  }
+  return null;
+}
+
+async function loadPartnerCompaniesForTemplateParse() {
+  const result = await getSupabaseAdminClient()
+    .from("partner_companies")
+    .select("id,name")
+    .order("created_at", { ascending: true });
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+  return (result.data ?? []) as AdminPartnerFileCompany[];
+}
+
+export async function createPartnerRegistrationExcelRequestAction(
+  _prevState: PartnerRegistrationExcelActionState = PARTNER_REGISTRATION_INITIAL_EXCEL_ACTION_STATE,
+  formData: FormData,
+): Promise<PartnerRegistrationExcelActionState> {
+  void _prevState;
+  const headerStore = await headers();
+  const identifier = getClientIdentifier(headerStore);
+
+  if (await isBlocked(identifier, PARTNER_REGISTRATION_RATE_LIMIT)) {
+    return {
+      status: "error",
+      message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
+  const file = getXlsxFile(formData);
+  const fileError = validateXlsxFile(file);
+  if (!file || fileError) {
+    await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+    return {
+      status: "error",
+      message: "업로드 파일을 확인해 주세요.",
+      fileError: fileError ?? "XLSX 파일을 업로드해 주세요.",
+    };
+  }
+
+  let categories;
+  let companies;
+  try {
+    [categories, companies] = await Promise.all([
+      loadPartnerRegistrationCategories(),
+      loadPartnerCompaniesForTemplateParse(),
+    ]);
+  } catch {
+    return {
+      status: "error",
+      message: "기준 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
+  const parseResult = await parseAdminPartnerXlsxDraft({
+    fileBuffer: Buffer.from(await file.arrayBuffer()),
+    categories,
+    companies,
+  });
+  if (!parseResult.ok) {
+    await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+    return {
+      status: "error",
+      message: "엑셀 내용을 확인해 주세요.",
+      fileError: parseResult.errors.join(" "),
+    };
+  }
+
+  const validation = validatePartnerRegistrationInput(
+    createPartnerRegistrationInputFromDraft(parseResult.draft),
+  );
+  if (hasPartnerRegistrationFieldErrors(validation.fieldErrors)) {
+    await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+    return {
+      status: "error",
+      message: "엑셀 필수 항목을 확인해 주세요.",
+      fileError: Object.values(validation.fieldErrors).join(" "),
+    };
+  }
+
+  let insertedRequest;
+  try {
+    insertedRequest = await insertPartnerRegistrationRequest({
+      values: validation.values,
+      categories,
+      context: { source: "public_excel" },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    console.error("[partner-registration:xlsx] insert failed", message);
+    return {
+      status: "error",
+      message,
+    };
+  }
+
+  await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+
+  const [context, actor] = await Promise.all([
+    getServerActionLogContext("/partner-registration"),
+    resolveCurrentActor(),
+  ]);
+  scheduleProductEventLog({
+    ...context,
+    eventName: "partner_registration_xlsx_submit",
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    targetType: "partner_registration_request",
+    targetId: insertedRequest.requestId,
+    properties: {
+      source: "public_excel",
+      serviceMode: validation.values.serviceMode,
+      benefitActionType: validation.values.benefitActionType,
+      brandName: validation.values.brandName,
+      categoryLabel: insertedRequest.categoryLabel,
+      categoryMatched: insertedRequest.categoryMatched,
+    },
+  });
+
+  revalidatePath("/admin/partner-registrations");
+
+  return {
+    status: "success",
+    message: "엑셀 신청이 접수되었습니다. 담당자가 확인 후 안내드리겠습니다.",
+    requestId: insertedRequest.requestId,
   };
 }

@@ -60,7 +60,9 @@ export const ApplySuccess: Story = {
       fireEvent.input(slider, { target: { value: "2" } });
       fireEvent.change(slider, { target: { value: "2" } });
 
-      const frame = body.getByText("드래그와 확대만 조정하세요.").closest("div")?.previousElementSibling;
+      const frame = body
+        .getByText("이미지를 드래그해서 위치를 맞추고 확대 정도를 조절하세요.")
+        .closest("div")?.previousElementSibling;
       if (frame instanceof HTMLElement) {
         await userEvent.pointer([
           { target: frame, coords: { x: 120, y: 120 }, keys: "[MouseLeft>]" },

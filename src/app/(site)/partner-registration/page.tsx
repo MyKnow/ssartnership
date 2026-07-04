@@ -11,9 +11,9 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: `제휴 업체 등록 | ${SITE_NAME}`,
+  title: `신규 파트너사 등록 | ${SITE_NAME}`,
   description:
-    "SSARTNERSHIP 제휴 등록에 필요한 업체 정보 양식을 선택해 다운로드하거나 웹에서 직접 입력합니다.",
+    "SSARTNERSHIP 신규 파트너사 등록에 필요한 업체 정보를 웹에서 입력하거나 엑셀로 접수합니다.",
   robots: {
     index: false,
     follow: true,
@@ -38,8 +38,8 @@ export default async function PartnerRegistrationPage() {
           <div className="mx-auto grid max-w-6xl min-w-0 gap-5">
             <ShellHeader
               eyebrow="Partner Registration"
-              title="제휴 업체 등록"
-              description="브랜드 유형을 선택해 공식 엑셀 양식을 받거나, 같은 항목을 웹에서 바로 입력해 검토를 요청할 수 있습니다."
+              title="신규 파트너사 등록"
+              description="브랜드 유형을 선택하고 웹 입력 또는 엑셀 파일로 신규 파트너사 검토를 요청할 수 있습니다."
               className="px-5 py-5 sm:px-6 sm:py-6"
             />
 

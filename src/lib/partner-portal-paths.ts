@@ -34,6 +34,10 @@ export function getCompanyScopedPartnerServiceHref(
   return `${getCompanyScopedPortalHref(companyId)}/services/${encodeURIComponent(partnerId)}`;
 }
 
+export function getCompanyScopedPartnerServiceNewHref(companyId: string) {
+  return `${getCompanyScopedPortalHref(companyId)}/services/new`;
+}
+
 export function getCompanyScopedPartnerServiceEditHref(
   companyId: string,
   partnerId: string,
