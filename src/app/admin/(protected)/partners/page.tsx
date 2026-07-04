@@ -245,6 +245,9 @@ export default async function AdminPartnersPage({
           description="고객에게 노출되는 제휴처 카드, 승인 대기 요청, 카테고리를 탭으로 나눠 관리합니다."
           actions={
             <>
+              <Button variant="secondary" href="/admin/partner-registrations">
+                등록 신청 검토
+              </Button>
               <Button variant="secondary" href="/admin/companies">
                 파트너사/계정 관리
               </Button>

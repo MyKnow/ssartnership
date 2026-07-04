@@ -15,6 +15,7 @@ export const PRODUCT_EVENT_NAMES = [
   'push_unsubscribe_all',
   'push_preference_change',
   'suggest_submit',
+  'partner_registration_submit',
   'pwa_install_click',
   'certification_view',
   'certification_qr_open',

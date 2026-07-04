@@ -93,6 +93,11 @@ test("admin partner xlsx template branches headers and writes metadata", async (
     String(input.getRow(categoryRow).getCell(3).dataValidation?.formulae?.[0] ?? ""),
     /'목록'!\$A\$2:\$A\$3/,
   );
+  assert.notEqual(
+    input.getRow(categoryRow).getCell(3).dataValidation?.showErrorMessage,
+    true,
+  );
+  assert.ok(offlineHeaders.includes("브랜드 전화번호"));
   const nameRow = offlineHeaders.indexOf("브랜드명") + 2;
   assert.equal(input.getRow(nameRow).getCell(3).dataValidation?.type, "custom");
   assert.match(
@@ -122,7 +127,7 @@ test("admin partner xlsx template branches headers and writes metadata", async (
     /<=1000/,
   );
   assert.equal(input.getRow(nameRow).getCell(1).fill.type, "pattern");
-  assert.equal(input.getRow(nameRow).getCell(2).value, "레뽀드라라 역삼 GS타워점");
+  assert.equal(input.getRow(nameRow).getCell(2).value, "카페 싸피 역삼본점");
   const list = offlineExternal.getWorksheet("목록");
   assert.ok(list);
   assert.equal(list.getRow(2).getCell(1).value, "카페");
@@ -150,13 +155,14 @@ test("admin partner xlsx draft parser accepts one Korean row and normalizes valu
     benefitActionType: "external_link",
   });
   setInputValues(workbook, {
-    브랜드명: "레뽀드라라",
+    브랜드명: "카페 싸피 역삼본점",
     카테고리: "카페",
     시작일: "2026-05-01",
     종료일: "2026-12-31",
     협력사명: "샘플 협력사",
     담당자명: "담당자",
     "담당자 이메일": "partner@example.com",
+    "브랜드 전화번호": "02-3429-5100",
     위치: "서울 강남구",
     "지도 URL": "https://map.example.com",
     "혜택 이용 링크": "https://benefit.example.com",
@@ -176,8 +182,10 @@ test("admin partner xlsx draft parser accepts one Korean row and normalizes valu
     return;
   }
   assert.equal(result.draft.categoryId, "cat-cafe");
-  assert.equal(result.draft.partner.name, "레뽀드라라");
+  assert.equal(result.draft.categoryLabel, "카페");
+  assert.equal(result.draft.partner.name, "카페 싸피 역삼본점");
   assert.equal(result.draft.partner.location, "서울 강남구");
+  assert.equal(result.draft.partner.inquiryLink, "02-3429-5100");
   assert.deepStrictEqual(result.draft.partner.campusSlugs, []);
   assert.deepStrictEqual(result.draft.partner.appliesTo, []);
   assert.deepStrictEqual(result.draft.partner.benefits, [
@@ -225,8 +233,34 @@ test("admin partner xlsx draft parser rejects empty and invalid rows", async () 
   assert.equal(invalidResult.ok, false);
   assert.match(
     invalidResult.ok ? "" : invalidResult.errors.join(" "),
-    /카테고리|기간|사이트 링크/,
+    /기간|사이트 링크/,
   );
+});
+
+test("admin partner xlsx draft parser preserves a new category label", async () => {
+  const { parseAdminPartnerXlsxDraft } = await serverModulePromise;
+  const workbook = await loadTemplate({
+    serviceMode: "online",
+    benefitActionType: "none",
+  });
+  setInputValues(workbook, {
+    브랜드명: "카페 싸피 멤버십몰",
+    카테고리: "멤버십 커머스",
+    "사이트 링크": "https://shop.cafessafy.example.com",
+  });
+
+  const result = await parseAdminPartnerXlsxDraft({
+    fileBuffer: await toBuffer(workbook),
+    categories,
+    companies,
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.equal(result.draft.categoryId, "");
+  assert.equal(result.draft.categoryLabel, "멤버십 커머스");
 });
 
 test("admin partner xlsx draft parser rejects values outside the template range", async () => {
