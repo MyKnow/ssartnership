@@ -2,6 +2,7 @@ import type { MouseEvent } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
+import PartnerValueBadge from "@/components/PartnerValueBadge";
 import {
   getPartnerPlaceLinkLabel,
   getPartnerServiceMode,
@@ -162,12 +163,9 @@ export default function PartnerCardMeta({
         <p className="font-medium text-foreground">혜택</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {partner.benefits.map((benefit) => (
-            <Badge
-              key={benefit}
-              className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-            >
+            <PartnerValueBadge key={benefit}>
               {benefit}
-            </Badge>
+            </PartnerValueBadge>
           ))}
         </div>
       </div>
