@@ -145,11 +145,18 @@ body {
     radial-gradient(circle at bottom left, rgba(33, 59, 104, 0.08), transparent 30%),
     linear-gradient(180deg, var(--background), var(--background-muted));
   color: var(--foreground);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+:where(code, pre, kbd, samp) {
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 ::selection {
