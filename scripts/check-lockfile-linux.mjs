@@ -30,6 +30,8 @@ if (dockerResult.status !== 0 || dockerResult.error) {
     .filter(Boolean)
     .join("\n");
   const dockerUnavailable =
+    dockerResult.error?.code === "ENOENT" ||
+    combinedOutput.includes("ENOENT") ||
     combinedOutput.includes("docker.sock") ||
     combinedOutput.includes("Cannot connect to the Docker daemon") ||
     combinedOutput.includes("Cannot find the Docker daemon") ||
