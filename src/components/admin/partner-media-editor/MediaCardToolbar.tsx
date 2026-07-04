@@ -23,7 +23,6 @@ export default function MediaCardToolbar({
 }) {
   const [draftUrl, setDraftUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const uploadLabel = multiple ? "파일/갤러리 업로드" : "파일 업로드";
 
   const submitUrl = () => {
     const urls = draftUrl
@@ -91,7 +90,7 @@ export default function MediaCardToolbar({
             className="w-auto"
           >
             <ArrowUpTrayIcon className="h-4 w-4" />
-            {uploadLabel}
+            이미지 추가
           </Button>
         </div>
       </div>

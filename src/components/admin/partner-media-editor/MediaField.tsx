@@ -164,7 +164,7 @@ export default function MediaField({
                   onClick={() => fileInputRef.current?.click()}
                   className="w-auto"
                 >
-                  {multiple ? "파일/갤러리" : "파일"}
+                  이미지 추가
                 </Button>
               </div>
             </div>
@@ -338,6 +338,8 @@ export default function MediaField({
           sourceUrl={currentCrop.sourceUrl}
           outputName={currentCrop.outputName}
           queueCount={pendingCropCount}
+          accept={accept}
+          validateFile={validateFile}
           onCancel={dismissCurrentCrop}
           onApply={applyCurrentCrop}
         />
