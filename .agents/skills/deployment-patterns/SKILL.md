@@ -25,6 +25,16 @@ Production deployment workflows and CI/CD best practices.
 - If `PREVIEW_TEST_MEMBER_USERNAME` and `PREVIEW_TEST_MEMBER_PASSWORD` are configured in CI secrets, `npm run sync:preview` re-seeds that single Preview-only member password after restore.
 - Do not reintroduce Production member password hashes into Preview sync unless the user explicitly accepts the security risk for a one-off operation.
 - If Preview login requires password reset after sync, inspect the sanitizer diagnostics before treating it as a migration or auth regression.
+- If `Sync Preview Supabase` fails with a missing relation during restore, compare Production-only tables against Preview schema before retrying. The sanitizer should drop, map, or intentionally exclude tables that Preview cannot restore yet.
+- Treat repeated Preview sync failures as schema-drift or sanitizer coverage gaps, not transient CI noise.
+
+## SSAFY Partnership Release Gates
+
+- `dev` to `main` promotion is complete only after GitHub Actions and external statuses are green. Watch `Verify Node Lockfile`, `Public Readiness`, `Publish Storybook`, Supabase Preview, and Vercel.
+- If branch protection or admin override allows a merge while checks are red/in progress, immediately monitor the target branch and fix forward before declaring the release done.
+- Dependency changes must pass `npm run check:lockfile` locally. A Linux canonical lockfile failure can also break `Publish Storybook` because `npm ci` stops before Chromatic runs.
+- Supabase migration changes must pass local migration validation and remote Preview branch application. A `MIGRATIONS_FAILED` external status usually means migration order or schema dependency failure.
+- Public readiness failures should be classified first: lockfile gate, migration validation, unit test, Playwright install/ffmpeg, route smoke 404, then real product regression.
 
 ## Deployment Strategies
 

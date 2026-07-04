@@ -18,6 +18,31 @@ Invoke this skill:
 
 ## Verification Phases
 
+### Phase 0: Repository-Specific CI Parity
+
+Before the generic phases, add checks that mirror the CI failures this repo has already seen:
+
+```bash
+# Dependency or package-lock changes
+npm run check:lockfile
+
+# Supabase migration changes
+npm run validate:migrations
+ls supabase/migrations | sort | tail -5
+
+# Storybook or client UI changes
+npm run build-storybook
+PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test-storybook
+```
+
+Use only the checks relevant to the changed files, but never skip `npm run check:lockfile` when `package.json`, `package-lock.json`, Playwright, Storybook, or native/optional dependencies changed.
+
+For Supabase work, local validation is not enough by itself. Confirm the new migration sorts after the latest existing file and wait for the remote Preview/Supabase branch status to leave `MIGRATIONS_FAILED`.
+
+For E2E work, a CI-wide failure that mentions missing `ffmpeg` or a missing Playwright executable is an environment/install problem. Fix the Playwright install step or use `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome` before debugging app behavior.
+
+For page-smoke failures, a 404 response body means the test route list and App Router tree are out of sync. Update the route, compatibility redirect, or smoke fixture deliberately.
+
 ### Phase 1: Build Verification
 ```bash
 # Check if project builds
@@ -84,6 +109,17 @@ Review each changed file for:
 - Unintended changes
 - Missing error handling
 - Potential edge cases
+
+### Phase 7: Remote Status Watch
+
+After pushing a PR branch or promoting `dev` to `main`, watch remote checks instead of assuming the push finished the release:
+
+```bash
+gh pr checks --watch
+gh run list --branch main --limit 10
+```
+
+Do not mark a release-ready task complete while `Verify Node Lockfile`, `Public Readiness`, `Publish Storybook`, Supabase Preview, or Vercel statuses are red or still in progress, unless the user explicitly accepts that risk.
 
 ## Output Format
 

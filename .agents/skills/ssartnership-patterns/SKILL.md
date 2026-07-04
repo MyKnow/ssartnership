@@ -104,6 +104,8 @@ For a new user-facing or admin-facing feature:
 - Separate schema changes from heavy data backfills when practical.
 - For metrics and rollups, add tests for aggregation helpers or query-shape assumptions.
 - When adding storage buckets or policies, review RLS and service-role usage before commit.
+- Before adding a migration, run `date '+%Y%m%d%H%M%S'` and inspect `ls supabase/migrations | sort | tail -5`; the new filename must sort after the latest existing migration.
+- When a migration alters a table, ensure that table is created in an earlier-sorted migration or already exists in the remote schema. A Preview branch `MIGRATIONS_FAILED` status often means filename ordering or schema drift, not only SQL syntax.
 
 ## Testing Patterns
 
@@ -123,6 +125,18 @@ node --test tests/<focused-test>.test.mts
 ```
 
 Run `next build` only when build/runtime behavior changed broadly or when explicitly requested.
+
+## CI Failure Guardrails
+
+Recent failed Actions clustered into four workflows: `Sync Preview Supabase`, `Verify Node Lockfile`, `Publish Storybook`, and `Public Readiness`. Before PR, `dev` merge, or `main` promotion, check the relevant guardrail instead of waiting for CI to rediscover the same issue.
+
+- Dependency or package graph changes: run `npm run check:lockfile` and commit any `package-lock.json` diff. Linux/amd64 optional dependency metadata can drift even when macOS installs look clean.
+- Storybook/client UI changes: run `npm run build-storybook`; when stories have interaction tests or media/crop dialogs, run `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test-storybook` and update story assertions with the component contract.
+- Public readiness/E2E changes: run the focused E2E locally with `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome`. If CI failures all mention missing `ffmpeg`, fix the Playwright install/config before debugging product behavior.
+- Route smoke failures: a rendered Korean 404 page means the route inventory, redirect, or app route changed. Update the smoke fixture and the route/redirect intentionally in the same work unit.
+- Supabase Preview changes: run `npm run validate:migrations`, inspect sorted migration order, and wait for the Supabase Preview external status to become green. Do not treat local migration validation as proof that the remote Preview branch applied successfully.
+- Preview sync failures: inspect sanitizer diagnostics and missing relation errors first. Production-to-Preview sync may fail when Production has tables not present in Preview, so the sync script must tolerate or explicitly map schema drift.
+- Main promotion: after pushing or merging into `main`, monitor `gh run list --branch main` or `gh pr checks --watch` until `Verify Node Lockfile`, `Public Readiness`, Supabase, and Vercel statuses are green.
 
 ## Release And Docs
 

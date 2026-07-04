@@ -250,6 +250,16 @@ jobs:
           retention-days: 30
 ```
 
+## SSAFY Partnership CI Lessons
+
+This repo has already failed `Public Readiness` for Playwright environment and route-inventory issues. Diagnose them separately:
+
+- If many or all tests fail before assertions with `Executable doesn't exist`, `ffmpeg-linux`, or `Video rendering requires ffmpeg binary`, treat it as a CI install/config failure. Install `ffmpeg` with Playwright or disable video for that CI job before changing app code.
+- Prefer `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome` for local and CI parity in this repo when the cached Playwright browser is missing or unstable.
+- If a page-smoke test fails because the body is the Korean 404 page, the smoke route list is stale or the route/redirect was removed. Update the App Router path, compatibility redirect, or `page-smoke` fixture in the same change.
+- For public pages and partner/admin portals, add loading/pending assertions only after the route itself renders a non-404 shell. Otherwise the test can hide a routing regression behind UI timing noise.
+- When adding image/crop/review flows, verify Storybook interaction tests as well as E2E; story assertions often catch copy and media error-state contract drift before CI.
+
 ## Test Report Template
 
 ```markdown
