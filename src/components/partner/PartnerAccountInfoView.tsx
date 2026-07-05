@@ -309,7 +309,7 @@ function BillingProfileCard({
               <Badge variant="success">전체 협력사</Badge>
             )}
           </div>
-          <p className="mt-1 line-clamp-2 break-words text-sm leading-6 text-muted-foreground">
+          <p className="mt-1 line-clamp-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
             {getProfileDescription(profile)}
           </p>
         </div>
@@ -352,7 +352,7 @@ function BillingProfileCard({
           <p className="text-xs font-semibold text-muted-foreground">
             세금계산서 이메일
           </p>
-          <p className="mt-1 break-all font-semibold text-foreground">
+          <p className="mt-1 text-token font-semibold text-foreground">
             {profile.taxInvoiceEmail}
           </p>
         </div>
@@ -360,7 +360,7 @@ function BillingProfileCard({
           <p className="text-xs font-semibold text-muted-foreground">
             사업장 주소
           </p>
-          <p className="mt-1 line-clamp-2 break-words text-foreground">
+          <p className="mt-1 line-clamp-2 text-ko-pretty text-foreground">
             {profile.businessAddress}
           </p>
         </div>
@@ -406,10 +406,10 @@ export default function PartnerAccountInfoView({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="ui-kicker">프로필</p>
-            <h2 className="mt-2 break-keep text-xl font-semibold leading-tight text-foreground">
+            <h2 className="mt-2 text-ko-title text-xl font-semibold leading-tight text-foreground">
               모든 협력사에서 동일하게 쓰는 계정 프로필입니다.
             </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
               로그인 정보, 비밀번호, 입금자와 세금계산서 정보를 한 곳에서
               관리합니다.
             </p>
@@ -423,7 +423,7 @@ export default function PartnerAccountInfoView({
               <p className="mt-2 truncate text-foreground">
                 {defaultProfile.label}
               </p>
-              <p className="mt-1 break-all text-xs text-muted-foreground">
+              <p className="mt-1 text-token text-xs text-muted-foreground">
                 {defaultProfile.payerName} · {defaultProfile.taxInvoiceEmail}
               </p>
             </div>
@@ -444,7 +444,7 @@ export default function PartnerAccountInfoView({
               <KeyRound className="h-4 w-4 text-primary" />
               로그인 ID
             </div>
-            <p className="mt-2 break-all text-sm text-muted-foreground">
+            <p className="mt-2 text-token text-sm text-muted-foreground">
               {loginId}
             </p>
           </div>
