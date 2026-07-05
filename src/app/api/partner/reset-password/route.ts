@@ -22,12 +22,28 @@ import {
   commitSupabasePartnerPortalPasswordReset,
   prepareSupabasePartnerPortalPasswordReset,
 } from "@/lib/partner-auth/supabase";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   let normalizedEmail = "";
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "partner_password_reset",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return NextResponse.json({ error: "reset_failed" }, { status: 403 });
+  }
+
   try {
     const payload = (await request.json()) as { email?: string };
     const rawEmail = String(payload.email ?? "").trim();

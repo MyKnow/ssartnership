@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const pathModulePromise = import(
@@ -278,4 +279,32 @@ test("auth security logs redact raw exception messages", async () => {
       message: "사용자에게 보여줄 수 있는 실패 사유",
     },
   );
+});
+
+test("session mutation routes require same-origin guards", () => {
+  const guardedMutationFiles = [
+    "../src/app/api/mm/login/route.ts",
+    "../src/app/api/mm/logout/route.ts",
+    "../src/app/api/mm/change-password/route.ts",
+    "../src/app/api/mm/consent/route.ts",
+    "../src/app/api/mm/delete/route.ts",
+    "../src/app/api/mm/profile-sync/route.ts",
+    "../src/app/api/mm/_shared/reset-password-complete.ts",
+    "../src/app/api/partner/change-password/route.ts",
+    "../src/app/api/partner/reset-password/route.ts",
+    "../src/app/api/partner/setup/[token]/route.ts",
+    "../src/app/api/partner/reviews/[reviewId]/route.ts",
+    "../src/app/api/ssafy/reset-password/route.ts",
+    "../src/app/api/ssafy/signup/route.ts",
+    "../src/app/api/ssafy/verify-token/route.ts",
+  ];
+
+  for (const relativePath of guardedMutationFiles) {
+    const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+    assert.match(
+      source,
+      /isTrustedSameOriginRequest/,
+      `${relativePath} should guard state-changing requests`,
+    );
+  }
 });

@@ -95,9 +95,10 @@
    - 조치: auth/security log sink 또는 호출부에서 allowlisted error code/message만 보존하고 raw provider/DB exception은 내부 console 또는 request id로만 연결한다.
    - 2026-07-05 업데이트: `logAuthSecurity` 경계에서 `reason: "exception"`의 `message`를 `redacted_exception`으로 치환한다.
 
-10. 일부 cookie/session 기반 mutation에 same-origin guard가 빠져 있다.
+10. 일부 cookie/session 기반 mutation에 same-origin guard가 빠져 있다. `2026-07-05 완료`
    - JSON + SameSite=Lax + CORS 기본값 때문에 즉시 치명적이진 않지만, trust-boundary 문서의 기준과 맞지 않는다.
    - 조치: 회원/파트너 session mutation route에 공통 same-origin 또는 CSRF 성격 검증 helper를 적용한다.
+   - 2026-07-05 업데이트: 회원 로그인/로그아웃/탈퇴/약관/비밀번호/프로필 sync, 파트너 비밀번호/리뷰 moderation, SSAFY Verify 가입/재설정 callback route에 same-origin guard를 적용했다.
 
 ### Low
 
@@ -182,7 +183,7 @@
 3. `perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination, `/admin/logs` bounded loading 또는 DB-side aggregate 전환.
 4. `perf/public-home-boundary`: 홈 목록 server/client 경계 재설계, 초기 목록 pagination/server filtering, `(site)` layout/session/header read 경량화.
 5. `perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
-6. `fix/session-mutation-origin-guard`: 회원/파트너 session mutation route에 same-origin guard 확대 적용. auth security raw exception redaction은 완료.
+6. `fix/session-mutation-origin-guard`: 완료. 회원/파트너 session mutation route에 same-origin guard 확대 적용.
 7. `fix/partner-notification-summary`: 완료. 파트너 알림센터 summary가 최근 알림 윈도우 기준임을 UI에 명시.
 8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
 9. `feat/ssafy-notification-status-sync`: Verify notification status/recovery 결과를 delivery log에 반영.

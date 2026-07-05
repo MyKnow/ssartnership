@@ -18,7 +18,7 @@
 - [x] SSAFY Verify User Auth/Server API request-response trace 로그 추가
 - [x] 비밀번호 재설정 completion token URL query 노출 제거
 - [x] auth/security log raw exception redaction 적용
-- [ ] 회원/파트너 session mutation route same-origin guard 전체 적용
+- [x] 회원/파트너 session mutation route same-origin guard 전체 적용
 
 주의: 관리자 IP allowlist와 Basic Auth는 운영자 접속을 잠글 수 있어 값 확정 후 적용한다.
 legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없게 만들 수 있어 별도 승인 후 적용한다.
@@ -170,8 +170,9 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
    16-9. [x] 비밀번호 재설정 completion token 서버 상태 전환
       목표: `/auth/reset/complete?token=...` query 전달을 제거하고, HttpOnly short-lived cookie 또는 server-owned reset transaction id로 재설정 완료 권한을 전달한다.
       완료: SSAFY Verify 재인증 API는 completion token을 JSON으로 반환하지 않고 HttpOnly short-lived cookie로 설정하며, 완료 API는 same-origin JSON 요청과 cookie token만 검증하고 성공 시 cookie를 폐기한다.
-   16-10. [ ] session mutation same-origin guard 정착
+   16-10. [x] session mutation same-origin guard 정착
       목표: 회원/파트너 session mutation route에는 공통 same-origin guard를 적용한다. auth/security logs의 raw exception message는 `logAuthSecurity` 경계에서 redaction하도록 완료했다.
+      완료: 회원 로그인/로그아웃/탈퇴/약관/비밀번호/프로필 sync, 파트너 비밀번호/리뷰 moderation, SSAFY Verify 가입/재설정 callback route에 same-origin guard를 적용했다.
 
 17. [ ] 공개 운영 성능 high-risk 보완
    근거: `docs/operations/project-completeness-audit-2026-06-24.md`

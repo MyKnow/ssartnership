@@ -31,6 +31,7 @@ import {
 } from "@/lib/ssafy-verify/redirect";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,21 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: null,
   };
+
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_password_reset_ssafy",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return publicError("VERIFY_REQUEST_FORBIDDEN", null, 403);
+  }
 
   try {
     const blockedState = await getMemberAuthBlockingState(

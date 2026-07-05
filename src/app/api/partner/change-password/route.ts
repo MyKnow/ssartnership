@@ -15,6 +15,7 @@ import {
   PartnerPortalPasswordChangeError,
 } from "@/lib/partner-password-errors";
 import { getPartnerSession, setPartnerSession } from "@/lib/partner-session";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,21 @@ export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   let sessionLoginId = "";
   let sessionAccountId = "";
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "partner_password_change",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return NextResponse.json({ error: "change_failed" }, { status: 403 });
+  }
+
   try {
     const session = await getPartnerSession();
     if (!session?.accountId) {
