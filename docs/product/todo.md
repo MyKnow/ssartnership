@@ -177,10 +177,12 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
 17. [ ] 공개 운영 성능 high-risk 보완
    근거: `docs/operations/project-completeness-audit-2026-06-24.md`
    세부 단계:
-   17-1. [ ] 관리자 회원 화면 query bounded loading
+   17-1. [x] 관리자 회원 화면 query bounded loading
       목표: 옵션/목록/추이/푸시 필터 query를 분리하고, 500명 page size와 전체 `created_at` 스캔을 제거하거나 DB-side aggregate로 대체한다. 회원 상세 보안 로그도 pagination으로 전환한다.
-   17-2. [ ] 관리자 로그 기본 진입 bounded loading
+      완료: 회원 목록 page size 500 옵션을 제거하고, 옵션/추이 조회를 최근 5,000건 상한으로 제한했다. 회원 상세 보안 로그는 URL 기반 25/50/100건 pagination으로 전환했다.
+   17-2. [x] 관리자 로그 기본 진입 bounded loading
       목표: `/admin/logs` 기본 `24h` 진입에서 그룹별 무제한 row 수집을 막고, 요약은 DB-side aggregate 또는 lightweight endpoint로 분리한다.
+      완료: 로그 fallback 수집 상한을 그룹당 page 5,000건, summary 3,000건으로 설정하고 500건 page size 옵션을 제거했다. DB summary/page RPC가 있으면 기존 aggregate 경로를 우선 사용한다.
    17-3. [ ] 공개 홈 server/client 경계 축소
       목표: 초기 노출 목록 기준 pagination/server filtering을 적용하고, favorite/popularity state를 전체 배열이 아니라 보이는 목록 중심으로 계산한다.
    17-4. [ ] 인증서 avatar payload 경량화

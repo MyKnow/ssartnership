@@ -61,7 +61,7 @@ export type {
 export { iterateAdminLogsCsvRows } from './log-insights/csv';
 export { resolveLogRange } from './log-insights/range';
 
-const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
+const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
 
 function parsePage(value: string | number | null | undefined) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);

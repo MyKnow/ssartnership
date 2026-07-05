@@ -17,7 +17,7 @@ import type {
   LogRangePreset,
 } from '@/lib/log-insights';
 
-const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250, 500] as const;
+const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
 const LOG_SEARCH_DEBOUNCE_MS = 350;
 
 export function useAdminLogsManager(initialData: AdminLogsPageData) {

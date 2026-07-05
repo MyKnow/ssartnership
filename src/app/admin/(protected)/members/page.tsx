@@ -39,8 +39,10 @@ const adminMembersErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
 
-const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100, 500] as const;
+const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 const DEFAULT_MEMBER_PAGE_SIZE = 50;
+const MEMBER_OPTION_SAMPLE_LIMIT = 5000;
+const MEMBER_TREND_SAMPLE_LIMIT = 5000;
 
 type AdminMemberSearchParams = {
   backfill?: string;
@@ -208,7 +210,11 @@ export default async function AdminMembersPage({
   const [activePolicies, activeMarketingPolicy, optionsResult, preferenceFilter] = await Promise.all([
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing").catch(() => null),
-    supabase.from("members").select("year,campus"),
+    supabase
+      .from("members")
+      .select("year,campus")
+      .order("created_at", { ascending: false })
+      .limit(MEMBER_OPTION_SAMPLE_LIMIT),
     getPreferenceFilteredMemberIds(supabase, [
       { column: "enabled", value: filters.pushEnabledFilter, defaultEnabled: false },
       { column: "announcement_enabled", value: filters.announcementEnabledFilter, defaultEnabled: true },
@@ -278,7 +284,11 @@ export default async function AdminMembersPage({
     memberQuery = memberQuery.order("created_at", { ascending: false });
   }
 
-  let memberTrendQuery = supabase.from("members").select("created_at").order("created_at", { ascending: true });
+  let memberTrendQuery = supabase
+    .from("members")
+    .select("created_at")
+    .order("created_at", { ascending: false })
+    .limit(MEMBER_TREND_SAMPLE_LIMIT);
   if (filters.searchValue) {
     const escaped = filters.searchValue.replaceAll("%", "\\%").replaceAll("_", "\\_");
     memberTrendQuery = memberTrendQuery.or(
@@ -334,6 +344,7 @@ export default async function AdminMembersPage({
   const memberTrendCreatedAts = (memberTrendResult.data ?? [])
     .map((row) => row.created_at)
     .filter((value): value is string => Boolean(value));
+  const isMemberTrendSampled = totalCount > memberTrendCreatedAts.length;
   const optionRows = optionsResult.data ?? [];
   const options = {
     campuses: Array.from(
@@ -596,6 +607,13 @@ export default async function AdminMembersPage({
           minItemWidth="13rem"
         />
         <AdminMemberTrendChart createdAts={memberTrendCreatedAts} />
+        {isMemberTrendSampled ? (
+          <InlineMessage
+            tone="warning"
+            title="회원 유입 추이는 최근 샘플 기준입니다."
+            description={`성능 보호를 위해 현재 필터의 최근 ${MEMBER_TREND_SAMPLE_LIMIT.toLocaleString("ko-KR")}명 생성 이력만 차트에 반영합니다.`}
+          />
+        ) : null}
         {membersError ? (
           <FormMessage variant="error">
             회원 목록을 불러오지 못했습니다. {membersError.message}

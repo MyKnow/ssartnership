@@ -19,7 +19,7 @@ import {
   normalizeAdminMembers,
 } from "@/components/admin/member-manager/selectors";
 
-const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100, 500] as const;
+const MEMBER_PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 
 export default function AdminMemberManager({
   members,

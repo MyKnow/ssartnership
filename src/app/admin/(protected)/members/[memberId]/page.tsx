@@ -16,6 +16,9 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+const SECURITY_LOG_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const DEFAULT_SECURITY_LOG_PAGE_SIZE = 50;
+
 function formatDate(value?: string | null) {
   if (!value) {
     return "-";
@@ -29,13 +32,39 @@ function getPolicyBadgeClass(value?: number | null) {
     : "border-border bg-surface-muted text-muted-foreground";
 }
 
+type AdminMemberDetailSearchParams = {
+  logPage?: string;
+  logPageSize?: string;
+};
+
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseSecurityLogPageSize(value: string | undefined) {
+  const parsed = parsePositiveInteger(value, DEFAULT_SECURITY_LOG_PAGE_SIZE);
+  return SECURITY_LOG_PAGE_SIZE_OPTIONS.includes(
+    parsed as (typeof SECURITY_LOG_PAGE_SIZE_OPTIONS)[number],
+  )
+    ? parsed
+    : DEFAULT_SECURITY_LOG_PAGE_SIZE;
+}
+
 export default async function AdminMemberDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ memberId: string }>;
+  searchParams?: Promise<AdminMemberDetailSearchParams>;
 }) {
   await requireAdminPermission("members", "read", { path: "/admin/members" });
   const { memberId } = await params;
+  const query = (await searchParams) ?? {};
+  const securityLogPage = parsePositiveInteger(query.logPage, 1);
+  const securityLogPageSize = parseSecurityLogPageSize(query.logPageSize);
+  const securityLogFrom = (securityLogPage - 1) * securityLogPageSize;
+  const securityLogTo = securityLogFrom + securityLogPageSize - 1;
   const supabase = getSupabaseAdminClient();
 
   const [memberResult, subscriptionsResult, securityLogsResult] = await Promise.all([
@@ -53,11 +82,13 @@ export default async function AdminMemberDetailPage({
       .eq("is_active", true),
     supabase
       .from("auth_security_logs")
-      .select("id,event_name,status,identifier,path,ip_address,properties,created_at")
+      .select("id,event_name,status,identifier,path,ip_address,properties,created_at", {
+        count: "exact",
+      })
       .eq("actor_type", "member")
       .eq("actor_id", memberId)
       .order("created_at", { ascending: false })
-      .range(0, 4999),
+      .range(securityLogFrom, securityLogTo),
   ]);
 
   if (memberResult.error || !memberResult.data) {
@@ -78,6 +109,7 @@ export default async function AdminMemberDetailPage({
         : null,
     createdAt: log.created_at,
   }));
+  const securityLogTotalCount = securityLogsResult.count ?? securityLogs.length;
   const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
   const displayName = profile.displayName ?? member.display_name ?? member.mm_username ?? "회원 상세";
   const year = member.year ?? getCurrentSsafyYear();
@@ -159,7 +191,9 @@ export default async function AdminMemberDetailPage({
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>보안 로그</span>
-                  <span className="font-medium text-foreground">{securityLogs.length.toLocaleString()}건</span>
+                  <span className="font-medium text-foreground">
+                    {securityLogTotalCount.toLocaleString()}건
+                  </span>
                 </div>
               </div>
             </Card>
@@ -189,7 +223,15 @@ export default async function AdminMemberDetailPage({
             </Card>
           </div>
 
-          <AdminMemberSecurityLogExplorer logs={securityLogs} />
+          <AdminMemberSecurityLogExplorer
+            logs={securityLogs}
+            pagination={{
+              totalCount: securityLogTotalCount,
+              page: securityLogPage,
+              pageSize: securityLogPageSize,
+              pageSizeOptions: SECURITY_LOG_PAGE_SIZE_OPTIONS,
+            }}
+          />
         </div>
       </div>
     </AdminShell>

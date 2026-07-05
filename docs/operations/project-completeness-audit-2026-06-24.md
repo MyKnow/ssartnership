@@ -33,15 +33,17 @@
    - 조치: query token 대신 HttpOnly short-lived cookie 또는 server-owned reset transaction id로 전환하고, reset 완료 시 즉시 폐기한다.
    - 2026-07-05 업데이트: HttpOnly short-lived cookie 방식으로 전환했고, 완료 API는 same-origin JSON 요청과 cookie token만 검증하며 성공 시 cookie를 폐기한다.
 
-2. 관리자 회원 화면이 page load마다 큰 범위의 회원/푸시 설정 데이터를 반복 조회한다.
+2. 관리자 회원 화면이 page load마다 큰 범위의 회원/푸시 설정 데이터를 반복 조회한다. `2026-07-05 완료`
    - [src/app/admin/(protected)/members/page.tsx](/Users/myknow/coding/ssartnership/src/app/admin/(protected)/members/page.tsx)는 옵션용 `members(year,campus)` 전체 조회, 알림 필터별 `push_preferences` 반복 조회, trend chart용 `members(created_at)` 전체 조회를 같은 요청에서 수행한다.
    - 페이지 크기도 `10, 50, 100, 500`을 허용해 운영 데이터가 늘면 관리자 화면 TTFB와 DB 부하가 빠르게 커진다.
    - 조치: 옵션/차트/목록 query를 분리하고, trend는 DB-side aggregate 또는 bounded range로 바꾸며, 500 page size는 제거하거나 명시 export 기능으로 분리한다.
+   - 2026-07-05 업데이트: 500명 page size 옵션을 제거하고, 옵션/추이 조회를 최근 5,000건 상한으로 제한했다. 회원 상세 보안 로그는 25/50/100건 URL pagination으로 전환했다.
 
-3. 관리자 로그 화면 기본 진입이 `24h` 전체 로그를 그룹별 상한 없이 읽어 요약을 만든다.
+3. 관리자 로그 화면 기본 진입이 `24h` 전체 로그를 그룹별 상한 없이 읽어 요약을 만든다. `2026-07-05 완료`
    - [src/app/admin/(protected)/logs/page.tsx](/Users/myknow/coding/ssartnership/src/app/admin/(protected)/logs/page.tsx)는 기본 진입부터 `getAdminLogsPageData({ preset: "24h" })`를 호출한다.
    - [src/lib/log-insights/shared.ts](/Users/myknow/coding/ssartnership/src/lib/log-insights/shared.ts)의 `PAGE_MAX_LOG_ROWS_PER_GROUP`과 `SUMMARY_MAX_LOG_ROWS_PER_GROUP`가 `null`이라 로그량 증가 시 수천~수만 row가 메모리로 모일 수 있다.
    - 조치: 화면 기본 로딩은 bounded page로 제한하고, summary는 DB-side aggregate 또는 별도 lightweight endpoint로 전환한다.
+   - 2026-07-05 업데이트: fallback row 수집 상한을 page 5,000건, summary 3,000건으로 설정하고 500건 page size 옵션을 제거했다. DB summary/page RPC가 있으면 기존 aggregate 경로를 우선 사용한다.
 
 4. 공개 홈이 전체 파트너/즐겨찾기/인기 지표를 선계산한 뒤 클라이언트 경계로 넘긴다.
    - [src/components/HomeContent.tsx](/Users/myknow/coding/ssartnership/src/components/HomeContent.tsx)는 전체 파트너 목록, favorite counts, 사용자 favorite state, popularity metrics를 계산한다.
@@ -86,9 +88,10 @@
    - 잘못된 ID나 접근 불가 대상에서 `notFound()` 또는 명시적 게이트 UI 대신 홈으로 이동하면 공유 링크 오류와 SEO/운영 분석이 흐려진다.
    - 조치: public 404, 비공개/권한 제한 상태, 삭제 상태를 분리해 표시한다.
 
-8. 회원 상세 로그 조회가 계정 단위로 최대 5000건을 한 번에 전달한다.
+8. 회원 상세 로그 조회가 계정 단위로 최대 5000건을 한 번에 전달한다. `2026-07-05 완료`
    - 계정 활동이 누적되면 상세 페이지 payload와 클라이언트 탐색 비용이 커진다.
    - 조치: 회원 상세 보안 로그도 pagination/filter를 기본값으로 둔다.
+   - 2026-07-05 업데이트: 회원 상세 보안 로그를 25/50/100건 단위 URL pagination으로 전환했다.
 
 9. `auth_security_logs`에 일부 raw exception message가 남고 CSV export로 전파될 수 있다. `2026-07-05 완료`
    - SSAFY Verify trace 자체는 redaction되지만 다른 auth 흐름의 `error.message`가 그대로 properties에 저장되는 경로가 있다.
@@ -180,7 +183,7 @@
 
 1. `docs/project-completeness-audit`: 이 문서와 이벤트 로깅/운영 TODO 동기화.
 2. `fix/reset-password-server-state`: 완료. reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
-3. `perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination, `/admin/logs` bounded loading 또는 DB-side aggregate 전환.
+3. `perf/admin-observability-bounds`: 완료. `/admin/members` query 상한과 회원 상세 보안 로그 pagination, `/admin/logs` fallback bounded loading을 적용.
 4. `perf/public-home-boundary`: 홈 목록 server/client 경계 재설계, 초기 목록 pagination/server filtering, `(site)` layout/session/header read 경량화.
 5. `perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
 6. `fix/session-mutation-origin-guard`: 완료. 회원/파트너 session mutation route에 same-origin guard 확대 적용.
