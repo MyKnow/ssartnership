@@ -14,7 +14,7 @@
 - [x] `main` 브랜치 보호 규칙과 required status checks 적용
 - [ ] 관리자 edge perimeter hardening 값 확정: `ADMIN_ALLOWED_IPS` 또는 Basic Auth
 - [ ] Vercel legacy Mattermost env 제거: 명시 승인 후 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
-- [ ] SSAFY Verify notification status/recovery 결과를 delivery log에 주기적으로 반영
+- [x] SSAFY Verify notification status/recovery 결과를 delivery log에 주기적으로 반영
 - [x] SSAFY Verify User Auth/Server API request-response trace 로그 추가
 - [x] 비밀번호 재설정 completion token URL query 노출 제거
 - [x] auth/security log raw exception redaction 적용
@@ -165,8 +165,9 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       완료: 일반 사용자 화면에는 stable error message만 보여주고, provider diagnostic은 서버 보안 로그와 명시적 `SSAFY_VERIFY_DEBUG_ERRORS=1` 환경에서만 확인한다.
    16-7. [x] SSAFY Verify API request/response 추적 로그
       완료: User Auth token exchange와 Server API profile/directory/sync/profile-events/notification/status 호출을 `ssafy_verify_api_trace`로 요약 저장하고, token/code/secret/raw provider 응답은 redaction한다.
-   16-8. [ ] Verify notification delivery status 동기화
+   16-8. [x] Verify notification delivery status 동기화
       목표: `GET /v1/notifications/{notification_id}`와 campaign status 조회 결과를 SSARTNERSHIP delivery log/recovery view에 주기적으로 반영한다.
+      완료: `notification_deliveries`에 Verify provider 식별자/상태 컬럼을 추가하고, `/api/cron/ssafy-verify-notification-status` Vercel cron이 campaign status를 조회해 delivery row와 notification metadata의 `verifyStatusSync` 요약을 갱신한다.
    16-9. [x] 비밀번호 재설정 completion token 서버 상태 전환
       목표: `/auth/reset/complete?token=...` query 전달을 제거하고, HttpOnly short-lived cookie 또는 server-owned reset transaction id로 재설정 완료 권한을 전달한다.
       완료: SSAFY Verify 재인증 API는 completion token을 JSON으로 반환하지 않고 HttpOnly short-lived cookie로 설정하며, 완료 API는 same-origin JSON 요청과 cookie token만 검증하고 성공 시 cookie를 폐기한다.

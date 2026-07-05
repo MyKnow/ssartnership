@@ -73,9 +73,10 @@
    - Vercel에 예전 Mattermost token/base URL이 남아 있으면 실사용은 되지 않더라도 secret sprawl이 된다.
    - 삭제 전에는 직접 Mattermost 연동으로 rollback할 수 없다는 점을 확인해야 한다.
 
-4. SSAFY Verify notification delivery status/recovery 반영이 아직 완결되지 않았다.
+4. SSAFY Verify notification delivery status/recovery 반영이 아직 완결되지 않았다. `2026-07-05 완료`
    - 발송 자체는 Verify Server API에 위임됐다.
    - `GET /v1/notifications/{notification_id}`와 `GET /v1/notifications?campaign_id=...` 결과를 SSARTNERSHIP delivery log에 주기적으로 반영하는 작업은 `Phase 4b`로 남겨둔다.
+   - 2026-07-05 업데이트: Verify provider campaign/notification/idempotency/status를 `notification_deliveries`에 저장하고, `/api/cron/ssafy-verify-notification-status` Vercel cron이 campaign status를 조회해 delivery row와 notification metadata를 갱신한다.
 
 5. 기존 사이트 비밀번호 로그인 모델은 아직 남아 있다.
    - 신규 가입은 SSAFY Verify 기반으로 동작하지만 로그인은 `mm_username` + 사이트 비밀번호를 유지한다.
@@ -192,7 +193,7 @@
 6. `fix/session-mutation-origin-guard`: 완료. 회원/파트너 session mutation route에 same-origin guard 확대 적용.
 7. `fix/partner-notification-summary`: 완료. 파트너 알림센터 summary가 최근 알림 윈도우 기준임을 UI에 명시.
 8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
-9. `feat/ssafy-notification-status-sync`: Verify notification status/recovery 결과를 delivery log에 반영.
+9. `feat/ssafy-notification-status-sync`: 완료. Verify notification status/recovery 결과를 delivery log와 notification metadata에 반영.
 10. `test/flow-coverage`: signup/login/reset/certification/notifications/admin login/partner login E2E와 핵심 integration 보강.
 11. `refactor/member-auth-model`: 사이트 비밀번호 로그인 유지/폐기 정책 확정 후 구현.
 
@@ -220,5 +221,5 @@ SSAFY_VERIFY_LIVE_SMOKE=1 SSAFY_VERIFY_SMOKE_SEND_MM=1 npm run test:ssafy-verify
 - [ ] `ADMIN_ALLOWED_IPS` 또는 Basic Auth 운영값을 확정한다.
 - [ ] Vercel Production/Preview에서 legacy Mattermost env 잔존 여부를 확인하고 제거한다.
 - [ ] 완료된 이슈 #48, #50, #52, #53, #59를 comment 후 close한다.
-- [ ] Verify notification status/recovery sync를 별도 PR로 진행한다.
+- [x] Verify notification status/recovery sync를 별도 PR로 진행한다.
 - [ ] Verify 전환 후 Production 성능을 재측정한다.

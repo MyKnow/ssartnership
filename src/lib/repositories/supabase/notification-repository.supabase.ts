@@ -170,6 +170,11 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       channel: input.channel,
       status: input.status,
       error_message: input.errorMessage ?? null,
+      provider: input.provider ?? null,
+      provider_notification_id: input.providerNotificationId ?? null,
+      provider_campaign_id: input.providerCampaignId ?? null,
+      provider_idempotency_key: input.providerIdempotencyKey ?? null,
+      provider_status: input.providerStatus ?? null,
       delivered_at: input.deliveredAt ?? (input.status === "sent" ? new Date().toISOString() : null),
     });
     if (error) {

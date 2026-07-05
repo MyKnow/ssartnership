@@ -32,6 +32,11 @@ type MockNotificationDelivery = {
   channel: NotificationDeliveryInput["channel"];
   status: NotificationDeliveryInput["status"];
   errorMessage: string | null;
+  provider: string | null;
+  providerNotificationId: string | null;
+  providerCampaignId: string | null;
+  providerIdempotencyKey: string | null;
+  providerStatus: string | null;
   deliveredAt: string | null;
   createdAt: string;
 };
@@ -124,6 +129,11 @@ export class MockNotificationRepository implements NotificationRepository {
         channel: "in_app",
         status: "sent",
         errorMessage: null,
+        provider: null,
+        providerNotificationId: null,
+        providerCampaignId: null,
+        providerIdempotencyKey: null,
+        providerStatus: null,
         deliveredAt: now,
         createdAt: now,
       });
@@ -144,6 +154,11 @@ export class MockNotificationRepository implements NotificationRepository {
       channel: input.channel,
       status: input.status,
       errorMessage: input.errorMessage ?? null,
+      provider: input.provider ?? null,
+      providerNotificationId: input.providerNotificationId ?? null,
+      providerCampaignId: input.providerCampaignId ?? null,
+      providerIdempotencyKey: input.providerIdempotencyKey ?? null,
+      providerStatus: input.providerStatus ?? null,
       deliveredAt: now,
       createdAt: now,
     });

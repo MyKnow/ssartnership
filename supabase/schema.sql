@@ -1387,8 +1387,14 @@ create table if not exists notification_deliveries (
   channel text not null,
   status text not null,
   error_message text,
+  provider text,
+  provider_notification_id text,
+  provider_campaign_id text,
+  provider_idempotency_key text,
+  provider_status text,
   delivered_at timestamp with time zone,
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 create table if not exists push_subscriptions (
@@ -2581,6 +2587,21 @@ create index if not exists notification_deliveries_member_id_idx
   on notification_deliveries(member_id);
 create index if not exists notification_deliveries_created_at_idx
   on notification_deliveries(created_at desc);
+create index if not exists notification_deliveries_provider_notification_idx
+  on notification_deliveries(provider, provider_notification_id)
+  where provider_notification_id is not null;
+create index if not exists notification_deliveries_provider_campaign_idx
+  on notification_deliveries(provider, provider_campaign_id, created_at desc)
+  where provider_campaign_id is not null;
+create index if not exists notification_deliveries_provider_pending_idx
+  on notification_deliveries(provider, channel, status, created_at desc)
+  where provider is not null;
+drop trigger if exists notification_deliveries_set_updated_at
+  on notification_deliveries;
+create trigger notification_deliveries_set_updated_at
+  before update on notification_deliveries
+  for each row
+  execute function set_partnership_updated_at();
 create index if not exists admin_push_subscriptions_admin_active_idx
   on admin_push_subscriptions(admin_id)
   where is_active = true;

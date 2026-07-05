@@ -56,6 +56,11 @@ export type NotificationDeliveryInput = {
   status: NotificationDeliveryStatus;
   errorMessage?: string | null;
   deliveredAt?: string | null;
+  provider?: string | null;
+  providerNotificationId?: string | null;
+  providerCampaignId?: string | null;
+  providerIdempotencyKey?: string | null;
+  providerStatus?: string | null;
 };
 
 export function normalizeNotificationTargetUrl(value?: string | null) {

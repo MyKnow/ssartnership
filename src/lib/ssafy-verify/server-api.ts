@@ -805,23 +805,27 @@ export function createSsafyVerifyServerApiClient(
 
     async getNotification(notificationId: string) {
       const normalizedNotificationId = requiredSafeKey(notificationId, "notification id");
-      return requestJson({
-        method: "GET",
-        path: `/notifications/${encodeURIComponent(normalizedNotificationId)}`,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostStatus],
-      });
+      return toNotificationResult(
+        await requestJson({
+          method: "GET",
+          path: `/notifications/${encodeURIComponent(normalizedNotificationId)}`,
+          scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostStatus],
+        }),
+      );
     },
 
     async listNotifications(input: { campaignId: string }) {
       const query = new URLSearchParams({
         campaign_id: requiredSafeKey(input.campaignId, "campaign id"),
       });
-      return requestJson({
-        method: "GET",
-        path: "/notifications",
-        query,
-        scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostStatus],
-      });
+      return toNotificationResult(
+        await requestJson({
+          method: "GET",
+          path: "/notifications",
+          query,
+          scopes: [SSAFY_VERIFY_SERVER_API_SCOPES.notifyMattermostStatus],
+        }),
+      );
     },
   };
 }
