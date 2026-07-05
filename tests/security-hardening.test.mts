@@ -23,6 +23,9 @@ const adminSecurityModulePromise = import(
 const authSecurityLogSanitizeModulePromise = import(
   new URL("../src/lib/auth-security-log-sanitize.ts", import.meta.url).href
 );
+const memberAvatarModulePromise = import(
+  new URL("../src/lib/member-avatar.ts", import.meta.url).href
+);
 
 test("product event locations mask verification tokens", async () => {
   const { normalizeProductEventLocation } = await pathModulePromise;
@@ -305,6 +308,47 @@ test("session mutation routes require same-origin guards", () => {
       source,
       /isTrustedSameOriginRequest/,
       `${relativePath} should guard state-changing requests`,
+    );
+  }
+});
+
+test("member avatar helper accepts only safe image sources", async () => {
+  const { normalizeMemberAvatarUrl, resolveMemberAvatarSource } =
+    await memberAvatarModulePromise;
+
+  assert.equal(normalizeMemberAvatarUrl("javascript:alert(1)"), null);
+  assert.equal(normalizeMemberAvatarUrl("https://example.com/a.png#token"), "https://example.com/a.png");
+
+  assert.equal(
+    resolveMemberAvatarSource({
+      avatarBase64: Buffer.from("<svg />").toString("base64"),
+      avatarContentType: "image/svg+xml",
+    }).kind,
+    "unsupported",
+  );
+
+  assert.equal(
+    resolveMemberAvatarSource({
+      avatarBase64: Buffer.from("image").toString("base64"),
+      avatarContentType: "image/png",
+    }).kind,
+    "image",
+  );
+});
+
+test("certification pages do not inline avatar base64 payloads", () => {
+  const files = [
+    "../src/app/(site)/certification/page.tsx",
+    "../src/components/certification/CertificationView.tsx",
+    "../src/app/(site)/verify/[token]/page.tsx",
+  ];
+
+  for (const relativePath of files) {
+    const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+    assert.doesNotMatch(
+      source,
+      /avatar_base64|avatarBase64|data:\$\{[^}]+};base64/,
+      `${relativePath} should not pass base64 avatars through page props`,
     );
   }
 });

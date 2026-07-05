@@ -41,6 +41,7 @@ export default function HomeView({
   currentUserId,
   partnerPopularityById,
   partnerFavoriteStateById,
+  loadedPartnerStateIds,
 }: {
   categories: Category[];
   partners: Partner[];
@@ -48,6 +49,7 @@ export default function HomeView({
   currentUserId: string | null;
   partnerPopularityById?: Record<string, PartnerPopularityMetrics | undefined>;
   partnerFavoriteStateById?: Record<string, boolean | undefined>;
+  loadedPartnerStateIds?: string[];
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
     "all",
@@ -79,6 +81,12 @@ export default function HomeView({
   const [localPopularityById, setLocalPopularityById] = useState<
     Record<string, PartnerPopularityMetrics | undefined>
   >(partnerPopularityById ?? {});
+  const [localFavoriteStateById, setLocalFavoriteStateById] = useState<
+    Record<string, boolean | undefined>
+  >(partnerFavoriteStateById ?? {});
+  const [loadedPartnerStateIdSet, setLoadedPartnerStateIdSet] = useState(
+    () => new Set(loadedPartnerStateIds ?? []),
+  );
   const deferredSearchValue = useDeferredValue(searchValue);
   const searchTimeoutRef = useRef<number | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -117,6 +125,10 @@ export default function HomeView({
   const displayPartners = filteredPartners.display.slice(0, visibleCardLimit);
   const hasMoreDisplayPartners =
     filteredPartners.display.length > displayPartners.length;
+  const displayPartnerIds = useMemo(
+    () => displayPartners.map((partner) => partner.id),
+    [displayPartners],
+  );
 
   const visibleResultCount = filteredPartners.visible.length;
 
@@ -175,6 +187,64 @@ export default function HomeView({
       notify("정상적으로 제출되었습니다.");
     }
   }, [notify]);
+
+  useEffect(() => {
+    const missingPartnerIds = displayPartnerIds.filter(
+      (partnerId) => !loadedPartnerStateIdSet.has(partnerId),
+    );
+    if (missingPartnerIds.length === 0) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    const params = new URLSearchParams();
+    for (const partnerId of missingPartnerIds) {
+      params.append("id", partnerId);
+    }
+
+    fetch(`/api/partners/home-state?${params.toString()}`, {
+      credentials: "same-origin",
+      signal: abortController.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("home_state_failed");
+        }
+        return (await response.json()) as {
+          loadedPartnerIds?: string[];
+          partnerFavoriteStateById?: Record<string, boolean | undefined>;
+          partnerPopularityById?: Record<
+            string,
+            PartnerPopularityMetrics | undefined
+          >;
+        };
+      })
+      .then((state) => {
+        setLocalPopularityById((current) => ({
+          ...current,
+          ...(state.partnerPopularityById ?? {}),
+        }));
+        setLocalFavoriteStateById((current) => ({
+          ...current,
+          ...(state.partnerFavoriteStateById ?? {}),
+        }));
+        setLoadedPartnerStateIdSet((current) => {
+          const next = new Set(current);
+          for (const partnerId of state.loadedPartnerIds ?? []) {
+            next.add(partnerId);
+          }
+          return next;
+        });
+      })
+      .catch((error) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+        console.error("[home-view] partner state hydration failed", error);
+      });
+
+    return () => abortController.abort();
+  }, [displayPartnerIds, loadedPartnerStateIdSet]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -325,7 +395,7 @@ export default function HomeView({
                     categoryColor={categoryMap.get(partner.category)?.color}
                     viewerAuthenticated={viewerAuthenticated}
                     currentUserId={currentUserId}
-                    isFavorited={partnerFavoriteStateById?.[partner.id] ?? false}
+                    isFavorited={localFavoriteStateById?.[partner.id] ?? false}
                     metrics={localPopularityById?.[partner.id]}
                     onCategoryClick={handleCategoryChange}
                     onFavoriteChange={handleFavoriteChange}

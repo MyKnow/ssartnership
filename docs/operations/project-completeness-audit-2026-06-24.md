@@ -45,15 +45,17 @@
    - 조치: 화면 기본 로딩은 bounded page로 제한하고, summary는 DB-side aggregate 또는 별도 lightweight endpoint로 전환한다.
    - 2026-07-05 업데이트: fallback row 수집 상한을 page 5,000건, summary 3,000건으로 설정하고 500건 page size 옵션을 제거했다. DB summary/page RPC가 있으면 기존 aggregate 경로를 우선 사용한다.
 
-4. 공개 홈이 전체 파트너/즐겨찾기/인기 지표를 선계산한 뒤 클라이언트 경계로 넘긴다.
+4. 공개 홈이 전체 파트너/즐겨찾기/인기 지표를 선계산한 뒤 클라이언트 경계로 넘긴다. `2026-07-05 완료`
    - [src/components/HomeContent.tsx](/Users/myknow/coding/ssartnership/src/components/HomeContent.tsx)는 전체 파트너 목록, favorite counts, 사용자 favorite state, popularity metrics를 계산한다.
    - [src/components/HomeView.tsx](/Users/myknow/coding/ssartnership/src/components/HomeView.tsx)는 실제 초기 노출 12개와 달리 전체 배열을 client state/filter/sort 대상으로 받는다.
    - 조치: 초기 목록 pagination 또는 server filtering을 우선하고, popularity/favorite state는 보이는 목록 기준 또는 lazy hydration으로 좁힌다.
+   - 2026-07-05 업데이트: 홈 초기 응답은 24개 카드 범위만 favorite/popularity state를 계산하고, 이후 보이는 카드는 same-origin `/api/partners/home-state`에서 ID 상한을 둔 lazy hydration으로 보강한다.
 
-5. 인증서 화면이 `avatar_base64`를 포함한 member row를 클라이언트로 전달한다.
+5. 인증서 화면이 `avatar_base64`를 포함한 member row를 클라이언트로 전달한다. `2026-07-05 완료`
    - [src/app/(site)/certification/page.tsx](/Users/myknow/coding/ssartnership/src/app/(site)/certification/page.tsx)는 `avatar_base64`를 select하고, [CertificationView.tsx](/Users/myknow/coding/ssartnership/src/components/certification/CertificationView.tsx)는 data URL로 렌더링한다.
    - Verify `picture` URL 계약이 도입된 뒤에도 큰 base64 fallback이 페이지 payload와 렌더 비용을 키울 수 있다.
    - 조치: 인증서 화면은 URL/thumbnail 중심으로 전달하고, base64 fallback은 서버 route 또는 migration cleanup으로 격리한다.
+   - 2026-07-05 업데이트: 인증서/QR 검증 page props에서 `avatar_base64`를 제거하고, legacy base64 fallback은 `/api/mm/avatar` 및 `/api/certification/avatar/[token]` route 내부로만 제한했다.
 
 ### Medium
 
@@ -84,9 +86,10 @@
    - 조치: 최근 N건 기준이라고 명시하거나, 실제 total aggregate를 별도 계산한다.
    - 2026-07-05 업데이트: 알림센터에 현재 화면에 불러온 최근 알림 기준이라는 안내와 저장 알림/변경 요청/리뷰/운영 로그별 로드 범위를 고정 노출한다.
 
-7. 파트너 상세 접근 실패 UX가 홈 redirect로 흐른다.
+7. 파트너 상세 접근 실패 UX가 홈 redirect로 흐른다. `2026-07-05 완료`
    - 잘못된 ID나 접근 불가 대상에서 `notFound()` 또는 명시적 게이트 UI 대신 홈으로 이동하면 공유 링크 오류와 SEO/운영 분석이 흐려진다.
    - 조치: public 404, 비공개/권한 제한 상태, 삭제 상태를 분리해 표시한다.
+   - 2026-07-05 업데이트: 잘못된 ID/비공개/삭제 대상은 파트너 상세 전용 404 화면으로 처리하고, confidential 대상은 기존 로그인 안내 gate를 유지한다.
 
 8. 회원 상세 로그 조회가 계정 단위로 최대 5000건을 한 번에 전달한다. `2026-07-05 완료`
    - 계정 활동이 누적되면 상세 페이지 payload와 클라이언트 탐색 비용이 커진다.
@@ -184,8 +187,8 @@
 1. `docs/project-completeness-audit`: 이 문서와 이벤트 로깅/운영 TODO 동기화.
 2. `fix/reset-password-server-state`: 완료. reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
 3. `perf/admin-observability-bounds`: 완료. `/admin/members` query 상한과 회원 상세 보안 로그 pagination, `/admin/logs` fallback bounded loading을 적용.
-4. `perf/public-home-boundary`: 홈 목록 server/client 경계 재설계, 초기 목록 pagination/server filtering, `(site)` layout/session/header read 경량화.
-5. `perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
+4. `perf/public-home-boundary`: 완료. 홈 favorite/popularity state를 초기 24개와 현재 보이는 카드 lazy hydration으로 제한.
+5. `perf/certification-media`: 완료. 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
 6. `fix/session-mutation-origin-guard`: 완료. 회원/파트너 session mutation route에 same-origin guard 확대 적용.
 7. `fix/partner-notification-summary`: 완료. 파트너 알림센터 summary가 최근 알림 윈도우 기준임을 UI에 명시.
 8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.

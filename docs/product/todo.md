@@ -183,15 +183,18 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
    17-2. [x] 관리자 로그 기본 진입 bounded loading
       목표: `/admin/logs` 기본 `24h` 진입에서 그룹별 무제한 row 수집을 막고, 요약은 DB-side aggregate 또는 lightweight endpoint로 분리한다.
       완료: 로그 fallback 수집 상한을 그룹당 page 5,000건, summary 3,000건으로 설정하고 500건 page size 옵션을 제거했다. DB summary/page RPC가 있으면 기존 aggregate 경로를 우선 사용한다.
-   17-3. [ ] 공개 홈 server/client 경계 축소
+   17-3. [x] 공개 홈 server/client 경계 축소
       목표: 초기 노출 목록 기준 pagination/server filtering을 적용하고, favorite/popularity state를 전체 배열이 아니라 보이는 목록 중심으로 계산한다.
-   17-4. [ ] 인증서 avatar payload 경량화
+      완료: 홈 초기 응답에서는 현재 초기 카드 범위 24개만 favorite/popularity state를 계산하고, 스크롤/필터로 새로 보이는 카드는 `/api/partners/home-state`에서 같은 상한으로 lazy hydration한다.
+   17-4. [x] 인증서 avatar payload 경량화
       목표: `avatar_base64` inline 전달을 URL/thumbnail 중심으로 바꾸고, base64 fallback은 서버 route 또는 migration cleanup으로 격리한다.
+      완료: 인증서/QR 검증 페이지 props에서 `avatar_base64`를 제거하고, 로그인 사용자 `/api/mm/avatar`와 QR 검증 `/api/certification/avatar/[token]` route에서만 legacy base64 fallback을 읽도록 격리했다.
    17-5. [x] 파트너 알림센터 summary 의미 보정
       목표: summary가 최근 N건 기준이면 UI에 명시하고, 전체 통계가 필요하면 total aggregate를 별도로 계산한다.
       완료: 알림센터에 현재 화면에 불러온 최근 알림 기준이며 운영 데이터는 저장 알림 최근 30건, 변경 요청/리뷰/운영 로그 최근 20건 단위라는 안내를 고정 노출한다.
-   17-6. [ ] 파트너 상세 접근 실패 UX 보정
+   17-6. [x] 파트너 상세 접근 실패 UX 보정
       목표: 잘못된 ID/비공개/삭제 상태를 홈 redirect가 아니라 명시적 404 또는 접근 제한 화면으로 구분한다.
+      완료: 잘못된 ID/비공개/삭제 대상은 홈 redirect 대신 파트너 상세 전용 404 화면으로 처리하고, confidential 대상은 기존 로그인 안내 gate를 유지한다.
 
 ## 유지 규칙
 
