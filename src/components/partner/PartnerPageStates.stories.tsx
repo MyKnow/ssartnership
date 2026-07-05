@@ -326,12 +326,20 @@ function PlansBillingState() {
     >
       <Card padding="md" className="grid gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <SectionHeading title="브랜드별 플랜" description="미납 7일 경과 시 Basic으로 조정될 수 있습니다." />
-          <Badge variant="warning">결제 대기 1건</Badge>
+          <SectionHeading
+            title="브랜드별 플랜"
+            description="미납 7일 경과 시 Basic으로 조정될 수 있습니다."
+          />
+          <Badge variant="warning">입금 확인 대기 1건</Badge>
         </div>
         {[
           ["카페 싸피 역삼본점", "Basic", "무료 · 핵심 요약 지표", "neutral"],
-          ["카페 싸피 강남역점", "Partner → Boost", "150,000원 VAT 포함 · 입금 확인 대기", "warning"],
+          [
+            "카페 싸피 강남역점",
+            "Partner → Boost",
+            "82,300원 VAT 포함 · 입금 확인 대기 · 관리자 승인 후 자동 적용",
+            "warning",
+          ],
           ["카페 싸피 삼성점", "Boost", "상세 지표와 광고 성과 확인 가능", "primary"],
         ].map(([name, plan, detail, tone]) => (
           <div
@@ -340,12 +348,38 @@ function PlansBillingState() {
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={tone as "neutral" | "warning" | "primary"}>{plan}</Badge>
+                <Badge variant={tone as "neutral" | "warning" | "primary"}>
+                  {plan}
+                </Badge>
                 <h3 className="truncate text-base font-semibold text-foreground">{name}</h3>
               </div>
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+              <p className="mt-2 line-clamp-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
                 {detail}
               </p>
+              {tone === "warning" ? (
+                <ol className="mt-3 grid gap-2 sm:grid-cols-4">
+                  {[
+                    ["요청 접수", "complete"],
+                    ["입금 확인", "current"],
+                    ["관리자 승인", "pending"],
+                    ["플랜 적용", "pending"],
+                  ].map(([label, state]) => (
+                    <li
+                      key={label}
+                      className={[
+                        "flex min-w-0 items-center gap-2 rounded-[0.8rem] border px-3 py-2 text-xs font-semibold",
+                        state === "complete"
+                          ? "border-success/15 bg-success/10 text-success"
+                          : state === "current"
+                            ? "border-primary/20 bg-primary-soft text-primary"
+                            : "border-border bg-surface-control text-muted-foreground",
+                      ].join(" ")}
+                    >
+                      <span className="block min-w-0 truncate">{label}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
             </div>
             <Button variant={tone === "warning" ? "primary" : "secondary"}>
               {tone === "warning" ? "입금 정보 확인" : "상세 보기"}

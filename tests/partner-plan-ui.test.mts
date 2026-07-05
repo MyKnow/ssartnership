@@ -6,6 +6,7 @@ import {
   getPartnerPlanFilterLabel,
   getPartnerPlanChannelLabel,
   getPartnerPlanProgressLabel,
+  getPartnerPlanRequestProgress,
   getPartnerPlanUpgradeOptions,
   matchesPartnerPlanFilter,
 } from "../src/lib/partner-plan-ui.ts";
@@ -63,6 +64,49 @@ describe("partner plan UI helpers", () => {
     assert.equal(
       matchesPartnerPlanFilter({ ...baseBrand, daysUntil: 14 }, "expiring"),
       true,
+    );
+  });
+
+  it("explains bank transfer progress and next steps for upgrade requests", () => {
+    assert.deepEqual(
+      getPartnerPlanRequestProgress({
+        requestStatus: "pending",
+        invoiceStatus: "pending_payment",
+        paymentStatus: "awaiting_transfer",
+      }),
+      {
+        label: "입금 확인 대기",
+        tone: "warning",
+        headline: "안내 계좌 입금 후 관리자 확인을 기다립니다.",
+        nextStep: "입금 확인과 관리자 승인이 끝나면 플랜이 자동으로 적용됩니다.",
+        steps: [
+          { key: "requested", label: "요청 접수", state: "complete" },
+          { key: "payment", label: "입금 확인", state: "current" },
+          { key: "review", label: "관리자 승인", state: "pending" },
+          { key: "applied", label: "플랜 적용", state: "pending" },
+        ],
+      },
+    );
+
+    assert.equal(
+      getPartnerPlanRequestProgress({
+        requestStatus: "pending",
+        invoiceStatus: "paid",
+        paymentStatus: "confirmed",
+      }).label,
+      "승인 대기",
+    );
+    assert.equal(
+      getPartnerPlanRequestProgress({
+        requestStatus: "pending",
+        invoiceStatus: "overdue",
+      }).tone,
+      "danger",
+    );
+    assert.equal(
+      getPartnerPlanRequestProgress({ requestStatus: "approved" }).steps.at(-1)
+        ?.state,
+      "current",
     );
   });
 });
