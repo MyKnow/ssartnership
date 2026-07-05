@@ -23,6 +23,9 @@ import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-portal-paths
 
 export type PartnerNotificationCategory = "request" | "review" | "operation" | "plan";
 
+export const PARTNER_NOTIFICATION_CENTER_SCOPE_LABEL =
+  "요약과 필터 결과는 현재 화면에 불러온 최근 알림 기준입니다. 운영 데이터는 저장 알림 최근 30건, 변경 요청/리뷰/운영 로그 최근 20건(계정 로그 10건)을 합산합니다.";
+
 export type PartnerNotificationTone =
   | "neutral"
   | "primary"

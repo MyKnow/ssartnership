@@ -19,6 +19,9 @@ const requestGuardsModulePromise = import(
 const adminSecurityModulePromise = import(
   new URL("../src/lib/admin-security.ts", import.meta.url).href
 );
+const authSecurityLogSanitizeModulePromise = import(
+  new URL("../src/lib/auth-security-log-sanitize.ts", import.meta.url).href
+);
 
 test("product event locations mask verification tokens", async () => {
   const { normalizeProductEventLocation } = await pathModulePromise;
@@ -56,7 +59,9 @@ test("reset password completion tokens are signed with the session secret", asyn
     process.env.USER_SESSION_SECRET = "s".repeat(32);
 
     const {
+      extractResetPasswordCompletionTokenFromCookieHeader,
       issueResetPasswordCompletionToken,
+      RESET_PASSWORD_COMPLETION_COOKIE_NAME,
       verifyResetPasswordCompletionToken,
     } = await resetPasswordSessionModulePromise;
     const token = issueResetPasswordCompletionToken({
@@ -72,6 +77,12 @@ test("reset password completion tokens are signed with the session secret", asyn
     assert.equal(payload?.mmUserId, "mm-user-id");
     assert.equal(payload?.mmUsername, "ssafy15.user");
     assert.equal(payload?.memberUpdatedAt, "2026-06-19T10:00:00.000Z");
+    assert.equal(
+      extractResetPasswordCompletionTokenFromCookieHeader(
+        `other=1; ${RESET_PASSWORD_COMPLETION_COOKIE_NAME}=${encodeURIComponent(token)}; theme=dark`,
+      ),
+      token,
+    );
 
     process.env.USER_SESSION_SECRET = "t".repeat(32);
     assert.equal(verifyResetPasswordCompletionToken(token), null);
@@ -239,4 +250,32 @@ test("admin session ttl defaults to short bounded windows", async () => {
   assert.equal(getAdminSessionTtlSeconds("48"), 24 * 60 * 60);
   assert.equal(getAdminSessionTtlSeconds("0"), 60 * 60);
   assert.equal(getAdminSessionTtlSeconds("not-a-number"), 12 * 60 * 60);
+});
+
+test("auth security logs redact raw exception messages", async () => {
+  const { redactAuthSecurityExceptionProperties } =
+    await authSecurityLogSanitizeModulePromise;
+
+  assert.deepStrictEqual(
+    redactAuthSecurityExceptionProperties({
+      reason: "exception",
+      message: "database password reset failed: secret-token",
+      requestId: "req-1",
+    }),
+    {
+      reason: "exception",
+      message: "redacted_exception",
+      requestId: "req-1",
+    },
+  );
+  assert.deepStrictEqual(
+    redactAuthSecurityExceptionProperties({
+      reason: "invalid_credentials",
+      message: "사용자에게 보여줄 수 있는 실패 사유",
+    }),
+    {
+      reason: "invalid_credentials",
+      message: "사용자에게 보여줄 수 있는 실패 사유",
+    },
+  );
 });

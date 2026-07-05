@@ -10,7 +10,6 @@ export type MemberAuthThrottleContext = {
 };
 
 export type ResetPasswordCompleteBody = {
-  token?: string;
   nextPassword?: string;
   nextPasswordConfirm?: string;
 };

@@ -6,6 +6,10 @@ import {
 } from "./hmac.js";
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
+export const RESET_PASSWORD_COMPLETION_COOKIE_NAME =
+  "ssartnership_reset_completion";
+export const RESET_PASSWORD_COMPLETION_COOKIE_MAX_AGE_SECONDS =
+  TOKEN_TTL_MS / 1000;
 
 export type ResetPasswordCompletionTokenPayload = {
   version: 2;
@@ -93,4 +97,45 @@ export function issueResetPasswordCompletionToken(input: {
 
 export function verifyResetPasswordCompletionToken(token: string) {
   return parsePayload(token);
+}
+
+export function getResetPasswordCompletionCookieOptions(
+  maxAge = RESET_PASSWORD_COMPLETION_COOKIE_MAX_AGE_SECONDS,
+) {
+  return {
+    httpOnly: true,
+    maxAge,
+    path: "/",
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+  };
+}
+
+export function decodeResetPasswordCompletionCookieValue(rawValue: string) {
+  try {
+    return decodeURIComponent(rawValue);
+  } catch {
+    return rawValue;
+  }
+}
+
+export function extractResetPasswordCompletionTokenFromCookieHeader(
+  cookieHeader: string | null,
+) {
+  if (!cookieHeader) {
+    return "";
+  }
+
+  const prefix = `${RESET_PASSWORD_COMPLETION_COOKIE_NAME}=`;
+  const rawValue = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length);
+
+  if (!rawValue) {
+    return "";
+  }
+
+  return decodeResetPasswordCompletionCookieValue(rawValue);
 }

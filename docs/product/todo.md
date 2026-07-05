@@ -2,7 +2,7 @@
 
 정렬 기준: 영향 범위 × 위험도 × 구현 효과. 위에 있는 항목일수록 먼저 처리한다.
 
-최종 점검: 2026-06-24
+최종 점검: 2026-07-05
 
 ## 공개 readiness 보완 (Issue #55)
 
@@ -16,8 +16,9 @@
 - [ ] Vercel legacy Mattermost env 제거: 명시 승인 후 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
 - [ ] SSAFY Verify notification status/recovery 결과를 delivery log에 주기적으로 반영
 - [x] SSAFY Verify User Auth/Server API request-response trace 로그 추가
-- [ ] 비밀번호 재설정 completion token URL query 노출 제거
-- [ ] auth/security log raw exception redaction 및 session mutation same-origin guard 적용
+- [x] 비밀번호 재설정 completion token URL query 노출 제거
+- [x] auth/security log raw exception redaction 적용
+- [ ] 회원/파트너 session mutation route same-origin guard 전체 적용
 
 주의: 관리자 IP allowlist와 Basic Auth는 운영자 접속을 잠글 수 있어 값 확정 후 적용한다.
 legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없게 만들 수 있어 별도 승인 후 적용한다.
@@ -80,7 +81,7 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
    대상: `src/lib/mm-directory.ts`, `src/lib/mm-member-sync.ts`
    완료: year 단위 작업을 병렬화하고, 결과 병합은 기존 우선순위를 유지하도록 정리했다.
 
-13. [ ] 협력사 전용 포털 분리
+13. [x] 협력사 전용 포털 분리
    대상: `supabase/schema.sql`, `supabase/migrations/*`, `src/app/partner/**`, `src/lib/partner-*.ts`, `src/lib/activity-logs.ts`, `src/app/admin/(protected)/actions.ts`
    이유: 협력사가 여러 브랜드를 소유하고, 그 아래 여러 관리 계정을 가질 수 있어야 한다. 협력사 / 브랜드 / account 구조를 먼저 깔고, 그 위에 전용 포털과 승인 흐름을 얹으면 admin과 권한을 분리하면서 외부 협력사용 UX를 단계적으로 만들 수 있다.
    세부 단계:
@@ -123,7 +124,7 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
    이유: 제휴 업체 이미지를 정적 저장/서빙하면 외부 링크 의존과 로딩 변동성을 줄이고, 캐시 효율과 안정성을 높일 수 있다.
    완료: 썸네일과 갤러리를 분리하고, 로컬 업로드/드래그앤드롭/URL 입력 후 크롭한 `webp` 파일을 `partner-media` storage로 일괄 저장하도록 바꿨다.
 
-15. [ ] 리뷰/즐겨찾기/알림센터 확장
+15. [x] 리뷰/즐겨찾기/알림센터 확장
    대상: `src/lib/reviews/**`, `src/components/review/**`, `src/components/home-view/selectors.ts`, `src/lib/partner-dashboard.ts`, `src/lib/admin-notification-ops.ts`, `src/app/admin/**`, `src/app/partner/**`, `src/components/notifications/**`
    이유: 리뷰 반응, 브랜드 즐겨찾기, 홈 인기 정렬, 카드 메트릭, Admin/Partner 전용 알림센터를 한 흐름으로 묶어 사용성, 재방문, 운영 효율을 같이 올린다.
    세부 단계:
@@ -166,10 +167,11 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       완료: User Auth token exchange와 Server API profile/directory/sync/profile-events/notification/status 호출을 `ssafy_verify_api_trace`로 요약 저장하고, token/code/secret/raw provider 응답은 redaction한다.
    16-8. [ ] Verify notification delivery status 동기화
       목표: `GET /v1/notifications/{notification_id}`와 campaign status 조회 결과를 SSARTNERSHIP delivery log/recovery view에 주기적으로 반영한다.
-   16-9. [ ] 비밀번호 재설정 completion token 서버 상태 전환
+   16-9. [x] 비밀번호 재설정 completion token 서버 상태 전환
       목표: `/auth/reset/complete?token=...` query 전달을 제거하고, HttpOnly short-lived cookie 또는 server-owned reset transaction id로 재설정 완료 권한을 전달한다.
-   16-10. [ ] auth/security log redaction 및 same-origin guard 정착
-      목표: auth/security logs에는 allowlisted error code/message만 남기고, 회원/파트너 session mutation route에는 공통 same-origin guard를 적용한다.
+      완료: SSAFY Verify 재인증 API는 completion token을 JSON으로 반환하지 않고 HttpOnly short-lived cookie로 설정하며, 완료 API는 same-origin JSON 요청과 cookie token만 검증하고 성공 시 cookie를 폐기한다.
+   16-10. [ ] session mutation same-origin guard 정착
+      목표: 회원/파트너 session mutation route에는 공통 same-origin guard를 적용한다. auth/security logs의 raw exception message는 `logAuthSecurity` 경계에서 redaction하도록 완료했다.
 
 17. [ ] 공개 운영 성능 high-risk 보완
    근거: `docs/operations/project-completeness-audit-2026-06-24.md`
@@ -182,8 +184,9 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       목표: 초기 노출 목록 기준 pagination/server filtering을 적용하고, favorite/popularity state를 전체 배열이 아니라 보이는 목록 중심으로 계산한다.
    17-4. [ ] 인증서 avatar payload 경량화
       목표: `avatar_base64` inline 전달을 URL/thumbnail 중심으로 바꾸고, base64 fallback은 서버 route 또는 migration cleanup으로 격리한다.
-   17-5. [ ] 파트너 알림센터 summary 의미 보정
+   17-5. [x] 파트너 알림센터 summary 의미 보정
       목표: summary가 최근 N건 기준이면 UI에 명시하고, 전체 통계가 필요하면 total aggregate를 별도로 계산한다.
+      완료: 알림센터에 현재 화면에 불러온 최근 알림 기준이며 운영 데이터는 저장 알림 최근 30건, 변경 요청/리뷰/운영 로그 최근 20건 단위라는 안내를 고정 노출한다.
    17-6. [ ] 파트너 상세 접근 실패 UX 보정
       목표: 잘못된 ID/비공개/삭제 상태를 홈 redirect가 아니라 명시적 404 또는 접근 제한 화면으로 구분한다.
 

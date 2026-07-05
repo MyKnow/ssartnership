@@ -12,11 +12,12 @@ import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
-import type {
-  PartnerNotificationCategory,
-  PartnerNotificationCenterData,
-  PartnerNotificationEntry,
-  PartnerNotificationStatus,
+import {
+  PARTNER_NOTIFICATION_CENTER_SCOPE_LABEL,
+  type PartnerNotificationCategory,
+  type PartnerNotificationCenterData,
+  type PartnerNotificationEntry,
+  type PartnerNotificationStatus,
 } from "@/lib/partner-notifications";
 import {
   derivePartnerNotificationUiModel,
@@ -574,6 +575,9 @@ export default function PartnerNotificationCenter({
       {data.warningMessage ? (
         <FormMessage variant="info">{data.warningMessage}</FormMessage>
       ) : null}
+      <FormMessage variant="info">
+        {PARTNER_NOTIFICATION_CENTER_SCOPE_LABEL}
+      </FormMessage>
 
       {attentionItems.length > 0 ? (
         <Card tone="default" padding="md" className="space-y-4">

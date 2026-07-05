@@ -26,11 +26,12 @@
 
 ### High
 
-1. 비밀번호 재설정 완료 토큰이 URL query로 노출된다.
+1. 비밀번호 재설정 완료 토큰이 URL query로 노출된다. `2026-07-05 완료`
    - [src/app/api/ssafy/reset-password/route.ts](/Users/myknow/coding/ssartnership/src/app/api/ssafy/reset-password/route.ts)는 SSAFY Verify 재인증 후 reset completion token을 발급한다.
-   - [src/components/auth/ResetPasswordForm.tsx](/Users/myknow/coding/ssartnership/src/components/auth/ResetPasswordForm.tsx)는 이 token을 `/auth/reset/complete?token=...`로 넘기고, [src/app/auth/reset/complete/page.tsx](/Users/myknow/coding/ssartnership/src/app/auth/reset/complete/page.tsx)는 query token을 읽는다.
-   - 이 token은 bearer 성격이고 payload에 `memberId`, `mmUserId`, `mmUsername`이 포함된다. 브라우저 history, 로그, referrer, 화면 공유로 새면 비밀번호 재설정 권한이 노출된다.
+   - 2026-06-24 당시 [src/components/auth/ResetPasswordForm.tsx](/Users/myknow/coding/ssartnership/src/components/auth/ResetPasswordForm.tsx)는 이 token을 `/auth/reset/complete?token=...`로 넘기고, [src/app/auth/reset/complete/page.tsx](/Users/myknow/coding/ssartnership/src/app/auth/reset/complete/page.tsx)는 query token을 읽었다.
+   - 이 token은 bearer 성격이고 payload에 `memberId`, `mmUserId`, `mmUsername`이 포함됐다. 브라우저 history, 로그, referrer, 화면 공유로 새면 비밀번호 재설정 권한이 노출될 수 있었다.
    - 조치: query token 대신 HttpOnly short-lived cookie 또는 server-owned reset transaction id로 전환하고, reset 완료 시 즉시 폐기한다.
+   - 2026-07-05 업데이트: HttpOnly short-lived cookie 방식으로 전환했고, 완료 API는 same-origin JSON 요청과 cookie token만 검증하며 성공 시 cookie를 폐기한다.
 
 2. 관리자 회원 화면이 page load마다 큰 범위의 회원/푸시 설정 데이터를 반복 조회한다.
    - [src/app/admin/(protected)/members/page.tsx](/Users/myknow/coding/ssartnership/src/app/admin/(protected)/members/page.tsx)는 옵션용 `members(year,campus)` 전체 조회, 알림 필터별 `push_preferences` 반복 조회, trend chart용 `members(created_at)` 전체 조회를 같은 요청에서 수행한다.
@@ -76,9 +77,10 @@
    - 신규 가입은 SSAFY Verify 기반으로 동작하지만 로그인은 `mm_username` + 사이트 비밀번호를 유지한다.
    - 완전한 SSO 제품 경험을 목표로 하면 `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경의 장기 정책을 다시 정해야 한다.
 
-6. 파트너 알림센터 summary 문구와 실제 계산 범위가 다르다.
+6. 파트너 알림센터 summary 문구와 실제 계산 범위가 다르다. `2026-07-05 완료`
    - 변경 요청, 리뷰, 감사 로그를 최근 일부만 모아 summary를 만들지만 UI는 전체 알림처럼 읽힌다.
    - 조치: 최근 N건 기준이라고 명시하거나, 실제 total aggregate를 별도 계산한다.
+   - 2026-07-05 업데이트: 알림센터에 현재 화면에 불러온 최근 알림 기준이라는 안내와 저장 알림/변경 요청/리뷰/운영 로그별 로드 범위를 고정 노출한다.
 
 7. 파트너 상세 접근 실패 UX가 홈 redirect로 흐른다.
    - 잘못된 ID나 접근 불가 대상에서 `notFound()` 또는 명시적 게이트 UI 대신 홈으로 이동하면 공유 링크 오류와 SEO/운영 분석이 흐려진다.
@@ -88,9 +90,10 @@
    - 계정 활동이 누적되면 상세 페이지 payload와 클라이언트 탐색 비용이 커진다.
    - 조치: 회원 상세 보안 로그도 pagination/filter를 기본값으로 둔다.
 
-9. `auth_security_logs`에 일부 raw exception message가 남고 CSV export로 전파될 수 있다.
+9. `auth_security_logs`에 일부 raw exception message가 남고 CSV export로 전파될 수 있다. `2026-07-05 완료`
    - SSAFY Verify trace 자체는 redaction되지만 다른 auth 흐름의 `error.message`가 그대로 properties에 저장되는 경로가 있다.
    - 조치: auth/security log sink 또는 호출부에서 allowlisted error code/message만 보존하고 raw provider/DB exception은 내부 console 또는 request id로만 연결한다.
+   - 2026-07-05 업데이트: `logAuthSecurity` 경계에서 `reason: "exception"`의 `message`를 `redacted_exception`으로 치환한다.
 
 10. 일부 cookie/session 기반 mutation에 same-origin guard가 빠져 있다.
    - JSON + SameSite=Lax + CORS 기본값 때문에 즉시 치명적이진 않지만, trust-boundary 문서의 기준과 맞지 않는다.
@@ -175,12 +178,12 @@
 ## 남은 PR Split
 
 1. `docs/project-completeness-audit`: 이 문서와 이벤트 로깅/운영 TODO 동기화.
-2. `fix/reset-password-server-state`: reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
+2. `fix/reset-password-server-state`: 완료. reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
 3. `perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination, `/admin/logs` bounded loading 또는 DB-side aggregate 전환.
 4. `perf/public-home-boundary`: 홈 목록 server/client 경계 재설계, 초기 목록 pagination/server filtering, `(site)` layout/session/header read 경량화.
 5. `perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
-6. `fix/auth-log-redaction-origin-guard`: auth security raw exception redaction과 session mutation same-origin guard 적용.
-7. `fix/partner-notification-summary`: 파트너 알림센터 summary를 최근 N건 기준으로 명시하거나 실제 total 집계와 분리.
+6. `fix/session-mutation-origin-guard`: 회원/파트너 session mutation route에 same-origin guard 확대 적용. auth security raw exception redaction은 완료.
+7. `fix/partner-notification-summary`: 완료. 파트너 알림센터 summary가 최근 알림 윈도우 기준임을 UI에 명시.
 8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
 9. `feat/ssafy-notification-status-sync`: Verify notification status/recovery 결과를 delivery log에 반영.
 10. `test/flow-coverage`: signup/login/reset/certification/notifications/admin login/partner login E2E와 핵심 integration 보강.

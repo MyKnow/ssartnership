@@ -10,6 +10,7 @@ import {
 } from '@/lib/event-catalog';
 import { SITE_URL } from '@/lib/site';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
+import { redactAuthSecurityExceptionProperties } from '@/lib/auth-security-log-sanitize';
 import {
   type PartnerMetricEventName,
   upsertPartnerMetricRollupsFromEventInput,
@@ -120,6 +121,13 @@ function sanitizeProperties(
   return sanitized && !Array.isArray(sanitized) && typeof sanitized === 'object'
     ? sanitized
     : {};
+}
+
+function sanitizeAuthSecurityProperties(
+  properties?: Record<string, unknown> | null,
+) {
+  const sanitized = sanitizeProperties(properties);
+  return redactAuthSecurityExceptionProperties(sanitized);
 }
 
 async function insertLog(table: string, payload: Record<string, unknown>) {
@@ -258,7 +266,7 @@ export async function logAuthSecurity(input: AuthSecurityInput) {
     actor_id: input.actorId ?? null,
     identifier: input.identifier ?? null,
     path: input.path ?? null,
-    properties: sanitizeProperties(input.properties),
+    properties: sanitizeAuthSecurityProperties(input.properties),
     user_agent: input.userAgent ?? null,
     ip_address: input.ipAddress ?? null,
   });
