@@ -45,6 +45,9 @@ export type PartnerNotificationStatus =
 
 export type PartnerNotificationEntry = {
   id: string;
+  notificationId?: string | null;
+  readAt?: string | null;
+  isUnread?: boolean;
   category: PartnerNotificationCategory;
   status: PartnerNotificationStatus;
   tone: PartnerNotificationTone;
@@ -211,6 +214,9 @@ function createStoredNotificationEntry(
   const company = notification.company_id ? companyMap.get(notification.company_id) ?? null : null;
   return {
     id: `stored:${notification.id}`,
+    notificationId: notification.id,
+    readAt: row.read_at,
+    isUnread: row.read_at == null,
     category: "plan",
     status: "notified",
     tone: row.read_at ? "neutral" : "primary",

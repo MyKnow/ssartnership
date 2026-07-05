@@ -10,10 +10,12 @@ import Input from "@/components/ui/Input";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
+import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import type {
   PartnerNotificationCategory,
   PartnerNotificationCenterData,
+  PartnerNotificationEntry,
   PartnerNotificationStatus,
 } from "@/lib/partner-notifications";
 import {
@@ -32,6 +34,11 @@ import {
 } from "@/lib/partner-notification-ui";
 
 type NotificationFilter = PartnerNotificationCategory | "all";
+type PartnerNotificationMutationResponse = {
+  ok?: boolean;
+  message?: string;
+  summary?: { unreadCount?: number };
+};
 
 const categoryOptions: Array<{
   value: NotificationFilter;
@@ -123,6 +130,43 @@ function SelectField({
   );
 }
 
+async function parsePartnerNotificationMutationResponse(response: Response) {
+  const data = (await response.json().catch(() => ({}))) as PartnerNotificationMutationResponse;
+
+  if (!response.ok) {
+    throw new Error(data.message ?? "알림을 처리하지 못했습니다.");
+  }
+
+  return data;
+}
+
+function updateNotificationReadState(
+  items: PartnerNotificationEntry[],
+  notificationIds: string[],
+  readAt: string,
+) {
+  const targets = new Set(notificationIds);
+  return items.map((item) =>
+    item.notificationId && targets.has(item.notificationId)
+      ? {
+          ...item,
+          readAt,
+          isUnread: false,
+          tone: item.tone === "primary" ? "neutral" : item.tone,
+          badgeLabel: item.badgeLabel.includes("새") ? "확인됨" : item.badgeLabel,
+        }
+      : item,
+  );
+}
+
+function removeNotifications(
+  items: PartnerNotificationEntry[],
+  notificationIds: string[],
+) {
+  const targets = new Set(notificationIds);
+  return items.filter((item) => !item.notificationId || !targets.has(item.notificationId));
+}
+
 function NotificationProgress({
   steps,
 }: {
@@ -145,9 +189,22 @@ function NotificationProgress({
   );
 }
 
-function NotificationCard({ model }: { model: PartnerNotificationUiModel }) {
+function NotificationCard({
+  model,
+  pending,
+  onMarkRead,
+  onDelete,
+}: {
+  model: PartnerNotificationUiModel;
+  pending: boolean;
+  onMarkRead: (model: PartnerNotificationUiModel) => void;
+  onDelete: (model: PartnerNotificationUiModel) => void;
+}) {
   const { item } = model;
   const isAction = model.purpose === "action";
+  const canMutate = Boolean(item.notificationId);
+  const canMarkRead = canMutate && model.readState === "unread";
+  const canDelete = canMutate && isAction;
 
   return (
     <Card
@@ -210,17 +267,51 @@ function NotificationCard({ model }: { model: PartnerNotificationUiModel }) {
           </div>
         </div>
 
-        {item.href ? (
-          <PartnerPendingButtonLink
-            href={item.href}
-            variant={isAction ? "soft" : "secondary"}
-            size="sm"
-            className="w-full sm:w-auto sm:shrink-0"
-            showSpinner
-          >
-            {model.ctaLabel}
-          </PartnerPendingButtonLink>
-        ) : null}
+        <div className="grid gap-2 sm:w-auto sm:shrink-0">
+          {item.href ? (
+            <PartnerPendingButtonLink
+              href={item.href}
+              variant={isAction ? "soft" : "secondary"}
+              size="sm"
+              className="w-full sm:w-auto"
+              showSpinner
+            >
+              {model.ctaLabel}
+            </PartnerPendingButtonLink>
+          ) : null}
+          {canMarkRead || canDelete ? (
+            <div className="flex min-w-0 gap-2 sm:justify-end">
+              {canMarkRead ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-9 flex-1 px-3 text-xs sm:flex-none"
+                  loading={pending}
+                  loadingText="처리 중"
+                  disabled={pending}
+                  onClick={() => onMarkRead(model)}
+                >
+                  읽음 처리
+                </Button>
+              ) : null}
+              {canDelete ? (
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  className="min-h-9 flex-1 px-3 text-xs sm:flex-none"
+                  loading={pending}
+                  loadingText="삭제 중"
+                  disabled={pending}
+                  onClick={() => onDelete(model)}
+                >
+                  삭제
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </Card>
   );
@@ -264,6 +355,12 @@ export default function PartnerNotificationCenter({
 }: {
   data: PartnerNotificationCenterData;
 }) {
+  const { notify } = useToast();
+  const [items, setItems] = useState(data.items);
+  const [pendingNotificationId, setPendingNotificationId] = useState<string | null>(null);
+  const [pendingBulkAction, setPendingBulkAction] = useState<
+    "read-visible" | "delete-action" | null
+  >(null);
   const [filters, setFilters] = useState<PartnerNotificationUiFilters>({
     category: "all",
     type: "all",
@@ -277,8 +374,8 @@ export default function PartnerNotificationCenter({
   });
 
   const uiItems = useMemo(
-    () => data.items.map((item) => derivePartnerNotificationUiModel(item)),
-    [data.items],
+    () => items.map((item) => derivePartnerNotificationUiModel(item)),
+    [items],
   );
 
   const summary = useMemo(() => summarizePartnerNotificationUiModels(uiItems), [uiItems]);
@@ -339,12 +436,137 @@ export default function PartnerNotificationCenter({
     filters.period !== "all",
     Boolean(filters.searchQuery.trim()),
   ].filter(Boolean).length;
+  const isMutationPending = Boolean(pendingNotificationId || pendingBulkAction);
+  const visibleUnreadNotificationIds = visibleItems
+    .filter((model) => model.readState === "unread")
+    .map((model) => model.item.notificationId)
+    .filter((value): value is string => Boolean(value));
+  const visibleActionNotificationIds = visibleItems
+    .filter((model) => model.purpose === "action")
+    .map((model) => model.item.notificationId)
+    .filter((value): value is string => Boolean(value));
 
   function updateFilter<K extends keyof PartnerNotificationUiFilters>(
     key: K,
     value: PartnerNotificationUiFilters[K],
   ) {
     setFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  async function markNotificationAsRead(model: PartnerNotificationUiModel) {
+    const notificationId = model.item.notificationId;
+    if (!notificationId || pendingNotificationId || pendingBulkAction || model.readState !== "unread") {
+      return;
+    }
+
+    const snapshot = items;
+    const now = new Date().toISOString();
+    setPendingNotificationId(notificationId);
+    setItems((current) => updateNotificationReadState(current, [notificationId], now));
+
+    try {
+      await parsePartnerNotificationMutationResponse(
+        await fetch(`/api/partner/notifications/${notificationId}`, {
+          method: "PATCH",
+        }),
+      );
+      notify("알림을 읽음 처리했습니다.");
+    } catch (error) {
+      setItems(snapshot);
+      notify(error instanceof Error ? error.message : "읽음 처리에 실패했습니다.");
+    } finally {
+      setPendingNotificationId(null);
+    }
+  }
+
+  async function deleteNotification(model: PartnerNotificationUiModel) {
+    const notificationId = model.item.notificationId;
+    if (!notificationId || pendingNotificationId || pendingBulkAction) {
+      return;
+    }
+
+    const snapshot = items;
+    setPendingNotificationId(notificationId);
+    setItems((current) => removeNotifications(current, [notificationId]));
+
+    try {
+      await parsePartnerNotificationMutationResponse(
+        await fetch(`/api/partner/notifications/${notificationId}`, {
+          method: "DELETE",
+        }),
+      );
+      notify("처리 필요 알림을 삭제했습니다.");
+    } catch (error) {
+      setItems(snapshot);
+      notify(error instanceof Error ? error.message : "알림 삭제에 실패했습니다.");
+    } finally {
+      setPendingNotificationId(null);
+    }
+  }
+
+  async function markVisibleNotificationsAsRead() {
+    if (
+      pendingNotificationId ||
+      pendingBulkAction ||
+      visibleUnreadNotificationIds.length === 0
+    ) {
+      return;
+    }
+
+    const snapshot = items;
+    const now = new Date().toISOString();
+    setPendingBulkAction("read-visible");
+    setItems((current) => updateNotificationReadState(current, visibleUnreadNotificationIds, now));
+
+    try {
+      await parsePartnerNotificationMutationResponse(
+        await fetch("/api/partner/notifications", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notificationIds: visibleUnreadNotificationIds }),
+        }),
+      );
+      notify("표시된 미확인 알림을 읽음 처리했습니다.");
+    } catch (error) {
+      setItems(snapshot);
+      notify(error instanceof Error ? error.message : "전체 읽음 처리에 실패했습니다.");
+    } finally {
+      setPendingBulkAction(null);
+    }
+  }
+
+  async function deleteVisibleActionNotifications() {
+    if (
+      pendingNotificationId ||
+      pendingBulkAction ||
+      visibleActionNotificationIds.length === 0
+    ) {
+      return;
+    }
+
+    if (!window.confirm("표시된 처리 필요 알림을 삭제할까요?")) {
+      return;
+    }
+
+    const snapshot = items;
+    setPendingBulkAction("delete-action");
+    setItems((current) => removeNotifications(current, visibleActionNotificationIds));
+
+    try {
+      await parsePartnerNotificationMutationResponse(
+        await fetch("/api/partner/notifications", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notificationIds: visibleActionNotificationIds }),
+        }),
+      );
+      notify("표시된 처리 필요 알림을 삭제했습니다.");
+    } catch (error) {
+      setItems(snapshot);
+      notify(error instanceof Error ? error.message : "처리 필요 알림 삭제에 실패했습니다.");
+    } finally {
+      setPendingBulkAction(null);
+    }
   }
 
   return (
@@ -551,6 +773,45 @@ export default function PartnerNotificationCenter({
             </Badge>
           </div>
 
+          <div className="grid gap-2 rounded-[1rem] border border-border bg-surface-inset p-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              loading={pendingBulkAction === "read-visible"}
+              loadingText="읽음 처리 중"
+              disabled={
+                visibleUnreadNotificationIds.length === 0 || isMutationPending
+              }
+              onClick={() => {
+                void markVisibleNotificationsAsRead();
+              }}
+            >
+              표시된 미확인 읽음
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              className="w-full"
+              loading={pendingBulkAction === "delete-action"}
+              loadingText="삭제 중"
+              disabled={
+                visibleActionNotificationIds.length === 0 || isMutationPending
+              }
+              onClick={() => {
+                void deleteVisibleActionNotifications();
+              }}
+            >
+              처리 필요 알림 삭제
+            </Button>
+            <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+              Information 알림은 읽음 처리만 제공하고, 삭제 같은 일괄 작업은
+              Action 알림에만 적용합니다.
+            </p>
+          </div>
+
           {activeFilterCount > 0 ? (
             <Button
               type="button"
@@ -589,7 +850,13 @@ export default function PartnerNotificationCenter({
         ) : (
           <div className="grid min-w-0 gap-3">
             {visibleItems.map((model) => (
-              <NotificationCard key={model.item.id} model={model} />
+              <NotificationCard
+                key={model.item.id}
+                model={model}
+                pending={pendingNotificationId === model.item.notificationId}
+                onMarkRead={markNotificationAsRead}
+                onDelete={deleteNotification}
+              />
             ))}
           </div>
         )}

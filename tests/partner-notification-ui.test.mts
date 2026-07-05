@@ -15,6 +15,9 @@ function createEntry(
 ): PartnerNotificationEntry {
   return {
     id: "notification-1",
+    notificationId: "11111111-1111-4111-8111-111111111111",
+    readAt: null,
+    isUnread: true,
     category: "plan",
     status: "pending",
     tone: "warning",
@@ -67,6 +70,19 @@ describe("partner notification UI helpers", () => {
     assert.equal(model.ctaLabel, "다시 제출");
     assert.equal(model.statusLabel, "반려");
     assert.match(model.nextStepLabel, /다시 제출/);
+  });
+
+  it("does not count generated notifications as unread unless read state is explicit", () => {
+    const model = derivePartnerNotificationUiModel(
+      createEntry({
+        notificationId: null,
+        readAt: undefined,
+        isUnread: undefined,
+      }),
+      now,
+    );
+
+    assert.equal(model.readState, "read");
   });
 
   it("filters by purpose, priority, status, company, period, and search query", () => {

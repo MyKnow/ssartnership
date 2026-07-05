@@ -34,6 +34,9 @@ const notificationData = {
   items: [
     {
       id: "mock-partner-notification-plan-pending",
+      notificationId: "11111111-1111-4111-8111-111111111111",
+      readAt: null,
+      isUnread: true,
       category: "plan",
       status: "pending",
       tone: "warning",
@@ -49,6 +52,9 @@ const notificationData = {
     },
     {
       id: "mock-partner-notification-review",
+      notificationId: "22222222-2222-4222-8222-222222222222",
+      readAt: null,
+      isUnread: true,
       category: "review",
       status: "created",
       tone: "primary",
@@ -64,6 +70,9 @@ const notificationData = {
     },
     {
       id: "mock-partner-notification-request",
+      notificationId: "33333333-3333-4333-8333-333333333333",
+      readAt: null,
+      isUnread: true,
       category: "request",
       status: "rejected",
       tone: "danger",
@@ -79,6 +88,9 @@ const notificationData = {
     },
     {
       id: "mock-partner-notification-operation",
+      notificationId: "44444444-4444-4444-8444-444444444444",
+      readAt: "2026-07-04T13:00:00.000+09:00",
+      isUnread: false,
       category: "operation",
       status: "notified",
       tone: "neutral",

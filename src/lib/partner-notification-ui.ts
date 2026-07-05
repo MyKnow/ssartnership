@@ -199,6 +199,18 @@ function getNotificationPriority(
 }
 
 function getNotificationReadState(item: PartnerNotificationEntry): PartnerNotificationReadState {
+  if (typeof item.isUnread === "boolean") {
+    return item.isUnread ? "unread" : "read";
+  }
+
+  if (item.readAt !== undefined) {
+    return item.readAt ? "read" : "unread";
+  }
+
+  if (!item.notificationId) {
+    return "read";
+  }
+
   if (item.badgeLabel.includes("확인됨")) {
     return "read";
   }
