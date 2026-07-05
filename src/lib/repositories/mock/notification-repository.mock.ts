@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   normalizeNotificationTargetUrl,
   type MemberNotificationRecord,
@@ -85,6 +84,13 @@ function sortNotifications(records: MockMemberNotification[]) {
   return [...records].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+function createMockNotificationId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `mock-notification-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export class MockNotificationRepository implements NotificationRepository {
   async createNotification(
     input: NotificationBroadcastInput,
@@ -96,7 +102,7 @@ export class MockNotificationRepository implements NotificationRepository {
 
     const now = new Date().toISOString();
     const notification: MockNotification = {
-      id: randomUUID(),
+      id: createMockNotificationId(),
       type: input.type,
       title: input.title,
       body: input.body,
@@ -114,7 +120,7 @@ export class MockNotificationRepository implements NotificationRepository {
 
     for (const memberId of recipientMemberIds) {
       store.memberNotifications.unshift({
-        id: randomUUID(),
+        id: createMockNotificationId(),
         notificationId: notification.id,
         memberId,
         readAt: null,
@@ -123,7 +129,7 @@ export class MockNotificationRepository implements NotificationRepository {
         updatedAt: now,
       });
       store.deliveries.unshift({
-        id: randomUUID(),
+        id: createMockNotificationId(),
         notificationId: notification.id,
         memberId,
         channel: "in_app",
@@ -148,7 +154,7 @@ export class MockNotificationRepository implements NotificationRepository {
   async recordNotificationDelivery(input: NotificationDeliveryInput) {
     const now = input.deliveredAt ?? new Date().toISOString();
     getStore().deliveries.unshift({
-      id: randomUUID(),
+      id: createMockNotificationId(),
       notificationId: input.notificationId,
       memberId: input.memberId,
       channel: input.channel,
