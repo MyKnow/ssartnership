@@ -4,8 +4,8 @@
 
 최종 점검: 2026-07-05
 
-최신화 기준: 코드 변경으로 처리 가능한 SSAFY Verify/성능/보안 TODO는 이 브랜치에서 구현 완료했다.
-남은 미완료 항목은 Vercel 콘솔 값 확인, 관리자 edge perimeter 운영값 확정처럼 코드만으로 결정할 수 없는 운영자 확인 항목이다.
+최신화 기준: 코드 변경으로 처리 가능한 SSAFY Verify/성능/보안 TODO와 Vercel 운영 env 정리는 이 브랜치에서 구현 완료했다.
+남은 항목은 다음 배포 후 운영 smoke 확인이다.
 
 ## 공개 readiness 보완 (Issue #55)
 
@@ -15,17 +15,17 @@
 - [x] 공개 저장소용 `SECURITY.md` responsible disclosure 정책 추가
 - [x] 파트너 상세 대표 이미지 LCP/CLS 개선
 - [x] `main` 브랜치 보호 규칙과 required status checks 적용
-- [ ] 관리자 edge perimeter hardening 값 확정: `ADMIN_ALLOWED_IPS` 또는 Basic Auth
-- [ ] Vercel legacy Mattermost env 제거: 명시 승인 후 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
+- [x] 관리자 edge perimeter hardening 값 확정: Basic Auth
+- [x] Vercel legacy Mattermost env 제거: `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
 - [x] SSAFY Verify notification status/recovery 결과를 delivery log에 주기적으로 반영
 - [x] SSAFY Verify User Auth/Server API request-response trace 로그 추가
 - [x] 비밀번호 재설정 completion token URL query 노출 제거
 - [x] auth/security log raw exception redaction 적용
 - [x] 회원/파트너 session mutation route same-origin guard 전체 적용
 
-주의: 관리자 IP allowlist와 Basic Auth는 운영자 접속을 잠글 수 있어 값 확정 후 적용한다.
-legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없게 만들 수 있어 별도 승인 후 적용한다.
-2026-07-05 21:47 KST 확인: `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live` 통과, Production `/admin/login`은 Basic Auth 없이 200 응답, Vercel CLI는 로컬 인증 부재로 env 목록 조회/삭제 불가.
+주의: 관리자 Basic Auth 값은 Vercel Production/Preview env와 gitignored `.env.local`에만 저장한다. 코드 반영 전 기존 Production 배포본은 `/admin/login` 화면에 Basic Auth challenge를 걸지 않으므로, 배포 후 `/admin/login` 401 challenge를 다시 확인한다.
+2026-07-05 21:47 KST 확인: `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live` 통과, Production `/admin/login`은 Basic Auth 없이 200 응답.
+2026-07-05 22:02 KST 확인: Vercel wrapper로 Production/Preview에 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 등록하고, legacy Mattermost env 15개를 제거했다. 로컬 빌드 서버에서 `/admin/login`은 무인증 401, Basic Auth 포함 200을 반환했다. 로컬 `.env`의 Mattermost 직접 연동 값도 제거했다. 로컬 Vercel wrapper token은 복호화할 수 없어 필요 시 `SSARTNERSHIP_VERCEL_TOKEN`을 다시 입력한다.
 
 1. [x] 공개 레이아웃의 세션 및 정책 조회 비용 줄이기
    대상: `src/app/(site)/layout.tsx`, `src/lib/user-auth.ts`, `src/lib/policy-documents.ts`

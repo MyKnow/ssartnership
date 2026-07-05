@@ -213,6 +213,26 @@ test("same-origin request guard requires matching origin or trusted referrer", a
   );
 });
 
+test("admin edge guard covers admin pages and admin APIs", async () => {
+  const { isAdminEdgeGuardPath, isProtectedAdminPath } =
+    await adminSecurityModulePromise;
+
+  assert.equal(isAdminEdgeGuardPath("/admin"), true);
+  assert.equal(isAdminEdgeGuardPath("/admin/login"), true);
+  assert.equal(isAdminEdgeGuardPath("/admin/setup/token"), true);
+  assert.equal(isAdminEdgeGuardPath("/admin/partners"), true);
+  assert.equal(isAdminEdgeGuardPath("/api/admin/logs"), true);
+  assert.equal(isAdminEdgeGuardPath("/api/push/admin/broadcast"), true);
+
+  assert.equal(isAdminEdgeGuardPath("/auth/login"), false);
+  assert.equal(isAdminEdgeGuardPath("/partner"), false);
+  assert.equal(isAdminEdgeGuardPath("/api/partners/partner-1/reviews"), false);
+
+  assert.equal(isProtectedAdminPath("/admin/login"), false);
+  assert.equal(isProtectedAdminPath("/api/admin/logs"), true);
+  assert.equal(isProtectedAdminPath("/api/push/admin/broadcast"), true);
+});
+
 test("admin basic auth validates credentials without direct string equality", async () => {
   const originalUsername = process.env.ADMIN_BASIC_AUTH_USERNAME;
   const originalPassword = process.env.ADMIN_BASIC_AUTH_PASSWORD;

@@ -1,6 +1,6 @@
 # 관리자 로그인 보안 강화
 
-Updated: 2026-05-14
+Updated: 2026-07-05
 
 ## 발생 배경
 
@@ -33,6 +33,7 @@ Updated: 2026-05-14
   - `ADMIN_BASIC_AUTH_USERNAME`
   - `ADMIN_BASIC_AUTH_PASSWORD`
 - 선택적 basic auth 비교는 timing-safe 방식으로 수행한다.
+- edge 보호 대상은 `/admin` 화면 전체와 `/api/admin`, `/api/push/admin`이다.
 - 관리자 세션 기본 TTL은 7일에서 12시간으로 줄였다.
   - `ADMIN_SESSION_TTL_HOURS`로 조정할 수 있다.
   - 허용 범위는 1~24시간이며, 잘못된 값은 기본 12시간으로 처리한다.
@@ -50,5 +51,6 @@ Updated: 2026-05-14
 
 - React escaping이 `/admin/login`의 reflected XSS 위험을 낮추지만, 현재 보완은 그 동작에만 의존하지 않도록 입력과 query를 제한한다.
 - IP allowlist와 Basic Auth는 해당 env가 설정되기 전까지 비활성이다.
+- Vercel env 변경은 새 배포부터 적용되므로, 배포 후 `/admin/login`이 401 Basic Auth challenge를 반환하는지 확인해야 한다.
 - MFA는 현재 env 기반 단일 관리자 credential 모델과 맞지 않으므로 이번 패치에서 직접 구현하지 않았다.
 - MFA가 필요해지는 시점에는 admin login 자체를 외부 IdP/OIDC로 교체하는 편이 현재 구조에 임시 OTP를 덧붙이는 것보다 안전하다.

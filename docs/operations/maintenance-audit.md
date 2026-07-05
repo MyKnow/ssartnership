@@ -52,17 +52,17 @@ Last updated: 2026-06-24
 - Confirmed Chromatic/Storybook publish is manual-only while the free quota is exhausted, leaving local Storybook build/test as the release gate.
 - Added the 2026-06-24 project completeness audit under `docs/operations/`.
 
-## Remaining candidates
+## Optional backlog candidates
 
 - Move repeated rate-limit table handling into a reusable repository/helper.
 - Improve auth form UX with inline field-level validation states instead of message-only errors.
 - Add stronger audit logging around admin mutations and auth-sensitive flows.
 - Review remaining client components for possible server/client boundary simplification.
 - Consider moving `/api/mm/session` lookup behind a server-provided header/session model to remove client fetches entirely.
-- Decide and apply the production admin edge perimeter value: `ADMIN_ALLOWED_IPS` or Basic Auth.
-- Verify and remove legacy Mattermost env values from Vercel once rollback through direct Mattermost integration is no longer needed.
+- Recheck `/admin/login` Basic Auth challenge after the branch with full `/admin` edge guard coverage is deployed.
 
 ## Notes
 
 - Current focus is defensive cleanup without changing the product model.
 - Changes prefer low-risk refactors that reduce attack surface and duplicated logic first.
+- 2026-07-05 22:02 KST: Basic Auth was selected for admin edge perimeter and registered in Vercel Production/Preview. Legacy direct Mattermost env values were removed from Vercel Production/Preview and local `.env`.

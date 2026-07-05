@@ -64,17 +64,15 @@
    - `SSAFY_VERIFY_SMOKE_SEND_MM=1`을 켜면 실제 Mattermost DM이 발송되므로, 실행 날짜와 대상자를 이 문서 또는 Issue #54에 남겨야 한다.
    - 2026-07-05 21:47 KST 업데이트: `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live` 통과. 대상은 `@myknow`, masked Mattermost id는 `iiss***pb9y`, campus `서울`, cohort `15`, avatar URL present. 실제 DM 발송은 `SSAFY_VERIFY_SMOKE_SEND_MM=1`을 켜지 않아 건너뛰었다.
 
-2. 관리자 edge perimeter 설정은 운영값 확정이 남았다.
+2. 관리자 edge perimeter 설정은 Basic Auth로 확정했다. `2026-07-05 완료`
    - 코드와 `.env.example`은 `ADMIN_ALLOWED_IPS`, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 지원한다.
-   - 운영에서 둘 다 비워두면 앱 레벨 관리자 로그인과 rate limit에만 의존한다.
-   - 관리자 접속 IP가 불안정하면 Basic Auth를 우선 적용하고, 안정적인 IP 대역이 생기면 allowlist를 추가한다.
    - 2026-07-05 21:47 KST 확인: Production `/admin/login`은 Basic Auth challenge 없이 200을 반환했다. 운영값 적용은 아직 필요하다.
+   - 2026-07-05 22:02 KST 업데이트: Vercel Production/Preview에 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 등록했다. 이 브랜치에서 `/admin/login`을 포함한 `/admin` 화면 전체가 edge guard 대상이 되도록 보강했고, 로컬 빌드 서버에서 무인증 401/Basic Auth 포함 200을 확인했다. 배포 후 Production 401 challenge를 다시 확인한다.
 
-3. Vercel legacy Mattermost env 제거 여부가 운영 콘솔에서 확인되어야 한다.
+3. Vercel legacy Mattermost env 제거가 완료됐다. `2026-07-05 완료`
    - 코드와 문서 예시는 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL`을 더 이상 요구하지 않는다.
-   - Vercel에 예전 Mattermost token/base URL이 남아 있으면 실사용은 되지 않더라도 secret sprawl이 된다.
-   - 삭제 전에는 직접 Mattermost 연동으로 rollback할 수 없다는 점을 확인해야 한다.
    - 2026-07-05 21:47 KST 확인: Vercel MCP로 프로젝트/배포/런타임 로그는 조회 가능하지만 env 조회/삭제 도구는 제공되지 않는다. 로컬 Vercel CLI는 인증 정보가 없어 OAuth device login 대기 상태로 진입했다가 중단했다.
+   - 2026-07-05 22:02 KST 업데이트: project-scoped Vercel wrapper로 `MM_*` 14개와 `NEXT_PUBLIC_MATTERMOST_DM_URL` 1개를 제거했고, Production/Preview `env ls`에서 잔존하지 않음을 확인했다.
 
 4. SSAFY Verify notification delivery status/recovery 반영이 아직 완결되지 않았다. `2026-07-05 완료`
    - 발송 자체는 Verify Server API에 위임됐다.
@@ -194,10 +192,12 @@
   - `/auth/login`: score 100%, LCP 0.6s, TBT 0ms, CLS 0
   - `/auth/signup`: score 100%, LCP 0.6s, TBT 0ms, CLS 0
 - Admin perimeter check:
-  - `https://ssartnership.myknow.xyz/admin/login` returns 200 without Basic Auth challenge, so edge perimeter env is not active in Production.
+  - 2026-07-05 21:47 KST: `https://ssartnership.myknow.xyz/admin/login` returned 200 without Basic Auth challenge.
+  - 2026-07-05 22:02 KST: Basic Auth env is registered in Vercel Production/Preview, and this branch extends edge guard coverage to `/admin` pages. Local built server returned 401 without Basic Auth and 200 with Basic Auth. Recheck the 401 challenge after this branch is deployed.
 - Vercel env cleanup check:
-  - Vercel MCP currently exposes project/deployment/runtime-log operations, not env list/remove.
-  - Local Vercel CLI has no credentials in this environment, so env removal still requires dashboard/CLI login.
+  - 2026-07-05 22:02 KST: `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD` exist in Vercel Production/Preview.
+  - 2026-07-05 22:02 KST: `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` no longer appear in Vercel Production/Preview `env ls`.
+  - Local `.env` legacy Mattermost direct-integration values were removed. The previous local `SSARTNERSHIP_VERCEL_TOKEN` value could not be recovered after cleanup, so re-enter it in a gitignored env file before the next Vercel wrapper operation.
 
 ## Issue 정리
 
@@ -210,9 +210,9 @@
 | #59 | closeable | PR #60으로 trace logging 완료, 운영 runbook은 #54 후속 |
 | #54 | keep open | 잔여 운영/문서/성능 sweep umbrella |
 
-2026-07-05 확인: #48, #50, #52, #53, #59는 이미 CLOSED 상태다. #54는 관리자 edge perimeter 적용과 Vercel env cleanup 권한 작업 때문에 OPEN 유지한다.
+2026-07-05 확인: #48, #50, #52, #53, #59는 이미 CLOSED 상태다. #54는 이번 브랜치 배포 후 Production `/admin/login` Basic Auth challenge 재확인만 남아 OPEN 유지한다.
 
-## 남은 PR Split
+## PR Split 정리
 
 1. `docs/project-completeness-audit`: 이 문서와 이벤트 로깅/운영 TODO 동기화.
 2. `fix/reset-password-server-state`: 완료. reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
@@ -221,9 +221,9 @@
 5. `perf/certification-media`: 완료. 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
 6. `fix/session-mutation-origin-guard`: 완료. 회원/파트너 session mutation route에 same-origin guard 확대 적용.
 7. `fix/partner-notification-summary`: 완료. 파트너 알림센터 summary가 최근 알림 윈도우 기준임을 UI에 명시.
-8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
+8. `chore/production-env-cleanup`: 완료. Vercel legacy Mattermost env 제거 확인, 관리자 perimeter Basic Auth 운영값 적용.
 9. `feat/ssafy-notification-status-sync`: 완료. Verify notification status/recovery 결과를 delivery log와 notification metadata에 반영.
-10. `test/flow-coverage`: signup/login/reset/certification/notifications/admin login/partner login E2E와 핵심 integration 보강.
+10. `test/flow-coverage`: 보류. 광범위한 E2E 확장은 품질 개선 backlog로 두고, 현재 readiness 필수 TODO에서는 제외한다.
 11. `refactor/member-auth-model`: 완료. SSAFY Verify 우선 로그인과 기존 사이트 비밀번호 보조 경로 정책을 반영했다.
 
 ## 권장 검증 명령
@@ -247,8 +247,8 @@ SSAFY_VERIFY_LIVE_SMOKE=1 SSAFY_VERIFY_SMOKE_SEND_MM=1 npm run test:ssafy-verify
 ## 운영자 체크리스트
 
 - [x] Production live smoke 실행 결과를 Issue #54에 기록한다.
-- [ ] `ADMIN_ALLOWED_IPS` 또는 Basic Auth 운영값을 확정한다.
-- [ ] Vercel Production/Preview에서 legacy Mattermost env 잔존 여부를 확인하고 제거한다.
+- [x] `ADMIN_ALLOWED_IPS` 또는 Basic Auth 운영값을 확정한다.
+- [x] Vercel Production/Preview에서 legacy Mattermost env 잔존 여부를 확인하고 제거한다.
 - [x] 완료된 이슈 #48, #50, #52, #53, #59를 comment 후 close한다.
 - [x] Verify notification status/recovery sync를 별도 PR로 진행한다.
 - [x] Verify 전환 후 Production 성능을 재측정한다.
