@@ -5,11 +5,16 @@ import {
   syncMemberById,
 } from "@/lib/mm-member-sync";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (!isTrustedSameOriginRequest(request)) {
+    return NextResponse.json({ ok: false, updated: false }, { status: 403 });
+  }
+
   const session = await getSignedUserSession();
   if (!session?.userId) {
     return NextResponse.json({ ok: false, updated: false }, { status: 401 });

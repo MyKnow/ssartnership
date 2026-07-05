@@ -25,6 +25,12 @@ const logsData: AdminLogsPageData = {
     any: false,
     limitPerGroup: 2000,
   },
+  partialFailure: {
+    product: false,
+    audit: false,
+    security: false,
+    any: false,
+  },
   chartBuckets: [
     {
       key: "bucket-1",
@@ -300,6 +306,20 @@ export const Truncated: Story = {
         security: true,
         any: true,
         limitPerGroup: 2000,
+      },
+    },
+  },
+};
+
+export const PartialFailure: Story = {
+  args: {
+    initialData: {
+      ...logsData,
+      partialFailure: {
+        product: false,
+        audit: true,
+        security: false,
+        any: true,
       },
     },
   },

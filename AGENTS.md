@@ -73,6 +73,8 @@ node --test tests/<focused-test>.test.mts
 
 Run `next build` only when the change touches build/runtime behavior broadly or the user asks for production verification.
 
+For UI creation or modification, include visual proof in the final handoff. Capture the affected surface after the change at the relevant viewport classes and show the screenshots with Markdown image tags using absolute local paths: mobile (`360px`, plus `320px`/`390px` when risky), tablet (`820px` or `1024px`), and desktop (`1366px` or `1440px`). If a viewport class is out of scope or screenshot capture fails, state that explicitly with the reason and the fallback verification performed. Store these QA screenshots in an ignored temporary folder such as `.tmp/ui-qa/`; do not stage them.
+
 ## Preview Supabase Sync
 
 - `npm run sync:preview` may copy public Production data into Preview, but it must not copy member password material.

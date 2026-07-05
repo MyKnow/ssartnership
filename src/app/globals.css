@@ -145,11 +145,19 @@ body {
     radial-gradient(circle at bottom left, rgba(33, 59, 104, 0.08), transparent 30%),
     linear-gradient(180deg, var(--background), var(--background-muted));
   color: var(--foreground);
+  word-break: keep-all;
+  overflow-wrap: normal;
+  line-break: auto;
   text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+:where(code, pre, kbd, samp) {
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 ::selection {
@@ -407,6 +415,32 @@ body {
 
   .ui-caption {
     @apply text-xs font-medium leading-5 tracking-[0.08em] text-muted-foreground sm:text-[0.8125rem];
+  }
+
+  .text-ko {
+    word-break: keep-all;
+    overflow-wrap: normal;
+    line-break: auto;
+  }
+
+  .text-ko-title {
+    word-break: keep-all;
+    overflow-wrap: normal;
+    line-break: auto;
+    text-wrap: balance;
+  }
+
+  .text-ko-pretty {
+    word-break: keep-all;
+    overflow-wrap: normal;
+    line-break: auto;
+    text-wrap: pretty;
+  }
+
+  .text-token {
+    word-break: normal;
+    overflow-wrap: anywhere;
+    line-break: anywhere;
   }
 
   .ui-decor-grid {

@@ -11,10 +11,8 @@ import { copyPasswordToClipboard, generateBrowserPassword, isBrowserPasswordVali
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
 export default function ResetPasswordCompleteForm({
-  token,
   mmUsername,
 }: {
-  token: string;
   mmUsername?: string | null;
 }) {
   const { notify } = useToast();
@@ -88,7 +86,6 @@ export default function ResetPasswordCompleteForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token,
           nextPassword: password,
           nextPasswordConfirm: confirmPassword,
         }),

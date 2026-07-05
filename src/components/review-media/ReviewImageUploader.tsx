@@ -126,7 +126,7 @@ export default function ReviewImageUploader({
         >
           <span className="inline-flex items-center gap-2">
             <PhotoIcon className="h-4 w-4" />
-            추가 ({items.length}/5)
+            이미지 추가 ({items.length}/5)
           </span>
         </Button>
       </div>

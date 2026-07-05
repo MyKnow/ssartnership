@@ -139,6 +139,7 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
   const chunks = chunkMembers(params.members, 25);
 
   for (const [chunkIndex, members] of chunks.entries()) {
+    const batchIdempotencyKey = `ssartnership:${params.notificationId}:mm:${chunkIndex + 1}`;
     try {
       const result = await client.sendMattermostNotificationBatch({
         campaignId: params.notificationId,
@@ -152,7 +153,7 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
         recipients: members.map((member) => ({
           mattermostUserId: member.mm_user_id,
         })),
-        idempotencyKey: `ssartnership:${params.notificationId}:mm:${chunkIndex + 1}`,
+        idempotencyKey: batchIdempotencyKey,
       });
 
       const targetResults =
@@ -161,6 +162,8 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
       for (const [memberIndex, member] of members.entries()) {
         const targetResult = targetResults[memberIndex];
         const verifyStatus = targetResult?.status ?? result.status;
+        const providerIdempotencyKey =
+          targetResult?.idempotencyKey ?? `${batchIdempotencyKey}:${memberIndex + 1}`;
         const deliveryStatus = toVerifyDeliveryStatus(verifyStatus);
         if (deliveryStatus === "sent") {
           sent += 1;
@@ -181,6 +184,12 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
                 deliveryStatus === "sent"
                   ? null
                   : toVerifyTargetErrorMessage(verifyStatus, targetResult),
+              provider: "ssafy_verify",
+              providerNotificationId:
+                targetResult?.notificationId ?? result.notificationId,
+              providerCampaignId: result.campaignId ?? params.notificationId,
+              providerIdempotencyKey,
+              providerStatus: verifyStatus,
             }),
           ],
           "mm",
@@ -191,7 +200,7 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
     } catch (error) {
       const errorMessage = toVerifyDeliveryErrorMessage(error);
       failed += members.length;
-      for (const member of members) {
+      for (const [memberIndex, member] of members.entries()) {
         await runBookkeepingTasks(
           [
             notificationRepository.recordNotificationDelivery({
@@ -200,6 +209,10 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
               channel: "mm",
               status: "failed",
               errorMessage,
+              provider: "ssafy_verify",
+              providerCampaignId: params.notificationId,
+              providerIdempotencyKey: `${batchIdempotencyKey}:${memberIndex + 1}`,
+              providerStatus: "request_failed",
             }),
           ],
           "mm",

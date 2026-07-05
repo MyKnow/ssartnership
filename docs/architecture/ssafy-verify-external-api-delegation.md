@@ -1,4 +1,4 @@
-# SSAFY Verify External API Delegation TODO
+# SSAFY Verify External API Delegation Plan
 
 ## 목적
 
@@ -44,14 +44,16 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 - 제공 경로: `GET /v1/notifications/{notification_id}`, `GET /v1/notifications?campaign_id=...`.
 - 요구사항: queued, sent, failed, retrying 등 안정적인 상태 값과 실패 코드 제공.
 
-## 전환 TODO
+## 전환 현황
+
+2026-07-05 기준 코드 전환은 완료했다. 남은 사항은 Production live smoke, Vercel legacy env 제거 여부 확인, Verify template 정책 확정처럼 운영자 또는 외부 서비스 확인이 필요한 항목이다.
 
 - [x] Phase 1: 회원가입/최초 연결 scope와 재인증 scope를 분리한다.
 - [x] Phase 2a: SSAFY Verify Server API client, token cache, safe error mapping, Mattermost ID 정책을 추가한다.
 - [x] Phase 2b: SSArtnership 회원 프로필 이미지 URL 저장을 위해 Supabase schema를 확장한다.
 - [x] Phase 3: SSAFY Verify 프로필 스냅샷 API와 profile-events를 이용해 프로필 동기화를 전환한다.
 - [x] Phase 4a: 관리자 Mattermost DM 발송을 Verify batch notification API로 위임할 수 있게 한다.
-- [ ] Phase 4b: 발송 상태 조회/recovery 결과를 SSArtnership delivery log에 주기적으로 반영한다.
+- [x] Phase 4b: 발송 상태 조회/recovery 결과를 SSArtnership delivery log에 주기적으로 반영한다.
 - [x] Phase 5: 더 이상 필요 없는 Mattermost 직접 호출 코드와 관련 env를 삭제한다.
 
 ## 보안 요구사항
@@ -71,9 +73,10 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 - 디렉터리 lookup, profile-events, 회원 프로필 동기화, 수동 회원 추가 임시 비밀번호 DM은 모두 Verify Server API를 호출한다.
 - 회원가입/재인증 UI는 일반 사용자에게 request id나 provider diagnostic을 직접 붙여 보여주지 않는다. 상세 진단은 `auth_security_logs.properties`와 명시적 `SSAFY_VERIFY_DEBUG_ERRORS=1` 환경에서만 확인한다.
 - SSAFY Verify User Auth와 Server API 호출은 `ssafy_verify_api_trace` 인증/보안 이벤트로 요약 저장한다. request/response 원문 대신 safe key, scope, status, request id, error code, notification id, profile payload shape만 보존하며 token, code, client secret, verification token, raw Mattermost response는 저장하지 않는다.
+- Verify Mattermost 발송은 `notification_deliveries`에 `provider='ssafy_verify'`, provider campaign/notification/idempotency/status를 저장한다. `/api/cron/ssafy-verify-notification-status`는 `CRON_SECRET` 또는 관리자 세션으로만 실행되며, Vercel cron에서 매일 campaign status를 조회해 delivery row와 notification metadata의 `verifyStatusSync` 요약을 갱신한다.
 - 실제 SSAFY Verify Server API 점검은 `npm run test:ssafy-verify:live`로 분리한다. 기본 테스트와 CI는 외부 API나 Mattermost DM을 호출하지 않고, `SSAFY_VERIFY_LIVE_SMOKE=1`일 때만 directory lookup/profile/sync/profile-events를 호출한다. `SSAFY_VERIFY_SMOKE_SEND_MM=1`을 추가로 설정한 경우에만 `@myknow` lookup 결과의 Mattermost user id로 batch DM smoke test를 발송한다.
 
-## 미결정 사항
+## 운영 확인 사항
 
 - Verify `picture`는 URL 계약으로 확정되었고, SSArtnership은 issuer 기준 absolute URL로 정규화한 뒤 `members.avatar_url`에 저장한다. 기존 `avatar_content_type`/`avatar_base64`는 과거 데이터와 fallback을 위해 유지한다.
 - 사용자 상호작용 없이 주기적 프로필 조회를 허용할 경우 offline grant 또는 server-to-server 권한 모델이 필요하다.

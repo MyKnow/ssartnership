@@ -11,20 +11,24 @@ export default function SupportTemplateCard({
   description: string;
 }) {
   return (
-    <Card tone="elevated" padding="md" className="space-y-5">
+    <Card tone="elevated" padding="md" className="min-w-0 space-y-5">
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-foreground">문의 템플릿</h2>
-        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        <h2 className="text-ko-title text-lg font-semibold text-foreground">
+          문의 템플릿
+        </h2>
+        <p className="text-ko-pretty text-sm leading-6 text-muted-foreground">
+          {description}
+        </p>
       </div>
 
-      <dl className="grid gap-3 rounded-card border border-border/70 bg-surface-muted/70 p-4 text-sm">
-        <div className="grid gap-1">
+      <dl className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface-muted/70 p-4 text-sm">
+        <div className="grid min-w-0 gap-1">
           <dt className="font-semibold text-muted-foreground">받는 사람</dt>
-          <dd className="break-all text-foreground">{template.to}</dd>
+          <dd className="text-token text-foreground">{template.to}</dd>
         </div>
-        <div className="grid gap-1">
+        <div className="grid min-w-0 gap-1">
           <dt className="font-semibold text-muted-foreground">제목</dt>
-          <dd className="text-foreground">{template.subject}</dd>
+          <dd className="text-ko-pretty text-foreground">{template.subject}</dd>
         </div>
       </dl>
 

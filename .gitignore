@@ -17,6 +17,7 @@
 playwright-results.xml
 /storybook-static
 build-storybook.log
+/.tmp/
 
 # next.js
 /.next/

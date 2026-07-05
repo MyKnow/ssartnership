@@ -1,7 +1,3 @@
-import {
-  generateTempPassword,
-  hashPassword,
-} from "../../password.ts";
 import type {
   PartnerPortalCompanySummary,
   PartnerPortalDemoSetupSummary,
@@ -60,9 +56,6 @@ function createMockPortalAccountRecord({
   email: string;
   setupToken: string;
 }): MockPortalAccountRecord {
-  const generatedPassword = generateTempPassword(12);
-  const passwordRecord = hashPassword(generatedPassword);
-
   return {
     id,
     loginId,
@@ -72,8 +65,8 @@ function createMockPortalAccountRecord({
     emailVerifiedAt: null,
     initialSetupCompletedAt: null,
     isActive: true,
-    passwordHash: passwordRecord.hash,
-    passwordSalt: passwordRecord.salt,
+    passwordHash: "mock-initial-password-hash",
+    passwordSalt: "mock-initial-password-salt",
     setupToken,
     lastLoginAt: null,
   };

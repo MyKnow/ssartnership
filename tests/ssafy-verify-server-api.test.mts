@@ -280,6 +280,90 @@ test("SSAFY Verify Server API dedupes concurrent token requests", async () => {
   assert.equal(calls[2]?.startsWith("https://verify.example.com/v1/mattermost-users/"), true);
 });
 
+test("SSAFY Verify Server API normalizes notification status responses", async () => {
+  const { createSsafyVerifyServerApiClient } = await serverApiModulePromise;
+  const calls: Array<{ url: string; scope: string | null }> = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/server/token")) {
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      calls.push({ url, scope: body.get("scope") });
+      return jsonResponse({
+        access_token: "status-token",
+        token_type: "Bearer",
+        expires_in: 600,
+      });
+    }
+
+    calls.push({ url, scope: null });
+    return jsonResponse({
+      ok: true,
+      data: {
+        campaign_id: "campaign-1",
+        notification_id: "notify-1",
+        status: "retrying",
+        summary: {
+          total: 2,
+          queued: 1,
+          sent: 1,
+          retrying: 0,
+          failed: 0,
+          skipped: 0,
+        },
+        results: [
+          {
+            idempotency_key: "campaign-1:mm:1",
+            notification_id: "notify-1",
+            status: "queued",
+          },
+        ],
+      },
+      request_id: "req_status_1",
+    });
+  };
+
+  const client = createSsafyVerifyServerApiClient(
+    {
+      issuer: "https://verify.example.com",
+      apiBaseUrl: "https://verify.example.com/v1",
+      clientId: "server-api-client",
+      clientSecret: "server-secret",
+    },
+    { fetch: fetchImpl, now: () => 1_000_000 },
+  );
+
+  assert.deepEqual(await client.listNotifications({ campaignId: "campaign-1" }), {
+    notificationId: "notify-1",
+    campaignId: "campaign-1",
+    status: "retrying",
+    requestId: "req_status_1",
+    summary: {
+      total: 2,
+      queued: 1,
+      sent: 1,
+      retrying: 0,
+      failed: 0,
+      skipped: 0,
+    },
+    results: [
+      {
+        idempotencyKey: "campaign-1:mm:1",
+        notificationId: "notify-1",
+        status: "queued",
+        errorCode: null,
+        errorMessage: null,
+        requestId: null,
+      },
+    ],
+  });
+
+  assert.equal(calls[0]?.scope, "ssafy.notify.mattermost.status");
+  assert.equal(
+    calls[1]?.url,
+    "https://verify.example.com/v1/notifications?campaign_id=campaign-1",
+  );
+});
+
 test("SSAFY Verify Server API normalizes stable public errors", async () => {
   const {
     SsafyVerifyServerApiError,

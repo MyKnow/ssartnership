@@ -3,7 +3,7 @@ import { expect, fireEvent, fn, userEvent, within } from "storybook/test";
 import ReviewImageCropModal from "./ReviewImageCropModal";
 
 const sourceUrl = `data:image/svg+xml;utf8,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
     <rect width="800" height="600" fill="#ecfeff"/>
     <circle cx="400" cy="300" r="180" fill="#06b6d4"/>
   </svg>`,
@@ -24,6 +24,8 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+export const VisualOpen: Story = {};
 
 export const Open: Story = {
   play: async ({ args }) => {
@@ -61,8 +63,8 @@ export const ApplySuccess: Story = {
       fireEvent.change(slider, { target: { value: "2" } });
 
       const frame = body
-        .getByText("이미지를 드래그해서 위치를 맞추고 확대 정도를 조절하세요.")
-        .closest("div")?.previousElementSibling;
+        .getByText("드래그로 위치를 맞추고 슬라이더로 확대합니다.")
+        .closest("div")?.parentElement?.previousElementSibling;
       if (frame instanceof HTMLElement) {
         await userEvent.pointer([
           { target: frame, coords: { x: 120, y: 120 }, keys: "[MouseLeft>]" },

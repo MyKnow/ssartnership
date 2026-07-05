@@ -1,6 +1,6 @@
 # Speed Insights Improvement Log
 
-Last updated: 2026-04-03
+Last updated: 2026-07-05
 
 Use this file after each production deploy and enough real traffic has accumulated in Vercel Speed Insights.
 
@@ -10,6 +10,16 @@ Use this file after each production deploy and enough real traffic has accumulat
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | 0 | Baseline before optimization | 66 | 2.49s | 2.8s | 872ms | 0 | 30ms | 1.66s | Screenshot captured on 2026-04-03 |
 | 1 | Home bundle split + filtering optimization + footer boundary cleanup | pending | pending | pending | pending | pending | pending | pending | Code implemented on 2026-04-03, fill after deploy |
+
+## Production Lighthouse Spot Checks
+
+Measured on 2026-07-05 21:47 KST against `https://ssartnership.myknow.xyz` with Lighthouse desktop.
+
+| Path | Performance | LCP | TBT | CLS | Notes |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `/` | 83 | 2.6s | 0ms | 0 | Home remains the slowest public shell path. |
+| `/auth/login` | 100 | 0.6s | 0ms | 0 | SSAFY Verify-first login page. |
+| `/auth/signup` | 100 | 0.6s | 0ms | 0 | SSAFY Verify signup entry. |
 
 ## Measurement checklist
 

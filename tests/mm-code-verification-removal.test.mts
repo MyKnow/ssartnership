@@ -40,10 +40,13 @@ test("MM signup verification storage and secret are no longer documented", () =>
   assert.equal(schema.includes("create table if not exists password_reset_codes"), false);
 });
 
-test("SSAFY Verify transition TODOs preserve unresolved decisions", () => {
+test("SSAFY Verify transition TODOs keep only operator-controlled follow-up items", () => {
   const todo = readFileSync(repoPath("docs/product/todo.md"), "utf8");
 
   assert.match(todo, /SSAFY Verify 전환 후속/);
   assert.match(todo, /members\.mm_user_id/);
   assert.match(todo, /Server API 위임/);
+  assert.match(todo, /SSAFY Verify를 1차 로그인/);
+  assert.match(todo, /기존 사이트 비밀번호 로그인은 전환 기간용 보조 경로/);
+  assert.doesNotMatch(todo, /16-3\. \[ \]/);
 });

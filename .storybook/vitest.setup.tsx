@@ -55,3 +55,25 @@ vi.mock("next/image", () => {
     default: MockNextImage,
   };
 });
+
+vi.mock("next/script", () => {
+  function MockNextScript({
+    onLoad,
+    onReady,
+  }: {
+    onLoad?: (event: Event) => void;
+    onReady?: () => void;
+  }) {
+    React.useEffect(() => {
+      onLoad?.(new Event("load"));
+      onReady?.();
+    }, [onLoad, onReady]);
+
+    return null;
+  }
+
+  return {
+    __esModule: true,
+    default: MockNextScript,
+  };
+});

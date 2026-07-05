@@ -5,6 +5,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
+import PartnerValueBadge from "@/components/PartnerValueBadge";
 import PartnerFavoriteCountLabel from "@/components/partner-favorites/PartnerFavoriteCountLabel";
 import PartnerFavoriteButton from "@/components/partner-favorites/PartnerFavoriteButton";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
@@ -164,12 +165,9 @@ export default function PartnerDetailSummaryCard({
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {partner.conditions.map((condition) => (
-                <Badge
-                  key={condition}
-                  className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-                >
+                <PartnerValueBadge key={condition}>
                   {condition}
-                </Badge>
+                </PartnerValueBadge>
               ))}
             </div>
           </div>
@@ -180,12 +178,9 @@ export default function PartnerDetailSummaryCard({
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {partner.benefits.map((benefit) => (
-                <Badge
-                  key={benefit}
-                  className="bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100"
-                >
+                <PartnerValueBadge key={benefit}>
                   {benefit}
-                </Badge>
+                </PartnerValueBadge>
               ))}
             </div>
           </div>

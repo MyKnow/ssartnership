@@ -25,6 +25,8 @@ export default function MediaCropModal({
   sourceUrl,
   outputName,
   queueCount = 1,
+  accept,
+  validateFile,
   onCancel,
   onApply,
 }: {
@@ -35,6 +37,8 @@ export default function MediaCropModal({
   sourceUrl: string;
   outputName: string;
   queueCount?: number;
+  accept?: string;
+  validateFile?: (file: File) => string | null;
   onCancel: () => void;
   onApply: (file: File) => void;
 }) {
@@ -51,6 +55,8 @@ export default function MediaCropModal({
       outputWidth={width}
       outputHeight={height}
       queueCount={queueCount}
+      accept={accept}
+      validateFile={validateFile}
       onCancel={onCancel}
       onApply={onApply}
     />

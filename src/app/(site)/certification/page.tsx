@@ -23,15 +23,13 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type CertificationMember = {
-  id: string;
-  mm_user_id: string;
   mm_username: string;
   display_name?: string | null;
   year?: number | null;
   campus?: string | null;
-  avatar_content_type?: string | null;
-  avatar_base64?: string | null;
   avatar_url?: string | null;
+  avatar_updated_at?: string | null;
+  has_legacy_avatar?: boolean | null;
 };
 
 function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
@@ -66,7 +64,7 @@ export default async function CertificationPage({
   const { data: member } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,avatar_url",
+      "mm_username,display_name,year,campus,avatar_content_type,avatar_url,updated_at",
     )
     .eq("id", session.userId)
     .maybeSingle();
@@ -88,7 +86,15 @@ export default async function CertificationPage({
               className="mx-auto max-w-2xl"
             />
             <CertificationView
-              member={member as CertificationMember}
+              member={{
+                mm_username: member.mm_username,
+                display_name: member.display_name,
+                year: member.year,
+                campus: member.campus,
+                avatar_url: member.avatar_url,
+                avatar_updated_at: member.updated_at,
+                has_legacy_avatar: Boolean(member.avatar_content_type),
+              } satisfies CertificationMember}
               initialTimestamp={initialTimestamp}
             />
           </div>

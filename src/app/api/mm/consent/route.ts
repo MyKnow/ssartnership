@@ -9,11 +9,27 @@ import {
   recordMarketingPolicyConsent,
   recordRequiredPolicyConsent,
 } from "@/lib/policy-documents";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_policy_consent",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   try {
     const session = await getUserSession();
     if (!session?.userId) {

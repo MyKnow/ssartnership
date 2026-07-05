@@ -23,9 +23,9 @@ type Member = {
   display_name?: string | null;
   year?: number | null;
   campus?: string | null;
-  avatar_content_type?: string | null;
-  avatar_base64?: string | null;
   avatar_url?: string | null;
+  avatar_updated_at?: string | null;
+  has_legacy_avatar?: boolean | null;
 };
 
 export default function CertificationView({
@@ -46,11 +46,15 @@ export default function CertificationView({
   const scheme = getCertificationScheme(year);
   const campusLabel = member.campus ?? profile.campus ?? null;
   const yearLabel = year > 0 ? formatSsafyYearLabel(year) : null;
-  const hasCustomAvatar = Boolean(member.avatar_base64 && member.avatar_content_type);
   const hasAvatarUrl = Boolean(member.avatar_url);
-  const avatarSrc = hasCustomAvatar
-    ? `data:${member.avatar_content_type};base64,${member.avatar_base64}`
-    : member.avatar_url ?? "/avatar-default.svg";
+  const hasLegacyAvatar = Boolean(member.has_legacy_avatar);
+  const avatarVersion = member.avatar_updated_at
+    ? encodeURIComponent(member.avatar_updated_at)
+    : "";
+  const legacyAvatarSrc = avatarVersion
+    ? `/api/mm/avatar?v=${avatarVersion}`
+    : "/api/mm/avatar";
+  const avatarSrc = member.avatar_url ?? (hasLegacyAvatar ? legacyAvatarSrc : "/avatar-default.svg");
   const name = profile.displayName ?? member.display_name ?? "이름 미지정";
 
   useEffect(() => {
@@ -148,12 +152,12 @@ export default function CertificationView({
           </div>
         }
         avatarSrc={avatarSrc}
-        avatarAlt={hasCustomAvatar || hasAvatarUrl ? "프로필" : "기본 프로필 이미지"}
-        avatarOnClick={hasCustomAvatar || hasAvatarUrl ? () => setAvatarOpen(true) : undefined}
+        avatarAlt={hasAvatarUrl || hasLegacyAvatar ? "프로필" : "기본 프로필 이미지"}
+        avatarOnClick={hasAvatarUrl || hasLegacyAvatar ? () => setAvatarOpen(true) : undefined}
         avatarButtonLabel="프로필 이미지 크게 보기"
       />
 
-      {(hasCustomAvatar || hasAvatarUrl) && isAvatarOpen ? (
+      {(hasAvatarUrl || hasLegacyAvatar) && isAvatarOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6">
           <button
             type="button"

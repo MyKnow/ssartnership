@@ -12,6 +12,7 @@ import {
   LifeBuoy,
   LogOut,
   Settings,
+  Store,
 } from "lucide-react";
 import BrandWordmark from "@/components/BrandWordmark";
 import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
@@ -45,12 +46,18 @@ const primaryNavItems = [
   {
     section: "dashboard",
     label: "대시보드",
-    description: "브랜드 현황",
+    description: "운영 요약",
     icon: Gauge,
   },
   {
+    section: "brands",
+    label: "브랜드",
+    description: "목록과 상세",
+    icon: Store,
+  },
+  {
     section: "notifications",
-    label: "알림센터",
+    label: "알림",
     description: "운영 알림",
     icon: Bell,
   },
@@ -83,14 +90,24 @@ const setupNavItem = {
 
 type PrimaryNavItem = (typeof primaryNavItems)[number];
 type PortalNavItem = PrimaryNavItem | typeof setupNavItem;
+type PrimaryNavSection = PrimaryNavItem["section"];
+
+function isCompanyScopedSection(
+  section: PrimaryNavSection,
+): section is PartnerPortalSection {
+  return section !== "brands";
+}
 
 function getPrimaryNavHref(item: PrimaryNavItem, companyId: string | null) {
   if (!companyId) {
     return "/partner";
   }
+  if (item.section === "brands") {
+    return `${getCompanyScopedPortalHref(companyId)}#brands`;
+  }
   return getCompanyScopedPortalHref(
     companyId,
-    item.section as PartnerPortalSection,
+    item.section,
   );
 }
 
@@ -115,12 +132,13 @@ function isActivePrimaryPath(
   }
   const scopedHref = getCompanyScopedPortalHref(
     companyId,
-    item.section as PartnerPortalSection,
+    isCompanyScopedSection(item.section) ? item.section : "dashboard",
   );
   if (item.section === "dashboard") {
-    return (
-      pathname === scopedHref || pathname.startsWith(`${scopedHref}/services/`)
-    );
+    return pathname === scopedHref;
+  }
+  if (item.section === "brands") {
+    return pathname.startsWith(`${scopedHref}/services/`);
   }
   return pathname === scopedHref || pathname.startsWith(`${scopedHref}/`);
 }
@@ -167,7 +185,7 @@ function MobileTopBar({
   showNavigation: boolean;
 }) {
   return (
-    <header className="border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:hidden">
+    <header className="overflow-x-hidden border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:hidden">
       <Container
         size="wide"
         className="flex flex-wrap items-center justify-between gap-3 py-4"
@@ -200,10 +218,10 @@ function MobileTopBar({
           )}
         </div>
         {session && showNavigation ? (
-          <div className="relative w-full min-w-0 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-8 after:bg-gradient-to-l after:from-surface-overlay/95 after:to-transparent">
+          <div className="w-full min-w-0">
             <nav
               aria-label="협력사 포털 주요 메뉴"
-              className="flex w-full min-w-0 max-w-full snap-x gap-2 overflow-x-auto scroll-px-3 pb-1 pr-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="grid w-full min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3"
             >
               {[...primaryNavItems, ...(isMock ? [setupNavItem] : [])].map(
                 (item) => {
@@ -220,14 +238,14 @@ function MobileTopBar({
                       href={href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "inline-flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-[0.95rem] border px-3 py-2 text-xs font-semibold shadow-flat transition-surface",
+                        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-[0.95rem] border px-2.5 py-2 text-xs font-semibold shadow-flat transition-surface",
                         active
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-surface-control text-foreground",
                       )}
                     >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 truncate">{item.label}</span>
                     </PartnerPendingLink>
                   );
                 },

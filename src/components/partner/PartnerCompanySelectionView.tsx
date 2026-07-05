@@ -27,7 +27,12 @@ export default function PartnerCompanySelectionView({
               title="협력사 선택"
               description="관리할 협력사를 선택하면 해당 협력사가 소유한 브랜드의 대시보드와 운영 메뉴로 이동합니다."
               actions={
-                <Badge variant="primary">로그인 아이디 · {session.loginId}</Badge>
+                <Badge
+                  variant="primary"
+                  className="max-w-full whitespace-normal break-all text-left leading-snug tracking-normal"
+                >
+                  로그인 아이디 · {session.loginId}
+                </Badge>
               }
             />
           </MotionReveal>

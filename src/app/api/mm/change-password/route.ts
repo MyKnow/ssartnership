@@ -10,11 +10,27 @@ import {
   getMemberAuthBlockingState,
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_password_change",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return NextResponse.json({ error: "change_failed" }, { status: 403 });
+  }
+
   try {
     const session = await getSignedUserSession();
     if (!session?.userId) {

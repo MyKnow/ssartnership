@@ -21,7 +21,7 @@ export default function StatsRow({
           key={item.label}
           label={item.label}
           title={
-            <span className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
+            <span className="min-w-0 text-2xl font-semibold tracking-normal text-foreground">
               {item.value}
             </span>
           }

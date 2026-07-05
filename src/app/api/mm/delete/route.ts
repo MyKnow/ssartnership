@@ -3,11 +3,23 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, clearUserSession } from "@/lib/user-auth";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (!isTrustedSameOriginRequest(request)) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_delete",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const session = await getSignedUserSession();
   if (!session?.userId) {
     await logAuthSecurity({

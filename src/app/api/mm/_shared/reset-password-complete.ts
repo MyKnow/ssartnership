@@ -15,22 +15,57 @@ import {
   failResetPasswordCompleteException,
 } from "./reset-password-complete-failure";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { verifyResetPasswordCompletionToken } from "@/lib/reset-password-session";
+import {
+  extractResetPasswordCompletionTokenFromCookieHeader,
+  getResetPasswordCompletionCookieOptions,
+  RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+  verifyResetPasswordCompletionToken,
+} from "@/lib/reset-password-session";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export async function handleResetPasswordCompletePost(request: Request) {
   const context = getRequestLogContext(request);
+  let throttleContext = createMemberAuthThrottleContext(
+    context.ipAddress ?? null,
+    null,
+  );
 
   try {
+    if (
+      !isTrustedSameOriginRequest(request, {
+        allowedContentTypes: ["application/json"],
+      })
+    ) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "invalid_request",
+        status: 403,
+        reason: "same_origin_failed",
+        recordFailure: false,
+        blockedDelay: true,
+      });
+    }
+
     const payload = await parseResetPasswordCompleteBody(request);
-    const token = String(payload.token ?? "").trim();
+    const token = extractResetPasswordCompletionTokenFromCookieHeader(
+      request.headers.get("cookie"),
+    );
     const nextPassword = String(payload.nextPassword ?? "");
     const nextPasswordConfirm = String(payload.nextPasswordConfirm ?? "");
-    let throttleContext = createMemberAuthThrottleContext(
-      context.ipAddress ?? null,
-      null,
-    );
 
-    if (!token || !nextPassword || !nextPasswordConfirm) {
+    if (!token) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "invalid_code",
+        status: 400,
+        reason: "missing_token",
+        identifier: null,
+      });
+    }
+
+    if (!nextPassword || !nextPasswordConfirm) {
       return failResetPasswordComplete({
         context,
         throttleContext,
@@ -192,7 +227,13 @@ export async function handleResetPasswordCompletePost(request: Request) {
     revalidatePath("/auth/reset");
     revalidatePath("/auth/change-password");
 
-    return mmOkResponse();
+    const response = mmOkResponse();
+    response.cookies.set(
+      RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+      "",
+      getResetPasswordCompletionCookieOptions(0),
+    );
+    return response;
   } catch (error) {
     return failResetPasswordCompleteException({ context, error });
   }

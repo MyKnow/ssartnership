@@ -21,6 +21,7 @@ import {
   clearSsafySignupSession,
   getSsafySignupSession,
 } from "@/lib/ssafy-verify/signup-session";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,21 @@ function errorResponse(error: string, status = 400, extra: Record<string, unknow
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_signup_complete",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return errorResponse("forbidden", 403);
+  }
+
   const signupSession = await getSsafySignupSession();
   if (!signupSession) {
     await logAuthSecurity({

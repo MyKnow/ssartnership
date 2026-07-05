@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import { getPartnerSession } from "@/lib/partner-session";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { partnerReviewRepository } from "@/lib/repositories";
 
 export const runtime = "nodejs";
@@ -21,6 +22,14 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ reviewId: string }> },
 ) {
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 403 });
+  }
+
   const session = await getPartnerSession().catch(() => null);
   if (!session || session.mustChangePassword) {
     return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });

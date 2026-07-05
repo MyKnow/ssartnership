@@ -7,7 +7,11 @@ import {
   getMemberAuthBlockingState,
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
-import { issueResetPasswordCompletionToken } from "@/lib/reset-password-session";
+import {
+  getResetPasswordCompletionCookieOptions,
+  issueResetPasswordCompletionToken,
+  RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+} from "@/lib/reset-password-session";
 import { getSsafyVerifyServerConfig } from "@/lib/ssafy-verify/config";
 import {
   findSsafyVerifiedMember,
@@ -27,6 +31,7 @@ import {
 } from "@/lib/ssafy-verify/redirect";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
@@ -48,6 +53,21 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: null,
   };
+
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_password_reset_ssafy",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return publicError("VERIFY_REQUEST_FORBIDDEN", null, 403);
+  }
 
   try {
     const blockedState = await getMemberAuthBlockingState(
@@ -269,13 +289,19 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       verified: true,
-      completionToken,
+      resetPath: "/auth/reset/complete",
       mmUsername: memberResult.member.mm_username,
       authTime: verified.claims.authTime,
     });
+    response.cookies.set(
+      RESET_PASSWORD_COMPLETION_COOKIE_NAME,
+      completionToken,
+      getResetPasswordCompletionCookieOptions(),
+    );
+    return response;
   } catch {
     await logAuthSecurity({
       ...context,

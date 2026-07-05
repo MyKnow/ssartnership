@@ -178,6 +178,12 @@ export type AdminLogsPageData = {
     any: boolean;
     limitPerGroup: number | null;
   };
+  partialFailure: {
+    product: boolean;
+    audit: boolean;
+    security: boolean;
+    any: boolean;
+  };
   chartBuckets: LogChartBucket[];
   filters: AdminLogsFilterMeta;
   summary: AdminLogsSummary;
@@ -253,6 +259,12 @@ export type AdminLogsLoadedData = {
     any: boolean;
     limitPerGroup: number | null;
   };
+  partialFailure: {
+    product: boolean;
+    audit: boolean;
+    security: boolean;
+    any: boolean;
+  };
 };
 
 export const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> = {
@@ -266,10 +278,10 @@ export const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> 
 export const DEFAULT_PRESET: LogRangePreset = '24h';
 export const QUERY_PAGE_SIZE = 1000;
 export const MAX_CUSTOM_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
-export const PAGE_MAX_LOG_ROWS_PER_GROUP: number | null = null;
+export const PAGE_MAX_LOG_ROWS_PER_GROUP = 5000;
 export const EXPORT_MAX_LOG_ROWS_PER_GROUP = 20000;
 export const MEMBER_LOOKUP_CHUNK_SIZE = 500;
-export const SUMMARY_MAX_LOG_ROWS_PER_GROUP: number | null = null;
+export const SUMMARY_MAX_LOG_ROWS_PER_GROUP = 3000;
 export const ADMIN_LOGS_CSV_HEADER = [
   'group',
   'action',

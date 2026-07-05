@@ -58,7 +58,7 @@ export default function AdminLogsManagerContent({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="grid gap-1">
                 <p className="text-sm font-semibold text-foreground">현재 조회 범위</p>
-                <p className="break-all text-sm text-muted-foreground">{logs.data.range.label}</p>
+                <p className="text-token text-sm text-muted-foreground">{logs.data.range.label}</p>
               </div>
               <Badge className="bg-surface-muted text-muted-foreground">
                 {logs.data.range.bucketLabel}
@@ -69,6 +69,12 @@ export default function AdminLogsManagerContent({
           {logs.data.truncated.any && logs.data.truncated.limitPerGroup !== null ? (
             <FormMessage variant="error">
               조회 범위의 로그가 많아 그룹별 최근 {logs.data.truncated.limitPerGroup.toLocaleString()}건만 불러왔습니다. 더 넓은 원본은 CSV 다운로드로 확인하세요.
+            </FormMessage>
+          ) : null}
+
+          {logs.data.partialFailure.any ? (
+            <FormMessage variant="error">
+              일부 로그 페이지 조회가 실패해 결과가 불완전할 수 있습니다. 조회 범위를 좁히거나 잠시 후 다시 시도해 주세요.
             </FormMessage>
           ) : null}
 

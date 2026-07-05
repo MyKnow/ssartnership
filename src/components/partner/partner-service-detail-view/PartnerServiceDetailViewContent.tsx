@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
@@ -84,20 +85,7 @@ export default function PartnerServiceDetailViewContent({
                 showSpinner
               >
                 <span className="inline-flex items-center gap-2">
-                  <svg
-                    width={16}
-                    height={16}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
+                  <Eye className="h-4 w-4" />
                   보기로 전환
                 </span>
               </PartnerPendingButtonLink>
@@ -105,12 +93,12 @@ export default function PartnerServiceDetailViewContent({
           </div>
 
           {isEditMode ? (
-            <Card className="space-y-3 p-6 sm:p-8">
-              <Badge className="bg-primary/10 text-primary">수정 요청</Badge>
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              <Card className="space-y-3 p-6 sm:p-8">
+                <Badge className="bg-primary/10 text-primary">수정 요청</Badge>
+              <h1 className="line-clamp-2 text-ko-title text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                 {context.partnerName}
               </h1>
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              <p className="max-w-3xl text-ko-pretty text-sm leading-6 text-muted-foreground">
                 변경 방식이 다른 항목을 분리했습니다. 즉시 반영 항목은 저장 직후 공개 화면에
                 적용되고, 승인 필요 항목은 관리자 검토 후 반영됩니다.
               </p>
@@ -147,15 +135,15 @@ export default function PartnerServiceDetailViewContent({
                       </Badge>
                       {pendingRequest ? (
                         <Badge className="bg-amber-500/10 text-amber-700">
-                          승인 대기 중
+                          수정 요청 승인 대기
                         </Badge>
                       ) : null}
                     </div>
                     <div>
-                      <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+                      <h1 className="line-clamp-2 text-ko-title text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                         {context.partnerName}
                       </h1>
-                      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                      <p className="mt-2 max-w-3xl text-ko-pretty text-sm leading-6 text-muted-foreground">
                         공개 상태, 플랜, 수정 요청 상태를 기준으로 브랜드 운영 신뢰도를 확인합니다.
                       </p>
                     </div>

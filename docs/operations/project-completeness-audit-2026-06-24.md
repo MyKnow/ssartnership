@@ -26,75 +26,88 @@
 
 ### High
 
-1. 비밀번호 재설정 완료 토큰이 URL query로 노출된다.
+1. 비밀번호 재설정 완료 토큰이 URL query로 노출된다. `2026-07-05 완료`
    - [src/app/api/ssafy/reset-password/route.ts](/Users/myknow/coding/ssartnership/src/app/api/ssafy/reset-password/route.ts)는 SSAFY Verify 재인증 후 reset completion token을 발급한다.
-   - [src/components/auth/ResetPasswordForm.tsx](/Users/myknow/coding/ssartnership/src/components/auth/ResetPasswordForm.tsx)는 이 token을 `/auth/reset/complete?token=...`로 넘기고, [src/app/auth/reset/complete/page.tsx](/Users/myknow/coding/ssartnership/src/app/auth/reset/complete/page.tsx)는 query token을 읽는다.
-   - 이 token은 bearer 성격이고 payload에 `memberId`, `mmUserId`, `mmUsername`이 포함된다. 브라우저 history, 로그, referrer, 화면 공유로 새면 비밀번호 재설정 권한이 노출된다.
+   - 2026-06-24 당시 [src/components/auth/ResetPasswordForm.tsx](/Users/myknow/coding/ssartnership/src/components/auth/ResetPasswordForm.tsx)는 이 token을 `/auth/reset/complete?token=...`로 넘기고, [src/app/auth/reset/complete/page.tsx](/Users/myknow/coding/ssartnership/src/app/auth/reset/complete/page.tsx)는 query token을 읽었다.
+   - 이 token은 bearer 성격이고 payload에 `memberId`, `mmUserId`, `mmUsername`이 포함됐다. 브라우저 history, 로그, referrer, 화면 공유로 새면 비밀번호 재설정 권한이 노출될 수 있었다.
    - 조치: query token 대신 HttpOnly short-lived cookie 또는 server-owned reset transaction id로 전환하고, reset 완료 시 즉시 폐기한다.
+   - 2026-07-05 업데이트: HttpOnly short-lived cookie 방식으로 전환했고, 완료 API는 same-origin JSON 요청과 cookie token만 검증하며 성공 시 cookie를 폐기한다.
 
-2. 관리자 회원 화면이 page load마다 큰 범위의 회원/푸시 설정 데이터를 반복 조회한다.
+2. 관리자 회원 화면이 page load마다 큰 범위의 회원/푸시 설정 데이터를 반복 조회한다. `2026-07-05 완료`
    - [src/app/admin/(protected)/members/page.tsx](/Users/myknow/coding/ssartnership/src/app/admin/(protected)/members/page.tsx)는 옵션용 `members(year,campus)` 전체 조회, 알림 필터별 `push_preferences` 반복 조회, trend chart용 `members(created_at)` 전체 조회를 같은 요청에서 수행한다.
    - 페이지 크기도 `10, 50, 100, 500`을 허용해 운영 데이터가 늘면 관리자 화면 TTFB와 DB 부하가 빠르게 커진다.
    - 조치: 옵션/차트/목록 query를 분리하고, trend는 DB-side aggregate 또는 bounded range로 바꾸며, 500 page size는 제거하거나 명시 export 기능으로 분리한다.
+   - 2026-07-05 업데이트: 500명 page size 옵션을 제거하고, 옵션/추이 조회를 최근 5,000건 상한으로 제한했다. 회원 상세 보안 로그는 25/50/100건 URL pagination으로 전환했다.
 
-3. 관리자 로그 화면 기본 진입이 `24h` 전체 로그를 그룹별 상한 없이 읽어 요약을 만든다.
+3. 관리자 로그 화면 기본 진입이 `24h` 전체 로그를 그룹별 상한 없이 읽어 요약을 만든다. `2026-07-05 완료`
    - [src/app/admin/(protected)/logs/page.tsx](/Users/myknow/coding/ssartnership/src/app/admin/(protected)/logs/page.tsx)는 기본 진입부터 `getAdminLogsPageData({ preset: "24h" })`를 호출한다.
    - [src/lib/log-insights/shared.ts](/Users/myknow/coding/ssartnership/src/lib/log-insights/shared.ts)의 `PAGE_MAX_LOG_ROWS_PER_GROUP`과 `SUMMARY_MAX_LOG_ROWS_PER_GROUP`가 `null`이라 로그량 증가 시 수천~수만 row가 메모리로 모일 수 있다.
    - 조치: 화면 기본 로딩은 bounded page로 제한하고, summary는 DB-side aggregate 또는 별도 lightweight endpoint로 전환한다.
+   - 2026-07-05 업데이트: fallback row 수집 상한을 page 5,000건, summary 3,000건으로 설정하고 500건 page size 옵션을 제거했다. DB summary/page RPC가 있으면 기존 aggregate 경로를 우선 사용한다.
 
-4. 공개 홈이 전체 파트너/즐겨찾기/인기 지표를 선계산한 뒤 클라이언트 경계로 넘긴다.
+4. 공개 홈이 전체 파트너/즐겨찾기/인기 지표를 선계산한 뒤 클라이언트 경계로 넘긴다. `2026-07-05 완료`
    - [src/components/HomeContent.tsx](/Users/myknow/coding/ssartnership/src/components/HomeContent.tsx)는 전체 파트너 목록, favorite counts, 사용자 favorite state, popularity metrics를 계산한다.
    - [src/components/HomeView.tsx](/Users/myknow/coding/ssartnership/src/components/HomeView.tsx)는 실제 초기 노출 12개와 달리 전체 배열을 client state/filter/sort 대상으로 받는다.
    - 조치: 초기 목록 pagination 또는 server filtering을 우선하고, popularity/favorite state는 보이는 목록 기준 또는 lazy hydration으로 좁힌다.
+   - 2026-07-05 업데이트: 홈 초기 응답은 24개 카드 범위만 favorite/popularity state를 계산하고, 이후 보이는 카드는 same-origin `/api/partners/home-state`에서 ID 상한을 둔 lazy hydration으로 보강한다.
 
-5. 인증서 화면이 `avatar_base64`를 포함한 member row를 클라이언트로 전달한다.
+5. 인증서 화면이 `avatar_base64`를 포함한 member row를 클라이언트로 전달한다. `2026-07-05 완료`
    - [src/app/(site)/certification/page.tsx](/Users/myknow/coding/ssartnership/src/app/(site)/certification/page.tsx)는 `avatar_base64`를 select하고, [CertificationView.tsx](/Users/myknow/coding/ssartnership/src/components/certification/CertificationView.tsx)는 data URL로 렌더링한다.
    - Verify `picture` URL 계약이 도입된 뒤에도 큰 base64 fallback이 페이지 payload와 렌더 비용을 키울 수 있다.
    - 조치: 인증서 화면은 URL/thumbnail 중심으로 전달하고, base64 fallback은 서버 route 또는 migration cleanup으로 격리한다.
+   - 2026-07-05 업데이트: 인증서/QR 검증 page props에서 `avatar_base64`를 제거하고, legacy base64 fallback은 `/api/mm/avatar` 및 `/api/certification/avatar/[token]` route 내부로만 제한했다.
 
 ### Medium
 
-1. Production live smoke 최신 결과가 문서화되어야 한다.
+1. Production live smoke 최신 결과가 문서화되어야 한다. `2026-07-05 완료`
    - `npm run test:ssafy-verify:live`는 기본 CI에서 제외되어 있어 운영자가 의도적으로 실행해야 한다.
    - `SSAFY_VERIFY_SMOKE_SEND_MM=1`을 켜면 실제 Mattermost DM이 발송되므로, 실행 날짜와 대상자를 이 문서 또는 Issue #54에 남겨야 한다.
+   - 2026-07-05 21:47 KST 업데이트: `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live` 통과. 대상은 `@myknow`, masked Mattermost id는 `iiss***pb9y`, campus `서울`, cohort `15`, avatar URL present. 실제 DM 발송은 `SSAFY_VERIFY_SMOKE_SEND_MM=1`을 켜지 않아 건너뛰었다.
 
-2. 관리자 edge perimeter 설정은 운영값 확정이 남았다.
+2. 관리자 edge perimeter 설정은 Basic Auth로 확정했다. `2026-07-05 완료`
    - 코드와 `.env.example`은 `ADMIN_ALLOWED_IPS`, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 지원한다.
-   - 운영에서 둘 다 비워두면 앱 레벨 관리자 로그인과 rate limit에만 의존한다.
-   - 관리자 접속 IP가 불안정하면 Basic Auth를 우선 적용하고, 안정적인 IP 대역이 생기면 allowlist를 추가한다.
+   - 2026-07-05 21:47 KST 확인: Production `/admin/login`은 Basic Auth challenge 없이 200을 반환했다. 운영값 적용은 아직 필요하다.
+   - 2026-07-05 22:02 KST 업데이트: Vercel Production/Preview에 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 등록했다. 이 브랜치에서 `/admin/login`을 포함한 `/admin` 화면 전체가 edge guard 대상이 되도록 보강했고, 로컬 빌드 서버에서 무인증 401/Basic Auth 포함 200을 확인했다. 배포 후 Production 401 challenge를 다시 확인한다.
 
-3. Vercel legacy Mattermost env 제거 여부가 운영 콘솔에서 확인되어야 한다.
+3. Vercel legacy Mattermost env 제거가 완료됐다. `2026-07-05 완료`
    - 코드와 문서 예시는 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL`을 더 이상 요구하지 않는다.
-   - Vercel에 예전 Mattermost token/base URL이 남아 있으면 실사용은 되지 않더라도 secret sprawl이 된다.
-   - 삭제 전에는 직접 Mattermost 연동으로 rollback할 수 없다는 점을 확인해야 한다.
+   - 2026-07-05 21:47 KST 확인: Vercel MCP로 프로젝트/배포/런타임 로그는 조회 가능하지만 env 조회/삭제 도구는 제공되지 않는다. 로컬 Vercel CLI는 인증 정보가 없어 OAuth device login 대기 상태로 진입했다가 중단했다.
+   - 2026-07-05 22:02 KST 업데이트: project-scoped Vercel wrapper로 `MM_*` 14개와 `NEXT_PUBLIC_MATTERMOST_DM_URL` 1개를 제거했고, Production/Preview `env ls`에서 잔존하지 않음을 확인했다.
 
-4. SSAFY Verify notification delivery status/recovery 반영이 아직 완결되지 않았다.
+4. SSAFY Verify notification delivery status/recovery 반영이 아직 완결되지 않았다. `2026-07-05 완료`
    - 발송 자체는 Verify Server API에 위임됐다.
    - `GET /v1/notifications/{notification_id}`와 `GET /v1/notifications?campaign_id=...` 결과를 SSARTNERSHIP delivery log에 주기적으로 반영하는 작업은 `Phase 4b`로 남겨둔다.
+   - 2026-07-05 업데이트: Verify provider campaign/notification/idempotency/status를 `notification_deliveries`에 저장하고, `/api/cron/ssafy-verify-notification-status` Vercel cron이 campaign status를 조회해 delivery row와 notification metadata를 갱신한다.
 
-5. 기존 사이트 비밀번호 로그인 모델은 아직 남아 있다.
+5. 기존 사이트 비밀번호 로그인 모델 정책이 확정되어야 한다. `2026-07-05 완료`
    - 신규 가입은 SSAFY Verify 기반으로 동작하지만 로그인은 `mm_username` + 사이트 비밀번호를 유지한다.
    - 완전한 SSO 제품 경험을 목표로 하면 `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경의 장기 정책을 다시 정해야 한다.
+   - 2026-07-05 업데이트: `/auth/login`은 SSAFY Verify를 1차 CTA로 전환하고, 기존 사이트 비밀번호 로그인은 전환 기간용 보조 경로로 낮췄다. 기존 비밀번호 해시 삭제는 운영 계정 마이그레이션과 rollback 포기 승인 전까지 진행하지 않는다.
 
-6. 파트너 알림센터 summary 문구와 실제 계산 범위가 다르다.
+6. 파트너 알림센터 summary 문구와 실제 계산 범위가 다르다. `2026-07-05 완료`
    - 변경 요청, 리뷰, 감사 로그를 최근 일부만 모아 summary를 만들지만 UI는 전체 알림처럼 읽힌다.
    - 조치: 최근 N건 기준이라고 명시하거나, 실제 total aggregate를 별도 계산한다.
+   - 2026-07-05 업데이트: 알림센터에 현재 화면에 불러온 최근 알림 기준이라는 안내와 저장 알림/변경 요청/리뷰/운영 로그별 로드 범위를 고정 노출한다.
 
-7. 파트너 상세 접근 실패 UX가 홈 redirect로 흐른다.
+7. 파트너 상세 접근 실패 UX가 홈 redirect로 흐른다. `2026-07-05 완료`
    - 잘못된 ID나 접근 불가 대상에서 `notFound()` 또는 명시적 게이트 UI 대신 홈으로 이동하면 공유 링크 오류와 SEO/운영 분석이 흐려진다.
    - 조치: public 404, 비공개/권한 제한 상태, 삭제 상태를 분리해 표시한다.
+   - 2026-07-05 업데이트: 잘못된 ID/비공개/삭제 대상은 파트너 상세 전용 404 화면으로 처리하고, confidential 대상은 기존 로그인 안내 gate를 유지한다.
 
-8. 회원 상세 로그 조회가 계정 단위로 최대 5000건을 한 번에 전달한다.
+8. 회원 상세 로그 조회가 계정 단위로 최대 5000건을 한 번에 전달한다. `2026-07-05 완료`
    - 계정 활동이 누적되면 상세 페이지 payload와 클라이언트 탐색 비용이 커진다.
    - 조치: 회원 상세 보안 로그도 pagination/filter를 기본값으로 둔다.
+   - 2026-07-05 업데이트: 회원 상세 보안 로그를 25/50/100건 단위 URL pagination으로 전환했다.
 
-9. `auth_security_logs`에 일부 raw exception message가 남고 CSV export로 전파될 수 있다.
+9. `auth_security_logs`에 일부 raw exception message가 남고 CSV export로 전파될 수 있다. `2026-07-05 완료`
    - SSAFY Verify trace 자체는 redaction되지만 다른 auth 흐름의 `error.message`가 그대로 properties에 저장되는 경로가 있다.
    - 조치: auth/security log sink 또는 호출부에서 allowlisted error code/message만 보존하고 raw provider/DB exception은 내부 console 또는 request id로만 연결한다.
+   - 2026-07-05 업데이트: `logAuthSecurity` 경계에서 `reason: "exception"`의 `message`를 `redacted_exception`으로 치환한다.
 
-10. 일부 cookie/session 기반 mutation에 same-origin guard가 빠져 있다.
+10. 일부 cookie/session 기반 mutation에 same-origin guard가 빠져 있다. `2026-07-05 완료`
    - JSON + SameSite=Lax + CORS 기본값 때문에 즉시 치명적이진 않지만, trust-boundary 문서의 기준과 맞지 않는다.
    - 조치: 회원/파트너 session mutation route에 공통 same-origin 또는 CSRF 성격 검증 helper를 적용한다.
+   - 2026-07-05 업데이트: 회원 로그인/로그아웃/탈퇴/약관/비밀번호/프로필 sync, 파트너 비밀번호/리뷰 moderation, SSAFY Verify 가입/재설정 callback route에 same-origin guard를 적용했다.
 
 ### Low
 
@@ -106,8 +119,9 @@
    - 로컬 release gate는 `build-storybook`과 `test-storybook`을 포함한다.
    - 외부 visual snapshot 자동화는 무료 한도 회복 또는 대체 도구 도입 전까지 보류한다.
 
-3. 성능 수치는 Verify 전환 이후 다시 측정해야 한다.
+3. 성능 수치는 Verify 전환 이후 다시 측정해야 한다. `2026-07-05 완료`
    - 홈 shell split, partner image preload, certification profile sync 지연 처리 후 실제 Production Lighthouse 또는 Speed Insights 재측정이 필요하다.
+   - 2026-07-05 21:47 KST 업데이트: Production `https://ssartnership.myknow.xyz` 대상으로 Lighthouse desktop 측정 완료. `/` 83점(LCP 2.6s, TBT 0ms, CLS 0), `/auth/login` 100점(LCP 0.6s, TBT 0ms, CLS 0), `/auth/signup` 100점(LCP 0.6s, TBT 0ms, CLS 0).
 
 4. 테스트 범위가 #54의 실제 브라우저 플로우를 충분히 덮지 못한다.
    - 현재 E2E는 홈/공개 상세 중심이고, signup/login/reset/certification/notifications/admin/partner portal의 실제 route, cookie, 권한, redirect 상호작용 회귀는 부족하다.
@@ -161,6 +175,30 @@
   - notification id: `notify_36ff3e17-eebc-416d-80e8-ffdd55e6264f`
   - status: `sent`
 
+### 2026-07-05 Production Checks
+
+- `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live`: pass
+  - target: `@myknow`
+  - directory lookup / profile / sync / profile-events 확인
+  - masked Mattermost id: `iiss***pb9y`
+  - campus: `서울`
+  - cohort: `15`
+  - avatar URL: present
+  - Mattermost DM smoke: skipped because `SSAFY_VERIFY_SMOKE_SEND_MM=1` was not set
+- Vercel Production runtime logs, last 24h:
+  - error/fatal logs: none found
+- Production Lighthouse desktop:
+  - `/`: score 83%, LCP 2.6s, TBT 0ms, CLS 0
+  - `/auth/login`: score 100%, LCP 0.6s, TBT 0ms, CLS 0
+  - `/auth/signup`: score 100%, LCP 0.6s, TBT 0ms, CLS 0
+- Admin perimeter check:
+  - 2026-07-05 21:47 KST: `https://ssartnership.myknow.xyz/admin/login` returned 200 without Basic Auth challenge.
+  - 2026-07-05 22:02 KST: Basic Auth env is registered in Vercel Production/Preview, and this branch extends edge guard coverage to `/admin` pages. Local built server returned 401 without Basic Auth and 200 with Basic Auth. Recheck the 401 challenge after this branch is deployed.
+- Vercel env cleanup check:
+  - 2026-07-05 22:02 KST: `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD` exist in Vercel Production/Preview.
+  - 2026-07-05 22:02 KST: `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` no longer appear in Vercel Production/Preview `env ls`.
+  - Local `.env` legacy Mattermost direct-integration values were removed. The previous local `SSARTNERSHIP_VERCEL_TOKEN` value could not be recovered after cleanup, so re-enter it in a gitignored env file before the next Vercel wrapper operation.
+
 ## Issue 정리
 
 | Issue | 상태 판단 | 조치 |
@@ -172,19 +210,21 @@
 | #59 | closeable | PR #60으로 trace logging 완료, 운영 runbook은 #54 후속 |
 | #54 | keep open | 잔여 운영/문서/성능 sweep umbrella |
 
-## 남은 PR Split
+2026-07-05 확인: #48, #50, #52, #53, #59는 이미 CLOSED 상태다. #54는 이번 브랜치 배포 후 Production `/admin/login` Basic Auth challenge 재확인만 남아 OPEN 유지한다.
+
+## PR Split 정리
 
 1. `docs/project-completeness-audit`: 이 문서와 이벤트 로깅/운영 TODO 동기화.
-2. `fix/reset-password-server-state`: reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
-3. `perf/admin-observability-bounds`: `/admin/members` query 구조 분리, 회원 상세 보안 로그 pagination, `/admin/logs` bounded loading 또는 DB-side aggregate 전환.
-4. `perf/public-home-boundary`: 홈 목록 server/client 경계 재설계, 초기 목록 pagination/server filtering, `(site)` layout/session/header read 경량화.
-5. `perf/certification-media`: 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
-6. `fix/auth-log-redaction-origin-guard`: auth security raw exception redaction과 session mutation same-origin guard 적용.
-7. `fix/partner-notification-summary`: 파트너 알림센터 summary를 최근 N건 기준으로 명시하거나 실제 total 집계와 분리.
-8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
-9. `feat/ssafy-notification-status-sync`: Verify notification status/recovery 결과를 delivery log에 반영.
-10. `test/flow-coverage`: signup/login/reset/certification/notifications/admin login/partner login E2E와 핵심 integration 보강.
-11. `refactor/member-auth-model`: 사이트 비밀번호 로그인 유지/폐기 정책 확정 후 구현.
+2. `fix/reset-password-server-state`: 완료. reset completion token을 URL query에서 제거하고 HttpOnly short-lived server state로 전환.
+3. `perf/admin-observability-bounds`: 완료. `/admin/members` query 상한과 회원 상세 보안 로그 pagination, `/admin/logs` fallback bounded loading을 적용.
+4. `perf/public-home-boundary`: 완료. 홈 favorite/popularity state를 초기 24개와 현재 보이는 카드 lazy hydration으로 제한.
+5. `perf/certification-media`: 완료. 인증서 avatar payload를 URL/thumbnail 중심으로 전환하고 base64 inline fallback 격리.
+6. `fix/session-mutation-origin-guard`: 완료. 회원/파트너 session mutation route에 same-origin guard 확대 적용.
+7. `fix/partner-notification-summary`: 완료. 파트너 알림센터 summary가 최근 알림 윈도우 기준임을 UI에 명시.
+8. `chore/production-env-cleanup`: 완료. Vercel legacy Mattermost env 제거 확인, 관리자 perimeter Basic Auth 운영값 적용.
+9. `feat/ssafy-notification-status-sync`: 완료. Verify notification status/recovery 결과를 delivery log와 notification metadata에 반영.
+10. `test/flow-coverage`: 보류. 광범위한 E2E 확장은 품질 개선 backlog로 두고, 현재 readiness 필수 TODO에서는 제외한다.
+11. `refactor/member-auth-model`: 완료. SSAFY Verify 우선 로그인과 기존 사이트 비밀번호 보조 경로 정책을 반영했다.
 
 ## 권장 검증 명령
 
@@ -206,9 +246,9 @@ SSAFY_VERIFY_LIVE_SMOKE=1 SSAFY_VERIFY_SMOKE_SEND_MM=1 npm run test:ssafy-verify
 
 ## 운영자 체크리스트
 
-- [ ] Production live smoke 실행 결과를 Issue #54에 기록한다.
-- [ ] `ADMIN_ALLOWED_IPS` 또는 Basic Auth 운영값을 확정한다.
-- [ ] Vercel Production/Preview에서 legacy Mattermost env 잔존 여부를 확인하고 제거한다.
-- [ ] 완료된 이슈 #48, #50, #52, #53, #59를 comment 후 close한다.
-- [ ] Verify notification status/recovery sync를 별도 PR로 진행한다.
-- [ ] Verify 전환 후 Production 성능을 재측정한다.
+- [x] Production live smoke 실행 결과를 Issue #54에 기록한다.
+- [x] `ADMIN_ALLOWED_IPS` 또는 Basic Auth 운영값을 확정한다.
+- [x] Vercel Production/Preview에서 legacy Mattermost env 잔존 여부를 확인하고 제거한다.
+- [x] 완료된 이슈 #48, #50, #52, #53, #59를 comment 후 close한다.
+- [x] Verify notification status/recovery sync를 별도 PR로 진행한다.
+- [x] Verify 전환 후 Production 성능을 재측정한다.

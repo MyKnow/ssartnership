@@ -38,14 +38,10 @@ export default function PartnerServiceSummaryCard({
 
   return (
     <Card
-      className="order-1 relative overflow-hidden p-6 xl:order-1"
+      className="order-1 overflow-hidden p-6 xl:order-1"
       data-partner-detail-summary
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.08),_transparent_45%),radial-gradient(circle_at_bottom_left,_rgba(14,165,233,0.08),_transparent_42%)]"
-      />
-      <div className="relative flex flex-col">
+      <div className="flex min-w-0 flex-col">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Badge
             className={
@@ -60,6 +56,13 @@ export default function PartnerServiceSummaryCard({
           <span className="text-xs font-medium text-muted-foreground">
             {context.periodStart ?? "미정"} ~ {context.periodEnd ?? "미정"}
           </span>
+        </div>
+
+        <div className="mt-4 min-w-0">
+          <p className="ui-kicker">Brand Snapshot</p>
+          <h2 className="mt-1 line-clamp-2 text-ko-title text-xl font-semibold leading-7 text-foreground">
+            {context.partnerName}
+          </h2>
         </div>
 
         {thumbnailUrl ? (
@@ -77,10 +80,12 @@ export default function PartnerServiceSummaryCard({
           </div>
         ) : null}
 
-        <h1 className="mt-4 text-3xl font-semibold text-foreground">{context.partnerName}</h1>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          {!isOnlineService ? <span>{context.partnerLocation}</span> : null}
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          {!isOnlineService ? (
+            <span className="block min-w-0 line-clamp-2 text-ko-pretty">
+              {context.partnerLocation}
+            </span>
+          ) : null}
           {mapLink ? (
             <TrackedAnchor
               className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"

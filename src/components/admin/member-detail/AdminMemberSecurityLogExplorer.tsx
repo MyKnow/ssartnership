@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
@@ -64,9 +65,19 @@ function getPropertyEntries(properties: Record<string, unknown> | null) {
 
 export default function AdminMemberSecurityLogExplorer({
   logs,
+  pagination,
 }: {
   logs: AdminMemberSecurityLog[];
+  pagination?: {
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    pageSizeOptions: readonly number[];
+  };
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [searchValue, setSearchValue] = useState("");
   const [eventFilter, setEventFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -127,14 +138,47 @@ export default function AdminMemberSecurityLogExplorer({
     });
   }, [eventFilter, logs, pathFilter, searchValue, sortFilter, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = (safeCurrentPage - 1) * pageSize;
-  const visibleLogs = filteredLogs.slice(pageStart, pageStart + pageSize);
+  const effectivePageSize = pagination?.pageSize ?? pageSize;
+  const totalPages = Math.max(
+    1,
+    Math.ceil((pagination?.totalCount ?? filteredLogs.length) / effectivePageSize),
+  );
+  const safeCurrentPage = pagination
+    ? Math.min(pagination.page, totalPages)
+    : Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * effectivePageSize;
+  const visibleLogs = pagination
+    ? filteredLogs
+    : filteredLogs.slice(pageStart, pageStart + effectivePageSize);
   const rangeLabel =
-    filteredLogs.length === 0
+    (pagination?.totalCount ?? filteredLogs.length) === 0
       ? "0건"
-      : `${pageStart + 1}-${Math.min(pageStart + visibleLogs.length, filteredLogs.length)} / ${filteredLogs.length}`;
+      : `${pageStart + 1}-${Math.min(
+          pageStart + visibleLogs.length,
+          pagination?.totalCount ?? filteredLogs.length,
+        )} / ${(pagination?.totalCount ?? filteredLogs.length).toLocaleString("ko-KR")}`;
+
+  function updateServerPagination(nextPage: number, nextPageSize = effectivePageSize) {
+    if (!pagination) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams.toString());
+    const safePage = Math.min(Math.max(1, nextPage), totalPages);
+    if (safePage <= 1) {
+      next.delete("logPage");
+    } else {
+      next.set("logPage", String(safePage));
+    }
+    if (nextPageSize === 50) {
+      next.delete("logPageSize");
+    } else {
+      next.set("logPageSize", String(nextPageSize));
+    }
+    const queryString = next.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+      scroll: false,
+    });
+  }
 
   function updateFilter(callback: () => void) {
     callback();
@@ -149,7 +193,8 @@ export default function AdminMemberSecurityLogExplorer({
           description="로그 조회와 같은 방식으로 이벤트, 상태, 경로, 검색어를 조합해 이 회원의 보안 활동을 탐색합니다."
         />
         <Badge className="w-fit bg-surface text-muted-foreground">
-          필터 결과 {filteredLogs.length.toLocaleString()}건 / 전체 {logs.length.toLocaleString()}건
+          현재 페이지 필터 {filteredLogs.length.toLocaleString()}건 / 전체{" "}
+          {(pagination?.totalCount ?? logs.length).toLocaleString()}건
         </Badge>
       </div>
 
@@ -257,13 +302,19 @@ export default function AdminMemberSecurityLogExplorer({
               <label className="flex items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
                 <span>페이지당</span>
                 <Select
-                  value={String(pageSize)}
+                  value={String(effectivePageSize)}
                   onChange={(event) => {
-                    setPageSize(Number(event.target.value) as (typeof PAGE_SIZE_OPTIONS)[number]);
-                    setCurrentPage(1);
+                    const nextPageSize = Number(event.target.value) as
+                      (typeof PAGE_SIZE_OPTIONS)[number];
+                    if (pagination) {
+                      updateServerPagination(1, nextPageSize);
+                    } else {
+                      setPageSize(nextPageSize);
+                      setCurrentPage(1);
+                    }
                   }}
                 >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
+                  {(pagination?.pageSizeOptions ?? PAGE_SIZE_OPTIONS).map((option) => (
                     <option key={option} value={option}>
                       {option}건
                     </option>
@@ -273,7 +324,11 @@ export default function AdminMemberSecurityLogExplorer({
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  onClick={() =>
+                    pagination
+                      ? updateServerPagination(safeCurrentPage - 1)
+                      : setCurrentPage((page) => Math.max(1, page - 1))
+                  }
                   disabled={safeCurrentPage === 1}
                   className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -284,7 +339,11 @@ export default function AdminMemberSecurityLogExplorer({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  onClick={() =>
+                    pagination
+                      ? updateServerPagination(safeCurrentPage + 1)
+                      : setCurrentPage((page) => Math.min(totalPages, page + 1))
+                  }
                   disabled={safeCurrentPage === totalPages}
                   className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -323,9 +382,9 @@ export default function AdminMemberSecurityLogExplorer({
                         {log.eventName}
                       </h3>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span className="max-w-full break-all">입력 ID: {log.identifier ?? "-"}</span>
-                        <span className="max-w-full break-all">IP: {log.ipAddress ?? "-"}</span>
-                        <span className="max-w-full break-all">경로: {log.path ?? "-"}</span>
+                        <span className="max-w-full text-token">입력 ID: {log.identifier ?? "-"}</span>
+                        <span className="max-w-full text-token">IP: {log.ipAddress ?? "-"}</span>
+                        <span className="max-w-full text-token">경로: {log.path ?? "-"}</span>
                       </div>
                     </div>
                   </div>
@@ -339,7 +398,7 @@ export default function AdminMemberSecurityLogExplorer({
                         {propertyEntries.map(([key, value]) => (
                           <Badge
                             key={key}
-                            className="max-w-full break-all whitespace-normal bg-surface-muted text-foreground"
+                            className="max-w-full text-token whitespace-normal bg-surface-muted text-foreground"
                           >
                             {key}: {Array.isArray(value) ? value.join(", ") : String(value)}
                           </Badge>

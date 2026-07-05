@@ -145,6 +145,14 @@ export function isProtectedAdminPath(pathname: string) {
   );
 }
 
+export function isAdminEdgeGuardPath(pathname: string) {
+  return (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    isProtectedAdminPath(pathname)
+  );
+}
+
 export function getForwardedClientIp(
   headers: Pick<Headers, "get">,
 ): string | null {

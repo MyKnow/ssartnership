@@ -76,10 +76,10 @@ export function AdminLogsExplorer({
   function renderActorLink(log: NormalizedLog) {
     if (log.actorType !== 'member' || !log.actorId) {
       if (log.actorMmUsername) {
-        return <span className="max-w-full break-all">MM 아이디: @{log.actorMmUsername}</span>;
+        return <span className="max-w-full text-token">MM 아이디: @{log.actorMmUsername}</span>;
       }
       if (log.actorName) {
-        return <span className="max-w-full break-all">이름: {log.actorName}</span>;
+        return <span className="max-w-full text-token">이름: {log.actorName}</span>;
       }
       return null;
     }
@@ -87,7 +87,7 @@ export function AdminLogsExplorer({
     const href = `/admin/members/${log.actorId}`;
     const label = log.actorName ?? (log.actorMmUsername ? `@${log.actorMmUsername}` : log.actorId);
     return (
-      <span className="max-w-full break-all">
+      <span className="max-w-full text-token">
         사용자:{' '}
         <Link
           href={href}
@@ -108,7 +108,7 @@ export function AdminLogsExplorer({
     }
 
     return (
-      <span className="max-w-full break-all">
+      <span className="max-w-full text-token">
         브랜드:{' '}
         <Link
           href={`/admin/partners/${log.partnerId}`}
@@ -342,32 +342,32 @@ export function AdminLogsExplorer({
 
                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                       {log.actorType ? (
-                        <span className="max-w-full break-all">주체: {log.actorType}</span>
+                        <span className="max-w-full text-token">주체: {log.actorType}</span>
                       ) : null}
                       {renderActorLink(log)}
                       {log.identifier && !log.actorMmUsername ? (
-                        <span className="max-w-full break-all">입력 ID: {log.identifier}</span>
+                        <span className="max-w-full text-token">입력 ID: {log.identifier}</span>
                       ) : null}
                       {log.actorId ? (
-                        <span className="max-w-full break-all">내부 ID: {log.actorId}</span>
+                        <span className="max-w-full text-token">내부 ID: {log.actorId}</span>
                       ) : null}
                       {log.ipAddress ? (
-                        <span className="max-w-full break-all">IP: {log.ipAddress}</span>
+                        <span className="max-w-full text-token">IP: {log.ipAddress}</span>
                       ) : null}
                       {log.path ? (
-                        <span className="max-w-full break-all">경로: {log.path}</span>
+                        <span className="max-w-full text-token">경로: {log.path}</span>
                       ) : null}
                       {log.targetType ? (
-                        <span className="max-w-full break-all">대상: {log.targetType}</span>
+                        <span className="max-w-full text-token">대상: {log.targetType}</span>
                       ) : null}
                       {log.targetId ? (
-                        <span className="max-w-full break-all">대상 ID: {log.targetId}</span>
+                        <span className="max-w-full text-token">대상 ID: {log.targetId}</span>
                       ) : null}
                       {renderPartnerLink(log)}
                     </div>
                   </div>
 
-                  <Badge className="max-w-full break-all whitespace-normal bg-surface-muted text-muted-foreground">
+                  <Badge className="max-w-full text-token whitespace-normal bg-surface-muted text-muted-foreground">
                     {log.name}
                   </Badge>
                 </div>
@@ -381,7 +381,7 @@ export function AdminLogsExplorer({
                       {propertyEntries.map(([key, value]) => (
                         <Badge
                           key={key}
-                          className="max-w-full break-all whitespace-normal bg-surface-muted text-foreground"
+                          className="max-w-full text-token whitespace-normal bg-surface-muted text-foreground"
                         >
                           {key}: {Array.isArray(value) ? value.join(', ') : String(value)}
                         </Badge>
@@ -402,13 +402,13 @@ export function AdminLogsExplorer({
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>이벤트</span>
-                        <span className="max-w-full break-all font-medium text-foreground">
+                        <span className="max-w-full text-token font-medium text-foreground">
                           {log.name}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>주체</span>
-                        <span className="max-w-full break-all text-right font-medium text-foreground">
+                        <span className="max-w-full text-token text-right font-medium text-foreground">
                           {log.actorType === 'member' && log.actorId ? (
                             <Link
                               href={`/admin/members/${log.actorId}`}
@@ -432,25 +432,25 @@ export function AdminLogsExplorer({
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>경로</span>
-                        <span className="max-w-full break-all font-medium text-foreground">
+                        <span className="max-w-full text-token font-medium text-foreground">
                           {log.path ?? '-'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>대상</span>
-                        <span className="max-w-full break-all font-medium text-foreground">
+                        <span className="max-w-full text-token font-medium text-foreground">
                           {log.targetType ?? '-'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>대상 ID</span>
-                        <span className="max-w-full break-all font-medium text-foreground">
+                        <span className="max-w-full text-token font-medium text-foreground">
                           {log.targetId ?? '-'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <span>브랜드</span>
-                        <span className="max-w-full break-all text-right font-medium text-foreground">
+                        <span className="max-w-full text-token text-right font-medium text-foreground">
                           {log.partnerId && log.partnerName ? (
                             <Link
                               href={`/admin/partners/${log.partnerId}`}

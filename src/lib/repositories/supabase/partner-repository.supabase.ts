@@ -19,6 +19,7 @@ import {
   maskPartnerBenefitsForAccess,
   normalizePartnerBenefitVisibility,
 } from "@/lib/partner-benefit-visibility";
+import { isUuid } from "@/lib/uuid";
 
 type PartnerRow = {
   id: string;
@@ -164,7 +165,7 @@ const getCachedPartnerRows = unstable_cache(
 const getCachedPartnerRowById = unstable_cache(
   async (id: string, versionKey: string): Promise<PartnerRow | null> => {
     void versionKey;
-    if (!id) {
+    if (!id || !isUuid(id)) {
       return null;
     }
 
@@ -329,7 +330,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
   }
 
   async partnerExists(id: string): Promise<boolean> {
-    if (!id) {
+    if (!id || !isUuid(id)) {
       return false;
     }
 

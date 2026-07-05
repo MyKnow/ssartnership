@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -32,8 +32,10 @@ import {
   getPartnerPlanChannelLabel,
   getPartnerPlanExpiryStatus,
   getPartnerPlanFilterLabel,
+  getPartnerPlanRequestProgress,
   getPartnerPlanUpgradeOptions,
   matchesPartnerPlanFilter,
+  type PartnerPlanRequestProgressStep,
   type PartnerPlanFilter,
 } from "@/lib/partner-plan-ui";
 import { cn } from "@/lib/cn";
@@ -98,34 +100,56 @@ function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
   );
 }
 
-function getRequestStatusLabel(status: string) {
-  switch (status) {
-    case "approved":
-      return "승인";
-    case "rejected":
-      return "반려";
-    case "cancelled":
-      return "취소";
-    default:
-      return "대기";
-  }
+function PlanRequestProgressSteps({
+  steps,
+}: {
+  steps: PartnerPlanRequestProgressStep[];
+}) {
+  return (
+    <ol className="grid min-w-0 gap-2 sm:grid-cols-4">
+      {steps.map((step) => (
+        <li
+          key={step.key}
+          className={cn(
+            "flex min-w-0 items-center gap-2 rounded-[0.8rem] border px-3 py-2 text-xs font-semibold",
+            step.state === "complete"
+              ? "border-success/15 bg-success/10 text-success"
+              : step.state === "current"
+                ? "border-primary/20 bg-primary-soft text-primary"
+                : "border-border bg-surface-control text-muted-foreground",
+          )}
+        >
+          <span
+            className={cn(
+              "h-2.5 w-2.5 shrink-0 rounded-full",
+              step.state === "complete"
+                ? "bg-success"
+                : step.state === "current"
+                  ? "bg-primary"
+                  : "bg-border-strong",
+            )}
+          />
+          <span className="min-w-0 truncate">{step.label}</span>
+        </li>
+      ))}
+    </ol>
+  );
 }
 
-function RequestStatusBadge({ status }: { status: string }) {
+function RequestMetaField({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
   return (
-    <Badge
-      variant={
-        status === "pending"
-          ? "warning"
-          : status === "approved"
-            ? "success"
-            : status === "rejected"
-              ? "danger"
-              : "neutral"
-      }
-    >
-      {getRequestStatusLabel(status)}
-    </Badge>
+    <div className="min-w-0 rounded-[0.8rem] border border-border/70 bg-surface-control p-3">
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <div className="mt-1 min-w-0 text-sm font-semibold text-foreground">
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -290,6 +314,13 @@ export default function PartnerPlanBrandList({
               expiresAt: brand.planExpiresAt,
               emptyLabel: `${periodLabel} 없음`,
             });
+            const requestProgress = pendingRequest
+              ? getPartnerPlanRequestProgress({
+                  requestStatus: pendingRequest.status,
+                  invoiceStatus: pendingRequest.billingInvoice?.invoiceStatus,
+                  paymentStatus: pendingRequest.billingInvoice?.paymentStatus,
+                })
+              : null;
 
             return (
               <Card key={brand.id} tone="default" padding="none" className="overflow-hidden">
@@ -315,7 +346,9 @@ export default function PartnerPlanBrandList({
                     {pendingRequest ? (
                       <div className="flex flex-wrap items-center gap-2 rounded-[0.95rem] border border-warning/25 bg-warning/10 px-3 py-2 text-sm">
                         <Clock3 className="h-4 w-4 text-warning" />
-                        <span className="font-semibold text-foreground">승인 대기</span>
+                        <span className="font-semibold text-foreground">
+                          {requestProgress?.label ?? "승인 대기"}
+                        </span>
                         <PlanBadge tier={pendingRequest.currentPlanTier} />
                         <span className="text-muted-foreground">→</span>
                         <PlanBadge tier={pendingRequest.requestedPlanTier} />
@@ -407,29 +440,58 @@ export default function PartnerPlanBrandList({
                           <Clock3 className="h-5 w-5" />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">
-                            입금 확인 후 관리자가 플랜을 반영합니다.
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={requestProgress?.tone ?? "warning"}>
+                              {requestProgress?.label ?? "입금 확인 대기"}
+                            </Badge>
+                            <span className="text-sm font-semibold text-foreground">
+                              {formatPartnerPlanCurrency(pendingRequest.paymentAmountKrw)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm font-semibold text-foreground">
+                            {requestProgress?.headline ??
+                              "입금 확인 후 관리자가 플랜을 반영합니다."}
                           </p>
-                          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                            납부기한{" "}
-                            {pendingRequest.billingInvoice
-                              ? formatDateTime(pendingRequest.billingInvoice.dueAt)
-                              : "확인 중"}
+                          <p className="mt-1 text-sm leading-6 text-muted-foreground text-ko-pretty">
+                            {requestProgress?.nextStep ??
+                              "입금 확인과 관리자 승인이 끝나면 플랜이 자동으로 적용됩니다."}
                           </p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <RequestStatusBadge
-                          status={
-                            pendingRequest.billingInvoice?.invoiceStatus === "paid"
-                              ? "approved"
-                              : "pending"
+
+                      {requestProgress ? (
+                        <PlanRequestProgressSteps steps={requestProgress.steps} />
+                      ) : null}
+
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <RequestMetaField
+                          label="납부기한"
+                          value={
+                            pendingRequest.billingInvoice
+                              ? formatDateTime(pendingRequest.billingInvoice.dueAt)
+                              : "확인 중"
                           }
                         />
-                        <span className="font-semibold text-foreground">
-                          {formatPartnerPlanCurrency(pendingRequest.paymentAmountKrw)}
-                        </span>
+                        <RequestMetaField
+                          label="요청 플랜"
+                          value={
+                            <span className="inline-flex min-w-0 flex-wrap items-center gap-1.5">
+                              <PlanBadge tier={pendingRequest.currentPlanTier} />
+                              <span className="text-muted-foreground">→</span>
+                              <PlanBadge tier={pendingRequest.requestedPlanTier} />
+                            </span>
+                          }
+                        />
+                        <RequestMetaField
+                          label="세금계산서"
+                          value={
+                            pendingRequest.billingInvoice?.taxDocumentStatus === "issued"
+                              ? "발급 완료"
+                              : "발급 대기"
+                          }
+                        />
                       </div>
+
                       <form action={cancelPartnerPlanUpgradeRequestAction} className="grid gap-2">
                         <input type="hidden" name="companyId" value={companyId} />
                         <input type="hidden" name="requestId" value={pendingRequest.id} />
@@ -459,6 +521,27 @@ export default function PartnerPlanBrandList({
                     </div>
                   ) : (
                     <div className="grid gap-3">
+                      <div className="grid gap-2 rounded-[1rem] border border-primary/15 bg-primary-soft p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-primary">
+                            다음 업그레이드 가능
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-primary/80 text-ko-pretty">
+                            목표 플랜을 선택하면 남은 기간 차액과 VAT 포함 입금액을
+                            바로 확인할 수 있습니다.
+                          </p>
+                        </div>
+                        <Button
+                          variant={expanded ? "secondary" : "soft"}
+                          onClick={() => {
+                            setExpandedBrandId(expanded ? null : brand.id);
+                          }}
+                          ariaPressed={expanded}
+                          className="w-full sm:w-auto"
+                        >
+                          {expanded ? "요청 닫기" : "플랜 선택"}
+                        </Button>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {upgradeOptions.map((definition) => (
                           <span

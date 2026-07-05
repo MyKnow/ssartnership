@@ -19,7 +19,7 @@ type ResetPasswordVerifyResult =
   | {
       ok: true;
       verified: true;
-      completionToken: string;
+      resetPath: string;
       mmUsername: string;
       authTime: number;
     }
@@ -135,7 +135,7 @@ export default function ResetPasswordForm() {
       return;
     }
 
-    if (!result.completionToken) {
+    if (!result.resetPath) {
       setStatus("failed");
       setError({
         ok: false,
@@ -145,9 +145,7 @@ export default function ResetPasswordForm() {
       return;
     }
 
-    window.location.replace(
-      `/auth/reset/complete?token=${encodeURIComponent(result.completionToken)}`,
-    );
+    window.location.replace(result.resetPath);
   }
 
   return (

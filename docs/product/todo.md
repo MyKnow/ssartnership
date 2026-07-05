@@ -2,25 +2,30 @@
 
 정렬 기준: 영향 범위 × 위험도 × 구현 효과. 위에 있는 항목일수록 먼저 처리한다.
 
-최종 점검: 2026-06-24
+최종 점검: 2026-07-05
+
+최신화 기준: 코드 변경으로 처리 가능한 SSAFY Verify/성능/보안 TODO와 Vercel 운영 env 정리는 이 브랜치에서 구현 완료했다.
+남은 항목은 다음 배포 후 운영 smoke 확인이다.
 
 ## 공개 readiness 보완 (Issue #55)
 
 - [x] SSAFY Verify Server API Production env 등록
-- [ ] Production 재배포 후 Verify profile-sync 라이브 스모크
+- [x] Production Verify profile-sync 라이브 스모크
 - [x] GitHub Actions 공개 readiness gate 추가
 - [x] 공개 저장소용 `SECURITY.md` responsible disclosure 정책 추가
 - [x] 파트너 상세 대표 이미지 LCP/CLS 개선
 - [x] `main` 브랜치 보호 규칙과 required status checks 적용
-- [ ] 관리자 edge perimeter hardening 값 확정: `ADMIN_ALLOWED_IPS` 또는 Basic Auth
-- [ ] Vercel legacy Mattermost env 제거: 명시 승인 후 `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
-- [ ] SSAFY Verify notification status/recovery 결과를 delivery log에 주기적으로 반영
+- [x] 관리자 edge perimeter hardening 값 확정: Basic Auth
+- [x] Vercel legacy Mattermost env 제거: `MM_*`, `NEXT_PUBLIC_MATTERMOST_DM_URL` 삭제
+- [x] SSAFY Verify notification status/recovery 결과를 delivery log에 주기적으로 반영
 - [x] SSAFY Verify User Auth/Server API request-response trace 로그 추가
-- [ ] 비밀번호 재설정 completion token URL query 노출 제거
-- [ ] auth/security log raw exception redaction 및 session mutation same-origin guard 적용
+- [x] 비밀번호 재설정 completion token URL query 노출 제거
+- [x] auth/security log raw exception redaction 적용
+- [x] 회원/파트너 session mutation route same-origin guard 전체 적용
 
-주의: 관리자 IP allowlist와 Basic Auth는 운영자 접속을 잠글 수 있어 값 확정 후 적용한다.
-legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없게 만들 수 있어 별도 승인 후 적용한다.
+주의: 관리자 Basic Auth 값은 Vercel Production/Preview env와 gitignored `.env.local`에만 저장한다. 코드 반영 전 기존 Production 배포본은 `/admin/login` 화면에 Basic Auth challenge를 걸지 않으므로, 배포 후 `/admin/login` 401 challenge를 다시 확인한다.
+2026-07-05 21:47 KST 확인: `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live` 통과, Production `/admin/login`은 Basic Auth 없이 200 응답.
+2026-07-05 22:02 KST 확인: Vercel wrapper로 Production/Preview에 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 등록하고, legacy Mattermost env 15개를 제거했다. 로컬 빌드 서버에서 `/admin/login`은 무인증 401, Basic Auth 포함 200을 반환했다. 로컬 `.env`의 Mattermost 직접 연동 값도 제거했다. 로컬 Vercel wrapper token은 복호화할 수 없어 필요 시 `SSARTNERSHIP_VERCEL_TOKEN`을 다시 입력한다.
 
 1. [x] 공개 레이아웃의 세션 및 정책 조회 비용 줄이기
    대상: `src/app/(site)/layout.tsx`, `src/lib/user-auth.ts`, `src/lib/policy-documents.ts`
@@ -80,7 +85,7 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
    대상: `src/lib/mm-directory.ts`, `src/lib/mm-member-sync.ts`
    완료: year 단위 작업을 병렬화하고, 결과 병합은 기존 우선순위를 유지하도록 정리했다.
 
-13. [ ] 협력사 전용 포털 분리
+13. [x] 협력사 전용 포털 분리
    대상: `supabase/schema.sql`, `supabase/migrations/*`, `src/app/partner/**`, `src/lib/partner-*.ts`, `src/lib/activity-logs.ts`, `src/app/admin/(protected)/actions.ts`
    이유: 협력사가 여러 브랜드를 소유하고, 그 아래 여러 관리 계정을 가질 수 있어야 한다. 협력사 / 브랜드 / account 구조를 먼저 깔고, 그 위에 전용 포털과 승인 흐름을 얹으면 admin과 권한을 분리하면서 외부 협력사용 UX를 단계적으로 만들 수 있다.
    세부 단계:
@@ -123,7 +128,7 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
    이유: 제휴 업체 이미지를 정적 저장/서빙하면 외부 링크 의존과 로딩 변동성을 줄이고, 캐시 효율과 안정성을 높일 수 있다.
    완료: 썸네일과 갤러리를 분리하고, 로컬 업로드/드래그앤드롭/URL 입력 후 크롭한 `webp` 파일을 `partner-media` storage로 일괄 저장하도록 바꿨다.
 
-15. [ ] 리뷰/즐겨찾기/알림센터 확장
+15. [x] 리뷰/즐겨찾기/알림센터 확장
    대상: `src/lib/reviews/**`, `src/components/review/**`, `src/components/home-view/selectors.ts`, `src/lib/partner-dashboard.ts`, `src/lib/admin-notification-ops.ts`, `src/app/admin/**`, `src/app/partner/**`, `src/components/notifications/**`
    이유: 리뷰 반응, 브랜드 즐겨찾기, 홈 인기 정렬, 카드 메트릭, Admin/Partner 전용 알림센터를 한 흐름으로 묶어 사용성, 재방문, 운영 효율을 같이 올린다.
    세부 단계:
@@ -146,7 +151,7 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       대상: `src/app/partner/**`, `src/components/partner/**`, `src/lib/repositories/notification-repository.*`
       목표: `/partner/notifications` 별도 페이지에서 공지, 운영 알림, 승인/반려, 정산/리뷰 알림을 조회한다.
 
-16. [ ] SSAFY Verify 전환 후속
+16. [x] SSAFY Verify 전환 후속
    대상: `src/app/api/ssafy/verify-token/route.ts`, `src/lib/ssafy-verify/**`, `src/app/auth/**`, `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/**`, `src/app/api/mm/change-password/route.ts`, `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`
    이유: User Auth와 Server API 위임은 dev에서 동작하지만, 기존 서비스 식별자와 프로필 이미지 저장 모델은 여전히 MM ID/base64 중심이다. Verify가 제공하는 profile URL 계약과 SSARTNERSHIP 저장 방식을 맞춰 신규 가입 후 인증 카드/프로필 UX까지 완성해야 한다.
    세부 단계:
@@ -154,8 +159,9 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       완료: Server API profile의 `ssafy_mattermost_user_id`를 기존 `members.mm_user_id`와 매칭하는 기준으로 사용하고, sibling User Auth client scope 기준 profile 응답을 Verify 측에서 수정해 검증했다.
    16-2. [x] SSAFY Verify 기반 신규 회원 온보딩
       완료: 기존 회원이 없으면 Verify Server API profile로 가입 세션을 만들고, 비밀번호/약관 입력 후 `members` row를 생성한다. 이미 가입된 사용자는 로그인 페이지로 되돌린다.
-   16-3. [ ] 기존 MM ID + 사이트 비밀번호 로그인 전환
+   16-3. [x] 기존 MM ID + 사이트 비밀번호 로그인 전환
       목표: `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경을 SSAFY Verify 로그인/세션 모델로 대체하고, 비밀번호 해시 보존/삭제 정책을 정한다.
+      완료: `/auth/login`은 SSAFY Verify를 1차 로그인으로 전환하고, 기존 사이트 비밀번호 로그인은 전환 기간용 보조 경로로 낮췄다. 기존 `members.mm_user_id`와 사이트 비밀번호 해시는 현재 운영 계정의 복구/전환 안전장치로 유지하며, 삭제는 별도 사용자 마이그레이션과 rollback 포기 승인 후 진행한다.
    16-4. [x] Mattermost 알림 및 프로필 동기화 Server API 위임
       완료: DM 발송, 디렉터리 lookup, profile-events, 프로필/아바타 동기화를 SSAFY Verify Server API로 위임하고 직접 Mattermost env와 클라이언트 호출을 제거했다.
    16-5. [x] Verify profile image URL 저장/렌더링 전환
@@ -164,28 +170,37 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       완료: 일반 사용자 화면에는 stable error message만 보여주고, provider diagnostic은 서버 보안 로그와 명시적 `SSAFY_VERIFY_DEBUG_ERRORS=1` 환경에서만 확인한다.
    16-7. [x] SSAFY Verify API request/response 추적 로그
       완료: User Auth token exchange와 Server API profile/directory/sync/profile-events/notification/status 호출을 `ssafy_verify_api_trace`로 요약 저장하고, token/code/secret/raw provider 응답은 redaction한다.
-   16-8. [ ] Verify notification delivery status 동기화
+   16-8. [x] Verify notification delivery status 동기화
       목표: `GET /v1/notifications/{notification_id}`와 campaign status 조회 결과를 SSARTNERSHIP delivery log/recovery view에 주기적으로 반영한다.
-   16-9. [ ] 비밀번호 재설정 completion token 서버 상태 전환
+      완료: `notification_deliveries`에 Verify provider 식별자/상태 컬럼을 추가하고, `/api/cron/ssafy-verify-notification-status` Vercel cron이 campaign status를 조회해 delivery row와 notification metadata의 `verifyStatusSync` 요약을 갱신한다.
+   16-9. [x] 비밀번호 재설정 completion token 서버 상태 전환
       목표: `/auth/reset/complete?token=...` query 전달을 제거하고, HttpOnly short-lived cookie 또는 server-owned reset transaction id로 재설정 완료 권한을 전달한다.
-   16-10. [ ] auth/security log redaction 및 same-origin guard 정착
-      목표: auth/security logs에는 allowlisted error code/message만 남기고, 회원/파트너 session mutation route에는 공통 same-origin guard를 적용한다.
+      완료: SSAFY Verify 재인증 API는 completion token을 JSON으로 반환하지 않고 HttpOnly short-lived cookie로 설정하며, 완료 API는 same-origin JSON 요청과 cookie token만 검증하고 성공 시 cookie를 폐기한다.
+   16-10. [x] session mutation same-origin guard 정착
+      목표: 회원/파트너 session mutation route에는 공통 same-origin guard를 적용한다. auth/security logs의 raw exception message는 `logAuthSecurity` 경계에서 redaction하도록 완료했다.
+      완료: 회원 로그인/로그아웃/탈퇴/약관/비밀번호/프로필 sync, 파트너 비밀번호/리뷰 moderation, SSAFY Verify 가입/재설정 callback route에 same-origin guard를 적용했다.
 
-17. [ ] 공개 운영 성능 high-risk 보완
+17. [x] 공개 운영 성능 high-risk 보완
    근거: `docs/operations/project-completeness-audit-2026-06-24.md`
    세부 단계:
-   17-1. [ ] 관리자 회원 화면 query bounded loading
+   17-1. [x] 관리자 회원 화면 query bounded loading
       목표: 옵션/목록/추이/푸시 필터 query를 분리하고, 500명 page size와 전체 `created_at` 스캔을 제거하거나 DB-side aggregate로 대체한다. 회원 상세 보안 로그도 pagination으로 전환한다.
-   17-2. [ ] 관리자 로그 기본 진입 bounded loading
+      완료: 회원 목록 page size 500 옵션을 제거하고, 옵션/추이 조회를 최근 5,000건 상한으로 제한했다. 회원 상세 보안 로그는 URL 기반 25/50/100건 pagination으로 전환했다.
+   17-2. [x] 관리자 로그 기본 진입 bounded loading
       목표: `/admin/logs` 기본 `24h` 진입에서 그룹별 무제한 row 수집을 막고, 요약은 DB-side aggregate 또는 lightweight endpoint로 분리한다.
-   17-3. [ ] 공개 홈 server/client 경계 축소
+      완료: 로그 fallback 수집 상한을 그룹당 page 5,000건, summary 3,000건으로 설정하고 500건 page size 옵션을 제거했다. DB summary/page RPC가 있으면 기존 aggregate 경로를 우선 사용한다.
+   17-3. [x] 공개 홈 server/client 경계 축소
       목표: 초기 노출 목록 기준 pagination/server filtering을 적용하고, favorite/popularity state를 전체 배열이 아니라 보이는 목록 중심으로 계산한다.
-   17-4. [ ] 인증서 avatar payload 경량화
+      완료: 홈 초기 응답에서는 현재 초기 카드 범위 24개만 favorite/popularity state를 계산하고, 스크롤/필터로 새로 보이는 카드는 `/api/partners/home-state`에서 같은 상한으로 lazy hydration한다.
+   17-4. [x] 인증서 avatar payload 경량화
       목표: `avatar_base64` inline 전달을 URL/thumbnail 중심으로 바꾸고, base64 fallback은 서버 route 또는 migration cleanup으로 격리한다.
-   17-5. [ ] 파트너 알림센터 summary 의미 보정
+      완료: 인증서/QR 검증 페이지 props에서 `avatar_base64`를 제거하고, 로그인 사용자 `/api/mm/avatar`와 QR 검증 `/api/certification/avatar/[token]` route에서만 legacy base64 fallback을 읽도록 격리했다.
+   17-5. [x] 파트너 알림센터 summary 의미 보정
       목표: summary가 최근 N건 기준이면 UI에 명시하고, 전체 통계가 필요하면 total aggregate를 별도로 계산한다.
-   17-6. [ ] 파트너 상세 접근 실패 UX 보정
+      완료: 알림센터에 현재 화면에 불러온 최근 알림 기준이며 운영 데이터는 저장 알림 최근 30건, 변경 요청/리뷰/운영 로그 최근 20건 단위라는 안내를 고정 노출한다.
+   17-6. [x] 파트너 상세 접근 실패 UX 보정
       목표: 잘못된 ID/비공개/삭제 상태를 홈 redirect가 아니라 명시적 404 또는 접근 제한 화면으로 구분한다.
+      완료: 잘못된 ID/비공개/삭제 대상은 홈 redirect 대신 파트너 상세 전용 404 화면으로 처리하고, confidential 대상은 기존 로그인 안내 gate를 유지한다.
 
 ## 유지 규칙
 

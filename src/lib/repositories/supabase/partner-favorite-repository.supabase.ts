@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { fetchPartnerFavoriteCounts } from "@/lib/partner-counts";
 import type { PartnerFavoriteRepository } from "@/lib/repositories/partner-favorite-repository";
+import { isUuid, normalizeUuidList } from "@/lib/uuid";
 
 type PartnerFavoriteRow = {
   partner_id: string;
@@ -8,7 +9,7 @@ type PartnerFavoriteRow = {
 };
 
 function normalizeIds(ids: string[]) {
-  return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  return normalizeUuidList(ids);
 }
 
 export class SupabasePartnerFavoriteRepository
@@ -34,6 +35,10 @@ export class SupabasePartnerFavoriteRepository
     partnerIds?: string[],
   ): Promise<Set<string>> {
     const normalizedPartnerIds = partnerIds ? normalizeIds(partnerIds) : [];
+    if (!isUuid(memberId) || (partnerIds && normalizedPartnerIds.length === 0)) {
+      return new Set();
+    }
+
     const supabase = getSupabaseAdminClient();
     let query = supabase
       .from("partner_favorites")

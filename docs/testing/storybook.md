@@ -89,6 +89,7 @@ Storybook 자체 검증은 로컬 릴리즈 게이트로 유지합니다.
 - [src/components/admin/AdminLogoutButton.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminLogoutButton.stories.tsx)
 - [src/components/admin/AdminMobileNav.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminMobileNav.stories.tsx)
 - [src/components/admin/AdminShell.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShell.stories.tsx)
+- [src/components/admin/AdminPageStates.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPageStates.stories.tsx)
 - [src/components/admin/AdminPartnerManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPartnerManager.stories.tsx)
 - [src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx)
 - [src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx)
@@ -101,6 +102,99 @@ Storybook 자체 검증은 로컬 릴리즈 게이트로 유지합니다.
 - [src/components/admin/AdminPushManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPushManager.stories.tsx)
 - [src/components/admin/AdminLogsManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminLogsManager.stories.tsx)
 
+### Partner Page States
+
+- [src/components/partner/PartnerCompanySelectionView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner/PartnerCompanySelectionView.stories.tsx)
+- [src/components/partner/PartnerDashboardView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner/PartnerDashboardView.stories.tsx)
+
+## Mock Scenario Registry
+
+Mock 전략은 Repository/service mock을 폐기하지 않고, 그 위에 시나리오 레지스트리를 얹는 방식으로 운영합니다.
+
+- 시나리오 정의: [src/lib/mock/scenarios/registry.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/registry.ts)
+- Route/View inventory: [src/lib/mock/scenarios/route-inventory.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/route-inventory.ts)
+- Required state policy: [src/lib/mock/scenarios/required-states.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/required-states.ts)
+- Coverage matrix: [src/lib/mock/scenarios/coverage.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/coverage.ts)
+- Storybook scenario traceability: [src/lib/mock/scenarios/storybook-coverage.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/storybook-coverage.ts)
+- Adoption policy: [src/lib/mock/scenarios/adoption-policy.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/adoption-policy.ts)
+- Partner portal story adapter: [src/lib/mock/scenarios/partner-portal.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/partner-portal.ts)
+- Browser-safe Storybook fixture: [src/lib/mock/scenarios/storybook-partner-portal.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/storybook-partner-portal.ts)
+- 검증 테스트: [tests/mock-scenarios.test.mts](/Users/myknow/coding/ssartnership/tests/mock-scenarios.test.mts)
+
+### 현재 Coverage Matrix
+
+현재 상태는 전체 완료가 아니라 foundation coverage입니다.
+
+- App Router `page.tsx` route: 61개
+- 등록된 mock scenario: 45개
+- Storybook scenario story: 14개
+- Storybook complete route: 11개
+- Storybook partial route: 0개
+- Storybook missing route: 17개
+- Route inventory only route: 33개
+
+이 숫자는 [tests/mock-scenarios.test.mts](/Users/myknow/coding/ssartnership/tests/mock-scenarios.test.mts)에서 고정합니다. 새 route나 story가 추가되면 coverage matrix 수치를 함께 갱신해야 합니다.
+
+운영 규칙:
+
+1. 새 화면, 새 데이터 분기, 새 권한 분기, 새 비동기 상태가 생기면 `registry.ts`에 stable scenario id를 추가합니다.
+2. 새 `page.tsx`가 생기면 `route-inventory.ts`에 route, view component, data source, required scenario를 추가합니다.
+3. 새 story가 생기면 `storybook-coverage.ts`에 route, scenario id, story id, viewport를 추가합니다.
+4. Storybook은 모든 route를 그대로 복제하지 않고, View 중심 Page States를 추가합니다.
+5. MSW는 client fetch/API route 상호작용이 필요한 경우에만 도입합니다. 서버 컴포넌트와 Repository mock은 scenario adapter를 우선 사용합니다.
+6. Storybook/test/local mock 데이터는 synthetic only입니다. 이메일은 `.example` 도메인만 사용하고, Supabase Preview/Production 데이터를 캡처 fixture에 섞지 않습니다.
+7. 자동 캡처 스크립트는 Storybook story id와 `parameters.mockScenario.scenarioId`가 안정화된 뒤 연결합니다.
+
+### MSW 도입 기준
+
+현재 기본 전략은 `scenario adapter`입니다. 서버 컴포넌트, Repository mock, service mock, props 기반 View는 별도 네트워크 레이어 없이 Storybook fixture로 표현합니다.
+
+MSW는 다음 조건을 모두 만족할 때만 추가합니다.
+
+- Storybook `play` 또는 browser-mode test에서 `fetch` 상호작용을 실제로 실행한다.
+- `PATCH`, `DELETE`, `더보기`, `미리보기`, `저장`처럼 응답에 따라 UI가 변한다.
+- props fixture만으로는 성공/실패/rollback/pending 상태를 재현하기 어렵다.
+
+단순히 route inventory의 `dataSources`에 `api-route`가 있다는 이유만으로 MSW를 넣지 않습니다. 네트워크 상호작용을 실행하지 않는 알림 수신함, 초기 목록, 읽기 전용 상태는 초기 state fixture를 우선합니다. 이 판단은 [src/lib/mock/scenarios/adoption-policy.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/adoption-policy.ts)의 `getMockScenarioNetworkMockingDecision`으로 고정합니다.
+
+### 관리자 Page States
+
+관리자 화면은 모든 `page.tsx`를 Storybook에 복제하지 않고, 운영 위험도가 높은 route를 우선 Page State로 연결합니다.
+
+- `/admin`: 운영 요약, 빠른 이동, 권한 제한을 확인하는 대시보드 상태
+- `/admin/companies`: 플랜/과금, 계좌이체 입금 확인, 세금계산서 발급 상태
+- `/admin/notifications`: 관리자 수신함, 중요/미확인 알림, 더보기 상태
+- `/admin/partners`, `/admin/partners/[partnerId]`, `/admin/partners/new`: 브랜드 목록과 생성/편집 흐름
+- `/admin/logs`, `/admin/push`, `/admin/reviews`: 기존 도메인 스토리를 route scenario에 연결
+
+관리자 Storybook 상태는 1차 기준으로 `360px / 820px / 1366px`를 고정합니다. 이후 자동 캡처 스크립트 단계에서 전체 viewport 세트(`320/360/390/768/820/1366/1440/1536`)로 확장합니다.
+
+### Required State Policy
+
+모든 route는 최소 `default`, `long-korean`, `mobile-overflow` 상태를 갖습니다. 데이터/권한/폼/이미지/페이지네이션 성격에 따라 `loading`, `error`, `unauthorized`, `validation-error`, `image-gallery`, `broken-image`, `pagination`, `filter`, `locked-metric`, `payment-pending`, `billing-profile` 같은 machine-readable state key가 추가됩니다.
+
+캡처 정책은 다음 viewport를 기준으로 합니다.
+
+- 모바일: 320px, 360px, 390px
+- 태블릿: 768px, 820px
+- 데스크탑: 1366px, 1440px, 1536px
+
+현재 Storybook page-state는 우선 `360px / 820px / 1366px`를 `parameters.chromatic.viewports`로 고정하고, 자동 캡처 스크립트 단계에서 전체 viewport 세트로 확장합니다.
+
+### Adoption Policy
+
+다음 변경은 scenario, Storybook state, coverage matrix 갱신이 필요합니다.
+
+- 새 route 또는 새 View
+- 새 데이터 분기
+- 새 권한 분기
+- 새 비동기 동작
+- 새 폼 검증
+- 새 이미지/업로드 흐름
+- 새 페이지네이션 흐름
+
+문구 변경이나 시각 polish만 있고 새 상태/분기/데이터 계약이 없으면 기존 scenario를 재사용할 수 있습니다.
+
 ## 검증 현황
 
 ### 완료
@@ -111,8 +205,8 @@ Storybook 자체 검증은 로컬 릴리즈 게이트로 유지합니다.
 
 ### 현재 자동 테스트 결과
 
-- `41` files passed
-- `99` tests passed
+- `74` files passed
+- `188` tests passed
 - skipped 없음
 
 ## 현재 상태

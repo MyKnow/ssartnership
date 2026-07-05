@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import {
   getForwardedClientIp,
   hasValidAdminBasicAuth,
+  isAdminEdgeGuardPath,
   isAllowedAdminIp,
   isProtectedAdminPath,
 } from "@/lib/admin-security";
@@ -235,23 +236,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const currentPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
 
-  if (isProtectedAdminPagePath(pathname)) {
-    const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-    const adminPayload = adminToken ? await verifyAdminToken(adminToken) : null;
-    if (adminPayload) {
-      return nextWithRequestUrl(request);
-    }
-
-    const userToken = request.cookies.get(COOKIE_NAME)?.value;
-    const userPayload = userToken ? await verifyToken(userToken) : null;
-    const url = request.nextUrl.clone();
-    url.pathname = userPayload ? "/admin/session" : "/auth/login";
-    url.search = "";
-    url.searchParams.set("returnTo", currentPath);
-    return NextResponse.redirect(url);
-  }
-
-  if (isProtectedAdminPath(pathname)) {
+  if (isAdminEdgeGuardPath(pathname)) {
     const clientIp = getForwardedClientIp(request.headers);
 
     if (!isAllowedAdminIp(clientIp)) {
@@ -275,7 +260,25 @@ export async function proxy(request: NextRequest) {
       });
     }
 
-    return nextWithRequestUrl(request);
+    if (isProtectedAdminPath(pathname)) {
+      return nextWithRequestUrl(request);
+    }
+  }
+
+  if (isProtectedAdminPagePath(pathname)) {
+    const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+    const adminPayload = adminToken ? await verifyAdminToken(adminToken) : null;
+    if (adminPayload) {
+      return nextWithRequestUrl(request);
+    }
+
+    const userToken = request.cookies.get(COOKIE_NAME)?.value;
+    const userPayload = userToken ? await verifyToken(userToken) : null;
+    const url = request.nextUrl.clone();
+    url.pathname = userPayload ? "/admin/session" : "/auth/login";
+    url.search = "";
+    url.searchParams.set("returnTo", currentPath);
+    return NextResponse.redirect(url);
   }
 
   if (
