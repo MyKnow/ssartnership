@@ -287,15 +287,34 @@ function AccountProfileState() {
         minItemWidth="12rem"
         items={[
           { label: "담당자", value: displayName, hint: "모든 협력사 공통 계정" },
-          { label: "로그인 ID", value: loginId, hint: "비밀번호 변경 탭과 연결" },
+          {
+            label: "로그인 ID",
+            value: <span className="text-token">{loginId}</span>,
+            hint: "비밀번호 변경 탭과 연결",
+          },
           { label: "기본 증빙", value: "카페 싸피 본점", hint: "플랜 요청 기본값" },
         ]}
       />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card padding="md" className="grid gap-4">
           <SectionHeading title="저장된 증빙 프로필" description="입금자와 세금계산서 정보를 재사용합니다." />
-          <CompactField label="카페 싸피 본점" tone="primary" value="카페싸피 · 220-81-62517 · tax@cafessafy.example" />
-          <CompactField label="카페 싸피 지점 공통" value="카페싸피 운영팀 · 120-88-00000 · invoice@cafessafy.example" />
+          <CompactField
+            label="카페 싸피 본점"
+            tone="primary"
+            value={
+              <span className="text-token">
+                카페싸피 · 220-81-62517 · tax@cafessafy.example
+              </span>
+            }
+          />
+          <CompactField
+            label="카페 싸피 지점 공통"
+            value={
+              <span className="text-token">
+                카페싸피 운영팀 · 120-88-00000 · invoice@cafessafy.example
+              </span>
+            }
+          />
         </Card>
         <Card padding="md" className="grid gap-4">
           <SectionHeading title="비밀번호 변경" description="현재 비밀번호 확인 후 새 비밀번호를 저장합니다." />
