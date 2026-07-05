@@ -22,12 +22,12 @@ const now = "2026-07-05T09:30:00.000+09:00";
 const notificationData = {
   warningMessage: null,
   summary: {
-    totalCount: 5,
-    requestCount: 2,
-    pendingRequestCount: 1,
+    totalCount: 4,
+    requestCount: 1,
+    pendingRequestCount: 0,
     resolvedRequestCount: 1,
     reviewCount: 1,
-    operationCount: 2,
+    operationCount: 1,
     companyCount: 1,
     serviceCount: 6,
   },
