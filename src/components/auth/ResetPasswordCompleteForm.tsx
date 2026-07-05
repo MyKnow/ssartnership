@@ -7,7 +7,8 @@ import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
-import { copyPasswordToClipboard, generateBrowserPassword, isBrowserPasswordValid } from "@/lib/browser-password";
+import { validateAuthPasswordPairDraft } from "@/lib/auth-form-validation";
+import { copyPasswordToClipboard, generateBrowserPassword } from "@/lib/browser-password";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
 export default function ResetPasswordCompleteForm({
@@ -48,33 +49,19 @@ export default function ResetPasswordCompleteForm({
     if (pending) {
       return;
     }
-    if (!password || !confirmPassword) {
-      setFieldErrors({
-        password: password ? undefined : "새 비밀번호를 입력해 주세요.",
-        confirmPassword: confirmPassword ? undefined : "비밀번호 확인을 입력해 주세요.",
-      });
+    const validation = validateAuthPasswordPairDraft({
+      password,
+      confirmPassword,
+      validatePolicy: true,
+    });
+    if (validation.firstInvalidField) {
+      setFieldErrors(validation.fieldErrors);
       setFormError(null);
-      if (!password) {
+      if (validation.firstInvalidField === "password") {
         focusField(passwordRef);
       } else {
         focusField(confirmPasswordRef);
       }
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setFieldErrors({
-        confirmPassword: "비밀번호가 서로 일치하지 않습니다.",
-      });
-      setFormError(null);
-      focusField(confirmPasswordRef);
-      return;
-    }
-
-    if (!isBrowserPasswordValid(password)) {
-      setFieldErrors({ password: PASSWORD_POLICY_MESSAGE });
-      setFormError(null);
-      focusField(passwordRef);
       return;
     }
 

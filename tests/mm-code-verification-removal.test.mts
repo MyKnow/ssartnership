@@ -22,6 +22,7 @@ test("legacy MM signup verification endpoints are removed", () => {
     "src/app/api/mm/_shared/reset-password.ts",
     "src/app/api/mm/_shared/reset-password-verify.ts",
     "src/app/api/mm/_shared/reset-password-code-store.ts",
+    "src/app/api/mm/session/route.ts",
     "src/lib/verification-code.ts",
   ];
 
@@ -42,6 +43,7 @@ test("MM signup verification storage and secret are no longer documented", () =>
 
 test("SSAFY Verify transition TODOs keep only operator-controlled follow-up items", () => {
   const todo = readFileSync(repoPath("docs/product/todo.md"), "utf8");
+  const maintenanceAudit = readFileSync(repoPath("docs/operations/maintenance-audit.md"), "utf8");
 
   assert.match(todo, /SSAFY Verify 전환 후속/);
   assert.match(todo, /members\.mm_user_id/);
@@ -49,4 +51,5 @@ test("SSAFY Verify transition TODOs keep only operator-controlled follow-up item
   assert.match(todo, /SSAFY Verify를 1차 로그인/);
   assert.match(todo, /기존 사이트 비밀번호 로그인은 전환 기간용 보조 경로/);
   assert.doesNotMatch(todo, /16-3\. \[ \]/);
+  assert.doesNotMatch(maintenanceAudit, /\/api\/mm\/session lookup/);
 });

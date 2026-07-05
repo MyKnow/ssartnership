@@ -6,6 +6,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
+import { validateAuthPasswordChangeDraft } from "@/lib/auth-form-validation";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
@@ -31,13 +32,18 @@ export default function ChangePasswordForm({
       return;
     }
 
-    if (!current || !nextPassword) {
+    const validation = validateAuthPasswordChangeDraft({
+      currentPassword: current,
+      nextPassword,
+      validatePolicy: true,
+    });
+    if (validation.firstInvalidField) {
       setFieldErrors({
-        current: current ? undefined : "현재 비밀번호를 입력해 주세요.",
-        nextPassword: nextPassword ? undefined : "새 비밀번호를 입력해 주세요.",
+        current: validation.fieldErrors.currentPassword,
+        nextPassword: validation.fieldErrors.nextPassword,
       });
       setFormError(null);
-      focusField(current ? nextRef : currentRef);
+      focusField(validation.firstInvalidField === "currentPassword" ? currentRef : nextRef);
       return;
     }
 

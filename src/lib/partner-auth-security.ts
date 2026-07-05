@@ -1,6 +1,9 @@
 import { randomInt } from "node:crypto";
 import {
+  buildScopedRateLimitKey,
   getBlockingState,
+  getRateLimitAttemptScope,
+  getScopedRateLimitKeys,
   recordAttemptBatch,
 } from "@/lib/rate-limit";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
@@ -28,27 +31,21 @@ export function buildPartnerAuthAttemptKey(
   scope: "ip" | "account",
   value: string,
 ) {
-  return `${route}:${scope}:${normalizePartnerLoginId(value)}`;
+  return buildScopedRateLimitKey(route, scope, value, normalizePartnerLoginId);
 }
 
 export function getPartnerAuthAttemptKeys(
   route: PartnerAuthRoute,
   context: PartnerAuthRateLimitContext,
 ) {
-  const keys = [
-    context.ipAddress
-      ? buildPartnerAuthAttemptKey(route, "ip", context.ipAddress)
-      : null,
-    context.accountIdentifier
-      ? buildPartnerAuthAttemptKey(route, "account", context.accountIdentifier)
-      : null,
-  ];
-
-  return [...new Set(keys.filter((key): key is string => Boolean(key)))];
+  return getScopedRateLimitKeys(route, {
+    ...context,
+    normalize: normalizePartnerLoginId,
+  });
 }
 
 export function getPartnerAuthAttemptScope(identifier: string) {
-  return identifier.includes(":account:") ? "account" : "ip";
+  return getRateLimitAttemptScope(identifier);
 }
 
 export async function getPartnerAuthBlockingState(

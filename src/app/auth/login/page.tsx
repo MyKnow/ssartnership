@@ -50,7 +50,10 @@ export default async function LoginPage({
               </p>
               <SsafyVerifyButton returnTo={returnTo} />
             </div>
-            <details className="mt-5 rounded-2xl border border-border bg-surface-muted/60">
+            <details
+              suppressHydrationWarning
+              className="mt-5 rounded-2xl border border-border bg-surface-muted/60"
+            >
               <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 outline-none transition hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-foreground">

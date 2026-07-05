@@ -36,7 +36,6 @@ export const authSmokeRoutes: SmokeRoute[] = [
     path: "/partner/setup/mock-partner-setup-cafe-ssafy",
     expected: /카페\s*싸피|초기 설정/,
   },
-  { path: "/admin/login", expected: /로그인/ },
 ];
 
 export const memberProtectedRoutes: RedirectRoute[] = [
@@ -83,4 +82,9 @@ export const adminProtectedRoutes: RedirectRoute[] = [
   { path: "/admin/promotions", expectedPath: "/auth/login" },
   { path: "/admin/push", expectedPath: "/auth/login" },
   { path: "/admin/reviews", expectedPath: "/auth/login" },
+];
+
+export const adminGuardRoutes = [
+  { path: "/admin/login" },
+  ...adminProtectedRoutes.map((route) => ({ path: route.path })),
 ];

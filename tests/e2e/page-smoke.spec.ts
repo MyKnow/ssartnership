@@ -1,6 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import {
-  adminProtectedRoutes,
+  adminGuardRoutes,
   authSmokeRoutes,
   memberProtectedRoutes,
   partnerProtectedRoutes,
@@ -30,10 +30,17 @@ test.describe("page smoke coverage", () => {
     for (const route of [
       ...memberProtectedRoutes,
       ...partnerProtectedRoutes,
-      ...adminProtectedRoutes,
     ]) {
       test(`redirects ${route.path}`, async ({ page }) => {
         await visitRedirectRoute(page, route);
+      });
+    }
+  });
+
+  test.describe("admin edge guard", () => {
+    for (const route of adminGuardRoutes) {
+      test(`guards ${route.path}`, async ({ request }) => {
+        await visitAdminGuardRoute(request, route);
       });
     }
   });
@@ -55,4 +62,32 @@ async function visitRedirectRoute(page: Page, route: RedirectRoute) {
     new RegExp(`${route.expectedPath.replaceAll("/", "\\/")}`),
   );
   await expectNoNextError(page);
+}
+
+async function visitAdminGuardRoute(
+  request: APIRequestContext,
+  route: { path: string },
+) {
+  const response = await request.get(route.path, { maxRedirects: 0 });
+  const status = response.status();
+
+  expect(status, route.path).toBeLessThan(500);
+  if (status === 401) {
+    expect(
+      response.headers()["www-authenticate"] ?? "",
+      route.path,
+    ).toContain('Basic realm="Admin Area"');
+    return;
+  }
+
+  if (route.path === "/admin/login") {
+    const body = await response.text();
+    expect(body, route.path).toMatch(/로그인/);
+    return;
+  }
+
+  expect([302, 303, 307, 308], route.path).toContain(status);
+  expect(response.headers().location ?? "", route.path).toMatch(
+    /\/admin\/login|\/auth\/login/,
+  );
 }

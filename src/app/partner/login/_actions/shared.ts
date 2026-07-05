@@ -38,6 +38,26 @@ export function getLoginErrorMessage(errorCode: string | undefined) {
   }
 }
 
+export function getPartnerLoginFieldErrors(errorCode: string | undefined): {
+  loginId?: string;
+  password?: string;
+} {
+  const passwordField = "password";
+  switch (errorCode) {
+    case "invalid_request":
+      return {
+        loginId: "담당자 이메일을 입력해 주세요.",
+        [passwordField]: "비밀번호를 입력해 주세요.",
+      };
+    case "invalid_email":
+      return {
+        loginId: "이메일 형식이 올바르지 않습니다.",
+      };
+    default:
+      return {};
+  }
+}
+
 export function buildPartnerLoginErrorRedirect(
   errorCode: string,
   loginId?: string | null,

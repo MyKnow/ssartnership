@@ -8,6 +8,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
+import { validateAuthPasswordPairDraft } from "@/lib/auth-form-validation";
 import type { PartnerPortalSetupContext } from "@/lib/partner-portal";
 import {
   getPartnerPortalSetupErrorMessage,
@@ -60,13 +61,15 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
     if (pending || isLocked) {
       return;
     }
-    if (!password || !confirmPassword) {
-      setFieldErrors({
-        password: password ? undefined : "새 비밀번호를 입력해 주세요.",
-        confirmPassword: confirmPassword ? undefined : "비밀번호 확인을 입력해 주세요.",
-      });
+    const validation = validateAuthPasswordPairDraft({
+      password,
+      confirmPassword,
+      validatePolicy: true,
+    });
+    if (validation.firstInvalidField) {
+      setFieldErrors(validation.fieldErrors);
       setFormError(null);
-      if (!password) {
+      if (validation.firstInvalidField === "password") {
         focusField(passwordRef);
       } else {
         focusField(confirmPasswordRef);

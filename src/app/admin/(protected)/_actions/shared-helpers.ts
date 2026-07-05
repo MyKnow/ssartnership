@@ -1,6 +1,11 @@
 import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "../../../../lib/activity-logs.ts";
+import {
+  buildAdminMutationAuditProperties,
+  type AdminMutationAuditOutcome,
+} from "@/lib/admin-mutation-audit";
 
 export async function logAdminAction(
   action: Parameters<typeof logAdminAudit>[0]["action"],
@@ -8,6 +13,8 @@ export async function logAdminAction(
     targetType?: string | null;
     targetId?: string | null;
     properties?: Record<string, unknown> | null;
+    outcome?: AdminMutationAuditOutcome;
+    reason?: string | null;
   },
 ) {
   const context = await getServerActionLogContext("/admin");
@@ -16,7 +23,31 @@ export async function logAdminAction(
     action,
     targetType: input?.targetType ?? null,
     targetId: input?.targetId ?? null,
-    properties: input?.properties ?? {},
+    properties: buildAdminMutationAuditProperties({
+      outcome: input?.outcome ?? "success",
+      reason: input?.reason,
+      properties: input?.properties ?? {},
+    }),
+  });
+}
+
+export function scheduleAdminActionFailureLog(
+  action: Parameters<typeof logAdminAudit>[0]["action"],
+  input?: {
+    targetType?: string | null;
+    targetId?: string | null;
+    reason?: string | null;
+    properties?: Record<string, unknown> | null;
+  },
+) {
+  after(async () => {
+    await logAdminAction(action, {
+      targetType: input?.targetType,
+      targetId: input?.targetId,
+      outcome: "failure",
+      reason: input?.reason,
+      properties: input?.properties,
+    });
   });
 }
 
@@ -90,7 +121,24 @@ export function revalidateCyclePaths() {
   revalidatePath("/certification");
 }
 
-export function redirectAdminActionError(path: string, code: string): never {
+export function redirectAdminActionError(
+  path: string,
+  code: string,
+  audit?: {
+    action: Parameters<typeof logAdminAudit>[0]["action"];
+    targetType?: string | null;
+    targetId?: string | null;
+    properties?: Record<string, unknown> | null;
+  },
+): never {
+  if (audit) {
+    scheduleAdminActionFailureLog(audit.action, {
+      targetType: audit.targetType,
+      targetId: audit.targetId,
+      reason: code,
+      properties: audit.properties,
+    });
+  }
   const separator = path.includes("?") ? "&" : "?";
   redirect(`${path}${separator}error=${encodeURIComponent(code)}`);
 }

@@ -9,10 +9,12 @@ import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import SubmitButton from "@/components/ui/SubmitButton";
 import PartnerLoginSetupToast from "@/components/partner/PartnerLoginSetupToast";
+import { getFieldErrorClass } from "@/components/ui/form-field-state";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { loginAction } from "./_actions/login";
 import {
+  getPartnerLoginFieldErrors,
   getLoginErrorMessage,
   readSearchParam,
   type PartnerLoginSearchParams,
@@ -41,6 +43,9 @@ export default async function PartnerLoginPage({
   const defaultLoginId = readSearchParam(params.loginId);
   const setupStatus = readSearchParam(params.setup);
   const errorMessage = getLoginErrorMessage(errorCode);
+  const fieldErrors = getPartnerLoginFieldErrors(errorCode);
+  const formErrorMessage =
+    fieldErrors.loginId || fieldErrors.password ? null : errorMessage;
 
   return (
     <div className="bg-background">
@@ -94,7 +99,12 @@ export default async function PartnerLoginPage({
                   placeholder="partner@example.com"
                   autoComplete="email"
                   required
+                  aria-invalid={Boolean(fieldErrors.loginId) || undefined}
+                  className={getFieldErrorClass(Boolean(fieldErrors.loginId))}
                 />
+                {fieldErrors.loginId ? (
+                  <FormMessage variant="error">{fieldErrors.loginId}</FormMessage>
+                ) : null}
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
@@ -104,15 +114,20 @@ export default async function PartnerLoginPage({
                   placeholder="초기 설정 후 받은 비밀번호"
                   autoComplete="current-password"
                   required
+                  aria-invalid={Boolean(fieldErrors.password) || undefined}
+                  className={getFieldErrorClass(Boolean(fieldErrors.password))}
                 />
+                {fieldErrors.password ? (
+                  <FormMessage variant="error">{fieldErrors.password}</FormMessage>
+                ) : null}
               </label>
 
               <FormMessage>
                 초기 설정이 끝난 계정만 로그인할 수 있습니다.<br />아직 설정하지
                 않았다면 받은 초기 설정 링크를 먼저 열어 주세요.
               </FormMessage>
-              {errorMessage ? (
-                <FormMessage variant="error">{errorMessage}</FormMessage>
+              {formErrorMessage ? (
+                <FormMessage variant="error">{formErrorMessage}</FormMessage>
               ) : null}
 
               <div className="flex flex-wrap items-center gap-3">

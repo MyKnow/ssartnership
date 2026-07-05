@@ -18,6 +18,10 @@ import {
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { getSignedUserSession } from '@/lib/user-auth';
 import { getPartnerSession } from '@/lib/partner-session';
+import {
+  sanitizeProductEventTargetId,
+  shouldRunPartnerMetricFallback,
+} from '@/lib/activity-log-targets';
 
 type HeaderSource = {
   get(name: string): string | null;
@@ -207,6 +211,7 @@ export async function resolveCurrentActor(): Promise<{
 }
 
 export async function logProductEvent(input: ProductLogInput) {
+  const targetId = sanitizeProductEventTargetId(input.targetType, input.targetId);
   const inserted = await insertLog('event_logs', {
     session_id: input.sessionId ?? null,
     actor_type: input.actorType,
@@ -215,17 +220,17 @@ export async function logProductEvent(input: ProductLogInput) {
     path: normalizeProductEventLocation(input.path ?? null),
     referrer: normalizeProductEventLocation(input.referrer ?? null),
     target_type: input.targetType ?? null,
-    target_id: input.targetId ?? null,
+    target_id: targetId,
     properties: sanitizeProperties(input.properties),
     user_agent: input.userAgent ?? null,
     ip_address: input.ipAddress ?? null,
   });
 
   if (!inserted) {
-    if (input.targetType === "partner" && input.targetId) {
+    if (shouldRunPartnerMetricFallback(input.targetType, targetId)) {
       try {
         await upsertPartnerMetricRollupsFromEventInput({
-          partnerId: input.targetId,
+          partnerId: targetId as string,
           eventName: input.eventName as PartnerMetricEventName,
           actorType: input.actorType,
           actorId: input.actorId ?? null,

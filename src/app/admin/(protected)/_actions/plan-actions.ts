@@ -73,6 +73,12 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
       error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      {
+        action: "partner_brand_plan_update",
+        targetType: "partner_brand",
+        targetId: getString(formData, "partnerId") || null,
+        properties: { stage: "parse" },
+      },
     );
   }
 
@@ -85,6 +91,12 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
       error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      {
+        action: "partner_brand_plan_update",
+        targetType: "partner_brand",
+        targetId: payload.partnerId,
+        properties: { stage: "service" },
+      },
     );
   }
 
@@ -115,7 +127,11 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
   });
   const requestId = getString(formData, "requestId");
   if (!requestId) {
-    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request");
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request", {
+      action: "partner_plan_bank_transfer_confirmed",
+      targetType: "partner_plan_upgrade_request",
+      properties: { stage: "parse" },
+    });
   }
 
   let taxDocumentStatus: "pending_issue" | "issued";
@@ -125,6 +141,12 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
       error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      {
+        action: "partner_plan_bank_transfer_confirmed",
+        targetType: "partner_plan_upgrade_request",
+        targetId: requestId,
+        properties: { stage: "tax_document_status" },
+      },
     );
   }
 
@@ -138,6 +160,12 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
       error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      {
+        action: "partner_plan_bank_transfer_confirmed",
+        targetType: "partner_plan_upgrade_request",
+        targetId: requestId,
+        properties: { stage: "service", taxDocumentStatus },
+      },
     );
   }
 
@@ -162,7 +190,11 @@ async function reviewPartnerPlanRequestAction(
   });
   const requestId = getString(formData, "requestId");
   if (!requestId) {
-    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request");
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request", {
+      action: `partner_plan_upgrade_${nextStatus}`,
+      targetType: "partner_plan_upgrade_request",
+      properties: { stage: "parse" },
+    });
   }
   try {
     await reviewPartnerPlanUpgradeRequest({
@@ -180,7 +212,12 @@ async function reviewPartnerPlanRequestAction(
         : error instanceof Error
           ? error.message
           : "partner_company_plan_invalid_request";
-    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, message);
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, message, {
+      action: `partner_plan_upgrade_${nextStatus}`,
+      targetType: "partner_plan_upgrade_request",
+      targetId: requestId,
+      properties: { stage: "service", status: nextStatus },
+    });
   }
 
   await logAdminAction(`partner_plan_upgrade_${nextStatus}`, {

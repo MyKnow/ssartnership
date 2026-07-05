@@ -211,6 +211,38 @@ test("same-origin request guard requires matching origin or trusted referrer", a
     ),
     false,
   );
+  assert.equal(
+    isTrustedSameOriginRequest(
+      new Request("http://127.0.0.1:3100/api/partner/setup/demo", {
+        method: "POST",
+        headers: {
+          origin: "http://127.0.0.1:3100",
+          "content-type": "application/json",
+        },
+      }),
+      {
+        expectedOrigin: "http://localhost:3100",
+        allowedContentTypes: ["application/json"],
+      },
+    ),
+    true,
+  );
+  assert.equal(
+    isTrustedSameOriginRequest(
+      new Request("http://127.0.0.1:3100/api/partner/setup/demo", {
+        method: "POST",
+        headers: {
+          origin: "http://127.0.0.1:3100",
+          "content-type": "application/json",
+        },
+      }),
+      {
+        expectedOrigin: "http://localhost:3101",
+        allowedContentTypes: ["application/json"],
+      },
+    ),
+    false,
+  );
 });
 
 test("admin edge guard covers admin pages and admin APIs", async () => {

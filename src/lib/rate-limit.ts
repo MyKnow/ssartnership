@@ -7,12 +7,71 @@ type AttemptState = {
   blockedUntil?: string | null;
 };
 
-type RateLimitConfig = {
+export type RateLimitConfig = {
   table: string;
   windowMs: number;
   maxAttempts: number;
   blockMs: number;
 };
+
+export type RateLimitAttemptScope = "ip" | "account";
+
+export function buildScopedRateLimitKey(
+  route: string,
+  scope: RateLimitAttemptScope,
+  value: string,
+  normalize: (value: string) => string = (input) => input.trim().toLowerCase(),
+) {
+  return `${route}:${scope}:${normalize(value)}`;
+}
+
+export function getScopedRateLimitKeys(
+  route: string,
+  {
+    ipAddress,
+    accountIdentifier,
+    normalize,
+  }: {
+    ipAddress?: string | null;
+    accountIdentifier?: string | null;
+    normalize?: (value: string) => string;
+  },
+) {
+  const keys = [
+    ipAddress
+      ? buildScopedRateLimitKey(route, "ip", ipAddress, normalize)
+      : null,
+    accountIdentifier
+      ? buildScopedRateLimitKey(route, "account", accountIdentifier, normalize)
+      : null,
+  ];
+
+  return [...new Set(keys.filter((key): key is string => Boolean(key)))];
+}
+
+export function getRateLimitAttemptScope(identifier: string): RateLimitAttemptScope {
+  return identifier.includes(":account:") ? "account" : "ip";
+}
+
+export function getScopedRateLimitCleanupKeys(
+  identifiers: Array<string | null | undefined>,
+  routes: readonly string[],
+  normalize: (value: string) => string = (input) => input.trim().toLowerCase(),
+) {
+  const uniqueIdentifiers = [
+    ...new Set(
+      identifiers
+        .filter((identifier): identifier is string => Boolean(identifier))
+        .map(normalize),
+    ),
+  ];
+
+  return uniqueIdentifiers.flatMap((identifier) =>
+    routes.map((route) =>
+      buildScopedRateLimitKey(route, "account", identifier, (value) => value),
+    ),
+  );
+}
 
 const ADMIN_RATE_LIMIT: RateLimitConfig = {
   table: "admin_login_attempts",

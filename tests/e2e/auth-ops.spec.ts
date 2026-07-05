@@ -1,0 +1,57 @@
+import { expect, test } from "@playwright/test";
+
+test.describe("auth and partner portal operation flows", () => {
+  test("member login shows field-level validation before submitting", async ({ page }) => {
+    await page.goto("/auth/login");
+
+    await page.getByText("기존 사이트 비밀번호로 로그인").click();
+    await page.getByRole("button", { name: "기존 비밀번호로 로그인" }).click();
+
+    await expect(page.getByText("아이디를 입력해 주세요.")).toBeVisible();
+    await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();
+  });
+
+  test("partner login maps safe server validation errors to fields", async ({ page }) => {
+    await page.goto("/partner/login?error=invalid_request");
+
+    await expect(page.getByText("담당자 이메일을 입력해 주세요.")).toBeVisible();
+    await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();
+  });
+
+  test("partner login maps invalid email errors to the email field only", async ({ page }) => {
+    await page.goto("/partner/login?error=invalid_email");
+
+    await expect(page.getByText("이메일 형식이 올바르지 않습니다.")).toBeVisible();
+    await expect(page.getByText("비밀번호를 입력해 주세요.")).toHaveCount(0);
+  });
+
+  test("partner setup then login reaches the scoped company selection flow", async ({ page }) => {
+    await page.goto("/partner/setup/mock-partner-setup-cafe-ssafy");
+
+    await page.getByPlaceholder("영문/숫자/특수문자 포함 8자 이상").fill("Partner!123");
+    await page.getByPlaceholder("다시 입력해 주세요").fill("Partner!123");
+    const setupResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/partner/setup/mock-partner-setup-cafe-ssafy") &&
+        response.request().method() === "POST",
+    );
+
+    await page.getByRole("button", { name: "초기 설정 완료" }).click();
+    const setupResult = await setupResponse;
+    expect(setupResult.ok()).toBe(true);
+
+    await expect(page).toHaveURL(/\/partner\/login(?:\?setup=completed)?$/);
+
+    await page.getByLabel("담당자 이메일").fill("partner@cafessafy.example");
+    await page.getByPlaceholder("초기 설정 후 받은 비밀번호").fill("Partner!123");
+    await page.getByRole("button", { name: "로그인" }).click();
+
+    await expect(page).toHaveURL(/\/partner/);
+    await expect(page.getByRole("heading", { name: "협력사 운영 공간" })).toBeVisible();
+  });
+
+  test("legacy mm session endpoint is not exposed", async ({ request }) => {
+    const response = await request.get("/api/mm/session");
+    expect(response.status()).toBe(404);
+  });
+});

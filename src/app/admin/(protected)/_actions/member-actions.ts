@@ -88,13 +88,22 @@ export async function updateMemberAction(formData: FormData) {
     String(formData.get("mustChangePassword") || "false").trim() === "true";
 
   if (!id) {
-    redirectAdminActionError("/admin/members", "member_missing_id");
+    redirectAdminActionError("/admin/members", "member_missing_id", {
+      action: "member_update",
+      targetType: "member",
+      properties: { reason: "missing_id" },
+    });
   }
 
   const yearError = validateMemberYear(yearRaw);
   const year = parseMemberYearValue(yearRaw);
   if (yearError || year === null) {
-    redirectAdminActionError("/admin/members", "member_invalid_year");
+    redirectAdminActionError("/admin/members", "member_invalid_year", {
+      action: "member_update",
+      targetType: "member",
+      targetId: id,
+      properties: { yearRaw },
+    });
   }
 
   const supabase = getSupabaseAdminClient();
@@ -110,7 +119,12 @@ export async function updateMemberAction(formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    redirectAdminActionError("/admin/members", "member_invalid_request");
+    redirectAdminActionError("/admin/members", "member_invalid_request", {
+      action: "member_update",
+      targetType: "member",
+      targetId: id,
+      properties: { errorCode: error.code },
+    });
   }
 
   await logAdminAction("member_update", {
@@ -221,7 +235,11 @@ export async function deleteMemberAction(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
 
   if (!id) {
-    redirectAdminActionError("/admin/members", "member_missing_id");
+    redirectAdminActionError("/admin/members", "member_missing_id", {
+      action: "member_delete",
+      targetType: "member",
+      properties: { reason: "missing_id" },
+    });
   }
 
   const supabase = getSupabaseAdminClient();
@@ -232,10 +250,20 @@ export async function deleteMemberAction(formData: FormData) {
     .maybeSingle();
 
   if (memberError) {
-    redirectAdminActionError("/admin/members", "member_invalid_request");
+    redirectAdminActionError("/admin/members", "member_invalid_request", {
+      action: "member_delete",
+      targetType: "member",
+      targetId: id,
+      properties: { errorCode: memberError.code },
+    });
   }
   if (!member?.mm_user_id && !member?.mm_username) {
-    redirectAdminActionError("/admin/members", "member_missing_id");
+    redirectAdminActionError("/admin/members", "member_missing_id", {
+      action: "member_delete",
+      targetType: "member",
+      targetId: id,
+      properties: { reason: "member_not_found" },
+    });
   }
 
   if (member.mm_user_id) {
@@ -259,7 +287,12 @@ export async function deleteMemberAction(formData: FormData) {
 
   const { error } = await supabase.from("members").delete().eq("id", id);
   if (error) {
-    redirectAdminActionError("/admin/members", "member_invalid_request");
+    redirectAdminActionError("/admin/members", "member_invalid_request", {
+      action: "member_delete",
+      targetType: "member",
+      targetId: id,
+      properties: { errorCode: error.code },
+    });
   }
 
   await logAdminAction("member_delete", {

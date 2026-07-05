@@ -54,12 +54,7 @@ Last updated: 2026-06-24
 
 ## Optional backlog candidates
 
-- Move repeated rate-limit table handling into a reusable repository/helper.
-- Improve auth form UX with inline field-level validation states instead of message-only errors.
-- Add stronger audit logging around admin mutations and auth-sensitive flows.
 - Review remaining client components for possible server/client boundary simplification.
-- Consider moving `/api/mm/session` lookup behind a server-provided header/session model to remove client fetches entirely.
-- Recheck `/admin/login` Basic Auth challenge after the branch with full `/admin` edge guard coverage is deployed.
 
 ## Notes
 

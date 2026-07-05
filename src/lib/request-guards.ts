@@ -21,6 +21,29 @@ function getOriginFromUrl(value: string | null) {
   }
 }
 
+function isLoopbackHostname(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function originsMatch(actualOrigin: string, expectedOrigin: string) {
+  if (actualOrigin === expectedOrigin) {
+    return true;
+  }
+
+  try {
+    const actual = new URL(actualOrigin);
+    const expected = new URL(expectedOrigin);
+    return (
+      actual.protocol === expected.protocol &&
+      actual.port === expected.port &&
+      isLoopbackHostname(actual.hostname) &&
+      isLoopbackHostname(expected.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function isTrustedSameOriginRequest(
   request: SameOriginRequest,
   options: SameOriginOptions = {},
@@ -33,12 +56,12 @@ export function isTrustedSameOriginRequest(
 
   const origin = request.headers.get("origin");
   if (origin) {
-    if (origin !== expectedOrigin) {
+    if (!originsMatch(origin, expectedOrigin)) {
       return false;
     }
   } else {
     const referrerOrigin = getOriginFromUrl(request.headers.get("referer"));
-    if (referrerOrigin !== expectedOrigin) {
+    if (!referrerOrigin || !originsMatch(referrerOrigin, expectedOrigin)) {
       return false;
     }
   }

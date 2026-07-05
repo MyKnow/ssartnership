@@ -11,6 +11,7 @@ import {
   getFieldErrorClass,
 } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
+import { validateAuthPasswordChangeDraft } from "@/lib/auth-form-validation";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 import {
   copyPasswordToClipboard,
@@ -71,15 +72,19 @@ export default function PartnerPasswordChangeForm({
     if (pending) {
       return;
     }
-    if (!currentPassword || !nextPassword) {
-      setFieldErrors({
-        currentPassword: currentPassword
-          ? undefined
-          : "현재 비밀번호를 입력해 주세요.",
-        nextPassword: nextPassword ? undefined : "새 비밀번호를 입력해 주세요.",
-      });
+    const validation = validateAuthPasswordChangeDraft({
+      currentPassword,
+      nextPassword,
+      validatePolicy: true,
+    });
+    if (validation.firstInvalidField) {
+      setFieldErrors(validation.fieldErrors);
       setFormError(null);
-      focusField(currentPassword ? nextPasswordRef : currentPasswordRef);
+      focusField(
+        validation.firstInvalidField === "currentPassword"
+          ? currentPasswordRef
+          : nextPasswordRef,
+      );
       return;
     }
 
