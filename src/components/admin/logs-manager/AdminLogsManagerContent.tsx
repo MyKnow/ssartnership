@@ -72,6 +72,12 @@ export default function AdminLogsManagerContent({
             </FormMessage>
           ) : null}
 
+          {logs.data.partialFailure.any ? (
+            <FormMessage variant="error">
+              일부 로그 페이지 조회가 실패해 결과가 불완전할 수 있습니다. 조회 범위를 좁히거나 잠시 후 다시 시도해 주세요.
+            </FormMessage>
+          ) : null}
+
           {logs.activePreset === 'custom' ? (
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
               <label className="grid gap-2 text-sm font-medium text-foreground">

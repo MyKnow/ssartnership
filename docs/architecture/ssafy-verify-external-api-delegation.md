@@ -1,4 +1,4 @@
-# SSAFY Verify External API Delegation TODO
+# SSAFY Verify External API Delegation Plan
 
 ## 목적
 
@@ -44,7 +44,9 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 - 제공 경로: `GET /v1/notifications/{notification_id}`, `GET /v1/notifications?campaign_id=...`.
 - 요구사항: queued, sent, failed, retrying 등 안정적인 상태 값과 실패 코드 제공.
 
-## 전환 TODO
+## 전환 현황
+
+2026-07-05 기준 코드 전환은 완료했다. 남은 사항은 Production live smoke, Vercel legacy env 제거 여부 확인, Verify template 정책 확정처럼 운영자 또는 외부 서비스 확인이 필요한 항목이다.
 
 - [x] Phase 1: 회원가입/최초 연결 scope와 재인증 scope를 분리한다.
 - [x] Phase 2a: SSAFY Verify Server API client, token cache, safe error mapping, Mattermost ID 정책을 추가한다.
@@ -74,7 +76,7 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 - Verify Mattermost 발송은 `notification_deliveries`에 `provider='ssafy_verify'`, provider campaign/notification/idempotency/status를 저장한다. `/api/cron/ssafy-verify-notification-status`는 `CRON_SECRET` 또는 관리자 세션으로만 실행되며, Vercel cron에서 매일 campaign status를 조회해 delivery row와 notification metadata의 `verifyStatusSync` 요약을 갱신한다.
 - 실제 SSAFY Verify Server API 점검은 `npm run test:ssafy-verify:live`로 분리한다. 기본 테스트와 CI는 외부 API나 Mattermost DM을 호출하지 않고, `SSAFY_VERIFY_LIVE_SMOKE=1`일 때만 directory lookup/profile/sync/profile-events를 호출한다. `SSAFY_VERIFY_SMOKE_SEND_MM=1`을 추가로 설정한 경우에만 `@myknow` lookup 결과의 Mattermost user id로 batch DM smoke test를 발송한다.
 
-## 미결정 사항
+## 운영 확인 사항
 
 - Verify `picture`는 URL 계약으로 확정되었고, SSArtnership은 issuer 기준 absolute URL로 정규화한 뒤 `members.avatar_url`에 저장한다. 기존 `avatar_content_type`/`avatar_base64`는 과거 데이터와 fallback을 위해 유지한다.
 - 사용자 상호작용 없이 주기적 프로필 조회를 허용할 경우 offline grant 또는 server-to-server 권한 모델이 필요하다.

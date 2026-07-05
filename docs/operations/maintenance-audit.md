@@ -47,6 +47,7 @@ Last updated: 2026-06-24
 - Added `members.avatar_url` so Verify `picture` URLs can render on signup, certification cards, and admin member views while older base64 avatars remain supported.
 - Added `ssafy_verify_api_trace` auth/security logs for SSAFY Verify User Auth and Server API request/response summaries with secret redaction.
 - Added SSAFY Verify notification status sync so Verify campaign status/recovery results update `notification_deliveries` and notification metadata through a cron route.
+- Shifted member login UX to SSAFY Verify first, leaving site-password login as a transition fallback until explicit account migration and rollback approval.
 - Confirmed Chromatic/Storybook publish is manual-only while the free quota is exhausted, leaving local Storybook build/test as the release gate.
 - Added the 2026-06-24 project completeness audit under `docs/operations/`.
 

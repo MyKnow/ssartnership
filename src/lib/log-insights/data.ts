@@ -32,7 +32,7 @@ async function queryAllRows<T>(
   endIso: string,
   maxRows: number | null,
   orFilter?: string,
-): Promise<{ rows: T[]; truncated: boolean }> {
+): Promise<{ rows: T[]; truncated: boolean; partialFailure: boolean }> {
   return collectPagedRows<T>(
     maxRows,
     async (from, to) => {
@@ -219,7 +219,7 @@ export async function loadAdminLogRows(
           config.maxRowsPerGroup,
           partnerPortalOnly ? 'path.like./partner%' : undefined,
         )
-      : Promise.resolve({ rows: [] as ProductLogRow[], truncated: false }),
+      : Promise.resolve({ rows: [] as ProductLogRow[], truncated: false, partialFailure: false }),
     selectedGroups.includes('audit')
       ? queryAllRows<AdminAuditLogRow>(
           supabase,
@@ -234,7 +234,7 @@ export async function loadAdminLogRows(
             ? 'action.like.partner_portal_%,path.like./partner%,path.like./api/partner%'
             : undefined,
         )
-      : Promise.resolve({ rows: [] as AdminAuditLogRow[], truncated: false }),
+      : Promise.resolve({ rows: [] as AdminAuditLogRow[], truncated: false, partialFailure: false }),
     selectedGroups.includes('security')
       ? queryAllRows<AuthSecurityLogRow>(
           supabase,
@@ -249,7 +249,7 @@ export async function loadAdminLogRows(
             ? 'event_name.like.partner_%,path.like./partner%,path.like./api/partner%'
             : undefined,
         )
-      : Promise.resolve({ rows: [] as AuthSecurityLogRow[], truncated: false }),
+      : Promise.resolve({ rows: [] as AuthSecurityLogRow[], truncated: false, partialFailure: false }),
   ]);
   const productRows = productResult.rows.map((row) => ({
     ...row,
@@ -305,6 +305,15 @@ export async function loadAdminLogRows(
         auditResult.truncated ||
         securityResult.truncated,
       limitPerGroup: config.maxRowsPerGroup,
+    },
+    partialFailure: {
+      product: productResult.partialFailure,
+      audit: auditResult.partialFailure,
+      security: securityResult.partialFailure,
+      any:
+        productResult.partialFailure ||
+        auditResult.partialFailure ||
+        securityResult.partialFailure,
     },
   };
 }
@@ -479,6 +488,27 @@ function parseRpcCount(value: number | string | null | undefined) {
   return 0;
 }
 
+function createPartialFailureState(group: LogGroup | 'all' | null = null) {
+  const product = group === 'product' || group === 'all';
+  const audit = group === 'audit' || group === 'all';
+  const security = group === 'security' || group === 'all';
+  return {
+    product,
+    audit,
+    security,
+    any: product || audit || security,
+  };
+}
+
+function createNoPartialFailureState() {
+  return {
+    product: false,
+    audit: false,
+    security: false,
+    any: false,
+  };
+}
+
 export async function loadAdminLogNormalizedPage(
   options: GetAdminLogsPageDataOptions,
   config: {
@@ -510,6 +540,7 @@ export async function loadAdminLogNormalizedPage(
       memberLookup: new Map<string, MemberLookupRecord>(),
       partnerLookup: new Map<string, string>(),
       total: 0,
+      partialFailure: createPartialFailureState('all'),
     };
   }
 
@@ -585,6 +616,7 @@ export async function loadAdminLogNormalizedPage(
     memberLookup,
     partnerLookup,
     total: parseRpcCount(rows[0]?.total_count),
+    partialFailure: createNoPartialFailureState(),
   };
 }
 
@@ -624,6 +656,7 @@ export async function loadAdminLogListPage(
         memberLookup: new Map<string, MemberLookupRecord>(),
         partnerLookup: new Map<string, string>(),
         total: 0,
+        partialFailure: createPartialFailureState('product'),
       };
     }
 
@@ -654,6 +687,7 @@ export async function loadAdminLogListPage(
         extractPartnerTargetIds(productRows, []),
       ),
       total: count ?? 0,
+      partialFailure: createNoPartialFailureState(),
     };
   }
 
@@ -679,6 +713,7 @@ export async function loadAdminLogListPage(
         memberLookup: new Map<string, MemberLookupRecord>(),
         partnerLookup: new Map<string, string>(),
         total: 0,
+        partialFailure: createPartialFailureState('audit'),
       };
     }
 
@@ -701,6 +736,7 @@ export async function loadAdminLogListPage(
         extractPartnerTargetIds([], auditRows),
       ),
       total: count ?? 0,
+      partialFailure: createNoPartialFailureState(),
     };
   }
 
@@ -731,6 +767,7 @@ export async function loadAdminLogListPage(
       memberLookup: new Map<string, MemberLookupRecord>(),
       partnerLookup: new Map<string, string>(),
       total: 0,
+      partialFailure: createPartialFailureState('security'),
     };
   }
 
@@ -754,5 +791,6 @@ export async function loadAdminLogListPage(
     memberLookup,
     partnerLookup: new Map<string, string>(),
     total: count ?? 0,
+    partialFailure: createNoPartialFailureState(),
   };
 }

@@ -30,6 +30,7 @@ test("collectPagedRows stops when a short page is returned", async () => {
   ]);
   assert.equal(result.rows.length, 1120);
   assert.equal(result.truncated, false);
+  assert.equal(result.partialFailure, false);
 });
 
 test("collectPagedRows marks truncated when it fills the cap without a short page", async () => {
@@ -44,9 +45,10 @@ test("collectPagedRows marks truncated when it fills the cap without a short pag
 
   assert.equal(result.rows.length, 1500);
   assert.equal(result.truncated, true);
+  assert.equal(result.partialFailure, false);
 });
 
-test("collectPagedRows stops on query error and returns partial rows", async () => {
+test("collectPagedRows flags partial failure when it stops on query error", async () => {
   const calls: number[] = [];
 
   const result = await collectPagedRows(
@@ -67,6 +69,7 @@ test("collectPagedRows stops on query error and returns partial rows", async () 
   assert.deepEqual(calls, [0, 1000]);
   assert.equal(result.rows.length, 1000);
   assert.equal(result.truncated, false);
+  assert.equal(result.partialFailure, true);
 });
 
 test("collectPagedRows can read until the final short page without a hard cap", async () => {
@@ -96,4 +99,5 @@ test("collectPagedRows can read until the final short page without a hard cap", 
   ]);
   assert.equal(result.rows.length, 1180);
   assert.equal(result.truncated, false);
+  assert.equal(result.partialFailure, false);
 });

@@ -78,9 +78,10 @@
    - `GET /v1/notifications/{notification_id}`와 `GET /v1/notifications?campaign_id=...` 결과를 SSARTNERSHIP delivery log에 주기적으로 반영하는 작업은 `Phase 4b`로 남겨둔다.
    - 2026-07-05 업데이트: Verify provider campaign/notification/idempotency/status를 `notification_deliveries`에 저장하고, `/api/cron/ssafy-verify-notification-status` Vercel cron이 campaign status를 조회해 delivery row와 notification metadata를 갱신한다.
 
-5. 기존 사이트 비밀번호 로그인 모델은 아직 남아 있다.
+5. 기존 사이트 비밀번호 로그인 모델 정책이 확정되어야 한다. `2026-07-05 완료`
    - 신규 가입은 SSAFY Verify 기반으로 동작하지만 로그인은 `mm_username` + 사이트 비밀번호를 유지한다.
    - 완전한 SSO 제품 경험을 목표로 하면 `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경의 장기 정책을 다시 정해야 한다.
+   - 2026-07-05 업데이트: `/auth/login`은 SSAFY Verify를 1차 CTA로 전환하고, 기존 사이트 비밀번호 로그인은 전환 기간용 보조 경로로 낮췄다. 기존 비밀번호 해시 삭제는 운영 계정 마이그레이션과 rollback 포기 승인 전까지 진행하지 않는다.
 
 6. 파트너 알림센터 summary 문구와 실제 계산 범위가 다르다. `2026-07-05 완료`
    - 변경 요청, 리뷰, 감사 로그를 최근 일부만 모아 summary를 만들지만 UI는 전체 알림처럼 읽힌다.
@@ -195,7 +196,7 @@
 8. `chore/production-env-cleanup`: Vercel legacy Mattermost env 제거 확인, 관리자 perimeter 운영값 적용.
 9. `feat/ssafy-notification-status-sync`: 완료. Verify notification status/recovery 결과를 delivery log와 notification metadata에 반영.
 10. `test/flow-coverage`: signup/login/reset/certification/notifications/admin login/partner login E2E와 핵심 integration 보강.
-11. `refactor/member-auth-model`: 사이트 비밀번호 로그인 유지/폐기 정책 확정 후 구현.
+11. `refactor/member-auth-model`: 완료. SSAFY Verify 우선 로그인과 기존 사이트 비밀번호 보조 경로 정책을 반영했다.
 
 ## 권장 검증 명령
 

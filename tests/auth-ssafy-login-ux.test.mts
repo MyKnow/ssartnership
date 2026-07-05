@@ -32,11 +32,17 @@ test("SSAFY callback route is not a user-facing auth start page", () => {
   assert.doesNotMatch(relay, /\.verify\(/);
 });
 
-test("member login keeps password login only and can remember the login id", () => {
+test("member login starts with SSAFY Verify and keeps password login as a legacy fallback", () => {
+  const loginPage = readRepoFile("src/app/auth/login/page.tsx");
   const loginForm = readRepoFile("src/components/auth/LoginForm.tsx");
 
-  assert.doesNotMatch(loginForm, /SSAFY 인증으로 로그인/);
+  assert.match(loginPage, /SsafyVerifyButton/);
+  assert.match(loginPage, /SSAFY Verify 로그인/);
+  assert.match(loginPage, /기존 사이트 비밀번호로 로그인/);
+  assert.match(loginPage, /전환 기간/);
+  assert.doesNotMatch(loginPage, /Mattermost 아이디와 사이트 비밀번호로 로그인합니다/);
   assert.match(loginForm, /ID 저장하기/);
+  assert.match(loginForm, /기존 비밀번호로 로그인/);
   assert.match(loginForm, /localStorage\.setItem\(savedLoginIdStorageKey/);
   assert.match(loginForm, /localStorage\.removeItem\(savedLoginIdStorageKey/);
   assert.doesNotMatch(loginForm, /localStorage\.setItem\([^,]+,\s*password/);

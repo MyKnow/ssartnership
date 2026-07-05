@@ -4,6 +4,10 @@
 
 최종 점검: 2026-07-05
 
+최신화 기준: 코드 변경으로 처리 가능한 SSAFY Verify/성능/보안 TODO는 이 브랜치에서 구현 완료했다.
+남은 미완료 항목은 Production 재배포, Vercel 콘솔 값 확인, 관리자 edge perimeter 운영값 확정처럼
+코드만으로 결정할 수 없는 운영자 확인 항목이다.
+
 ## 공개 readiness 보완 (Issue #55)
 
 - [x] SSAFY Verify Server API Production env 등록
@@ -147,7 +151,7 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       대상: `src/app/partner/**`, `src/components/partner/**`, `src/lib/repositories/notification-repository.*`
       목표: `/partner/notifications` 별도 페이지에서 공지, 운영 알림, 승인/반려, 정산/리뷰 알림을 조회한다.
 
-16. [ ] SSAFY Verify 전환 후속
+16. [x] SSAFY Verify 전환 후속
    대상: `src/app/api/ssafy/verify-token/route.ts`, `src/lib/ssafy-verify/**`, `src/app/auth/**`, `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/**`, `src/app/api/mm/change-password/route.ts`, `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`
    이유: User Auth와 Server API 위임은 dev에서 동작하지만, 기존 서비스 식별자와 프로필 이미지 저장 모델은 여전히 MM ID/base64 중심이다. Verify가 제공하는 profile URL 계약과 SSARTNERSHIP 저장 방식을 맞춰 신규 가입 후 인증 카드/프로필 UX까지 완성해야 한다.
    세부 단계:
@@ -155,8 +159,9 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       완료: Server API profile의 `ssafy_mattermost_user_id`를 기존 `members.mm_user_id`와 매칭하는 기준으로 사용하고, sibling User Auth client scope 기준 profile 응답을 Verify 측에서 수정해 검증했다.
    16-2. [x] SSAFY Verify 기반 신규 회원 온보딩
       완료: 기존 회원이 없으면 Verify Server API profile로 가입 세션을 만들고, 비밀번호/약관 입력 후 `members` row를 생성한다. 이미 가입된 사용자는 로그인 페이지로 되돌린다.
-   16-3. [ ] 기존 MM ID + 사이트 비밀번호 로그인 전환
+   16-3. [x] 기존 MM ID + 사이트 비밀번호 로그인 전환
       목표: `/api/mm/login`, 비밀번호 재설정, 비밀번호 변경을 SSAFY Verify 로그인/세션 모델로 대체하고, 비밀번호 해시 보존/삭제 정책을 정한다.
+      완료: `/auth/login`은 SSAFY Verify를 1차 로그인으로 전환하고, 기존 사이트 비밀번호 로그인은 전환 기간용 보조 경로로 낮췄다. 기존 `members.mm_user_id`와 사이트 비밀번호 해시는 현재 운영 계정의 복구/전환 안전장치로 유지하며, 삭제는 별도 사용자 마이그레이션과 rollback 포기 승인 후 진행한다.
    16-4. [x] Mattermost 알림 및 프로필 동기화 Server API 위임
       완료: DM 발송, 디렉터리 lookup, profile-events, 프로필/아바타 동기화를 SSAFY Verify Server API로 위임하고 직접 Mattermost env와 클라이언트 호출을 제거했다.
    16-5. [x] Verify profile image URL 저장/렌더링 전환
@@ -175,7 +180,7 @@ legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없
       목표: 회원/파트너 session mutation route에는 공통 same-origin guard를 적용한다. auth/security logs의 raw exception message는 `logAuthSecurity` 경계에서 redaction하도록 완료했다.
       완료: 회원 로그인/로그아웃/탈퇴/약관/비밀번호/프로필 sync, 파트너 비밀번호/리뷰 moderation, SSAFY Verify 가입/재설정 callback route에 same-origin guard를 적용했다.
 
-17. [ ] 공개 운영 성능 high-risk 보완
+17. [x] 공개 운영 성능 high-risk 보완
    근거: `docs/operations/project-completeness-audit-2026-06-24.md`
    세부 단계:
    17-1. [x] 관리자 회원 화면 query bounded loading

@@ -193,6 +193,28 @@ function canUseMergedNewestList(options: GetAdminLogsPageDataOptions) {
   );
 }
 
+function mergePartialFailureStates(
+  primary: AdminLogsLoadedData['partialFailure'],
+  secondary?: AdminLogsLoadedData['partialFailure'],
+): AdminLogsLoadedData['partialFailure'] {
+  const fallback = {
+    product: false,
+    audit: false,
+    security: false,
+    any: false,
+  };
+  const next = secondary ?? fallback;
+  const product = primary.product || next.product;
+  const audit = primary.audit || next.audit;
+  const security = primary.security || next.security;
+  return {
+    product,
+    audit,
+    security,
+    any: product || audit || security,
+  };
+}
+
 function buildAdminLogsPageDataFromRows({
   options,
   page,
@@ -207,7 +229,7 @@ function buildAdminLogsPageDataFromRows({
   pageSize: number;
   summaryData: AdminLogsLoadedData;
   listSourceData: Omit<AdminLogsLoadedData, 'truncated'> &
-    Partial<Pick<AdminLogsLoadedData, 'truncated'> & { total: number }>;
+    Partial<Pick<AdminLogsLoadedData, 'truncated' | 'partialFailure'> & { total: number }>;
   useDbPagedList: boolean;
   useSplitLoading: boolean;
 }): AdminLogsPageData {
@@ -325,6 +347,10 @@ function buildAdminLogsPageDataFromRows({
       security: securityLogs.length,
     },
     truncated: summaryData.truncated,
+    partialFailure: mergePartialFailureStates(
+      summaryData.partialFailure,
+      listSourceData.partialFailure,
+    ),
     chartBuckets: buildChartBuckets(
       summaryData.range,
       productLogs,
@@ -465,6 +491,12 @@ export async function getAdminLogsPageData(
         security: false,
         any: false,
         limitPerGroup: null,
+      },
+      partialFailure: listSourceData.partialFailure ?? {
+        product: false,
+        audit: false,
+        security: false,
+        any: false,
       },
       chartBuckets: buildAggregateChartBuckets(range, aggregate),
       filters: buildAggregateFilters(

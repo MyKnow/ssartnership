@@ -204,10 +204,10 @@ export default function LoginForm({
       </label>
 
       <Button onClick={handleLogin} loading={pending} loadingText="로그인 중">
-        로그인
+        기존 비밀번호로 로그인
       </Button>
       <Button variant="ghost" href="/auth/reset">
-        비밀번호 재설정
+        사이트 비밀번호 재설정
       </Button>
 
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}

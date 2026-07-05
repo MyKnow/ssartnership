@@ -178,6 +178,12 @@ export type AdminLogsPageData = {
     any: boolean;
     limitPerGroup: number | null;
   };
+  partialFailure: {
+    product: boolean;
+    audit: boolean;
+    security: boolean;
+    any: boolean;
+  };
   chartBuckets: LogChartBucket[];
   filters: AdminLogsFilterMeta;
   summary: AdminLogsSummary;
@@ -252,6 +258,12 @@ export type AdminLogsLoadedData = {
     security: boolean;
     any: boolean;
     limitPerGroup: number | null;
+  };
+  partialFailure: {
+    product: boolean;
+    audit: boolean;
+    security: boolean;
+    any: boolean;
   };
 };
 
