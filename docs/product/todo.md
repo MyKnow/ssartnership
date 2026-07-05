@@ -5,13 +5,12 @@
 최종 점검: 2026-07-05
 
 최신화 기준: 코드 변경으로 처리 가능한 SSAFY Verify/성능/보안 TODO는 이 브랜치에서 구현 완료했다.
-남은 미완료 항목은 Production 재배포, Vercel 콘솔 값 확인, 관리자 edge perimeter 운영값 확정처럼
-코드만으로 결정할 수 없는 운영자 확인 항목이다.
+남은 미완료 항목은 Vercel 콘솔 값 확인, 관리자 edge perimeter 운영값 확정처럼 코드만으로 결정할 수 없는 운영자 확인 항목이다.
 
 ## 공개 readiness 보완 (Issue #55)
 
 - [x] SSAFY Verify Server API Production env 등록
-- [ ] Production 재배포 후 Verify profile-sync 라이브 스모크
+- [x] Production Verify profile-sync 라이브 스모크
 - [x] GitHub Actions 공개 readiness gate 추가
 - [x] 공개 저장소용 `SECURITY.md` responsible disclosure 정책 추가
 - [x] 파트너 상세 대표 이미지 LCP/CLS 개선
@@ -26,6 +25,7 @@
 
 주의: 관리자 IP allowlist와 Basic Auth는 운영자 접속을 잠글 수 있어 값 확정 후 적용한다.
 legacy Mattermost env 제거는 예전 직접 연동 배포로 롤백할 수 없게 만들 수 있어 별도 승인 후 적용한다.
+2026-07-05 21:47 KST 확인: `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live` 통과, Production `/admin/login`은 Basic Auth 없이 200 응답, Vercel CLI는 로컬 인증 부재로 env 목록 조회/삭제 불가.
 
 1. [x] 공개 레이아웃의 세션 및 정책 조회 비용 줄이기
    대상: `src/app/(site)/layout.tsx`, `src/lib/user-auth.ts`, `src/lib/policy-documents.ts`

@@ -48,6 +48,7 @@ Last updated: 2026-06-24
 - Added `ssafy_verify_api_trace` auth/security logs for SSAFY Verify User Auth and Server API request/response summaries with secret redaction.
 - Added SSAFY Verify notification status sync so Verify campaign status/recovery results update `notification_deliveries` and notification metadata through a cron route.
 - Shifted member login UX to SSAFY Verify first, leaving site-password login as a transition fallback until explicit account migration and rollback approval.
+- Re-measured Production live smoke and Lighthouse after the Verify transition; `/`, `/auth/login`, and `/auth/signup` were checked against `ssartnership.myknow.xyz`.
 - Confirmed Chromatic/Storybook publish is manual-only while the free quota is exhausted, leaving local Storybook build/test as the release gate.
 - Added the 2026-06-24 project completeness audit under `docs/operations/`.
 
@@ -58,7 +59,6 @@ Last updated: 2026-06-24
 - Add stronger audit logging around admin mutations and auth-sensitive flows.
 - Review remaining client components for possible server/client boundary simplification.
 - Consider moving `/api/mm/session` lookup behind a server-provided header/session model to remove client fetches entirely.
-- Re-measure public home, signup, certification, and partner detail routes after the Verify transition because auth/profile work moved to new server boundaries.
 - Decide and apply the production admin edge perimeter value: `ADMIN_ALLOWED_IPS` or Basic Auth.
 - Verify and remove legacy Mattermost env values from Vercel once rollback through direct Mattermost integration is no longer needed.
 
