@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
   getForwardedClientIp,
-  hasValidAdminBasicAuth,
   isAdminEdgeGuardPath,
+  isAdminPagePath,
   isAllowedAdminIp,
   isProtectedAdminPath,
+  shouldChallengeAdminBasicAuth,
 } from "@/lib/admin-security";
 
 const COOKIE_NAME = "user_session";
@@ -235,6 +236,15 @@ function isProtectedAdminPagePath(pathname: string) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const currentPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const adminPagePath = isAdminPagePath(pathname);
+  const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  const adminPayload =
+    adminToken && (adminPagePath || isProtectedAdminPath(pathname))
+      ? await verifyAdminToken(adminToken)
+      : null;
+  const userToken = request.cookies.get(COOKIE_NAME)?.value;
+  const userPayload =
+    userToken && adminPagePath ? await verifyToken(userToken) : null;
 
   if (isAdminEdgeGuardPath(pathname)) {
     const clientIp = getForwardedClientIp(request.headers);
@@ -247,7 +257,14 @@ export async function proxy(request: NextRequest) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
-    if (!hasValidAdminBasicAuth(request.headers.get("authorization"))) {
+    if (
+      shouldChallengeAdminBasicAuth({
+        pathname,
+        authorization: request.headers.get("authorization"),
+        hasAdminSession: Boolean(adminPayload),
+        hasUserSession: Boolean(userPayload),
+      })
+    ) {
       console.warn("[admin-edge-guard] blocked by basic auth", {
         path: pathname,
         ipAddress: clientIp,
@@ -266,14 +283,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isProtectedAdminPagePath(pathname)) {
-    const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-    const adminPayload = adminToken ? await verifyAdminToken(adminToken) : null;
     if (adminPayload) {
       return nextWithRequestUrl(request);
     }
 
-    const userToken = request.cookies.get(COOKIE_NAME)?.value;
-    const userPayload = userToken ? await verifyToken(userToken) : null;
     const url = request.nextUrl.clone();
     url.pathname = userPayload ? "/admin/session" : "/auth/login";
     url.search = "";

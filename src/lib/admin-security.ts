@@ -153,6 +153,31 @@ export function isAdminEdgeGuardPath(pathname: string) {
   );
 }
 
+export function isAdminPagePath(pathname: string) {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+export function shouldChallengeAdminBasicAuth(input: {
+  pathname: string;
+  authorization?: string | null;
+  hasAdminSession?: boolean;
+  hasUserSession?: boolean;
+}) {
+  if (!isAdminEdgeGuardPath(input.pathname)) {
+    return false;
+  }
+  if (hasValidAdminBasicAuth(input.authorization)) {
+    return false;
+  }
+  if (input.hasAdminSession) {
+    return false;
+  }
+  if (isAdminPagePath(input.pathname) && input.hasUserSession) {
+    return false;
+  }
+  return true;
+}
+
 export function getForwardedClientIp(
   headers: Pick<Headers, "get">,
 ): string | null {

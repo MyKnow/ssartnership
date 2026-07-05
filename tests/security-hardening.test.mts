@@ -299,6 +299,64 @@ test("admin basic auth validates credentials without direct string equality", as
   }
 });
 
+test("admin basic auth challenge does not block session bridge pages", async () => {
+  const originalUsername = process.env.ADMIN_BASIC_AUTH_USERNAME;
+  const originalPassword = process.env.ADMIN_BASIC_AUTH_PASSWORD;
+
+  try {
+    process.env.ADMIN_BASIC_AUTH_USERNAME = "operator";
+    process.env.ADMIN_BASIC_AUTH_PASSWORD = "secret-password";
+
+    const { shouldChallengeAdminBasicAuth } = await adminSecurityModulePromise;
+
+    assert.equal(
+      shouldChallengeAdminBasicAuth({
+        pathname: "/admin",
+        hasUserSession: true,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldChallengeAdminBasicAuth({
+        pathname: "/admin/session",
+        hasUserSession: true,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldChallengeAdminBasicAuth({
+        pathname: "/api/admin/logs",
+        hasUserSession: true,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldChallengeAdminBasicAuth({
+        pathname: "/api/admin/logs",
+        hasAdminSession: true,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldChallengeAdminBasicAuth({
+        pathname: "/admin",
+      }),
+      true,
+    );
+  } finally {
+    if (originalUsername === undefined) {
+      delete process.env.ADMIN_BASIC_AUTH_USERNAME;
+    } else {
+      process.env.ADMIN_BASIC_AUTH_USERNAME = originalUsername;
+    }
+    if (originalPassword === undefined) {
+      delete process.env.ADMIN_BASIC_AUTH_PASSWORD;
+    } else {
+      process.env.ADMIN_BASIC_AUTH_PASSWORD = originalPassword;
+    }
+  }
+});
+
 test("admin session ttl defaults to short bounded windows", async () => {
   const { getAdminSessionTtlSeconds } = await adminSecurityModulePromise;
 
