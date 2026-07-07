@@ -79,5 +79,17 @@ test("SSAFY Verify client error messages distinguish setup and user actions", as
     getSsafyVerifyClientErrorMessage("SSAFY_VERIFY_CALLBACK_TIMEOUT"),
     /결과를 받지 못했습니다/,
   );
+  assert.match(
+    getSsafyVerifyClientErrorMessage("SSAFY_VERIFY_POPUP_BLOCKED"),
+    /같은 창/,
+  );
+  assert.doesNotMatch(
+    getSsafyVerifyClientErrorMessage("SSAFY_VERIFY_POPUP_BLOCKED"),
+    /팝업 차단을 해제/,
+  );
+  assert.match(
+    getSsafyVerifyClientErrorMessage("SSAFY_VERIFY_REDIRECT_SESSION_MISSING"),
+    /만료/,
+  );
   assert.match(getSsafyVerifyClientErrorMessage("CONSENT_DENIED"), /취소/);
 });

@@ -26,9 +26,10 @@ test("SSAFY callback route is not a user-facing auth start page", () => {
   assert.doesNotMatch(ssafyPage, /SsafyVerifyButton/);
   assert.doesNotMatch(ssafyPage, /SSAFY 구성원 인증/);
 
-  assert.match(relay, /handleCallback/);
   assert.match(relay, /window\.opener/);
-  assert.match(relay, /https:\/\/verify\.myknow\.xyz\/sdk\/ssafy-verify\.js/);
+  assert.match(relay, /readSsafyVerifyRedirectSession/);
+  assert.match(relay, /\/api\/ssafy\/verify-token/);
+  assert.match(relay, /\/api\/ssafy\/reset-password/);
   assert.doesNotMatch(relay, /\.verify\(/);
 });
 

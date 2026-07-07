@@ -7,6 +7,10 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
+  shouldUseSsafyVerifyRedirectFlow,
+  startSsafyVerifyRedirectFlow,
+} from "@/lib/ssafy-verify/client-redirect";
+import {
   getSsafyVerifyClientErrorMessage,
   normalizeSsafyVerifyCallbackFailure,
   normalizeSsafyVerifySdkError,
@@ -85,6 +89,36 @@ export default function SsafyVerifyButton({
       return;
     }
 
+    setStatus("working");
+    setError(null);
+
+    const expectedIssuer = defaultIssuer;
+    const redirectUri = buildSsafyVerifyRedirectUri(window.location.origin);
+    const clientId = process.env.NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID ?? "";
+    const redirectFlowOptions = {
+      clientId,
+      redirectUri,
+      scopes: [...SSAFY_VERIFY_PROFILE_SCOPES],
+      purpose: "member-login" as const,
+      returnTo: returnTo ?? null,
+    };
+
+    if (
+      shouldUseSsafyVerifyRedirectFlow({
+        userAgent: window.navigator.userAgent,
+        platform: window.navigator.platform,
+        maxTouchPoints: window.navigator.maxTouchPoints,
+      })
+    ) {
+      try {
+        await startSsafyVerifyRedirectFlow(redirectFlowOptions);
+      } catch (redirectError) {
+        setStatus("failed");
+        setError(normalizeSsafyVerifySdkError(redirectError));
+      }
+      return;
+    }
+
     const sdk = window.ssafyVerify;
     if (!sdk) {
       setStatus("failed");
@@ -92,23 +126,27 @@ export default function SsafyVerifyButton({
       return;
     }
 
-    setStatus("working");
-    setError(null);
-
-    const expectedIssuer = defaultIssuer;
-    const redirectUri = buildSsafyVerifyRedirectUri(window.location.origin);
-
     let callback: SsafyVerifyCallbackPayload;
     try {
       callback = await sdk.verify({
-        clientId: process.env.NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID ?? "",
+        clientId,
         redirectUri,
         scopes: [...SSAFY_VERIFY_PROFILE_SCOPES],
         waitForCallback: true,
       });
     } catch (sdkError) {
+      const normalizedError = normalizeSsafyVerifySdkError(sdkError);
+      if (normalizedError.errorCode === "SSAFY_VERIFY_POPUP_BLOCKED") {
+        try {
+          await startSsafyVerifyRedirectFlow(redirectFlowOptions);
+        } catch (redirectError) {
+          setStatus("failed");
+          setError(normalizeSsafyVerifySdkError(redirectError));
+        }
+        return;
+      }
       setStatus("failed");
-      setError(normalizeSsafyVerifySdkError(sdkError));
+      setError(normalizedError);
       return;
     }
 

@@ -108,11 +108,17 @@ export function getSsafyVerifyClientErrorMessage(errorCode: string) {
   if (errorCode === "SDK_NOT_READY") {
     return "SSAFY Verify를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.";
   }
+  if (errorCode === "SSAFY_VERIFY_CRYPTO_UNAVAILABLE") {
+    return "현재 브라우저에서 안전한 인증 준비를 완료하지 못했습니다. 최신 브라우저로 다시 시도해 주세요.";
+  }
+  if (errorCode === "SSAFY_VERIFY_REDIRECT_SESSION_MISSING") {
+    return "인증 세션이 만료되었습니다. 처음 화면에서 다시 시도해 주세요.";
+  }
   if (errorCode === "VERIFY_CANCELLED" || errorCode === "CONSENT_DENIED") {
     return "SSAFY 인증이 취소되었습니다.";
   }
   if (errorCode === "SSAFY_VERIFY_POPUP_BLOCKED") {
-    return "브라우저에서 인증 팝업을 열 수 없습니다. 팝업 차단을 해제한 뒤 다시 시도해 주세요.";
+    return "브라우저에서 인증 창을 열 수 없습니다. 같은 창에서 인증을 다시 시작해 주세요.";
   }
   if (errorCode === "SSAFY_VERIFY_POPUP_CLOSED") {
     return "SSAFY 인증 창이 닫혔습니다. 인증을 다시 시작해 주세요.";
