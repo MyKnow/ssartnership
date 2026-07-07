@@ -28,6 +28,10 @@ describe("regional admin scope", () => {
     assert.equal(template.permissions.companies.create, true);
     assert.equal(template.permissions.companies.update, true);
     assert.equal(template.permissions.companies.delete, false);
+    assert.equal(template.permissions.logs.create, false);
+    assert.equal(template.permissions.logs.read, false);
+    assert.equal(template.permissions.logs.update, false);
+    assert.equal(template.permissions.logs.delete, false);
     assert.equal(template.permissions.members.read, false);
     assert.equal(template.permissions.admin_management.read, false);
   });

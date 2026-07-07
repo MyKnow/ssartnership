@@ -81,8 +81,14 @@ async function visitAdminGuardRoute(
   }
 
   if (route.path === "/admin/login") {
+    const location = response.headers().location ?? "";
+    if ([302, 303, 307, 308].includes(status)) {
+      expect(location, route.path).toMatch(/\/auth\/login\?returnTo=%2Fadmin/);
+      return;
+    }
+
     const body = await response.text();
-    expect(body, route.path).toMatch(/로그인/);
+    expect(body, route.path).toMatch(/\/auth\/login\?returnTo=%2Fadmin|로그인/);
     return;
   }
 
