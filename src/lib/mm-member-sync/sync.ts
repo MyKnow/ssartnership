@@ -29,6 +29,9 @@ function buildMemberSyncSummary(result: MemberSyncResult) {
   if (result.changes.campus) {
     summaryParts.push(`캠퍼스 ${result.changes.campus}`);
   }
+  if (result.changes.track) {
+    summaryParts.push(`트랙 ${result.changes.track}`);
+  }
   if (result.changes.avatar) {
     summaryParts.push("프로필 사진 업데이트");
   }
@@ -60,6 +63,8 @@ export async function syncMemberSnapshot(
   snapshot: MemberSyncSnapshot,
 ) {
   const nextCampus = snapshot.campus ?? member.campus ?? null;
+  const nextTrack = snapshot.track ?? member.ssafy_track ?? null;
+  const nextTrackName = snapshot.track ? snapshot.trackName : member.ssafy_track_name ?? null;
   const nextAvatarContentType = snapshot.avatarFetched
     ? snapshot.avatarContentType
     : member.avatar_content_type ?? null;
@@ -68,8 +73,8 @@ export async function syncMemberSnapshot(
     : member.avatar_base64 ?? null;
   const nextAvatarUrl = snapshot.avatarUrl ?? member.avatar_url ?? null;
 
-  const changedFields: Array<"mmUsername" | "displayName" | "campus" | "avatar"> = [];
-  const changes: Partial<Record<"mmUsername" | "displayName" | "campus" | "avatar", string>> = {};
+  const changedFields: Array<"mmUsername" | "displayName" | "campus" | "track" | "avatar"> = [];
+  const changes: Partial<Record<"mmUsername" | "displayName" | "campus" | "track" | "avatar", string>> = {};
 
   if (member.mm_username !== snapshot.mmUsername) {
     changedFields.push("mmUsername");
@@ -82,6 +87,16 @@ export async function syncMemberSnapshot(
   if ((member.campus ?? null) !== nextCampus) {
     changedFields.push("campus");
     changes.campus = `${member.campus ?? "-"} → ${nextCampus ?? "-"}`;
+  }
+  if (
+    snapshot.track &&
+    ((member.ssafy_track ?? null) !== nextTrack ||
+      (member.ssafy_track_name ?? null) !== nextTrackName)
+  ) {
+    changedFields.push("track");
+    changes.track = `${member.ssafy_track_name ?? member.ssafy_track ?? "-"} → ${
+      nextTrackName ?? nextTrack
+    }`;
   }
 
   const avatarChanged =
@@ -111,6 +126,8 @@ export async function syncMemberSnapshot(
     mm_username: snapshot.mmUsername,
     display_name: snapshot.displayName,
     campus: nextCampus,
+    ssafy_track: nextTrack,
+    ssafy_track_name: nextTrackName,
     avatar_content_type: nextAvatarContentType,
     avatar_base64: nextAvatarBase64,
     avatar_url: nextAvatarUrl,
@@ -124,6 +141,8 @@ export async function syncMemberSnapshot(
       mm_username: nextMember.mm_username,
       display_name: nextMember.display_name,
       campus: nextMember.campus,
+      ssafy_track: nextMember.ssafy_track,
+      ssafy_track_name: nextMember.ssafy_track_name,
       avatar_content_type: nextMember.avatar_content_type,
       avatar_base64: nextMember.avatar_base64,
       avatar_url: nextMember.avatar_url,

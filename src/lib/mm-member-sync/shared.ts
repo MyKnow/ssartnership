@@ -9,13 +9,20 @@ export type MemberRow = {
   year: number;
   staff_source_year?: number | null;
   campus?: string | null;
+  ssafy_track?: string | null;
+  ssafy_track_name?: string | null;
   avatar_content_type?: string | null;
   avatar_base64?: string | null;
   avatar_url?: string | null;
   updated_at?: string | null;
 };
 
-export type MemberSyncField = "mmUsername" | "displayName" | "campus" | "avatar";
+export type MemberSyncField =
+  | "mmUsername"
+  | "displayName"
+  | "campus"
+  | "track"
+  | "avatar";
 
 export type SenderSession = {
   year: number;
@@ -26,6 +33,8 @@ export type MemberSyncSnapshot = {
   mmUsername: string;
   displayName: string;
   campus: string | null;
+  track: string | null;
+  trackName: string | null;
   avatarFetched: boolean;
   avatarUrl: string | null;
   avatarContentType: string | null;
@@ -72,6 +81,8 @@ export function makeSnapshot(
     mmUsername: user.username,
     displayName,
     campus: profile.campus ?? null,
+    track: null,
+    trackName: null,
     avatarFetched: Boolean(avatar),
     avatarUrl: null,
     avatarContentType: avatar?.contentType ?? null,

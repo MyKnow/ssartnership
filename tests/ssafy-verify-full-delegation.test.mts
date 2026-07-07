@@ -40,6 +40,8 @@ test("SSAFY Verify profiles map to directory and member sync snapshots", async (
     name: "김싸피",
     ssafy_campus: "서울",
     ssafy_cohort: "15",
+    ssafy_track: "data",
+    ssafy_track_name: "데이터",
     ssafy_is_staff: false,
     profile_image: {
       content_type: "image/png",
@@ -54,6 +56,8 @@ test("SSAFY Verify profiles map to directory and member sync snapshots", async (
     displayName: "김싸피",
     campus: "서울",
     cohort: 15,
+    track: "data",
+    trackName: "데이터",
     isStaff: false,
     sourceYears: [15],
     profileImage: {
@@ -76,6 +80,8 @@ test("SSAFY Verify profiles map to directory and member sync snapshots", async (
     mmUsername: "student.name",
     displayName: "김싸피",
     campus: "서울",
+    track: "data",
+    trackName: "데이터",
     avatarFetched: true,
     avatarUrl: null,
     avatarContentType: "image/png",
@@ -96,6 +102,8 @@ test("SSAFY Verify profiles preserve picture URLs for member avatars", async () 
     name: "김싸피",
     ssafy_campus: "서울",
     ssafy_cohort: "15",
+    ssafy_track: null,
+    ssafy_track_name: null,
     picture: "https://verify.example.com/api/mattermost/avatar/mm.user-123",
   });
 
@@ -111,6 +119,8 @@ test("SSAFY Verify profiles preserve picture URLs for member avatars", async () 
     campus: "서울",
     avatarFetched: false,
     avatarUrl: "https://verify.example.com/api/mattermost/avatar/mm.user-123",
+    track: null,
+    trackName: null,
     avatarContentType: null,
     avatarBase64: null,
   });
