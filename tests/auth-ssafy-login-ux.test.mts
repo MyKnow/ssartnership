@@ -48,3 +48,13 @@ test("member login starts with SSAFY Verify and keeps password login as a legacy
   assert.match(loginForm, /localStorage\.removeItem\(savedLoginIdStorageKey/);
   assert.doesNotMatch(loginForm, /localStorage\.setItem\([^,]+,\s*password/);
 });
+
+test("SSAFY Verify token route signs in existing verified members", () => {
+  const verifyTokenRoute = readRepoFile("src/app/api/ssafy/verify-token/route.ts");
+
+  assert.match(verifyTokenRoute, /setUserSession/);
+  assert.match(verifyTokenRoute, /updateMemberSsafyVerification/);
+  assert.match(verifyTokenRoute, /status:\s*"verified"/);
+  assert.match(verifyTokenRoute, /next:\s*"login"/);
+  assert.doesNotMatch(verifyTokenRoute, /MEMBER_ALREADY_REGISTERED/);
+});
