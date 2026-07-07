@@ -186,7 +186,6 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
     description: "배정된 지역의 제휴처와 파트너사 운영을 담당합니다.",
     permissions: normalizeAdminPermissionMatrix({
       reviews: { read: true },
-      logs: { read: true },
       brands: { create: true, read: true, update: true },
       companies: { create: true, read: true, update: true },
     }),
