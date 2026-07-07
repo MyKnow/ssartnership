@@ -9,9 +9,13 @@ import {
   getMemberAuthBlockingState,
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
+import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents";
 import { getSsafyVerifyServerConfig } from "@/lib/ssafy-verify/config";
-import { findSsafyVerifiedMember } from "@/lib/ssafy-verify/member";
+import {
+  findSsafyVerifiedMember,
+  updateMemberSsafyVerification,
+} from "@/lib/ssafy-verify/member";
 import { resolveSsafySignupProfile } from "@/lib/ssafy-verify/signup-profile";
 import {
   clearSsafySignupSession,
@@ -206,25 +210,97 @@ export async function POST(request: Request) {
       mattermostUserId: verified.claims.mattermostUserId,
     });
 
-    if (memberResult.ok || memberResult.errorCode === "SSAFY_MEMBER_CONFLICT") {
+    if (memberResult.ok) {
+      const updateResult = await updateMemberSsafyVerification(
+        supabase,
+        memberResult.member.id,
+        {
+          ...verified.claims,
+          verificationId: exchanged.verificationId,
+          scope: exchanged.scope,
+        },
+      );
+      if (!updateResult.ok) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_ssafy_verify",
+          status: "failure",
+          actorType: "member",
+          actorId: memberResult.member.id,
+          identifier: verified.claims.sub,
+          properties: { reason: updateResult.errorCode },
+        });
+        await recordMemberAuthAttempt(
+          "ssafy-verify",
+          verifiedThrottleContext,
+          false,
+        );
+        await delayMemberAuthAttempt("ssafy-verify");
+        return publicError(updateResult.errorCode, null, 500);
+      }
+
+      const policyStatus = await getMemberRequiredPolicyStatus(
+        memberResult.member.id,
+      );
+      await setUserSession(
+        memberResult.member.id,
+        Boolean(memberResult.member.must_change_password),
+      );
+      await clearSsafySignupSession();
+      await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, true);
+      revalidatePath("/");
+      revalidatePath("/auth/login");
+      revalidatePath("/auth/consent");
+      revalidatePath("/auth/change-password");
+      revalidatePath("/certification");
+
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_ssafy_verify",
+        status: "success",
+        actorType: "member",
+        actorId: memberResult.member.id,
+        identifier: verified.claims.sub,
+        properties: {
+          cohort: verified.claims.cohort,
+          campus: verified.claims.campus,
+          hasMattermostUserId: Boolean(verified.claims.mattermostUserId),
+          mustChangePassword: Boolean(memberResult.member.must_change_password),
+          requiresConsent: policyStatus.requiresConsent,
+          next: "login",
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        verified: true,
+        status: "verified",
+        cohort:
+          verified.claims.cohort === null
+            ? null
+            : String(verified.claims.cohort),
+        campus: verified.claims.campus,
+        authTime: verified.claims.authTime,
+        requiresConsent: policyStatus.requiresConsent,
+      });
+    }
+
+    if (memberResult.errorCode === "SSAFY_MEMBER_CONFLICT") {
       await logAuthSecurity({
         ...context,
         eventName: "member_ssafy_verify",
         status: "blocked",
-        actorType: memberResult.ok ? "member" : "guest",
-        actorId: memberResult.ok ? memberResult.member.id : undefined,
+        actorType: "guest",
         identifier: verified.claims.sub,
         properties: {
-          reason: memberResult.ok ? "already_registered" : memberResult.errorCode,
+          reason: memberResult.errorCode,
           hasSession: Boolean(currentSession?.userId),
         },
       });
       await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, false);
       await delayMemberAuthAttempt("ssafy-verify");
       await clearSsafySignupSession();
-      return publicError("MEMBER_ALREADY_REGISTERED", null, 409, {
-        redirectTo: "/auth/login",
-      });
+      return publicError(memberResult.errorCode, null, 409);
     }
 
     if (memberResult.errorCode === "MEMBER_LOOKUP_FAILED") {
