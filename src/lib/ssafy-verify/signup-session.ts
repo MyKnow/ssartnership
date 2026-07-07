@@ -47,6 +47,10 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function isOptionalNullableString(value: unknown): value is string | null | undefined {
+  return value === undefined || isNullableString(value);
+}
+
 function parseSessionPayload(value: unknown): SignedSignupSession | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return null;
@@ -58,6 +62,8 @@ function parseSessionPayload(value: unknown): SignedSignupSession | null {
     !isString(payload.mattermostUsername) ||
     !isString(payload.displayName) ||
     !isNullableString(payload.campus) ||
+    !isOptionalNullableString(payload.track) ||
+    !isOptionalNullableString(payload.trackName) ||
     !isNullableString(payload.verificationId) ||
     !isNullableString(payload.scope) ||
     (payload.avatarUrl !== undefined && !isNullableString(payload.avatarUrl)) ||
@@ -89,6 +95,8 @@ function parseSessionPayload(value: unknown): SignedSignupSession | null {
     displayName: payload.displayName,
     cohort,
     campus: payload.campus,
+    track: payload.track ?? null,
+    trackName: payload.trackName ?? null,
     isStaff: payload.isStaff,
     sourceYears,
     avatarUrl: payload.avatarUrl ?? null,
@@ -133,6 +141,8 @@ export async function getSsafySignupSession() {
     displayName: session.displayName,
     cohort: session.cohort,
     campus: session.campus,
+    track: session.track,
+    trackName: session.trackName,
     isStaff: session.isStaff,
     sourceYears: session.sourceYears,
     avatarUrl: session.avatarUrl,

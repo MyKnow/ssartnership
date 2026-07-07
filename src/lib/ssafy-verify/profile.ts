@@ -19,6 +19,8 @@ export type SsafyVerifyMemberProfile = {
   displayName: string;
   campus: string | null;
   cohort: number | null;
+  track: string | null;
+  trackName: string | null;
   isStaff: boolean;
   sourceYears: number[];
   profileImage: {
@@ -32,6 +34,8 @@ type UnknownRecord = Record<string, unknown>;
 
 const MATTERMOST_ID_PATTERN = /^[A-Za-z0-9._-]{3,64}$/;
 const CONTENT_TYPE_PATTERN = /^image\/[A-Za-z0-9.+-]{1,40}$/;
+const TRACK_SLUG_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+const TRACK_NAME_MAX_LENGTH = 80;
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -124,6 +128,20 @@ function normalizeMattermostId(value: string | null) {
 
 function normalizeContentType(value: string | null) {
   if (!value || !CONTENT_TYPE_PATTERN.test(value)) {
+    return null;
+  }
+  return value;
+}
+
+function normalizeTrackSlug(value: string | null) {
+  if (!value || !TRACK_SLUG_PATTERN.test(value)) {
+    return null;
+  }
+  return value;
+}
+
+function normalizeTrackName(value: string | null) {
+  if (!value || value.length > TRACK_NAME_MAX_LENGTH) {
     return null;
   }
   return value;
@@ -224,6 +242,12 @@ export function normalizeSsafyVerifyMemberProfile(
     displayName,
     campus: readString(input, ["ssafy_campus", "campus"]),
     cohort,
+    track: normalizeTrackSlug(
+      readString(input, ["ssafy_track", "track", "track_slug", "trackSlug"]),
+    ),
+    trackName: normalizeTrackName(
+      readString(input, ["ssafy_track_name", "track_name", "trackName"]),
+    ),
     isStaff: Boolean(isStaff),
     sourceYears,
     profileImage: readProfileImage(input),
@@ -303,6 +327,8 @@ export function toMemberSyncSnapshot(
     mmUsername: profile.mattermostUsername,
     displayName: profile.displayName,
     campus: profile.campus,
+    track: profile.track,
+    trackName: profile.trackName,
     avatarFetched: Boolean(profile.profileImage?.base64),
     avatarUrl: profile.profileImage?.url ?? null,
     avatarContentType: profile.profileImage?.contentType ?? null,

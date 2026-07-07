@@ -120,7 +120,7 @@ export async function loadBackfillableMembers() {
   const { data: members, error } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,avatar_url,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,campus,ssafy_track,ssafy_track_name,avatar_content_type,avatar_base64,avatar_url,updated_at",
     )
     .in("year", years)
     .order("year", { ascending: false })
@@ -141,7 +141,7 @@ export async function loadMemberById(memberId: string) {
   const { data: member, error } = await supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,avatar_content_type,avatar_base64,avatar_url,updated_at",
+      "id,mm_user_id,mm_username,display_name,year,campus,ssafy_track,ssafy_track_name,avatar_content_type,avatar_base64,avatar_url,updated_at",
     )
     .eq("id", memberId)
     .maybeSingle();

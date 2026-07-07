@@ -10,6 +10,8 @@ export type SsafyVerificationClaims = {
   cohort: string | null;
   campus: string | null;
   region: string | null;
+  track: string | null;
+  trackName: string | null;
   name: string | null;
   picture: string | null;
   role: string | null;
@@ -81,6 +83,8 @@ export function validateSsafyVerificationClaims(
       cohort: optionalString(claims.ssafy_cohort),
       campus: optionalString(claims.ssafy_campus),
       region: optionalString(claims.ssafy_region),
+      track: optionalString(claims.ssafy_track),
+      trackName: optionalString(claims.ssafy_track_name),
       name: optionalString(claims.name),
       picture: optionalString(claims.picture),
       role: optionalString(claims.ssafy_role),
