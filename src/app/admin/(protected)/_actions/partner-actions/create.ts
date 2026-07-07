@@ -6,12 +6,8 @@ import {
   type AdminScopeAccountLike,
   resolveCreatedManagedCampusSlugs,
 } from "@/lib/admin-scope";
+import { sendCampusScopedNewPartnerNotification } from "@/lib/new-partner-notifications";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
-import {
-  createNewPartnerPayload,
-  isPushConfigured,
-} from "@/lib/push";
-import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -146,27 +142,13 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
       .maybeSingle();
 
     try {
-      const notificationPayload = createNewPartnerPayload({
+      await sendCampusScopedNewPartnerNotification({
         partnerId,
         name: payload.name,
         location: payload.location,
         categoryLabel: category?.label ?? null,
+        campusSlugs: payload.campusSlugs,
       });
-      await sendAdminNotificationCampaign(
-        {
-          notificationType: "new_partner",
-          title: notificationPayload.title,
-          body: notificationPayload.body,
-          url: notificationPayload.url,
-          audience: { scope: "all" },
-          channels: {
-            in_app: true,
-            push: isPushConfigured(),
-            mm: false,
-          },
-        },
-        "automatic",
-      );
     } catch (pushError) {
       console.error("new partner push failed", pushError);
     }
