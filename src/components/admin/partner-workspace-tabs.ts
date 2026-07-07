@@ -7,6 +7,7 @@ type AdminPartnerWorkspaceTabCounts = {
   requestCount: number;
   planRequestCount: number;
   categoryCount: number;
+  includeGlobalSections?: boolean;
 };
 
 function formatCount(value: number) {
@@ -33,8 +34,9 @@ export function createAdminPartnerWorkspaceTabOptions({
   requestCount,
   planRequestCount,
   categoryCount,
+  includeGlobalSections = true,
 }: AdminPartnerWorkspaceTabCounts): ReadonlyArray<TabOption<AdminPartnerWorkspaceTab>> {
-  return [
+  const options: Array<TabOption<AdminPartnerWorkspaceTab>> = [
     {
       value: "partners",
       label: "제휴처(브랜드)",
@@ -45,6 +47,14 @@ export function createAdminPartnerWorkspaceTabOptions({
       label: "변경 요청",
       description: `승인 대기 ${formatCount(requestCount)}건`,
     },
+  ];
+
+  if (!includeGlobalSections) {
+    return options;
+  }
+
+  return [
+    ...options,
     {
       value: "plans",
       label: "플랜/과금",

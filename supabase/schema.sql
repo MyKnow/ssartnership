@@ -35,6 +35,7 @@ create table if not exists partner_companies (
   slug text not null unique,
   description text,
   is_active boolean not null default true,
+  managed_campus_slugs text[] not null default '{}',
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
@@ -49,6 +50,7 @@ create table if not exists partners (
   location text not null,
   detail_description text,
   campus_slugs text[] not null default '{}',
+  managed_campus_slugs text[] not null default '{}',
   map_url text,
   benefit_action_type text not null default 'none',
   benefit_action_link text,
@@ -105,6 +107,7 @@ alter table partners add column if not exists visibility text not null default '
 alter table partners add column if not exists benefit_visibility text not null default 'public';
 alter table partners add column if not exists detail_description text;
 alter table partners add column if not exists campus_slugs text[] not null default '{}';
+alter table partners add column if not exists managed_campus_slugs text[] not null default '{}';
 update partners
 set visibility = case lower(trim(coalesce(visibility, 'public')))
   when 'public' then 'public'
@@ -141,6 +144,52 @@ alter table partners add constraint partners_campus_slugs_check
   check (
     cardinality(campus_slugs) > 0
     and campus_slugs <@ array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
+  );
+update partners
+set managed_campus_slugs = case
+  when cardinality(managed_campus_slugs) > 0 then managed_campus_slugs
+  when cardinality(campus_slugs) > 0 then campus_slugs
+  else public.infer_partner_campus_slugs(location)
+end
+where cardinality(managed_campus_slugs) = 0;
+alter table partners drop constraint if exists partners_managed_campus_slugs_check;
+alter table partners add constraint partners_managed_campus_slugs_check
+  check (
+    cardinality(managed_campus_slugs) > 0
+    and managed_campus_slugs <@ array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
+  );
+
+alter table partner_companies add column if not exists managed_campus_slugs text[] not null default '{}';
+with company_managed_campuses as (
+  select
+    company_id,
+    array_agg(distinct campus_slug order by campus_slug) as managed_campus_slugs
+  from partners
+  cross join lateral unnest(
+    case
+      when cardinality(partners.managed_campus_slugs) > 0
+        then partners.managed_campus_slugs
+      when cardinality(partners.campus_slugs) > 0
+        then partners.campus_slugs
+      else public.infer_partner_campus_slugs(partners.location)
+    end
+  ) as campus_slug
+  where company_id is not null
+  group by company_id
+)
+update partner_companies
+set managed_campus_slugs = company_managed_campuses.managed_campus_slugs
+from company_managed_campuses
+where partner_companies.id = company_managed_campuses.company_id
+  and cardinality(partner_companies.managed_campus_slugs) = 0;
+update partner_companies
+set managed_campus_slugs = array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
+where cardinality(managed_campus_slugs) = 0;
+alter table partner_companies drop constraint if exists partner_companies_managed_campus_slugs_check;
+alter table partner_companies add constraint partner_companies_managed_campus_slugs_check
+  check (
+    cardinality(managed_campus_slugs) > 0
+    and managed_campus_slugs <@ array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
   );
 
 alter table partners add column if not exists applies_to text[] not null default '{staff,student,graduate}';
@@ -574,6 +623,7 @@ create table if not exists members (
   marketing_policy_version integer,
   marketing_policy_consented_at timestamp with time zone,
   admin_permission_id text,
+  admin_managed_campus_slugs text[] not null default '{}',
   avatar_content_type text,
   avatar_base64 text,
   avatar_url text,
@@ -2473,6 +2523,14 @@ create table if not exists operational_notification_dedupes (
 
 alter table members
   drop constraint if exists members_admin_permission_id_fkey;
+alter table members add column if not exists admin_managed_campus_slugs text[] not null default '{}';
+alter table members
+  drop constraint if exists members_admin_managed_campus_slugs_check;
+alter table members
+  add constraint members_admin_managed_campus_slugs_check
+  check (
+    admin_managed_campus_slugs <@ array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
+  );
 alter table members
   add constraint members_admin_permission_id_fkey
   foreign key (admin_permission_id)
@@ -2631,12 +2689,19 @@ create index if not exists members_campus_display_name_idx
 create index if not exists members_admin_permission_id_idx
   on members(admin_permission_id)
   where admin_permission_id is not null;
+create index if not exists members_admin_managed_campus_slugs_idx
+  on members using gin(admin_managed_campus_slugs)
+  where cardinality(admin_managed_campus_slugs) > 0;
 create unique index if not exists members_ssafy_sub_key
   on members(ssafy_sub)
   where ssafy_sub is not null;
 create unique index if not exists members_ssafy_mattermost_user_id_key
   on members(ssafy_mattermost_user_id)
   where ssafy_mattermost_user_id is not null;
+create index if not exists partner_companies_managed_campus_slugs_idx
+  on partner_companies using gin(managed_campus_slugs);
+create index if not exists partners_managed_campus_slugs_idx
+  on partners using gin(managed_campus_slugs);
 create index if not exists event_logs_created_at_idx on event_logs(created_at desc);
 create index if not exists event_logs_created_at_id_idx
   on event_logs(created_at desc, id desc);
@@ -3256,6 +3321,7 @@ insert into admin_permission_templates (key, name, description, permissions)
 values
   ('super_admin', 'Super Admin', '멤버 관리자 권한과 전체 운영 권한을 관리합니다.', '{"members":{"create":true,"read":true,"update":true,"delete":true},"reviews":{"create":true,"read":true,"update":true,"delete":true},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":true,"read":true,"update":true,"delete":true},"notifications":{"create":true,"read":true,"update":true,"delete":true},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":true,"read":true,"update":true,"delete":true},"admin_management":{"create":true,"read":true,"update":true,"delete":true}}'::jsonb),
   ('operations_manager', '운영 관리자', '회원, 협력사, 알림, 이벤트, 기수 운영을 담당합니다.', '{"members":{"create":true,"read":true,"update":true,"delete":true},"reviews":{"create":false,"read":true,"update":true,"delete":true},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":true,"read":true,"update":true,"delete":true},"notifications":{"create":true,"read":true,"update":true,"delete":true},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":false,"read":true,"update":true,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
+  ('regional_partner_manager', '지역 제휴 관리자', '배정된 지역의 제휴처와 파트너사 운영을 담당합니다.', '{"members":{"create":false,"read":false,"update":false,"delete":false},"reviews":{"create":false,"read":true,"update":false,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":false},"companies":{"create":true,"read":true,"update":true,"delete":false},"notifications":{"create":false,"read":false,"update":false,"delete":false},"home_ads":{"create":false,"read":false,"update":false,"delete":false},"events":{"create":false,"read":false,"update":false,"delete":false},"cycles":{"create":false,"read":false,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
   ('content_manager', '콘텐츠 관리자', '브랜드, 홈광고, 이벤트 노출 콘텐츠를 관리합니다.', '{"members":{"create":false,"read":false,"update":false,"delete":false},"reviews":{"create":false,"read":true,"update":true,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":true,"read":true,"update":true,"delete":true},"companies":{"create":false,"read":false,"update":false,"delete":false},"notifications":{"create":false,"read":false,"update":false,"delete":false},"home_ads":{"create":true,"read":true,"update":true,"delete":true},"events":{"create":true,"read":true,"update":true,"delete":true},"cycles":{"create":false,"read":false,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
   ('support', '고객지원', '회원과 리뷰 상태를 확인하고 필요한 조치를 수행합니다.', '{"members":{"create":false,"read":true,"update":true,"delete":false},"reviews":{"create":false,"read":true,"update":true,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":false,"read":true,"update":false,"delete":false},"companies":{"create":false,"read":true,"update":false,"delete":false},"notifications":{"create":false,"read":true,"update":false,"delete":false},"home_ads":{"create":false,"read":false,"update":false,"delete":false},"events":{"create":false,"read":true,"update":false,"delete":false},"cycles":{"create":false,"read":false,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb),
   ('readonly', '조회 전용', '운영 데이터를 조회만 할 수 있습니다.', '{"members":{"create":false,"read":true,"update":false,"delete":false},"reviews":{"create":false,"read":true,"update":false,"delete":false},"logs":{"create":false,"read":true,"update":false,"delete":false},"brands":{"create":false,"read":true,"update":false,"delete":false},"companies":{"create":false,"read":true,"update":false,"delete":false},"notifications":{"create":false,"read":true,"update":false,"delete":false},"home_ads":{"create":false,"read":true,"update":false,"delete":false},"events":{"create":false,"read":true,"update":false,"delete":false},"cycles":{"create":false,"read":true,"update":false,"delete":false},"admin_management":{"create":false,"read":false,"update":false,"delete":false}}'::jsonb)

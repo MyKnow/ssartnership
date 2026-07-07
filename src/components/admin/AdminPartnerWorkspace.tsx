@@ -309,6 +309,7 @@ export default function AdminPartnerWorkspace({
   createCategoryAction,
   updateCategoryAction,
   deleteCategoryAction,
+  canManageGlobalSections = true,
 }: {
   categories: AdminCategory[];
   partners: AdminPartner[];
@@ -326,9 +327,14 @@ export default function AdminPartnerWorkspace({
   createCategoryAction: FormAction;
   updateCategoryAction: FormAction;
   deleteCategoryAction: FormAction;
+  canManageGlobalSections?: boolean;
 }) {
+  const normalizedInitialTab =
+    canManageGlobalSections || (initialTab !== "plans" && initialTab !== "categories")
+      ? initialTab
+      : "partners";
   const [activeTab, setActiveTab] =
-    useState<AdminPartnerWorkspaceTab>(initialTab);
+    useState<AdminPartnerWorkspaceTab>(normalizedInitialTab);
   const safePartners = partners.map((partner) => ({
     ...partner,
     metrics: partnerMetrics.metricsByPartnerId.get(partner.id) ?? null,
@@ -338,11 +344,12 @@ export default function AdminPartnerWorkspace({
     requestCount: changeRequests.length,
     planRequestCount: planRequests.filter((request) => request.status === "pending").length,
     categoryCount: categories.length,
+    includeGlobalSections: canManageGlobalSections,
   });
 
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
+    setActiveTab(normalizedInitialTab);
+  }, [normalizedInitialTab]);
 
   return (
     <div className="grid gap-6">
@@ -384,7 +391,7 @@ export default function AdminPartnerWorkspace({
         />
       ) : null}
 
-      {activeTab === "plans" ? (
+      {canManageGlobalSections && activeTab === "plans" ? (
         <section className="grid gap-4">
           <SectionHeading
             title="브랜드 플랜과 과금"
@@ -398,7 +405,7 @@ export default function AdminPartnerWorkspace({
         </section>
       ) : null}
 
-      {activeTab === "categories" ? (
+      {canManageGlobalSections && activeTab === "categories" ? (
         <CategoryManagerSection
           categories={categories}
           createCategoryAction={createCategoryAction}

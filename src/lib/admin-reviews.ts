@@ -82,6 +82,10 @@ export type AdminReviewPageData = {
 
 const ADMIN_REVIEW_RESULT_LIMIT = 200;
 
+type AdminReviewScopeOptions = {
+  managedCampusSlugs?: string[] | null;
+};
+
 type AdminReviewRow = {
   id: string;
   partner_id: string;
@@ -312,25 +316,42 @@ function applyAdminReviewFilters(
   });
 }
 
-async function fetchFilteredAdminReviewRows(filters: AdminReviewFilters) {
+async function fetchFilteredAdminReviewRows(
+  filters: AdminReviewFilters,
+  scope: AdminReviewScopeOptions = {},
+) {
   const supabase = getSupabaseAdminClient();
-  let partnerIdsByCompany: string[] | null = null;
+  const managedCampusSlugs = scope.managedCampusSlugs ?? null;
+  let scopedPartnerIds: string[] | null = null;
 
-  if (filters.companyId) {
+  if (filters.companyId || managedCampusSlugs) {
     if (!isUuid(filters.companyId)) {
-      return [];
+      if (filters.companyId) {
+        return [];
+      }
     }
-    const { data: partners, error: partnersError } = await supabase
+    let partnersQuery = supabase
       .from("partners")
-      .select("id")
-      .eq("company_id", filters.companyId);
+      .select("id");
+
+    if (filters.companyId) {
+      partnersQuery = partnersQuery.eq("company_id", filters.companyId);
+    }
+    if (managedCampusSlugs) {
+      if (managedCampusSlugs.length === 0) {
+        return [];
+      }
+      partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
+    }
+
+    const { data: partners, error: partnersError } = await partnersQuery;
 
     if (partnersError) {
       throw new Error(partnersError.message);
     }
 
-    partnerIdsByCompany = (partners ?? []).map((partner) => partner.id);
-    if (partnerIdsByCompany.length === 0) {
+    scopedPartnerIds = (partners ?? []).map((partner) => partner.id);
+    if (scopedPartnerIds.length === 0) {
       return [];
     }
   }
@@ -350,9 +371,12 @@ async function fetchFilteredAdminReviewRows(filters: AdminReviewFilters) {
     if (!isUuid(filters.partnerId)) {
       return [];
     }
+    if (scopedPartnerIds && !scopedPartnerIds.includes(filters.partnerId)) {
+      return [];
+    }
     query = query.eq("partner_id", filters.partnerId);
-  } else if (partnerIdsByCompany) {
-    query = query.in("partner_id", partnerIdsByCompany);
+  } else if (scopedPartnerIds) {
+    query = query.in("partner_id", scopedPartnerIds);
   }
 
   if (filters.rating !== "all") {
@@ -420,19 +444,29 @@ export async function getAdminReviewPageData(
   input: AdminReviewFilters,
   options?: {
     includeCounts?: boolean;
+    managedCampusSlugs?: string[] | null;
   },
 ): Promise<AdminReviewPageData> {
   const supabase = getSupabaseAdminClient();
   const includeCounts = options?.includeCounts ?? true;
+  const managedCampusSlugs = options?.managedCampusSlugs ?? null;
+  let companiesQuery = supabase
+    .from("partner_companies")
+    .select("id,name,slug,managed_campus_slugs")
+    .order("name", { ascending: true });
+  let partnersQuery = supabase
+    .from("partners")
+    .select("id,name,company_id,managed_campus_slugs,company:partner_companies(id,name,slug)")
+    .order("name", { ascending: true });
+
+  if (managedCampusSlugs) {
+    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
+    partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
+  }
+
   const [companiesResult, partnersResult, counts, reviews] = await Promise.all([
-    supabase
-      .from("partner_companies")
-      .select("id,name,slug")
-      .order("name", { ascending: true }),
-    supabase
-      .from("partners")
-      .select("id,name,company_id,company:partner_companies(id,name,slug)")
-      .order("name", { ascending: true }),
+    companiesQuery,
+    partnersQuery,
     includeCounts
       ? getAdminReviewCounts()
       : Promise.resolve({
@@ -440,7 +474,7 @@ export async function getAdminReviewPageData(
           visibleCount: 0,
           hiddenCount: 0,
         } satisfies AdminReviewCounts),
-    fetchFilteredAdminReviewRows(input),
+    fetchFilteredAdminReviewRows(input, { managedCampusSlugs }),
   ]);
 
   const companies = (companiesResult.data ?? []) as AdminReviewCompanyOption[];
@@ -458,9 +492,16 @@ export async function getAdminReviewPageData(
   );
 
   const filteredReviews = applyAdminReviewFilters(reviews, input);
+  const scopedCounts = managedCampusSlugs
+    ? {
+        totalCount: reviews.length,
+        visibleCount: reviews.filter((review) => !review.isHidden).length,
+        hiddenCount: reviews.filter((review) => review.isHidden).length,
+      }
+    : counts;
 
   return {
-    counts,
+    counts: scopedCounts,
     reviews: filteredReviews,
     companies,
     partners,

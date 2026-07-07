@@ -11,9 +11,14 @@ import Textarea from "@/components/ui/Textarea";
 import { updatePartnerRegistrationRequestStatus } from "@/app/admin/(protected)/partner-registrations/actions";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
+  canAdminAccessManagedCampuses,
+  getManagedCampusFilterValues,
+} from "@/lib/admin-scope";
+import {
   ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS,
   ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS,
 } from "@/lib/admin-partner-file-import";
+import { inferCampusSlugsFromLocation } from "@/lib/campuses";
 import {
   isPartnerRegistrationRequestStatus,
   PARTNER_REGISTRATION_SOURCE_LABELS,
@@ -60,6 +65,7 @@ type RegistrationRow = {
   admin_note?: string | null;
   reviewed_at?: string | null;
   created_at: string;
+  company?: { managed_campus_slugs?: string[] | null } | { managed_campus_slugs?: string[] | null }[] | null;
 };
 
 function formatDateTime(value?: string | null) {
@@ -139,9 +145,10 @@ export default async function AdminPartnerRegistrationsPage({
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
-  await requireAdminPermission("brands", "read", {
+  const adminSession = await requireAdminPermission("brands", "read", {
     path: "/admin/partner-registrations",
   });
+  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
 
   const params = (await searchParams) ?? {};
   const statusFilter = params.status;
@@ -152,7 +159,7 @@ export default async function AdminPartnerRegistrationsPage({
 
   let query = getSupabaseAdminClient()
     .from("partner_registration_requests")
-    .select("*")
+    .select("*,company:partner_companies(managed_campus_slugs)")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -165,7 +172,18 @@ export default async function AdminPartnerRegistrationsPage({
     throw new Error(`partner registration request load failed: ${error.message}`);
   }
 
-  const rows = (data ?? []) as RegistrationRow[];
+  const rows = ((data ?? []) as RegistrationRow[]).filter((row) => {
+    if (!managedCampusFilter) {
+      return true;
+    }
+    const company = Array.isArray(row.company) ? row.company[0] : row.company;
+    const managedCampusSlugs =
+      company?.managed_campus_slugs ?? inferCampusSlugsFromLocation(row.location);
+    return canAdminAccessManagedCampuses(
+      adminSession.account,
+      managedCampusSlugs,
+    );
+  });
   const counts = rows.reduce(
     (acc, row) => {
       const rowStatus = normalizeStatus(row.status);

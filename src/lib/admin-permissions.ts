@@ -30,6 +30,7 @@ export type AdminPermissionMatrix = Record<
 export type AdminPermissionTemplateKey =
   | "super_admin"
   | "operations_manager"
+  | "regional_partner_manager"
   | "content_manager"
   | "support"
   | "readonly";
@@ -177,6 +178,17 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
       home_ads: { create: true, read: true, update: true, delete: true },
       events: { create: true, read: true, update: true, delete: true },
       cycles: { read: true, update: true },
+    }),
+  },
+  {
+    key: "regional_partner_manager",
+    name: "지역 제휴 관리자",
+    description: "배정된 지역의 제휴처와 파트너사 운영을 담당합니다.",
+    permissions: normalizeAdminPermissionMatrix({
+      reviews: { read: true },
+      logs: { read: true },
+      brands: { create: true, read: true, update: true },
+      companies: { create: true, read: true, update: true },
     }),
   },
   {

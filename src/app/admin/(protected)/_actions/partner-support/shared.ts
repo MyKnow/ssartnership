@@ -31,6 +31,7 @@ export function normalizePartnerCompanyRow(
     slug: row.slug,
     description: row.description ?? null,
     is_active: row.is_active ?? true,
+    managed_campus_slugs: row.managed_campus_slugs ?? [],
   } satisfies PartnerCompanyRow;
 }
 

@@ -6,6 +6,8 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { getManagedCampusFilterValues } from "@/lib/admin-scope";
+import { CAMPUS_SLUGS } from "@/lib/campuses";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -34,18 +36,25 @@ function normalizePartnerCompanies(value: unknown): PartnerCompanyRow[] {
 }
 
 export default async function AdminPartnerNewPage() {
-  await requireAdminPermission("brands", "create", { path: "/admin/partners/new" });
+  const adminSession = await requireAdminPermission("brands", "create", {
+    path: "/admin/partners/new",
+  });
   const supabase = getSupabaseAdminClient();
+  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
+  let companiesQuery = supabase
+    .from("partner_companies")
+    .select("id,name,slug,description,is_active,managed_campus_slugs,created_at,updated_at")
+    .order("name", { ascending: true });
+  if (managedCampusFilter) {
+    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusFilter);
+  }
 
   const [categoriesResult, companiesResult] = await Promise.all([
     supabase
       .from("categories")
       .select("id,key,label,description,color")
       .order("created_at", { ascending: true }),
-    supabase
-      .from("partner_companies")
-      .select("id,name,slug,description,is_active,created_at,updated_at")
-      .order("name", { ascending: true }),
+    companiesQuery,
   ]);
 
   const categories = categoriesResult.data ?? [];
@@ -55,6 +64,8 @@ export default async function AdminPartnerNewPage() {
     slug: company.slug,
   }));
   const defaultCategoryId = categories[0]?.id ?? "";
+  const defaultCampusSlugs =
+    managedCampusFilter ?? [...CAMPUS_SLUGS];
 
   return (
     <AdminShell
@@ -96,7 +107,7 @@ export default async function AdminPartnerNewPage() {
                   benefitVisibility: "public",
                   location: "",
                   detailDescription: "",
-                  campusSlugs: ["seoul", "gumi", "daejeon", "busan-ulsan-gyeongnam", "gwangju"],
+                  campusSlugs: defaultCampusSlugs,
                   mapUrl: "",
                   benefitActionType: "none",
                   benefitActionLink: "",

@@ -18,6 +18,8 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_exists: "이미 존재하는 로그인 아이디입니다.",
   partner_account_company_missing: "연결할 계정과 회사를 찾을 수 없습니다.",
   partner_account_company_invalid_request: "연결 상태 입력값을 확인해 주세요.",
+  regional_admin_scope_denied: "배정된 지역의 제휴처 또는 파트너사만 관리할 수 있습니다.",
+  admin_global_scope_required: "전역 관리자만 수행할 수 있는 작업입니다.",
   partner_company_plan_invalid_request: "플랜 입력값을 확인해 주세요.",
   partner_company_plan_missing_request: "플랜 요청을 찾을 수 없습니다.",
   partner_company_plan_pending_exists: "이미 처리 대기 중인 업그레이드 요청이 있습니다.",

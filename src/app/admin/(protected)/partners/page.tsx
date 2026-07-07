@@ -25,6 +25,10 @@ import {
 import { listPartnerChangeRequests } from "@/lib/partner-change-requests";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { normalizeAdminPartnerWorkspaceTab } from "@/components/admin/partner-workspace-tabs";
+import {
+  getManagedCampusFilterValues,
+  isRegionalAdminAccount,
+} from "@/lib/admin-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +43,7 @@ type PartnerCompanyRow = {
   slug: string;
   description?: string | null;
   is_active?: boolean | null;
+  managed_campus_slugs?: string[] | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -102,11 +107,20 @@ export default async function AdminPartnersPage({
 }: {
   searchParams?: Promise<{ error?: string; tab?: string }>;
 }) {
-  await requireAdminPermission("brands", "read", { path: "/admin/partners" });
+  const adminSession = await requireAdminPermission("brands", "read", { path: "/admin/partners" });
   const supabase = getSupabaseAdminClient();
+  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
+  const canManageGlobalSections = !isRegionalAdminAccount(adminSession.account);
   const params = (await searchParams) ?? {};
   const partnerFormError = params.error ? adminPartnersErrorMessages[params.error] : null;
   const initialTab = normalizeAdminPartnerWorkspaceTab(params.tab);
+  let partnersQuery = supabase
+    .from("partners")
+    .select("id,name,category_id,company_id,location,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)")
+    .order("created_at", { ascending: false });
+  if (managedCampusFilter) {
+    partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusFilter);
+  }
 
   const [
     categoriesResult,
@@ -119,10 +133,7 @@ export default async function AdminPartnersPage({
       .from("categories")
       .select("id,key,label,description,color")
       .order("created_at", { ascending: true }),
-    supabase
-      .from("partners")
-      .select("id,name,category_id,company_id,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active)")
-      .order("created_at", { ascending: false }),
+    partnersQuery,
     supabase
       .from("partner_plan_upgrade_requests")
       .select(
@@ -153,6 +164,12 @@ export default async function AdminPartnersPage({
     ...partner,
     company: normalizePartnerCompany((partner as { company?: unknown }).company),
   }));
+  const scopedPartnerIds = new Set(normalizedPartners.map((partner) => partner.id));
+  const scopedCompanyIds = new Set(
+    normalizedPartners
+      .map((partner) => partner.company_id ?? partner.company?.id ?? null)
+      .filter((companyId): companyId is string => Boolean(companyId)),
+  );
   const partnerMetrics = await getAdminPartnerMetrics(
     normalizedPartners.map((partner) => partner.id),
   );
@@ -183,7 +200,17 @@ export default async function AdminPartnersPage({
       planUpdatedAt: (partner as { plan_updated_at?: string | null }).plan_updated_at ?? null,
     };
   });
-  const mappedPlanRequests = ((planRequestsResult.data ?? []) as PartnerPlanUpgradeRequestRow[]).map((request) => {
+  const mappedPlanRequests = ((planRequestsResult.data ?? []) as PartnerPlanUpgradeRequestRow[])
+    .filter((request) => {
+      if (!managedCampusFilter) {
+        return true;
+      }
+      return (
+        (request.partner_id ? scopedPartnerIds.has(request.partner_id) : false) ||
+        scopedCompanyIds.has(request.company_id)
+      );
+    })
+    .map((request) => {
     const brand = normalizeRelation(request.brand);
     const company = normalizeRelation(request.company);
     const requestedBy = normalizeRelation(request.requested_by);
@@ -205,7 +232,7 @@ export default async function AdminPartnersPage({
       createdAt: request.created_at,
       billingInvoice: null,
     };
-  });
+    });
   const billingByRequestId =
     await getPartnerBillingInvoiceSummariesForUpgradeRequests(
       mappedPlanRequests.map((request) => request.id),
@@ -214,7 +241,17 @@ export default async function AdminPartnersPage({
     ...request,
     billingInvoice: billingByRequestId.get(request.id) ?? null,
   }));
-  const planEvents = ((planEventsResult.data ?? []) as PartnerPlanEventRow[]).map((event) => {
+  const planEvents = ((planEventsResult.data ?? []) as PartnerPlanEventRow[])
+    .filter((event) => {
+      if (!managedCampusFilter) {
+        return true;
+      }
+      return (
+        (event.partner_id ? scopedPartnerIds.has(event.partner_id) : false) ||
+        scopedCompanyIds.has(event.company_id)
+      );
+    })
+    .map((event) => {
     const brand = normalizeRelation(event.brand);
     return {
       id: event.id,
@@ -229,7 +266,10 @@ export default async function AdminPartnersPage({
       note: event.note ?? "",
       createdAt: event.created_at,
     };
-  });
+    });
+  const scopedChangeRequests = managedCampusFilter
+    ? changeRequests.filter((request) => scopedPartnerIds.has(request.partnerId))
+    : changeRequests;
 
   return (
     <AdminShell
@@ -272,7 +312,7 @@ export default async function AdminPartnersPage({
         <AdminPartnerWorkspace
           categories={safeCategories}
           partners={normalizedPartners}
-          changeRequests={changeRequests}
+          changeRequests={scopedChangeRequests}
           planBrands={planBrands}
           planRequests={planRequests}
           planEvents={planEvents}
@@ -283,6 +323,7 @@ export default async function AdminPartnersPage({
           createCategoryAction={createCategory}
           updateCategoryAction={updateCategory}
           deleteCategoryAction={deleteCategory}
+          canManageGlobalSections={canManageGlobalSections}
         />
 
       </section>

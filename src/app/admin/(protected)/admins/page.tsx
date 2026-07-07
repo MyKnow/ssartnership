@@ -20,6 +20,7 @@ import {
   ADMIN_PERMISSION_RESOURCES,
   getAdminPermissionResourceLabel,
 } from "@/lib/admin-permissions";
+import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,30 @@ export default async function AdminAccountsPage({
                 ))}
               </select>
             </label>
+            <fieldset className="grid gap-2 md:col-span-3">
+              <legend className="text-sm font-medium text-foreground">
+                관리 캠퍼스
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {CAMPUS_DIRECTORY.map((campus) => (
+                  <label
+                    key={campus.slug}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
+                  >
+                    <input
+                      type="checkbox"
+                      name="managedCampusSlugs"
+                      value={campus.slug}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    {campus.label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                지역 제휴 관리자 권한에만 적용됩니다. 전국 노출 제휴라도 운영 책임 지역은 여기서 별도로 관리합니다.
+              </p>
+            </fieldset>
             <SubmitButton pendingText="저장 중">권한 부여</SubmitButton>
           </form>
         </Card>
@@ -158,6 +183,28 @@ export default async function AdminAccountsPage({
                     ))}
                   </select>
                 </label>
+                <fieldset className="grid min-w-full gap-2">
+                  <legend className="text-sm font-medium text-foreground">
+                    관리 캠퍼스
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    {CAMPUS_DIRECTORY.map((campus) => (
+                      <label
+                        key={campus.slug}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          name="managedCampusSlugs"
+                          value={campus.slug}
+                          defaultChecked={account.managedCampusSlugs.includes(campus.slug)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        {campus.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
                 <SubmitButton variant="secondary" pendingText="적용 중">
                   적용
                 </SubmitButton>
@@ -173,6 +220,25 @@ export default async function AdminAccountsPage({
                       {getAdminPermissionResourceLabel(resource)}
                     </Badge>
                   ))}
+                </div>
+              </div>
+              <div className="grid gap-2 rounded-2xl border border-border bg-surface-inset p-4">
+                <p className="text-sm font-semibold text-foreground">관리 캠퍼스</p>
+                <div className="flex flex-wrap gap-2">
+                  {account.managedCampusSlugs.length > 0 ? (
+                    account.managedCampusSlugs.map((slug) => {
+                      const campus = CAMPUS_DIRECTORY.find((item) => item.slug === slug);
+                      return (
+                        <Badge key={slug} variant="neutral">
+                          {campus?.label ?? slug}
+                        </Badge>
+                      );
+                    })
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      지역 제한 없음
+                    </span>
+                  )}
                 </div>
               </div>
             </Card>

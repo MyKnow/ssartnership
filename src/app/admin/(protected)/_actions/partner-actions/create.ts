@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
+import {
+  assertAdminCanAccessManagedCampuses,
+  type AdminScopeAccountLike,
+  resolveCreatedManagedCampusSlugs,
+} from "@/lib/admin-scope";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import {
   createNewPartnerPayload,
@@ -25,17 +30,35 @@ import {
 } from "@/app/admin/(protected)/_actions/shared-parsers";
 import type { CreatedPartnerRecord } from "@/app/admin/(protected)/_actions/shared-types";
 
-async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRecord> {
+async function createPartnerRecord(
+  formData: FormData,
+  adminAccount: AdminScopeAccountLike,
+): Promise<CreatedPartnerRecord> {
   const payload = parsePartnerPayload(formData);
   const partnerId = randomUUID();
   const companyPayload = parsePartnerCompanyPayload(formData);
   const media = await resolvePartnerMediaPayload(formData, partnerId);
+  const managedCampusSlugs = resolveCreatedManagedCampusSlugs(
+    adminAccount,
+    payload.campusSlugs,
+  );
 
   const supabase = getSupabaseAdminClient();
   let companyProvision = null;
 
   try {
-    companyProvision = await ensurePartnerCompanyRow(supabase, companyPayload, false);
+    companyProvision = await ensurePartnerCompanyRow(
+      supabase,
+      companyPayload,
+      false,
+      { managedCampusSlugs },
+    );
+    if (companyProvision?.company) {
+      assertAdminCanAccessManagedCampuses(
+        adminAccount,
+        companyProvision.company.managed_campus_slugs,
+      );
+    }
 
     const { error } = await supabase.from("partners").insert({
       id: partnerId,
@@ -60,6 +83,7 @@ async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRe
       tags: payload.tags,
       visibility: payload.visibility,
       benefit_visibility: payload.benefitVisibility,
+      managed_campus_slugs: managedCampusSlugs,
     });
 
     if (error) {
@@ -74,6 +98,7 @@ async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRe
   return {
     partnerId,
     payload,
+    managedCampusSlugs,
     companyProvision,
     media,
     supabase,
@@ -81,7 +106,7 @@ async function createPartnerRecord(formData: FormData): Promise<CreatedPartnerRe
 }
 
 async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
-  const { partnerId, payload, companyProvision, media, supabase } = record;
+  const { partnerId, payload, managedCampusSlugs, companyProvision, media, supabase } = record;
 
   await logAdminAction("partner_create", {
     targetType: "partner",
@@ -92,6 +117,7 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
       companyName: companyProvision?.company?.name ?? null,
       categoryId: payload.categoryId,
       location: payload.location,
+      managedCampusSlugs,
       hasDetailDescription: Boolean(payload.detailDescription),
       campusSlugs: payload.campusSlugs,
       hasMapUrl: Boolean(payload.mapUrl),
@@ -154,9 +180,11 @@ export async function createPartnerFormActionImpl(
   _prevState: PartnerCreateFormState,
   formData: FormData,
 ): Promise<PartnerCreateFormState> {
-  await requireAdminPermission("brands", "create", { path: "/admin/partners/new" });
+  const adminSession = await requireAdminPermission("brands", "create", {
+    path: "/admin/partners/new",
+  });
   try {
-    const record = await createPartnerRecord(formData);
+    const record = await createPartnerRecord(formData, adminSession.account);
     await finalizeCreatedPartner(record);
   } catch (error) {
     return {

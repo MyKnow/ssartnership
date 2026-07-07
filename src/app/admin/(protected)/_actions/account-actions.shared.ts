@@ -1,4 +1,10 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  assertAdminCanAccessManagedCampuses,
+  canAdminAccessManagedCampuses,
+  isRegionalAdminAccount,
+  type AdminScopeAccountLike,
+} from "@/lib/admin-scope";
 import { redirectAdminActionError } from "./shared-helpers";
 
 export function getPartnerAccountSupabase() {
@@ -30,7 +36,7 @@ export async function loadPartnerCompanyOrRedirect(companyId: string) {
   const supabase = getPartnerAccountSupabase();
   const { data: company, error } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,is_active")
+    .select("id,name,slug,description,is_active,managed_campus_slugs")
     .eq("id", companyId)
     .maybeSingle();
 
@@ -39,4 +45,54 @@ export async function loadPartnerCompanyOrRedirect(companyId: string) {
   }
 
   return { supabase, company };
+}
+
+export async function loadScopedPartnerCompanyOrRedirect(
+  companyId: string,
+  adminAccount: AdminScopeAccountLike,
+) {
+  const result = await loadPartnerCompanyOrRedirect(companyId);
+  try {
+    assertAdminCanAccessManagedCampuses(
+      adminAccount,
+      (result.company as { managed_campus_slugs?: string[] | null }).managed_campus_slugs,
+    );
+  } catch {
+    redirectAdminActionError("/admin/companies", "regional_admin_scope_denied");
+  }
+  return result;
+}
+
+export async function assertPartnerAccountInManagedScopeOrRedirect(
+  accountId: string,
+  adminAccount: AdminScopeAccountLike,
+) {
+  if (!isRegionalAdminAccount(adminAccount)) {
+    return;
+  }
+
+  const supabase = getPartnerAccountSupabase();
+  const { data: links, error } = await supabase
+    .from("partner_account_companies")
+    .select("company:partner_companies(id,managed_campus_slugs)")
+    .eq("account_id", accountId)
+    .eq("is_active", true);
+
+  if (error) {
+    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
+  }
+
+  const hasAccessibleCompany = (links ?? []).some((link) => {
+    const company = Array.isArray((link as { company?: unknown }).company)
+      ? ((link as { company?: Array<{ managed_campus_slugs?: string[] | null }> }).company?.[0] ?? null)
+      : ((link as { company?: { managed_campus_slugs?: string[] | null } | null }).company ?? null);
+    return canAdminAccessManagedCampuses(
+      adminAccount,
+      company?.managed_campus_slugs,
+    );
+  });
+
+  if (!hasAccessibleCompany) {
+    redirectAdminActionError("/admin/companies?tab=accounts", "regional_admin_scope_denied");
+  }
 }

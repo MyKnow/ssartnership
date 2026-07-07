@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -35,7 +36,9 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export async function updatePartnerAction(formData: FormData) {
-  await requireAdminPermission("brands", "update", { path: "/admin/partners" });
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: "/admin/partners",
+  });
   const id = String(formData.get("id") || "").trim();
   if (!id) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
@@ -51,7 +54,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,detail_description,campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug),categories(id,label)",
+      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -62,21 +65,31 @@ export async function updatePartnerAction(formData: FormData) {
   if (!previousPartner) {
     throw new Error("수정할 업체를 찾을 수 없습니다.");
   }
+  const previousManagedCampusSlugs =
+    (previousPartner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs ??
+    [];
+  assertAdminCanAccessManagedCampuses(
+    adminSession.account,
+    previousManagedCampusSlugs,
+  );
 
   const previousCompany = normalizeRelation<{
     id: string;
     name: string;
     slug: string;
+    managed_campus_slugs?: string[] | null;
   }>((previousPartner as { company?: unknown }).company as
     | {
         id: string;
         name: string;
         slug: string;
+        managed_campus_slugs?: string[] | null;
       }
     | Array<{
         id: string;
         name: string;
         slug: string;
+        managed_campus_slugs?: string[] | null;
       }>
     | null
     | undefined);
@@ -116,8 +129,13 @@ export async function updatePartnerAction(formData: FormData) {
       supabase,
       companyPayload,
       Boolean(previousPartner.company_id || hasCompanyPayload),
+      { managedCampusSlugs: previousManagedCampusSlugs },
     );
     if (companyProvision.company) {
+      assertAdminCanAccessManagedCampuses(
+        adminSession.account,
+        companyProvision.company.managed_campus_slugs,
+      );
       nextCompanyId = companyProvision.company.id;
     }
   }

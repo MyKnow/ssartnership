@@ -13,13 +13,16 @@ import {
   revalidatePartnerCompanyData,
 } from "./shared-helpers";
 import {
+  assertPartnerAccountInManagedScopeOrRedirect,
   getPartnerAccountSupabase,
   loadPartnerAccountOrRedirect,
-  loadPartnerCompanyOrRedirect,
+  loadScopedPartnerCompanyOrRedirect,
 } from "./account-actions.shared";
 
 export async function updatePartnerAccountAction(formData: FormData) {
-  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "update", {
+    path: "/admin/companies",
+  });
   let payload: ReturnType<typeof parsePartnerAccountPayload>;
   try {
     payload = parsePartnerAccountPayload(formData);
@@ -31,6 +34,7 @@ export async function updatePartnerAccountAction(formData: FormData) {
   }
 
   const { supabase, account: existingAccount } = await loadPartnerAccountOrRedirect(payload.id);
+  await assertPartnerAccountInManagedScopeOrRedirect(payload.id, adminSession.account);
   const nextAccount = {
     login_id: payload.loginId,
     display_name: payload.displayName,
@@ -81,7 +85,9 @@ export async function updatePartnerAccountAction(formData: FormData) {
 }
 
 export async function createPartnerAccountAction(formData: FormData) {
-  await requireAdminPermission("companies", "create", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "create", {
+    path: "/admin/companies",
+  });
   let payload: ReturnType<typeof parsePartnerAccountCreatePayload>;
   try {
     payload = parsePartnerAccountCreatePayload(formData);
@@ -106,7 +112,10 @@ export async function createPartnerAccountAction(formData: FormData) {
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_exists");
   }
 
-  const { company } = await loadPartnerCompanyOrRedirect(payload.companyId);
+  const { company } = await loadScopedPartnerCompanyOrRedirect(
+    payload.companyId,
+    adminSession.account,
+  );
   const passwordRecord = hashPassword(generateTempPassword(12));
   const now = new Date().toISOString();
 

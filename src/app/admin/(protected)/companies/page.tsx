@@ -5,6 +5,7 @@ import ShellHeader from "@/components/ui/ShellHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ type PartnerCompanyRow = {
   slug: string;
   description?: string | null;
   is_active?: boolean | null;
+  managed_campus_slugs?: string[] | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -137,8 +139,11 @@ export default async function AdminCompaniesPage({
     tab?: string;
   }>;
 }) {
-  await requireAdminPermission("companies", "read", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "read", {
+    path: "/admin/companies",
+  });
   const supabase = getSupabaseAdminClient();
+  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
   const params = (await searchParams) ?? {};
   const companyError = params.error ? adminCompaniesErrorMessages[params.error] : null;
   const generatedSetupUrl =
@@ -152,20 +157,23 @@ export default async function AdminCompaniesPage({
       ? "accounts"
       : "companies";
 
-  const [
-    partnersResult,
-    companiesResult,
-    accountsResult,
-    accountLinksResult,
-  ] = await Promise.all([
-    supabase
-      .from("partners")
-      .select("id,company_id,company:partner_companies(id)")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("partner_companies")
-      .select("id,name,slug,description,is_active,created_at,updated_at")
-      .order("name", { ascending: true }),
+  let partnersQuery = supabase
+    .from("partners")
+    .select("id,company_id,managed_campus_slugs,company:partner_companies(id)")
+    .order("created_at", { ascending: false });
+  let companiesQuery = supabase
+    .from("partner_companies")
+    .select("id,name,slug,description,is_active,managed_campus_slugs,created_at,updated_at")
+    .order("name", { ascending: true });
+  if (managedCampusFilter) {
+    partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusFilter);
+    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusFilter);
+  }
+
+  const [partnersResult, companiesResult, accountsResult, accountLinksResult] =
+    await Promise.all([
+      partnersQuery,
+      companiesQuery,
     supabase
       .from("partner_accounts")
       .select(
@@ -175,7 +183,7 @@ export default async function AdminCompaniesPage({
     supabase
       .from("partner_account_companies")
       .select(
-        "id,account_id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active)",
+        "id,account_id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)",
       )
       .order("created_at", { ascending: false }),
   ]);
@@ -197,16 +205,21 @@ export default async function AdminCompaniesPage({
     company: normalizePartnerCompany((partner as { company?: unknown }).company),
   }));
   const safeCompanies = companiesResult.data ?? [];
+  const scopedCompanyIds = new Set(safeCompanies.map((company) => company.id));
   const accountLinksByAccountId = new Map<string, PartnerAccountCompanyLinkRow[]>();
   for (const rawLink of accountLinksResult.data ?? []) {
     const link = rawLink as PartnerAccountCompanyLinkRowRecord;
+    const company = normalizePartnerCompany(link.company);
+    if (managedCampusFilter && (!company || !scopedCompanyIds.has(company.id))) {
+      continue;
+    }
     const links = accountLinksByAccountId.get(link.account_id) ?? [];
     links.push({
       id: link.id,
       account_id: link.account_id,
       is_active: link.is_active ?? null,
       created_at: link.created_at ?? null,
-      company: normalizePartnerCompany(link.company),
+      company,
     });
     accountLinksByAccountId.set(link.account_id, links);
   }
@@ -218,7 +231,8 @@ export default async function AdminCompaniesPage({
         links: accountLinksByAccountId.get((account as { id: string }).id) ?? [],
       }),
     )
-    .filter((account): account is PartnerAccountRow => Boolean(account));
+    .filter((account): account is PartnerAccountRow => Boolean(account))
+    .filter((account) => !managedCampusFilter || account.links.length > 0);
   const activeCompanyCount = safeCompanies.filter((company) => company.is_active !== false).length;
   const activeAccountCount = safeAccounts.filter((account) => account.is_active !== false).length;
   const totalAccountLinks = safeAccounts.reduce(

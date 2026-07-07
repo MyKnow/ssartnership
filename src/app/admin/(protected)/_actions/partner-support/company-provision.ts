@@ -18,6 +18,7 @@ export async function ensurePartnerCompanyRow(
   supabase: AdminSupabaseClient,
   companyInput: PartnerCompanyInput,
   requireCompany: boolean,
+  options: { managedCampusSlugs?: string[] | null } = {},
 ): Promise<PartnerCompanyProvision> {
   const hasCompanySelection = Boolean(companyInput.companyId);
   const hasCompanyFields = Boolean(
@@ -52,7 +53,7 @@ export async function ensurePartnerCompanyRow(
     if (hasCompanySelection) {
       const { data, error } = await supabase
         .from("partner_companies")
-        .select("id,name,slug,description,is_active")
+        .select("id,name,slug,description,is_active,managed_campus_slugs")
         .eq("id", companyInput.companyId)
         .maybeSingle();
 
@@ -90,8 +91,9 @@ export async function ensurePartnerCompanyRow(
         slug: buildPartnerCompanySlug(companyInput.name),
         description: companyInput.description,
         is_active: true,
+        managed_campus_slugs: options.managedCampusSlugs ?? [],
       })
-      .select("id,name,slug,description,is_active")
+      .select("id,name,slug,description,is_active,managed_campus_slugs")
       .single();
 
     if (error) {

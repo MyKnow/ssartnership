@@ -15,6 +15,10 @@ import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTime
 import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
+import {
+  assertAdminCanAccessManagedCampuses,
+  getManagedCampusFilterValues,
+} from "@/lib/admin-scope";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import {
   getAdminReviewPageData,
@@ -45,6 +49,7 @@ type PartnerCompanyRow = {
   slug: string;
   description?: string | null;
   is_active?: boolean | null;
+  managed_campus_slugs?: string[] | null;
 };
 
 type PartnerCategoryRow = {
@@ -69,8 +74,11 @@ export default async function AdminPartnerDetailPage({
   params: Promise<{ partnerId: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminPermission("brands", "read", { path: "/admin/partners" });
+  const adminSession = await requireAdminPermission("brands", "read", {
+    path: "/admin/partners",
+  });
   const { partnerId } = await params;
+  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
   const query = (await searchParams) ?? {};
   const detailPath = `/admin/partners/${partnerId}`;
   const partnerError = query.error
@@ -83,6 +91,13 @@ export default async function AdminPartnerDetailPage({
     partnerId,
     companyId: "",
   };
+  let companiesQuery = supabase
+    .from("partner_companies")
+    .select("id,name,slug,description,is_active,managed_campus_slugs")
+    .order("name", { ascending: true });
+  if (managedCampusFilter) {
+    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusFilter);
+  }
 
   const [
     categoriesResult,
@@ -96,19 +111,19 @@ export default async function AdminPartnerDetailPage({
       .from("categories")
       .select("id,key,label,description,color")
       .order("created_at", { ascending: true }),
-    supabase
-      .from("partner_companies")
-      .select("id,name,slug,description,is_active")
-      .order("name", { ascending: true }),
+    companiesQuery,
     supabase
       .from("partners")
       .select(
-        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active),categories(id,key,label,color,description)",
+        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)",
       )
       .eq("id", partnerId)
       .maybeSingle(),
     getAdminPartnerMetrics([partnerId]),
-    getAdminReviewPageData(reviewFilters, { includeCounts: false }),
+    getAdminReviewPageData(reviewFilters, {
+      includeCounts: false,
+      managedCampusSlugs: managedCampusFilter,
+    }),
     fetchPartnerReviewVisibilityCounts(supabase, partnerId),
   ]);
 
@@ -117,6 +132,14 @@ export default async function AdminPartnerDetailPage({
   }
 
   const partner = partnerResult.data;
+  try {
+    assertAdminCanAccessManagedCampuses(
+      adminSession.account,
+      (partner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs,
+    );
+  } catch {
+    notFound();
+  }
   const company = normalizeRelation<PartnerCompanyRow>(
     (partner as { company?: PartnerCompanyRow | PartnerCompanyRow[] | null }).company,
   );

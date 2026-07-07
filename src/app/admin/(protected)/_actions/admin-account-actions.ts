@@ -16,6 +16,13 @@ function adminManagementPathWithStatus(status: string, extra?: Record<string, st
   return `/admin/admins?${params.toString()}`;
 }
 
+function readManagedCampusSlugs(formData: FormData) {
+  return formData
+    .getAll("managedCampusSlugs")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+}
+
 async function notifyAdminSecurityAlert(input: {
   title: string;
   body: string;
@@ -44,6 +51,7 @@ export async function grantMemberAdminPermissionAction(formData: FormData) {
     const account = await grantMemberAdminPermission({
       memberUsername,
       templateKey,
+      managedCampusSlugs: readManagedCampusSlugs(formData),
     });
     await logAdminAction("admin_account_create", {
       targetType: "member_admin_permission",
@@ -51,6 +59,7 @@ export async function grantMemberAdminPermissionAction(formData: FormData) {
       properties: {
         memberUsername: account.loginId,
         templateKey: account.permissionId,
+        managedCampusSlugs: account.managedCampusSlugs,
       },
     });
     await notifyAdminSecurityAlert({
@@ -60,6 +69,7 @@ export async function grantMemberAdminPermissionAction(formData: FormData) {
         targetAdminId: account.id,
         targetLoginId: account.loginId,
         permissionId: account.permissionId,
+        managedCampusSlugs: account.managedCampusSlugs,
       },
     });
     revalidatePath("/admin/admins");
@@ -134,6 +144,7 @@ export async function applyAdminPermissionTemplateAction(formData: FormData) {
       actorAdminId: actor.adminId,
       targetAdminId: adminId,
       templateKey,
+      managedCampusSlugs: readManagedCampusSlugs(formData),
     });
     await logAdminAction("admin_account_template_apply", {
       targetType: "member_admin_permission",
@@ -146,6 +157,7 @@ export async function applyAdminPermissionTemplateAction(formData: FormData) {
       metadata: {
         targetAdminId: adminId,
         templateKey,
+        managedCampusSlugs: readManagedCampusSlugs(formData),
         actorAdminId: actor.adminId,
       },
     });

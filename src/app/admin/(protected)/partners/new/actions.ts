@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin-partner-file-import";
 import { parseAdminPartnerXlsxDraft } from "@/lib/admin-partner-file-import.server";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
@@ -29,7 +30,9 @@ function normalizePartnerCompanies(value: unknown): PartnerCompanyRow[] {
 export async function parseAdminPartnerXlsxFileAction(
   formData: FormData,
 ): Promise<AdminPartnerFileParseResult> {
-  await requireAdminPermission("brands", "create", { path: "/admin/partners/new" });
+  const adminSession = await requireAdminPermission("brands", "create", {
+    path: "/admin/partners/new",
+  });
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
@@ -40,15 +43,20 @@ export async function parseAdminPartnerXlsxFileAction(
   }
 
   const supabase = getSupabaseAdminClient();
+  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
+  let companiesQuery = supabase
+    .from("partner_companies")
+    .select("id,name,managed_campus_slugs")
+    .order("name", { ascending: true });
+  if (managedCampusFilter) {
+    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusFilter);
+  }
   const [categoriesResult, companiesResult] = await Promise.all([
     supabase
       .from("categories")
       .select("id,key,label")
       .order("created_at", { ascending: true }),
-    supabase
-      .from("partner_companies")
-      .select("id,name")
-      .order("name", { ascending: true }),
+    companiesQuery,
   ]);
 
   if (categoriesResult.error || companiesResult.error) {

@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminPermission } from "@/lib/admin-access";
+import {
+  assertAdminCanAccessManagedCampuses,
+  assertAdminCanUseGlobalFeature,
+  resolveCreatedManagedCampusSlugs,
+} from "@/lib/admin-scope";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import { buildPartnerCompanySlug } from "./partner-support";
 import {
@@ -26,11 +31,19 @@ function normalizePartnerCompanyRow(row: PartnerCompanyRow | null | undefined) {
     slug: row.slug,
     description: row.description ?? null,
     is_active: row.is_active ?? true,
+    managed_campus_slugs: row.managed_campus_slugs ?? [],
   } satisfies PartnerCompanyRow;
 }
 
 export async function createCategoryAction(formData: FormData) {
-  await requireAdminPermission("brands", "create", { path: "/admin/partners" });
+  const adminSession = await requireAdminPermission("brands", "create", {
+    path: "/admin/partners",
+  });
+  try {
+    assertAdminCanUseGlobalFeature(adminSession.account);
+  } catch {
+    redirectAdminActionError("/admin/partners", "admin_global_scope_required");
+  }
   const { key, label, description, color } = parseCategoryPayloadOrRedirect(
     formData,
     "/admin/partners",
@@ -57,7 +70,14 @@ export async function createCategoryAction(formData: FormData) {
 }
 
 export async function updateCategoryAction(formData: FormData) {
-  await requireAdminPermission("brands", "update", { path: "/admin/partners" });
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: "/admin/partners",
+  });
+  try {
+    assertAdminCanUseGlobalFeature(adminSession.account);
+  } catch {
+    redirectAdminActionError("/admin/partners", "admin_global_scope_required");
+  }
   const id = String(formData.get("id") || "").trim();
   const { key, label, description, color } = parseCategoryPayloadOrRedirect(
     formData,
@@ -89,7 +109,14 @@ export async function updateCategoryAction(formData: FormData) {
 }
 
 export async function deleteCategoryAction(formData: FormData) {
-  await requireAdminPermission("brands", "delete", { path: "/admin/partners" });
+  const adminSession = await requireAdminPermission("brands", "delete", {
+    path: "/admin/partners",
+  });
+  try {
+    assertAdminCanUseGlobalFeature(adminSession.account);
+  } catch {
+    redirectAdminActionError("/admin/partners", "admin_global_scope_required");
+  }
   const id = String(formData.get("id") || "").trim();
   if (!id) {
     redirectAdminActionError("/admin/partners", "category_invalid_request");
@@ -111,7 +138,9 @@ export async function deleteCategoryAction(formData: FormData) {
 }
 
 export async function createPartnerCompanyAction(formData: FormData) {
-  await requireAdminPermission("companies", "create", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "create", {
+    path: "/admin/companies",
+  });
   let payload: PartnerCompanyCrudInput;
   try {
     payload = parsePartnerCompanyCrudPayload(formData);
@@ -123,6 +152,10 @@ export async function createPartnerCompanyAction(formData: FormData) {
   }
 
   const supabase = getSupabaseAdminClient();
+  const managedCampusSlugs = resolveCreatedManagedCampusSlugs(
+    adminSession.account,
+    null,
+  );
   const { data, error } = await supabase
     .from("partner_companies")
     .insert({
@@ -130,8 +163,9 @@ export async function createPartnerCompanyAction(formData: FormData) {
       slug: buildPartnerCompanySlug(payload.name),
       description: payload.description,
       is_active: payload.isActive,
+      managed_campus_slugs: managedCampusSlugs,
     })
-    .select("id,name,slug,description,is_active")
+    .select("id,name,slug,description,is_active,managed_campus_slugs")
     .single();
 
   if (error) {
@@ -151,6 +185,7 @@ export async function createPartnerCompanyAction(formData: FormData) {
       slug: company.slug,
       description: company.description ?? null,
       isActive: company.is_active ?? true,
+      managedCampusSlugs,
     },
   });
 
@@ -159,7 +194,9 @@ export async function createPartnerCompanyAction(formData: FormData) {
 }
 
 export async function updatePartnerCompanyAction(formData: FormData) {
-  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "update", {
+    path: "/admin/companies",
+  });
   let payload: PartnerCompanyCrudInput;
   try {
     payload = parsePartnerCompanyCrudPayload(formData);
@@ -177,12 +214,20 @@ export async function updatePartnerCompanyAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: existingCompany, error: companyError } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,is_active,created_at,updated_at")
+    .select("id,name,slug,description,is_active,managed_campus_slugs,created_at,updated_at")
     .eq("id", payload.companyId)
     .maybeSingle();
 
   if (companyError || !existingCompany) {
     redirectAdminActionError("/admin/companies", "company_invalid_request");
+  }
+  try {
+    assertAdminCanAccessManagedCampuses(
+      adminSession.account,
+      (existingCompany as PartnerCompanyRow).managed_campus_slugs,
+    );
+  } catch {
+    redirectAdminActionError("/admin/companies", "regional_admin_scope_denied");
   }
 
   const nextCompany = {
@@ -251,7 +296,9 @@ export async function updatePartnerCompanyAction(formData: FormData) {
 }
 
 export async function deletePartnerCompanyAction(formData: FormData) {
-  await requireAdminPermission("companies", "delete", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "delete", {
+    path: "/admin/companies",
+  });
   const companyId = String(formData.get("companyId") || "").trim();
   if (!companyId) {
     redirectAdminActionError("/admin/companies", "company_invalid_request");
@@ -260,12 +307,20 @@ export async function deletePartnerCompanyAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: existingCompany, error: companyError } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,is_active")
+    .select("id,name,slug,description,is_active,managed_campus_slugs")
     .eq("id", companyId)
     .maybeSingle();
 
   if (companyError || !existingCompany) {
     redirectAdminActionError("/admin/companies", "company_invalid_request");
+  }
+  try {
+    assertAdminCanAccessManagedCampuses(
+      adminSession.account,
+      (existingCompany as PartnerCompanyRow).managed_campus_slugs,
+    );
+  } catch {
+    redirectAdminActionError("/admin/companies", "regional_admin_scope_denied");
   }
 
   const [brandCountResult, accountLinkCountResult] = await Promise.all([

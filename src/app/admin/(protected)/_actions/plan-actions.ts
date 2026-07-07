@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { assertAdminCanUseGlobalFeature } from "@/lib/admin-scope";
 import {
   isPartnerCompanyPlanTier,
   type PartnerCompanyPlanTier,
@@ -50,6 +51,16 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "update", {
     path: "/admin/partners",
   });
+  try {
+    assertAdminCanUseGlobalFeature(adminSession.account);
+  } catch {
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "admin_global_scope_required", {
+      action: "partner_brand_plan_update",
+      targetType: "partner_brand",
+      targetId: getString(formData, "partnerId") || null,
+      properties: { stage: "scope" },
+    });
+  }
   let payload: {
     partnerId: string;
     nextPlanTier: PartnerCompanyPlanTier;
@@ -125,6 +136,16 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
   const adminSession = await requireAdminPermission("brands", "update", {
     path: "/admin/partners",
   });
+  try {
+    assertAdminCanUseGlobalFeature(adminSession.account);
+  } catch {
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "admin_global_scope_required", {
+      action: "partner_plan_bank_transfer_confirmed",
+      targetType: "partner_plan_upgrade_request",
+      targetId: getString(formData, "requestId") || null,
+      properties: { stage: "scope" },
+    });
+  }
   const requestId = getString(formData, "requestId");
   if (!requestId) {
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request", {
@@ -188,6 +209,16 @@ async function reviewPartnerPlanRequestAction(
   const adminSession = await requireAdminPermission("brands", "update", {
     path: "/admin/partners",
   });
+  try {
+    assertAdminCanUseGlobalFeature(adminSession.account);
+  } catch {
+    redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "admin_global_scope_required", {
+      action: `partner_plan_upgrade_${nextStatus}`,
+      targetType: "partner_plan_upgrade_request",
+      targetId: getString(formData, "requestId") || null,
+      properties: { stage: "scope", status: nextStatus },
+    });
+  }
   const requestId = getString(formData, "requestId");
   if (!requestId) {
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request", {

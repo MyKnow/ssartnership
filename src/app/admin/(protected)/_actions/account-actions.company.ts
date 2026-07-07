@@ -7,10 +7,16 @@ import {
   revalidatePartnerAccountData,
   revalidatePartnerCompanyData,
 } from "./shared-helpers";
-import { getPartnerAccountSupabase } from "./account-actions.shared";
+import {
+  assertPartnerAccountInManagedScopeOrRedirect,
+  getPartnerAccountSupabase,
+  loadScopedPartnerCompanyOrRedirect,
+} from "./account-actions.shared";
 
 export async function updatePartnerAccountCompanyConnectionAction(formData: FormData) {
-  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "update", {
+    path: "/admin/companies",
+  });
   let payload: ReturnType<typeof parsePartnerAccountCompanyPayload>;
   try {
     payload = parsePartnerAccountCompanyPayload(formData);
@@ -22,6 +28,7 @@ export async function updatePartnerAccountCompanyConnectionAction(formData: Form
   }
 
   const supabase = getPartnerAccountSupabase();
+  await loadScopedPartnerCompanyOrRedirect(payload.companyId, adminSession.account);
   const { data: existingLink, error: linkError } = await supabase
     .from("partner_account_companies")
     .select("id,account_id,company_id,is_active,created_at")
@@ -34,6 +41,12 @@ export async function updatePartnerAccountCompanyConnectionAction(formData: Form
   }
 
   const createdLink = !existingLink;
+  if (createdLink) {
+    await assertPartnerAccountInManagedScopeOrRedirect(
+      payload.accountId,
+      adminSession.account,
+    );
+  }
 
   if (existingLink && Boolean(existingLink.is_active) !== payload.isActive) {
     const { error } = await supabase

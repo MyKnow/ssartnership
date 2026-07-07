@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
+import {
+  assertAdminCanAccessManagedCampuses,
+  type AdminScopeAccountLike,
+} from "@/lib/admin-scope";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   approvePartnerChangeRequest as approvePartnerChangeRequestRecord,
   rejectPartnerChangeRequest as rejectPartnerChangeRequestRecord,
@@ -13,6 +18,41 @@ import {
   revalidatePartnerPortalPaths,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 
+async function assertCanReviewPartnerChangeRequest(
+  account: AdminScopeAccountLike,
+  requestId: string,
+) {
+  const supabase = getSupabaseAdminClient();
+  const { data: request, error: requestError } = await supabase
+    .from("partner_change_requests")
+    .select("partner_id")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError || !request?.partner_id) {
+    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+  }
+
+  const { data: partner, error: partnerError } = await supabase
+    .from("partners")
+    .select("managed_campus_slugs")
+    .eq("id", request.partner_id)
+    .maybeSingle();
+
+  if (partnerError || !partner) {
+    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+  }
+
+  try {
+    assertAdminCanAccessManagedCampuses(
+      account,
+      (partner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs,
+    );
+  } catch {
+    redirectAdminActionError("/admin/partners", "regional_admin_scope_denied");
+  }
+}
+
 export async function approvePartnerChangeRequestAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "update", {
     path: "/admin/partners",
@@ -21,6 +61,7 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
   if (!requestId) {
     redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
   }
+  await assertCanReviewPartnerChangeRequest(adminSession.account, requestId);
 
   const request = await approvePartnerChangeRequestRecord({
     requestId,
@@ -130,6 +171,7 @@ export async function rejectPartnerChangeRequestAction(formData: FormData) {
   if (!requestId) {
     redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
   }
+  await assertCanReviewPartnerChangeRequest(adminSession.account, requestId);
 
   const request = await rejectPartnerChangeRequestRecord({
     requestId,

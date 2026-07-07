@@ -7,14 +7,20 @@ import {
   redirectAdminActionError,
   revalidatePartnerAccountData,
 } from "./shared-helpers";
-import { getPartnerAccountSupabase } from "./account-actions.shared";
+import {
+  assertPartnerAccountInManagedScopeOrRedirect,
+  getPartnerAccountSupabase,
+} from "./account-actions.shared";
 
 export async function createPartnerAccountInitialSetupUrlAction(formData: FormData) {
-  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "update", {
+    path: "/admin/companies",
+  });
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
   }
+  await assertPartnerAccountInManagedScopeOrRedirect(accountId, adminSession.account);
 
   const supabase = getPartnerAccountSupabase();
   let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;
@@ -43,11 +49,14 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
 }
 
 export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData) {
-  await requireAdminPermission("companies", "update", { path: "/admin/companies" });
+  const adminSession = await requireAdminPermission("companies", "update", {
+    path: "/admin/companies",
+  });
   const accountId = String(formData.get("id") || "").trim();
   if (!accountId) {
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
   }
+  await assertPartnerAccountInManagedScopeOrRedirect(accountId, adminSession.account);
 
   const supabase = getPartnerAccountSupabase();
   let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;

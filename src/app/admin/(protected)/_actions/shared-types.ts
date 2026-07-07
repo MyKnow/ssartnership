@@ -61,6 +61,7 @@ export type PartnerCompanyRow = {
   slug: string;
   description?: string | null;
   is_active?: boolean | null;
+  managed_campus_slugs?: string[] | null;
 };
 
 export type PartnerAccountRow = {
@@ -92,6 +93,7 @@ export type PartnerCompanyProvision = {
 export type CreatedPartnerRecord = {
   partnerId: string;
   payload: PartnerCoreInput;
+  managedCampusSlugs: string[];
   companyProvision: PartnerCompanyProvision | null;
   media: PartnerMediaInput;
   supabase: AdminSupabaseClient;

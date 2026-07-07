@@ -1,4 +1,5 @@
 import { requireAdminPermission } from "@/lib/admin-access";
+import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { collectPartnerMediaUrls } from "@/app/admin/(protected)/_actions/partner-support";
@@ -19,7 +20,9 @@ function getSafeAdminPartnerPath(value: FormDataEntryValue | null, fallback: str
 }
 
 export async function deletePartnerAction(formData: FormData) {
-  await requireAdminPermission("brands", "delete", { path: "/admin/partners" });
+  const adminSession = await requireAdminPermission("brands", "delete", {
+    path: "/admin/partners",
+  });
   const id = String(formData.get("id") || "").trim();
   const redirectPath = getSafeAdminPartnerPath(
     formData.get("deleteRedirectTo"),
@@ -32,12 +35,21 @@ export async function deletePartnerAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
-    .select("thumbnail,images")
+    .select("thumbnail,images,managed_campus_slugs")
     .eq("id", id)
     .maybeSingle();
 
-  if (previousPartnerError) {
+  if (previousPartnerError || !previousPartner) {
     redirectAdminActionError(redirectPath, "partner_form_invalid_request");
+  }
+  try {
+    assertAdminCanAccessManagedCampuses(
+      adminSession.account,
+      (previousPartner as { managed_campus_slugs?: string[] | null } | null)
+        ?.managed_campus_slugs,
+    );
+  } catch {
+    redirectAdminActionError(redirectPath, "regional_admin_scope_denied");
   }
 
   const { error } = await supabase.from("partners").delete().eq("id", id);

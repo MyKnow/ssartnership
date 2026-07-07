@@ -6,6 +6,10 @@ import {
   findAdminPermissionTemplate,
   normalizeAdminPermissionMatrix,
 } from "@/lib/admin-permissions";
+import {
+  getDefaultManagedCampusSlugsForTemplate,
+  normalizeAdminManagedCampusSlugs,
+} from "@/lib/admin-scope";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminAccount = {
@@ -20,6 +24,7 @@ export type AdminAccount = {
   lastLoginAt: string | null;
   permissionVersion: number;
   permissionId: AdminPermissionTemplateKey;
+  managedCampusSlugs: string[];
   createdAt: string | null;
   updatedAt: string | null;
   permissions: AdminPermissionMatrix;
@@ -31,12 +36,13 @@ type AdminMemberRow = {
   display_name: string | null;
   must_change_password: boolean | null;
   admin_permission_id: string | null;
+  admin_managed_campus_slugs?: string[] | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 const ADMIN_MEMBER_SELECT =
-  "id,mm_username,display_name,must_change_password,admin_permission_id,created_at,updated_at";
+  "id,mm_username,display_name,must_change_password,admin_permission_id,admin_managed_campus_slugs,created_at,updated_at";
 
 const SUPER_ADMIN_USERNAME = "myknow";
 const DEFAULT_ADMIN_PERMISSION_ID = "readonly";
@@ -78,6 +84,9 @@ function mapAdminMember(row: AdminMemberRow): AdminAccount | null {
     lastLoginAt: null,
     permissionVersion: 1,
     permissionId: template.key,
+    managedCampusSlugs: normalizeAdminManagedCampusSlugs(
+      row.admin_managed_campus_slugs ?? [],
+    ),
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
     permissions: normalizeAdminPermissionMatrix(template.permissions),
@@ -162,6 +171,7 @@ export async function countActivePrivilegedAdmins() {
 export async function grantMemberAdminPermission(input: {
   memberUsername: string;
   templateKey?: string | null;
+  managedCampusSlugs?: string[] | null;
 }) {
   const memberUsername = normalizeMemberUsername(input.memberUsername);
   if (!memberUsername) {
@@ -176,11 +186,21 @@ export async function grantMemberAdminPermission(input: {
   if (template.key === "super_admin" && memberUsername !== SUPER_ADMIN_USERNAME) {
     throw new Error("Super Admin 권한은 myknow 계정에만 부여할 수 있습니다.");
   }
+  const managedCampusSlugs = getDefaultManagedCampusSlugsForTemplate(
+    template.key,
+    input.managedCampusSlugs,
+  );
+  if (template.key === "regional_partner_manager" && managedCampusSlugs.length === 0) {
+    throw new Error("지역 제휴 관리자 권한에는 관리 캠퍼스를 하나 이상 선택해야 합니다.");
+  }
 
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
-    .update({ admin_permission_id: template.key })
+    .update({
+      admin_permission_id: template.key,
+      admin_managed_campus_slugs: managedCampusSlugs,
+    })
     .eq("mm_username", memberUsername)
     .select(ADMIN_MEMBER_SELECT)
     .maybeSingle();
@@ -231,6 +251,9 @@ export async function updateAdminAccountStatus(input: {
       admin_permission_id: input.isActive
         ? target.permissionId
         : null,
+      admin_managed_campus_slugs: input.isActive
+        ? target.managedCampusSlugs
+        : [],
     })
     .eq("id", input.targetAdminId);
 
@@ -268,6 +291,7 @@ export async function updateAdminPermissions(input: {
     actorAdminId: input.actorAdminId,
     targetAdminId: input.targetAdminId,
     templateKey: template.key,
+    managedCampusSlugs: target.managedCampusSlugs,
   });
 }
 
@@ -275,6 +299,7 @@ export async function applyAdminPermissionTemplate(input: {
   actorAdminId: string;
   targetAdminId: string;
   templateKey: string;
+  managedCampusSlugs?: string[] | null;
 }) {
   const target = await getAdminAccountById(input.targetAdminId);
   if (!target) {
@@ -286,6 +311,13 @@ export async function applyAdminPermissionTemplate(input: {
   }
   if (template.key === "super_admin" && target.loginId !== SUPER_ADMIN_USERNAME) {
     throw new Error("Super Admin 권한은 myknow 계정에만 부여할 수 있습니다.");
+  }
+  const managedCampusSlugs = getDefaultManagedCampusSlugsForTemplate(
+    template.key,
+    input.managedCampusSlugs ?? target.managedCampusSlugs,
+  );
+  if (template.key === "regional_partner_manager" && managedCampusSlugs.length === 0) {
+    throw new Error("지역 제휴 관리자 권한에는 관리 캠퍼스를 하나 이상 선택해야 합니다.");
   }
 
   assertCanManageAdminPermissions({
@@ -299,7 +331,10 @@ export async function applyAdminPermissionTemplate(input: {
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase
     .from("members")
-    .update({ admin_permission_id: template.key })
+    .update({
+      admin_permission_id: template.key,
+      admin_managed_campus_slugs: managedCampusSlugs,
+    })
     .eq("id", input.targetAdminId);
 
   if (error) {
