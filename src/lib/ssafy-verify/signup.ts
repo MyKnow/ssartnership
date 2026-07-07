@@ -23,6 +23,8 @@ export type SsafySignupSessionData = {
   campus: string | null;
   isStaff: boolean;
   sourceYears: number[];
+  track: string | null;
+  trackName: string | null;
   avatarUrl: string | null;
   authTime: number;
   verificationId: string | null;
@@ -150,6 +152,8 @@ export function buildSsafySignupMemberInsertPayload(input: {
     ssafy_auth_time: authTimeIso,
     ssafy_verification_id: input.session.verificationId,
     ssafy_mattermost_user_id: input.session.mattermostUserId,
+    ssafy_track: input.session.track,
+    ssafy_track_name: input.session.trackName,
     ssafy_last_scope: input.session.scope,
     avatar_url: input.session.avatarUrl ?? null,
     created_at: input.agreedAt,

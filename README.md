@@ -270,6 +270,8 @@ npm run ci:local
   - `16기 이하`: 수료생
 
 운영진은 `members.staff_source_year`에 어느 기수 팀에서 확인된 계정인지 함께 저장합니다.
+트랙 정보는 SSAFY Verify의 `ssafy.track` scope에서만 받으며, `members.ssafy_track`에는 slug를, `members.ssafy_track_name`에는 표시명을 nullable로 저장합니다. 트랙 규칙이 없거나 매칭되지 않는 사용자는 인증 성공 상태에서도 두 값이 `null`일 수 있습니다.
+반/강의실 운영 정보인 `floor`, `classroom`, `classLeader`, `classCaNames` 계열 값은 저장하지 않습니다.
 
 기수 기준을 조정하거나 조기 시작을 적용하려면 관리자 화면의 `기수 관리`를 사용합니다.
 
@@ -286,6 +288,7 @@ npm run ci:local
   - `synced_at`
 - 회원가입 / 로그인 / 재설정은 이 디렉토리를 먼저 조회하고, 없으면 SSAFY Verify Server API의 directory lookup으로 보강합니다.
 - Mattermost 프로필 조회, 디렉토리 lookup, 프로필 이벤트, DM 발송은 SSAFY Verify Server API로 위임합니다. SSARTNERSHIP은 Mattermost base URL, team name, sender credential을 보유하지 않습니다.
+- Server API profile에 `ssafy_track`, `ssafy_track_name`이 포함되면 회원 row에만 반영합니다. `mm_user_directory`는 기존 lookup 보조 스냅샷으로 유지합니다.
 
 ### 닉네임 파싱
 

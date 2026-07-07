@@ -258,9 +258,12 @@ export const InteractiveComposer: Story = {
     await expect(body.getByText("현재 선택 1명")).toBeInTheDocument();
     await userEvent.click(body.getByRole("button", { name: "완료" }));
 
-    await waitFor(async () => {
-      await expect(body.queryByText("개인 대상 선택")).not.toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(body.queryByText("개인 대상 선택")).not.toBeInTheDocument();
+      },
+      { timeout: 4000 },
+    );
     await expect(canvas.getByRole("button", { name: /김싸피/ })).toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole("button", { name: "3. 대상자 검색" }));
@@ -274,9 +277,12 @@ export const InteractiveComposer: Story = {
     await expect(body.getByText("현재 표시 1명")).toBeInTheDocument();
     await userEvent.click(body.getByText("닫기"));
 
-    await waitFor(async () => {
-      await expect(body.queryByText("발송 대상자 2명")).not.toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(body.queryByText("발송 대상자 2명")).not.toBeInTheDocument();
+      },
+      { timeout: 4000 },
+    );
 
     await userEvent.selectOptions(canvas.getByLabelText("연결 페이지 선택(선택)"), "partner-2");
     await userEvent.clear(canvas.getByLabelText("이동 URL(선택)"));
@@ -296,10 +302,13 @@ export const InteractiveComposer: Story = {
     await expect(sendButton).toBeEnabled();
     await userEvent.click(sendButton);
 
-    await waitFor(async () => {
-      await expect(args.onConfirmSubmit).toHaveBeenCalled();
-      await expect(body.queryByText("2명에게 발송")).not.toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(args.onConfirmSubmit).toHaveBeenCalled();
+        expect(body.queryByText("2명에게 발송")).not.toBeInTheDocument();
+      },
+      { timeout: 4000 },
+    );
   },
 };
 

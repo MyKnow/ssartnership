@@ -6,10 +6,12 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 
 ## 현재 판단
 
-- 회원가입 또는 최초 SSAFY Verify 연결 시에는 `ssafy.verify`, `ssafy.affiliation`, `ssafy.name`, `ssafy.profile_image`, `ssafy.role`, `ssafy.mattermost_id`를 요청한다.
+- 회원가입 또는 최초 SSAFY Verify 연결 시에는 `ssafy.verify`, `ssafy.affiliation`, `ssafy.track`, `ssafy.name`, `ssafy.profile_image`, `ssafy.role`, `ssafy.mattermost_id`를 요청한다.
 - 비밀번호 재설정 등 본인 재확인 플로우에서는 `ssafy.verify`, `ssafy.mattermost_id`만 요청한다.
 - 본인 재확인은 Verify 응답의 Mattermost user id가 기존 회원의 `mm_user_id`와 같은지만 대조한다.
 - 프로필 이미지는 Verify `picture` URL을 `members.avatar_url`에 저장하고, 기존 base64 아바타는 fallback으로 유지한다.
+- 트랙은 Verify `ssafy.track` scope의 `ssafy_track`, `ssafy_track_name`을 `members.ssafy_track`, `members.ssafy_track_name`에 nullable로 저장한다. 권한/검색/분기 기준은 표시명이 아니라 slug인 `ssafy_track`을 우선한다.
+- `ssafy.affiliation`은 기수/캠퍼스/지역만 제공한다고 가정하며, `floor`, `classroom`, `classLeader`, `classCaNames`, `class_leader`, `class_ca_names` 계열 값은 저장하지 않는다.
 - Server API v1은 Hosted User Auth client와 분리된 confidential credential로 호출한다.
 - Server API credential이 설정되지 않으면 Mattermost DM, 디렉터리 lookup, 프로필 동기화 기능은 직접 Mattermost fallback 없이 실패한다.
 - SSArtnership 런타임은 Mattermost base URL, team name, sender credential, raw Mattermost 응답을 보유하지 않는다.
@@ -21,7 +23,7 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 - 목적: SSArtnership이 직접 Mattermost API를 호출하지 않고 최신 사용자 프로필을 조회한다.
 - 제공 경로: `GET /v1/ssafy-members/{sub}/profile`, `GET /v1/mattermost-users/{mattermost_user_id}/profile`
 - 식별자: SSAFY Verify `sub` 우선, 필요 시 `ssafy_mattermost_user_id` 보조.
-- 응답 필드: 승인된 scope 안에서만 이름, 프로필 이미지, 기수, 캠퍼스, 지역, 역할, 운영진 여부, Mattermost user id를 반환한다.
+- 응답 필드: 승인된 scope 안에서만 이름, 프로필 이미지, 기수, 캠퍼스, 지역, 트랙, 역할, 운영진 여부, Mattermost user id를 반환한다.
 - 요구사항: client별 scope 승인, request id, 안정적인 에러 코드, rate limit, audit log.
 
 ### 2. 디렉터리 lookup / 프로필 이벤트
@@ -79,5 +81,6 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 ## 운영 확인 사항
 
 - Verify `picture`는 URL 계약으로 확정되었고, SSArtnership은 issuer 기준 absolute URL로 정규화한 뒤 `members.avatar_url`에 저장한다. 기존 `avatar_content_type`/`avatar_base64`는 과거 데이터와 fallback을 위해 유지한다.
+- Verify `ssafy_track`, `ssafy_track_name`은 scope 승인과 트랙 규칙 매칭 상태에 따라 `null`일 수 있다. SSArtnership은 이를 인증 실패로 보지 않고 회원 row의 nullable metadata로만 보존한다.
 - 사용자 상호작용 없이 주기적 프로필 조회를 허용할 경우 offline grant 또는 server-to-server 권한 모델이 필요하다.
 - DM 알림은 자유문이 아니라 목적별 template으로 제한할지 결정해야 한다.

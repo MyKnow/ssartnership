@@ -23,6 +23,8 @@ export function buildSsafyMemberUpdatePayload(input: SsafyVerificationForMember)
     ssafy_auth_time: authTimeIso,
     ssafy_verification_id: input.verificationId,
     ssafy_mattermost_user_id: input.mattermostUserId,
+    ssafy_track: input.track,
+    ssafy_track_name: input.trackName,
     ssafy_last_scope: input.scope,
     updated_at: new Date().toISOString(),
   };

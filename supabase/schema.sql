@@ -632,6 +632,8 @@ create table if not exists members (
   ssafy_auth_time timestamp with time zone,
   ssafy_verification_id text,
   ssafy_mattermost_user_id text,
+  ssafy_track text,
+  ssafy_track_name text,
   ssafy_last_scope text,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
@@ -1012,6 +1014,8 @@ comment on column members.ssafy_verified_at is 'Timestamp when SSAFY Verify last
 comment on column members.ssafy_auth_time is 'verification_token auth_time converted from JWT NumericDate seconds.';
 comment on column members.ssafy_verification_id is 'Last SSAFY Verify transaction identifier from /verify/token result.';
 comment on column members.ssafy_mattermost_user_id is 'Mattermost raw user.id returned by ssafy.mattermost_id for legacy account mapping.';
+comment on column members.ssafy_track is 'Canonical track slug returned by SSAFY Verify ssafy.track scope. Nullable when no track rule matches or scope is unavailable.';
+comment on column members.ssafy_track_name is 'Display track name returned by SSAFY Verify ssafy.track scope. Nullable and not used as a stable key.';
 comment on column members.ssafy_last_scope is 'Last approved SSAFY Verify scope string used during member verification.';
 
 create table if not exists ssafy_cycle_settings (
@@ -2698,6 +2702,9 @@ create unique index if not exists members_ssafy_sub_key
 create unique index if not exists members_ssafy_mattermost_user_id_key
   on members(ssafy_mattermost_user_id)
   where ssafy_mattermost_user_id is not null;
+create index if not exists members_ssafy_track_idx
+  on members(ssafy_track)
+  where ssafy_track is not null;
 create index if not exists partner_companies_managed_campus_slugs_idx
   on partner_companies using gin(managed_campus_slugs);
 create index if not exists partners_managed_campus_slugs_idx

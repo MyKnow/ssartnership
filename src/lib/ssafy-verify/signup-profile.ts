@@ -171,6 +171,8 @@ export async function resolveSsafySignupProfile(input: {
         campus: profile.campus ?? input.claims.campus,
         isStaff: profile.isStaff,
         sourceYears,
+        track: profile.track ?? input.claims.track,
+        trackName: profile.trackName ?? input.claims.trackName,
         avatarUrl: profile.profileImage?.url ?? input.claims.picture,
         authTime: input.claims.authTime,
         verificationId: input.verificationId,
