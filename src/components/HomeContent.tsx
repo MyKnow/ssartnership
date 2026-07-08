@@ -1,10 +1,5 @@
 import HomeView from "@/components/HomeView";
-import {
-  getHomePartnerState,
-  HOME_PARTNER_STATE_BATCH_LIMIT,
-} from "@/lib/home-partner-state";
-import { partnerRepository } from "@/lib/repositories";
-import { isWithinPeriod } from "@/lib/partner-utils";
+import { loadHomePartnerDirectory } from "@/lib/home-partner-directory";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
 export default async function HomeContent({
@@ -16,42 +11,22 @@ export default async function HomeContent({
   currentUserId: string | null;
   viewerAudience?: PartnerAudienceKey | null;
 }) {
-  const [categories, partners] = await Promise.all([
-    partnerRepository.getCategories(),
-    partnerRepository.getPartners({
-      authenticated: viewerAuthenticated,
-      viewerAudience,
-    }),
-  ]);
-
-  const viewPartners = partners.map((partner) => {
-    if (isWithinPeriod(partner.period.start, partner.period.end)) {
-      return partner;
-    }
-    return {
-      ...partner,
-      reservationLink: undefined,
-      inquiryLink: undefined,
-    };
-  });
-  const initialPartnerStateIds = viewPartners
-    .slice(0, HOME_PARTNER_STATE_BATCH_LIMIT)
-    .map((partner) => partner.id);
-  const partnerState = await getHomePartnerState({
-    partnerIds: initialPartnerStateIds,
+  const directory = await loadHomePartnerDirectory({
+    viewerAuthenticated,
     currentUserId,
+    viewerAudience,
   });
 
   return (
     <section id="partner-explore" className="scroll-mt-24">
       <HomeView
-        categories={categories}
-        partners={viewPartners}
+        categories={directory.categories}
+        partners={directory.partners}
         viewerAuthenticated={viewerAuthenticated}
         currentUserId={currentUserId}
-        partnerPopularityById={partnerState.partnerPopularityById}
-        partnerFavoriteStateById={partnerState.partnerFavoriteStateById}
-        loadedPartnerStateIds={partnerState.loadedPartnerIds}
+        partnerPopularityById={directory.partnerState.partnerPopularityById}
+        partnerFavoriteStateById={directory.partnerState.partnerFavoriteStateById}
+        loadedPartnerStateIds={directory.partnerState.loadedPartnerIds}
       />
     </section>
   );
