@@ -72,6 +72,14 @@ export default function UserMenu({
     <div className={cn("flex items-center gap-2", className)}>
       <Button
         variant="ghost"
+        href="/coupons"
+        prefetch={false}
+        className={buttonClassName}
+      >
+        쿠폰함
+      </Button>
+      <Button
+        variant="ghost"
         href="/certification"
         prefetch={false}
         className={buttonClassName}

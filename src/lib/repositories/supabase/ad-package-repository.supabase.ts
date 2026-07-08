@@ -12,8 +12,10 @@ import type {
   AdCoupon,
   AdCouponRedemption,
   AdPackageRepository,
+  AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  ListAvailableCouponsForMemberInput,
   RedeemAdCouponInput,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
@@ -171,6 +173,33 @@ function mapRedemptionRow(row: RedemptionRow): AdCouponRedemption {
     sessionId: row.session_id,
     redemptionCode: row.redemption_code ?? "",
     createdAt: row.created_at,
+  };
+}
+
+function getTime(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+}
+
+function toAvailableCoupon(
+  coupon: AdCoupon,
+  memberUsedCount: number,
+): AvailableAdCoupon | null {
+  const remainingMemberUses = Math.max(0, coupon.perMemberLimit - memberUsedCount);
+  const remainingGlobalUses =
+    typeof coupon.usageLimit === "number"
+      ? Math.max(0, coupon.usageLimit - coupon.usedCount)
+      : null;
+
+  if (remainingMemberUses <= 0 || remainingGlobalUses === 0) {
+    return null;
+  }
+
+  return {
+    coupon,
+    memberUsedCount,
+    remainingMemberUses,
+    remainingGlobalUses,
   };
 }
 
@@ -388,6 +417,110 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
           now,
         }),
       );
+  }
+
+  async listAvailableCouponsForMember(
+    input: ListAvailableCouponsForMemberInput,
+  ): Promise<AvailableAdCoupon[]> {
+    const partnerIds = [...new Set(input.partnerIds.filter(Boolean))];
+    if (!input.memberId || partnerIds.length === 0) {
+      return [];
+    }
+
+    const now = input.now ?? new Date();
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("ad_coupons")
+      .select(
+        "id,campaign_id,partner_id,title,description,code,redemption_type,discount_label,terms,status,starts_at,ends_at,usage_limit,per_member_limit,external_url,created_at,updated_at,partners(name)",
+      )
+      .in("partner_id", partnerIds)
+      .eq("status", "active")
+      .lte("starts_at", now.toISOString())
+      .gte("ends_at", now.toISOString())
+      .order("ends_at", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (error) {
+      if (isMissingAdPackageSchemaMessage(error.message, "ad_coupons")) {
+        return [];
+      }
+      throw new Error(error.message);
+    }
+
+    const rows = (data ?? []) as AdCouponRow[];
+    const couponIds = rows.map((row) => row.id);
+    if (couponIds.length === 0) {
+      return [];
+    }
+
+    const campaignIds = rows
+      .map((row) => row.campaign_id)
+      .filter((id): id is string => Boolean(id));
+    const [redemptionResult, campaignResult] = await Promise.all([
+      supabase
+        .from("ad_coupon_redemptions")
+        .select("coupon_id,member_id")
+        .in("coupon_id", couponIds)
+        .eq("status", "redeemed"),
+      campaignIds.length > 0
+        ? supabase
+            .from("ad_campaigns")
+            .select(
+              "id,partner_id,package_tier,title,description,sponsor_label,status,starts_at,ends_at,channels,monthly_price_krw,notes,created_at,updated_at,partners(name)",
+            )
+            .in("id", campaignIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (redemptionResult.error) {
+      throw new Error(redemptionResult.error.message);
+    }
+    if (campaignResult.error) {
+      throw new Error(campaignResult.error.message);
+    }
+
+    const redemptionRows = (redemptionResult.data ?? []) as Array<{
+      coupon_id: string | null;
+      member_id: string | null;
+    }>;
+    const useCounts = countByKey(redemptionRows, "coupon_id");
+    const memberUseCounts = countByKey(
+      redemptionRows.filter((row) => row.member_id === input.memberId),
+      "coupon_id",
+    );
+    const campaignsById = new Map(
+      ((campaignResult.data ?? []) as AdCampaignRow[]).map((row) => [
+        row.id,
+        mapCampaignRow(row),
+      ]),
+    );
+
+    return rows
+      .map((row) => {
+        const coupon = mapCouponRow(row, useCounts.get(row.id) ?? 0);
+        return {
+          coupon,
+          campaign: coupon.campaignId ? campaignsById.get(coupon.campaignId) : null,
+          memberUsedCount: memberUseCounts.get(coupon.id) ?? 0,
+        };
+      })
+      .filter(({ coupon, campaign }) =>
+        isAdCouponRedeemable({
+          coupon,
+          campaign,
+          now,
+        }),
+      )
+      .map(({ coupon, memberUsedCount }) =>
+        toAvailableCoupon(coupon, memberUsedCount),
+      )
+      .filter((item): item is AvailableAdCoupon => Boolean(item))
+      .sort((left, right) => {
+        const endDiff = getTime(left.coupon.endsAt) - getTime(right.coupon.endsAt);
+        if (endDiff !== 0) {
+          return endDiff;
+        }
+        return right.coupon.createdAt.localeCompare(left.coupon.createdAt);
+      });
   }
 
   async createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign> {

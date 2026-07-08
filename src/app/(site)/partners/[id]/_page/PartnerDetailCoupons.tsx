@@ -170,7 +170,7 @@ export default function PartnerDetailCoupons({
   }
 
   return (
-    <Card className="w-full p-4 sm:p-5">
+    <Card id="coupons" className="w-full scroll-mt-28 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <SectionHeading
           title="SSAFY 쿠폰"

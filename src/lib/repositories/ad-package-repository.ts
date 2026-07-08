@@ -108,6 +108,19 @@ export type RedeemAdCouponInput = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type ListAvailableCouponsForMemberInput = {
+  memberId: string;
+  partnerIds: string[];
+  now?: Date;
+};
+
+export type AvailableAdCoupon = {
+  coupon: AdCoupon;
+  memberUsedCount: number;
+  remainingMemberUses: number;
+  remainingGlobalUses: number | null;
+};
+
 export type RedeemAdCouponResult =
   | {
       ok: true;
@@ -132,6 +145,9 @@ export interface AdPackageRepository {
     partnerId: string,
     options?: { now?: Date },
   ): Promise<AdCoupon[]>;
+  listAvailableCouponsForMember(
+    input: ListAvailableCouponsForMemberInput,
+  ): Promise<AvailableAdCoupon[]>;
   createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign>;
   updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void>;
   createCoupon(input: CreateAdCouponInput): Promise<AdCoupon>;

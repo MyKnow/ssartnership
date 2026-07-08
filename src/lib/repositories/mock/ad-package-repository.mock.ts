@@ -11,8 +11,10 @@ import type {
   AdCoupon,
   AdCouponRedemption,
   AdPackageRepository,
+  AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  ListAvailableCouponsForMemberInput,
   RedeemAdCouponInput,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
@@ -44,6 +46,33 @@ function cloneCoupon(coupon: AdCoupon): AdCoupon {
 
 function cloneRedemption(redemption: AdCouponRedemption): AdCouponRedemption {
   return { ...redemption };
+}
+
+function getTime(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+}
+
+function toAvailableCoupon(
+  coupon: AdCoupon,
+  memberUsedCount: number,
+): AvailableAdCoupon | null {
+  const remainingMemberUses = Math.max(0, coupon.perMemberLimit - memberUsedCount);
+  const remainingGlobalUses =
+    typeof coupon.usageLimit === "number"
+      ? Math.max(0, coupon.usageLimit - coupon.usedCount)
+      : null;
+
+  if (remainingMemberUses <= 0 || remainingGlobalUses === 0) {
+    return null;
+  }
+
+  return {
+    coupon: cloneCoupon(coupon),
+    memberUsedCount,
+    remainingMemberUses,
+    remainingGlobalUses,
+  };
 }
 
 function createMockCampaigns(): AdCampaign[] {
@@ -191,6 +220,45 @@ export class MockAdPackageRepository implements AdPackageRepository {
       }));
   }
 
+  async listAvailableCouponsForMember(
+    input: ListAvailableCouponsForMemberInput,
+  ): Promise<AvailableAdCoupon[]> {
+    const now = input.now ?? new Date();
+    const partnerIds = new Set(input.partnerIds.filter(Boolean));
+    if (!input.memberId || partnerIds.size === 0) {
+      return [];
+    }
+
+    return this.coupons
+      .filter((coupon) => partnerIds.has(coupon.partnerId))
+      .map((coupon) => ({
+        coupon: {
+          ...coupon,
+          usedCount: this.countCouponRedemptions(coupon.id),
+        },
+        campaign: this.campaigns.find((campaign) => campaign.id === coupon.campaignId),
+        memberUsedCount: this.countCouponRedemptions(coupon.id, input.memberId),
+      }))
+      .filter(({ coupon, campaign }) =>
+        isAdCouponRedeemable({
+          coupon,
+          campaign,
+          now,
+        }),
+      )
+      .map(({ coupon, memberUsedCount }) =>
+        toAvailableCoupon(coupon, memberUsedCount),
+      )
+      .filter((item): item is AvailableAdCoupon => Boolean(item))
+      .sort((left, right) => {
+        const endDiff = getTime(left.coupon.endsAt) - getTime(right.coupon.endsAt);
+        if (endDiff !== 0) {
+          return endDiff;
+        }
+        return right.coupon.createdAt.localeCompare(left.coupon.createdAt);
+      });
+  }
+
   async createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign> {
     const now = isoNow();
     const packageTier = input.packageTier;
@@ -323,9 +391,11 @@ export class MockAdPackageRepository implements AdPackageRepository {
     };
   }
 
-  private countCouponRedemptions(couponId: string) {
+  private countCouponRedemptions(couponId: string, memberId?: string | null) {
     return this.redemptions.filter(
-      (redemption) => redemption.couponId === couponId,
+      (redemption) =>
+        redemption.couponId === couponId &&
+        (!memberId || redemption.memberId === memberId),
     ).length;
   }
 }

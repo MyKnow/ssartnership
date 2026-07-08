@@ -40,6 +40,7 @@ export const authSmokeRoutes: SmokeRoute[] = [
 
 export const memberProtectedRoutes: RedirectRoute[] = [
   { path: "/certification", expectedPath: "/auth/login" },
+  { path: "/coupons", expectedPath: "/auth/login" },
   { path: "/notifications", expectedPath: "/auth/login" },
 ];
 
