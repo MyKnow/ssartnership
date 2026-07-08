@@ -2,7 +2,6 @@ import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
 import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import InlineMessage from "@/components/ui/InlineMessage";
 import FormMessage from "@/components/ui/FormMessage";
@@ -586,9 +585,6 @@ export default async function AdminMembersPage({
           description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="ghost" href="/admin/members/mock">
-                Mock 미리보기
-              </Button>
               <form action={backfillMemberProfiles}>
                 <SubmitButton pendingText="백필 중">
                   지금 백필 실행
@@ -704,7 +700,7 @@ export default async function AdminMembersPage({
               />
               <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
                 <p>정책 동의 상태와 알림 설정은 현재 페이지 결과에서 즉시 확인할 수 있습니다.</p>
-                <p>대량 정비 전에는 Mock 미리보기에서 카드 표현을 먼저 확인하는 흐름을 권장합니다.</p>
+                <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
               </div>
             </Card>
           </div>

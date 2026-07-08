@@ -58,10 +58,13 @@ const config: StorybookConfig = {
       },
       optimizeDeps: {
         ...viteConfig.optimizeDeps,
-        include: viteConfig.optimizeDeps?.include?.filter(
-          (item) =>
-            item !== "next/image" && item !== "next/script" && item !== "next-themes",
-        ),
+        include: [
+          ...(viteConfig.optimizeDeps?.include?.filter(
+            (item) =>
+              item !== "next/image" && item !== "next/script" && item !== "next-themes",
+          ) ?? []),
+          "qrcode",
+        ],
         exclude: [
           ...(viteConfig.optimizeDeps?.exclude ?? []),
           "next/image",

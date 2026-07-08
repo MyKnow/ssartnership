@@ -13,6 +13,7 @@ import {
   getCertificationRoleLabel,
   getCertificationScheme,
 } from "@/lib/certification-scheme";
+import type { CohortCardTheme } from "@/lib/cohort-card-themes";
 import CertificationCardFrame from "@/components/certification/CertificationCardFrame";
 import CertificationQrButton from "@/components/certification/CertificationQrButton";
 import { formatKoreanDateTime } from "@/lib/datetime";
@@ -32,10 +33,12 @@ export default function CertificationView({
   member,
   initialTimestamp,
   disableTracking = false,
+  cohortCardThemes,
 }: {
   member: Member;
   initialTimestamp: string;
   disableTracking?: boolean;
+  cohortCardThemes?: readonly CohortCardTheme[] | null;
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
@@ -43,7 +46,7 @@ export default function CertificationView({
   const hasTrackedViewRef = useRef(false);
   const year = member.year ?? getCurrentSsafyYear();
   const roleLabel = getCertificationRoleLabel(year);
-  const scheme = getCertificationScheme(year);
+  const scheme = getCertificationScheme(year, cohortCardThemes);
   const campusLabel = member.campus ?? profile.campus ?? null;
   const yearLabel = year > 0 ? formatSsafyYearLabel(year) : null;
   const hasAvatarUrl = Boolean(member.avatar_url);
@@ -147,7 +150,10 @@ export default function CertificationView({
             </div>
             <CertificationQrButton
               roleLabel={roleLabel}
-              className="!h-11 !min-h-11 !px-4 text-sm whitespace-nowrap"
+              className={cn(
+                scheme.qrButtonClassName,
+                "!h-11 !min-h-11 !px-4 text-sm whitespace-nowrap",
+              )}
             />
           </div>
         }

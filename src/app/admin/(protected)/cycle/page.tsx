@@ -9,9 +9,15 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import SubmitButton from "@/components/ui/SubmitButton";
 import {
+  AdminCertificationCardPreviewGrid,
+  AdminCohortCardThemeManager,
+} from "@/components/admin/cohort-card-themes/AdminCohortCardThemeManager";
+import {
+  deleteCohortCardTheme,
   earlyStartSsafyCycle,
   restoreSsafyCycleSettings,
   updateSsafyCycleSettings,
+  upsertCohortCardTheme,
 } from "@/app/admin/(protected)/actions";
 import {
   getConfiguredCurrentSsafyYear,
@@ -25,6 +31,7 @@ import {
 import { SITE_NAME } from "@/lib/site";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +55,10 @@ export default async function AdminCyclePage({
   await requireAdminPermission("cycles", "read", { path: "/admin/cycle" });
   const params = (await searchParams) ?? {};
   const cycleError = params.error ? adminCycleErrorMessages[params.error] : null;
-  const settings = await getSsafyCycleSettings();
+  const [settings, cohortCardThemes] = await Promise.all([
+    getSsafyCycleSettings(),
+    listCohortCardThemes(),
+  ]);
   const overview = getSsafyCycleOverview(settings);
   const currentYear = getConfiguredCurrentSsafyYear(settings);
   const currentSemester = getCurrentSsafySemester();
@@ -57,6 +67,14 @@ export default async function AdminCyclePage({
   const studentLabels = overview.studentYears.map((year) =>
     formatSsafyMemberLifecycleLabel(year),
   );
+  const cardThemeYears = Array.from(
+    new Set([
+      overview.currentYear,
+      ...overview.studentYears,
+      overview.graduateThresholdYear,
+    ].filter((year) => year > 0)),
+  );
+  const initialTimestamp = new Date().toISOString();
 
   return (
     <AdminShell title="기수 관리" backHref="/admin" backLabel="관리 홈">
@@ -64,7 +82,7 @@ export default async function AdminCyclePage({
         <ShellHeader
           eyebrow="Cycle"
           title="기수 계산 기준 관리"
-          description="기수 전환 기준과 조기 시작 상태를 확인하고 복구합니다."
+          description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다."
         />
         <StatsRow
           items={[
@@ -92,6 +110,10 @@ export default async function AdminCyclePage({
                     ? "조기 시작이 적용되었습니다."
                     : params.status === "restored"
                       ? "자동 계산으로 복구했습니다."
+                      : params.status === "theme-saved"
+                        ? "기수별 카드 색상을 저장했습니다."
+                        : params.status === "theme-deleted"
+                          ? "기수별 카드 색상을 삭제했습니다."
                       : "기수 관리 작업을 완료했습니다."}
               </FormMessage>
             ) : null}
@@ -239,6 +261,18 @@ export default async function AdminCyclePage({
               </p>
             </div>
           </Card>
+        </div>
+        <div className="grid gap-6">
+          <AdminCohortCardThemeManager
+            themes={cohortCardThemes}
+            suggestedYears={cardThemeYears}
+            upsertAction={upsertCohortCardTheme}
+            deleteAction={deleteCohortCardTheme}
+          />
+          <AdminCertificationCardPreviewGrid
+            themes={cohortCardThemes}
+            initialTimestamp={initialTimestamp}
+          />
         </div>
       </div>
     </AdminShell>
