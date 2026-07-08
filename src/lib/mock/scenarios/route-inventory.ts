@@ -45,6 +45,14 @@ export const mockRouteInventory = [
     requiredScenarioIds: ["public.certification.qr-valid"],
   },
   {
+    routePath: "/coupons",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "CouponWalletView",
+    dataSources: ["repository", "storybook"],
+    requiredScenarioIds: ["public.coupons.wallet"],
+  },
+  {
     routePath: "/events/[slug]",
     surface: "public",
     authScope: "public",

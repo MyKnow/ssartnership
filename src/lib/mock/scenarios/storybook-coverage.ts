@@ -79,6 +79,13 @@ export const mockStorybookScenarioCoverage = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
+    routePath: "/coupons",
+    scenarioId: "public.coupons.wallet",
+    storyId: "page-states-coupons-wallet--available-accordion",
+    storyFile: "src/components/coupons/CouponWalletView.stories.tsx",
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
     routePath: "/partner",
     scenarioId: "partner.company.selection.multi-company",
     storyId: "domains-partner-pagestates-companyselection--multi-company",

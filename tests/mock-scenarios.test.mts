@@ -169,10 +169,10 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
   const matrix = buildMockCoverageMatrix();
   const summary = summarizeMockCoverageMatrix(matrix);
 
-  assert.equal(summary.totalRoutes, 61);
-  assert.equal(summary.scenarioCount, 45);
-  assert.equal(summary.storybookStoryCount, 26);
-  assert.equal(summary.storybookCompleteRoutes, 22);
+  assert.equal(summary.totalRoutes, 62);
+  assert.equal(summary.scenarioCount, 46);
+  assert.equal(summary.storybookStoryCount, 27);
+  assert.equal(summary.storybookCompleteRoutes, 23);
   assert.equal(summary.storybookPartialRoutes, 0);
   assert.equal(summary.storybookMissingRoutes, 6);
   assert.equal(summary.routeInventoryOnlyRoutes, 33);

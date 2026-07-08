@@ -2,6 +2,7 @@ import {
   ArrowRightIcon,
   BuildingStorefrontIcon,
   CalendarDaysIcon,
+  ChevronDownIcon,
   SparklesIcon,
   TicketIcon,
 } from "@heroicons/react/24/outline";
@@ -100,74 +101,113 @@ function CouponWalletStats({ coupons }: { coupons: AvailableAdCoupon[] }) {
   );
 }
 
-function CouponWalletCard({ item }: { item: AvailableAdCoupon }) {
+function CouponWalletAccordionItem({
+  item,
+  accordionName,
+  defaultOpen = false,
+}: {
+  item: AvailableAdCoupon;
+  accordionName: string;
+  defaultOpen?: boolean;
+}) {
   const { coupon, remainingGlobalUses, remainingMemberUses } = item;
   const detailHref = `/partners/${encodeURIComponent(coupon.partnerId)}#coupons`;
 
   return (
-    <article className="grid gap-4 rounded-panel border border-border bg-surface p-4 shadow-flat sm:p-5">
-      <div className="flex items-start justify-between gap-4">
+    <details
+      className="group rounded-panel border border-border bg-surface shadow-flat transition hover:border-strong open:border-primary/30 open:bg-surface-elevated"
+      name={accordionName}
+      open={defaultOpen ? true : undefined}
+    >
+      <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-4 outline-none transition hover:bg-surface-muted/60 focus-visible:bg-surface-muted/60 focus-visible:ring-2 focus-visible:ring-primary/20 sm:px-5 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Badge variant="success" className="tracking-normal">
               {coupon.discountLabel || "쿠폰"}
             </Badge>
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-              <BuildingStorefrontIcon className="size-4" aria-hidden="true" />
-              {coupon.partnerName}
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1 text-xs font-semibold text-muted-foreground">
+              <BuildingStorefrontIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span className="block min-w-0 truncate">{coupon.partnerName}</span>
             </span>
           </div>
-          <h3 className="mt-3 text-base font-semibold leading-7 text-foreground sm:text-lg">
+          <h3 className="mt-3 truncate text-ko-title text-base font-semibold leading-7 text-foreground sm:text-lg">
             {coupon.title}
           </h3>
-          {coupon.description ? (
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {coupon.description}
-            </p>
-          ) : null}
+          <div className="mt-2 flex min-w-0 flex-wrap gap-2 text-xs font-semibold text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <TicketIcon className="size-4" aria-hidden="true" />
+              내 {remainingMemberUses.toLocaleString("ko-KR")}회
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <CalendarDaysIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span className="block min-w-0 truncate">{formatDate(coupon.endsAt)}</span>
+            </span>
+          </div>
         </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-primary/10 bg-primary-soft text-primary">
-          <TicketIcon className="size-5" aria-hidden="true" />
+        <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] border border-border bg-surface-control text-muted-foreground transition group-open:rotate-180 group-open:border-primary/20 group-open:bg-primary-soft group-open:text-primary">
+          <ChevronDownIcon className="size-5" aria-hidden="true" />
+        </span>
+      </summary>
+
+      <div className="border-t border-border/70 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="min-w-0 space-y-3">
+            {coupon.description ? (
+              <p className="line-clamp-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
+                {coupon.description}
+              </p>
+            ) : (
+              <p className="text-ko-pretty text-sm leading-6 text-muted-foreground">
+                제휴처 상세에서 쿠폰 사용 방법을 확인해 주세요.
+              </p>
+            )}
+
+            <div className="rounded-2xl border border-border/80 bg-surface-muted px-3 py-3">
+              <p className="text-xs font-semibold text-muted-foreground">사용 조건</p>
+              {coupon.terms.length > 0 ? (
+                <ul className="mt-2 grid gap-1 text-xs leading-5 text-muted-foreground">
+                  {coupon.terms.map((term) => (
+                    <li key={term} className="line-clamp-2 text-ko-pretty">
+                      - {term}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-ko-pretty text-xs leading-5 text-muted-foreground">
+                  별도 사용 조건은 제휴처 상세를 확인해 주세요.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid min-w-0 gap-2 rounded-2xl border border-border/80 bg-surface-inset px-3 py-3 text-sm">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">내 남은 사용 횟수</p>
+              <p className="mt-1 font-semibold text-foreground">
+                {remainingMemberUses.toLocaleString("ko-KR")}회 남음
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">전체 잔여 수량</p>
+              <p className="mt-1 font-semibold text-foreground">
+                {formatGlobalRemaining(remainingGlobalUses)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">만료일</p>
+              <p className="mt-1 inline-flex min-w-0 items-center gap-1 font-semibold text-foreground">
+                <CalendarDaysIcon className="size-4 shrink-0" aria-hidden="true" />
+                <span className="block min-w-0 truncate">{formatDate(coupon.endsAt)}</span>
+              </p>
+            </div>
+            <Button href={detailHref} variant="primary" className="mt-1 w-full justify-center">
+              제휴처 상세 보기
+              <ArrowRightIcon className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       </div>
-
-      <div className="grid gap-2 rounded-2xl border border-border/80 bg-surface-muted px-3 py-3 text-sm sm:grid-cols-3">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">내 사용 가능</p>
-          <p className="mt-1 font-semibold text-foreground">
-            {remainingMemberUses.toLocaleString("ko-KR")}회 남음
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">전체 잔여</p>
-          <p className="mt-1 font-semibold text-foreground">
-            {formatGlobalRemaining(remainingGlobalUses)}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">사용 기간</p>
-          <p className="mt-1 inline-flex items-center gap-1 font-semibold text-foreground">
-            <CalendarDaysIcon className="size-4" aria-hidden="true" />
-            {formatDate(coupon.endsAt)}
-          </p>
-        </div>
-      </div>
-
-      {coupon.terms.length > 0 ? (
-        <ul className="grid gap-1 text-xs leading-5 text-muted-foreground">
-          {coupon.terms.map((term) => (
-            <li key={term}>- {term}</li>
-          ))}
-        </ul>
-      ) : null}
-
-      <div className="flex justify-end">
-        <Button href={detailHref} variant="primary" className="w-full justify-center sm:w-auto">
-          제휴처 상세 보기
-          <ArrowRightIcon className="size-4" aria-hidden="true" />
-        </Button>
-      </div>
-    </article>
+    </details>
   );
 }
 
@@ -214,9 +254,14 @@ function CouponWalletSectionView({ section }: { section: CouponWalletSection }) 
           {section.items.length.toLocaleString("ko-KR")}개
         </Badge>
       </div>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {section.items.map((item) => (
-          <CouponWalletCard key={item.coupon.id} item={item} />
+      <div className="grid gap-3">
+        {section.items.map((item, index) => (
+          <CouponWalletAccordionItem
+            key={item.coupon.id}
+            accordionName={`coupon-wallet-${section.id}`}
+            item={item}
+            defaultOpen={index === 0}
+          />
         ))}
       </div>
     </section>

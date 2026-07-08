@@ -76,6 +76,16 @@ export const mockScenarios = [
     requiredStates: ["QR 표시", "만료 전 갱신", "인증 실패 fallback"],
   },
   {
+    id: "public.coupons.wallet",
+    label: "회원 쿠폰함",
+    surface: "public",
+    description: "로그인한 회원이 지금 사용할 수 있는 쿠폰을 아코디언 목록으로 확인하는 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["repository", "storybook"],
+    requiredStates: ["사용 가능 쿠폰", "아코디언 펼침", "빈 상태", "로그인 필요"],
+    seed: { partnerIds: ["cafe-001", "space-001"] },
+  },
+  {
     id: "public.notifications.default",
     label: "회원 알림센터 기본",
     surface: "public",
