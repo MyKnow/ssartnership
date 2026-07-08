@@ -49,8 +49,12 @@ export function normalizeHomePartnerStateIds(
 export async function getHomePartnerState(input: {
   partnerIds: string[];
   currentUserId?: string | null;
+  partnerIdLimit?: number;
 }): Promise<HomePartnerState> {
-  const partnerIds = normalizeHomePartnerStateIds(input.partnerIds);
+  const partnerIds = normalizeHomePartnerStateIds(
+    input.partnerIds,
+    input.partnerIdLimit ?? HOME_PARTNER_STATE_BATCH_LIMIT,
+  );
   const partnerPopularityById: Record<string, PartnerPopularityMetrics> = {};
   const partnerFavoriteStateById: Record<string, boolean> = {};
 
