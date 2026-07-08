@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
 import type { CertificationScheme } from "@/lib/certification-scheme";
@@ -20,6 +20,7 @@ type CertificationCardFrameProps = {
   avatarOnClick?: () => void;
   avatarButtonLabel?: string;
   className?: string;
+  style?: CSSProperties;
 };
 
 export default function CertificationCardFrame({
@@ -36,15 +37,18 @@ export default function CertificationCardFrame({
   avatarOnClick,
   avatarButtonLabel,
   className,
+  style,
 }: CertificationCardFrameProps) {
   return (
     <div
       className={cn(
-        "relative mx-auto min-h-[250px] min-w-0 max-w-2xl overflow-hidden rounded-[clamp(24px,4vw,38px)] border p-3 text-white shadow-overlay ring-1 transform-gpu sm:aspect-[1.58/1] sm:min-h-0 sm:p-5",
+        "relative mx-auto min-h-[250px] min-w-0 max-w-2xl overflow-hidden rounded-[clamp(24px,4vw,38px)] border p-3 shadow-overlay ring-1 transform-gpu sm:aspect-[1.58/1] sm:min-h-0 sm:p-5",
+        scheme.textClassName,
         scheme.cardClassName,
         scheme.frameRingClassName,
         className,
       )}
+      style={{ ...scheme.style, ...style }}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 opacity-80">

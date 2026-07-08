@@ -8,10 +8,18 @@ import {
   upsertSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
 import {
+  deleteCohortCardTheme,
+  upsertCohortCardTheme,
+} from "@/lib/cohort-card-themes";
+import {
   logAdminAction,
   revalidateCyclePaths,
 } from "./shared-helpers";
-import { parseSsafyCycleSettingsPayloadOrRedirect } from "./shared-parser-redirects";
+import {
+  parseCohortCardThemeDeletePayloadOrRedirect,
+  parseCohortCardThemePayloadOrRedirect,
+  parseSsafyCycleSettingsPayloadOrRedirect,
+} from "./shared-parser-redirects";
 
 export async function updateSsafyCycleSettingsAction(formData: FormData) {
   await requireAdminPermission("cycles", "update", { path: "/admin/cycle" });
@@ -66,4 +74,43 @@ export async function restoreSsafyCycleSettingsAction() {
   });
   revalidateCyclePaths();
   redirect("/admin/cycle?status=restored");
+}
+
+export async function upsertCohortCardThemeAction(formData: FormData) {
+  await requireAdminPermission("cycles", "update", { path: "/admin/cycle" });
+  const payload = parseCohortCardThemePayloadOrRedirect(
+    formData,
+    "/admin/cycle",
+  );
+  await upsertCohortCardTheme(payload);
+  await logAdminAction("cohort_card_theme_upsert", {
+    targetType: "ssafy_cohort_card_theme",
+    targetId: String(payload.cohortYear),
+    properties: {
+      cohortYear: payload.cohortYear,
+      displayName: payload.displayName,
+      backgroundFrom: payload.backgroundFrom,
+      backgroundVia: payload.backgroundVia,
+      backgroundTo: payload.backgroundTo,
+      accentColor: payload.accentColor,
+    },
+  });
+  revalidateCyclePaths();
+  redirect("/admin/cycle?status=theme-saved#card-theme-manager");
+}
+
+export async function deleteCohortCardThemeAction(formData: FormData) {
+  await requireAdminPermission("cycles", "delete", { path: "/admin/cycle" });
+  const payload = parseCohortCardThemeDeletePayloadOrRedirect(
+    formData,
+    "/admin/cycle",
+  );
+  await deleteCohortCardTheme(payload.cohortYear);
+  await logAdminAction("cohort_card_theme_delete", {
+    targetType: "ssafy_cohort_card_theme",
+    targetId: String(payload.cohortYear),
+    properties: payload,
+  });
+  revalidateCyclePaths();
+  redirect("/admin/cycle?status=theme-deleted#card-theme-manager");
 }

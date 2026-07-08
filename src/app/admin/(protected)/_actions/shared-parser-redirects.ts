@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
 import {
+  parseCohortCardThemeDeletePayload,
+  parseCohortCardThemePayload,
+} from "@/lib/cohort-card-themes";
+import {
   parseCategoryPayload,
   parsePartnerCompanyPayload,
   parsePartnerPayload,
@@ -52,6 +56,30 @@ export function parseSsafyCycleSettingsPayloadOrRedirect(
     return parseSsafyCycleSettingsPayload(formData);
   } catch (error) {
     const code = error instanceof Error ? error.message : "cycle_invalid_request";
+    redirect(`${path}?error=${encodeURIComponent(code)}`);
+  }
+}
+
+export function parseCohortCardThemePayloadOrRedirect(
+  formData: FormData,
+  path: string,
+) {
+  try {
+    return parseCohortCardThemePayload(formData);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "cohort_theme_invalid_request";
+    redirect(`${path}?error=${encodeURIComponent(code)}`);
+  }
+}
+
+export function parseCohortCardThemeDeletePayloadOrRedirect(
+  formData: FormData,
+  path: string,
+) {
+  try {
+    return parseCohortCardThemeDeletePayload(formData);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "cohort_theme_invalid_request";
     redirect(`${path}?error=${encodeURIComponent(code)}`);
   }
 }

@@ -58,6 +58,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'cycle_settings_update',
   'cycle_settings_early_start',
   'cycle_settings_restore',
+  'cohort_card_theme_upsert',
+  'cohort_card_theme_delete',
   'push_send',
   'push_log_delete',
   'partner_account_update',

@@ -28,9 +28,11 @@ import {
   updatePartnerCompanyAction,
 } from "./_actions/catalog-actions";
 import {
+  deleteCohortCardThemeAction,
   earlyStartSsafyCycleAction,
   restoreSsafyCycleSettingsAction,
   updateSsafyCycleSettingsAction,
+  upsertCohortCardThemeAction,
 } from "./_actions/cycle-actions";
 import {
   backfillMemberProfilesAction,
@@ -207,6 +209,14 @@ export async function earlyStartSsafyCycle() {
 
 export async function restoreSsafyCycleSettings() {
   return restoreSsafyCycleSettingsAction();
+}
+
+export async function upsertCohortCardTheme(formData: FormData) {
+  return upsertCohortCardThemeAction(formData);
+}
+
+export async function deleteCohortCardTheme(formData: FormData) {
+  return deleteCohortCardThemeAction(formData);
 }
 
 export async function deleteMember(formData: FormData) {

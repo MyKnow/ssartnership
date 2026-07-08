@@ -24,6 +24,7 @@ export default defineConfig({
       "next/cache",
       "next/headers",
       "nodemailer",
+      "qrcode",
       "web-push",
     ],
   },

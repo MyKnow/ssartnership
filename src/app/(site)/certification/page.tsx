@@ -11,6 +11,7 @@ import CertificationFooterActions from "@/components/certification/Certification
 import CertificationProfileSync from "@/components/certification/CertificationProfileSync";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 
 export const metadata: Metadata = {
   title: `SSAFY 인증 | ${SITE_NAME}`,
@@ -58,7 +59,10 @@ export default async function CertificationPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
-  const headerSession = await getHeaderSession(session.userId);
+  const [headerSession, cohortCardThemes] = await Promise.all([
+    getHeaderSession(session.userId),
+    listCohortCardThemes(),
+  ]);
 
   const supabase = getSupabaseAdminClient();
   const { data: member } = await supabase
@@ -96,6 +100,7 @@ export default async function CertificationPage({
                 has_legacy_avatar: Boolean(member.avatar_content_type),
               } satisfies CertificationMember}
               initialTimestamp={initialTimestamp}
+              cohortCardThemes={cohortCardThemes}
             />
           </div>
           <CertificationFooterActions />

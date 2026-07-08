@@ -1,3 +1,11 @@
+import {
+  DEFAULT_STUDENT_CARD_THEME,
+  findCohortCardTheme,
+  getReadableTextColor,
+  getReadableTextColorForGradient,
+  hexToRgba,
+  type CohortCardTheme,
+} from "@/lib/cohort-card-themes";
 import { getSsafyMemberLifecycle } from "@/lib/ssafy-year";
 
 export type CertificationScheme = {
@@ -12,49 +20,38 @@ export type CertificationScheme = {
   avatarFrameClassName: string;
   subduedTextClassName: string;
   mutedTextClassName: string;
+  textClassName: string;
+  qrButtonClassName: string;
+  style?: Record<string, string>;
 };
 
-const STUDENT_14_SCHEME: CertificationScheme = {
+const THEMED_STUDENT_SCHEME_CLASSNAMES = {
   roleBadgeClassName:
-    "bg-emerald-400 text-slate-950 shadow-[0_0_0_1px_rgba(167,243,208,0.2)]",
+    "!border-transparent !bg-[var(--cert-accent)] !text-[color:var(--cert-badge-text)] shadow-[0_0_0_1px_var(--cert-accent-ring)]",
   yearChipClassName:
-    "bg-emerald-400/15 text-emerald-50 ring-1 ring-emerald-300/25",
+    "border-[color:var(--cert-chip-border)] bg-[var(--cert-chip-bg)] text-[color:var(--cert-chip-text)] ring-1 ring-[color:var(--cert-chip-border)]",
   campusBadgeClassName:
-    "bg-emerald-400/10 text-emerald-50 ring-1 ring-emerald-300/20",
+    "border-[color:var(--cert-chip-border)] bg-[var(--cert-chip-bg)] text-[color:var(--cert-chip-text)] ring-1 ring-[color:var(--cert-chip-border)]",
   cardClassName:
-    "border-emerald-300/34 bg-[linear-gradient(135deg,#07120d_0%,#0a1a15_42%,#111827_100%)] shadow-[0_28px_90px_rgba(16,185,129,0.22)]",
-  frameRingClassName: "ring-emerald-300/16",
+    "border-[color:var(--cert-border)] bg-[linear-gradient(135deg,var(--cert-bg-from)_0%,var(--cert-bg-via)_44%,var(--cert-bg-to)_100%)] shadow-[0_28px_90px_var(--cert-shadow)]",
+  frameRingClassName: "ring-[color:var(--cert-ring)]",
   glowClassName:
-    "bg-[radial-gradient(circle,rgba(74,222,128,0.28)_0%,rgba(74,222,128,0.12)_22%,transparent_58%)]",
-  panelClassName: "border-emerald-300/14 bg-white/5",
-  accentClassName: "bg-emerald-400",
-  avatarFrameClassName: "border-emerald-300/20 ring-emerald-300/12",
-  subduedTextClassName: "text-emerald-50/80",
-  mutedTextClassName: "text-emerald-100/60",
-};
-
-const STUDENT_15_SCHEME: CertificationScheme = {
-  roleBadgeClassName:
-    "bg-violet-400 text-slate-950 shadow-[0_0_0_1px_rgba(221,214,254,0.2)]",
-  yearChipClassName:
-    "bg-violet-400/15 text-violet-50 ring-1 ring-violet-300/25",
-  campusBadgeClassName:
-    "bg-violet-400/10 text-violet-50 ring-1 ring-violet-300/20",
-  cardClassName:
-    "border-violet-300/34 bg-[linear-gradient(135deg,#110c1f_0%,#1a1430_42%,#111827_100%)] shadow-[0_28px_90px_rgba(139,92,246,0.22)]",
-  frameRingClassName: "ring-violet-300/16",
-  glowClassName:
-    "bg-[radial-gradient(circle,rgba(196,181,253,0.28)_0%,rgba(196,181,253,0.12)_22%,transparent_58%)]",
-  panelClassName: "border-violet-300/14 bg-white/5",
-  accentClassName: "bg-violet-400",
-  avatarFrameClassName: "border-violet-300/20 ring-violet-300/12",
-  subduedTextClassName: "text-violet-50/80",
-  mutedTextClassName: "text-violet-100/60",
-};
+    "bg-[radial-gradient(circle,var(--cert-glow-strong)_0%,var(--cert-glow-soft)_22%,transparent_58%)]",
+  panelClassName:
+    "border-[color:var(--cert-panel-border)] bg-[var(--cert-panel-bg)]",
+  accentClassName: "bg-[var(--cert-accent)]",
+  avatarFrameClassName:
+    "border-[color:var(--cert-avatar-border)] ring-[color:var(--cert-avatar-ring)]",
+  subduedTextClassName: "text-[color:var(--cert-subdued)]",
+  mutedTextClassName: "text-[color:var(--cert-muted)]",
+  textClassName: "text-[color:var(--cert-text)]",
+  qrButtonClassName:
+    "!border-[color:var(--cert-qr-border)] !bg-[var(--cert-qr-bg)] !text-[color:var(--cert-qr-text)] hover:!border-[color:var(--cert-qr-border-hover)] hover:!bg-[var(--cert-qr-bg-hover)]",
+} satisfies Omit<CertificationScheme, "style">;
 
 const STAFF_SCHEME: CertificationScheme = {
   roleBadgeClassName:
-    "bg-black text-white ring-1 ring-white/10",
+    "!border-white/25 !bg-white/90 !text-slate-950 ring-1 ring-white/35",
   yearChipClassName:
     "bg-white/10 text-white/85 ring-1 ring-white/10 dark:bg-white/10 dark:text-white/90",
   campusBadgeClassName:
@@ -69,26 +66,80 @@ const STAFF_SCHEME: CertificationScheme = {
   avatarFrameClassName: "border-white/16 ring-white/10",
   subduedTextClassName: "text-white/80",
   mutedTextClassName: "text-white/60",
+  textClassName: "text-white",
+  qrButtonClassName:
+    "!border-white/15 !bg-white/10 !text-white hover:!border-white/25 hover:!bg-white/15",
 };
 
 const GRADUATE_SCHEME: CertificationScheme = {
   roleBadgeClassName:
-    "bg-slate-200 text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] dark:bg-slate-700 dark:text-white",
+    "!border-slate-900/10 !bg-slate-900 !text-white shadow-[0_0_0_1px_rgba(15,23,42,0.16)] dark:!border-white/20 dark:!bg-white/90 dark:!text-slate-950",
   yearChipClassName:
-    "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/40 dark:bg-slate-800/80 dark:text-slate-200 dark:ring-slate-600/50",
+    "bg-white/85 text-slate-800 ring-1 ring-slate-400/45 dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-500/55",
   campusBadgeClassName:
-    "bg-slate-200/60 text-slate-700 ring-1 ring-slate-300/35 dark:bg-slate-800/80 dark:text-slate-200 dark:ring-slate-600/45",
+    "bg-white/85 text-slate-800 ring-1 ring-slate-400/40 dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-500/50",
   cardClassName:
-    "border-slate-300/45 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_46%,#e2e8f0_100%)] shadow-[0_28px_90px_rgba(100,116,139,0.18)] dark:border-slate-500/45 dark:bg-[linear-gradient(135deg,#0f172a_0%,#111827_46%,#1f2937_100%)] dark:shadow-[0_28px_90px_rgba(15,23,42,0.35)]",
-  frameRingClassName: "ring-slate-300/22 dark:ring-slate-500/16",
+    "border-slate-300/55 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_46%,#e2e8f0_100%)] shadow-[0_28px_90px_rgba(100,116,139,0.18)] dark:border-slate-500/45 dark:bg-[linear-gradient(135deg,#0f172a_0%,#111827_46%,#1f2937_100%)] dark:shadow-[0_28px_90px_rgba(15,23,42,0.35)]",
+  frameRingClassName: "ring-slate-300/30 dark:ring-slate-500/16",
   glowClassName:
     "bg-[radial-gradient(circle,rgba(148,163,184,0.2)_0%,rgba(148,163,184,0.08)_22%,transparent_58%)]",
-  panelClassName: "border-slate-300/25 bg-white/70 dark:border-slate-500/18 dark:bg-white/5",
-  accentClassName: "bg-slate-400 dark:bg-slate-300",
-  avatarFrameClassName: "border-slate-300/34 ring-slate-300/20 dark:border-slate-500/18 dark:ring-slate-500/14",
-  subduedTextClassName: "text-slate-700/80 dark:text-slate-100/80",
-  mutedTextClassName: "text-slate-600/60 dark:text-slate-100/60",
+  panelClassName: "border-slate-300/45 bg-white/82 dark:border-slate-500/18 dark:bg-white/5",
+  accentClassName: "bg-slate-600 dark:bg-slate-300",
+  avatarFrameClassName: "border-slate-300/45 ring-slate-300/25 dark:border-slate-500/18 dark:ring-slate-500/14",
+  subduedTextClassName: "text-slate-700 dark:text-slate-100/80",
+  mutedTextClassName: "text-slate-600 dark:text-slate-100/60",
+  textClassName: "text-slate-950 dark:text-white",
+  qrButtonClassName:
+    "!border-slate-300/70 !bg-white/90 !text-slate-800 hover:!border-slate-400/80 hover:!bg-white dark:!border-white/15 dark:!bg-white/10 dark:!text-white dark:hover:!border-white/25 dark:hover:!bg-white/15",
 };
+
+function buildStudentThemeStyle(theme: CohortCardTheme) {
+  const textColor = getReadableTextColorForGradient([
+    theme.backgroundFrom,
+    theme.backgroundVia,
+    theme.backgroundTo,
+  ]);
+  const isDarkText = textColor !== "#ffffff";
+  const accentText = getReadableTextColor(theme.accentColor);
+
+  return {
+    "--cert-bg-from": theme.backgroundFrom,
+    "--cert-bg-via": theme.backgroundVia,
+    "--cert-bg-to": theme.backgroundTo,
+    "--cert-accent": theme.accentColor,
+    "--cert-text": textColor,
+    "--cert-badge-text": accentText,
+    "--cert-subdued": isDarkText ? "rgba(15, 23, 42, 0.78)" : "rgba(255, 255, 255, 0.82)",
+    "--cert-muted": isDarkText ? "rgba(51, 65, 85, 0.72)" : "rgba(255, 255, 255, 0.64)",
+    "--cert-chip-text": isDarkText ? "#0f172a" : "rgba(255, 255, 255, 0.92)",
+    "--cert-chip-bg": isDarkText ? "rgba(255, 255, 255, 0.74)" : "rgba(255, 255, 255, 0.12)",
+    "--cert-chip-border": isDarkText ? "rgba(100, 116, 139, 0.34)" : "rgba(255, 255, 255, 0.22)",
+    "--cert-panel-bg": isDarkText ? "rgba(255, 255, 255, 0.82)" : "rgba(255, 255, 255, 0.08)",
+    "--cert-panel-border": isDarkText ? "rgba(100, 116, 139, 0.28)" : "rgba(255, 255, 255, 0.16)",
+    "--cert-border": hexToRgba(theme.accentColor, 0.34),
+    "--cert-ring": hexToRgba(theme.accentColor, 0.18),
+    "--cert-shadow": hexToRgba(theme.accentColor, 0.22),
+    "--cert-accent-ring": hexToRgba(theme.accentColor, 0.2),
+    "--cert-glow-strong": hexToRgba(theme.accentColor, 0.28),
+    "--cert-glow-soft": hexToRgba(theme.accentColor, 0.12),
+    "--cert-avatar-border": hexToRgba(theme.accentColor, 0.24),
+    "--cert-avatar-ring": hexToRgba(theme.accentColor, 0.16),
+    "--cert-qr-text": isDarkText ? "#0f172a" : "#ffffff",
+    "--cert-qr-bg": isDarkText ? "rgba(255, 255, 255, 0.86)" : "rgba(255, 255, 255, 0.1)",
+    "--cert-qr-bg-hover": isDarkText ? "rgba(255, 255, 255, 0.94)" : "rgba(255, 255, 255, 0.15)",
+    "--cert-qr-border": isDarkText ? "rgba(100, 116, 139, 0.35)" : "rgba(255, 255, 255, 0.15)",
+    "--cert-qr-border-hover": isDarkText ? "rgba(100, 116, 139, 0.5)" : "rgba(255, 255, 255, 0.25)",
+  };
+}
+
+export function buildStudentCertificationScheme(
+  theme: CohortCardTheme = DEFAULT_STUDENT_CARD_THEME,
+): CertificationScheme {
+  return {
+    ...THEMED_STUDENT_SCHEME_CLASSNAMES,
+    style: buildStudentThemeStyle(theme),
+  };
+}
 
 export function getCertificationRoleLabel(year: number | null | undefined) {
   if (typeof year !== "number") {
@@ -104,7 +155,10 @@ export function getCertificationRoleLabel(year: number | null | undefined) {
   return "교육생";
 }
 
-export function getCertificationScheme(year: number | null | undefined) {
+export function getCertificationScheme(
+  year: number | null | undefined,
+  cohortThemes?: readonly CohortCardTheme[] | null,
+) {
   if (year === 0) {
     return STAFF_SCHEME;
   }
@@ -113,9 +167,15 @@ export function getCertificationScheme(year: number | null | undefined) {
     return GRADUATE_SCHEME;
   }
 
-  if (year === 14) {
-    return STUDENT_14_SCHEME;
+  if (typeof year === "number") {
+    return buildStudentCertificationScheme(
+      findCohortCardTheme(cohortThemes, year) ?? {
+        ...DEFAULT_STUDENT_CARD_THEME,
+        cohortYear: year,
+        displayName: `${year}기`,
+      },
+    );
   }
 
-  return STUDENT_15_SCHEME;
+  return buildStudentCertificationScheme(DEFAULT_STUDENT_CARD_THEME);
 }

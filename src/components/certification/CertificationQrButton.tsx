@@ -147,7 +147,7 @@ export default function CertificationQrButton({
       <Button
         variant="ghost"
         className={cn(
-          "!border-white/15 !bg-white/10 !text-white shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur-md hover:!border-white/25 hover:!bg-white/15",
+          "shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur-md",
           className,
         )}
         onClick={() => {

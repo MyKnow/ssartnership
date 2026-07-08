@@ -18,6 +18,7 @@ import {
 import CertificationCardFrame from "@/components/certification/CertificationCardFrame";
 import { cn } from "@/lib/cn";
 import { formatKoreanDateTimeToSecond } from "@/lib/datetime";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 
 export const dynamic = "force-dynamic";
 
@@ -73,9 +74,10 @@ export default async function CertificationVerifyPage({
   }
 
   const isValid = verification.ok && Boolean(member);
+  const cohortCardThemes = member ? await listCohortCardThemes() : [];
   const profile = member ? parseSsafyProfile(member.display_name ?? "") : null;
   const roleLabel = member ? getCertificationRoleLabel(member.year) : null;
-  const scheme = member ? getCertificationScheme(member.year) : null;
+  const scheme = member ? getCertificationScheme(member.year, cohortCardThemes) : null;
   const campusLabel = member?.campus ?? profile?.campus ?? null;
   const yearLabel = member?.year && member.year > 0 ? `${member.year}기` : null;
   const avatarSrc = member?.avatar_url
