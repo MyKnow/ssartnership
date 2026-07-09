@@ -10,6 +10,10 @@ import {
   isPartnerRegistrationRequestStatus,
   type PartnerRegistrationRequestStatus,
 } from "@/lib/partner-registration";
+import {
+  DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
+  normalizeBenefitGroupKey,
+} from "@/lib/partner-branch-registration";
 import { ensurePartnerCompanyRow } from "@/app/admin/(protected)/_actions/partner-support/company-provision";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -104,6 +108,10 @@ function resolveRegistrationManagedCampusSlugs(
     company?.managed_campus_slugs ??
       inferCampusSlugsFromLocation(request.location),
   );
+}
+
+function normalizeRegistrationBenefitGroupKey(value?: string | null) {
+  return normalizeBenefitGroupKey(value, DEFAULT_PARTNER_BENEFIT_GROUP_KEY);
 }
 
 async function findExistingConvertedPartner(
@@ -225,8 +233,8 @@ async function createPartnerFromPortalRegistrationRequest({
       ? groups
       : [
           {
-            group_key: "default",
-            label: "기본 혜택",
+            group_key: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
+            label: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
             benefit_action_type: request.benefit_action_type,
             benefit_action_link: request.benefit_action_link,
             benefits: request.benefits ?? [],
@@ -240,8 +248,11 @@ async function createPartnerFromPortalRegistrationRequest({
   const createdPartners: ConvertedPartnerRow[] = [];
 
   for (const group of safeGroups) {
+    const normalizedGroupKey = normalizeRegistrationBenefitGroupKey(group.group_key);
     const groupBranches = branches.filter(
-      (branch) => (branch.benefit_group_key ?? "default") === group.group_key,
+      (branch) =>
+        normalizeRegistrationBenefitGroupKey(branch.benefit_group_key) ===
+        normalizedGroupKey,
     );
     const groupCampusSlugs = normalizeCampusSlugs(
       groupBranches.flatMap((branch) => branch.campus_slugs ?? []),
@@ -255,7 +266,8 @@ async function createPartnerFromPortalRegistrationRequest({
           ? groupBranches[0]!.address
           : `${groupBranches[0]!.address} 외 ${groupBranches.length - 1}개 지점`;
     const partnerName =
-      safeGroups.length === 1 || group.group_key === "default"
+      safeGroups.length === 1 ||
+      normalizedGroupKey === DEFAULT_PARTNER_BENEFIT_GROUP_KEY
         ? request.brand_name
         : `${request.brand_name} · ${group.label}`;
     const existingPartner = await findExistingConvertedPartner(supabase, {

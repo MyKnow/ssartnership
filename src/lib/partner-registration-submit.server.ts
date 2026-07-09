@@ -5,6 +5,7 @@ import {
   ADMIN_PARTNER_FILE_MAX_BYTES,
 } from "@/lib/admin-partner-file-import";
 import {
+  DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
   getDefaultBranchTypeForScope,
   inferPartnerBranchScopeType,
   normalizePartnerBranchRows,
@@ -65,7 +66,7 @@ function buildRegistrationBenefitGroupRows(
   branches: PartnerBranchDraft[],
 ) {
   const groupLabels = new Map<string, string>();
-  groupLabels.set("default", "기본 혜택");
+  groupLabels.set(DEFAULT_PARTNER_BENEFIT_GROUP_KEY, DEFAULT_PARTNER_BENEFIT_GROUP_KEY);
 
   for (const branch of branches) {
     if (groupLabels.has(branch.benefitGroupKey)) {
@@ -267,7 +268,7 @@ async function parsePartnerRegistrationBranchXlsxFile(
   const parsed = normalizePartnerBranchRows(rows, {
     companyName: values.companyName,
     brandName: values.brandName,
-    defaultBenefitGroupKey: "default",
+    defaultBenefitGroupKey: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
     defaultBranchType: getDefaultBranchTypeForScope(values.branchScopeType),
   });
   if (parsed.errors.length > 0) {

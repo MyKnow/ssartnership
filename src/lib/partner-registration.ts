@@ -15,6 +15,7 @@ import {
   validateDateRange,
 } from "@/lib/validation";
 import {
+  DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
   createFallbackSingleBranch,
   getDefaultBranchTypeForScope,
   inferPartnerBranchScopeType,
@@ -562,7 +563,7 @@ export function validatePartnerRegistrationInput(
   const branchContext = {
     companyName: values.companyName,
     brandName: values.brandName,
-    defaultBenefitGroupKey: "default",
+    defaultBenefitGroupKey: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
     defaultBranchType: getDefaultBranchTypeForScope(branchScopeType),
   };
   const branchTextResult = values.branchListText

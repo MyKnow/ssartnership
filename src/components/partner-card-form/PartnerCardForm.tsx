@@ -9,12 +9,22 @@ import PartnerCompanySection from "@/components/partner-card-form/PartnerCompany
 import PartnerChipSections from "@/components/partner-card-form/PartnerChipSections";
 import PartnerAudienceSection from "@/components/partner-card-form/PartnerAudienceSection";
 import PartnerFormActions from "@/components/partner-card-form/PartnerFormActions";
+import PartnerBranchListEditor, {
+  branchRowHasValue,
+  parseInitialBranchEditorRows,
+  serializeBranchRows,
+  type BranchEditorRow,
+} from "@/components/partner-branches/PartnerBranchListEditor";
 import { cn } from "@/lib/cn";
 import { validateFormCampusSlugSelection } from "@/lib/campuses";
 import { isPartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
 import { isPartnerDetailDescriptionValid } from "@/lib/partner-detail-description";
+import {
+  inferPartnerBranchScopeType,
+  type PartnerBranchScopeType,
+} from "@/lib/partner-branch-registration";
 import type {
   PartnerCardCategoryOption,
   PartnerCardCompanyOption,
@@ -22,6 +32,8 @@ import type {
   PartnerCardFormMode,
   PartnerCardFormValues,
 } from "@/components/partner-card-form/types";
+
+type BranchEntryMode = "single" | "multi";
 
 export default function PartnerCardForm({
   partner,
@@ -55,6 +67,11 @@ export default function PartnerCardForm({
   const [clientFieldErrors, setClientFieldErrors] = useState<
     Partial<Record<PartnerCardFormField, string>>
   >({});
+  const [branchEntryMode, setBranchEntryMode] =
+    useState<BranchEntryMode>("single");
+  const [branchRows, setBranchRows] = useState<BranchEditorRow[]>(() =>
+    parseInitialBranchEditorRows(),
+  );
   const {
     formRef,
     periodStart,
@@ -103,6 +120,23 @@ export default function PartnerCardForm({
     setAppliesToValue,
     companyFieldsLocked,
   } = usePartnerCardFormState({ partner, categoryId, focusField });
+  const branchListText = useMemo(
+    () => (branchEntryMode === "multi" ? serializeBranchRows(branchRows) : ""),
+    [branchEntryMode, branchRows],
+  );
+  const inferredBranchScopeType = useMemo<PartnerBranchScopeType>(() => {
+    if (serviceModeValue === "online") {
+      return "online";
+    }
+    if (branchEntryMode === "single") {
+      return "single_location";
+    }
+    return inferPartnerBranchScopeType({
+      serviceMode: serviceModeValue,
+      branches: branchRows.filter(branchRowHasValue),
+      fallback: "selected_direct_branches",
+    });
+  }, [branchEntryMode, branchRows, serviceModeValue]);
 
   const mergedFieldErrors = useMemo(
     () => ({
@@ -219,6 +253,18 @@ export default function PartnerCardForm({
         {hiddenFields?.map((field) => (
           <input key={`${field.name}-${field.value}`} type="hidden" name={field.name} value={field.value} />
         ))}
+        {mode === "create" ? (
+          <>
+            <input
+              type="hidden"
+              name="branchScopeType"
+              value={inferredBranchScopeType}
+            />
+            {branchEntryMode === "single" ? (
+              <input type="hidden" name="branchListText" value="" />
+            ) : null}
+          </>
+        ) : null}
 
         <div className="grid gap-6">
           <PartnerBasicInfoSection
@@ -259,7 +305,12 @@ export default function PartnerCardForm({
               setVisibilityValue: (value) => setVisibilityValue(value),
               setBenefitVisibilityValue,
               setCategoryValue,
-              setServiceModeValue,
+              setServiceModeValue: (value) => {
+                setServiceModeValue(value);
+                if (value === "online") {
+                  setBranchEntryMode("single");
+                }
+              },
               setPeriodStartValue,
               setPeriodEndValue,
               setLocationValue,
@@ -294,6 +345,78 @@ export default function PartnerCardForm({
               setCompanyDescriptionValue,
             }}
           />
+
+          {mode === "create" && serviceModeValue === "offline" ? (
+            <section className="grid gap-5 rounded-[1.25rem] border border-border bg-surface p-5 shadow-flat">
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-semibold text-foreground">
+                  지점 및 혜택 그룹
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  단일 지점은 기본 위치를 사용하고, 다중 지점은 XLSX 또는 행 추가로 적용 지점을 연결합니다.
+                </p>
+              </div>
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      value: "single",
+                      label: "단일 지점",
+                      description: "브랜드 위치를 그대로 적용합니다.",
+                    },
+                    {
+                      value: "multi",
+                      label: "다중 지점",
+                      description: "지점 리스트와 G01 그룹을 함께 관리합니다.",
+                    },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={branchEntryMode === option.value}
+                    onClick={() => setBranchEntryMode(option.value)}
+                    className={cn(
+                      "grid min-h-20 min-w-0 gap-1 rounded-[1rem] border px-4 py-3 text-left transition-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
+                      branchEntryMode === option.value
+                        ? "border-primary/35 bg-primary-soft text-primary"
+                        : "border-border bg-surface-control text-foreground hover:border-strong hover:bg-surface-elevated",
+                    )}
+                  >
+                    <span className="truncate text-sm font-semibold">
+                      {option.label}
+                    </span>
+                    <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                      {option.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <label className="grid min-w-0 gap-2">
+                <span className="ui-caption">적용 범위 메모</span>
+                <textarea
+                  name="branchScopeNote"
+                  rows={3}
+                  placeholder="예: 직영점 일부만 참여, 일부 가맹점 제외"
+                  className="min-h-24 rounded-[1rem] border border-border bg-surface-control px-3 py-3 text-sm text-foreground shadow-flat outline-none transition-interactive placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+              </label>
+              {branchEntryMode === "multi" ? (
+                <PartnerBranchListEditor
+                  rows={branchRows}
+                  serializedValue={branchListText}
+                  inferredScopeType={inferredBranchScopeType}
+                  onChange={setBranchRows}
+                  title="어드민 적용 지점 목록"
+                  description="업로드한 XLSX 값은 리스트에 즉시 반영되며, 제출 시 지점 원장과 카드 연결로 저장됩니다."
+                />
+              ) : (
+                <div className="rounded-[1rem] border border-primary/15 bg-primary-soft px-4 py-3 text-sm leading-6 text-primary">
+                  단일 지점은 기본 정보의 위치, 지도 URL, 전화번호를 기준으로 연결됩니다.
+                </div>
+              )}
+            </section>
+          ) : null}
 
           <PartnerChipSections partner={partner} />
 

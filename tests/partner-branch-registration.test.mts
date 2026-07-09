@@ -6,19 +6,22 @@ const registrationModulePromise = import("../src/lib/partner-registration.ts");
 
 describe("partner branch registration", () => {
   it("accepts branch rows without external branch codes and infers campus from address", async () => {
-    const { normalizePartnerBranchRows } = await branchModulePromise;
+    const {
+      DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
+      normalizePartnerBranchRows,
+    } = await branchModulePromise;
 
     const branches = normalizePartnerBranchRows(
       [
         {
-          benefitGroupLabel: "기본 혜택",
+          benefitGroupKey: "G01",
           branchName: "역삼본점",
           address: "서울 강남구 테헤란로 212",
           branchCode: "",
           branchType: "직영",
         },
         {
-          benefitGroupLabel: "기본 혜택",
+          benefitGroupKey: "G01",
           branchName: "",
           address: "서울 강남구 강남대로 382",
           branchType: "가맹",
@@ -27,7 +30,7 @@ describe("partner branch registration", () => {
       {
         companyName: "카페 싸피",
         brandName: "카페 싸피",
-        defaultBenefitGroupKey: "default",
+        defaultBenefitGroupKey: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
         defaultBranchType: "direct",
       },
     );
@@ -42,26 +45,36 @@ describe("partner branch registration", () => {
   });
 
   it("parses pasted branch lists with minimum columns", async () => {
-    const { parsePartnerBranchListText } = await branchModulePromise;
+    const {
+      DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
+      normalizeBenefitGroupKey,
+      parsePartnerBranchListText,
+    } = await branchModulePromise;
 
     const parsed = parsePartnerBranchListText(
       [
-        "기본 혜택\t역삼본점\t서울 강남구 테헤란로 212",
-        "기본 혜택\t\t서울 강남구 논현로 508\t\t가맹",
+        "G01\t역삼본점\t서울 강남구 테헤란로 212",
+        "G02\t\t서울 강남구 논현로 508\t\t가맹",
       ].join("\n"),
       {
         companyName: "카페 싸피",
         brandName: "카페 싸피",
-        defaultBenefitGroupKey: "default",
+        defaultBenefitGroupKey: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
         defaultBranchType: "direct",
       },
     );
 
     assert.equal(parsed.errors.length, 0);
     assert.equal(parsed.branches.length, 2);
-    assert.equal(parsed.branches[0]?.benefitGroupKey, "default");
+    assert.equal(parsed.branches[0]?.benefitGroupKey, "G01");
+    assert.equal(parsed.branches[1]?.benefitGroupKey, "G02");
     assert.equal(parsed.branches[1]?.branchName, "서울 강남구 논현로 508");
     assert.equal(parsed.branches[1]?.branchType, "franchise");
+    assert.equal(
+      normalizeBenefitGroupKey("기본 혜택", DEFAULT_PARTNER_BENEFIT_GROUP_KEY),
+      "G01",
+    );
+    assert.equal(normalizeBenefitGroupKey("g2", DEFAULT_PARTNER_BENEFIT_GROUP_KEY), "G02");
   });
 
   it("infers branch scope from branch rows without requiring a manual scope choice", async () => {
@@ -92,8 +105,8 @@ describe("partner branch registration", () => {
     const withBranches = validatePartnerRegistrationInput({
       ...baseInput,
       branchListText: [
-        "기본 혜택\t역삼본점\t서울 강남구 테헤란로 212\t\t직영",
-        "기본 혜택\t강남점\t서울 강남구 강남대로 382\t\t가맹",
+        "G01\t역삼본점\t서울 강남구 테헤란로 212\t\t직영",
+        "G02\t강남점\t서울 강남구 강남대로 382\t\t가맹",
       ].join("\n"),
     });
     assert.equal(withBranches.fieldErrors.branchListText, undefined);

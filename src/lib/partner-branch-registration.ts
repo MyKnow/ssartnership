@@ -51,6 +51,8 @@ export type PartnerBranchDraft = {
   memo: string | null;
 };
 
+export const DEFAULT_PARTNER_BENEFIT_GROUP_KEY = "G01";
+
 export const PARTNER_REGISTRATION_MODE_OPTIONS = [
   {
     value: "full_new",
@@ -138,6 +140,11 @@ function hashString(value: string) {
     hash = (hash * 33) ^ char.charCodeAt(0);
   }
   return (hash >>> 0).toString(36).padStart(6, "0").slice(0, 10);
+}
+
+export function createPartnerBenefitGroupCode(index: number) {
+  const safeIndex = Number.isFinite(index) ? Math.max(0, Math.floor(index)) : 0;
+  return `G${String(safeIndex + 1).padStart(2, "0")}`;
 }
 
 export function normalizePartnerRegistrationMode(
@@ -264,6 +271,11 @@ export function normalizeBenefitGroupKey(
   const normalized = normalizeText(value);
   if (DEFAULT_BENEFIT_GROUP_LABELS.has(normalized.toLowerCase())) {
     return fallback;
+  }
+  const codeMatch = normalized.match(/^g\s*0*(\d+)$/i);
+  if (codeMatch) {
+    const codeIndex = Number.parseInt(codeMatch[1]!, 10) - 1;
+    return createPartnerBenefitGroupCode(codeIndex);
   }
   return normalizeKeyPart(normalized) || fallback;
 }
@@ -418,7 +430,7 @@ export function createFallbackSingleBranch(
     mapUrl?: string | null;
     phone?: string | null;
   },
-  defaultBenefitGroupKey = "default",
+  defaultBenefitGroupKey = DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
 ) {
   return normalizePartnerBranchRows(
     [
