@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   ArrowDownTrayIcon,
   DocumentArrowUpIcon,
@@ -48,6 +48,42 @@ type ExcelWorksheetLike = {
   getRow: (rowNumber: number) => ExcelRowLike;
   eachRow: (callback: (row: ExcelRowLike, rowNumber: number) => void) => void;
 };
+
+function BranchRowField({
+  label,
+  inputId,
+  required = false,
+  description,
+  children,
+}: {
+  label: string;
+  inputId: string;
+  required?: boolean;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="grid min-w-0 gap-1.5" htmlFor={inputId}>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="truncate text-xs font-semibold text-foreground">{label}</span>
+        <span
+          className={cn(
+            "inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 text-[10px] font-semibold leading-none tracking-normal",
+            required
+              ? "border-danger/20 bg-danger/10 text-danger"
+              : "border-border bg-surface-control text-muted-foreground",
+          )}
+        >
+          {required ? "필수" : "선택"}
+        </span>
+      </span>
+      {children}
+      <span className="text-ko-pretty text-[11px] leading-4 text-muted-foreground">
+        {description}
+      </span>
+    </label>
+  );
+}
 
 function createBranchEditorRowId() {
   return `branch-${Math.random().toString(36).slice(2, 10)}`;
@@ -448,6 +484,9 @@ export default function PartnerBranchListEditor({
       </div>
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <p className="basis-full text-ko-pretty text-xs leading-5 text-muted-foreground">
+          같은 혜택이면 G01을 그대로 사용하고, 지점별 혜택이 다를 때만 그룹을 추가합니다.
+        </p>
         {benefitGroupCodes.map((code) => (
           <span
             key={code}
@@ -484,90 +523,147 @@ export default function PartnerBranchListEditor({
               </Button>
             </div>
             <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-              <Input
-                value={row.branchName}
-                onChange={(event) =>
-                  updateRow(row.id, "branchName", event.currentTarget.value)
-                }
-                placeholder="지점명 예: 역삼본점"
-                aria-label={`지점 ${index + 1} 이름`}
-              />
-              <Input
-                value={row.address}
-                onChange={(event) =>
-                  updateRow(row.id, "address", event.currentTarget.value)
-                }
-                placeholder="주소 예: 서울 강남구 테헤란로 212"
-                aria-label={`지점 ${index + 1} 주소`}
-              />
+              <BranchRowField
+                label="지점명"
+                inputId={`${row.id}-branch-name`}
+                description="사용자에게 보일 지점 이름입니다. 비우면 주소를 기준으로 표시합니다."
+              >
+                <Input
+                  id={`${row.id}-branch-name`}
+                  value={row.branchName}
+                  onChange={(event) =>
+                    updateRow(row.id, "branchName", event.currentTarget.value)
+                  }
+                  placeholder="예: 역삼본점"
+                  aria-label={`지점 ${index + 1} 이름`}
+                />
+              </BranchRowField>
+              <BranchRowField
+                label="주소"
+                inputId={`${row.id}-address`}
+                required
+                description="캠퍼스 자동 분류와 중복 지점 식별에 사용합니다."
+              >
+                <Input
+                  id={`${row.id}-address`}
+                  value={row.address}
+                  onChange={(event) =>
+                    updateRow(row.id, "address", event.currentTarget.value)
+                  }
+                  placeholder="예: 서울 강남구 테헤란로 212"
+                  aria-label={`지점 ${index + 1} 주소`}
+                />
+              </BranchRowField>
             </div>
             <div className="grid min-w-0 gap-3 md:grid-cols-[8rem_10rem_minmax(0,1fr)]">
-              <select
-                value={row.benefitGroupKey}
-                onChange={(event) =>
-                  updateRow(row.id, "benefitGroupKey", event.currentTarget.value)
-                }
-                aria-label={`지점 ${index + 1} 혜택 그룹`}
-                className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+              <BranchRowField
+                label="혜택 그룹"
+                inputId={`${row.id}-benefit-group`}
+                description="혜택 내용이 같은 지점끼리 같은 그룹 코드로 묶습니다."
               >
-                {benefitGroupCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={row.branchType}
-                onChange={(event) =>
-                  updateRow(row.id, "branchType", event.currentTarget.value)
-                }
-                aria-label={`지점 ${index + 1} 직영 또는 가맹`}
-                className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                <select
+                  id={`${row.id}-benefit-group`}
+                  value={row.benefitGroupKey}
+                  onChange={(event) =>
+                    updateRow(row.id, "benefitGroupKey", event.currentTarget.value)
+                  }
+                  aria-label={`지점 ${index + 1} 혜택 그룹`}
+                  className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                >
+                  {benefitGroupCodes.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </BranchRowField>
+              <BranchRowField
+                label="지점 유형"
+                inputId={`${row.id}-branch-type`}
+                description="직영, 가맹, 미정 중 하나를 선택합니다."
               >
-                {branchTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <Input
-                value={row.branchCode}
-                onChange={(event) =>
-                  updateRow(row.id, "branchCode", event.currentTarget.value)
-                }
-                placeholder="지점 코드 선택"
-                aria-label={`지점 ${index + 1} 코드`}
-              />
+                <select
+                  id={`${row.id}-branch-type`}
+                  value={row.branchType}
+                  onChange={(event) =>
+                    updateRow(row.id, "branchType", event.currentTarget.value)
+                  }
+                  aria-label={`지점 ${index + 1} 직영 또는 가맹`}
+                  className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                >
+                  {branchTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </BranchRowField>
+              <BranchRowField
+                label="지점 코드"
+                inputId={`${row.id}-branch-code`}
+                description="브랜드 내부 코드가 있으면 입력합니다. 없으면 자동 생성합니다."
+              >
+                <Input
+                  id={`${row.id}-branch-code`}
+                  value={row.branchCode}
+                  onChange={(event) =>
+                    updateRow(row.id, "branchCode", event.currentTarget.value)
+                  }
+                  placeholder="예: STORE-001"
+                  aria-label={`지점 ${index + 1} 코드`}
+                />
+              </BranchRowField>
             </div>
             <details className="group rounded-[0.9rem] border border-border/70 bg-surface-muted px-3 py-2">
               <summary className="cursor-pointer select-none text-xs font-semibold text-muted-foreground">
                 선택 정보
               </summary>
               <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-3">
-                <Input
-                  value={row.mapUrl}
-                  onChange={(event) =>
-                    updateRow(row.id, "mapUrl", event.currentTarget.value)
-                  }
-                  placeholder="지도 URL"
-                  aria-label={`지점 ${index + 1} 지도 URL`}
-                />
-                <Input
-                  value={row.phone}
-                  onChange={(event) =>
-                    updateRow(row.id, "phone", event.currentTarget.value)
-                  }
-                  placeholder="전화번호"
-                  aria-label={`지점 ${index + 1} 전화번호`}
-                />
-                <Input
-                  value={row.memo}
-                  onChange={(event) =>
-                    updateRow(row.id, "memo", event.currentTarget.value)
-                  }
-                  placeholder="메모"
-                  aria-label={`지점 ${index + 1} 메모`}
-                />
+                <BranchRowField
+                  label="지도 URL"
+                  inputId={`${row.id}-map-url`}
+                  description="지점별 지도 링크가 다를 때만 입력합니다."
+                >
+                  <Input
+                    id={`${row.id}-map-url`}
+                    value={row.mapUrl}
+                    onChange={(event) =>
+                      updateRow(row.id, "mapUrl", event.currentTarget.value)
+                    }
+                    placeholder="https://map.naver.com/..."
+                    aria-label={`지점 ${index + 1} 지도 URL`}
+                  />
+                </BranchRowField>
+                <BranchRowField
+                  label="전화번호"
+                  inputId={`${row.id}-phone`}
+                  description="대표 번호와 다른 지점 전용 번호가 있을 때 입력합니다."
+                >
+                  <Input
+                    id={`${row.id}-phone`}
+                    value={row.phone}
+                    onChange={(event) =>
+                      updateRow(row.id, "phone", event.currentTarget.value)
+                    }
+                    placeholder="예: 02-3429-5100"
+                    aria-label={`지점 ${index + 1} 전화번호`}
+                  />
+                </BranchRowField>
+                <BranchRowField
+                  label="운영 메모"
+                  inputId={`${row.id}-memo`}
+                  description="관리자가 검토할 참여 조건이나 예외를 적습니다."
+                >
+                  <Input
+                    id={`${row.id}-memo`}
+                    value={row.memo}
+                    onChange={(event) =>
+                      updateRow(row.id, "memo", event.currentTarget.value)
+                    }
+                    placeholder="예: 평일만 참여"
+                    aria-label={`지점 ${index + 1} 메모`}
+                  />
+                </BranchRowField>
               </div>
             </details>
           </div>
