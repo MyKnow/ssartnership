@@ -32,6 +32,12 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
 import {
+  COUPON_ONLY_BENEFIT_TEXT,
+  COUPON_ONLY_CONDITION_TEXT,
+  getBenefitListingMode,
+  type BenefitListingMode,
+} from "@/lib/partner-coupon-only";
+import {
   PARTNER_REGISTRATION_MODE_OPTIONS,
   inferPartnerBranchScopeType,
   isMultiBranchScopeType,
@@ -541,6 +547,13 @@ export default function PartnerRegistrationClient({
     useState<AdminPartnerFileBenefitActionType>(() =>
       getInitialBenefitActionType(initialValues),
     );
+  const [benefitListingMode, setBenefitListingMode] =
+    useState<BenefitListingMode>(() =>
+      getBenefitListingMode({
+        benefits: initialValues?.benefits,
+        conditions: initialValues?.conditions,
+      }),
+    );
   const [branchRows, setBranchRows] = useState<BranchEditorRow[]>(() =>
     parseInitialBranchEditorRows(initialValues?.branchListText),
   );
@@ -574,6 +587,8 @@ export default function PartnerRegistrationClient({
   const selectedAction = PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS.find(
     (option) => option.value === benefitActionType,
   );
+  const effectiveBenefitActionType =
+    benefitListingMode === "coupon_only" ? "none" : benefitActionType;
   const xlsxError = clientFileError ?? excelState.fileError;
   const activeBranchRows = useMemo(
     () => (branchEntryMode === "multi" ? branchRows : []),
@@ -734,12 +749,40 @@ export default function PartnerRegistrationClient({
     }
   };
 
+  const handleBenefitActionTypeChange = (
+    value: AdminPartnerFileBenefitActionType,
+  ) => {
+    setBenefitActionType(value);
+    if (benefitListingMode === "coupon_only" && value !== "none") {
+      setBenefitListingMode("always_on");
+    }
+  };
+
+  const handleBenefitListingModeChange = (value: BenefitListingMode) => {
+    setBenefitListingMode(value);
+    if (value === "coupon_only") {
+      setBenefitActionType("none");
+      setClientFieldErrors((current) => {
+        const {
+          benefitActionLink: _benefitActionLink,
+          benefits: _benefits,
+          conditions: _conditions,
+          ...nextErrors
+        } = current;
+        void _benefitActionLink;
+        void _benefits;
+        void _conditions;
+        return nextErrors;
+      });
+    }
+  };
+
   const typeSelector = (
     <RegistrationTypeSelector
       serviceMode={serviceMode}
       benefitActionType={benefitActionType}
       onServiceModeChange={handleServiceModeChange}
-      onBenefitActionTypeChange={setBenefitActionType}
+      onBenefitActionTypeChange={handleBenefitActionTypeChange}
     />
   );
 
@@ -875,7 +918,11 @@ export default function PartnerRegistrationClient({
               <StepProgress activeStep={activeStep} onStepClick={goToStep} />
               <input type="hidden" name="registrationMode" value={registrationMode} />
               <input type="hidden" name="serviceMode" value={serviceMode} />
-              <input type="hidden" name="benefitActionType" value={benefitActionType} />
+              <input
+                type="hidden"
+                name="benefitActionType"
+                value={effectiveBenefitActionType}
+              />
               <input type="hidden" name="branchScopeType" value={inferredBranchScopeType} />
               {branchEntryMode === "single" ? (
                 <input type="hidden" name="branchListText" value="" />
@@ -1223,66 +1270,143 @@ export default function PartnerRegistrationClient({
                   <h2 className="truncate text-base font-semibold text-foreground">
                     혜택과 이용 조건
                   </h2>
-                  <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                    입력 후 Enter를 누르면 칩으로 분리되고, 각 항목은 수정·삭제·순서 변경이 가능합니다.
+                  <p className="mt-1 text-ko-pretty text-sm leading-6 text-muted-foreground">
+                    상시 노출할 혜택이 있는지, 소모성 쿠폰만 운영하는지 먼저 선택합니다.
                   </p>
                 </div>
 
-                {benefitActionType === "external_link" ? (
-                  <Field
-                    label="혜택 이용 링크"
-                    name="benefitActionLink"
-                    required
-                    error={fieldErrors.benefitActionLink}
-                  >
-                    <FormInput
-                      name="benefitActionLink"
-                      fieldErrors={fieldErrors}
-                      inputRef={(element) => {
-                        fieldRefs.current.benefitActionLink = element;
-                      }}
-                      required
-                      defaultValue={initialValues?.benefitActionLink}
-                      placeholder="https://cafessafy.example.com/coupon"
+                <section className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      혜택 구성
+                    </p>
+                    <p className="mt-1 text-ko-pretty text-xs leading-5 text-muted-foreground">
+                      상세 카드에 항상 보일 혜택을 입력하거나, 수량과 사용 기간이 있는 쿠폰만 운영하도록 설정합니다.
+                    </p>
+                  </div>
+                  <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                    <OptionChip
+                      value="always_on"
+                      selected={benefitListingMode === "always_on"}
+                      label="상시 혜택 있음"
+                      description="상세 카드에 노출할 혜택과 조건을 직접 입력합니다."
+                      onClick={handleBenefitListingModeChange}
                     />
-                  </Field>
-                ) : null}
+                    <OptionChip
+                      value="coupon_only"
+                      selected={benefitListingMode === "coupon_only"}
+                      label="소모성 쿠폰만 제공"
+                      description="쿠폰별 수량, 기간, 조건을 별도로 운영합니다."
+                      onClick={handleBenefitListingModeChange}
+                    />
+                  </div>
+                </section>
 
-                <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                  <Field label="혜택" name="benefits" required error={fieldErrors.benefits}>
-                    <TokenChipField
-                      id="partner-registration-benefits"
+                {benefitListingMode === "coupon_only" ? (
+                  <>
+                    <input
+                      type="hidden"
                       name="benefits"
-                      inputRef={(element) => {
-                        fieldRefs.current.benefits = element;
-                      }}
-                      initialValues={splitInitialChipValues(initialValues?.benefits)}
-                      placeholder="예: 아메리카노 10% 할인"
-                      helpText="Enter로 혜택을 하나씩 추가합니다."
-                      emptyText="등록된 혜택이 없습니다."
-                      error={fieldErrors.benefits}
+                      value={COUPON_ONLY_BENEFIT_TEXT}
                     />
-                  </Field>
-                  <Field
-                    label="이용 조건"
-                    name="conditions"
-                    required
-                    error={fieldErrors.conditions}
-                  >
-                    <TokenChipField
-                      id="partner-registration-conditions"
+                    <input
+                      type="hidden"
                       name="conditions"
-                      inputRef={(element) => {
-                        fieldRefs.current.conditions = element;
-                      }}
-                      initialValues={splitInitialChipValues(initialValues?.conditions)}
-                      placeholder="예: 싸트너십 인증"
-                      helpText="Enter로 조건을 하나씩 추가합니다."
-                      emptyText="등록된 이용 조건이 없습니다."
-                      error={fieldErrors.conditions}
+                      value={COUPON_ONLY_CONDITION_TEXT}
                     />
-                  </Field>
-                </div>
+                    <div className="grid min-w-0 gap-3 rounded-[1rem] border border-primary/15 bg-primary-soft p-4 text-primary">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">
+                          쿠폰 전용 브랜드로 접수
+                        </p>
+                        <p className="mt-1 text-ko-pretty text-sm leading-6">
+                          상시 할인 문구 없이 등록하고, 승인 후 쿠폰 관리에서 쿠폰명, 수량, 사용 기간, 1인당 사용 횟수를 설정합니다.
+                        </p>
+                      </div>
+                      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                        <div className="grid min-w-0 gap-1 rounded-[0.85rem] border border-primary/15 bg-surface/80 px-3 py-2">
+                          <span className="text-[11px] font-semibold text-muted-foreground">
+                            제출 혜택
+                          </span>
+                          <span className="truncate text-sm font-semibold text-foreground">
+                            {COUPON_ONLY_BENEFIT_TEXT}
+                          </span>
+                        </div>
+                        <div className="grid min-w-0 gap-1 rounded-[0.85rem] border border-primary/15 bg-surface/80 px-3 py-2">
+                          <span className="text-[11px] font-semibold text-muted-foreground">
+                            제출 조건
+                          </span>
+                          <span className="truncate text-sm font-semibold text-foreground">
+                            {COUPON_ONLY_CONDITION_TEXT}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {benefitActionType === "external_link" ? (
+                      <Field
+                        label="혜택 이용 링크"
+                        name="benefitActionLink"
+                        required
+                        error={fieldErrors.benefitActionLink}
+                      >
+                        <FormInput
+                          name="benefitActionLink"
+                          fieldErrors={fieldErrors}
+                          inputRef={(element) => {
+                            fieldRefs.current.benefitActionLink = element;
+                          }}
+                          required
+                          defaultValue={initialValues?.benefitActionLink}
+                          placeholder="https://cafessafy.example.com/coupon"
+                        />
+                      </Field>
+                    ) : null}
+
+                    <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                      <Field
+                        label="혜택"
+                        name="benefits"
+                        required
+                        error={fieldErrors.benefits}
+                      >
+                        <TokenChipField
+                          id="partner-registration-benefits"
+                          name="benefits"
+                          inputRef={(element) => {
+                            fieldRefs.current.benefits = element;
+                          }}
+                          initialValues={splitInitialChipValues(initialValues?.benefits)}
+                          placeholder="예: 아메리카노 10% 할인"
+                          helpText="Enter로 혜택을 하나씩 추가합니다."
+                          emptyText="등록된 혜택이 없습니다."
+                          error={fieldErrors.benefits}
+                        />
+                      </Field>
+                      <Field
+                        label="이용 조건"
+                        name="conditions"
+                        required
+                        error={fieldErrors.conditions}
+                      >
+                        <TokenChipField
+                          id="partner-registration-conditions"
+                          name="conditions"
+                          inputRef={(element) => {
+                            fieldRefs.current.conditions = element;
+                          }}
+                          initialValues={splitInitialChipValues(initialValues?.conditions)}
+                          placeholder="예: 싸트너십 인증"
+                          helpText="Enter로 조건을 하나씩 추가합니다."
+                          emptyText="등록된 이용 조건이 없습니다."
+                          error={fieldErrors.conditions}
+                        />
+                      </Field>
+                    </div>
+                  </>
+                )}
 
                 <Field label="태그" name="tags" error={fieldErrors.tags}>
                   <TokenChipField

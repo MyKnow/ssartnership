@@ -57,10 +57,10 @@ export default async function PartnerRegistrationPage() {
                   <ul className="grid min-w-0 gap-2 text-sm leading-6 text-muted-foreground">
                     <li className="rounded-[1rem] border border-border/70 bg-surface px-4 py-3">
                       <strong className="block truncate text-foreground">
-                        한 브랜드 또는 한 지점
+                        한 브랜드, 여러 지점 가능
                       </strong>
                       <span className="line-clamp-2">
-                        여러 지점이 있으면 지점별로 양식을 나누어 작성합니다.
+                        공통 정보는 한 번 입력하고 지점 단계에서 여러 지점을 추가합니다.
                       </span>
                     </li>
                     <li className="rounded-[1rem] border border-border/70 bg-surface px-4 py-3">

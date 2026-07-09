@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const modulePromise = import("../src/lib/partner-registration.ts");
+const couponOnlyModulePromise = import("../src/lib/partner-coupon-only.ts");
 
 test("partner registration validation accepts offline external link submission", async () => {
   const {
@@ -63,6 +64,56 @@ test("partner registration validation requires online site and contact email", a
 
   assert.equal(result.fieldErrors.siteLink, "온라인 브랜드는 사이트 링크를 입력해 주세요.");
   assert.equal(result.fieldErrors.contactEmail, "이메일 형식을 확인해 주세요.");
+});
+
+test("partner registration validation accepts coupon-only brand defaults", async () => {
+  const { validatePartnerRegistrationInput, hasPartnerRegistrationFieldErrors } =
+    await modulePromise;
+  const { COUPON_ONLY_BENEFIT_TEXT, COUPON_ONLY_CONDITION_TEXT } =
+    await couponOnlyModulePromise;
+
+  const result = validatePartnerRegistrationInput({
+    serviceMode: "offline",
+    benefitActionType: "none",
+    brandName: "쿠폰 싸피 역삼점",
+    categoryLabel: "쿠폰",
+    location: "서울 강남구 테헤란로 212",
+    benefits: COUPON_ONLY_BENEFIT_TEXT,
+    conditions: COUPON_ONLY_CONDITION_TEXT,
+    companyName: "쿠폰 싸피",
+    contactName: "김싸피",
+    contactEmail: "coupon@ssafy.example",
+  });
+
+  assert.equal(hasPartnerRegistrationFieldErrors(result.fieldErrors), false);
+  assert.deepStrictEqual(result.values.parsedBenefits, [COUPON_ONLY_BENEFIT_TEXT]);
+  assert.deepStrictEqual(result.values.parsedConditions, [
+    COUPON_ONLY_CONDITION_TEXT,
+  ]);
+});
+
+test("coupon-only listing mode is restored from default benefit strings", async () => {
+  const {
+    COUPON_ONLY_BENEFIT_TEXT,
+    COUPON_ONLY_CONDITION_TEXT,
+    getBenefitListingMode,
+    removeCouponOnlyDefaults,
+  } = await couponOnlyModulePromise;
+
+  assert.equal(
+    getBenefitListingMode({
+      benefits: [COUPON_ONLY_BENEFIT_TEXT],
+      conditions: [COUPON_ONLY_CONDITION_TEXT],
+    }),
+    "coupon_only",
+  );
+  assert.deepStrictEqual(
+    removeCouponOnlyDefaults([
+      COUPON_ONLY_BENEFIT_TEXT,
+      "아메리카노 10% 할인",
+    ]),
+    ["아메리카노 10% 할인"],
+  );
 });
 
 test("partner registration template href normalizes selected options", async () => {

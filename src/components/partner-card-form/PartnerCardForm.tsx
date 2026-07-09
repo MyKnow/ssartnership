@@ -25,6 +25,10 @@ import {
   inferPartnerBranchScopeType,
   type PartnerBranchScopeType,
 } from "@/lib/partner-branch-registration";
+import {
+  getBenefitListingMode,
+  type BenefitListingMode,
+} from "@/lib/partner-coupon-only";
 import type {
   PartnerCardCategoryOption,
   PartnerCardCompanyOption,
@@ -69,6 +73,13 @@ export default function PartnerCardForm({
   >({});
   const [branchEntryMode, setBranchEntryMode] =
     useState<BranchEntryMode>("single");
+  const [benefitListingMode, setBenefitListingMode] =
+    useState<BenefitListingMode>(() =>
+      getBenefitListingMode({
+        benefits: partner.benefits,
+        conditions: partner.conditions,
+      }),
+    );
   const [branchRows, setBranchRows] = useState<BranchEditorRow[]>(() =>
     parseInitialBranchEditorRows(),
   );
@@ -145,6 +156,15 @@ export default function PartnerCardForm({
     }),
     [fieldErrors, clientFieldErrors],
   );
+
+  const handleBenefitListingModeChange = (value: BenefitListingMode) => {
+    setBenefitListingMode(value);
+    if (value === "coupon_only") {
+      setBenefitActionTypeValue("none");
+      setBenefitActionLinkValue("");
+      setReservationLinkValue("");
+    }
+  };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     const formData = new FormData(event.currentTarget);
@@ -316,7 +336,12 @@ export default function PartnerCardForm({
               setLocationValue,
               setDetailDescriptionValue,
               setMapUrlValue,
-              setBenefitActionTypeValue,
+              setBenefitActionTypeValue: (value) => {
+                setBenefitActionTypeValue(value);
+                if (benefitListingMode === "coupon_only" && value !== "none") {
+                  setBenefitListingMode("always_on");
+                }
+              },
               setBenefitActionLinkValue,
               setReservationLinkValue,
               setInquiryLinkValue,
@@ -418,7 +443,11 @@ export default function PartnerCardForm({
             </section>
           ) : null}
 
-          <PartnerChipSections partner={partner} />
+          <PartnerChipSections
+            partner={partner}
+            benefitListingMode={benefitListingMode}
+            onBenefitListingModeChange={handleBenefitListingModeChange}
+          />
 
           <PartnerAudienceSection
             appliesToValue={appliesToValue}
