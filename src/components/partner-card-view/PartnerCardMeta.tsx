@@ -7,6 +7,7 @@ import {
   getPartnerPlaceLinkLabel,
   getPartnerServiceMode,
 } from "@/lib/partner-service-mode";
+import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
 import type { CategoryKey, Partner } from "@/lib/types";
 
 export default function PartnerCardMeta({
@@ -75,6 +76,12 @@ export default function PartnerCardMeta({
   const serviceMode = getPartnerServiceMode(partner.location);
   const isOnlineService = serviceMode === "online";
   const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);
+  const branchScopeLabel = getPartnerBranchScopeLabel(
+    partner.branchScopeType,
+    serviceMode,
+  );
+  const showBranchScopeBadge =
+    !isOnlineService && partner.branchScopeType && partner.branchScopeType !== "single_location";
   const placeLinkAction = mapLink ? (
     <a
       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-control text-foreground shadow-flat hover:border-strong hover:bg-surface-elevated"
@@ -156,6 +163,11 @@ export default function PartnerCardMeta({
             <p className="min-w-0 break-words text-sm leading-snug text-muted-foreground">
               {partner.location}
             </p>
+          ) : null}
+          {showBranchScopeBadge ? (
+            <Badge variant="warning" className="w-fit">
+              {branchScopeLabel}
+            </Badge>
           ) : null}
         </div>
       </div>

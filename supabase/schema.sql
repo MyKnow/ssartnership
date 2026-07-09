@@ -40,9 +40,28 @@ create table if not exists partner_companies (
   updated_at timestamp with time zone default now()
 );
 
+create table if not exists partner_brand_profiles (
+  id uuid primary key default uuid_generate_v4(),
+  company_id uuid references partner_companies(id) on delete cascade,
+  name text not null,
+  category_id uuid references categories(id) on delete set null,
+  category_label text,
+  description text,
+  inquiry_link text,
+  brand_phone text,
+  thumbnail_url text,
+  image_urls text[] not null default '{}',
+  tags text[] not null default '{}',
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_brand_profiles_description_length_check
+    check (description is null or char_length(description) <= 1200)
+);
+
 create table if not exists partners (
   id uuid primary key default uuid_generate_v4(),
   company_id uuid references partner_companies(id) on delete set null,
+  brand_profile_id uuid references partner_brand_profiles(id) on delete set null,
   category_id uuid not null references categories(id) on delete cascade,
   name text not null,
   visibility text not null default 'public',
@@ -68,6 +87,8 @@ create table if not exists partners (
   thumbnail text,
   images text[] not null default '{}',
   tags text[] not null default '{}',
+  branch_scope_type text not null default 'single_location',
+  branch_scope_note text,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
   constraint partners_plan_tier_check
@@ -218,11 +239,27 @@ alter table partners add column if not exists plan_tier text not null default 'b
 alter table partners add column if not exists plan_started_at timestamp with time zone;
 alter table partners add column if not exists plan_expires_at timestamp with time zone;
 alter table partners add column if not exists plan_updated_at timestamp with time zone not null default now();
+alter table partners add column if not exists brand_profile_id uuid references partner_brand_profiles(id) on delete set null;
+alter table partners add column if not exists branch_scope_type text not null default 'single_location';
+alter table partners add column if not exists branch_scope_note text;
 alter table partners add column if not exists updated_at timestamp with time zone default now();
 alter table partners drop column if exists contact;
 alter table partners drop constraint if exists partners_plan_tier_check;
 alter table partners add constraint partners_plan_tier_check
   check (plan_tier in ('basic', 'partner', 'boost'));
+alter table partners drop constraint if exists partners_branch_scope_type_check;
+alter table partners add constraint partners_branch_scope_type_check
+  check (
+    branch_scope_type in (
+      'single_location',
+      'selected_direct_branches',
+      'many_direct_branches',
+      'all_direct_branches',
+      'selected_franchise_branches',
+      'mixed_selected_branches',
+      'online'
+    )
+  );
 
 update partners
 set
@@ -544,8 +581,11 @@ create table if not exists partner_registration_requests (
   source text not null default 'public_web',
   company_id uuid references partner_companies(id) on delete set null,
   requested_by_partner_account_id uuid references partner_accounts(id) on delete set null,
+  registration_mode text not null default 'full_new',
   service_mode text not null,
   benefit_action_type text not null,
+  branch_scope_type text not null default 'single_location',
+  branch_scope_note text,
   brand_name text not null,
   category_id uuid references categories(id) on delete set null,
   category_label text not null,
@@ -578,8 +618,22 @@ create table if not exists partner_registration_requests (
     check (status in ('pending', 'in_review', 'converted', 'rejected', 'archived')),
   constraint partner_registration_requests_source_check
     check (source in ('public_web', 'public_excel', 'partner_portal')),
+  constraint partner_registration_requests_registration_mode_check
+    check (registration_mode in ('full_new', 'add_benefit_group', 'add_branches')),
   constraint partner_registration_requests_service_mode_check
     check (service_mode in ('offline', 'online')),
+  constraint partner_registration_requests_branch_scope_type_check
+    check (
+      branch_scope_type in (
+        'single_location',
+        'selected_direct_branches',
+        'many_direct_branches',
+        'all_direct_branches',
+        'selected_franchise_branches',
+        'mixed_selected_branches',
+        'online'
+      )
+    ),
   constraint partner_registration_requests_benefit_action_type_check
     check (benefit_action_type in ('certification', 'external_link', 'onsite', 'none')),
   constraint partner_registration_requests_detail_description_length_check
@@ -593,6 +647,147 @@ drop trigger if exists partner_registration_requests_set_updated_at
   on partner_registration_requests;
 create trigger partner_registration_requests_set_updated_at
   before update on partner_registration_requests
+  for each row
+  execute function set_partnership_updated_at();
+
+alter table partner_registration_requests add column if not exists registration_mode text not null default 'full_new';
+alter table partner_registration_requests add column if not exists branch_scope_type text not null default 'single_location';
+alter table partner_registration_requests add column if not exists branch_scope_note text;
+alter table partner_registration_requests drop constraint if exists partner_registration_requests_registration_mode_check;
+alter table partner_registration_requests add constraint partner_registration_requests_registration_mode_check
+  check (registration_mode in ('full_new', 'add_benefit_group', 'add_branches'));
+alter table partner_registration_requests drop constraint if exists partner_registration_requests_branch_scope_type_check;
+alter table partner_registration_requests add constraint partner_registration_requests_branch_scope_type_check
+  check (
+    branch_scope_type in (
+      'single_location',
+      'selected_direct_branches',
+      'many_direct_branches',
+      'all_direct_branches',
+      'selected_franchise_branches',
+      'mixed_selected_branches',
+      'online'
+    )
+  );
+
+create table if not exists partner_registration_benefit_groups (
+  id uuid primary key default uuid_generate_v4(),
+  registration_request_id uuid not null references partner_registration_requests(id) on delete cascade,
+  group_key text not null,
+  label text not null,
+  benefit_action_type text not null default 'none',
+  benefit_action_link text,
+  benefits text[] not null default '{}',
+  conditions text[] not null default '{}',
+  period_start date,
+  period_end date,
+  tags text[] not null default '{}',
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_registration_benefit_groups_action_type_check
+    check (benefit_action_type in ('certification', 'external_link', 'onsite', 'none')),
+  constraint partner_registration_benefit_groups_request_key
+    unique (registration_request_id, group_key)
+);
+
+create table if not exists partner_registration_branches (
+  id uuid primary key default uuid_generate_v4(),
+  registration_request_id uuid not null references partner_registration_requests(id) on delete cascade,
+  benefit_group_key text not null default 'default',
+  branch_key text not null,
+  branch_code text,
+  name text not null,
+  address text not null,
+  branch_type text not null default 'unknown',
+  campus_slugs text[] not null default '{}',
+  map_url text,
+  phone text,
+  memo text,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_registration_branches_type_check
+    check (branch_type in ('direct', 'franchise', 'unknown')),
+  constraint partner_registration_branches_campus_slugs_check
+    check (
+      campus_slugs <@ array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
+    ),
+  constraint partner_registration_branches_request_branch_key
+    unique (registration_request_id, benefit_group_key, branch_key)
+);
+
+create table if not exists partner_company_branches (
+  id uuid primary key default uuid_generate_v4(),
+  company_id uuid not null references partner_companies(id) on delete cascade,
+  brand_profile_id uuid references partner_brand_profiles(id) on delete set null,
+  branch_key text not null,
+  branch_code text,
+  name text not null,
+  address text not null,
+  branch_type text not null default 'unknown',
+  campus_slugs text[] not null default '{}',
+  map_url text,
+  phone text,
+  memo text,
+  is_active boolean not null default true,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_company_branches_type_check
+    check (branch_type in ('direct', 'franchise', 'unknown')),
+  constraint partner_company_branches_campus_slugs_check
+    check (
+      campus_slugs <@ array['seoul','gumi','daejeon','busan-ulsan-gyeongnam','gwangju']::text[]
+    )
+);
+
+create table if not exists partner_offer_branches (
+  id uuid primary key default uuid_generate_v4(),
+  partner_id uuid not null references partners(id) on delete cascade,
+  branch_id uuid not null references partner_company_branches(id) on delete cascade,
+  status text not null default 'active',
+  source text not null default 'registration',
+  memo text,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now(),
+  constraint partner_offer_branches_status_check
+    check (status in ('active', 'inactive', 'pending', 'excluded')),
+  constraint partner_offer_branches_source_check
+    check (source in ('registration', 'admin', 'partner_portal', 'system')),
+  constraint partner_offer_branches_partner_branch_key
+    unique (partner_id, branch_id)
+);
+
+drop trigger if exists partner_brand_profiles_set_updated_at
+  on partner_brand_profiles;
+create trigger partner_brand_profiles_set_updated_at
+  before update on partner_brand_profiles
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partner_registration_benefit_groups_set_updated_at
+  on partner_registration_benefit_groups;
+create trigger partner_registration_benefit_groups_set_updated_at
+  before update on partner_registration_benefit_groups
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partner_registration_branches_set_updated_at
+  on partner_registration_branches;
+create trigger partner_registration_branches_set_updated_at
+  before update on partner_registration_branches
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partner_company_branches_set_updated_at
+  on partner_company_branches;
+create trigger partner_company_branches_set_updated_at
+  before update on partner_company_branches
+  for each row
+  execute function set_partnership_updated_at();
+
+drop trigger if exists partner_offer_branches_set_updated_at
+  on partner_offer_branches;
+create trigger partner_offer_branches_set_updated_at
+  before update on partner_offer_branches
   for each row
   execute function set_partnership_updated_at();
 
@@ -2604,9 +2799,27 @@ create table if not exists auth_security_logs (
 
 create index if not exists partners_category_id_idx on partners(category_id);
 create index if not exists partners_company_id_idx on partners(company_id);
+create index if not exists partners_brand_profile_idx
+  on partners(brand_profile_id)
+  where brand_profile_id is not null;
 create index if not exists partners_updated_at_idx on partners(updated_at desc);
 create index if not exists categories_updated_at_idx on categories(updated_at desc);
 create index if not exists partner_companies_name_idx on partner_companies(name);
+create index if not exists partner_brand_profiles_company_idx
+  on partner_brand_profiles(company_id, created_at desc);
+create unique index if not exists partner_company_branches_company_brand_key_idx
+  on partner_company_branches(company_id, coalesce(brand_profile_id, '00000000-0000-0000-0000-000000000000'::uuid), branch_key);
+create index if not exists partner_company_branches_company_idx
+  on partner_company_branches(company_id, is_active, created_at desc);
+create index if not exists partner_company_branches_brand_idx
+  on partner_company_branches(brand_profile_id, is_active, created_at desc)
+  where brand_profile_id is not null;
+create index if not exists partner_company_branches_campus_slugs_idx
+  on partner_company_branches using gin(campus_slugs);
+create index if not exists partner_offer_branches_partner_idx
+  on partner_offer_branches(partner_id, status);
+create index if not exists partner_offer_branches_branch_idx
+  on partner_offer_branches(branch_id, status);
 create index if not exists admin_login_attempts_identifier_idx on admin_login_attempts(identifier);
 create index if not exists suggestion_attempts_identifier_idx on suggestion_attempts(identifier);
 create index if not exists partner_registration_attempts_identifier_idx on partner_registration_attempts(identifier);
@@ -2622,6 +2835,12 @@ create index if not exists partner_registration_requests_company_created_idx
 create index if not exists partner_registration_requests_requested_account_created_idx
   on partner_registration_requests(requested_by_partner_account_id, created_at desc)
   where requested_by_partner_account_id is not null;
+create index if not exists partner_registration_benefit_groups_request_idx
+  on partner_registration_benefit_groups(registration_request_id);
+create index if not exists partner_registration_branches_request_idx
+  on partner_registration_branches(registration_request_id);
+create index if not exists partner_registration_branches_campus_slugs_idx
+  on partner_registration_branches using gin(campus_slugs);
 create index if not exists member_auth_attempts_identifier_idx on member_auth_attempts(identifier);
 create index if not exists partner_accounts_login_id_idx on partner_accounts(login_id);
 create index if not exists partner_account_companies_account_id_idx on partner_account_companies(account_id);
@@ -3393,7 +3612,10 @@ update members
 alter table categories enable row level security;
 alter table public_cache_versions enable row level security;
 alter table partner_companies enable row level security;
+alter table partner_brand_profiles enable row level security;
 alter table partners enable row level security;
+alter table partner_company_branches enable row level security;
+alter table partner_offer_branches enable row level security;
 alter table partner_accounts enable row level security;
 alter table partner_account_companies enable row level security;
 alter table partner_plan_upgrade_requests enable row level security;
@@ -3407,6 +3629,8 @@ alter table admin_login_attempts enable row level security;
 alter table suggestion_attempts enable row level security;
 alter table partner_registration_attempts enable row level security;
 alter table partner_registration_requests enable row level security;
+alter table partner_registration_benefit_groups enable row level security;
+alter table partner_registration_branches enable row level security;
 alter table member_auth_attempts enable row level security;
 alter table members enable row level security;
 alter table policy_documents enable row level security;
@@ -3476,6 +3700,12 @@ revoke all on table public_cache_versions from anon;
 revoke all on table public_cache_versions from authenticated;
 revoke all on table partner_companies from anon;
 revoke all on table partner_companies from authenticated;
+revoke all on table partner_brand_profiles from anon;
+revoke all on table partner_brand_profiles from authenticated;
+revoke all on table partner_company_branches from anon;
+revoke all on table partner_company_branches from authenticated;
+revoke all on table partner_offer_branches from anon;
+revoke all on table partner_offer_branches from authenticated;
 revoke all on table partner_accounts from anon;
 revoke all on table partner_accounts from authenticated;
 revoke all on table partner_account_companies from anon;
@@ -3496,6 +3726,10 @@ revoke all on table partner_auth_attempts from anon;
 revoke all on table partner_auth_attempts from authenticated;
 revoke all on table partner_change_requests from anon;
 revoke all on table partner_change_requests from authenticated;
+revoke all on table partner_registration_benefit_groups from anon;
+revoke all on table partner_registration_benefit_groups from authenticated;
+revoke all on table partner_registration_branches from anon;
+revoke all on table partner_registration_branches from authenticated;
 revoke all on table partner_reviews from anon;
 revoke all on table partner_reviews from authenticated;
 revoke all on table partner_review_reactions from anon;

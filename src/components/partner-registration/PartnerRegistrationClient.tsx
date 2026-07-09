@@ -6,6 +6,7 @@ import {
   ArrowDownTrayIcon,
   CheckCircleIcon,
   ClipboardDocumentListIcon,
+  MapPinIcon,
   PhotoIcon,
 } from "@heroicons/react/24/outline";
 import {
@@ -17,16 +18,18 @@ import {
   PartnerGalleryField,
   PartnerThumbnailField,
 } from "@/components/admin/PartnerMediaEditor";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
-import Tabs from "@/components/ui/Tabs";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
+import {
+  PARTNER_BRANCH_SCOPE_OPTIONS,
+  PARTNER_REGISTRATION_MODE_OPTIONS,
+} from "@/lib/partner-branch-registration";
 import {
   getPartnerRegistrationTemplateHref,
   PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS,
@@ -51,7 +54,7 @@ import type {
 } from "@/lib/admin-partner-file-import";
 import type { PartnerServiceMode } from "@/lib/partner-service-mode";
 
-type RegistrationTab = "web" | "excel";
+type RegistrationStepId = "brand" | "scope" | "benefit" | "media" | "contact";
 type WebRegistrationAction = (
   previousState: PartnerRegistrationActionState,
   formData: FormData,
@@ -63,6 +66,70 @@ type ExcelRegistrationAction = (
 
 const invalidFieldClassName =
   "border-danger/50 bg-danger/5 focus:border-danger focus:ring-danger/15";
+
+const registrationSteps = [
+  {
+    id: "brand",
+    label: "브랜드",
+    description: "공통 정보",
+    fields: [
+      "registrationMode",
+      "serviceMode",
+      "brandName",
+      "categoryLabel",
+      "location",
+      "siteLink",
+      "mapUrl",
+      "brandPhone",
+      "inquiryLink",
+      "detailDescription",
+    ],
+  },
+  {
+    id: "scope",
+    label: "지점",
+    description: "적용 범위",
+    fields: ["branchScopeType", "branchScopeNote", "branchListText"],
+  },
+  {
+    id: "benefit",
+    label: "혜택",
+    description: "그룹/조건",
+    fields: [
+      "benefitActionType",
+      "benefitActionLink",
+      "benefits",
+      "conditions",
+      "periodStart",
+      "periodEnd",
+      "tags",
+    ],
+  },
+  {
+    id: "media",
+    label: "소개",
+    description: "연락/이미지",
+    fields: [],
+  },
+  {
+    id: "contact",
+    label: "확인",
+    description: "담당자",
+    fields: [
+      "companyName",
+      "contactName",
+      "contactEmail",
+      "contactPhone",
+      "companyDescription",
+      "memo",
+    ],
+  },
+] as const satisfies Array<{
+  id: RegistrationStepId;
+  label: string;
+  description: string;
+  fields: readonly PartnerRegistrationFieldName[];
+}>;
 
 function isBenefitActionType(value: string): value is AdminPartnerFileBenefitActionType {
   return PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS.some(
@@ -153,6 +220,67 @@ function OptionChip<T extends string>({
         {description}
       </span>
     </button>
+  );
+}
+
+function StepProgress({
+  activeStep,
+  onStepClick,
+}: {
+  activeStep: RegistrationStepId;
+  onStepClick: (stepId: RegistrationStepId) => void;
+}) {
+  const activeIndex = registrationSteps.findIndex((step) => step.id === activeStep);
+  return (
+    <nav
+      aria-label="파트너 등록 단계"
+      className="grid min-w-0 gap-2 rounded-[1rem] border border-border/70 bg-surface-inset p-2 sm:grid-cols-5"
+    >
+      {registrationSteps.map((step, index) => {
+        const active = step.id === activeStep;
+        const complete = index < activeIndex;
+        return (
+          <button
+            key={step.id}
+            type="button"
+            onClick={() => onStepClick(step.id)}
+            aria-current={active ? "step" : undefined}
+            className={cn(
+              "grid min-h-16 min-w-0 gap-1 rounded-[0.85rem] border px-3 py-2 text-left transition-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
+              active
+                ? "border-primary/25 bg-primary text-primary-foreground shadow-flat"
+                : complete
+                  ? "border-primary/15 bg-primary-soft text-primary"
+                  : "border-transparent bg-transparent text-foreground hover:bg-surface-control",
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+              <span
+                className={cn(
+                  "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px]",
+                  active
+                    ? "bg-primary-foreground/15 text-primary-foreground"
+                    : complete
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-surface-control text-muted-foreground",
+                )}
+              >
+                {complete ? "✓" : index + 1}
+              </span>
+              <span className="truncate">{step.label}</span>
+            </span>
+            <span
+              className={cn(
+                "line-clamp-1 text-[11px] leading-4",
+                active ? "text-primary-foreground/80" : "text-muted-foreground",
+              )}
+            >
+              {step.description}
+            </span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -264,6 +392,78 @@ function RegistrationTypeSelector({
   );
 }
 
+function RegistrationModeSelector({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <section className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-foreground">등록 목적</p>
+        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+          전체 신규 등록인지, 기존 브랜드에 혜택이나 지점만 추가하는지 먼저 고릅니다.
+        </p>
+      </div>
+      <div className="grid min-w-0 gap-2 md:grid-cols-3">
+        {PARTNER_REGISTRATION_MODE_OPTIONS.map((option) => (
+          <OptionChip
+            key={option.value}
+            value={option.value}
+            selected={value === option.value}
+            label={option.label}
+            description={option.description}
+            onClick={onChange}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BranchScopeSelector({
+  value,
+  serviceMode,
+  onChange,
+}: {
+  value: string;
+  serviceMode: PartnerServiceMode;
+  onChange: (value: string) => void;
+}) {
+  if (serviceMode === "online") {
+    return (
+      <div className="rounded-[1rem] border border-primary/15 bg-primary-soft px-4 py-3 text-sm leading-6 text-primary">
+        온라인 서비스는 지점 목록 없이 사이트 링크 기준으로 등록합니다.
+      </div>
+    );
+  }
+
+  return (
+    <section className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-foreground">적용 지점 범위</p>
+        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+          사용자가 헷갈리지 않도록 직영/가맹/일부 지점 여부를 명확히 남깁니다.
+        </p>
+      </div>
+      <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {PARTNER_BRANCH_SCOPE_OPTIONS.map((option) => (
+          <OptionChip
+            key={option.value}
+            value={option.value}
+            selected={value === option.value}
+            label={option.label}
+            description={option.description}
+            onClick={onChange}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function getInitialServiceMode(initialValues?: Partial<PartnerRegistrationFormState>) {
   return initialValues?.serviceMode === "online" ? "online" : "offline";
 }
@@ -301,6 +501,7 @@ export default function PartnerRegistrationClient({
   webAction = createPartnerRegistrationRequestAction,
   excelAction = createPartnerRegistrationExcelRequestAction,
   initialValues,
+  brandProfiles = [],
   showExcelTab = true,
   lockCompanyName = false,
   titleBadge = "관리자 검토 후 등록",
@@ -312,6 +513,14 @@ export default function PartnerRegistrationClient({
   webAction?: WebRegistrationAction;
   excelAction?: ExcelRegistrationAction;
   initialValues?: Partial<PartnerRegistrationFormState>;
+  brandProfiles?: Array<{
+    id: string;
+    name: string;
+    categoryLabel?: string | null;
+    detailDescription?: string | null;
+    inquiryLink?: string | null;
+    brandPhone?: string | null;
+  }>;
   showExcelTab?: boolean;
   lockCompanyName?: boolean;
   titleBadge?: string;
@@ -319,7 +528,11 @@ export default function PartnerRegistrationClient({
   submitPendingLabel?: string;
   hiddenFields?: Record<string, string>;
 }) {
-  const [activeTab, setActiveTab] = useState<RegistrationTab>("web");
+  const [activeStep, setActiveStep] = useState<RegistrationStepId>("brand");
+  const [showExcelPanel, setShowExcelPanel] = useState(false);
+  const [registrationMode, setRegistrationMode] = useState(
+    initialValues?.registrationMode ?? "full_new",
+  );
   const [serviceMode, setServiceMode] = useState<PartnerServiceMode>(() =>
     getInitialServiceMode(initialValues),
   );
@@ -327,6 +540,10 @@ export default function PartnerRegistrationClient({
     useState<AdminPartnerFileBenefitActionType>(() =>
       getInitialBenefitActionType(initialValues),
     );
+  const [branchScopeType, setBranchScopeType] = useState(
+    initialValues?.branchScopeType ??
+      (getInitialServiceMode(initialValues) === "online" ? "online" : "single_location"),
+  );
   const [webState, webFormAction] = useActionState(
     webAction,
     PARTNER_REGISTRATION_INITIAL_ACTION_STATE,
@@ -341,6 +558,7 @@ export default function PartnerRegistrationClient({
   const fieldRefs = useRef<
     Partial<Record<PartnerRegistrationFieldName, HTMLElement | null>>
   >({});
+  const formRef = useRef<HTMLFormElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fieldErrors = useMemo(
     () => ({ ...clientFieldErrors, ...(webState.fieldErrors ?? {}) }),
@@ -357,6 +575,10 @@ export default function PartnerRegistrationClient({
     (option) => option.value === benefitActionType,
   );
   const xlsxError = clientFileError ?? excelState.fileError;
+  const currentStepIndex = registrationSteps.findIndex(
+    (step) => step.id === activeStep,
+  );
+  const isLastStep = currentStepIndex === registrationSteps.length - 1;
 
   useEffect(() => {
     const firstInvalid = PARTNER_REGISTRATION_FIELD_ORDER.find(
@@ -373,6 +595,83 @@ export default function PartnerRegistrationClient({
     }
   }, [xlsxError]);
 
+  const getStepErrors = (
+    stepId: RegistrationStepId,
+    errors: PartnerRegistrationFieldErrors,
+  ) => {
+    const step = registrationSteps.find((candidate) => candidate.id === stepId);
+    if (!step) {
+      return {};
+    }
+    return Object.fromEntries(
+      step.fields
+        .filter((fieldName) => errors[fieldName])
+        .map((fieldName) => [fieldName, errors[fieldName]]),
+    ) as PartnerRegistrationFieldErrors;
+  };
+
+  const focusFirstStepError = (errors: PartnerRegistrationFieldErrors) => {
+    const firstInvalid = PARTNER_REGISTRATION_FIELD_ORDER.find(
+      (fieldName) => errors[fieldName],
+    );
+    if (firstInvalid) {
+      scrollToElement(fieldRefs.current[firstInvalid]);
+    }
+  };
+
+  const validateCurrentStep = () => {
+    if (!formRef.current) {
+      return true;
+    }
+    const validation = validatePartnerRegistrationInput(new FormData(formRef.current));
+    const stepErrors = getStepErrors(activeStep, validation.fieldErrors);
+    if (Object.keys(stepErrors).length === 0) {
+      setClientFieldErrors({});
+      return true;
+    }
+    setClientFieldErrors(stepErrors);
+    focusFirstStepError(stepErrors);
+    return false;
+  };
+
+  const goToStep = (stepId: RegistrationStepId) => {
+    const targetIndex = registrationSteps.findIndex((step) => step.id === stepId);
+    if (targetIndex <= currentStepIndex || validateCurrentStep()) {
+      setActiveStep(stepId);
+    }
+  };
+
+  const goToNextStep = () => {
+    if (!validateCurrentStep()) {
+      return;
+    }
+    const nextStep = registrationSteps[currentStepIndex + 1];
+    if (nextStep) {
+      setActiveStep(nextStep.id);
+    }
+  };
+
+  const applyBrandProfile = (profileId: string) => {
+    const profile = brandProfiles.find((candidate) => candidate.id === profileId);
+    if (!profile || !formRef.current) {
+      return;
+    }
+    const assignValue = (name: PartnerRegistrationFieldName, value?: string | null) => {
+      const element = formRef.current?.querySelector<
+        HTMLInputElement | HTMLTextAreaElement
+      >(`[name="${name}"]`);
+      if (element && value !== undefined && value !== null) {
+        element.value = value;
+      }
+    };
+    assignValue("brandName", profile.name);
+    assignValue("categoryLabel", profile.categoryLabel);
+    assignValue("detailDescription", profile.detailDescription);
+    assignValue("inquiryLink", profile.inquiryLink);
+    assignValue("brandPhone", profile.brandPhone);
+    setClientFieldErrors({});
+  };
+
   const handleWebSubmit = (event: FormEvent<HTMLFormElement>) => {
     const validation = validatePartnerRegistrationInput(
       new FormData(event.currentTarget),
@@ -383,6 +682,15 @@ export default function PartnerRegistrationClient({
     }
     event.preventDefault();
     setClientFieldErrors(validation.fieldErrors);
+    const firstInvalid = PARTNER_REGISTRATION_FIELD_ORDER.find(
+      (fieldName) => validation.fieldErrors[fieldName],
+    );
+    const targetStep = registrationSteps.find((step) =>
+      step.fields.some((fieldName) => fieldName === firstInvalid),
+    );
+    if (targetStep) {
+      setActiveStep(targetStep.id);
+    }
   };
 
   const handleExcelSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -395,11 +703,16 @@ export default function PartnerRegistrationClient({
     setClientFileError("XLSX 파일을 업로드해 주세요.");
   };
 
+  const handleServiceModeChange = (value: PartnerServiceMode) => {
+    setServiceMode(value);
+    setBranchScopeType(value === "online" ? "online" : "single_location");
+  };
+
   const typeSelector = (
     <RegistrationTypeSelector
       serviceMode={serviceMode}
       benefitActionType={benefitActionType}
-      onServiceModeChange={setServiceMode}
+      onServiceModeChange={handleServiceModeChange}
       onBenefitActionTypeChange={setBenefitActionType}
     />
   );
@@ -407,114 +720,107 @@ export default function PartnerRegistrationClient({
   return (
     <div className="grid min-w-0 gap-5">
       {showExcelTab ? (
-        <Tabs
-          value={activeTab}
-          onChange={setActiveTab}
-          options={[
-            {
-              value: "web",
-              label: "웹 입력",
-              description: "브라우저에서 바로 입력해 접수합니다.",
-            },
-            {
-              value: "excel",
-              label: "엑셀 파일 입력",
-              description: "양식 작성 후 XLSX로 업로드합니다.",
-            },
-          ]}
-          className="sm:grid-cols-2"
-        />
-      ) : null}
-
-      {activeTab === "excel" && showExcelTab ? (
-        <Card tone="elevated" padding="md" className="grid gap-5">
-          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <SectionHeading
-              eyebrow="Excel Input"
-              title="엑셀 파일 입력"
-              description="브랜드 유형과 혜택 이용 방식을 선택해 양식을 받은 뒤, 작성한 XLSX 파일을 업로드합니다."
-              className="min-w-0"
-            />
-            <Badge variant="primary" className="w-fit">
-              카페 싸피 예시 포함
-            </Badge>
-          </div>
-
-          {typeSelector}
-
-          <div className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <Card tone="muted" padding="md" className="grid gap-4">
+          <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">
-                {selectedService?.label} · {selectedAction?.label}
-              </p>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                양식은 한 브랜드 또는 한 지점 기준입니다. 여러 지점은 파일을 나누어 접수합니다.
+              <p className="ui-kicker">Bulk File</p>
+              <h2 className="mt-1 truncate text-base font-semibold text-foreground">
+                파일로 일괄 접수
+              </h2>
+              <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                내부 양식이 이미 있거나 운영자가 정리한 자료가 있으면 XLSX 파일로 제출할 수 있습니다.
               </p>
             </div>
             <Button
-              href={templateHref}
-              variant="primary"
+              variant={showExcelPanel ? "secondary" : "soft"}
               className="w-full md:w-auto"
-              prefetch={false}
+              onClick={() => setShowExcelPanel((current) => !current)}
             >
               <ArrowDownTrayIcon className="h-4 w-4" />
-              XLSX 다운로드
+              파일 접수 {showExcelPanel ? "닫기" : "열기"}
             </Button>
           </div>
 
-          {excelState.message ? (
-            <FormMessage
-              variant={excelState.status === "success" ? "info" : "error"}
-              className="break-words"
-            >
-              {excelState.message}
-            </FormMessage>
-          ) : null}
+          {showExcelPanel ? (
+            <div className="grid gap-5 border-t border-border/70 pt-4">
+              {typeSelector}
 
-          <form action={excelFormAction} noValidate className="grid gap-4" onSubmit={handleExcelSubmit}>
-            <input type="hidden" name="serviceMode" value={serviceMode} />
-            <input type="hidden" name="benefitActionType" value={benefitActionType} />
-            <label className="grid min-w-0 gap-2" htmlFor="partner-registration-xlsxFile">
-              <span className="ui-caption inline-flex items-center gap-1">
-                <span className="truncate">파일 업로드</span>
-                <span className="shrink-0 text-danger" aria-label="필수 입력">
-                  *
-                </span>
-              </span>
-              <Input
-                id="partner-registration-xlsxFile"
-                ref={fileInputRef}
-                name="xlsxFile"
-                type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                aria-invalid={Boolean(xlsxError) || undefined}
-                className={xlsxError ? invalidFieldClassName : undefined}
-                onChange={() => setClientFileError(null)}
-              />
-              <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-                다운로드한 싸트너십 양식을 작성해 .xlsx 파일로 업로드해 주세요.
-              </span>
-              {xlsxError ? (
-                <span className="text-xs font-medium leading-5 text-danger" role="alert">
-                  {xlsxError}
-                </span>
+              <div className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {selectedService?.label} · {selectedAction?.label}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    브랜드 공통 정보 양식입니다. 다지점 목록은 아래 지점 단계에서 붙여넣거나 XLSX로 추가할 수 있습니다.
+                  </p>
+                </div>
+                <Button
+                  href={templateHref}
+                  variant="primary"
+                  className="w-full md:w-auto"
+                  prefetch={false}
+                >
+                  <ArrowDownTrayIcon className="h-4 w-4" />
+                  XLSX 다운로드
+                </Button>
+              </div>
+
+              {excelState.message ? (
+                <FormMessage
+                  variant={excelState.status === "success" ? "info" : "error"}
+                  className="break-words"
+                >
+                  {excelState.message}
+                </FormMessage>
               ) : null}
-            </label>
-            <div className="flex justify-end border-t border-border/70 pt-4">
-              <SubmitButton pendingText="업로드 중" className="w-full sm:w-auto">
-                업로드 및 신청 접수
-              </SubmitButton>
+
+              <form action={excelFormAction} noValidate className="grid gap-4" onSubmit={handleExcelSubmit}>
+                <input type="hidden" name="serviceMode" value={serviceMode} />
+                <input type="hidden" name="benefitActionType" value={benefitActionType} />
+                <label className="grid min-w-0 gap-2" htmlFor="partner-registration-xlsxFile">
+                  <span className="ui-caption inline-flex items-center gap-1">
+                    <span className="truncate">파일 업로드</span>
+                    <span className="shrink-0 text-danger" aria-label="필수 입력">
+                      *
+                    </span>
+                  </span>
+                  <Input
+                    id="partner-registration-xlsxFile"
+                    ref={fileInputRef}
+                    name="xlsxFile"
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    aria-invalid={Boolean(xlsxError) || undefined}
+                    className={xlsxError ? invalidFieldClassName : undefined}
+                    onChange={() => setClientFileError(null)}
+                  />
+                  <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    다운로드한 싸트너십 양식을 작성해 .xlsx 파일로 업로드해 주세요.
+                  </span>
+                  {xlsxError ? (
+                    <span className="text-xs font-medium leading-5 text-danger" role="alert">
+                      {xlsxError}
+                    </span>
+                  ) : null}
+                </label>
+                <div className="flex justify-end border-t border-border/70 pt-4">
+                  <SubmitButton pendingText="업로드 중" className="w-full sm:w-auto">
+                    업로드 및 신청 접수
+                  </SubmitButton>
+                </div>
+              </form>
             </div>
-          </form>
+          ) : null}
         </Card>
-      ) : (
+      ) : null}
+
         <Card tone="default" padding="md">
           <div className="grid min-w-0 gap-5">
             <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <SectionHeading
-                eyebrow="Web Input"
-                title="웹 입력"
-                description="엑셀 없이 같은 항목을 바로 입력해 접수합니다. 제출 후 관리자가 검토합니다."
+                eyebrow="Step Form"
+                title="단계별 등록"
+                description="브랜드 정보부터 적용 지점까지 단계별로 입력해 검토를 요청합니다."
                 className="min-w-0"
               />
               <div className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-surface-muted px-3 py-2 text-xs font-semibold text-muted-foreground">
@@ -533,22 +839,28 @@ export default function PartnerRegistrationClient({
             ) : null}
 
             <form
+              ref={formRef}
               action={webFormAction}
               noValidate
               className="grid min-w-0 gap-6"
               onSubmit={handleWebSubmit}
               onChange={() => setClientFieldErrors({})}
             >
+              <StepProgress activeStep={activeStep} onStepClick={goToStep} />
+              <input type="hidden" name="registrationMode" value={registrationMode} />
               <input type="hidden" name="serviceMode" value={serviceMode} />
               <input type="hidden" name="benefitActionType" value={benefitActionType} />
+              <input type="hidden" name="branchScopeType" value={branchScopeType} />
               {hiddenFields
                 ? Object.entries(hiddenFields).map(([name, value]) => (
                     <input key={name} type="hidden" name={name} value={value} />
                   ))
                 : null}
-              {typeSelector}
 
-              <section className="grid min-w-0 gap-4 border-t border-border/70 pt-5">
+              <section
+                hidden={activeStep !== "brand"}
+                className="grid min-w-0 gap-4 border-t border-border/70 pt-5"
+              >
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-semibold text-foreground">
                     브랜드 정보
@@ -557,6 +869,34 @@ export default function PartnerRegistrationClient({
                     사용자에게 보일 브랜드명, 카테고리, 위치 또는 사이트 정보를 입력합니다.
                   </p>
                 </div>
+
+                <RegistrationModeSelector
+                  value={registrationMode}
+                  onChange={setRegistrationMode}
+                />
+
+                {brandProfiles.length > 0 ? (
+                  <label className="grid min-w-0 gap-2">
+                    <span className="ui-caption">기존 브랜드에서 복사</span>
+                    <select
+                      defaultValue=""
+                      onChange={(event) => applyBrandProfile(event.currentTarget.value)}
+                      className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground shadow-flat focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+                    >
+                      <option value="">직접 입력</option>
+                      {brandProfiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                      같은 협력사의 기존 브랜드명을 선택하면 공통 정보 일부를 초안으로 채웁니다.
+                    </span>
+                  </label>
+                ) : null}
+
+                {typeSelector}
 
                 <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                   <Field label="브랜드명" name="brandName" required error={fieldErrors.brandName}>
@@ -731,7 +1071,95 @@ export default function PartnerRegistrationClient({
                 </Field>
               </section>
 
-              <section className="grid min-w-0 gap-4 border-t border-border/70 pt-5">
+              <section
+                hidden={activeStep !== "scope"}
+                className="grid min-w-0 gap-4 border-t border-border/70 pt-5"
+              >
+                <div className="min-w-0">
+                  <h2 className="truncate text-base font-semibold text-foreground">
+                    적용 지점
+                  </h2>
+                  <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                    지점 코드는 선택입니다. 캠퍼스는 주소로 자동 분류하고, 추론이 어려운 주소는 관리자 검토 단계에서 보정합니다.
+                  </p>
+                </div>
+
+                <BranchScopeSelector
+                  value={branchScopeType}
+                  serviceMode={serviceMode}
+                  onChange={setBranchScopeType}
+                />
+
+                {serviceMode === "offline" ? (
+                  <>
+                    <Field
+                      label="적용 범위 메모"
+                      name="branchScopeNote"
+                      description="예: 역삼·강남 직영점만 참여, 일부 가맹점 한정"
+                      error={fieldErrors.branchScopeNote}
+                    >
+                      <FormTextarea
+                        name="branchScopeNote"
+                        fieldErrors={fieldErrors}
+                        inputRef={(element) => {
+                          fieldRefs.current.branchScopeNote = element;
+                        }}
+                        rows={3}
+                        defaultValue={initialValues?.branchScopeNote}
+                        placeholder="직영점 일부만 참여하며, 가맹점은 이번 제휴에서 제외됩니다."
+                      />
+                    </Field>
+
+                    <Field
+                      label="지점 목록 붙여넣기"
+                      name="branchListText"
+                      description="한 줄에 하나씩 입력합니다. 예: 기본 혜택 | 역삼본점 | 서울 강남구 테헤란로 212 | | 직영"
+                      error={fieldErrors.branchListText}
+                    >
+                      <FormTextarea
+                        name="branchListText"
+                        fieldErrors={fieldErrors}
+                        inputRef={(element) => {
+                          fieldRefs.current.branchListText = element;
+                        }}
+                        rows={6}
+                        defaultValue={initialValues?.branchListText}
+                        placeholder={[
+                          "기본 혜택 | 역삼본점 | 서울 강남구 테헤란로 212 | | 직영",
+                          "기본 혜택 | 강남점 | 서울 강남구 강남대로 382 | | 가맹",
+                        ].join("\n")}
+                      />
+                    </Field>
+
+                    <label className="grid min-w-0 gap-2" htmlFor="partner-registration-branchListFile">
+                      <span className="ui-caption inline-flex min-w-0 items-center gap-1.5">
+                        <MapPinIcon className="h-4 w-4" />
+                        <span className="truncate">지점 XLSX 업로드</span>
+                        <span
+                          aria-label="선택 입력"
+                          className="inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-surface-control px-1.5 text-[10px] font-semibold leading-none tracking-normal text-muted-foreground"
+                        >
+                          선택
+                        </span>
+                      </span>
+                      <Input
+                        id="partner-registration-branchListFile"
+                        name="branchListFile"
+                        type="file"
+                        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      />
+                      <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        최소 컬럼은 혜택 그룹, 지점명, 주소입니다. 지점 코드, 직영/가맹, 지도 URL, 전화번호, 메모는 선택입니다.
+                      </span>
+                    </label>
+                  </>
+                ) : null}
+              </section>
+
+              <section
+                hidden={activeStep !== "media"}
+                className="grid min-w-0 gap-4 border-t border-border/70 pt-5"
+              >
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-semibold text-foreground">
                     이미지
@@ -759,7 +1187,10 @@ export default function PartnerRegistrationClient({
                 </div>
               </section>
 
-              <section className="grid min-w-0 gap-4 border-t border-border/70 pt-5">
+              <section
+                hidden={activeStep !== "benefit"}
+                className="grid min-w-0 gap-4 border-t border-border/70 pt-5"
+              >
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-semibold text-foreground">
                     혜택과 이용 조건
@@ -841,7 +1272,10 @@ export default function PartnerRegistrationClient({
                 </Field>
               </section>
 
-              <section className="grid min-w-0 gap-4 border-t border-border/70 pt-5">
+              <section
+                hidden={activeStep !== "contact"}
+                className="grid min-w-0 gap-4 border-t border-border/70 pt-5"
+              >
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-semibold text-foreground">
                     협력사와 담당자
@@ -949,17 +1383,46 @@ export default function PartnerRegistrationClient({
 
               <div className="flex min-w-0 flex-col gap-3 border-t border-border/70 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-                  제출 즉시 공개되지 않습니다. 관리자가 내용과 연락처를 확인한 뒤 등록을 진행합니다.
+                  {isLastStep
+                    ? "제출 즉시 공개되지 않습니다. 공통 브랜드 정보, 혜택 그룹, 적용 지점 수, 제외 범위를 관리자가 확인합니다."
+                    : "현재 단계의 필수값을 확인한 뒤 다음 단계로 이동합니다."}
                 </p>
-                <SubmitButton pendingText={submitPendingLabel} className="w-full sm:w-auto">
-                  <PhotoIcon className="h-4 w-4" />
-                  {submitLabel}
-                </SubmitButton>
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:justify-end">
+                  {currentStepIndex > 0 ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        const previousStep = registrationSteps[currentStepIndex - 1];
+                        if (previousStep) {
+                          setActiveStep(previousStep.id);
+                        }
+                      }}
+                    >
+                      이전
+                    </Button>
+                  ) : null}
+                  {isLastStep ? (
+                    <SubmitButton pendingText={submitPendingLabel} className="w-full sm:w-auto">
+                      <PhotoIcon className="h-4 w-4" />
+                      {submitLabel}
+                    </SubmitButton>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      className="w-full sm:w-auto"
+                      onClick={goToNextStep}
+                    >
+                      다음 단계
+                    </Button>
+                  )}
+                </div>
               </div>
             </form>
           </div>
         </Card>
-      )}
     </div>
   );
 }

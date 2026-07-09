@@ -20,6 +20,7 @@ import { getPartnerSession } from "@/lib/partner-session";
 import {
   insertPartnerRegistrationRequest,
   loadPartnerRegistrationCategories,
+  resolvePartnerRegistrationBranchPayload,
   resolvePartnerRegistrationMediaPayload,
 } from "@/lib/partner-registration-submit.server";
 
@@ -68,6 +69,10 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
   let insertedRequest;
   try {
     const media = await resolvePartnerRegistrationMediaPayload(formData, requestId);
+    const branches = await resolvePartnerRegistrationBranchPayload(
+      formData,
+      validation.values,
+    );
     insertedRequest = await insertPartnerRegistrationRequest({
       requestId,
       values: validation.values,
@@ -78,6 +83,7 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
         requestedByPartnerAccountId: session.accountId,
       },
       media,
+      branches,
     });
   } catch (error) {
     const message =
@@ -88,6 +94,7 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
     return {
       status: "error",
       message,
+      fieldErrors: message.includes("지점") ? { branchListText: message } : undefined,
     };
   }
 

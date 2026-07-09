@@ -45,6 +45,8 @@ type PartnerRow = {
   tags?: string[] | null;
   visibility?: string | null;
   benefit_visibility?: string | null;
+  branch_scope_type?: string | null;
+  branch_scope_note?: string | null;
   categories?: { key?: string | null } | Array<{ key?: string | null }> | null;
 };
 
@@ -64,7 +66,7 @@ type PublicCacheVersionRow = {
 };
 
 const PARTNER_SELECT_COLUMNS =
-  "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,categories(key)";
+  "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -223,6 +225,8 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
     appliesTo: normalizePartnerAudience(row.applies_to),
     images: galleryImages,
     tags: row.tags ?? [],
+    branchScopeType: row.branch_scope_type ?? "single_location",
+    branchScopeNote: row.branch_scope_note ?? null,
   };
 }
 

@@ -10,6 +10,7 @@ import {
   isPartnerRegistrationRequestStatus,
   type PartnerRegistrationRequestStatus,
 } from "@/lib/partner-registration";
+import { ensurePartnerCompanyRow } from "@/app/admin/(protected)/_actions/partner-support/company-provision";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   logAdminAction,
@@ -28,8 +29,11 @@ type PartnerRegistrationRequestRow = {
   status: string;
   source?: string | null;
   company_id?: string | null;
+  registration_mode?: string | null;
   service_mode: string;
   benefit_action_type: string;
+  branch_scope_type?: string | null;
+  branch_scope_note?: string | null;
   brand_name: string;
   category_id?: string | null;
   category_label: string;
@@ -37,6 +41,12 @@ type PartnerRegistrationRequestRow = {
   period_end?: string | null;
   inquiry_link?: string | null;
   detail_description?: string | null;
+  brand_phone?: string | null;
+  company_name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone?: string | null;
+  company_description?: string | null;
   benefits?: string[] | null;
   conditions?: string[] | null;
   tags?: string[] | null;
@@ -55,6 +65,31 @@ type ConvertedPartnerRow = {
   location: string;
   campus_slugs?: string[] | null;
   visibility?: string | null;
+};
+
+type RegistrationBenefitGroupRow = {
+  group_key: string;
+  label: string;
+  benefit_action_type?: string | null;
+  benefit_action_link?: string | null;
+  benefits?: string[] | null;
+  conditions?: string[] | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  tags?: string[] | null;
+};
+
+type RegistrationBranchRow = {
+  benefit_group_key?: string | null;
+  branch_key: string;
+  branch_code?: string | null;
+  name: string;
+  address: string;
+  branch_type?: string | null;
+  campus_slugs?: string[] | null;
+  map_url?: string | null;
+  phone?: string | null;
+  memo?: string | null;
 };
 
 function getRegistrationCompany(company: RegistrationCompanyRelation) {
@@ -102,63 +137,244 @@ async function createPartnerFromPortalRegistrationRequest({
   request: PartnerRegistrationRequestRow;
   campusSlugs: string[];
 }) {
-  if (
-    request.source !== "partner_portal" ||
-    !request.company_id ||
-    !request.category_id
-  ) {
-    return { partner: null, created: false };
-  }
-
-  const existingPartner = await findExistingConvertedPartner(supabase, request);
-  if (existingPartner) {
-    return { partner: existingPartner, created: false };
+  if (!request.category_id) {
+    return { partners: [], created: false };
   }
 
   const normalizedCampusSlugs = normalizeCampusSlugs(campusSlugs);
   if (normalizedCampusSlugs.length === 0) {
-    return { partner: null, created: false };
+    return { partners: [], created: false };
   }
 
-  const partnerId = randomUUID();
-  const benefitActionLink =
-    request.benefit_action_link ??
-    (request.benefit_action_type === "external_link" ? request.site_link ?? null : null);
-  const { data, error } = await supabase
-    .from("partners")
-    .insert({
-      id: partnerId,
-      company_id: request.company_id,
-      name: request.brand_name,
-      category_id: request.category_id,
-      location: request.location,
-      detail_description: request.detail_description ?? null,
-      campus_slugs: normalizedCampusSlugs,
-      managed_campus_slugs: normalizedCampusSlugs,
-      map_url: request.map_url ?? null,
-      benefit_action_type: request.benefit_action_type,
-      benefit_action_link: benefitActionLink,
-      reservation_link: null,
-      inquiry_link: request.inquiry_link ?? null,
-      period_start: request.period_start ?? null,
-      period_end: request.period_end ?? null,
-      conditions: request.conditions ?? [],
-      benefits: request.benefits ?? [],
-      applies_to: ["staff", "student", "graduate"],
-      thumbnail: request.thumbnail_url ?? null,
-      images: request.image_urls ?? [],
-      tags: request.tags ?? [],
-      visibility: "public",
-      benefit_visibility: "public",
-    })
-    .select("id,name,location,campus_slugs,visibility")
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
+  const companyProvision = request.company_id
+    ? null
+    : await ensurePartnerCompanyRow(
+        supabase,
+        {
+          companyId: null,
+          name: request.company_name,
+          description: request.company_description ?? null,
+          contactName: request.contact_name,
+          contactEmail: request.contact_email,
+          contactPhone: request.contact_phone ?? null,
+        },
+        true,
+        { managedCampusSlugs: normalizedCampusSlugs },
+      );
+  const companyId = request.company_id ?? companyProvision?.company?.id ?? null;
+  if (!companyId) {
+    return { partners: [], created: false };
   }
 
-  return { partner: data as ConvertedPartnerRow, created: true };
+  const { data: existingProfile, error: profileLookupError } = await supabase
+    .from("partner_brand_profiles")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("name", request.brand_name)
+    .maybeSingle();
+  if (profileLookupError) {
+    throw new Error(profileLookupError.message);
+  }
+
+  let brandProfileId = (existingProfile as { id?: string } | null)?.id ?? null;
+  if (!brandProfileId) {
+    const { data: createdProfile, error: profileCreateError } = await supabase
+      .from("partner_brand_profiles")
+      .insert({
+        company_id: companyId,
+        name: request.brand_name,
+        category_id: request.category_id,
+        category_label: request.category_label,
+        description: request.detail_description ?? null,
+        inquiry_link: request.inquiry_link ?? null,
+        brand_phone: request.brand_phone ?? null,
+        thumbnail_url: request.thumbnail_url ?? null,
+        image_urls: request.image_urls ?? [],
+        tags: request.tags ?? [],
+      })
+      .select("id")
+      .single();
+    if (profileCreateError) {
+      throw new Error(profileCreateError.message);
+    }
+    brandProfileId = (createdProfile as { id: string }).id;
+  }
+
+  const [groupResult, branchResult] = await Promise.all([
+    supabase
+      .from("partner_registration_benefit_groups")
+      .select("group_key,label,benefit_action_type,benefit_action_link,benefits,conditions,period_start,period_end,tags")
+      .eq("registration_request_id", request.id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("partner_registration_branches")
+      .select("benefit_group_key,branch_key,branch_code,name,address,branch_type,campus_slugs,map_url,phone,memo")
+      .eq("registration_request_id", request.id)
+      .order("created_at", { ascending: true }),
+  ]);
+  if (groupResult.error) {
+    throw new Error(groupResult.error.message);
+  }
+  if (branchResult.error) {
+    throw new Error(branchResult.error.message);
+  }
+
+  const groups = ((groupResult.data ?? []) as RegistrationBenefitGroupRow[]);
+  const safeGroups =
+    groups.length > 0
+      ? groups
+      : [
+          {
+            group_key: "default",
+            label: "기본 혜택",
+            benefit_action_type: request.benefit_action_type,
+            benefit_action_link: request.benefit_action_link,
+            benefits: request.benefits ?? [],
+            conditions: request.conditions ?? [],
+            period_start: request.period_start ?? null,
+            period_end: request.period_end ?? null,
+            tags: request.tags ?? [],
+          },
+        ];
+  const branches = (branchResult.data ?? []) as RegistrationBranchRow[];
+  const createdPartners: ConvertedPartnerRow[] = [];
+
+  for (const group of safeGroups) {
+    const groupBranches = branches.filter(
+      (branch) => (branch.benefit_group_key ?? "default") === group.group_key,
+    );
+    const groupCampusSlugs = normalizeCampusSlugs(
+      groupBranches.flatMap((branch) => branch.campus_slugs ?? []),
+    );
+    const partnerCampusSlugs =
+      groupCampusSlugs.length > 0 ? groupCampusSlugs : normalizedCampusSlugs;
+    const locationSummary =
+      groupBranches.length === 0
+        ? request.location
+        : groupBranches.length === 1
+          ? groupBranches[0]!.address
+          : `${groupBranches[0]!.address} 외 ${groupBranches.length - 1}개 지점`;
+    const partnerName =
+      safeGroups.length === 1 || group.group_key === "default"
+        ? request.brand_name
+        : `${request.brand_name} · ${group.label}`;
+    const existingPartner = await findExistingConvertedPartner(supabase, {
+      ...request,
+      company_id: companyId,
+      brand_name: partnerName,
+      location: locationSummary,
+    });
+    if (existingPartner) {
+      createdPartners.push(existingPartner);
+      continue;
+    }
+
+    const partnerId = randomUUID();
+    const benefitActionType = group.benefit_action_type ?? request.benefit_action_type;
+    const benefitActionLink =
+      group.benefit_action_link ??
+      request.benefit_action_link ??
+      (benefitActionType === "external_link" ? request.site_link ?? null : null);
+    const { data, error } = await supabase
+      .from("partners")
+      .insert({
+        id: partnerId,
+        company_id: companyId,
+        brand_profile_id: brandProfileId,
+        name: partnerName,
+        category_id: request.category_id,
+        location: locationSummary,
+        detail_description: request.detail_description ?? null,
+        campus_slugs: partnerCampusSlugs,
+        managed_campus_slugs: partnerCampusSlugs,
+        map_url: groupBranches[0]?.map_url ?? request.map_url ?? null,
+        benefit_action_type: benefitActionType,
+        benefit_action_link: benefitActionLink,
+        reservation_link: null,
+        inquiry_link: request.inquiry_link ?? null,
+        period_start: group.period_start ?? request.period_start ?? null,
+        period_end: group.period_end ?? request.period_end ?? null,
+        conditions: group.conditions ?? request.conditions ?? [],
+        benefits: group.benefits ?? request.benefits ?? [],
+        applies_to: ["staff", "student", "graduate"],
+        thumbnail: request.thumbnail_url ?? null,
+        images: request.image_urls ?? [],
+        tags: group.tags ?? request.tags ?? [],
+        visibility: "public",
+        benefit_visibility: "public",
+        branch_scope_type:
+          request.service_mode === "online"
+            ? "online"
+            : request.branch_scope_type ?? "single_location",
+        branch_scope_note: request.branch_scope_note ?? null,
+      })
+      .select("id,name,location,campus_slugs,visibility")
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const createdPartner = data as ConvertedPartnerRow;
+    createdPartners.push(createdPartner);
+
+    for (const branch of groupBranches) {
+      const { data: existingBranch, error: branchLookupError } = await supabase
+        .from("partner_company_branches")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("brand_profile_id", brandProfileId)
+        .eq("branch_key", branch.branch_key)
+        .maybeSingle();
+      if (branchLookupError) {
+        throw new Error(branchLookupError.message);
+      }
+
+      let branchId = (existingBranch as { id?: string } | null)?.id ?? null;
+      if (!branchId) {
+        const { data: createdBranch, error: branchCreateError } = await supabase
+          .from("partner_company_branches")
+          .insert({
+            company_id: companyId,
+            brand_profile_id: brandProfileId,
+            branch_key: branch.branch_key,
+            branch_code: branch.branch_code ?? null,
+            name: branch.name,
+            address: branch.address,
+            branch_type: branch.branch_type ?? "unknown",
+            campus_slugs: branch.campus_slugs ?? [],
+            map_url: branch.map_url ?? null,
+            phone: branch.phone ?? null,
+            memo: branch.memo ?? null,
+            is_active: true,
+          })
+          .select("id")
+          .single();
+        if (branchCreateError) {
+          throw new Error(branchCreateError.message);
+        }
+        branchId = (createdBranch as { id: string }).id;
+      }
+
+      const { error: offerBranchError } = await supabase
+        .from("partner_offer_branches")
+        .upsert(
+          {
+            partner_id: createdPartner.id,
+            branch_id: branchId,
+            status: "active",
+            source: request.source === "partner_portal" ? "partner_portal" : "registration",
+            memo: branch.memo ?? null,
+          },
+          { onConflict: "partner_id,branch_id" },
+        );
+      if (offerBranchError) {
+        throw new Error(offerBranchError.message);
+      }
+    }
+  }
+
+  return { partners: createdPartners, created: createdPartners.length > 0 };
 }
 
 export async function updatePartnerRegistrationRequestStatus(formData: FormData) {
@@ -178,7 +394,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   const { data: request, error: requestError } = await supabase
     .from("partner_registration_requests")
     .select(
-      "id,status,source,company_id,service_mode,benefit_action_type,brand_name,category_id,category_label,period_start,period_end,inquiry_link,detail_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
+      "id,status,source,company_id,registration_mode,service_mode,benefit_action_type,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -233,35 +449,35 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         campusSlugs: managedCampusSlugs,
       });
 
-      if (conversion.partner && conversion.created) {
+      for (const partner of conversion.partners) {
         await logAdminAction("partner_create", {
           targetType: "partner",
-          targetId: conversion.partner.id,
+          targetId: partner.id,
           properties: {
             source: "partner_registration_request",
             requestId: registrationRequest.id,
             requestSource: registrationRequest.source ?? null,
-            name: conversion.partner.name,
+            name: partner.name,
             categoryId: registrationRequest.category_id ?? null,
             categoryLabel: registrationRequest.category_label,
-            location: conversion.partner.location,
-            campusSlugs: conversion.partner.campus_slugs ?? managedCampusSlugs,
+            location: partner.location,
+            campusSlugs: partner.campus_slugs ?? managedCampusSlugs,
             companyId: registrationRequest.company_id ?? null,
           },
         });
 
-        if (conversion.partner.visibility !== "private") {
+        if (partner.visibility !== "private") {
           await sendCampusScopedNewPartnerNotification({
-            partnerId: conversion.partner.id,
-            name: conversion.partner.name,
-            location: conversion.partner.location,
+            partnerId: partner.id,
+            name: partner.name,
+            location: partner.location,
             categoryLabel: registrationRequest.category_label,
-            campusSlugs: conversion.partner.campus_slugs ?? managedCampusSlugs,
+            campusSlugs: partner.campus_slugs ?? managedCampusSlugs,
           });
         }
 
         revalidatePartnerData();
-        revalidateAdminAndPublicPaths(conversion.partner.id);
+        revalidateAdminAndPublicPaths(partner.id);
       }
     } catch (error) {
       const message =

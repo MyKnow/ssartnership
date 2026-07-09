@@ -33,6 +33,7 @@ type PartnerServiceRow = {
   company_id?: string | null;
   name: string;
   location: string;
+  branch_scope_type?: string | null;
   plan_tier?: string | null;
   visibility?: string | null;
   categories?:
@@ -121,6 +122,7 @@ function toServiceDashboard(
     name: row.name,
     location: row.location,
     categoryLabel: extractCategoryLabel(row.categories),
+    branchScopeType: row.branch_scope_type ?? null,
     planTier,
     visibility: normalizePartnerVisibility(row.visibility),
     status: normalizePartnerPortalServiceStatus(status),
@@ -172,7 +174,7 @@ export async function getSupabasePartnerPortalDashboard(
       .order("created_at", { ascending: true }),
     supabase
       .from("partners")
-      .select("id,company_id,name,location,plan_tier,visibility,categories(label)")
+      .select("id,company_id,name,location,branch_scope_type,plan_tier,visibility,categories(label)")
       .in("company_id", uniqueCompanyIds)
       .order("created_at", { ascending: true }),
     supabase

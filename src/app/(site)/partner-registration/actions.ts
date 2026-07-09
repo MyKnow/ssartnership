@@ -25,6 +25,7 @@ import {
 import {
   insertPartnerRegistrationRequest,
   loadPartnerRegistrationCategories,
+  resolvePartnerRegistrationBranchPayload,
   resolvePartnerRegistrationMediaPayload,
 } from "@/lib/partner-registration-submit.server";
 import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib/rate-limit";
@@ -78,12 +79,14 @@ export async function createPartnerRegistrationRequestAction(
   let insertedRequest;
   try {
     const media = await resolvePartnerRegistrationMediaPayload(formData, requestId);
+    const branches = await resolvePartnerRegistrationBranchPayload(formData, values);
     insertedRequest = await insertPartnerRegistrationRequest({
       requestId,
       values,
       categories,
       context: { source: "public_web" },
       media,
+      branches,
     });
   } catch (error) {
     const message =
@@ -94,6 +97,7 @@ export async function createPartnerRegistrationRequestAction(
     return {
       status: "error",
       message,
+      fieldErrors: message.includes("지점") ? { branchListText: message } : undefined,
     };
   }
 
@@ -142,7 +146,7 @@ function validateXlsxFile(file: File | null) {
     return "XLSX 파일은 1MB 이하만 업로드할 수 있습니다.";
   }
   if (!/\.xlsx$/i.test(file.name)) {
-    return "엑셀 입력은 .xlsx 파일만 업로드할 수 있습니다.";
+    return "파일 접수는 .xlsx 파일만 업로드할 수 있습니다.";
   }
   return null;
 }

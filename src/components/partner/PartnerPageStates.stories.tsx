@@ -159,13 +159,13 @@ function RegistrationWebInputState() {
   return (
     <PartnerStateFrame
       title="신규 파트너사 등록"
-      description="웹 입력 탭에서 브랜드 유형, 혜택 방식, 이미지, 담당자 정보를 한 번에 접수합니다."
+      description="단계별 등록 화면에서 브랜드 유형, 혜택 방식, 이미지, 담당자 정보를 한 번에 접수합니다."
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <Card className="grid min-w-0 gap-5" padding="md">
           <div className="flex flex-wrap gap-2">
-            <Badge variant="primary">웹 입력</Badge>
-            <Badge variant="neutral">엑셀 파일 입력</Badge>
+            <Badge variant="primary">단계별 등록</Badge>
+            <Badge variant="neutral">파일 접수</Badge>
             <Badge variant="warning">필수값 오류 3건</Badge>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -235,12 +235,12 @@ function RegistrationExcelState() {
   return (
     <PartnerStateFrame
       title="신규 파트너사 등록"
-      description="엑셀 파일 입력 탭에서는 유형을 고른 뒤 템플릿을 내려받고 XLSX 파일을 업로드합니다."
+      description="파일 접수 화면에서는 유형을 고른 뒤 템플릿을 내려받고 XLSX 파일을 업로드합니다."
     >
       <Card className="grid min-w-0 gap-5" padding="md">
         <div className="flex flex-wrap gap-2">
-          <Badge variant="neutral">웹 입력</Badge>
-          <Badge variant="primary">엑셀 파일 입력</Badge>
+          <Badge variant="neutral">단계별 등록</Badge>
+          <Badge variant="primary">파일 접수</Badge>
           <Badge variant="warning">파일 미첨부</Badge>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">

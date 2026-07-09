@@ -9,6 +9,7 @@ export type PartnerPortalServiceSummary = {
   name: string;
   location: string;
   categoryLabel: string;
+  branchScopeType?: string | null;
   visibility: "public" | "confidential" | "private";
 };
 

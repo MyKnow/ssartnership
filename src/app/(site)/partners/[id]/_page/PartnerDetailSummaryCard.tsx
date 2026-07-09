@@ -13,6 +13,7 @@ import {
   getPartnerPlaceLinkLabel,
   getPartnerServiceMode,
 } from "@/lib/partner-service-mode";
+import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
 import { isProxiedCachedImageUrl } from "@/lib/image-cache";
 import type { Partner } from "@/lib/types";
 
@@ -40,6 +41,12 @@ export default function PartnerDetailSummaryCard({
   const serviceMode = getPartnerServiceMode(partner.location);
   const isOnlineService = serviceMode === "online";
   const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);
+  const branchScopeLabel = getPartnerBranchScopeLabel(
+    partner.branchScopeType,
+    serviceMode,
+  );
+  const showBranchScope =
+    !isOnlineService && partner.branchScopeType && partner.branchScopeType !== "single_location";
 
   return (
     <Card
@@ -98,6 +105,9 @@ export default function PartnerDetailSummaryCard({
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           {!isOnlineService ? <span>{partner.location}</span> : null}
+          {showBranchScope ? (
+            <Badge variant="warning">{branchScopeLabel}</Badge>
+          ) : null}
           {mapLink ? (
             <TrackedAnchor
               className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-border text-foreground hover:border-strong"
@@ -148,6 +158,17 @@ export default function PartnerDetailSummaryCard({
         </div>
 
         <div className="mt-6 grid gap-5">
+          {showBranchScope || partner.branchScopeNote ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                적용 지점
+              </p>
+              <p className="mt-3 whitespace-pre-line rounded-3xl border border-border bg-surface-inset px-4 py-3 text-sm leading-7 text-muted-foreground">
+                {partner.branchScopeNote?.trim() || `${branchScopeLabel}에 적용됩니다.`}
+              </p>
+            </div>
+          ) : null}
+
           {partner.detailDescription ? (
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">

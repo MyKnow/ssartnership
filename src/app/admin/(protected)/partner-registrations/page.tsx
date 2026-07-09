@@ -18,6 +18,7 @@ import {
   ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS,
   ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS,
 } from "@/lib/admin-partner-file-import";
+import { PARTNER_BRANCH_SCOPE_OPTIONS } from "@/lib/partner-branch-registration";
 import { inferCampusSlugsFromLocation } from "@/lib/campuses";
 import {
   isPartnerRegistrationRequestStatus,
@@ -37,8 +38,11 @@ type RegistrationRow = {
   source?: PartnerRegistrationSource | null;
   company_id?: string | null;
   requested_by_partner_account_id?: string | null;
+  registration_mode?: string | null;
   service_mode: "offline" | "online";
   benefit_action_type: keyof typeof ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS;
+  branch_scope_type?: string | null;
+  branch_scope_note?: string | null;
   brand_name: string;
   category_id?: string | null;
   category_label: string;
@@ -66,6 +70,16 @@ type RegistrationRow = {
   reviewed_at?: string | null;
   created_at: string;
   company?: { managed_campus_slugs?: string[] | null } | { managed_campus_slugs?: string[] | null }[] | null;
+  branches?: Array<{
+    id: string;
+    branch_type?: string | null;
+    campus_slugs?: string[] | null;
+  }> | null;
+  benefit_groups?: Array<{
+    id: string;
+    group_key?: string | null;
+    label?: string | null;
+  }> | null;
 };
 
 function formatDateTime(value?: string | null) {
@@ -111,6 +125,32 @@ function getSourceLabel(source?: string | null) {
     return PARTNER_REGISTRATION_SOURCE_LABELS[source as PartnerRegistrationSource];
   }
   return PARTNER_REGISTRATION_SOURCE_LABELS.public_web;
+}
+
+function getBranchScopeLabel(value?: string | null, serviceMode?: string | null) {
+  if (serviceMode === "online" || value === "online") {
+    return "온라인";
+  }
+  return (
+    PARTNER_BRANCH_SCOPE_OPTIONS.find((option) => option.value === value)?.label ??
+    "단일 지점"
+  );
+}
+
+function getBranchTypeSummary(branches?: RegistrationRow["branches"]) {
+  const safeBranches = branches ?? [];
+  const directCount = safeBranches.filter((branch) => branch.branch_type === "direct").length;
+  const franchiseCount = safeBranches.filter((branch) => branch.branch_type === "franchise").length;
+  if (safeBranches.length === 0) {
+    return "지점 목록 없음";
+  }
+  return [
+    `${safeBranches.length.toLocaleString("ko-KR")}개 지점`,
+    directCount > 0 ? `직영 ${directCount.toLocaleString("ko-KR")}` : null,
+    franchiseCount > 0 ? `가맹 ${franchiseCount.toLocaleString("ko-KR")}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function ValueList({
@@ -159,7 +199,7 @@ export default async function AdminPartnerRegistrationsPage({
 
   let query = getSupabaseAdminClient()
     .from("partner_registration_requests")
-    .select("*,company:partner_companies(managed_campus_slugs)")
+    .select("*,company:partner_companies(managed_campus_slugs),branches:partner_registration_branches(id,branch_type,campus_slugs),benefit_groups:partner_registration_benefit_groups(id,group_key,label)")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -274,6 +314,9 @@ export default async function AdminPartnerRegistrationsPage({
                           {PARTNER_REGISTRATION_STATUS_LABELS[rowStatus]}
                         </Badge>
                         <Badge variant="neutral">{getSourceLabel(row.source)}</Badge>
+                        <Badge variant="primary">
+                          {getBranchScopeLabel(row.branch_scope_type, row.service_mode)}
+                        </Badge>
                         {!row.category_id ? (
                           <Badge variant="warning">신규 카테고리</Badge>
                         ) : null}
@@ -287,6 +330,10 @@ export default async function AdminPartnerRegistrationsPage({
                       <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
                         {row.company_name} · {row.category_label} · {serviceLabel} ·{" "}
                         {actionLabel}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                        {getBranchTypeSummary(row.branches)} · 혜택 그룹{" "}
+                        {(row.benefit_groups ?? []).length || 1}개
                       </p>
                     </div>
                     <Button variant="soft" href="/admin/partners/new" className="w-full sm:w-auto">
@@ -375,8 +422,14 @@ export default async function AdminPartnerRegistrationsPage({
                     </div>
                   ) : null}
 
-                  {row.detail_description || row.company_description || row.memo ? (
+                  {row.branch_scope_note || row.detail_description || row.company_description || row.memo ? (
                     <div className="grid min-w-0 gap-3 text-sm leading-6 text-muted-foreground">
+                      {row.branch_scope_note ? (
+                        <p className="min-w-0 break-words">
+                          <strong className="text-foreground">지점 범위</strong>{" "}
+                          {row.branch_scope_note}
+                        </p>
+                      ) : null}
                       {row.detail_description ? (
                         <p className="min-w-0 break-words">
                           <strong className="text-foreground">브랜드 설명</strong>{" "}

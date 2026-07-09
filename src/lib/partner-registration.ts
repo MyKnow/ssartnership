@@ -14,10 +14,24 @@ import {
   sanitizePartnerLinkValue,
   validateDateRange,
 } from "@/lib/validation";
+import {
+  createFallbackSingleBranch,
+  getDefaultBranchTypeForScope,
+  isMultiBranchScopeType,
+  normalizePartnerBranchScopeType,
+  normalizePartnerRegistrationMode,
+  parsePartnerBranchListText,
+  type PartnerBranchDraft,
+  type PartnerBranchScopeType,
+  type PartnerRegistrationMode,
+} from "@/lib/partner-branch-registration";
 
 export type PartnerRegistrationFieldName =
+  | "registrationMode"
   | "serviceMode"
   | "benefitActionType"
+  | "branchScopeType"
+  | "branchScopeNote"
   | "brandName"
   | "categoryLabel"
   | "periodStart"
@@ -37,6 +51,7 @@ export type PartnerRegistrationFieldName =
   | "mapUrl"
   | "siteLink"
   | "benefitActionLink"
+  | "branchListText"
   | "memo";
 
 export type PartnerRegistrationFormState = Record<
@@ -75,6 +90,8 @@ export type PartnerRegistrationRequestStatus =
   | "archived";
 
 export type PartnerRegistrationResolvedValues = PartnerRegistrationFormState & {
+  registrationMode: PartnerRegistrationMode;
+  branchScopeType: PartnerBranchScopeType;
   safeInquiryLink: string | null;
   safeBrandPhone: string | null;
   safeMapUrl: string | null;
@@ -83,6 +100,7 @@ export type PartnerRegistrationResolvedValues = PartnerRegistrationFormState & {
   parsedBenefits: string[];
   parsedConditions: string[];
   parsedTags: string[];
+  parsedBranches: PartnerBranchDraft[];
 };
 
 export const PARTNER_REGISTRATION_INITIAL_ACTION_STATE: PartnerRegistrationActionState = {
@@ -97,8 +115,11 @@ export const PARTNER_REGISTRATION_INITIAL_EXCEL_ACTION_STATE: PartnerRegistratio
   };
 
 export const partnerRegistrationInitialFormState: PartnerRegistrationFormState = {
+  registrationMode: "full_new",
   serviceMode: "offline",
   benefitActionType: "external_link",
+  branchScopeType: "single_location",
+  branchScopeNote: "",
   brandName: "",
   categoryLabel: "",
   periodStart: "",
@@ -118,18 +139,23 @@ export const partnerRegistrationInitialFormState: PartnerRegistrationFormState =
   mapUrl: "",
   siteLink: "",
   benefitActionLink: "",
+  branchListText: "",
   memo: "",
 };
 
 export const PARTNER_REGISTRATION_FIELD_ORDER: PartnerRegistrationFieldName[] = [
+  "registrationMode",
   "serviceMode",
   "benefitActionType",
+  "branchScopeType",
+  "branchScopeNote",
   "brandName",
   "categoryLabel",
   "location",
   "mapUrl",
   "siteLink",
   "benefitActionLink",
+  "branchListText",
   "benefits",
   "conditions",
   "periodStart",
@@ -221,8 +247,8 @@ export const PARTNER_REGISTRATION_SOURCE_LABELS: Record<
   PartnerRegistrationSource,
   string
 > = {
-  public_web: "공개 웹 입력",
-  public_excel: "공개 엑셀 입력",
+  public_web: "공개 단계별 등록",
+  public_excel: "공개 파일 접수",
   partner_portal: "파트너 포털",
 };
 
@@ -253,6 +279,7 @@ export function isPartnerRegistrationRequestStatus(
 }
 
 const maxLengthByField: Partial<Record<PartnerRegistrationFieldName, number>> = {
+  branchScopeNote: 600,
   brandName: 100,
   categoryLabel: 60,
   inquiryLink: 300,
@@ -270,6 +297,7 @@ const maxLengthByField: Partial<Record<PartnerRegistrationFieldName, number>> = 
   mapUrl: 500,
   siteLink: 500,
   benefitActionLink: 500,
+  branchListText: 12000,
   memo: 1000,
 };
 
@@ -322,8 +350,11 @@ export function createPartnerRegistrationInputFromDraft(
   const serviceMode =
     draft.partner.location === ONLINE_PARTNER_LOCATION ? "online" : "offline";
   return {
+    registrationMode: "full_new",
     serviceMode,
     benefitActionType: draft.partner.benefitActionType,
+    branchScopeType: serviceMode === "online" ? "online" : "single_location",
+    branchScopeNote: "",
     brandName: draft.partner.name,
     categoryLabel: draft.categoryLabel,
     periodStart: draft.partner.period.start,
@@ -343,6 +374,7 @@ export function createPartnerRegistrationInputFromDraft(
     mapUrl: serviceMode === "offline" ? draft.partner.mapUrl : "",
     siteLink: serviceMode === "online" ? draft.partner.mapUrl : "",
     benefitActionLink: draft.partner.benefitActionLink,
+    branchListText: "",
     memo: "",
   };
 }
@@ -406,6 +438,21 @@ export function resolvePartnerRegistrationCategory(
   );
 }
 
+function hasFormDataFile(
+  input:
+    | Partial<Record<PartnerRegistrationFieldName, unknown>>
+    | FormData
+    | null
+    | undefined,
+  name: string,
+) {
+  if (!input || typeof (input as { get?: unknown }).get !== "function") {
+    return false;
+  }
+  const value = (input as Pick<FormData, "get">).get(name);
+  return typeof File !== "undefined" && value instanceof File && value.size > 0;
+}
+
 export function validatePartnerRegistrationInput(
   input:
     | Partial<Record<PartnerRegistrationFieldName, unknown>>
@@ -418,6 +465,11 @@ export function validatePartnerRegistrationInput(
 } {
   const values = normalizePartnerRegistrationInput(input);
   const fieldErrors: PartnerRegistrationFieldErrors = {};
+  const registrationMode = normalizePartnerRegistrationMode(values.registrationMode);
+  const branchScopeType = normalizePartnerBranchScopeType(
+    values.branchScopeType,
+    values.serviceMode,
+  );
   const options = {
     serviceMode: values.serviceMode,
     benefitActionType: values.benefitActionType,
@@ -506,9 +558,54 @@ export function validatePartnerRegistrationInput(
     fieldErrors.benefitActionLink = "혜택 이용 링크 형식을 확인해 주세요.";
   }
 
+  const branchContext = {
+    companyName: values.companyName,
+    brandName: values.brandName,
+    defaultBenefitGroupKey: "default",
+    defaultBranchType: getDefaultBranchTypeForScope(branchScopeType),
+  };
+  const branchTextResult = values.branchListText
+    ? parsePartnerBranchListText(values.branchListText, branchContext)
+    : { branches: [] as PartnerBranchDraft[], errors: [] as string[] };
+  if (branchTextResult.errors.length > 0) {
+    fieldErrors.branchListText = branchTextResult.errors[0];
+  }
+
+  const hasBranchFile = hasFormDataFile(input, "branchListFile");
+  const shouldRequireBranchList =
+    values.serviceMode === "offline" && isMultiBranchScopeType(branchScopeType);
+  if (
+    shouldRequireBranchList &&
+    branchTextResult.branches.length === 0 &&
+    !hasBranchFile &&
+    !fieldErrors.branchListText
+  ) {
+    fieldErrors.branchListText =
+      "선택 지점 또는 다수 지점 범위는 적용 지점 목록을 입력하거나 XLSX로 업로드해 주세요.";
+  }
+
+  const fallbackBranchResult =
+    values.serviceMode === "offline" &&
+    !shouldRequireBranchList &&
+    branchTextResult.branches.length === 0 &&
+    values.location
+      ? createFallbackSingleBranch({
+          companyName: values.companyName,
+          brandName: values.brandName,
+          location: values.location,
+          mapUrl: safeMapUrl,
+          phone: safeBrandPhone,
+        })
+      : null;
+  if (fallbackBranchResult?.errors.length && !fieldErrors.branchListText) {
+    fieldErrors.branchListText = fallbackBranchResult.errors[0];
+  }
+
   return {
     values: {
       ...values,
+      registrationMode,
+      branchScopeType,
       location:
         values.serviceMode === "online" ? ONLINE_PARTNER_LOCATION : values.location,
       safeInquiryLink,
@@ -519,6 +616,12 @@ export function validatePartnerRegistrationInput(
       parsedBenefits: parseDelimitedInput(values.benefits),
       parsedConditions: parseDelimitedInput(values.conditions),
       parsedTags: parseDelimitedInput(values.tags),
+      parsedBranches:
+        values.serviceMode === "online"
+          ? []
+          : branchTextResult.branches.length > 0
+            ? branchTextResult.branches
+            : (fallbackBranchResult?.branches ?? []),
     },
     fieldErrors,
   };

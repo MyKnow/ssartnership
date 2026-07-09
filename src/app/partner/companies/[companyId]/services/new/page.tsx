@@ -55,15 +55,24 @@ export default async function PartnerCompanyServiceNewPage({
     notFound();
   }
 
-  const [categoriesResult, accountEmail] = await Promise.all([
+  const [categoriesResult, brandProfilesResult, accountEmail] = await Promise.all([
     getSupabaseAdminClient()
       .from("categories")
       .select("id,key,label")
       .order("created_at", { ascending: true }),
+    getSupabaseAdminClient()
+      .from("partner_brand_profiles")
+      .select("id,name,category_label,description,inquiry_link,brand_phone")
+      .eq("company_id", scope.id)
+      .order("updated_at", { ascending: false })
+      .limit(30),
     getPartnerAccountEmail(session.accountId),
   ]);
   if (categoriesResult.error) {
     throw new Error(`category load failed: ${categoriesResult.error.message}`);
+  }
+  if (brandProfilesResult.error) {
+    throw new Error(`brand profile load failed: ${brandProfilesResult.error.message}`);
   }
 
   const fallbackEmail = session.loginId.includes("@") ? session.loginId : "";
@@ -88,6 +97,14 @@ export default async function PartnerCompanyServiceNewPage({
 
           <PartnerRegistrationClient
             categories={categoriesResult.data ?? []}
+            brandProfiles={(brandProfilesResult.data ?? []).map((profile) => ({
+              id: profile.id,
+              name: profile.name,
+              categoryLabel: profile.category_label,
+              detailDescription: profile.description,
+              inquiryLink: profile.inquiry_link,
+              brandPhone: profile.brand_phone,
+            }))}
             webAction={createPartnerPortalBrandRegistrationRequestAction}
             showExcelTab={false}
             lockCompanyName

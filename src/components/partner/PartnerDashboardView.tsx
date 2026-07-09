@@ -24,6 +24,7 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
+import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
 import {
   getCompanyScopedPartnerServiceHref,
   getCompanyScopedPartnerServiceNewHref,
@@ -133,6 +134,11 @@ function ServiceListRow({
           <p className="line-clamp-1 text-sm text-muted-foreground">
             {service.categoryLabel} · {service.location || "위치 미지정"}
           </p>
+          {service.branchScopeType && service.branchScopeType !== "single_location" ? (
+            <p className="line-clamp-1 text-xs font-semibold text-warning">
+              {getPartnerBranchScopeLabel(service.branchScopeType)}
+            </p>
+          ) : null}
         </div>
       </div>
 
