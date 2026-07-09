@@ -195,6 +195,51 @@ export function getPartnerBranchScopeLabel(
   );
 }
 
+export function inferPartnerBranchScopeType({
+  serviceMode,
+  branches,
+  fallback = "single_location",
+}: {
+  serviceMode?: string | null;
+  branches: Array<{ branchType?: string | null }>;
+  fallback?: PartnerBranchScopeType;
+}): PartnerBranchScopeType {
+  if (serviceMode === "online" || fallback === "online") {
+    return "online";
+  }
+  if (branches.length === 0) {
+    return fallback;
+  }
+
+  const branchTypes = branches.map((branch) =>
+    normalizePartnerBranchType(branch.branchType, "unknown"),
+  );
+  const hasDirect = branchTypes.includes("direct");
+  const hasFranchise = branchTypes.includes("franchise");
+  const hasUnknown = branchTypes.includes("unknown");
+
+  if (branches.length === 1) {
+    if (hasFranchise) {
+      return "selected_franchise_branches";
+    }
+    if (fallback !== "single_location") {
+      return fallback;
+    }
+    return "single_location";
+  }
+
+  if (hasFranchise && (hasDirect || hasUnknown)) {
+    return "mixed_selected_branches";
+  }
+  if (hasFranchise) {
+    return "selected_franchise_branches";
+  }
+  if (hasUnknown) {
+    return "mixed_selected_branches";
+  }
+  return branches.length >= 10 ? "many_direct_branches" : "selected_direct_branches";
+}
+
 export function normalizePartnerBranchType(
   value?: string | null,
   fallback: PartnerBranchType = "unknown",

@@ -8,6 +8,8 @@ import {
   ClipboardDocumentListIcon,
   MapPinIcon,
   PhotoIcon,
+  PlusIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import {
   createPartnerRegistrationExcelRequestAction,
@@ -27,8 +29,10 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
 import {
-  PARTNER_BRANCH_SCOPE_OPTIONS,
   PARTNER_REGISTRATION_MODE_OPTIONS,
+  getPartnerBranchScopeLabel,
+  inferPartnerBranchScopeType,
+  normalizePartnerBranchScopeType,
 } from "@/lib/partner-branch-registration";
 import {
   getPartnerRegistrationTemplateHref,
@@ -423,42 +427,316 @@ function RegistrationModeSelector({
   );
 }
 
-function BranchScopeSelector({
-  value,
-  serviceMode,
-  onChange,
-}: {
-  value: string;
-  serviceMode: PartnerServiceMode;
-  onChange: (value: string) => void;
-}) {
-  if (serviceMode === "online") {
-    return (
-      <div className="rounded-[1rem] border border-primary/15 bg-primary-soft px-4 py-3 text-sm leading-6 text-primary">
-        온라인 서비스는 지점 목록 없이 사이트 링크 기준으로 등록합니다.
-      </div>
-    );
+type BranchEditorRow = {
+  id: string;
+  benefitGroupLabel: string;
+  branchName: string;
+  address: string;
+  branchCode: string;
+  branchType: "direct" | "franchise" | "unknown";
+  mapUrl: string;
+  phone: string;
+  memo: string;
+};
+
+const branchTypeOptions = [
+  { value: "direct", label: "직영" },
+  { value: "franchise", label: "가맹" },
+  { value: "unknown", label: "미정" },
+] as const satisfies Array<{ value: BranchEditorRow["branchType"]; label: string }>;
+
+function createEmptyBranchEditorRow(id: string): BranchEditorRow {
+  return {
+    id,
+    benefitGroupLabel: "기본 혜택",
+    branchName: "",
+    address: "",
+    branchCode: "",
+    branchType: "direct",
+    mapUrl: "",
+    phone: "",
+    memo: "",
+  };
+}
+
+function createBranchEditorRowId() {
+  return `branch-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function splitBranchListLine(line: string) {
+  if (line.includes("\t")) {
+    return line.split("\t");
   }
+  if (line.includes("|")) {
+    return line.split("|");
+  }
+  return line.split(",");
+}
+
+function parseInitialBranchEditorRows(value?: string) {
+  const rows = (value ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index): BranchEditorRow => {
+      const cells = splitBranchListLine(line).map((cell) => cell.trim());
+      if (cells.length === 1) {
+        return {
+          ...createEmptyBranchEditorRow(`initial-${index}`),
+          address: cells[0] ?? "",
+        };
+      }
+      if (cells.length === 2) {
+        return {
+          ...createEmptyBranchEditorRow(`initial-${index}`),
+          branchName: cells[0] ?? "",
+          address: cells[1] ?? "",
+        };
+      }
+      const branchType = cells[4] === "가맹" || cells[4] === "franchise"
+        ? "franchise"
+        : cells[4] === "미정" || cells[4] === "unknown"
+          ? "unknown"
+          : "direct";
+      return {
+        id: `initial-${index}`,
+        benefitGroupLabel: cells[0] || "기본 혜택",
+        branchName: cells[1] ?? "",
+        address: cells[2] ?? "",
+        branchCode: cells[3] ?? "",
+        branchType,
+        mapUrl: cells[5] ?? "",
+        phone: cells[6] ?? "",
+        memo: cells.slice(7).join(" "),
+      };
+    });
+  return rows.length > 0 ? rows : [createEmptyBranchEditorRow("initial-0")];
+}
+
+function trimBranchRow(row: BranchEditorRow) {
+  return {
+    ...row,
+    benefitGroupLabel: row.benefitGroupLabel.trim(),
+    branchName: row.branchName.trim(),
+    address: row.address.trim(),
+    branchCode: row.branchCode.trim(),
+    mapUrl: row.mapUrl.trim(),
+    phone: row.phone.trim(),
+    memo: row.memo.trim(),
+  };
+}
+
+function branchRowHasValue(row: BranchEditorRow) {
+  const trimmed = trimBranchRow(row);
+  return Boolean(
+    trimmed.branchName ||
+      trimmed.address ||
+      trimmed.branchCode ||
+      trimmed.mapUrl ||
+      trimmed.phone ||
+      trimmed.memo,
+  );
+}
+
+function serializeBranchRows(rows: BranchEditorRow[]) {
+  return rows
+    .map(trimBranchRow)
+    .filter(branchRowHasValue)
+    .map((row) =>
+      [
+        row.benefitGroupLabel || "기본 혜택",
+        row.branchName,
+        row.address,
+        row.branchCode,
+        row.branchType,
+        row.mapUrl,
+        row.phone,
+        row.memo,
+      ].join("\t"),
+    )
+    .join("\n");
+}
+
+function BranchListEditor({
+  rows,
+  error,
+  serializedValue,
+  inferredScopeType,
+  onChange,
+  inputRef,
+}: {
+  rows: BranchEditorRow[];
+  error?: string;
+  serializedValue: string;
+  inferredScopeType: string;
+  onChange: (rows: BranchEditorRow[]) => void;
+  inputRef?: (element: HTMLElement | null) => void;
+}) {
+  const filledRows = rows.filter(branchRowHasValue);
+
+  const updateRow = (
+    rowId: string,
+    key: keyof Omit<BranchEditorRow, "id">,
+    value: string,
+  ) => {
+    onChange(
+      rows.map((row) => (row.id === rowId ? { ...row, [key]: value } : row)),
+    );
+  };
+
+  const addRow = () => {
+    onChange([...rows, createEmptyBranchEditorRow(createBranchEditorRowId())]);
+  };
+
+  const removeRow = (rowId: string) => {
+    const nextRows = rows.filter((row) => row.id !== rowId);
+    onChange(
+      nextRows.length > 0
+        ? nextRows
+        : [createEmptyBranchEditorRow(createBranchEditorRowId())],
+    );
+  };
 
   return (
-    <section className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-foreground">적용 지점 범위</p>
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-          사용자가 헷갈리지 않도록 직영/가맹/일부 지점 여부를 명확히 남깁니다.
-        </p>
+    <section
+      ref={inputRef}
+      tabIndex={-1}
+      className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4 focus:outline-none"
+    >
+      <input type="hidden" name="branchListText" value={serializedValue} />
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-foreground">적용 지점 목록</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            단일 지점은 비워두면 브랜드 위치로 등록됩니다. 여러 지점은 행을 추가하면
+            적용 범위를 자동으로 판단합니다.
+          </p>
+        </div>
+        <div className="rounded-[0.9rem] border border-primary/15 bg-primary-soft px-3 py-2 text-xs leading-5 text-primary">
+          자동 판단: {getPartnerBranchScopeLabel(inferredScopeType)}
+        </div>
       </div>
-      <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {PARTNER_BRANCH_SCOPE_OPTIONS.map((option) => (
-          <OptionChip
-            key={option.value}
-            value={option.value}
-            selected={value === option.value}
-            label={option.label}
-            description={option.description}
-            onClick={onChange}
-          />
+
+      <div className="grid min-w-0 gap-3">
+        {rows.map((row, index) => (
+          <div
+            key={row.id}
+            className="grid min-w-0 gap-3 rounded-[1rem] border border-border bg-surface px-3 py-3"
+          >
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="truncate text-sm font-semibold text-foreground">
+                지점 {index + 1}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                ariaLabel={`지점 ${index + 1} 삭제`}
+                disabled={rows.length === 1 && !branchRowHasValue(row)}
+                onClick={() => removeRow(row.id)}
+              >
+                <TrashIcon className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+              <Input
+                value={row.branchName}
+                onChange={(event) =>
+                  updateRow(row.id, "branchName", event.currentTarget.value)
+                }
+                placeholder="지점명 예: 역삼본점"
+                aria-label={`지점 ${index + 1} 이름`}
+              />
+              <Input
+                value={row.address}
+                onChange={(event) =>
+                  updateRow(row.id, "address", event.currentTarget.value)
+                }
+                placeholder="주소 예: 서울 강남구 테헤란로 212"
+                aria-label={`지점 ${index + 1} 주소`}
+              />
+            </div>
+            <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_10rem_minmax(0,1fr)]">
+              <Input
+                value={row.benefitGroupLabel}
+                onChange={(event) =>
+                  updateRow(row.id, "benefitGroupLabel", event.currentTarget.value)
+                }
+                placeholder="혜택 그룹"
+                aria-label={`지점 ${index + 1} 혜택 그룹`}
+              />
+              <select
+                value={row.branchType}
+                onChange={(event) =>
+                  updateRow(row.id, "branchType", event.currentTarget.value)
+                }
+                aria-label={`지점 ${index + 1} 직영 또는 가맹`}
+                className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+              >
+                {branchTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <Input
+                value={row.branchCode}
+                onChange={(event) =>
+                  updateRow(row.id, "branchCode", event.currentTarget.value)
+                }
+                placeholder="지점 코드 선택"
+                aria-label={`지점 ${index + 1} 코드`}
+              />
+            </div>
+            <details className="group rounded-[0.9rem] border border-border/70 bg-surface-muted px-3 py-2">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-muted-foreground">
+                선택 정보
+              </summary>
+              <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-3">
+                <Input
+                  value={row.mapUrl}
+                  onChange={(event) =>
+                    updateRow(row.id, "mapUrl", event.currentTarget.value)
+                  }
+                  placeholder="지도 URL"
+                  aria-label={`지점 ${index + 1} 지도 URL`}
+                />
+                <Input
+                  value={row.phone}
+                  onChange={(event) =>
+                    updateRow(row.id, "phone", event.currentTarget.value)
+                  }
+                  placeholder="전화번호"
+                  aria-label={`지점 ${index + 1} 전화번호`}
+                />
+                <Input
+                  value={row.memo}
+                  onChange={(event) =>
+                    updateRow(row.id, "memo", event.currentTarget.value)
+                  }
+                  placeholder="메모"
+                  aria-label={`지점 ${index + 1} 메모`}
+                />
+              </div>
+            </details>
+          </div>
         ))}
+      </div>
+
+      {error ? (
+        <span className="text-xs font-medium leading-5 text-danger" role="alert">
+          {error}
+        </span>
+      ) : null}
+
+      <div className="flex min-w-0 flex-col gap-2 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-5 text-muted-foreground">
+          입력된 지점 {filledRows.length.toLocaleString()}개
+        </p>
+        <Button type="button" variant="soft" size="sm" onClick={addRow}>
+          <PlusIcon className="h-4 w-4" />
+          지점 추가
+        </Button>
       </div>
     </section>
   );
@@ -540,9 +818,8 @@ export default function PartnerRegistrationClient({
     useState<AdminPartnerFileBenefitActionType>(() =>
       getInitialBenefitActionType(initialValues),
     );
-  const [branchScopeType, setBranchScopeType] = useState(
-    initialValues?.branchScopeType ??
-      (getInitialServiceMode(initialValues) === "online" ? "online" : "single_location"),
+  const [branchRows, setBranchRows] = useState<BranchEditorRow[]>(() =>
+    parseInitialBranchEditorRows(initialValues?.branchListText),
   );
   const [webState, webFormAction] = useActionState(
     webAction,
@@ -575,6 +852,19 @@ export default function PartnerRegistrationClient({
     (option) => option.value === benefitActionType,
   );
   const xlsxError = clientFileError ?? excelState.fileError;
+  const branchListText = useMemo(() => serializeBranchRows(branchRows), [branchRows]);
+  const inferredBranchScopeType = useMemo(
+    () =>
+      inferPartnerBranchScopeType({
+        serviceMode,
+        branches: branchRows.filter(branchRowHasValue),
+        fallback: normalizePartnerBranchScopeType(
+          initialValues?.branchScopeType,
+          serviceMode,
+        ),
+      }),
+    [branchRows, initialValues?.branchScopeType, serviceMode],
+  );
   const currentStepIndex = registrationSteps.findIndex(
     (step) => step.id === activeStep,
   );
@@ -705,7 +995,6 @@ export default function PartnerRegistrationClient({
 
   const handleServiceModeChange = (value: PartnerServiceMode) => {
     setServiceMode(value);
-    setBranchScopeType(value === "online" ? "online" : "single_location");
   };
 
   const typeSelector = (
@@ -850,7 +1139,7 @@ export default function PartnerRegistrationClient({
               <input type="hidden" name="registrationMode" value={registrationMode} />
               <input type="hidden" name="serviceMode" value={serviceMode} />
               <input type="hidden" name="benefitActionType" value={benefitActionType} />
-              <input type="hidden" name="branchScopeType" value={branchScopeType} />
+              <input type="hidden" name="branchScopeType" value={inferredBranchScopeType} />
               {hiddenFields
                 ? Object.entries(hiddenFields).map(([name, value]) => (
                     <input key={name} type="hidden" name={name} value={value} />
@@ -1084,18 +1373,12 @@ export default function PartnerRegistrationClient({
                   </p>
                 </div>
 
-                <BranchScopeSelector
-                  value={branchScopeType}
-                  serviceMode={serviceMode}
-                  onChange={setBranchScopeType}
-                />
-
                 {serviceMode === "offline" ? (
                   <>
                     <Field
                       label="적용 범위 메모"
                       name="branchScopeNote"
-                      description="예: 역삼·강남 직영점만 참여, 일부 가맹점 한정"
+                      description="예: 역삼·강남 직영점만 참여, 일부 가맹점 제외, 전체 직영점 참여"
                       error={fieldErrors.branchScopeNote}
                     >
                       <FormTextarea
@@ -1110,26 +1393,16 @@ export default function PartnerRegistrationClient({
                       />
                     </Field>
 
-                    <Field
-                      label="지점 목록 붙여넣기"
-                      name="branchListText"
-                      description="한 줄에 하나씩 입력합니다. 예: 기본 혜택 | 역삼본점 | 서울 강남구 테헤란로 212 | | 직영"
+                    <BranchListEditor
+                      rows={branchRows}
+                      serializedValue={branchListText}
+                      inferredScopeType={inferredBranchScopeType}
                       error={fieldErrors.branchListText}
-                    >
-                      <FormTextarea
-                        name="branchListText"
-                        fieldErrors={fieldErrors}
-                        inputRef={(element) => {
-                          fieldRefs.current.branchListText = element;
-                        }}
-                        rows={6}
-                        defaultValue={initialValues?.branchListText}
-                        placeholder={[
-                          "기본 혜택 | 역삼본점 | 서울 강남구 테헤란로 212 | | 직영",
-                          "기본 혜택 | 강남점 | 서울 강남구 강남대로 382 | | 가맹",
-                        ].join("\n")}
-                      />
-                    </Field>
+                      onChange={setBranchRows}
+                      inputRef={(element) => {
+                        fieldRefs.current.branchListText = element;
+                      }}
+                    />
 
                     <label className="grid min-w-0 gap-2" htmlFor="partner-registration-branchListFile">
                       <span className="ui-caption inline-flex min-w-0 items-center gap-1.5">
@@ -1142,18 +1415,32 @@ export default function PartnerRegistrationClient({
                           선택
                         </span>
                       </span>
-                      <Input
-                        id="partner-registration-branchListFile"
-                        name="branchListFile"
-                        type="file"
-                        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      />
+                      <div className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                        <Input
+                          id="partner-registration-branchListFile"
+                          name="branchListFile"
+                          type="file"
+                          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        />
+                        <Button
+                          href="/partner-registration/branches/template"
+                          variant="secondary"
+                          className="w-full md:w-auto"
+                        >
+                          <ArrowDownTrayIcon className="h-4 w-4" />
+                          양식 다운로드
+                        </Button>
+                      </div>
                       <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">
                         최소 컬럼은 혜택 그룹, 지점명, 주소입니다. 지점 코드, 직영/가맹, 지도 URL, 전화번호, 메모는 선택입니다.
                       </span>
                     </label>
                   </>
-                ) : null}
+                ) : (
+                  <div className="rounded-[1rem] border border-primary/15 bg-primary-soft px-4 py-3 text-sm leading-6 text-primary">
+                    온라인 서비스는 사이트 링크 기준으로 등록하고 지점 목록은 받지 않습니다.
+                  </div>
+                )}
               </section>
 
               <section

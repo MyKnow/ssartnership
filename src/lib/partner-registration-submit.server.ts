@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin-partner-file-import";
 import {
   getDefaultBranchTypeForScope,
+  inferPartnerBranchScopeType,
   normalizePartnerBranchRows,
   type PartnerBranchDraft,
   type PartnerBranchInputRow,
@@ -316,6 +317,11 @@ export async function insertPartnerRegistrationRequest({
     values.categoryLabel,
     categories,
   );
+  const branchScopeType = inferPartnerBranchScopeType({
+    serviceMode: values.serviceMode,
+    branches,
+    fallback: values.branchScopeType,
+  });
 
   const insertResult = await getSupabaseAdminClient()
     .from("partner_registration_requests")
@@ -327,7 +333,7 @@ export async function insertPartnerRegistrationRequest({
       registration_mode: values.registrationMode,
       service_mode: values.serviceMode,
       benefit_action_type: values.benefitActionType,
-      branch_scope_type: values.branchScopeType,
+      branch_scope_type: branchScopeType,
       branch_scope_note: values.branchScopeNote || null,
       brand_name: values.brandName,
       category_id: matchedCategory?.id ?? null,

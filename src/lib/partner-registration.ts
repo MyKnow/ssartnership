@@ -17,6 +17,7 @@ import {
 import {
   createFallbackSingleBranch,
   getDefaultBranchTypeForScope,
+  inferPartnerBranchScopeType,
   isMultiBranchScopeType,
   normalizePartnerBranchScopeType,
   normalizePartnerRegistrationMode,
@@ -587,6 +588,7 @@ export function validatePartnerRegistrationInput(
   const fallbackBranchResult =
     values.serviceMode === "offline" &&
     !shouldRequireBranchList &&
+    !hasBranchFile &&
     branchTextResult.branches.length === 0 &&
     values.location
       ? createFallbackSingleBranch({
@@ -601,11 +603,23 @@ export function validatePartnerRegistrationInput(
     fieldErrors.branchListText = fallbackBranchResult.errors[0];
   }
 
+  const parsedBranches =
+    values.serviceMode === "online"
+      ? []
+      : branchTextResult.branches.length > 0
+        ? branchTextResult.branches
+        : (fallbackBranchResult?.branches ?? []);
+  const inferredBranchScopeType = inferPartnerBranchScopeType({
+    serviceMode: values.serviceMode,
+    branches: parsedBranches,
+    fallback: branchScopeType,
+  });
+
   return {
     values: {
       ...values,
       registrationMode,
-      branchScopeType,
+      branchScopeType: inferredBranchScopeType,
       location:
         values.serviceMode === "online" ? ONLINE_PARTNER_LOCATION : values.location,
       safeInquiryLink,
@@ -616,12 +630,7 @@ export function validatePartnerRegistrationInput(
       parsedBenefits: parseDelimitedInput(values.benefits),
       parsedConditions: parseDelimitedInput(values.conditions),
       parsedTags: parseDelimitedInput(values.tags),
-      parsedBranches:
-        values.serviceMode === "online"
-          ? []
-          : branchTextResult.branches.length > 0
-            ? branchTextResult.branches
-            : (fallbackBranchResult?.branches ?? []),
+      parsedBranches,
     },
     fieldErrors,
   };

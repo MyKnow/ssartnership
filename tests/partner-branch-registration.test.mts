@@ -64,14 +64,14 @@ describe("partner branch registration", () => {
     assert.equal(parsed.branches[1]?.branchType, "franchise");
   });
 
-  it("requires branch lists only for multi-branch offline scopes", async () => {
+  it("infers branch scope from branch rows without requiring a manual scope choice", async () => {
     const { validatePartnerRegistrationInput } = await registrationModulePromise;
 
     const baseInput = {
       serviceMode: "offline",
       benefitActionType: "onsite",
       registrationMode: "full_new",
-      branchScopeType: "selected_direct_branches",
+      branchScopeType: "single_location",
       branchScopeNote: "",
       brandName: "카페 싸피",
       categoryLabel: "카페",
@@ -84,18 +84,21 @@ describe("partner branch registration", () => {
       branchListText: "",
     };
 
-    const missingBranches = validatePartnerRegistrationInput(baseInput);
-    assert.equal(
-      missingBranches.fieldErrors.branchListText,
-      "선택 지점 또는 다수 지점 범위는 적용 지점 목록을 입력하거나 XLSX로 업로드해 주세요.",
-    );
+    const singleLocation = validatePartnerRegistrationInput(baseInput);
+    assert.equal(singleLocation.fieldErrors.branchListText, undefined);
+    assert.equal(singleLocation.values.branchScopeType, "single_location");
+    assert.equal(singleLocation.values.parsedBranches.length, 1);
 
     const withBranches = validatePartnerRegistrationInput({
       ...baseInput,
-      branchListText: "기본 혜택\t역삼본점\t서울 강남구 테헤란로 212",
+      branchListText: [
+        "기본 혜택\t역삼본점\t서울 강남구 테헤란로 212\t\t직영",
+        "기본 혜택\t강남점\t서울 강남구 강남대로 382\t\t가맹",
+      ].join("\n"),
     });
     assert.equal(withBranches.fieldErrors.branchListText, undefined);
-    assert.equal(withBranches.values.parsedBranches.length, 1);
+    assert.equal(withBranches.values.branchScopeType, "mixed_selected_branches");
+    assert.equal(withBranches.values.parsedBranches.length, 2);
     assert.deepEqual(withBranches.values.parsedBranches[0]?.campusSlugs, [
       "seoul",
     ]);
@@ -110,5 +113,29 @@ describe("partner branch registration", () => {
     });
     assert.equal(online.fieldErrors.branchListText, undefined);
     assert.equal(online.values.parsedBranches.length, 0);
+  });
+
+  it("does not add a fallback single branch when a branch file is present", async () => {
+    const { validatePartnerRegistrationInput } = await registrationModulePromise;
+    const formData = new FormData();
+    formData.set("serviceMode", "offline");
+    formData.set("benefitActionType", "onsite");
+    formData.set("registrationMode", "full_new");
+    formData.set("branchScopeType", "single_location");
+    formData.set("brandName", "카페 싸피");
+    formData.set("categoryLabel", "카페");
+    formData.set("location", "서울 강남구 테헤란로 212");
+    formData.set("benefits", "아메리카노 10% 할인");
+    formData.set("conditions", "싸트너십 인증");
+    formData.set("companyName", "카페 싸피");
+    formData.set("contactName", "김싸피");
+    formData.set("contactEmail", "partner@cafessafy.example");
+    formData.set("branchListText", "");
+    formData.set("branchListFile", new File(["x"], "branches.xlsx"));
+
+    const result = validatePartnerRegistrationInput(formData);
+
+    assert.equal(result.fieldErrors.branchListText, undefined);
+    assert.equal(result.values.parsedBranches.length, 0);
   });
 });
