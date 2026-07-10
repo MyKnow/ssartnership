@@ -37,16 +37,16 @@ function normalizePartnerCompanyRow(row: PartnerCompanyRow | null | undefined) {
 
 export async function createCategoryAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "create", {
-    path: "/admin/partners",
+    path: "/admin/categories",
   });
   try {
     assertAdminCanUseGlobalFeature(adminSession.account);
   } catch {
-    redirectAdminActionError("/admin/partners", "admin_global_scope_required");
+    redirectAdminActionError("/admin/categories", "admin_global_scope_required");
   }
   const { key, label, description, color } = parseCategoryPayloadOrRedirect(
     formData,
-    "/admin/partners",
+    "/admin/categories",
   );
 
   const supabase = getSupabaseAdminClient();
@@ -57,7 +57,7 @@ export async function createCategoryAction(formData: FormData) {
     .single();
 
   if (error) {
-    redirectAdminActionError("/admin/partners", "category_invalid_request");
+    redirectAdminActionError("/admin/categories", "category_invalid_request");
   }
 
   await logAdminAction("category_create", {
@@ -71,21 +71,21 @@ export async function createCategoryAction(formData: FormData) {
 
 export async function updateCategoryAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "update", {
-    path: "/admin/partners",
+    path: "/admin/categories",
   });
   try {
     assertAdminCanUseGlobalFeature(adminSession.account);
   } catch {
-    redirectAdminActionError("/admin/partners", "admin_global_scope_required");
+    redirectAdminActionError("/admin/categories", "admin_global_scope_required");
   }
   const id = String(formData.get("id") || "").trim();
   const { key, label, description, color } = parseCategoryPayloadOrRedirect(
     formData,
-    "/admin/partners",
+    "/admin/categories",
   );
 
   if (!id) {
-    redirectAdminActionError("/admin/partners", "category_invalid_request");
+    redirectAdminActionError("/admin/categories", "category_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -95,7 +95,7 @@ export async function updateCategoryAction(formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    redirectAdminActionError("/admin/partners", "category_invalid_request");
+    redirectAdminActionError("/admin/categories", "category_invalid_request");
   }
 
   await logAdminAction("category_update", {
@@ -105,36 +105,23 @@ export async function updateCategoryAction(formData: FormData) {
   });
   revalidateCategoryData();
   revalidateAdminAndPublicPaths();
-  redirect("/admin/partners");
+  redirect("/admin/categories");
 }
 
 export async function deleteCategoryAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "delete", {
-    path: "/admin/partners",
+    path: "/admin/categories",
   });
   try {
     assertAdminCanUseGlobalFeature(adminSession.account);
   } catch {
-    redirectAdminActionError("/admin/partners", "admin_global_scope_required");
+    redirectAdminActionError("/admin/categories", "admin_global_scope_required");
   }
   const id = String(formData.get("id") || "").trim();
   if (!id) {
-    redirectAdminActionError("/admin/partners", "category_invalid_request");
+    redirectAdminActionError("/admin/categories", "category_invalid_request");
   }
-
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.from("categories").delete().eq("id", id);
-
-  if (error) {
-    redirectAdminActionError("/admin/partners", "category_invalid_request");
-  }
-
-  await logAdminAction("category_delete", {
-    targetType: "category",
-    targetId: id,
-  });
-  revalidateCategoryData();
-  revalidateAdminAndPublicPaths();
+  redirectAdminActionError("/admin/categories", "category_delete_deferred");
 }
 
 export async function createPartnerCompanyAction(formData: FormData) {
@@ -255,7 +242,7 @@ export async function updatePartnerCompanyAction(formData: FormData) {
     }
   }
 
-  const companyAudit = buildAuditChangeSummary("협력사", [
+  const companyAudit = buildAuditChangeSummary("파트너사", [
     {
       label: "이름",
       before: existingCompany.name,

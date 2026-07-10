@@ -5,7 +5,16 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { AdminNotificationListResult } from "@/lib/admin-notification-inbox";
-import { ADMIN_NAV_GROUPS } from "./admin-navigation";
+import { ADMIN_PERMISSION_TEMPLATES } from "@/lib/admin-permissions";
+import {
+  ADMIN_NAV_GROUPS,
+  filterAdminNavGroupsByPermissions,
+  type AdminNavGroup,
+} from "./admin-navigation";
+import AdminDashboardView, {
+  type AdminDashboardViewState,
+} from "./AdminDashboardView";
+import AdminPageHeader from "./AdminPageHeader";
 import AdminNotificationInbox from "./AdminNotificationInbox";
 import AdminShellView from "./AdminShellView";
 
@@ -37,7 +46,7 @@ const notificationState: AdminNotificationListResult = {
       notificationId: "mock-admin-notification-expiring",
       type: "expiring_partner",
       title: "카페 싸피 삼성점 제휴 종료가 7일 남았습니다",
-      body: "협력사 담당자에게 갱신 여부를 확인하고, 만료 전 플랜 상태와 노출 상태를 함께 점검하세요.",
+      body: "파트너사 담당자에게 갱신 여부를 확인하고, 만료 전 플랜 상태와 노출 상태를 함께 점검하세요.",
       targetUrl: "/admin/partners/mock-partner-service-cafe-ssafy-samseong",
       metadata: {},
       readAt: null,
@@ -52,72 +61,95 @@ const notificationState: AdminNotificationListResult = {
 function AdminPageStateFrame({
   title,
   children,
+  navGroups = ADMIN_NAV_GROUPS,
 }: {
   title: string;
   children: ReactNode;
+  navGroups?: AdminNavGroup[];
 }) {
   return (
     <AdminShellView
       title={title}
       logoutAction={async () => {}}
-      navGroups={ADMIN_NAV_GROUPS}
+      navGroups={navGroups}
     >
       {children}
     </AdminShellView>
   );
 }
 
-function DashboardOverviewState() {
+function DashboardOverviewState({
+  state = "ready",
+  longKorean = false,
+  regional = false,
+}: {
+  state?: AdminDashboardViewState;
+  longKorean?: boolean;
+  regional?: boolean;
+}) {
+  const permissions = ADMIN_PERMISSION_TEMPLATES.find(
+    (template) =>
+      template.key ===
+      (regional ? "regional_partner_manager" : "super_admin"),
+  )?.permissions;
+
+  if (!permissions) {
+    return null;
+  }
+
   return (
-    <AdminPageStateFrame title="관리 대시보드">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <Card className="grid min-w-0 gap-4">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="ui-kicker">Operations</p>
-              <h2 className="truncate text-xl font-semibold text-foreground">
-                오늘 운영 확인이 필요한 항목
-              </h2>
-            </div>
-            <Badge variant="warning">검토 6건</Badge>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              ["신규 파트너사", "3건", "접수 후 관리자 검토 대기"],
-              ["플랜 결제", "2건", "입금 확인 또는 세금계산서 발급 대기"],
-              ["보안 알림", "1건", "관리자 로그인 실패 반복"],
-            ].map(([label, value, description]) => (
-              <div key={label} className="ui-surface-inset min-w-0 rounded-card p-4">
-                <p className="truncate text-sm font-semibold text-foreground">{label}</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
-                <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                  {description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card className="grid min-w-0 gap-3" tone="muted">
-          <h3 className="truncate text-base font-semibold text-foreground">빠른 이동</h3>
-          <Button href="/admin/partner-registrations" variant="secondary">
-            신규 신청 검토
-          </Button>
-          <Button href="/admin/companies" variant="secondary">
-            플랜/과금 관리
-          </Button>
-          <Button href="/admin/notifications" variant="secondary">
-            관리자 알림
-          </Button>
-        </Card>
-      </div>
+    <AdminPageStateFrame
+      title="관리 대시보드"
+      navGroups={filterAdminNavGroupsByPermissions(ADMIN_NAV_GROUPS, permissions, {
+        includeGlobalItems: !regional,
+      })}
+    >
+      <AdminDashboardView
+        counts={{
+          memberCount: 428,
+          companyCount: 18,
+          partnerCount: regional ? 4 : 32,
+          categoryCount: 8,
+          accountCount: 21,
+          reviewCount: 164,
+          activePushSubscriptionCount: 283,
+          productLogCount: 4821,
+          auditLogCount: 918,
+          securityLogCount: 73,
+        }}
+        queueCounts={{
+          registrationPendingCount: 3,
+          changeRequestPendingCount: 2,
+          planRequestPendingCount: 1,
+          unreadNotificationCount: 4,
+        }}
+        permissions={permissions}
+        cycleMeta={
+          longKorean
+            ? "15기 · 서울 캠퍼스 하반기 집중 운영 및 장기 제휴 갱신 검토 기간"
+            : "15기 · 2학기"
+        }
+        state={state}
+        includeGlobalTasks={!regional}
+        errorMessage={
+          state === "error"
+            ? "운영 집계 서비스 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."
+            : undefined
+        }
+      />
     </AdminPageStateFrame>
   );
 }
 
 function CompanyBillingState() {
   return (
-    <AdminPageStateFrame title="협력사 관리">
+    <AdminPageStateFrame title="파트너사 관리">
       <div className="grid gap-4">
+        <AdminPageHeader
+          eyebrow="Companies"
+          title="파트너사와 계정"
+          description="계약 회사와 담당자 계정을 관리합니다."
+        />
         <Card className="grid min-w-0 gap-4">
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -126,16 +158,16 @@ function CompanyBillingState() {
                 카페 싸피 플랜/과금 검토
               </h2>
               <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                계좌이체 입금 확인, 세금계산서 발급 상태, 브랜드별 플랜 기간을 한 화면에서 점검합니다.
+                계좌이체 입금 확인, 세금계산서 발급 상태, 제휴처별 플랜 기간을 한 화면에서 점검합니다.
               </p>
             </div>
             <Badge variant="warning">입금 확인 대기</Badge>
           </div>
           <div className="grid gap-3 lg:grid-cols-3">
             {[
-              ["Basic", "3개 브랜드", "제휴기간과 동일"],
-              ["Partner", "2개 브랜드", "집계 리포트 제공"],
-              ["Boost", "1개 브랜드", "홈 배너와 푸시/MM 노출"],
+              ["Basic", "제휴처 3개", "제휴기간과 동일"],
+              ["Partner", "제휴처 2개", "집계 리포트 제공"],
+              ["Boost", "제휴처 1개", "홈 배너와 푸시/MM 노출"],
             ].map(([tier, count, description]) => (
               <div key={tier} className="ui-surface-inset min-w-0 rounded-card p-4">
                 <div className="flex min-w-0 items-center justify-between gap-2">
@@ -173,8 +205,14 @@ function CompanyBillingState() {
 
 function PartnerEditorState() {
   return (
-    <AdminPageStateFrame title="브랜드 편집">
-      <Card className="grid min-w-0 gap-5">
+    <AdminPageStateFrame title="제휴처 편집">
+      <div className="grid min-w-0 gap-5">
+        <AdminPageHeader
+          eyebrow="Partner"
+          title="제휴처 상세"
+          description="혜택과 공개 상태를 검토합니다."
+        />
+        <Card className="grid min-w-0 gap-5">
         <div className="min-w-0">
           <p className="ui-kicker">Brand Editor</p>
           <h2 className="truncate text-xl font-semibold text-foreground">
@@ -211,9 +249,10 @@ function PartnerEditorState() {
           <Button variant="secondary" href="/admin/partners">
             목록으로
           </Button>
-          <Button>브랜드 저장</Button>
+          <Button>제휴처 저장</Button>
         </div>
-      </Card>
+        </Card>
+      </div>
     </AdminPageStateFrame>
   );
 }
@@ -222,7 +261,14 @@ function NotificationsInboxState() {
   return (
     <ToastProvider>
       <AdminPageStateFrame title="관리자 알림">
-        <AdminNotificationInbox initialState={notificationState} />
+        <div className="grid gap-6">
+          <AdminPageHeader
+            eyebrow="Notifications"
+            title="내 알림"
+            description="현재 관리자 계정으로 수신한 운영 알림입니다."
+          />
+          <AdminNotificationInbox initialState={notificationState} />
+        </div>
       </AdminPageStateFrame>
     </ToastProvider>
   );
@@ -249,6 +295,53 @@ export const DashboardOverview: Story = {
       scenarioId: "admin.dashboard.default",
     },
   },
+};
+
+export const DashboardLongKorean: Story = {
+  render: () => <DashboardOverviewState longKorean />,
+  parameters: {
+    mockScenario: {
+      routePath: "/admin",
+      scenarioId: "admin.dashboard.default",
+    },
+  },
+};
+
+export const DashboardMobile: Story = {
+  render: () => <DashboardOverviewState longKorean />,
+  parameters: {
+    viewport: { defaultViewport: "mobile1" },
+    mockScenario: {
+      routePath: "/admin",
+      scenarioId: "admin.dashboard.default",
+    },
+  },
+};
+
+export const DashboardRegionalScope: Story = {
+  render: () => <DashboardOverviewState regional />,
+  parameters: {
+    mockScenario: {
+      routePath: "/admin",
+      scenarioId: "admin.dashboard.default",
+    },
+  },
+};
+
+export const DashboardLoading: Story = {
+  render: () => <DashboardOverviewState state="loading" />,
+};
+
+export const DashboardError: Story = {
+  render: () => <DashboardOverviewState state="error" />,
+};
+
+export const DashboardUnauthorized: Story = {
+  render: () => <DashboardOverviewState state="unauthorized" />,
+};
+
+export const DashboardForbidden: Story = {
+  render: () => <DashboardOverviewState state="forbidden" />,
 };
 
 export const CompanyBilling: Story = {

@@ -201,7 +201,7 @@ async function assertSupabaseAccountCompanyAccess(input: {
     .maybeSingle();
 
   if (error || !data) {
-    throw new Error("협력사 접근 권한이 없습니다.");
+    throw new Error("파트너사 접근 권한이 없습니다.");
   }
 }
 
@@ -391,7 +391,7 @@ export async function setDefaultPartnerBillingProfile(input: {
   const profile = await getAccessibleProfile(input);
   if (profile.accountId !== input.accountId) {
     throw new Error(
-      "기존 협력사 정보는 기본값으로 지정할 수 없습니다. 새 프로필로 저장해 주세요.",
+      "기존 파트너사 정보는 기본값으로 지정할 수 없습니다. 새 프로필로 저장해 주세요.",
     );
   }
 
@@ -432,7 +432,7 @@ export async function archivePartnerBillingProfile(input: {
 }) {
   const profile = await getAccessibleProfile(input);
   if (profile.accountId !== input.accountId) {
-    throw new Error("기존 협력사 정보는 삭제할 수 없습니다.");
+    throw new Error("기존 파트너사 정보는 삭제할 수 없습니다.");
   }
   const archivedAt = nowIso();
 

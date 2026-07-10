@@ -49,7 +49,7 @@ export async function cancelSupabaseRequest(input: PartnerChangeRequestCancelInp
   if (currentPartnerError) {
     throw wrapPartnerChangeRequestDbError(
       currentPartnerError,
-      "현재 브랜드 정보를 불러오지 못했습니다.",
+      "현재 제휴처 정보를 불러오지 못했습니다.",
     );
   }
 

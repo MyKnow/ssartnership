@@ -32,7 +32,7 @@ const baseLogs: NormalizedLog[] = [
     id: "audit-1",
     group: "audit",
     name: "partner_update",
-    label: "브랜드 수정",
+    label: "제휴처 수정",
     status: null,
     actorType: "admin",
     actorId: "admin-1",
@@ -196,7 +196,7 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.type(
-      canvas.getByPlaceholderText("유저명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"),
+      canvas.getByPlaceholderText("회원명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"),
       "ops15",
     );
     await expect(canvas.getByText("회원 로그인")).toBeInTheDocument();

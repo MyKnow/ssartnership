@@ -227,7 +227,7 @@ function createStoredNotificationEntry(
     title: notification.title,
     body: notification.body,
     companyId: notification.company_id,
-    companyName: company?.name ?? "협력사",
+    companyName: company?.name ?? "파트너사",
     partnerId: null,
     partnerName: null,
     href: getPartnerScopedHrefFromLegacyTarget(
@@ -501,7 +501,7 @@ async function loadSupabasePartnerNotificationCenter(
       });
     }),
     ...accountAuditResult.rows.map((row) => {
-      const companyName = companies[0]?.name ?? "협력사 계정";
+      const companyName = companies[0]?.name ?? "파트너사 계정";
       return createOperationEntry({
         id: row.id,
         action: row.action,
@@ -637,10 +637,10 @@ async function loadMockPartnerNotificationCenter(
       status: "updated",
       tone: "primary",
       badgeLabel: "계정",
-      title: "협력사 계정 정보가 수정되었습니다",
+      title: "파트너사 계정 정보가 수정되었습니다",
       body: "Mock 환경에서는 계정 관련 운영 알림이 제한적으로 표시됩니다.",
       companyId: null,
-      companyName: "협력사 계정",
+      companyName: "파트너사 계정",
       partnerId: null,
       partnerName: null,
       href: "/partner",

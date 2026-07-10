@@ -359,27 +359,25 @@ export default function NotificationInbox({
             return (
               <div
                 key={item.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`${item.title} 알림 열기`}
                 className={cn(
-                  "group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3.5 outline-none transition-colors hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 sm:px-5 sm:py-4",
+                  "group relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3.5 sm:px-5 sm:py-4",
                   item.isUnread
                     ? "bg-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
-                    : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)] opacity-[0.74]",
+                    : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)]",
                   isBusy ? "pointer-events-none opacity-70" : null,
                 )}
-                onClick={() => {
-                  void markAsReadAndOpen(item);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    void markAsReadAndOpen(item);
-                  }
-                }}
               >
-                <div className="mt-1 shrink-0 pt-1">
+                <button
+                  type="button"
+                  aria-label={`${item.title} 알림 열기`}
+                  disabled={isBusy}
+                  className="absolute inset-0 z-0 cursor-pointer outline-none transition-colors hover:bg-surface-muted/70 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                  onClick={() => {
+                    void markAsReadAndOpen(item);
+                  }}
+                />
+
+                <div className="pointer-events-none relative z-10 mt-1 shrink-0 pt-1">
                   <span
                     aria-hidden="true"
                     className={cn(
@@ -389,7 +387,7 @@ export default function NotificationInbox({
                   />
                 </div>
 
-                <div className="min-w-0 space-y-2">
+                <div className="pointer-events-none relative z-10 min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant={item.isUnread ? "primary" : "neutral"}
@@ -397,7 +395,7 @@ export default function NotificationInbox({
                         "px-2 py-0.5 text-[10px]",
                         item.isUnread
                           ? "border-primary/20 bg-primary-soft text-primary"
-                          : "border-border/40 bg-surface-muted/55 text-muted-foreground/75",
+                          : "border-border/70 bg-surface-muted text-muted-foreground",
                       )}
                     >
                       {getNotificationTypeLabel(item.type)}
@@ -405,7 +403,7 @@ export default function NotificationInbox({
                     <span
                       className={cn(
                         "text-xs text-muted-foreground",
-                        item.isUnread ? "text-foreground-soft" : "text-muted-foreground/65",
+                        item.isUnread ? "text-foreground-soft" : "text-muted-foreground",
                       )}
                     >
                       {formatNotificationDate(item.createdAt)}
@@ -415,7 +413,7 @@ export default function NotificationInbox({
                     <h3
                       className={cn(
                         "text-sm font-semibold leading-6 text-foreground sm:text-[15px]",
-                        item.isUnread ? "text-foreground" : "text-foreground-soft/75",
+                        item.isUnread ? "text-foreground" : "text-muted-foreground",
                       )}
                     >
                       {item.title}
@@ -423,7 +421,7 @@ export default function NotificationInbox({
                     <p
                       className={cn(
                         "line-clamp-2 text-sm leading-5 text-muted-foreground sm:leading-6",
-                        item.isUnread ? "text-muted-foreground" : "text-muted-foreground/60",
+                        "text-muted-foreground",
                       )}
                     >
                       {item.body}
@@ -431,7 +429,7 @@ export default function NotificationInbox({
                   </div>
                 </div>
 
-                <IconActionGroup className="self-center">
+                <IconActionGroup className="relative z-20 self-center">
                   {item.isUnread ? (
                     <IconActionButton
                       tone="success"

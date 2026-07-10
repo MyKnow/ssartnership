@@ -642,7 +642,7 @@ export default function PartnerNotificationCenter({
           <div className="space-y-1">
             <p className="ui-kicker">검색과 필터</p>
             <p className="ui-body">
-              목적, 유형, 상태, 협력사, 기간을 조합해 필요한 알림만 좁혀 봅니다.
+              목적, 유형, 상태, 파트너사, 기간을 조합해 필요한 알림만 좁혀 봅니다.
             </p>
           </div>
 
@@ -652,7 +652,7 @@ export default function PartnerNotificationCenter({
               type="search"
               value={filters.searchQuery}
               onChange={(event) => updateFilter("searchQuery", event.target.value)}
-              placeholder="브랜드, 상태, 알림 내용 검색"
+              placeholder="제휴처, 상태, 알림 내용 검색"
             />
           </label>
 
@@ -686,11 +686,11 @@ export default function PartnerNotificationCenter({
             </SelectField>
 
             <SelectField
-              label="협력사"
+              label="파트너사"
               value={filters.companyId}
               onChange={(value) => updateFilter("companyId", value)}
             >
-              <option value="all">전체 협력사</option>
+              <option value="all">전체 파트너사</option>
               {companyOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -770,8 +770,8 @@ export default function PartnerNotificationCenter({
           </div>
 
           <div className="flex flex-wrap gap-2" role="status" aria-live="polite">
-            <Badge variant="primary">{data.summary.companyCount}개 협력사</Badge>
-            <Badge variant="neutral">{data.summary.serviceCount}개 브랜드</Badge>
+            <Badge variant="primary">{data.summary.companyCount}개 파트너사</Badge>
+            <Badge variant="neutral">{data.summary.serviceCount}개 제휴처</Badge>
             <Badge variant="neutral">
               필터 {activeFilterCount}개 · {visibleItems.length}건 표시
             </Badge>

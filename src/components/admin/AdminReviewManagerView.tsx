@@ -1,6 +1,6 @@
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
-import SectionHeading from "@/components/ui/SectionHeading";
+import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import Card from "@/components/ui/Card";
 import type { AdminReviewPageData } from "@/lib/admin-reviews";
@@ -44,15 +44,15 @@ export default function AdminReviewManagerView({
       <div className="grid gap-6 2xl:grid-cols-[minmax(300px,0.72fr)_minmax(0,1.9fr)] 2xl:items-start">
         <div className="grid gap-6 2xl:sticky 2xl:top-24">
           <div className="grid gap-4">
-            <SectionHeading
+            <AdminSectionHeading
               title="리뷰 필터"
-              description="협력사, 브랜드, 작성자, 별점, 상태를 기준으로 검수 대상을 좁힙니다."
+              description="파트너사, 제휴처, 작성자, 별점, 상태를 기준으로 검수 대상을 좁힙니다."
             />
             <AdminReviewFilters filters={filters} companies={companies} partners={partners} />
           </div>
 
           <Card tone="elevated" padding="md" className="grid gap-3">
-            <SectionHeading
+            <AdminSectionHeading
               title="검수 기준"
               description="상태 변경은 현재 필터 결과를 벗어나게 만들 수 있습니다."
             />

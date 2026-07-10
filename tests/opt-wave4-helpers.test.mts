@@ -49,7 +49,7 @@ test("partner card helpers derive accent styles and CTA presentation", async () 
   const accent = createCategoryAccentStyles("#3366ff");
   assert.deepStrictEqual(accent.badgeStyle, {
     backgroundColor: "#3366ff1f",
-    color: "#3366ff",
+    color: "var(--foreground)",
   });
 
   const activePresentation = createPartnerCardPresentation(
@@ -80,6 +80,30 @@ test("partner card helpers derive accent styles and CTA presentation", async () 
   assert.equal(activePresentation.reservationAction?.label, "혜택 이용");
   assert.equal(activePresentation.inquiryAction?.label, "문의하기");
   assert.equal(activePresentation.detailHref, "/partners/partner-1");
+
+  const returnAwarePresentation = createPartnerCardPresentation(
+    {
+      id: "partner-1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      name: "레코디드",
+      location: "역삼",
+      category: "food",
+      visibility: "public",
+      period: { start: "2026-01-01", end: "2099-12-31" },
+      thumbnail: null,
+      images: [],
+      conditions: [],
+      benefits: [],
+      appliesTo: ["student"],
+      tags: [],
+    },
+    false,
+    "/?category=food#benefits",
+  );
+  assert.equal(
+    returnAwarePresentation.detailHref,
+    "/partners/partner-1?returnTo=%2F%3Fcategory%3Dfood%23benefits",
+  );
 
   const inactivePresentation = createPartnerCardPresentation(
     {

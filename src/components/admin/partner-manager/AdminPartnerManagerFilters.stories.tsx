@@ -27,6 +27,7 @@ function AdminPartnerManagerFiltersStory() {
       setSortValue={setSortValue}
       visibilityFilter={visibilityFilter}
       setVisibilityFilter={setVisibilityFilter}
+      canCreate
     />
   );
 }

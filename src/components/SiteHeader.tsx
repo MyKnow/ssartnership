@@ -50,25 +50,43 @@ export default function SiteHeader({
             hidden ? "-translate-y-full" : "translate-y-0",
           )}
         >
-          <Container className="flex items-center justify-between gap-3 py-4" size="wide">
+          <Container className="flex min-w-0 items-center justify-between gap-3 py-3" size="wide">
             <Link
               href="/"
               aria-label={SITE_NAME}
-              className="inline-flex min-h-11 items-center text-foreground transition-opacity hover:opacity-80"
+              className="inline-flex min-h-11 shrink-0 items-center text-foreground transition-opacity hover:opacity-80"
             >
               <BrandWordmark className="text-lg sm:text-xl" />
             </Link>
+            <nav
+              aria-label="주요 메뉴"
+              className="hidden min-w-0 flex-1 items-center justify-center gap-1 md:flex"
+            >
+              {[
+                { href: "/#events", label: "이벤트" },
+                { href: "/#benefits", label: "혜택 찾기" },
+                { href: "/campuses/seoul", label: "캠퍼스" },
+              ].map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-muted-foreground transition-interactive hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
             <div className="flex items-center gap-2">
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className="hidden items-center gap-2 xl:flex">
                 <Button variant="soft" href={suggestHref}>
                   제휴 제안하기
                 </Button>
               </div>
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className="hidden items-center gap-2 xl:flex">
                 <UserMenu initialSession={initialSession} logoutIconOnly />
               </div>
               {initialSession ? (
-                <div className="relative hidden items-center sm:flex">
+                <div className="relative hidden items-center xl:flex">
                   <Button
                     variant="secondary"
                     size="icon"
@@ -92,11 +110,11 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div className="hidden sm:flex">
+              <div className="hidden md:flex">
                 <ThemeToggle />
               </div>
               {initialSession ? (
-                <div className="sm:hidden">
+                <div className="xl:hidden">
                   <Button
                     variant="secondary"
                     size="icon"
@@ -120,9 +138,6 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div className="sm:hidden">
-                <ThemeToggle />
-              </div>
               <MobileNav initialSession={initialSession} />
             </div>
           </Container>

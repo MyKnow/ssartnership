@@ -18,7 +18,7 @@ export default async function HomeContent({
   });
 
   return (
-    <section id="partner-explore" className="scroll-mt-24">
+    <div className="min-w-0">
       <HomeView
         categories={directory.categories}
         partners={directory.partners}
@@ -28,6 +28,6 @@ export default async function HomeContent({
         partnerFavoriteStateById={directory.partnerState.partnerFavoriteStateById}
         loadedPartnerStateIds={directory.partnerState.loadedPartnerIds}
       />
-    </section>
+    </div>
   );
 }

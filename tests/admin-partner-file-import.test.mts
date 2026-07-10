@@ -18,7 +18,7 @@ const categories = [
 ];
 
 const companies = [
-  { id: "company-1", name: "샘플 협력사" },
+  { id: "company-1", name: "샘플 파트너사" },
 ];
 
 async function loadTemplate(options: {
@@ -97,8 +97,8 @@ test("admin partner xlsx template branches headers and writes metadata", async (
     input.getRow(categoryRow).getCell(3).dataValidation?.showErrorMessage,
     true,
   );
-  assert.ok(offlineHeaders.includes("브랜드 전화번호"));
-  const nameRow = offlineHeaders.indexOf("브랜드명") + 2;
+  assert.ok(offlineHeaders.includes("제휴처 전화번호"));
+  const nameRow = offlineHeaders.indexOf("제휴처명") + 2;
   assert.equal(input.getRow(nameRow).getCell(3).dataValidation?.type, "custom");
   assert.match(
     String(input.getRow(nameRow).getCell(3).dataValidation?.formulae?.[0] ?? ""),
@@ -155,14 +155,14 @@ test("admin partner xlsx draft parser accepts one Korean row and normalizes valu
     benefitActionType: "external_link",
   });
   setInputValues(workbook, {
-    브랜드명: "카페 싸피 역삼본점",
+    제휴처명: "카페 싸피 역삼본점",
     카테고리: "카페",
     시작일: "2026-05-01",
     종료일: "2026-12-31",
-    협력사명: "샘플 협력사",
+    파트너사명: "샘플 파트너사",
     담당자명: "담당자",
     "담당자 이메일": "partner@example.com",
-    "브랜드 전화번호": "02-3429-5100",
+    "제휴처 전화번호": "02-3429-5100",
     위치: "서울 강남구",
     "지도 URL": "https://map.example.com",
     "혜택 이용 링크": "https://benefit.example.com",
@@ -199,6 +199,48 @@ test("admin partner xlsx draft parser accepts one Korean row and normalizes valu
   assert.equal(result.draft.partner.benefitActionLink, "https://benefit.example.com/");
 });
 
+test("admin partner xlsx draft parser accepts legacy brand and company headers", async () => {
+  const { parseAdminPartnerXlsxDraft } = await serverModulePromise;
+  const workbook = await loadTemplate({
+    serviceMode: "offline",
+    benefitActionType: "onsite",
+  });
+  const input = workbook.getWorksheet("입력");
+  assert.ok(input);
+  const legacyAliases: Record<string, string> = {
+    제휴처명: "브랜드명",
+    "제휴처 전화번호": "브랜드 전화번호",
+    파트너사명: "협력사명",
+    "파트너사 설명": "협력사 설명",
+  };
+  for (let rowNumber = 2; rowNumber <= input.rowCount; rowNumber += 1) {
+    const cell = input.getRow(rowNumber).getCell(1);
+    const label = String(cell.value ?? "");
+    if (legacyAliases[label]) {
+      cell.value = legacyAliases[label];
+    }
+  }
+  setInputValues(workbook, {
+    브랜드명: "기존 양식 제휴처",
+    카테고리: "카페",
+    협력사명: "샘플 파트너사",
+    위치: "서울 강남구",
+    "브랜드 전화번호": "02-3429-5100",
+  });
+
+  const result = await parseAdminPartnerXlsxDraft({
+    fileBuffer: await toBuffer(workbook),
+    categories,
+    companies,
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.draft.partner.name, "기존 양식 제휴처");
+    assert.equal(result.draft.partner.company?.id, "company-1");
+  }
+});
+
 test("admin partner xlsx draft parser rejects empty and invalid rows", async () => {
   const { parseAdminPartnerXlsxDraft } = await serverModulePromise;
   const emptyWorkbook = await loadTemplate({
@@ -219,7 +261,7 @@ test("admin partner xlsx draft parser rejects empty and invalid rows", async () 
     benefitActionType: "none",
   });
   setInputValues(invalidWorkbook, {
-    브랜드명: "온라인 브랜드",
+    제휴처명: "온라인 제휴처",
     카테고리: "없는 카테고리",
     시작일: "2026-12-31",
     종료일: "2026-05-01",
@@ -244,7 +286,7 @@ test("admin partner xlsx draft parser preserves a new category label", async () 
     benefitActionType: "none",
   });
   setInputValues(workbook, {
-    브랜드명: "카페 싸피 멤버십몰",
+    제휴처명: "카페 싸피 멤버십몰",
     카테고리: "멤버십 커머스",
     "사이트 링크": "https://shop.cafessafy.example.com",
   });
@@ -270,7 +312,7 @@ test("admin partner xlsx draft parser rejects values outside the template range"
     benefitActionType: "none",
   });
   setInputValues(workbook, {
-    브랜드명: "온라인 브랜드",
+    제휴처명: "온라인 제휴처",
     카테고리: "문화",
     "사이트 링크": "https://service.example.com",
   });
@@ -302,14 +344,14 @@ test("admin partner xlsx draft converts to form data compatible with partner par
     benefitActionType: "certification",
   });
   setInputValues(workbook, {
-    브랜드명: "온라인 브랜드",
+    제휴처명: "온라인 제휴처",
     카테고리: "culture",
     "사이트 링크": "https://service.example.com",
-    협력사명: "신규 협력사",
+    파트너사명: "신규 파트너사",
     담당자명: "담당자",
     "담당자 이메일": "new@example.com",
     "담당자 전화번호": "010-1111-2222",
-    "협력사 설명": "설명",
+    "파트너사 설명": "설명",
     혜택: "로그인 후 조회 가능",
     태그: "온라인",
   });
@@ -342,6 +384,6 @@ test("admin partner xlsx draft converts to form data compatible with partner par
   assert.equal(payload.benefitActionLink, null);
   assert.deepStrictEqual(payload.campusSlugs, ["seoul", "daejeon"]);
   assert.deepStrictEqual(payload.appliesTo, ["staff", "student"]);
-  assert.equal(companyPayload.name, "신규 협력사");
+  assert.equal(companyPayload.name, "신규 파트너사");
   assert.equal(companyPayload.contactEmail, "new@example.com");
 });

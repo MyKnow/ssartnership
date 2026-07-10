@@ -19,8 +19,8 @@ function formatPeriod(
 }
 
 export function summarizeRequestChanges(summary: PartnerChangeRequestSummary) {
-  return buildAuditChangeSummary("브랜드", [
-    { label: "브랜드명", before: summary.currentPartnerName, after: summary.requestedPartnerName },
+  return buildAuditChangeSummary("제휴처", [
+    { label: "제휴처명", before: summary.currentPartnerName, after: summary.requestedPartnerName },
     { label: "위치", before: summary.currentPartnerLocation, after: summary.requestedPartnerLocation },
     { label: "지도 URL", before: summary.currentMapUrl, after: summary.requestedMapUrl },
     { label: "이용조건", before: summary.currentConditions, after: summary.requestedConditions },
@@ -65,16 +65,16 @@ export function createRequestEntry(summary: PartnerChangeRequestSummary): Partne
     cancelled: "neutral",
   };
   const bodyByStatus: Record<PartnerChangeRequestStatus, string> = {
-    pending: `${requesterLabel}이(가) ${summary.companyName}에 브랜드 수정 요청을 보냈습니다.${
+    pending: `${requesterLabel}이(가) ${summary.companyName}에 제휴처 수정 요청을 보냈습니다.${
       changePreview ? ` ${changePreview}` : ""
     }`,
-    approved: `${summary.companyName}의 브랜드 수정 요청이 승인되었습니다.${
+    approved: `${summary.companyName}의 제휴처 수정 요청이 승인되었습니다.${
       changePreview ? ` ${changePreview}` : ""
     }`,
-    rejected: `${summary.companyName}의 브랜드 수정 요청이 반려되었습니다.${
+    rejected: `${summary.companyName}의 제휴처 수정 요청이 반려되었습니다.${
       changePreview ? ` ${changePreview}` : ""
     }`,
-    cancelled: `${summary.companyName}의 브랜드 수정 요청이 취소되었습니다.${
+    cancelled: `${summary.companyName}의 제휴처 수정 요청이 취소되었습니다.${
       changePreview ? ` ${changePreview}` : ""
     }`,
   };

@@ -46,7 +46,7 @@ export const SignedInCancelLogout: Story = {
     window.fetch = async () => Response.json({ ok: true });
 
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("link", { name: "내 프로필 조회" })).toHaveAttribute("href", "/certification");
+    await expect(canvas.getByRole("link", { name: "내 인증" })).toHaveAttribute("href", "/certification");
     await userEvent.click(canvas.getByRole("button", { name: "로그아웃" }));
     await expect(canvas.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
 

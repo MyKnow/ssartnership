@@ -11,14 +11,6 @@ function normalizeHexColor(value?: string | null) {
   return color;
 }
 
-function getReadableTextColor(color: string) {
-  const red = Number.parseInt(color.slice(1, 3), 16);
-  const green = Number.parseInt(color.slice(3, 5), 16);
-  const blue = Number.parseInt(color.slice(5, 7), 16);
-  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
-  return luminance >= 160 ? "#111827" : color;
-}
-
 export default function CategoryColorBadge({
   label,
   color,
@@ -40,7 +32,7 @@ export default function CategoryColorBadge({
       style={{
         backgroundColor: `${normalizedColor}18`,
         borderColor: `${normalizedColor}55`,
-        color: getReadableTextColor(normalizedColor),
+        color: "var(--foreground)",
       }}
     >
       {label}

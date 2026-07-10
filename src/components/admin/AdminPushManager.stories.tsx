@@ -241,7 +241,7 @@ export const Default: Story = {
     await userEvent.type(canvas.getByPlaceholderText("제목, 내용, URL, 대상 검색"), "분식랩");
     await expect(canvas.getByText("오늘 제휴 안내")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "불러오기" }));
-    await expect(canvas.getByText("통합 알림 운영")).toBeInTheDocument();
+    await expect(canvas.getByText("통합 발송 관리")).toBeInTheDocument();
     await expect(canvas.getByDisplayValue("오늘 제휴 안내")).toBeInTheDocument();
   },
 };
@@ -257,7 +257,7 @@ export const SendAnnouncement: Story = {
     const canvas = within(canvasElement);
     const fetchMock = installPushFetchMock();
 
-    await userEvent.click(canvas.getByRole("button", { name: /알림 전송/ }));
+    await userEvent.click(canvas.getByRole("tab", { name: /알림 전송/ }));
     await userEvent.click(canvas.getByRole("button", { name: "3. 대상자 검색" }));
     await expect(await canvas.findByText("발송 가능 대상")).toBeInTheDocument();
     await userEvent.type(canvas.getByPlaceholderText("알림 제목"), "신규 제휴 안내");
@@ -283,7 +283,7 @@ export const PreviewFailure: Story = {
     const canvas = within(canvasElement);
     const fetchMock = installPreviewFailureFetchMock("대상자 미리보기를 다시 시도해 주세요.");
 
-    await userEvent.click(canvas.getByRole("button", { name: /알림 전송/ }));
+    await userEvent.click(canvas.getByRole("tab", { name: /알림 전송/ }));
     await userEvent.click(canvas.getByRole("button", { name: "3. 대상자 검색" }));
 
     await expect(

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import AdminTimeseriesChart from "@/components/admin/AdminTimeseriesChart";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
-import Tabs from "@/components/ui/Tabs";
+import AdminTabs from "@/components/admin/AdminTabs";
 import { cn } from "@/lib/cn";
 
 type MemberTrendGranularity = "daily" | "weekly" | "monthly" | "yearly";
@@ -259,7 +259,7 @@ export default function AdminMemberTrendChart({
             description="현재 필터 기준 회원 생성 이력을 일·주·월·연 단위로 확인합니다."
           />
           <div className="xl:hidden">
-            <Tabs
+            <AdminTabs
               value={granularity}
               onChange={(value) => {
                 setGranularity(value);

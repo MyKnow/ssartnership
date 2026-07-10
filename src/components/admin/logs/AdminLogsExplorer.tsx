@@ -109,7 +109,7 @@ export function AdminLogsExplorer({
 
     return (
       <span className="max-w-full text-token">
-        브랜드:{' '}
+        제휴처:{' '}
         <Link
           href={`/admin/partners/${log.partnerId}`}
           target="_blank"
@@ -145,7 +145,7 @@ export function AdminLogsExplorer({
               <Input
                 value={searchValue}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="유저명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"
+                placeholder="회원명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"
               />
             </label>
             <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -206,7 +206,7 @@ export function AdminLogsExplorer({
               >
                 <option value="newest">최신순</option>
                 <option value="oldest">오래된순</option>
-                <option value="actor">유저명/MM 아이디순</option>
+                <option value="actor">회원명/MM 아이디순</option>
                 <option value="ip">IP순</option>
               </Select>
             </label>
@@ -256,6 +256,7 @@ export function AdminLogsExplorer({
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 whitespace-nowrap">
                 <Input
                   type="number"
+                  aria-label="이동할 로그 페이지"
                   min={1}
                   max={totalPages}
                   value={pageInputValue}
@@ -292,7 +293,7 @@ export function AdminLogsExplorer({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeading
               title="로그 탐색기"
-              description="유저명, MM 아이디, IP, 경로, 속성까지 포함해 검색하고 정렬·필터링할 수 있습니다."
+              description="회원명, MM 아이디, IP, 경로, 속성까지 포함해 검색하고 정렬·필터링할 수 있습니다."
             />
             <Badge className="w-fit bg-surface text-muted-foreground">
               필터 결과 {filteredTotal.toLocaleString()}건 / 전체{' '}
@@ -449,7 +450,7 @@ export function AdminLogsExplorer({
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <span>브랜드</span>
+                        <span>제휴처</span>
                         <span className="max-w-full text-token text-right font-medium text-foreground">
                           {log.partnerId && log.partnerName ? (
                             <Link

@@ -2,19 +2,20 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
-import ShellHeader from "@/components/ui/ShellHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
 import CertificationProfileSync from "@/components/certification/CertificationProfileSync";
+import Button from "@/components/ui/Button";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 
 export const metadata: Metadata = {
-  title: `SSAFY 인증 | ${SITE_NAME}`,
+  title: `내 인증 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: true,
@@ -53,6 +54,10 @@ export default async function CertificationPage({
 }) {
   const initialTimestamp = new Date().toISOString();
   const params = (await searchParams) ?? {};
+  const benefitReturnTo = sanitizeReturnTo(
+    Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo,
+    "",
+  );
   const returnTo = buildCertificationReturnTo(params.returnTo);
   const session = await getSignedUserSession();
   if (!session?.userId) {
@@ -83,11 +88,17 @@ export default async function CertificationPage({
       <main>
         <Container className="pb-16 pt-10" size="wide">
           <div className="mx-auto max-w-4xl space-y-6">
-            <ShellHeader
-              eyebrow="Certification"
-              title="SSAFY 인증"
+            <PageHeader
+              eyebrow="Member"
+              title="내 인증"
               description="현재 계정의 인증 상태와 표시 정보를 확인합니다."
-              className="mx-auto max-w-2xl"
+              actions={
+                benefitReturnTo ? (
+                  <Button href={benefitReturnTo} variant="secondary">
+                    혜택 화면으로 돌아가기
+                  </Button>
+                ) : undefined
+              }
             />
             <CertificationView
               member={{
@@ -103,7 +114,9 @@ export default async function CertificationPage({
               cohortCardThemes={cohortCardThemes}
             />
           </div>
-          <CertificationFooterActions />
+          <div className="mx-auto mt-10 max-w-4xl border-t border-border/70 pt-8">
+            <CertificationFooterActions />
+          </div>
           <CertificationProfileSync />
         </Container>
       </main>

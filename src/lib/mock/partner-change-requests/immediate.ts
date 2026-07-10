@@ -11,7 +11,7 @@ export async function updateMockPartnerImmediateFields(
   if (!service || !input.companyIds.includes(service.companyId)) {
     throw new PartnerChangeRequestError(
       "forbidden",
-      "해당 브랜드의 즉시 반영 항목을 수정할 수 없습니다.",
+      "해당 제휴처의 즉시 반영 항목을 수정할 수 없습니다.",
     );
   }
 

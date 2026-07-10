@@ -263,9 +263,9 @@ export const InteractiveFiltersAndExport: Story = {
     await userEvent.selectOptions(canvas.getByLabelText("보안 상태"), "failure");
     await expect(canvas.getAllByText("login").length).toBeGreaterThan(0);
 
-    await userEvent.clear(canvas.getByPlaceholderText("유저명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"));
+    await userEvent.clear(canvas.getByPlaceholderText("회원명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"));
     await userEvent.type(
-      canvas.getByPlaceholderText("유저명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"),
+      canvas.getByPlaceholderText("회원명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"),
       "ssafy-fail",
     );
     await expect(await canvas.findByText(/@ssafy-fail/)).toBeInTheDocument();

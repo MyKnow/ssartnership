@@ -1,19 +1,28 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import PartnerSupportScreen from "@/components/partner/PartnerSupportScreen";
+import { getPartnerPortalDashboard } from "@/lib/partner-dashboard";
+import { getPartnerGlobalPortalHref } from "@/lib/partner-portal-paths";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
-import { SITE_NAME } from "@/lib/site";
+import { BUG_REPORT_EMAIL, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: `기술 지원 | ${SITE_NAME}`,
-  robots: {
-    index: false,
-    follow: false,
-  },
+  robots: { index: false, follow: false },
 };
 
-export default async function PartnerSupportPage() {
+export const dynamic = "force-dynamic";
+
+function readSearchParam(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function PartnerSupportPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ companyId?: string | string[] }>;
+}) {
   const session = await getPartnerSession();
   if (!session) {
     redirect("/partner/login");
@@ -22,9 +31,34 @@ export default async function PartnerSupportPage() {
     redirect("/partner/change-password");
   }
 
-  const companies = await getPartnerPortalCompanySummaries(session.companyIds);
-  if (companies.length === 1 && companies[0]) {
-    redirect(getCompanyScopedPortalHref(companies[0].id, "support"));
-  }
-  redirect("/partner");
+  const [companies, dashboard] = await Promise.all([
+    getPartnerPortalCompanySummaries(session.companyIds),
+    getPartnerPortalDashboard(session.companyIds),
+  ]);
+  const requestedCompanyId = readSearchParam(
+    (await searchParams)?.companyId,
+  )?.trim();
+  const contextCompany =
+    companies.find((company) => company.id === requestedCompanyId) ?? null;
+  const brandNames =
+    dashboard.companies
+      .flatMap((company) => company.services.map((service) => service.name))
+      .join(", ") || "미지정";
+  const companyNames = companies.map((company) => company.name).join(", ") || "미지정";
+  const supportPath = getPartnerGlobalPortalHref(
+    "support",
+    contextCompany?.id ?? null,
+  );
+
+  return (
+    <PartnerSupportScreen
+      to={BUG_REPORT_EMAIL}
+      siteName={SITE_NAME}
+      companyName={companyNames}
+      brandNames={brandNames}
+      displayName={session.displayName}
+      loginId={session.loginId}
+      currentUrl={supportPath}
+    />
+  );
 }

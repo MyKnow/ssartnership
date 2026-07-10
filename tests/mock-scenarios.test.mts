@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -10,9 +10,11 @@ const scenarioModulePromise = import(
   new URL("../src/lib/mock/scenarios/index.ts", import.meta.url).href
 ) as Promise<ScenarioModule>;
 
-const appDir = path.resolve(
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const appDir = path.join(repoRoot, "src/app");
+const screenSpecsDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../src/app",
+  "../docs/product/screen-specs",
 );
 
 function collectPageFiles(dir: string): string[] {
@@ -45,10 +47,7 @@ test("route inventory covers every App Router page route", async () => {
     .map(routePathFromPageFile)
     .sort((left, right) => left.localeCompare(right));
 
-  assert.deepStrictEqual(
-    pageRoutes.filter((routePath) => !inventoryRoutes.has(routePath)),
-    [],
-  );
+  assert.deepStrictEqual([...inventoryRoutes].sort(), pageRoutes);
 });
 
 test("every route has at least one stable scenario id", async () => {
@@ -64,6 +63,74 @@ test("every route has at least one stable scenario id", async () => {
     for (const scenarioId of route.requiredScenarioIds) {
       assert.ok(getMockScenario(scenarioId), `${scenarioId} is not registered`);
     }
+  }
+});
+
+test("route inventory classifies IA purpose and declares screen contracts", async () => {
+  const { getMockRouteInventory } = await scenarioModulePromise;
+  const inventory = getMockRouteInventory();
+  const knownRouteKinds = new Set([
+    "canonical",
+    "conditional",
+    "compat-redirect",
+    "mock-only",
+  ]);
+
+  for (const route of inventory) {
+    assert.ok(
+      knownRouteKinds.has(route.routeKind),
+      `${route.routePath} has unknown route kind ${route.routeKind}`,
+    );
+    assert.ok(route.primaryTask.trim().length > 0, `${route.routePath} has no primary task`);
+    assert.ok(
+      route.requiredStateKeys.length > 0,
+      `${route.routePath} has no required state keys`,
+    );
+
+    if (route.routeKind === "canonical") {
+      assert.ok(
+        route.screenContractId?.trim(),
+        `${route.routePath} canonical route has no screen contract`,
+      );
+    }
+    if (route.routeKind === "compat-redirect") {
+      assert.deepStrictEqual(route.requiredStateKeys, ["redirect"]);
+      assert.ok(route.dataSources.includes("redirect"));
+    }
+  }
+
+  assert.equal(
+    inventory.find((route) => route.routePath === "/")?.routeKind,
+    "canonical",
+  );
+  assert.equal(
+    inventory.find((route) => route.routePath === "/admin/members/mock")
+      ?.routeKind,
+    "mock-only",
+  );
+  assert.equal(
+    inventory.find((route) => route.routePath === "/admin/promotions")
+      ?.routeKind,
+    "compat-redirect",
+  );
+});
+
+test("every canonical route is backed by a decision-complete screen contract", async () => {
+  const { getMockRouteInventory } = await scenarioModulePromise;
+  const canonicalContracts = getMockRouteInventory()
+    .filter((route) => route.routeKind === "canonical")
+    .map((route) => route.screenContractId);
+  const screenSpecText = readdirSync(screenSpecsDir)
+    .filter((fileName) => fileName.endsWith(".md"))
+    .map((fileName) => readFileSync(path.join(screenSpecsDir, fileName), "utf8"))
+    .join("\n");
+
+  for (const contractId of canonicalContracts) {
+    assert.ok(contractId);
+    assert.ok(
+      screenSpecText.includes(`<!-- screen-contract: ${contractId} -->`),
+      `${contractId} is missing from docs/product/screen-specs`,
+    );
   }
 });
 
@@ -148,7 +215,7 @@ test("partner portal scenario adapters build fresh view props", async () => {
   assert.equal(dashboard.dashboard.companies[0]?.services[0]?.metrics.detailUv, 0);
   assert.equal(dashboard.dashboard.companies[0]?.services[1]?.metrics.detailUv, 338);
 
-  assert.equal(emptyDashboard.selectedCompany.name, "브랜드 미연결 협력사");
+  assert.equal(emptyDashboard.selectedCompany.name, "제휴처 미연결 파트너사");
   assert.equal(emptyDashboard.dashboard.companies[0]?.services.length, 0);
   emptyDashboard.dashboard.companies[0]?.services.push(
     dashboard.dashboard.companies[0]!.services[0]!,
@@ -169,17 +236,25 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
   const matrix = buildMockCoverageMatrix();
   const summary = summarizeMockCoverageMatrix(matrix);
 
-  assert.equal(summary.totalRoutes, 62);
+  assert.equal(summary.totalRoutes, collectPageFiles(appDir).length);
   assert.equal(summary.scenarioCount, 46);
-  assert.equal(summary.storybookStoryCount, 27);
-  assert.equal(summary.storybookCompleteRoutes, 23);
-  assert.equal(summary.storybookPartialRoutes, 0);
-  assert.equal(summary.storybookMissingRoutes, 6);
-  assert.equal(summary.routeInventoryOnlyRoutes, 33);
+  assert.equal(summary.storybookStoryCount, 98);
+  assert.equal(summary.storybookCompleteRoutes, 6);
+  assert.equal(summary.storybookPartialRoutes, 30);
+  assert.equal(summary.storybookReferenceOnlyRoutes, 2);
+  assert.equal(summary.storybookMissingRoutes, 0);
+  assert.equal(
+    summary.storybookCompleteRoutes +
+      summary.storybookPartialRoutes +
+      summary.storybookReferenceOnlyRoutes +
+      summary.storybookMissingRoutes +
+      summary.routeInventoryOnlyRoutes,
+    summary.totalRoutes,
+  );
 
   const partnerSelection = matrix.find((row) => row.routePath === "/partner");
   assert.ok(partnerSelection);
-  assert.equal(partnerSelection.coverageLevel, "storybook-complete");
+  assert.equal(partnerSelection.coverageLevel, "storybook-partial");
   assert.deepStrictEqual(partnerSelection.missingStorybookScenarioIds, []);
   assert.deepStrictEqual(
     partnerSelection.storybookStories.map((story) => story.storyId),
@@ -200,42 +275,61 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
     [
       "domains-partner-pagestates-core--registration-web-input",
       "domains-partner-pagestates-core--registration-excel-upload",
+      "domains-partnerregistration-actualview--web-input",
+      "domains-partnerregistration-actualview--excel-disclosure",
+      "domains-partnerregistration-actualview--validation-error",
+      "domains-partnerregistration-actualview--image-gallery",
+      "domains-partnerregistration-actualview--long-korean-content",
+      "domains-partnerregistration-actualview--broken-image",
+      "domains-partnerregistration-actualview--action-success",
+      "domains-partnerregistration-actualview--action-error",
+      "domains-partnerregistration-actualview--async-pending",
     ],
   );
+
+  const completePartnerDashboard = matrix.find(
+    (row) => row.routePath === "/partner/companies/[companyId]",
+  );
+  assert.ok(completePartnerDashboard);
+  assert.equal(completePartnerDashboard.coverageLevel, "storybook-complete");
+  assert.deepStrictEqual(completePartnerDashboard.missingActualViewStateKeys, []);
 
   const adminCompanyBilling = matrix.find(
     (row) => row.routePath === "/admin/companies",
   );
   assert.ok(adminCompanyBilling);
-  assert.equal(adminCompanyBilling.coverageLevel, "storybook-complete");
+  assert.equal(adminCompanyBilling.coverageLevel, "storybook-partial");
   assert.deepStrictEqual(adminCompanyBilling.missingStorybookScenarioIds, []);
   assert.deepStrictEqual(
     adminCompanyBilling.storybookStories.map((story) => story.storyId),
-    ["domains-admin-pagestates--company-billing"],
+    ["domains-admin-admincompaniesview--default"],
   );
 
   const adminNotificationInbox = matrix.find(
     (row) => row.routePath === "/admin/notifications",
   );
   assert.ok(adminNotificationInbox);
-  assert.equal(adminNotificationInbox.coverageLevel, "storybook-complete");
+  assert.equal(adminNotificationInbox.coverageLevel, "storybook-partial");
   assert.deepStrictEqual(
     adminNotificationInbox.storybookStories.map((story) => story.storyId),
-    ["domains-admin-pagestates--notifications-inbox"],
+    ["domains-admin-adminnotificationsview--default"],
   );
 
   const partnerNotifications = matrix.find(
-    (row) => row.routePath === "/partner/companies/[companyId]/notifications",
+    (row) => row.routePath === "/partner/notifications",
   );
   assert.ok(partnerNotifications);
-  assert.equal(partnerNotifications.coverageLevel, "storybook-complete");
+  assert.equal(
+    partnerNotifications.coverageLevel,
+    "storybook-partial",
+  );
   assert.deepStrictEqual(partnerNotifications.missingStorybookScenarioIds, []);
 
   const partnerSetup = matrix.find(
     (row) => row.routePath === "/partner/setup/[token]",
   );
   assert.ok(partnerSetup);
-  assert.equal(partnerSetup.coverageLevel, "storybook-complete");
+  assert.equal(partnerSetup.coverageLevel, "storybook-reference-only");
 
   for (const story of listMockStorybookScenarioCoverage()) {
     const row = matrix.find((item) => item.routePath === story.routePath);
@@ -244,7 +338,167 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
       row.requiredScenarioIds.includes(story.scenarioId),
       `${story.storyId} references an unrelated scenario`,
     );
+    assert.ok(story.coveredStateKeys.length > 0);
+    assert.ok(
+      ["actual-view", "component-fragment", "state-model"].includes(
+        story.renderKind,
+      ),
+    );
     assert.deepStrictEqual(story.viewportKeys, [
+      "mobile-360",
+      "tablet-820",
+      "desktop-1366",
+    ]);
+
+    const storySource = readFileSync(path.join(repoRoot, story.storyFile), "utf8");
+    if (story.renderKind === "actual-view") {
+      assert.ok(
+        story.actualViewComponent,
+        `${story.storyId} has no actual view component`,
+      );
+      const escapedViewComponent = story.actualViewComponent.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
+      assert.match(
+        storySource,
+        new RegExp(
+          `(?:component:\\s*|<|function\\s+)${escapedViewComponent}\\b`,
+        ),
+        `${story.storyId} is marked actual-view but does not render ${story.actualViewComponent}`,
+      );
+    }
+  }
+
+  for (const row of matrix) {
+    assert.deepStrictEqual(
+      row.stateStoryTrace.map((trace) => trace.stateKey),
+      row.requiredStateKeys,
+      `${row.routePath} state trace is incomplete`,
+    );
+    if (row.coverageLevel === "storybook-complete") {
+      assert.equal(
+        row.stateStoryTrace.every(
+          (trace) =>
+            trace.status === "actual-view" &&
+            trace.missingViewportKeys.length === 0,
+        ),
+        true,
+      );
+    }
+  }
+
+  const syntheticCompanyBilling = matrix.find(
+    (row) => row.routePath === "/admin/companies",
+  );
+  assert.ok(syntheticCompanyBilling);
+  assert.equal(
+    syntheticCompanyBilling.storybookStories[0]?.renderKind,
+    "actual-view",
+  );
+  assert.notEqual(
+    syntheticCompanyBilling.coverageLevel,
+    "storybook-complete",
+  );
+
+  const partnerDashboard = matrix.find(
+    (row) => row.routePath === "/partner/companies/[companyId]",
+  );
+  assert.ok(partnerDashboard);
+  assert.equal(partnerDashboard.storybookStories[0]?.renderKind, "actual-view");
+  assert.equal(
+    partnerDashboard.stateStoryTrace.find((trace) => trace.stateKey === "default")
+      ?.status,
+    "actual-view",
+  );
+});
+
+test("canonical partner screens expose default actual-view stories at every required viewport", async () => {
+  const { buildMockCoverageMatrix } = await scenarioModulePromise;
+  const matrix = buildMockCoverageMatrix();
+  const expectedActualViews = new Map([
+    ["/partner/account", "PartnerAccountScreen"],
+    ["/partner/companies/[companyId]/plans", "PartnerPlanScreen"],
+    [
+      "/partner/companies/[companyId]/services/[partnerId]",
+      "PartnerServiceDetailView",
+    ],
+    ["/partner/companies/[companyId]/services/new", "PartnerServiceNewScreen"],
+    ["/partner/login", "PartnerLoginScreen"],
+    ["/partner/notifications", "PartnerNotificationsScreen"],
+    ["/partner/reset", "PartnerResetScreen"],
+    ["/partner/support", "PartnerSupportScreen"],
+  ]);
+
+  for (const [routePath, actualViewComponent] of expectedActualViews) {
+    const route = matrix.find((row) => row.routePath === routePath);
+    assert.ok(route, `${routePath} must exist in the route coverage matrix`);
+    const defaultActualView = route.storybookStories.find(
+      (story) =>
+        story.renderKind === "actual-view" &&
+        story.actualViewComponent === actualViewComponent &&
+        story.coveredStateKeys.includes("default"),
+    );
+    assert.ok(
+      defaultActualView,
+      `${routePath} must expose a default actual-view story for ${actualViewComponent}`,
+    );
+    assert.deepStrictEqual(defaultActualView.viewportKeys, [
+      "mobile-360",
+      "tablet-820",
+      "desktop-1366",
+    ]);
+  }
+});
+
+test("canonical admin screens expose default actual-view stories at every required viewport", async () => {
+  const { buildMockCoverageMatrix } = await scenarioModulePromise;
+  const matrix = buildMockCoverageMatrix();
+  const expectedActualViews = new Map([
+    ["/admin", "AdminDashboardView"],
+    ["/admin/admins", "AdminAccountsView"],
+    ["/admin/advertisement", "AdminAdvertisementView"],
+    ["/admin/companies", "AdminCompaniesView"],
+    ["/admin/categories", "AdminCategoryManager"],
+    ["/admin/cycle", "AdminCycleView"],
+    ["/admin/event", "AdminEventListView"],
+    ["/admin/event/[slug]", "AdminEventDetailView"],
+    ["/admin/logs", "AdminLogsManager"],
+    ["/admin/members", "AdminMemberManager"],
+    ["/admin/members/[memberId]", "AdminMemberDetailView"],
+    ["/admin/notifications", "AdminNotificationsView"],
+    ["/admin/partner-registrations", "AdminPartnerRegistrationsView"],
+    ["/admin/partner-requests", "PartnerChangeRequestQueue"],
+    ["/admin/partners", "AdminPartnerManager"],
+    ["/admin/partners/[partnerId]", "PartnerCardForm"],
+    ["/admin/partners/new", "AdminPartnerNewView"],
+    ["/admin/push", "AdminPushManager"],
+    ["/admin/reviews", "AdminReviewManagerView"],
+  ]);
+  const canonicalAdminRoutes = matrix.filter(
+    (route) => route.surface === "admin" && route.routeKind === "canonical",
+  );
+
+  assert.equal(canonicalAdminRoutes.length, expectedActualViews.size);
+  assert.deepStrictEqual(
+    canonicalAdminRoutes.map((route) => route.routePath).sort(),
+    [...expectedActualViews.keys()].sort(),
+  );
+
+  for (const [routePath, actualViewComponent] of expectedActualViews) {
+    const route = matrix.find((row) => row.routePath === routePath);
+    assert.ok(route, `${routePath} must exist in the route coverage matrix`);
+    const defaultActualView = route.storybookStories.find(
+      (story) =>
+        story.renderKind === "actual-view" &&
+        story.actualViewComponent === actualViewComponent &&
+        story.coveredStateKeys.includes("default"),
+    );
+    assert.ok(
+      defaultActualView,
+      `${routePath} must expose a default actual-view story for ${actualViewComponent}`,
+    );
+    assert.deepStrictEqual(defaultActualView.viewportKeys, [
       "mobile-360",
       "tablet-820",
       "desktop-1366",
@@ -255,6 +509,7 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
 test("required state policy gives every route machine-readable QA states", async () => {
   const {
     buildMockCoverageMatrix,
+    getMockRouteInventory,
     listMockRequiredStateDefinitions,
     requiredCaptureViewportKeys,
   } = await scenarioModulePromise;
@@ -269,18 +524,28 @@ test("required state policy gives every route machine-readable QA states", async
     "mobile-390",
     "tablet-768",
     "tablet-820",
+    "tablet-1024",
     "desktop-1366",
     "desktop-1440",
     "desktop-1536",
   ]);
 
   for (const row of matrix) {
-    assert.ok(row.requiredStateKeys.includes("default"));
-    assert.ok(row.requiredStateKeys.includes("long-korean"));
-    assert.ok(row.requiredStateKeys.includes("mobile-overflow"));
+    if (row.routeKind === "compat-redirect") {
+      assert.deepStrictEqual(row.requiredStateKeys, ["redirect"]);
+    } else {
+      assert.ok(row.requiredStateKeys.includes("default"));
+      assert.ok(row.requiredStateKeys.includes("long-korean"));
+      assert.ok(row.requiredStateKeys.includes("mobile-overflow"));
+    }
     for (const key of row.requiredStateKeys) {
       assert.ok(knownStateKeys.has(key), `${row.routePath} has unknown state ${key}`);
     }
+    assert.deepStrictEqual(
+      row.requiredStateKeys,
+      getMockRouteInventory().find((route) => route.routePath === row.routePath)
+        ?.requiredStateKeys,
+    );
   }
 
   const partnerPlan = matrix.find(

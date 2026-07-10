@@ -387,7 +387,7 @@ export default function PartnerCardForm({
                     {
                       value: "single",
                       label: "단일 지점",
-                      description: "브랜드 위치를 그대로 적용합니다.",
+                      description: "제휴처의 지점 위치를 그대로 적용합니다.",
                     },
                     {
                       value: "multi",

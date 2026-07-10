@@ -71,7 +71,7 @@ export async function authenticateSupabasePartnerPortalLogin(
   if (companyIds.length === 0) {
     throw new PartnerPortalLoginError(
       "not_linked",
-      "해당 계정에 연결된 업체가 없습니다. 관리자에게 문의해 주세요.",
+      "해당 계정에 연결된 파트너사가 없습니다. 관리자에게 문의해 주세요.",
     );
   }
 

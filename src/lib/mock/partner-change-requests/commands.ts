@@ -25,7 +25,7 @@ export async function createMockPartnerChangeRequest(
   if (!service || !input.companyIds.includes(service.companyId)) {
     throw new PartnerChangeRequestError(
       "forbidden",
-      "해당 서비스의 변경 요청을 만들 수 없습니다.",
+      "해당 제휴처의 변경 요청을 만들 수 없습니다.",
     );
   }
 

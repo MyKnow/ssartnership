@@ -30,7 +30,7 @@ async function assertCanReviewPartnerChangeRequest(
     .maybeSingle();
 
   if (requestError || !request?.partner_id) {
-    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
   }
 
   const { data: partner, error: partnerError } = await supabase
@@ -40,7 +40,7 @@ async function assertCanReviewPartnerChangeRequest(
     .maybeSingle();
 
   if (partnerError || !partner) {
-    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
   }
 
   try {
@@ -49,17 +49,17 @@ async function assertCanReviewPartnerChangeRequest(
       (partner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs,
     );
   } catch {
-    redirectAdminActionError("/admin/partners", "regional_admin_scope_denied");
+    redirectAdminActionError("/admin/partner-requests", "regional_admin_scope_denied");
   }
 }
 
 export async function approvePartnerChangeRequestAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "update", {
-    path: "/admin/partners",
+    path: "/admin/partner-requests",
   });
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
-    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
   }
   await assertCanReviewPartnerChangeRequest(adminSession.account, requestId);
 
@@ -68,9 +68,9 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
     adminId: adminSession.adminId,
   });
 
-  const approvalAudit = buildAuditChangeSummary("브랜드", [
+  const approvalAudit = buildAuditChangeSummary("제휴처", [
     {
-      label: "브랜드명",
+      label: "제휴처명",
       before: request.currentPartnerName,
       after: request.requestedPartnerName,
     },
@@ -160,16 +160,16 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(request.partnerId);
   revalidatePartnerPortalPaths(request.partnerId);
-  redirect("/admin/partners");
+  redirect("/admin/partner-requests");
 }
 
 export async function rejectPartnerChangeRequestAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "update", {
-    path: "/admin/partners",
+    path: "/admin/partner-requests",
   });
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
-    redirectAdminActionError("/admin/partners", "partner_form_invalid_request");
+    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
   }
   await assertCanReviewPartnerChangeRequest(adminSession.account, requestId);
 
@@ -200,5 +200,5 @@ export async function rejectPartnerChangeRequestAction(formData: FormData) {
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(request.partnerId);
   revalidatePartnerPortalPaths(request.partnerId);
-  redirect("/admin/partners");
+  redirect("/admin/partner-requests");
 }

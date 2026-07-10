@@ -5,6 +5,7 @@ import {
   filterAdminNavGroupsByPermissions,
 } from "./admin-navigation";
 import AdminShellView from "./AdminShellView";
+import { isRegionalAdminAccount } from "@/lib/admin-scope";
 
 export default async function AdminShell({
   title,
@@ -23,6 +24,7 @@ export default async function AdminShell({
     ? filterAdminNavGroupsByPermissions(
         ADMIN_NAV_GROUPS,
         session.account.permissions,
+        { includeGlobalItems: !isRegionalAdminAccount(session.account) },
       )
     : ADMIN_NAV_GROUPS;
 

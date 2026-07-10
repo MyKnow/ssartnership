@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata = {
@@ -10,5 +10,5 @@ export const metadata = {
 };
 
 export default function AdminLoginPage() {
-  redirect("/auth/login?returnTo=%2Fadmin");
+  permanentRedirect("/auth/login?returnTo=%2Fadmin");
 }

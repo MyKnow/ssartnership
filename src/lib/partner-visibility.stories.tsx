@@ -115,6 +115,6 @@ export const Summary: Story = {
     await expect(canvas.getByText("copy-confidential-badge:대외비")).toBeInTheDocument();
     await expect(canvas.getByText("copy-confidential-title:로그인하면 확인할 수 있어요")).toBeInTheDocument();
     await expect(canvas.getByText("copy-private-badge:비공개")).toBeInTheDocument();
-    await expect(canvas.getByText("copy-private-title:아직 추진 중인 제휴 업체예요")).toBeInTheDocument();
+    await expect(canvas.getByText("copy-private-title:아직 추진 중인 제휴처예요")).toBeInTheDocument();
   },
 };

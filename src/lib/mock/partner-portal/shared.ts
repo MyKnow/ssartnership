@@ -218,7 +218,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
       id: "mock-partner-company-urban-gym",
       name: "어반짐 역삼",
       slug: "urban-gym",
-      description: "헬스와 PT 패키지를 운영하는 복합 피트니스 브랜드입니다.",
+      description: "헬스와 PT 패키지를 운영하는 복합 피트니스 제휴처입니다.",
       services: [
         {
           id: "mock-partner-service-urban-gym-pt",

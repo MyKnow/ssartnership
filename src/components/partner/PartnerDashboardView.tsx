@@ -6,6 +6,7 @@ import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import MotionReveal from "@/components/ui/MotionReveal";
+import Surface from "@/components/ui/Surface";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 import ShellHeader from "@/components/ui/ShellHeader";
@@ -18,8 +19,6 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
-import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
-import type { PartnerSession } from "@/lib/partner-session";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
@@ -48,12 +47,12 @@ function ServiceMetric({
   value: number;
 }) {
   return (
-    <div className="rounded-[1rem] border border-border/80 bg-surface-inset p-4 shadow-none">
+    <Surface level="inset" padding="md" className="min-w-0">
       <p className="ui-kicker">{label}</p>
-      <p className="mt-1 text-base font-semibold text-foreground">
+      <p className="mt-1 truncate text-base font-semibold text-foreground">
         {formatCount(value)}
       </p>
-    </div>
+    </Surface>
   );
 }
 
@@ -179,14 +178,11 @@ function canAnyCompanyServiceAccessMetric(
   );
 }
 
-function CompanyHeader({
+function CompanyMetrics({
   company,
 }: {
   company: PartnerPortalCompanyDashboard;
 }) {
-  const needsReview = company.services.some(
-    (service) => service.status === "pending" || service.status === "rejected",
-  );
   const visibleMetrics = [
     { key: "favoriteCount", label: "즐겨찾기", value: company.totals.favoriteCount },
     { key: "reviewCount", label: "리뷰 수", value: company.totals.reviewCount },
@@ -197,28 +193,18 @@ function CompanyHeader({
 
   return (
     <Card tone="default" padding="md" className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <p className="ui-kicker">운영 상태</p>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">
-              {company.name}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {company.description?.trim()
-                ? company.description
-                : "연결된 브랜드와 핵심 지표를 확인할 수 있습니다."}
-            </p>
-          </div>
-        </div>
-
-        <Badge variant={needsReview ? "warning" : "success"}>
-          {needsReview ? "검토 진행 중" : "정상 운영"}
-        </Badge>
+      <div className="min-w-0 space-y-1">
+        <p className="ui-kicker">Metrics</p>
+        <h2 className="truncate text-lg font-semibold text-foreground">
+          핵심 지표
+        </h2>
+        <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+          이용자가 제휴처를 찾고 저장하고 방문한 흐름을 요약합니다.
+        </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-        <ServiceMetric label="브랜드 수" value={company.services.length} />
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ServiceMetric label="제휴처 수" value={company.services.length} />
         {visibleMetrics
           .filter((metric) => canAnyCompanyServiceAccessMetric(company, metric.key))
           .map((metric) => (
@@ -239,36 +225,36 @@ function CompanyBrandList({
   company: PartnerPortalCompanyDashboard;
 }) {
   return (
-    <Card id="brands" tone="default" padding="md" className="scroll-mt-24 space-y-4">
+    <Card id="services" tone="default" padding="md" className="scroll-mt-24 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 pb-4">
         <div className="space-y-1">
-          <p className="ui-kicker">Brands</p>
-          <h3 className="text-lg font-semibold text-foreground">브랜드 운영 현황</h3>
+          <p className="ui-kicker">Partnerships</p>
+          <h2 className="text-lg font-semibold text-foreground">제휴처 운영 현황</h2>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <p className="text-sm text-muted-foreground">
-            {company.services.length}개 브랜드
+            {company.services.length}개 제휴처
           </p>
           <PartnerPendingButtonLink
             href={getCompanyScopedPartnerServiceNewHref(company.id)}
             variant="secondary"
             size="sm"
           >
-            브랜드 추가
+            제휴처 추가
           </PartnerPendingButtonLink>
         </div>
       </div>
 
       {company.services.length === 0 ? (
         <EmptyState
-          title="연결된 브랜드가 없습니다."
-          description="관리자에서 협력사 브랜드를 연결하면 여기에서 조회할 수 있습니다."
+          title="연결된 제휴처가 없습니다."
+          description="관리자가 파트너사 제휴처를 연결하면 여기에서 조회할 수 있습니다."
           action={
             <PartnerPendingButtonLink
               href={getCompanyScopedPartnerServiceNewHref(company.id)}
               variant="primary"
             >
-              브랜드 추가 신청
+              제휴처 추가 신청
             </PartnerPendingButtonLink>
           }
         />
@@ -311,14 +297,14 @@ function CompanyOperationsSummary({
       value: `${attentionCount.toLocaleString("ko-KR")}건`,
       description:
         attentionCount > 0
-          ? "승인 대기, 반려, 검토용 공개 상태를 확인하세요."
+            ? "승인 대기, 반려, 검토용 공개 상태를 확인하세요."
           : "승인/공개 상태가 안정적으로 유지되고 있습니다.",
       tone: attentionCount > 0 ? "warning" : "success",
     },
     {
-      label: "공개 브랜드",
+      label: "공개 제휴처",
       value: `${(company.services.length - hiddenCount).toLocaleString("ko-KR")}개`,
-      description: "사용자 화면에서 노출 중인 브랜드 수입니다.",
+      description: "사용자 화면에서 노출 중인 제휴처 수입니다.",
       tone: "neutral",
     },
     {
@@ -338,7 +324,7 @@ function CompanyOperationsSummary({
             먼저 확인할 상태
           </h2>
           <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-            브랜드 운영 상태, 노출 상태, 플랜 구성을 빠르게 점검합니다.
+            제휴처 운영 상태, 노출 상태, 플랜 구성을 빠르게 점검합니다.
           </p>
         </div>
         <Badge variant={attentionCount > 0 ? "warning" : "success"}>
@@ -368,13 +354,9 @@ function CompanyOperationsSummary({
 }
 
 export default function PartnerDashboardView({
-  session,
   dashboard,
-  selectedCompany,
 }: {
-  session: PartnerSession;
   dashboard: PartnerPortalDashboard;
-  selectedCompany: PartnerPortalCompanyScope;
 }) {
   const activeCompany = dashboard.companies[0] ?? null;
 
@@ -385,16 +367,8 @@ export default function PartnerDashboardView({
           <MotionReveal>
             <ShellHeader
               eyebrow="Partner Portal"
-              title="운영 대시보드"
-              description={`${selectedCompany.name}의 브랜드 상태와 핵심 지표를 한 화면에서 확인합니다.`}
-              actions={
-                <Badge
-                  variant="primary"
-                  className="max-w-full whitespace-normal break-all text-left leading-snug tracking-normal"
-                >
-                  로그인 아이디 · {session.loginId}
-                </Badge>
-              }
+              title="운영 홈"
+              description="처리할 항목을 먼저 확인하고 제휴처 운영 현황과 핵심 지표를 이어서 살펴봅니다."
             />
           </MotionReveal>
 
@@ -406,23 +380,23 @@ export default function PartnerDashboardView({
 
           {dashboard.companies.length === 0 ? (
             <EmptyState
-              title="연결된 협력사가 없습니다."
-              description="관리자에서 이 계정과 협력사를 먼저 연결해야 합니다."
+              title="연결된 파트너사가 없습니다."
+              description="관리자에서 이 계정과 파트너사를 먼저 연결해야 합니다."
             />
           ) : (
             <>
               {activeCompany ? (
-                <MotionReveal delay={0.08}>
-                  <div className="grid min-w-0 gap-5 xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
-                    <div className="grid gap-5 xl:sticky xl:top-24">
-                      <CompanyHeader company={activeCompany} />
-                    </div>
-                    <div className="grid min-w-0 gap-5">
-                      <CompanyOperationsSummary company={activeCompany} />
-                      <CompanyBrandList company={activeCompany} />
-                    </div>
-                  </div>
-                </MotionReveal>
+                <div className="grid min-w-0 gap-5">
+                  <MotionReveal delay={0.05}>
+                    <CompanyOperationsSummary company={activeCompany} />
+                  </MotionReveal>
+                  <MotionReveal delay={0.08}>
+                    <CompanyBrandList company={activeCompany} />
+                  </MotionReveal>
+                  <MotionReveal delay={0.11}>
+                    <CompanyMetrics company={activeCompany} />
+                  </MotionReveal>
+                </div>
               ) : null}
             </>
           )}

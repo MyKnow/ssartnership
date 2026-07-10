@@ -43,16 +43,16 @@ export type AdminPermissionTemplate = {
 };
 
 const RESOURCE_LABELS: Record<AdminPermissionResource, string> = {
-  members: "유저",
+  members: "회원",
   reviews: "리뷰",
   logs: "로그",
-  brands: "브랜드",
-  companies: "협력사",
+  brands: "제휴처",
+  companies: "파트너사",
   notifications: "알림",
   home_ads: "홈광고",
   events: "이벤트",
   cycles: "기수",
-  admin_management: "어드민관리",
+  admin_management: "관리자 관리",
 };
 
 const ACTION_LABELS: Record<AdminPermissionAction, string> = {
@@ -167,7 +167,7 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
   {
     key: "operations_manager",
     name: "운영 관리자",
-    description: "회원, 협력사, 알림, 이벤트, 기수 운영을 담당합니다.",
+    description: "회원, 파트너사, 알림, 이벤트, 기수 운영을 담당합니다.",
     permissions: normalizeAdminPermissionMatrix({
       members: { create: true, read: true, update: true, delete: true },
       reviews: { read: true, update: true, delete: true },
@@ -193,7 +193,7 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
   {
     key: "content_manager",
     name: "콘텐츠 관리자",
-    description: "브랜드, 홈광고, 이벤트 노출 콘텐츠를 관리합니다.",
+    description: "제휴처, 홈광고, 이벤트 노출 콘텐츠를 관리합니다.",
     permissions: normalizeAdminPermissionMatrix({
       reviews: { read: true, update: true },
       logs: { read: true },

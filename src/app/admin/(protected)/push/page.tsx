@@ -1,8 +1,8 @@
 import AdminPushManager from "@/components/admin/AdminPushManager";
 import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
-import SectionHeading from "@/components/ui/SectionHeading";
-import ShellHeader from "@/components/ui/ShellHeader";
+import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import {
   getAdminNotificationOverview,
@@ -48,17 +48,17 @@ export default async function AdminPushPage({
   const automaticSummaryCount = notificationOverview.automaticSummaries.length;
 
   return (
-    <AdminShell title="알림 운영" backHref="/admin" backLabel="관리 홈">
+    <AdminShell title="발송 관리" backHref="/admin" backLabel="관리 홈">
       <div className="grid gap-6">
-        <ShellHeader
+        <AdminPageHeader
           eyebrow="Notifications"
-          title="알림 운영"
-          description="발송 결과 확인과 즉시 전송을 같은 작업 영역에서 처리합니다."
+          title="발송 관리"
+          description="메시지 작성, 발송 결과, 자동 발송 상태를 한 작업 영역에서 관리합니다."
         />
         <StatsRow
           items={[
             { label: "회원 대상", value: `${safeMembers.length.toLocaleString()}명`, hint: "개인·기수·캠퍼스 기준" },
-            { label: "브랜드 대상", value: `${partners.length.toLocaleString()}개`, hint: "신규 제휴/종료 임박 연결" },
+            { label: "제휴처 대상", value: `${partners.length.toLocaleString()}개`, hint: "신규 제휴/종료 임박 연결" },
             { label: "최근 로그", value: `${recentLogCount.toLocaleString()}건`, hint: "최근 30일 운영 로그" },
             { label: "자동 규칙", value: `${automaticSummaryCount.toLocaleString()}개`, hint: "예약/자동 발송 요약" },
           ]}
@@ -66,7 +66,7 @@ export default async function AdminPushPage({
         />
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.72fr)] 2xl:items-start">
           <section className="grid gap-4">
-            <SectionHeading
+            <AdminSectionHeading
               title="발송 워크스페이스"
               description="로그 확인과 즉시 발송을 같은 작업 영역에서 전환합니다."
             />
@@ -82,7 +82,7 @@ export default async function AdminPushPage({
           </section>
           <div className="grid gap-6 2xl:sticky 2xl:top-24">
             <Card tone="elevated" className="grid gap-4">
-              <SectionHeading
+              <AdminSectionHeading
                 title="채널 상태"
                 description="발송 전 먼저 확인해야 하는 운영 상태입니다."
               />
@@ -102,7 +102,7 @@ export default async function AdminPushPage({
               </div>
             </Card>
             <Card tone="elevated" className="grid gap-3">
-              <SectionHeading
+              <AdminSectionHeading
                 title="운영 메모"
                 description="발송 화면을 넓게 쓰되, 보조 지침은 우측에 고정합니다."
               />

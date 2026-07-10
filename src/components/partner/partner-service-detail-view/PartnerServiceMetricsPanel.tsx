@@ -36,19 +36,19 @@ export default function PartnerServiceMetricsPanel({
       key: "favoriteCount",
       label: "즐겨찾기",
       value: formatCount(metrics.favoriteCount),
-      hint: "브랜드 즐겨찾기 수",
+      hint: "제휴처 즐겨찾기 수",
     },
     {
       key: "detailViews",
       label: "PV",
       value: formatCount(metrics.detailViews),
-      hint: "브랜드 상세 페이지 총 조회 수",
+      hint: "제휴처 상세 페이지 총 조회 수",
     },
     {
       key: "detailUv",
       label: "UV",
       value: formatCount(metrics.detailUv),
-      hint: "브랜드 상세 페이지 고유 방문자 수",
+      hint: "제휴처 상세 페이지 고유 방문자 수",
     },
     {
       key: "totalClicks",
@@ -79,10 +79,10 @@ export default function PartnerServiceMetricsPanel({
         <SectionTitle label="Brand Insights" />
         <div>
           <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
-            브랜드 집계
+            제휴처 집계
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            공개 리뷰와 포털 상호작용 기준으로 현재 브랜드 성과를 요약합니다.
+            공개 리뷰와 포털 상호작용 기준으로 현재 제휴처 성과를 요약합니다.
           </p>
         </div>
       </div>

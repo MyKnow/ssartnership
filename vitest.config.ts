@@ -29,6 +29,28 @@ export default defineConfig({
     ],
   },
   test: {
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      reportsDirectory: path.join(dirname, ".tmp", "coverage", "unit"),
+      include: [
+        "src/components/partner-registration/registration-steps.ts",
+        "src/lib/admin-dashboard-scope.ts",
+        "src/lib/admin-ia.ts",
+        "src/lib/admin-member-detail.ts",
+        "src/lib/content-budget.ts",
+        "src/lib/e2e-mutation-mode.ts",
+        "src/lib/home-directory-state.ts",
+        "src/lib/partner-billing-action-errors.ts",
+        "src/lib/partner-portal-paths.ts",
+      ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+      },
+    },
     projects: [
       {
         extends: true,

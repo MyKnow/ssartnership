@@ -66,23 +66,23 @@ export function ApprovalChangeForm({
       <InlineMessage
         tone="warning"
         title="승인 요청 항목"
-        description="브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자 승인 후 반영됩니다."
+        description="제휴처명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자 승인 후 반영됩니다."
       />
 
       <div className="grid gap-4">
         <FormSection
-          title="브랜드 정보"
-          description="브랜드명, 위치, 지도 URL을 수정합니다."
+          title="제휴처 정보"
+          description="제휴처명, 위치, 지도 URL을 수정합니다."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <FieldGroup
-              label="브랜드명"
-              note="브랜드명 변경도 관리자 승인 후 반영됩니다."
+              label="제휴처명"
+              note="제휴처명 변경도 관리자 승인 후 반영됩니다."
             >
               <Input
                 name="partnerName"
                 defaultValue={context.partnerName}
-                placeholder="브랜드명"
+                placeholder="제휴처명"
               />
             </FieldGroup>
             <FieldGroup
@@ -109,7 +109,7 @@ export function ApprovalChangeForm({
           <div className="mt-4">
             <FieldGroup
               label="상세 설명"
-              note="구성원이 브랜드의 특징과 이용 흐름을 이해할 수 있도록 상세 페이지에 표시됩니다."
+              note="구성원이 제휴처의 특징과 이용 흐름을 이해할 수 있도록 상세 페이지에 표시됩니다."
             >
               <Textarea
                 name="detailDescription"
@@ -129,18 +129,18 @@ export function ApprovalChangeForm({
                   setCampusSlugError(null);
                 }
               }}
-              description="캠퍼스별 제휴 목록에 이 브랜드를 노출할 범위를 선택합니다."
+              description="캠퍼스별 제휴 목록에 이 제휴처를 노출할 범위를 선택합니다."
             />
           </div>
         </FormSection>
 
         <FormSection
           title="기간"
-          description="브랜드 노출 시작일과 종료일을 수정합니다."
+          description="제휴처 노출 시작일과 종료일을 수정합니다."
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <FieldGroup
-              label="브랜드 시작일"
+              label="제휴처 시작일"
               note="기간 변경은 관리자 승인이 필요합니다."
             >
               <Input
@@ -150,7 +150,7 @@ export function ApprovalChangeForm({
               />
             </FieldGroup>
             <FieldGroup
-              label="브랜드 종료일"
+              label="제휴처 종료일"
               note="기간 변경은 관리자 승인이 필요합니다."
             >
               <Input
@@ -164,7 +164,7 @@ export function ApprovalChangeForm({
 
         <FormSection
           title="이용 조건"
-          description="브랜드 이용 시 지켜야 할 조건을 추가합니다."
+          description="제휴처 이용 시 지켜야 할 조건을 추가합니다."
         >
           <TokenChipField
             name="conditions"
@@ -176,7 +176,7 @@ export function ApprovalChangeForm({
         </FormSection>
         <FormSection
           title="혜택"
-          description="협력사가 제공하는 할인이나 혜택을 추가합니다."
+          description="파트너사가 제공하는 할인이나 혜택을 추가합니다."
         >
           <TokenChipField
             name="benefits"
@@ -229,7 +229,7 @@ export function ApprovalChangeForm({
 
       <InlineMessage
         title="안내"
-        description="메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그는 즉시 저장됩니다. 브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자 승인 후 반영됩니다."
+        description="메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그는 즉시 저장됩니다. 제휴처명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상은 관리자 승인 후 반영됩니다."
       />
 
       <div className="flex flex-wrap items-center gap-3">

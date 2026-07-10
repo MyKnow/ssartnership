@@ -37,10 +37,10 @@ const supportTypeOptions: Array<{
 }> = [
   {
     value: "service",
-    label: "브랜드 정보",
+    label: "제휴처 정보",
     badge: "정보 수정",
-    subject: "브랜드 정보 지원 요청",
-    requestLine: "6. 필요한 지원 내용: 브랜드 정보 수정/노출 상태 확인",
+    subject: "제휴처 정보 지원 요청",
+    requestLine: "6. 필요한 지원 내용: 제휴처 정보 수정/노출 상태 확인",
   },
   {
     value: "account",
@@ -78,9 +78,9 @@ function buildTemplate(
 ): SupportMailTemplate {
   return buildSupportMailTemplate({
     to: props.to,
-    subject: `[${props.siteName} 협력사 포털] ${props.companyName} ${option.subject}`,
+    subject: `[${props.siteName} 파트너사 포털] ${props.companyName} ${option.subject}`,
     bodyLines: [
-      `1. 업체명 / 브랜드명: ${props.companyName} / ${props.brandNames}`,
+      `1. 파트너사명 / 제휴처명: ${props.companyName} / ${props.brandNames}`,
       `2. 담당자명: ${props.displayName}`,
       `3. 로그인 이메일: ${props.loginId}`,
       "4. 연락 가능한 전화번호:",

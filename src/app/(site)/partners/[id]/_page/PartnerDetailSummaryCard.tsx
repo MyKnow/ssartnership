@@ -1,9 +1,9 @@
 import type { CSSProperties } from "react";
-import Image from "next/image";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import Badge from "@/components/ui/Badge";
-import Card from "@/components/ui/Card";
 import Chip from "@/components/ui/Chip";
+import PageSection from "@/components/ui/PageSection";
+import Surface from "@/components/ui/Surface";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import PartnerValueBadge from "@/components/PartnerValueBadge";
 import PartnerFavoriteCountLabel from "@/components/partner-favorites/PartnerFavoriteCountLabel";
@@ -14,7 +14,7 @@ import {
   getPartnerServiceMode,
 } from "@/lib/partner-service-mode";
 import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
-import { isProxiedCachedImageUrl } from "@/lib/image-cache";
+import { applyContentBudget } from "@/lib/content-budget";
 import type { Partner } from "@/lib/types";
 
 export default function PartnerDetailSummaryCard({
@@ -22,7 +22,6 @@ export default function PartnerDetailSummaryCard({
   categoryLabel,
   badgeStyle,
   chipStyle,
-  thumbnailUrl,
   mapLink,
   currentUserId,
   isFavorited,
@@ -32,7 +31,6 @@ export default function PartnerDetailSummaryCard({
   categoryLabel: string;
   badgeStyle?: CSSProperties;
   chipStyle?: CSSProperties;
-  thumbnailUrl: string;
   mapLink?: string;
   currentUserId?: string | null;
   isFavorited?: boolean;
@@ -47,17 +45,22 @@ export default function PartnerDetailSummaryCard({
   );
   const showBranchScope =
     !isOnlineService && partner.branchScopeType && partner.branchScopeType !== "single_location";
+  const tagBudget = applyContentBudget(partner.tags ?? [], 4);
+  const hasAdditionalInformation = Boolean(
+    partner.conditions.length > 0 ||
+      partner.detailDescription ||
+      partner.branchScopeNote ||
+      (partner.tags?.length ?? 0) > 0,
+  );
 
   return (
-    <Card
-      className="order-1 relative overflow-hidden p-6 xl:order-1"
+    <Surface
+      level="default"
+      padding="lg"
+      className="order-1 min-w-0 xl:order-1"
       data-partner-detail-summary
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.08),_transparent_45%),radial-gradient(circle_at_bottom_left,_rgba(14,165,233,0.08),_transparent_42%)]"
-      />
-      <div className="relative flex flex-col">
+      <div className="flex min-w-0 flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Badge
@@ -86,24 +89,29 @@ export default function PartnerDetailSummaryCard({
           </span>
         </div>
 
-        {thumbnailUrl ? (
-          <div className="mt-4 w-full max-w-40 overflow-hidden rounded-3xl border border-border bg-surface-muted sm:max-w-48">
-            <div className="relative aspect-square w-full">
-              <Image
-                src={thumbnailUrl}
-                alt=""
-                fill
-                sizes="(max-width: 640px) 40vw, 192px"
-                className="object-cover"
-                unoptimized={isProxiedCachedImageUrl(thumbnailUrl)}
-              />
-            </div>
+        <PageSection
+          title="받을 수 있는 혜택"
+          description="방문하거나 이용하기 전에 적용 대상과 기간을 확인하세요."
+        >
+          <div className="grid gap-2">
+            {partner.benefits.length > 0 ? (
+              partner.benefits.map((benefit) => (
+                <Surface
+                  key={benefit}
+                  level="inset"
+                  padding="sm"
+                  className="text-ko-pretty font-semibold text-foreground"
+                >
+                  {benefit}
+                </Surface>
+              ))
+            ) : (
+              <p className="ui-body">등록된 혜택 정보가 없습니다.</p>
+            )}
           </div>
-        ) : null}
+        </PageSection>
 
-        <h1 className="mt-4 text-3xl font-semibold text-foreground">{partner.name}</h1>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
           {!isOnlineService ? <span>{partner.location}</span> : null}
           {showBranchScope ? (
             <Badge variant="warning">{branchScopeLabel}</Badge>
@@ -157,78 +165,67 @@ export default function PartnerDetailSummaryCard({
           ) : null}
         </div>
 
-        <div className="mt-6 grid gap-5">
-          {showBranchScope || partner.branchScopeNote ? (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                적용 지점
-              </p>
-              <p className="mt-3 whitespace-pre-line rounded-3xl border border-border bg-surface-inset px-4 py-3 text-sm leading-7 text-muted-foreground">
-                {partner.branchScopeNote?.trim() || `${branchScopeLabel}에 적용됩니다.`}
-              </p>
-            </div>
-          ) : null}
-
-          {partner.detailDescription ? (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                브랜드 소개
-              </p>
-              <p className="mt-3 whitespace-pre-line rounded-3xl border border-border bg-surface-inset px-4 py-3 text-sm leading-7 text-muted-foreground">
-                {partner.detailDescription}
-              </p>
-            </div>
-          ) : null}
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              이용 조건
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {partner.conditions.map((condition) => (
-                <PartnerValueBadge key={condition}>
-                  {condition}
-                </PartnerValueBadge>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              혜택
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {partner.benefits.map((benefit) => (
-                <PartnerValueBadge key={benefit}>
-                  {benefit}
-                </PartnerValueBadge>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              적용 대상
-            </p>
-            <PartnerAudienceChips appliesTo={partner.appliesTo} className="mt-3" />
-          </div>
-
-          {partner.tags && partner.tags.length > 0 ? (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                태그
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {partner.tags.map((tag) => (
-                  <Chip key={tag} style={chipStyle}>
-                    #{tag}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-          ) : null}
+        <div>
+          <p className="ui-caption">적용 대상</p>
+          <PartnerAudienceChips appliesTo={partner.appliesTo} className="mt-2" />
         </div>
+
+        {hasAdditionalInformation ? (
+          <details className="group border-t border-border/70 pt-2">
+            <summary className="ui-label flex min-h-11 cursor-pointer list-none items-center justify-between rounded-[1rem] px-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25">
+              이용 조건과 제휴처 정보
+              <span aria-hidden="true" className="text-muted-foreground group-open:rotate-180">
+                ↓
+              </span>
+            </summary>
+            <div className="grid gap-5 pt-4">
+              {partner.conditions.length > 0 ? (
+                <div>
+                  <p className="ui-caption">이용 조건</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {partner.conditions.map((condition) => (
+                      <PartnerValueBadge key={condition}>
+                        {condition}
+                      </PartnerValueBadge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {showBranchScope || partner.branchScopeNote ? (
+                <div>
+                  <p className="ui-caption">적용 지점</p>
+                  <p className="text-ko-pretty mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">
+                    {partner.branchScopeNote?.trim() || `${branchScopeLabel}에 적용됩니다.`}
+                  </p>
+                </div>
+              ) : null}
+              {partner.detailDescription ? (
+                <div>
+                  <p className="ui-caption">제휴처 소개</p>
+                  <p className="text-ko-pretty mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">
+                    {partner.detailDescription}
+                  </p>
+                </div>
+              ) : null}
+              {tagBudget.visible.length > 0 ? (
+                <div>
+                  <p className="ui-caption">태그</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {tagBudget.visible.map((tag) => (
+                      <Chip key={tag} style={chipStyle}>
+                        #{tag}
+                      </Chip>
+                    ))}
+                    {tagBudget.hiddenCount > 0 ? (
+                      <Chip>+{tagBudget.hiddenCount}</Chip>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
       </div>
-    </Card>
+    </Surface>
   );
 }

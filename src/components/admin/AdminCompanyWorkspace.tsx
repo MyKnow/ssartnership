@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Tabs from "@/components/ui/Tabs";
-import SectionHeading from "@/components/ui/SectionHeading";
+import AdminTabs from "@/components/admin/AdminTabs";
+import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
 import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 
-type AdminCompanyWorkspaceProps = {
+export type AdminCompanyWorkspaceProps = {
   companies: Array<{
     id: string;
     name: string;
@@ -23,6 +24,7 @@ type AdminCompanyWorkspaceProps = {
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
   initialTab?: AdminCompanyTab;
+  actions: AdminCompanyFormActions;
 };
 
 type AdminCompanyTab = "companies" | "accounts";
@@ -46,6 +48,7 @@ export default function AdminCompanyWorkspace({
   generatedSetupUrl,
   generatedSetupAccountId,
   initialTab = "companies",
+  actions,
 }: AdminCompanyWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<AdminCompanyTab>(initialTab);
 
@@ -55,20 +58,24 @@ export default function AdminCompanyWorkspace({
 
   return (
     <section className="grid gap-4">
-      <Tabs value={activeTab} onChange={setActiveTab} options={companyTabOptions} />
+      <AdminTabs value={activeTab} onChange={setActiveTab} options={companyTabOptions} />
 
       {activeTab === "companies" ? (
         <section className="grid gap-4">
-          <SectionHeading
+          <AdminSectionHeading
             eyebrow="Companies"
             title="파트너사 운영"
             description="회사 기본 정보, 연결 제휴처 수, 삭제/수정 작업을 한 영역에서 관리합니다."
           />
-          <AdminCompanyManager companies={companies} accounts={accounts} />
+          <AdminCompanyManager
+            companies={companies}
+            accounts={accounts}
+            actions={actions}
+          />
         </section>
       ) : activeTab === "accounts" ? (
         <section className="grid gap-4">
-          <SectionHeading
+          <AdminSectionHeading
             eyebrow="Accounts"
             title="파트너 계정"
             description="담당 계정 생성, 초기 설정 링크 발급, 연결 조정을 같은 영역에서 처리합니다."
@@ -78,6 +85,7 @@ export default function AdminCompanyWorkspace({
             companies={companies}
             generatedSetupUrl={generatedSetupUrl}
             generatedSetupAccountId={generatedSetupAccountId}
+            actions={actions}
           />
         </section>
       ) : null}

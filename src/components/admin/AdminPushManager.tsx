@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import AdminNotificationCenter from "@/components/admin/notification-center/AdminNotificationCenter";
-import Tabs from "@/components/ui/Tabs";
+import AdminTabs from "@/components/admin/AdminTabs";
 import { getMemberLabel } from "./push-manager/constants";
 import { PushComposerSection } from "./push-manager/PushComposerSection";
 import { PushLogsSection } from "./push-manager/PushLogsSection";
@@ -68,7 +68,7 @@ export default function AdminPushManager({
 
   return (
     <div className="grid min-w-0 gap-8 overflow-x-hidden">
-      <Tabs value={activeTab} onChange={setActiveTab} options={adminPushTabOptions} />
+      <AdminTabs value={activeTab} onChange={setActiveTab} options={adminPushTabOptions} />
 
       {activeTab === "center" ? (
         <AdminNotificationCenter

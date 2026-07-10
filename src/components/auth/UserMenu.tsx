@@ -84,7 +84,7 @@ export default function UserMenu({
         prefetch={false}
         className={buttonClassName}
       >
-        내 프로필 조회
+        내 인증
       </Button>
       {logoutIconOnly ? (
         <Button

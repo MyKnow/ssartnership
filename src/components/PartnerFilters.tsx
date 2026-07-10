@@ -2,9 +2,10 @@
 
 import type { Category, CategoryKey } from "@/lib/types";
 import CategoryTabs, { CategoryTabOption } from "@/components/CategoryTabs";
-import FilterBar from "@/components/ui/FilterBar";
+import AdvancedFilterDisclosure from "@/components/ui/AdvancedFilterDisclosure";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
+import Surface from "@/components/ui/Surface";
 import { cn } from "@/lib/cn";
 import {
   PARTNER_AUDIENCE_FILTER_OPTIONS,
@@ -43,50 +44,83 @@ export default function PartnerFilters({
   className?: string;
 }) {
   const tabOptions: CategoryTabOption[] = [
-    { key: "all", label: "전체", description: "모든 제휴" },
+    { key: "all", label: "전체" },
     ...categories.map((category) => ({
       key: category.key,
       label: category.label,
-      description: category.description,
     })),
   ];
 
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
-      <CategoryTabs
-        options={tabOptions}
-        activeKey={activeCategory}
-        onChange={onCategoryChange}
-      />
-      <FilterBar tone="default" className="border-border/70 bg-surface">
-        <div className="flex min-w-0 flex-1 flex-col gap-1 lg:min-w-[18rem]">
-          <span className="ui-caption">검색</span>
-          <Input
-            value={searchValue}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="업체명, 위치, 혜택, 태그, 적용 대상으로 검색"
-            data-testid="partner-search-input"
-          />
-        </div>
-        {appliesToFilter && onAppliesToFilterChange ? (
-          <div className="flex min-w-0 flex-col gap-1 lg:w-40">
-            <span className="ui-caption">적용 대상</span>
-            <Select
-              value={appliesToFilter}
-              onChange={(event) =>
-                onAppliesToFilterChange(event.target.value as PartnerAudienceFilter)
-              }
-              data-testid="partner-audience-filter"
-            >
-              {PARTNER_AUDIENCE_FILTER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
+    <Surface
+      level="inset"
+      padding="md"
+      className={cn("flex min-w-0 flex-col gap-4", className)}
+    >
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span className="ui-caption">카테고리</span>
+        <CategoryTabs
+          options={tabOptions}
+          activeKey={activeCategory}
+          onChange={onCategoryChange}
+        />
+      </div>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span className="ui-caption">검색</span>
+        <Input
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="제휴처명, 위치, 혜택으로 검색"
+          data-testid="partner-search-input"
+        />
+      </div>
+      {appliesToFilter && onAppliesToFilterChange ? (
+        <AdvancedFilterDisclosure
+          summary={
+            appliesToFilter === "all" && sortValue === "popular"
+              ? "기본값"
+              : "적용 중"
+          }
+        >
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            <label className="flex min-w-0 flex-col gap-1.5">
+              <span className="ui-caption">적용 대상</span>
+              <Select
+                value={appliesToFilter}
+                onChange={(event) =>
+                  onAppliesToFilterChange(
+                    event.target.value as PartnerAudienceFilter,
+                  )
+                }
+                data-testid="partner-audience-filter"
+              >
+                {PARTNER_AUDIENCE_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label className="flex min-w-0 flex-col gap-1.5">
+              <span className="ui-caption">정렬</span>
+              <Select
+                value={sortValue}
+                onChange={(event) =>
+                  onSortChange(event.target.value as PartnerSortOption)
+                }
+                data-testid="partner-sort-select"
+              >
+                {partnerSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
           </div>
-        ) : null}
-        <div className="flex min-w-0 flex-col gap-1 lg:w-48">
+        </AdvancedFilterDisclosure>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-1">
           <span className="ui-caption">정렬</span>
           <Select
             value={sortValue}
@@ -102,7 +136,7 @@ export default function PartnerFilters({
             ))}
           </Select>
         </div>
-      </FilterBar>
-    </div>
+      )}
+    </Surface>
   );
 }

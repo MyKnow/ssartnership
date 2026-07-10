@@ -112,7 +112,7 @@ export default function PartnerServiceDetailViewContent({
                 <div className="rounded-[1rem] border border-warning/20 bg-warning/10 p-4">
                   <p className="text-sm font-semibold text-warning">승인 필요</p>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    브랜드명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상
+                    제휴처명, 위치, 지도 URL, 기간, 이용 조건, 혜택, 적용 대상
                   </p>
                 </div>
               </div>
@@ -123,7 +123,7 @@ export default function PartnerServiceDetailViewContent({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="bg-primary/10 text-primary">브랜드</Badge>
+                      <Badge className="bg-primary/10 text-primary">제휴처</Badge>
                       <Badge className="bg-surface text-muted-foreground">
                         {context.companyName}
                       </Badge>
@@ -144,7 +144,7 @@ export default function PartnerServiceDetailViewContent({
                         {context.partnerName}
                       </h1>
                       <p className="mt-2 max-w-3xl text-ko-pretty text-sm leading-6 text-muted-foreground">
-                        공개 상태, 플랜, 수정 요청 상태를 기준으로 브랜드 운영 신뢰도를 확인합니다.
+                        공개 상태, 플랜, 수정 요청 상태를 기준으로 제휴처 운영 신뢰도를 확인합니다.
                       </p>
                     </div>
                   </div>

@@ -42,7 +42,7 @@ export function buildPartnerChangeRequestDiffItems(
     request.currentPartnerName !== request.requestedPartnerName
       ? {
           key: "partnerName",
-          label: "브랜드명",
+          label: "제휴처명",
           current: <DiffText tone="current">{request.currentPartnerName}</DiffText>,
           requested: <DiffText tone="requested">{request.requestedPartnerName}</DiffText>,
         }

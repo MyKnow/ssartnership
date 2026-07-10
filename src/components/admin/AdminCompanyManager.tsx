@@ -7,11 +7,7 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
-import {
-  createPartnerCompany,
-  deletePartnerCompany,
-  updatePartnerCompany,
-} from "@/app/admin/(protected)/actions";
+import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 import CompanyAccountConnections, {
   type CompanyAccountOption,
   type LinkedCompanyAccount,
@@ -60,9 +56,11 @@ function formatDateTime(value?: string | null) {
 export default function AdminCompanyManager({
   companies,
   accounts,
+  actions,
 }: {
   companies: AdminCompany[];
   accounts: AdminPartnerAccount[];
+  actions: AdminCompanyFormActions;
 }) {
   const accountSummaries = accounts.map((account) => ({
     id: account.id,
@@ -102,22 +100,22 @@ export default function AdminCompanyManager({
         <Card tone="muted" padding="md" className="grid gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionHeading
-              title="협력사 추가"
-              description="한 협력사를 먼저 만들고, 브랜드와 관리 계정을 이어서 연결합니다."
+              title="파트너사 추가"
+              description="계약 회사인 파트너사를 먼저 만들고, 제휴처와 관리 계정을 이어서 연결합니다."
             />
             <Badge variant="neutral">
               총 {companies.length}개
             </Badge>
           </div>
 
-          <form action={createPartnerCompany} className="grid gap-4">
-            <FieldGroup label="협력사명">
-              <Input name="companyName" placeholder="협력사명" required />
+          <form action={actions.createCompanyAction} className="grid gap-4">
+            <FieldGroup label="파트너사명">
+              <Input name="companyName" placeholder="파트너사명" required />
             </FieldGroup>
             <FieldGroup label="설명">
               <Textarea
                 name="companyDescription"
-                placeholder="포털과 관리자 화면에 함께 보일 협력사 소개를 입력합니다."
+                placeholder="포털과 관리자 화면에 함께 보일 파트너사 소개를 입력합니다."
                 rows={5}
               />
             </FieldGroup>
@@ -126,7 +124,7 @@ export default function AdminCompanyManager({
               <div className="space-y-1">
                 <h4 className="text-sm font-semibold text-foreground">기본 상태</h4>
                 <p className="text-xs leading-5 text-muted-foreground">
-                  비활성으로 저장하면 연결된 브랜드와 계정은 유지되고, 상태만 내려갑니다.
+                  비활성으로 저장하면 연결된 제휴처와 계정은 유지되고, 상태만 내려갑니다.
                 </p>
               </div>
               <label className="flex items-center gap-3 text-sm font-medium text-foreground">
@@ -137,13 +135,13 @@ export default function AdminCompanyManager({
                   defaultChecked
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
-                협력사 활성
+                파트너사 활성
               </label>
               <p className="text-xs text-muted-foreground">
                 식별자(`slug`)는 저장 시 자동 생성되고 이후에도 유지됩니다.
               </p>
               <SubmitButton pendingText="추가 중" className="w-full">
-                협력사 추가
+                파트너사 추가
               </SubmitButton>
             </div>
           </form>
@@ -154,15 +152,15 @@ export default function AdminCompanyManager({
         {companies.length === 0 ? (
           <Card tone="elevated" padding="md">
             <EmptyState
-              title="협력사가 없습니다."
-              description="새 협력사를 추가하면 이곳에서 목록을 관리할 수 있습니다."
+              title="파트너사가 없습니다."
+              description="새 파트너사를 추가하면 이곳에서 목록을 관리할 수 있습니다."
             />
           </Card>
         ) : (
           <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionHeading
-              title="협력사 목록"
+              title="파트너사 목록"
               description="기본 정보와 연결 수를 먼저 훑고, 필요한 항목만 펼쳐 수정합니다."
             />
             <Badge variant="neutral">{companies.length}개</Badge>
@@ -192,7 +190,7 @@ export default function AdminCompanyManager({
                           {isActive ? "활성" : "비활성"}
                         </Badge>
                         <Badge variant="neutral">
-                          브랜드 {company.brandCount}개
+                          제휴처 {company.brandCount}개
                         </Badge>
                         <Badge variant="neutral">
                           계정 {company.accountCount}개
@@ -225,17 +223,17 @@ export default function AdminCompanyManager({
                   <div className="grid gap-5 border-t border-border/70 bg-surface-inset/40 p-5 md:p-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
                   <form
                     id={updateFormId}
-                    action={updatePartnerCompany}
+                    action={actions.updateCompanyAction}
                     className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset/80 p-4"
                   >
                     <input type="hidden" name="companyId" value={company.id} />
                     <div className="space-y-1">
                       <h4 className="text-sm font-semibold text-foreground">기본 정보 수정</h4>
                       <p className="text-xs leading-5 text-muted-foreground">
-                        협력사명과 설명을 정리하고 활성 상태를 조정합니다.
+                        파트너사명과 설명을 정리하고 활성 상태를 조정합니다.
                       </p>
                     </div>
-                    <FieldGroup label="협력사명">
+                    <FieldGroup label="파트너사명">
                       <Input name="companyName" defaultValue={company.name} required />
                     </FieldGroup>
                     <FieldGroup label="설명">
@@ -254,10 +252,10 @@ export default function AdminCompanyManager({
                           defaultChecked={isActive}
                           className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                         />
-                        협력사 활성
+                        파트너사 활성
                       </label>
                       <p className="text-xs text-muted-foreground">
-                        협력사명 변경 시 slug는 유지됩니다.
+                        파트너사명 변경 시 slug는 유지됩니다.
                       </p>
                     </div>
 
@@ -267,7 +265,7 @@ export default function AdminCompanyManager({
                         pendingText="저장 중"
                         className="w-full sm:w-auto"
                       >
-                        협력사 저장
+                        파트너사 저장
                       </SubmitButton>
                     </div>
                   </form>
@@ -283,7 +281,7 @@ export default function AdminCompanyManager({
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-2xl border border-border/70 bg-surface-muted/70 p-4">
                           <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground">
-                            연결 브랜드
+                            연결 제휴처
                           </p>
                           <p className="mt-2 text-2xl font-semibold text-foreground">
                             {company.brandCount}
@@ -305,11 +303,11 @@ export default function AdminCompanyManager({
                         <h4 className="text-sm font-semibold text-foreground">삭제</h4>
                         <p className="text-xs leading-5 text-muted-foreground">
                           {hasLinkedData
-                            ? `연결된 브랜드 ${company.brandCount}개, 계정 ${company.accountCount}개가 있어 삭제 시 연결이 함께 해제됩니다.`
-                            : "연결된 브랜드와 계정이 없어 바로 삭제할 수 있습니다."}
+                            ? `연결된 제휴처 ${company.brandCount}개, 계정 ${company.accountCount}개가 있어 삭제 시 연결이 함께 해제됩니다.`
+                            : "연결된 제휴처와 계정이 없어 바로 삭제할 수 있습니다."}
                         </p>
                       </div>
-                      <form id={deleteFormId} action={deletePartnerCompany}>
+                      <form id={deleteFormId} action={actions.deleteCompanyAction}>
                         <input type="hidden" name="companyId" value={company.id} />
                         <SubmitButton
                           form={deleteFormId}
@@ -317,7 +315,7 @@ export default function AdminCompanyManager({
                           pendingText="삭제 중"
                           className="w-full sm:w-auto"
                         >
-                          협력사 삭제
+                          파트너사 삭제
                         </SubmitButton>
                       </form>
                     </div>
@@ -328,6 +326,7 @@ export default function AdminCompanyManager({
                     company={company}
                     accountOptions={accountOptions}
                     linkedAccounts={linkedAccountsByCompanyId.get(company.id) ?? []}
+                    updateConnectionAction={actions.updateConnectionAction}
                   />
                 </details>
               </Card>

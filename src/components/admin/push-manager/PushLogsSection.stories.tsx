@@ -181,7 +181,7 @@ export const EmptyAndReadOnly: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("조건에 맞는 알림 운영 로그가 없습니다.")).toBeInTheDocument();
+    await expect(canvas.getByText("조건에 맞는 발송 로그가 없습니다.")).toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "불러오기" })).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "삭제" })).not.toBeInTheDocument();
   },

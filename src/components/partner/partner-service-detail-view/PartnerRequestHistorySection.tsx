@@ -25,7 +25,7 @@ export default function PartnerRequestHistorySection({
           계정별 요청 이력
         </h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          현재 로그인한 계정으로 요청한 브랜드 수정 이력만 표시됩니다.
+          현재 로그인한 계정으로 요청한 제휴처 수정 이력만 표시됩니다.
         </p>
       </div>
 

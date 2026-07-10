@@ -351,8 +351,8 @@ test("log selectors expose partner portal activity as a virtual group", async ()
     getAvailableLogNames(unified, "partner").map((item) => item.label),
     [
       "페이지 조회",
-      "협력사 포털 로그인",
-      "협력사 포털 변경 요청 제출",
+      "파트너사 포털 로그인",
+      "파트너사 포털 변경 요청 제출",
       "api_request",
     ].sort((a, b) => a.localeCompare(b, "ko-KR")),
   );

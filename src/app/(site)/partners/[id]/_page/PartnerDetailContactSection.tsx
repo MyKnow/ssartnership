@@ -1,7 +1,7 @@
 import ContactCopyRow from "@/components/ContactCopyRow";
-import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import SectionHeading from "@/components/ui/SectionHeading";
+import PageSection from "@/components/ui/PageSection";
+import Surface from "@/components/ui/Surface";
 import PartnerDetailBenefitActionLink from "./PartnerDetailBenefitActionLink";
 
 type ContactDisplay = NonNullable<
@@ -32,20 +32,21 @@ export default function PartnerDetailContactSection({
 }) {
   if (!isActive) {
     return (
-      <Card className="w-full p-4 sm:p-5">
-        <SectionHeading title="혜택 이용/문의" />
-        <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
+      <Surface level="inset" padding="lg" className="w-full">
+        <PageSection title="혜택 이용과 문의">
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
           현재 제휴기간이 아니므로, 혜택 이용/문의를 할 수 없습니다.
         </div>
-      </Card>
+        </PageSection>
+      </Surface>
     );
   }
 
   return (
     <div className={`grid gap-4 ${contactCount > 1 ? "xl:grid-cols-2" : ""}`}>
       {benefitUseAction ? (
-        <Card className="w-full p-4 sm:p-5">
-          <SectionHeading title="혜택 이용" />
+        <Surface level="inset" padding="lg" className="w-full">
+          <PageSection title="혜택 이용">
           {benefitUseAction.disabled ? (
             <Button
               className="mt-4 w-full justify-center"
@@ -77,12 +78,13 @@ export default function PartnerDetailContactSection({
               targetId={partnerId}
             />
           )}
-        </Card>
+          </PageSection>
+        </Surface>
       ) : null}
 
       {inquiryDisplay ? (
-        <Card className="w-full p-4 sm:p-5">
-          <SectionHeading title="문의" />
+        <Surface level="inset" padding="lg" className="w-full">
+          <PageSection title="문의">
           <ContactCopyRow
             href={inquiryDisplay.href}
             label={inquiryDisplay.label}
@@ -91,16 +93,18 @@ export default function PartnerDetailContactSection({
             targetType="partner"
             targetId={partnerId}
           />
-        </Card>
+          </PageSection>
+        </Surface>
       ) : null}
 
       {contactCount === 0 ? (
-        <Card className="w-full p-4 sm:p-5">
-          <SectionHeading title="혜택 이용/문의" />
-          <div className="mt-4 rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
+        <Surface level="inset" padding="lg" className="w-full">
+          <PageSection title="혜택 이용과 문의">
+          <div className="rounded-2xl border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
             현재 등록된 혜택 이용/문의 정보가 없습니다.
           </div>
-        </Card>
+          </PageSection>
+        </Surface>
       ) : null}
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import UserMenu from "@/components/auth/UserMenu";
 import PwaInstallButton from "@/components/PwaInstallButton";
 import type { HeaderSession } from "@/lib/header-session";
@@ -60,7 +61,7 @@ export default function MobileNav({
     <>
       <button
         type="button"
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground sm:hidden"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground xl:hidden"
         aria-label="메뉴 열기"
         onClick={() => setOpen(true)}
       >
@@ -85,7 +86,7 @@ export default function MobileNav({
         ? createPortal(
             <div
               className={cn(
-                "fixed inset-0 z-[70] sm:hidden",
+                "fixed inset-0 z-[70] xl:hidden",
                 open ? "pointer-events-auto" : "pointer-events-none",
               )}
               aria-hidden={!open}
@@ -146,6 +147,26 @@ export default function MobileNav({
 
                   <div className="flex-1 overflow-y-auto px-6 py-5">
                     <div className="flex flex-col gap-4">
+                      <DrawerSection title="둘러보기">
+                        <nav className="grid gap-1" aria-label="모바일 주요 메뉴">
+                          {[
+                            { href: "/#events", label: "이벤트" },
+                            { href: "/#benefits", label: "혜택 찾기" },
+                            { href: "/campuses/seoul", label: "캠퍼스" },
+                            { href: "/suggest", label: "제휴 제안하기" },
+                          ].map((item) => (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setOpen(false)}
+                              className="inline-flex min-h-11 items-center rounded-2xl px-3 font-semibold text-foreground transition-interactive hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </nav>
+                      </DrawerSection>
+
                       <DrawerSection
                         title="계정"
                         description="로그인, 회원가입, 프로필, 알림 관련 메뉴입니다."

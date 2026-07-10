@@ -21,7 +21,7 @@ import {
   getPartnerPlanChannelLabel,
 } from "@/lib/partner-plan-ui";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
-import { requestPartnerPlanUpgradeAction } from "@/app/partner/plans/actions";
+import type { PartnerPlanFormAction } from "@/components/partner/PartnerPlanManagementView";
 
 type PartnerPlanUpgradeFormProps = {
   companyId: string;
@@ -32,6 +32,7 @@ type PartnerPlanUpgradeFormProps = {
   >;
   bankTransferAccount: PartnerBankTransferAccount;
   billingProfiles: PartnerBillingProfileRecord[];
+  action: PartnerPlanFormAction;
 };
 
 export default function PartnerPlanUpgradeForm({
@@ -41,6 +42,7 @@ export default function PartnerPlanUpgradeForm({
   upgradeOptions,
   bankTransferAccount,
   billingProfiles,
+  action,
 }: PartnerPlanUpgradeFormProps) {
   const initialTier = upgradeOptions[0]?.tier ?? currentPlanTier;
   const [selectedTier, setSelectedTier] =
@@ -74,7 +76,7 @@ export default function PartnerPlanUpgradeForm({
 
   return (
     <form
-      action={requestPartnerPlanUpgradeAction}
+      action={action}
       className="grid gap-4 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
     >
       <input type="hidden" name="companyId" value={companyId} />

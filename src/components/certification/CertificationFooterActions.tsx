@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
+import Surface from "@/components/ui/Surface";
 import { useToast } from "@/components/ui/Toast";
 
 export default function CertificationFooterActions() {
@@ -12,9 +12,10 @@ export default function CertificationFooterActions() {
   const [deleting, setDeleting] = useState(false);
 
   return (
-    <Card
-      tone="elevated"
-      className="mx-auto mt-4 flex w-full max-w-2xl flex-wrap items-center gap-3"
+    <Surface
+      level="inset"
+      padding="lg"
+      className="flex w-full flex-wrap items-center gap-3"
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">계정 관리</p>
@@ -67,6 +68,6 @@ export default function CertificationFooterActions() {
           회원 탈퇴
         </Button>
       </div>
-    </Card>
+    </Surface>
   );
 }

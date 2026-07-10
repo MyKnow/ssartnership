@@ -115,11 +115,11 @@ export default function AdminShellView({
             <Container className="flex items-center justify-between gap-3 py-3" size="dashboard">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Admin Workspace
+                  {SITE_NAME}
                 </p>
-                <h1 className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  {title}
-                </h1>
+                <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-foreground">
+                  관리자 콘솔
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -156,6 +156,7 @@ export default function AdminShellView({
           <div className="flex h-full flex-col gap-6 px-3 py-4 xl:px-4 xl:py-5">
             <Link
               href="/admin"
+              aria-label="관리 홈"
               className={cn(
                 "flex items-center rounded-2xl border border-border/70 bg-surface-elevated px-3 py-3 text-foreground shadow-flat",
                 "justify-center xl:justify-start xl:gap-3",
@@ -192,9 +193,6 @@ export default function AdminShellView({
                     </>
                   ) : null}
                 </div>
-                <h1 className="mt-1 truncate text-2xl font-semibold tracking-[-0.03em] text-foreground">
-                  {title}
-                </h1>
               </div>
 
               <div className="flex shrink-0 items-center gap-2">

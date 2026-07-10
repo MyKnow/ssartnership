@@ -1,12 +1,22 @@
 import type { MockRouteInventoryItem } from "./types.ts";
 import type { MockScenarioId } from "./registry.ts";
+import { getRequiredStateKeysForRoute } from "./required-states.ts";
 
 type RouteInventoryInput = Omit<
   MockRouteInventoryItem,
-  "requiredScenarioIds"
+  | "routeKind"
+  | "screenContractId"
+  | "primaryTask"
+  | "requiredScenarioIds"
+  | "requiredStateKeys"
 > & {
   requiredScenarioIds: MockScenarioId[];
 };
+
+type RouteContractDefinition = Pick<
+  MockRouteInventoryItem,
+  "routeKind" | "screenContractId" | "primaryTask"
+>;
 
 const publicHome = ["public.home.default"] satisfies MockScenarioId[];
 const publicPartnerRegistration = [
@@ -19,7 +29,7 @@ const partnerDashboard = [
   "partner.company.dashboard.pending-review",
 ] satisfies MockScenarioId[];
 
-export const mockRouteInventory = [
+const mockRouteInventoryBase = [
   {
     routePath: "/",
     surface: "public",
@@ -32,8 +42,8 @@ export const mockRouteInventory = [
     routePath: "/campuses/[campus]",
     surface: "public",
     authScope: "public",
-    viewComponent: "HomeView",
-    dataSources: ["repository"],
+    viewComponent: "CampusLandingView",
+    dataSources: ["repository", "storybook"],
     requiredScenarioIds: ["public.campus.default"],
   },
   {
@@ -56,8 +66,8 @@ export const mockRouteInventory = [
     routePath: "/events/[slug]",
     surface: "public",
     authScope: "public",
-    viewComponent: "EventDetailPage",
-    dataSources: ["repository", "service"],
+    viewComponent: "EventPageView",
+    dataSources: ["repository", "service", "storybook"],
     requiredScenarioIds: ["public.event.detail"],
   },
   {
@@ -72,15 +82,15 @@ export const mockRouteInventory = [
     routePath: "/legal/[kind]",
     surface: "public",
     authScope: "public",
-    viewComponent: "PolicyDocumentView",
-    dataSources: ["repository"],
+    viewComponent: "LegalPolicyView",
+    dataSources: ["repository", "storybook"],
     requiredScenarioIds: ["public.legal.document"],
   },
   {
     routePath: "/notifications",
     surface: "public",
     authScope: "member",
-    viewComponent: "NotificationInbox",
+    viewComponent: "NotificationsView",
     dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["public.notifications.default"],
   },
@@ -107,15 +117,15 @@ export const mockRouteInventory = [
     routePath: "/suggest",
     surface: "public",
     authScope: "public",
-    viewComponent: "SuggestPage",
-    dataSources: ["service"],
+    viewComponent: "SuggestPageView",
+    dataSources: ["service", "storybook"],
     requiredScenarioIds: ["public.suggest.default"],
   },
   {
     routePath: "/support/bug-report",
     surface: "public",
     authScope: "public",
-    viewComponent: "BugReportPage",
+    viewComponent: "BugReportView",
     dataSources: ["service", "storybook"],
     requiredScenarioIds: ["public.support.bug-report"],
   },
@@ -147,7 +157,7 @@ export const mockRouteInventory = [
     routePath: "/auth/login",
     surface: "auth",
     authScope: "public",
-    viewComponent: "LoginPage",
+    viewComponent: "LoginPageView",
     dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["auth.login.default"],
   },
@@ -155,8 +165,8 @@ export const mockRouteInventory = [
     routePath: "/auth/reset",
     surface: "auth",
     authScope: "public",
-    viewComponent: "ResetPasswordPage",
-    dataSources: ["api-route"],
+    viewComponent: "ResetPasswordPageView",
+    dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["auth.reset.default"],
   },
   {
@@ -171,8 +181,8 @@ export const mockRouteInventory = [
     routePath: "/auth/signup",
     surface: "auth",
     authScope: "public",
-    viewComponent: "SignupPage",
-    dataSources: ["api-route"],
+    viewComponent: "SignupPageView",
+    dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["auth.signup.default"],
   },
   {
@@ -195,7 +205,7 @@ export const mockRouteInventory = [
     routePath: "/admin",
     surface: "admin",
     authScope: "admin",
-    viewComponent: "AdminDashboardPage",
+    viewComponent: "AdminDashboardView",
     dataSources: ["repository", "service", "storybook"],
     requiredScenarioIds: ["admin.dashboard.default"],
   },
@@ -222,6 +232,15 @@ export const mockRouteInventory = [
     viewComponent: "AdminCompanyPlanManager",
     dataSources: ["repository", "service", "storybook"],
     requiredScenarioIds: ["admin.company.billing"],
+  },
+  {
+    routePath: "/admin/categories",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminCategoryManager",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.partners.list"],
+    notes: "전역 카테고리 관리 화면이며 지역 관리자는 제휴처 목록으로 이동합니다.",
   },
   {
     routePath: "/admin/cycle",
@@ -260,14 +279,14 @@ export const mockRouteInventory = [
     surface: "admin",
     authScope: "public",
     viewComponent: "AdminLoginPage",
-    dataSources: ["api-route"],
+    dataSources: ["redirect"],
     requiredScenarioIds: ["auth.login.default"],
   },
   {
     routePath: "/admin/logs",
     surface: "admin",
     authScope: "admin",
-    viewComponent: "AdminLogsExplorer",
+    viewComponent: "AdminLogsManager",
     dataSources: ["repository", "api-route", "storybook"],
     requiredScenarioIds: ["admin.logs.list"],
   },
@@ -275,8 +294,8 @@ export const mockRouteInventory = [
     routePath: "/admin/members",
     surface: "admin",
     authScope: "admin",
-    viewComponent: "AdminMembersPage",
-    dataSources: ["repository", "service"],
+    viewComponent: "AdminMemberManager",
+    dataSources: ["repository", "service", "storybook"],
     requiredScenarioIds: ["admin.members.list"],
   },
   {
@@ -312,12 +331,23 @@ export const mockRouteInventory = [
     requiredScenarioIds: ["admin.registration.queue"],
   },
   {
+    routePath: "/admin/partner-requests",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "PartnerChangeRequestQueue",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.registration.queue"],
+    notes: "파트너사의 기존 제휴처 변경 요청만 검토합니다.",
+  },
+  {
     routePath: "/admin/partners",
     surface: "admin",
     authScope: "admin",
     viewComponent: "AdminPartnerManager",
     dataSources: ["repository", "storybook"],
     requiredScenarioIds: ["admin.partners.list"],
+    notes:
+      "canonical은 제휴처 목록이며 tab=plans만 플랜 기능 보존용 conditional legacy 상태입니다.",
   },
   {
     routePath: "/admin/partners/[partnerId]",
@@ -340,7 +370,7 @@ export const mockRouteInventory = [
     surface: "admin",
     authScope: "admin",
     viewComponent: "AdminPromotionsPage",
-    dataSources: ["repository", "service"],
+    dataSources: ["redirect"],
     requiredScenarioIds: ["admin.ads.default"],
   },
   {
@@ -364,7 +394,7 @@ export const mockRouteInventory = [
     surface: "admin",
     authScope: "setup-token",
     viewComponent: "AdminSetupPage",
-    dataSources: ["api-route"],
+    dataSources: ["redirect"],
     requiredScenarioIds: ["admin.dashboard.default"],
   },
   {
@@ -382,10 +412,10 @@ export const mockRouteInventory = [
     routePath: "/partner/account",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerAccountInfoView",
+    viewComponent: "PartnerAccountScreen",
     dataSources: ["service", "api-route", "storybook"],
     requiredScenarioIds: ["partner.account.profile"],
-    notes: "계정 정보는 협력사 scoped 화면과 전역 화면에서 동일하게 접근됩니다.",
+    notes: "계정 전역 화면이며 companyId query는 복귀 맥락으로만 사용합니다.",
   },
   {
     routePath: "/partner/change-password",
@@ -407,23 +437,23 @@ export const mockRouteInventory = [
     routePath: "/partner/companies/[companyId]/account",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerAccountInfoView",
-    dataSources: ["service", "api-route", "storybook"],
-    requiredScenarioIds: ["partner.account.profile"],
+    viewComponent: "PartnerCompanyAccountCompatPage",
+    dataSources: ["redirect"],
+    requiredScenarioIds: ["partner.compat.redirect"],
   },
   {
     routePath: "/partner/companies/[companyId]/notifications",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerNotificationCenter",
-    dataSources: ["api-route", "storybook"],
-    requiredScenarioIds: ["partner.notifications.inbox"],
+    viewComponent: "PartnerCompanyNotificationsCompatPage",
+    dataSources: ["redirect"],
+    requiredScenarioIds: ["partner.compat.redirect"],
   },
   {
     routePath: "/partner/companies/[companyId]/plans",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerPlanManagementView",
+    viewComponent: "PartnerPlanScreen",
     dataSources: ["service", "storybook"],
     requiredScenarioIds: ["partner.plans.billing"],
   },
@@ -433,13 +463,13 @@ export const mockRouteInventory = [
     authScope: "partner",
     viewComponent: "PartnerServiceDetailView",
     dataSources: ["service", "api-route", "storybook"],
-    requiredScenarioIds: ["partner.service.detail"],
+    requiredScenarioIds: ["partner.service.detail", "partner.service.request"],
   },
   {
     routePath: "/partner/companies/[companyId]/services/new",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerServiceNewPage",
+    viewComponent: "PartnerServiceNewScreen",
     dataSources: ["service", "storybook"],
     requiredScenarioIds: ["partner.service.new"],
   },
@@ -447,25 +477,25 @@ export const mockRouteInventory = [
     routePath: "/partner/companies/[companyId]/support",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerSupportRequestPanel",
-    dataSources: ["service", "storybook"],
-    requiredScenarioIds: ["partner.support.template"],
+    viewComponent: "PartnerCompanySupportCompatPage",
+    dataSources: ["redirect"],
+    requiredScenarioIds: ["partner.compat.redirect"],
   },
   {
     routePath: "/partner/login",
     surface: "partner",
     authScope: "public",
-    viewComponent: "PartnerLoginPage",
-    dataSources: ["api-route"],
+    viewComponent: "PartnerLoginScreen",
+    dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["partner.auth.login"],
   },
   {
     routePath: "/partner/notifications",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerNotificationsCompatPage",
-    dataSources: ["redirect"],
-    requiredScenarioIds: ["partner.compat.redirect"],
+    viewComponent: "PartnerNotificationsScreen",
+    dataSources: ["api-route", "storybook"],
+    requiredScenarioIds: ["partner.notifications.inbox"],
   },
   {
     routePath: "/partner/plans",
@@ -479,8 +509,8 @@ export const mockRouteInventory = [
     routePath: "/partner/reset",
     surface: "partner",
     authScope: "public",
-    viewComponent: "PartnerResetPage",
-    dataSources: ["api-route"],
+    viewComponent: "PartnerResetScreen",
+    dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["partner.auth.login"],
   },
   {
@@ -495,9 +525,9 @@ export const mockRouteInventory = [
     routePath: "/partner/services/[partnerId]/request",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerServiceRequestPage",
-    dataSources: ["service", "storybook"],
-    requiredScenarioIds: ["partner.service.request"],
+    viewComponent: "PartnerServiceRequestCompatPage",
+    dataSources: ["redirect"],
+    requiredScenarioIds: ["partner.compat.redirect"],
   },
   {
     routePath: "/partner/setup",
@@ -519,8 +549,348 @@ export const mockRouteInventory = [
     routePath: "/partner/support",
     surface: "partner",
     authScope: "partner",
-    viewComponent: "PartnerSupportCompatPage",
-    dataSources: ["redirect"],
-    requiredScenarioIds: ["partner.compat.redirect"],
+    viewComponent: "PartnerSupportScreen",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["partner.support.template"],
   },
 ] as const satisfies RouteInventoryInput[];
+
+const routeContracts = {
+  "/": {
+    routeKind: "canonical",
+    screenContractId: "public.home",
+    primaryTask: "대표 이벤트를 확인하고 제휴 혜택 탐색을 시작한다.",
+  },
+  "/campuses/[campus]": {
+    routeKind: "canonical",
+    screenContractId: "public.campus-directory",
+    primaryTask: "선택한 캠퍼스에서 이용 가능한 제휴처를 탐색한다.",
+  },
+  "/certification": {
+    routeKind: "canonical",
+    screenContractId: "member.certification",
+    primaryTask: "내 SSAFY 구성원 인증 상태와 QR을 제시한다.",
+  },
+  "/coupons": {
+    routeKind: "canonical",
+    screenContractId: "member.coupons",
+    primaryTask: "사용 가능한 쿠폰을 확인하고 이용 조건을 펼쳐 본다.",
+  },
+  "/events/[slug]": {
+    routeKind: "canonical",
+    screenContractId: "public.event-detail",
+    primaryTask: "이벤트 내용과 참여 조건을 확인하고 참여한다.",
+  },
+  "/events/[slug]/winner-form": {
+    routeKind: "conditional",
+    screenContractId: "member.event-winner-form",
+    primaryTask: "당첨자 정보를 안전하게 제출한다.",
+  },
+  "/legal/[kind]": {
+    routeKind: "canonical",
+    screenContractId: "public.legal-document",
+    primaryTask: "현재 또는 지정 버전의 정책 문서를 확인한다.",
+  },
+  "/notifications": {
+    routeKind: "canonical",
+    screenContractId: "member.notifications",
+    primaryTask: "내 알림을 확인하고 읽음 상태를 관리한다.",
+  },
+  "/partner-registration": {
+    routeKind: "canonical",
+    screenContractId: "public.partner-registration",
+    primaryTask: "신규 제휴처와 파트너사 정보를 등록 신청한다.",
+  },
+  "/partners/[id]": {
+    routeKind: "canonical",
+    screenContractId: "public.partner-detail",
+    primaryTask: "핵심 혜택과 이용 조건을 확인하고 이용 액션을 실행한다.",
+  },
+  "/suggest": {
+    routeKind: "canonical",
+    screenContractId: "public.suggest",
+    primaryTask: "원하는 제휴처를 운영진에게 제안한다.",
+  },
+  "/support/bug-report": {
+    routeKind: "canonical",
+    screenContractId: "public.bug-report",
+    primaryTask: "문제 재현 정보를 정리해 운영진에게 제보한다.",
+  },
+  "/verify/[token]": {
+    routeKind: "conditional",
+    screenContractId: "public.verify-token",
+    primaryTask: "인증 QR 토큰의 유효성과 구성원 상태를 확인한다.",
+  },
+  "/auth/change-password": {
+    routeKind: "conditional",
+    screenContractId: "auth.change-password",
+    primaryTask: "필수 또는 자발적 비밀번호 변경을 완료한다.",
+  },
+  "/auth/consent": {
+    routeKind: "conditional",
+    screenContractId: "auth.consent",
+    primaryTask: "필수 정책을 확인하고 동의한다.",
+  },
+  "/auth/login": {
+    routeKind: "canonical",
+    screenContractId: "auth.login",
+    primaryTask: "회원 또는 관리자 계정으로 로그인한다.",
+  },
+  "/auth/reset": {
+    routeKind: "canonical",
+    screenContractId: "auth.reset",
+    primaryTask: "SSAFY 인증을 통해 비밀번호 재설정을 시작한다.",
+  },
+  "/auth/reset/complete": {
+    routeKind: "conditional",
+    screenContractId: "auth.reset-complete",
+    primaryTask: "검증된 재설정 세션에서 새 비밀번호를 확정한다.",
+  },
+  "/auth/signup": {
+    routeKind: "canonical",
+    screenContractId: "auth.signup",
+    primaryTask: "SSAFY 구성원 인증을 시작해 회원가입한다.",
+  },
+  "/auth/signup/complete": {
+    routeKind: "conditional",
+    screenContractId: "auth.signup-complete",
+    primaryTask: "인증 결과를 확인하고 회원가입을 완료한다.",
+  },
+  "/auth/ssafy": {
+    routeKind: "conditional",
+    screenContractId: "auth.ssafy-callback",
+    primaryTask: "SSAFY Verify 결과에 따라 가입 또는 로그인 흐름을 잇는다.",
+  },
+  "/admin": {
+    routeKind: "canonical",
+    screenContractId: "admin.dashboard",
+    primaryTask: "처리가 필요한 운영 업무를 파악하고 바로 이동한다.",
+  },
+  "/admin/admins": {
+    routeKind: "canonical",
+    screenContractId: "admin.accounts",
+    primaryTask: "관리자 계정과 권한 범위를 관리한다.",
+  },
+  "/admin/advertisement": {
+    routeKind: "canonical",
+    screenContractId: "admin.advertisement",
+    primaryTask: "광고 상품과 홈 프로모션 노출을 관리한다.",
+  },
+  "/admin/companies": {
+    routeKind: "canonical",
+    screenContractId: "admin.companies",
+    primaryTask: "파트너사 계정, 플랜, 과금 상태를 관리한다.",
+  },
+  "/admin/categories": {
+    routeKind: "canonical",
+    screenContractId: "admin.categories",
+    primaryTask: "제휴처 카테고리와 연결 영향을 관리한다.",
+  },
+  "/admin/cycle": {
+    routeKind: "canonical",
+    screenContractId: "admin.cycle",
+    primaryTask: "SSAFY 기수 운영 기준과 카드 테마를 관리한다.",
+  },
+  "/admin/denied": {
+    routeKind: "conditional",
+    screenContractId: "admin.denied",
+    primaryTask: "권한 부족 사유를 확인하고 안전한 화면으로 이동한다.",
+  },
+  "/admin/event": {
+    routeKind: "canonical",
+    screenContractId: "admin.event-list",
+    primaryTask: "이벤트 목록과 운영 상태를 확인한다.",
+  },
+  "/admin/event/[slug]": {
+    routeKind: "canonical",
+    screenContractId: "admin.event-detail",
+    primaryTask: "이벤트 참여와 보상 처리 내역을 운영한다.",
+  },
+  "/admin/login": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "통합 회원 로그인 화면으로 이동한다.",
+  },
+  "/admin/logs": {
+    routeKind: "canonical",
+    screenContractId: "admin.logs",
+    primaryTask: "제품·감사·인증 로그를 검색하고 내보낸다.",
+  },
+  "/admin/members": {
+    routeKind: "canonical",
+    screenContractId: "admin.members",
+    primaryTask: "회원 목록을 핵심 조건으로 검색하고 상세로 이동한다.",
+  },
+  "/admin/members/[memberId]": {
+    routeKind: "canonical",
+    screenContractId: "admin.member-detail",
+    primaryTask: "한 회원의 정보와 보안·운영 이력을 확인한다.",
+  },
+  "/admin/members/mock": {
+    routeKind: "mock-only",
+    screenContractId: null,
+    primaryTask: "기수 카드의 합성 미리보기로 이동한다.",
+  },
+  "/admin/notifications": {
+    routeKind: "canonical",
+    screenContractId: "admin.notifications",
+    primaryTask: "내 운영 알림을 확인하고 읽음·수신 설정을 관리한다.",
+  },
+  "/admin/partner-registrations": {
+    routeKind: "canonical",
+    screenContractId: "admin.partner-registrations",
+    primaryTask: "신규 제휴 접수를 검토하고 승인 또는 반려한다.",
+  },
+  "/admin/partner-requests": {
+    routeKind: "canonical",
+    screenContractId: "admin.partner-requests",
+    primaryTask: "기존 제휴처 변경 요청의 diff를 검토하고 처리한다.",
+  },
+  "/admin/partners": {
+    routeKind: "canonical",
+    screenContractId: "admin.partners",
+    primaryTask: "제휴처 목록을 검색하고 생성·편집 흐름으로 이동한다.",
+  },
+  "/admin/partners/[partnerId]": {
+    routeKind: "canonical",
+    screenContractId: "admin.partner-editor",
+    primaryTask: "제휴처 정보와 혜택·미디어를 수정한다.",
+  },
+  "/admin/partners/new": {
+    routeKind: "canonical",
+    screenContractId: "admin.partner-new",
+    primaryTask: "새 제휴처를 검증된 정보로 생성한다.",
+  },
+  "/admin/promotions": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "통합 광고·프로모션 관리 화면으로 이동한다.",
+  },
+  "/admin/push": {
+    routeKind: "canonical",
+    screenContractId: "admin.push",
+    primaryTask: "대상과 채널을 검토해 알림을 발송하고 결과를 확인한다.",
+  },
+  "/admin/reviews": {
+    routeKind: "canonical",
+    screenContractId: "admin.reviews",
+    primaryTask: "회원 리뷰를 검색하고 공개 상태를 조정한다.",
+  },
+  "/admin/setup/[token]": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "현재 관리자 진입 화면으로 이동한다.",
+  },
+  "/partner": {
+    routeKind: "conditional",
+    screenContractId: "partner.company-selection",
+    primaryTask: "운영할 파트너사를 선택하거나 유일한 회사 대시보드로 이동한다.",
+  },
+  "/partner/account": {
+    routeKind: "canonical",
+    screenContractId: "partner.account",
+    primaryTask: "파트너 계정과 담당자 정보를 확인한다.",
+  },
+  "/partner/change-password": {
+    routeKind: "conditional",
+    screenContractId: "partner.change-password",
+    primaryTask: "초기 또는 자발적 비밀번호 변경을 완료한다.",
+  },
+  "/partner/companies/[companyId]": {
+    routeKind: "canonical",
+    screenContractId: "partner.dashboard",
+    primaryTask: "처리 필요 항목과 제휴처 현황을 확인한다.",
+  },
+  "/partner/companies/[companyId]/account": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "회사 맥락을 보존해 전역 계정 화면으로 이동한다.",
+  },
+  "/partner/companies/[companyId]/notifications": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "회사 맥락을 보존해 전역 알림 화면으로 이동한다.",
+  },
+  "/partner/companies/[companyId]/plans": {
+    routeKind: "canonical",
+    screenContractId: "partner.plans",
+    primaryTask: "선택 파트너사의 플랜과 결제 상태를 관리한다.",
+  },
+  "/partner/companies/[companyId]/services/[partnerId]": {
+    routeKind: "canonical",
+    screenContractId: "partner.service-detail",
+    primaryTask: "제휴처 정보와 성과를 확인하고 변경을 요청한다.",
+  },
+  "/partner/companies/[companyId]/services/new": {
+    routeKind: "canonical",
+    screenContractId: "partner.service-new",
+    primaryTask: "선택 파트너사에 새 제휴처를 신청한다.",
+  },
+  "/partner/companies/[companyId]/support": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "회사 맥락을 보존해 전역 지원 화면으로 이동한다.",
+  },
+  "/partner/login": {
+    routeKind: "canonical",
+    screenContractId: "partner.login",
+    primaryTask: "파트너 계정으로 로그인한다.",
+  },
+  "/partner/notifications": {
+    routeKind: "canonical",
+    screenContractId: "partner.notifications",
+    primaryTask: "담당 파트너사의 알림을 확인하고 수신 설정을 관리한다.",
+  },
+  "/partner/plans": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "선택 가능한 파트너사 플랜 화면으로 이동한다.",
+  },
+  "/partner/reset": {
+    routeKind: "canonical",
+    screenContractId: "partner.reset",
+    primaryTask: "파트너 계정의 비밀번호 재설정을 요청한다.",
+  },
+  "/partner/services/[partnerId]": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "권한 있는 회사 범위를 찾아 canonical 제휴처 상세로 이동한다.",
+  },
+  "/partner/services/[partnerId]/request": {
+    routeKind: "compat-redirect",
+    screenContractId: null,
+    primaryTask: "canonical 제휴처 변경 화면으로 이동한다.",
+  },
+  "/partner/setup": {
+    routeKind: "mock-only",
+    screenContractId: null,
+    primaryTask: "개발용 합성 초기 설정 링크를 확인한다.",
+  },
+  "/partner/setup/[token]": {
+    routeKind: "conditional",
+    screenContractId: "partner.setup",
+    primaryTask: "초대 토큰으로 파트너 계정의 초기 비밀번호를 설정한다.",
+  },
+  "/partner/support": {
+    routeKind: "canonical",
+    screenContractId: "partner.support",
+    primaryTask: "지원 유형과 문의 템플릿을 확인해 운영진에게 요청한다.",
+  },
+} as const satisfies Record<
+  (typeof mockRouteInventoryBase)[number]["routePath"],
+  RouteContractDefinition
+>;
+
+export const mockRouteInventory: MockRouteInventoryItem[] =
+  mockRouteInventoryBase.map((route) => {
+    const contract = routeContracts[route.routePath];
+    const routeWithContract = {
+      ...route,
+      ...contract,
+    } satisfies Omit<MockRouteInventoryItem, "requiredStateKeys">;
+
+    return {
+      ...routeWithContract,
+      requiredStateKeys: getRequiredStateKeysForRoute(routeWithContract),
+    };
+  });

@@ -1,0 +1,132 @@
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import AdminMemberDetailView from "./AdminMemberDetailView";
+
+const meta = {
+  title: "Domains/Admin/AdminMemberDetailView",
+  component: AdminMemberDetailView,
+  args: {
+    member: {
+      id: "member-seoul-15-001",
+      displayName: "김하늘",
+      mmUsername: "seoul15_haneul",
+      mmUserId: "mm-user-seoul-15-001",
+      year: 15,
+      yearLabel: "15기 · 2학기",
+      campus: "서울",
+      mustChangePassword: false,
+      createdAt: "2026-01-12T10:00:00+09:00",
+      updatedAt: "2026-07-10T09:30:00+09:00",
+      hasAvatar: false,
+      avatarUrl: "/api/admin/members/member-seoul-15-001/avatar",
+    },
+    activeDeviceCount: 2,
+    preferences: {
+      enabled: true,
+      announcementEnabled: true,
+      newPartnerEnabled: true,
+      expiringPartnerEnabled: false,
+      reviewEnabled: true,
+      mmEnabled: true,
+      marketingEnabled: false,
+      activeDeviceCount: 2,
+    },
+    policyStates: [
+      {
+        kind: "service",
+        label: "서비스 이용약관",
+        status: "current",
+        statusLabel: "현재 동의",
+        version: 3,
+        eventAt: "2026-07-01T09:00:00+09:00",
+        eventLabel: "동의 시각",
+        title: "싸트너십 서비스 이용약관",
+        effectiveAt: "2026-07-01T00:00:00+09:00",
+      },
+      {
+        kind: "privacy",
+        label: "개인정보 처리방침",
+        status: "current",
+        statusLabel: "현재 동의",
+        version: 3,
+        eventAt: "2026-07-01T09:00:00+09:00",
+        eventLabel: "동의 시각",
+        title: "개인정보 처리방침",
+        effectiveAt: "2026-07-01T00:00:00+09:00",
+      },
+      {
+        kind: "marketing",
+        label: "마케팅 정보 수신",
+        status: "notAgreed",
+        statusLabel: "미동의",
+        version: null,
+        eventAt: null,
+        eventLabel: "동의 시각",
+        title: null,
+        effectiveAt: null,
+      },
+    ],
+    consentTimeline: [
+      {
+        kind: "service",
+        agreed: true,
+        at: "2026-07-01T09:00:00+09:00",
+        version: 3,
+        title: "싸트너십 서비스 이용약관",
+        effectiveAt: "2026-07-01T00:00:00+09:00",
+      },
+      {
+        kind: "privacy",
+        agreed: true,
+        at: "2026-07-01T09:00:00+09:00",
+        version: 3,
+        title: "개인정보 처리방침",
+        effectiveAt: "2026-07-01T00:00:00+09:00",
+      },
+    ],
+    securityLogs: [
+      {
+        id: "security-log-1",
+        eventName: "member_login_success",
+        status: "success",
+        identifier: "seoul15_haneul",
+        path: "/auth/login",
+        ipAddress: "203.0.113.15",
+        properties: { provider: "ssafy_verify" },
+        createdAt: "2026-07-10T09:30:00+09:00",
+      },
+      {
+        id: "security-log-2",
+        eventName: "member_policy_consent",
+        status: "success",
+        identifier: "seoul15_haneul",
+        path: "/auth/consent",
+        ipAddress: "203.0.113.15",
+        properties: { serviceVersion: 3, privacyVersion: 3 },
+        createdAt: "2026-07-01T09:00:00+09:00",
+      },
+    ],
+    securityLogPagination: {
+      totalCount: 2,
+      page: 1,
+      pageSize: 50,
+      pageSizeOptions: [25, 50, 100],
+    },
+    updateAction: async () => {},
+    deleteAction: async () => {},
+    canUpdate: true,
+    canDelete: false,
+  },
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: { pathname: "/admin/members/member-seoul-15-001" },
+    },
+    chromatic: { viewports: [360, 820, 1366] },
+  },
+} satisfies Meta<typeof AdminMemberDetailView>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};

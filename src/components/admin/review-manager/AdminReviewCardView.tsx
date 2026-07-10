@@ -76,7 +76,7 @@ export default function AdminReviewCardView({
 
           <div className="grid gap-1">
             <p className="text-xs font-medium text-muted-foreground">
-              {review.companyName ?? "알 수 없는 협력사"} · {review.partnerName}
+              {review.companyName ?? "알 수 없는 파트너사"} · {review.partnerName}
             </p>
             <h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{review.title}</h3>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -156,8 +156,8 @@ export default function AdminReviewCardView({
         <MetaItem label="작성자" value={`${review.memberName} · ${review.memberId}`} />
         <MetaItem label="MM" value={review.memberUsername ?? "미등록"} />
         <MetaItem label="캠퍼스" value={review.memberCampus ?? "미상"} />
-        <MetaItem label="협력사" value={review.companyName ?? "미상"} />
-        <MetaItem label="브랜드" value={review.partnerName} />
+        <MetaItem label="파트너사" value={review.companyName ?? "미상"} />
+        <MetaItem label="제휴처" value={review.partnerName} />
         <MetaItem label="작성" value={formatPartnerReviewDate(review.createdAt)} />
         <MetaItem label="수정" value={formatPartnerReviewDate(review.updatedAt)} />
       </dl>

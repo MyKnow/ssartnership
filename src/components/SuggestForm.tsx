@@ -41,7 +41,7 @@ function SuggestField({
             *
           </span>
         ) : (
-          <span className="font-medium tracking-normal text-muted-foreground/80">
+          <span className="font-medium tracking-normal text-muted-foreground">
             선택
           </span>
         )}
@@ -165,7 +165,7 @@ export default function SuggestForm() {
           </p>
         </div>
 
-        <SuggestField label="업체명" required error={fieldErrors.companyName}>
+        <SuggestField label="제휴처명" required error={fieldErrors.companyName}>
           <Input
             ref={(element) => {
               fieldRefs.current.companyName = element;
@@ -181,8 +181,8 @@ export default function SuggestForm() {
         </SuggestField>
 
         <SuggestField
-          label="업체 분야 소개"
-          description="업종, 위치, 주요 서비스가 드러나면 검토가 빨라집니다."
+          label="제휴처 분야 소개"
+          description="업종, 위치, 주요 제공 내용이 드러나면 검토가 빨라집니다."
           required
           error={fieldErrors.businessArea}
         >

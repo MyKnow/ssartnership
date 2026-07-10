@@ -118,7 +118,7 @@ export default function Footer() {
               className="w-full justify-start gap-2"
             >
               <UserCircleIcon className="h-5 w-5" />
-              내 프로필 설정
+              내 인증
             </Button>
           </FooterSection>
 

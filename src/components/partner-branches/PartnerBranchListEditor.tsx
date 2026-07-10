@@ -601,7 +601,7 @@ export default function PartnerBranchListEditor({
               <BranchRowField
                 label="지점 코드"
                 inputId={`${row.id}-branch-code`}
-                description="브랜드 내부 코드가 있으면 입력합니다. 없으면 자동 생성합니다."
+                description="제휴처 내부 코드가 있으면 입력합니다. 없으면 자동 생성합니다."
               >
                 <Input
                   id={`${row.id}-branch-code`}

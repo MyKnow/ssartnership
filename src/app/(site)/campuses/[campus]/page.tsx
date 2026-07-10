@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import HeroSection from "@/components/HeroSection";
-import HomeView from "@/components/HomeView";
+import CampusLandingView from "@/components/campuses/CampusLandingView";
 import SiteHeader from "@/components/SiteHeader";
-import Container from "@/components/ui/Container";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import {
   CAMPUS_DIRECTORY,
@@ -206,29 +204,18 @@ export default async function CampusLandingPage({
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
-      <main>
-        <Container className="pb-16 pt-10" size="wide">
-          {campusJsonLd ? (
-            <script
-              type="application/ld+json"
-              dangerouslySetInnerHTML={{ __html: JSON.stringify(campusJsonLd) }}
-            />
-          ) : null}
-          <HeroSection
-            eyebrow={`Campus · ${campus.label}`}
-            title={`${campus.fullLabel} 제휴 혜택`}
-            description={`${campus.description} 공개 제휴 ${publicCampusPartners.length}건을 기준으로 카테고리와 검색 필터를 바로 사용할 수 있습니다.`}
-          />
-          <HomeView
-            categories={categories}
-            partners={campusPartners}
-            viewerAuthenticated={Boolean(headerSession?.userId)}
-            currentUserId={headerSession?.userId ?? null}
-            partnerPopularityById={campusPopularityById}
-            partnerFavoriteStateById={campusFavoriteStateById}
-          />
-        </Container>
-      </main>
+      <CampusLandingView
+        campus={campus}
+        publicPartnerCount={publicCampusPartners.length}
+        categories={categories}
+        partners={campusPartners}
+        viewerAuthenticated={Boolean(headerSession?.userId)}
+        currentUserId={headerSession?.userId ?? null}
+        partnerPopularityById={campusPopularityById}
+        partnerFavoriteStateById={campusFavoriteStateById}
+        loadedPartnerStateIds={campusPartnerIds}
+        structuredData={campusJsonLd}
+      />
     </div>
   );
 }

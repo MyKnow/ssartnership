@@ -19,12 +19,12 @@ test.describe("public partner discovery", () => {
     const initialCount = await cards.count();
     expect(initialCount).toBeGreaterThan(0);
 
-    const publicPartnerLink = page.locator('a[href="/partners/health-001"]').first();
+    const publicPartnerLink = page.locator('a[href^="/partners/health-001"]').first();
     await expect(publicPartnerLink).toBeVisible();
     await publicPartnerLink.scrollIntoViewIfNeeded();
     await publicPartnerLink.click();
 
-    await expect(page).toHaveURL(/\/partners\/health-001$/);
+    await expect(page).toHaveURL(/\/partners\/health-001(?:\?|$)/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
@@ -43,6 +43,7 @@ test.describe("public partner discovery", () => {
         return cards.count();
       })
       .toBe(1);
+    await expect(page).toHaveURL(/q=%EB%B0%94%EB%94%94%EB%9D%BC%EC%9D%B8/);
 
     await typeSearch(page, "");
     await expect(cards).toHaveCount(initialCount);
@@ -52,5 +53,24 @@ test.describe("public partner discovery", () => {
 
     await typeSearch(page, "");
     await expect(cards).toHaveCount(initialCount);
+  });
+
+  test("moves from the featured event into search and returns with filters intact", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.getByRole("link", { name: "혜택 찾기" }).first().click();
+    await expect(page.locator("#benefits")).toBeVisible();
+    await typeSearch(page, "바디라인");
+    await expect(page).toHaveURL(/q=%EB%B0%94%EB%94%94%EB%9D%BC%EC%9D%B8/);
+
+    const resultCard = page.getByTestId("partner-card").first();
+    await expect(resultCard).toBeVisible();
+    await resultCard.getByRole("link", { name: "제휴 상세 보기" }).click();
+
+    await expect(page).toHaveURL(/returnTo=/);
+    await page.getByRole("link", { name: "혜택 목록으로" }).click();
+
+    await expect(page).toHaveURL(/q=%EB%B0%94%EB%94%94%EB%9D%BC%EC%9D%B8/);
+    await expect(page.getByTestId("partner-search-input")).toHaveValue("바디라인");
   });
 });

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import Container from "@/components/ui/Container";
-import FormMessage from "@/components/ui/FormMessage";
-import ShellHeader from "@/components/ui/ShellHeader";
-import PartnerPlanManagementView from "@/components/partner/PartnerPlanManagementView";
+import PartnerPlanScreen from "@/components/partner/PartnerPlanScreen";
+import {
+  cancelPartnerPlanUpgradeRequestAction,
+  requestPartnerPlanUpgradeAction,
+} from "@/app/partner/plans/actions";
 import { getPartnerBillingProfiles } from "@/lib/partner-billing-profiles";
 import { getPartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import { getPartnerPlanPortalData } from "@/lib/partner-plan-service";
@@ -63,22 +64,18 @@ export default async function PartnerCompanyPlansPage({
     : null;
 
   return (
-    <Container size="wide" className="pb-16 pt-6 lg:pt-8">
-      <div className="space-y-6">
-        <ShellHeader
-          eyebrow="Partner Portal"
-          title="플랜 관리"
-          description={`${scope.name} 소유 브랜드의 플랜과 업그레이드 요청 상태를 확인합니다.`}
-        />
-        {statusMessage ? <FormMessage variant="info">{statusMessage}</FormMessage> : null}
-        {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
-        <PartnerPlanManagementView
-          data={data}
-          companyId={scope.id}
-          bankTransferAccount={bankTransferAccount}
-          billingProfiles={billingProfiles}
-        />
-      </div>
-    </Container>
+    <PartnerPlanScreen
+      data={data}
+      companyId={scope.id}
+      companyName={scope.name}
+      bankTransferAccount={bankTransferAccount}
+      billingProfiles={billingProfiles}
+      statusMessage={statusMessage}
+      errorMessage={errorMessage}
+      actions={{
+        requestUpgrade: requestPartnerPlanUpgradeAction,
+        cancelUpgrade: cancelPartnerPlanUpgradeRequestAction,
+      }}
+    />
   );
 }

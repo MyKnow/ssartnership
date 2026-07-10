@@ -8,7 +8,7 @@ import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `협력사 대시보드 | ${SITE_NAME}`,
+  title: `파트너사 대시보드 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,
@@ -38,11 +38,5 @@ export default async function PartnerCompanyDashboardPage({
 
   const dashboard = await getPartnerPortalDashboard([scope.id]);
 
-  return (
-    <PartnerDashboardView
-      session={session}
-      dashboard={dashboard}
-      selectedCompany={scope}
-    />
-  );
+  return <PartnerDashboardView dashboard={dashboard} />;
 }

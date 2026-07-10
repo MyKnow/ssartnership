@@ -1,10 +1,7 @@
 import Badge from "@/components/ui/Badge";
 import SubmitButton from "@/components/ui/SubmitButton";
 import PartnerInitialSetupUrlCopyButton from "@/components/admin/PartnerInitialSetupUrlCopyButton";
-import {
-  createPartnerAccountInitialSetupUrl,
-  sendPartnerAccountInitialSetupUrl,
-} from "@/app/admin/(protected)/actions";
+import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import {
   formatPartnerAccountDateTime,
   getPartnerInitialSetupBadge,
@@ -15,9 +12,13 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 export default function PartnerAccountHeader({
   account,
   generatedSetupUrl,
+  createSetupUrlAction,
+  sendSetupUrlAction,
 }: {
   account: AdminPartnerAccount;
   generatedSetupUrl?: string | null;
+  createSetupUrlAction: AdminFormAction;
+  sendSetupUrlAction: AdminFormAction;
 }) {
   const hasIssuedSetupLink = hasIssuedPartnerInitialSetupLink(account);
   const setupBadge = getPartnerInitialSetupBadge(account);
@@ -33,7 +34,7 @@ export default function PartnerAccountHeader({
             {account.must_change_password ? "비밀번호 변경 필요" : "일반"}
           </Badge>
           <Badge variant="neutral">
-            협력사 연결 {account.links.length}개
+            파트너사 연결 {account.links.length}개
           </Badge>
           <Badge variant={setupBadge.variant}>{setupBadge.label}</Badge>
         </div>
@@ -56,7 +57,7 @@ export default function PartnerAccountHeader({
       <div className="grid gap-2 xl:justify-items-end">
         <div className="flex flex-wrap gap-2 xl:justify-end">
           {!account.initial_setup_completed_at && account.is_active !== false ? (
-            <form action={createPartnerAccountInitialSetupUrl}>
+            <form action={createSetupUrlAction}>
               <input type="hidden" name="id" value={account.id} />
               <SubmitButton
                 pendingText="생성 중"
@@ -75,7 +76,7 @@ export default function PartnerAccountHeader({
           ) : null}
 
           {!account.initial_setup_completed_at && account.is_active !== false ? (
-            <form action={sendPartnerAccountInitialSetupUrl}>
+            <form action={sendSetupUrlAction}>
               <input type="hidden" name="id" value={account.id} />
               <SubmitButton pendingText="전송 중" className="w-full sm:w-auto">
                 {hasIssuedSetupLink

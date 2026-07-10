@@ -85,7 +85,7 @@ export default function AdminMemberManualAddPanel({
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
-            추가 시 각 유저에게 임시 비밀번호를 전송하고, 비밀번호 변경을 필수로 지정합니다.
+            추가 시 각 회원에게 임시 비밀번호를 전송하고, 비밀번호 변경을 필수로 지정합니다.
           </p>
           <SubmitButton pendingText="추가 중">추가 및 전송</SubmitButton>
         </div>

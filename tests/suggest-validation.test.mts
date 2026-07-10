@@ -30,7 +30,7 @@ test("suggest validation rejects missing required fields with field errors", asy
   if (!result.ok) {
     assert.equal(result.code, "suggest_missing_required");
     assert.equal(result.message, "필수 항목이 누락되었습니다.");
-    assert.equal(result.fieldErrors.companyName, "업체명을 입력해 주세요.");
+    assert.equal(result.fieldErrors.companyName, "파트너사명을 입력해 주세요.");
     assert.equal(result.fieldErrors.contactEmail, "담당자 이메일을 입력해 주세요.");
   }
 });
@@ -43,7 +43,7 @@ test("suggest validation rejects non-object payloads as missing required fields"
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.equal(result.code, "suggest_missing_required");
-    assert.equal(result.fieldErrors.companyName, "업체명을 입력해 주세요.");
+    assert.equal(result.fieldErrors.companyName, "파트너사명을 입력해 주세요.");
   }
 });
 

@@ -495,7 +495,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
       const message =
         error instanceof Error
           ? error.message
-          : "브랜드 등록 신청 승인 후처리에 실패했습니다.";
+          : "제휴처 등록 신청 승인 후처리에 실패했습니다.";
       console.error("[partner-registration] converted follow-up failed", message);
     }
   }

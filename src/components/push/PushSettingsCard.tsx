@@ -139,7 +139,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                 <span className="flex items-center gap-3">
                   <span
                     className={controller.pushEnabled
-                      ? "min-w-10 text-right text-xs font-semibold text-emerald-600 dark:text-emerald-300"
+                      ? "min-w-10 text-right text-xs font-semibold text-success"
                       : "min-w-10 text-right text-xs font-semibold text-muted-foreground"}
                   >
                     {controller.pushEnabled ? "켜짐" : "꺼짐"}

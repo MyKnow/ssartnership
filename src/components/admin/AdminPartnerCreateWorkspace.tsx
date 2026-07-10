@@ -8,14 +8,14 @@ import PartnerCardForm, {
   type PartnerCardFormValues,
 } from "@/components/PartnerCardForm";
 import AdminPartnerFileImportForm from "@/components/admin/AdminPartnerFileImportForm";
-import Tabs from "@/components/ui/Tabs";
-import { createPartnerFormAction } from "@/app/admin/(protected)/actions";
+import AdminTabs from "@/components/admin/AdminTabs";
 import {
   PARTNER_CREATE_FORM_INITIAL_STATE,
   type PartnerCreateFormState,
 } from "@/lib/partner-form-state";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import type { AdminPartnerFileDraft } from "@/lib/admin-partner-file-import";
+import type { AdminPartnerFileParseResult } from "@/lib/admin-partner-file-import";
 
 type CreateMode = "single" | "csv";
 
@@ -23,12 +23,12 @@ const createModeOptions = [
   {
     value: "single",
     label: "단건 추가",
-    description: "하나의 브랜드를 카드 폼으로 직접 입력합니다.",
+    description: "하나의 제휴처를 카드 폼으로 직접 입력합니다.",
   },
   {
     value: "csv",
     label: "파일로 채우기",
-    description: "한 브랜드 XLSX 값을 단건 입력 폼에 반영합니다.",
+    description: "한 제휴처의 XLSX 값을 단건 입력 폼에 반영합니다.",
   },
 ] satisfies Array<{
   value: CreateMode;
@@ -69,24 +69,35 @@ function buildFieldErrors(state: PartnerCreateFormState) {
   return { [focusField]: message } as Partial<Record<PartnerCardFormField, string>>;
 }
 
+export type AdminPartnerCreateWorkspaceProps = {
+  partner: PartnerCardFormValues;
+  categoryOptions: PartnerCardCategoryOption[];
+  companyOptions: PartnerCardCompanyOption[];
+  categoryId: string;
+  createAction: (
+    previousState: PartnerCreateFormState,
+    formData: FormData,
+  ) => PartnerCreateFormState | Promise<PartnerCreateFormState>;
+  parseFileAction: (
+    formData: FormData,
+  ) => Promise<AdminPartnerFileParseResult>;
+};
+
 export default function AdminPartnerCreateWorkspace({
   partner,
   categoryOptions,
   companyOptions,
   categoryId,
-}: {
-  partner: PartnerCardFormValues;
-  categoryOptions: PartnerCardCategoryOption[];
-  companyOptions: PartnerCardCompanyOption[];
-  categoryId: string;
-}) {
+  createAction,
+  parseFileAction,
+}: AdminPartnerCreateWorkspaceProps) {
   const [mode, setMode] = useState<CreateMode>("single");
   const [partnerDraft, setPartnerDraft] = useState(partner);
   const [draftCategoryId, setDraftCategoryId] = useState(categoryId);
   const [draftRevision, setDraftRevision] = useState(0);
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [state, formAction] = useActionState(
-    createPartnerFormAction,
+    createAction,
     PARTNER_CREATE_FORM_INITIAL_STATE,
   );
   const fieldErrors = useMemo(() => buildFieldErrors(state), [state]);
@@ -97,12 +108,12 @@ export default function AdminPartnerCreateWorkspace({
   const formError =
     state.status === "error" && state.errorCode && !fieldErrors
       ? partnerFormErrorMessages[state.errorCode] ??
-        "브랜드를 추가하지 못했습니다. 입력값을 확인해 주세요."
+        "제휴처를 추가하지 못했습니다. 입력값을 확인해 주세요."
       : null;
 
   return (
     <div className="mt-6 grid gap-6">
-      <Tabs value={mode} onChange={setMode} options={createModeOptions} />
+      <AdminTabs value={mode} onChange={setMode} options={createModeOptions} />
 
       {mode === "single" ? (
         <div className="grid gap-4">
@@ -119,7 +130,7 @@ export default function AdminPartnerCreateWorkspace({
             companyOptions={companyOptions}
             categoryId={draftCategoryId}
             formAction={formAction}
-            submitLabel="브랜드 추가"
+            submitLabel="제휴처 추가"
             focusField={focusField}
             fieldErrors={fieldErrors}
             formError={formError}
@@ -127,10 +138,11 @@ export default function AdminPartnerCreateWorkspace({
         </div>
       ) : (
         <AdminPartnerFileImportForm
+          parseFileAction={parseFileAction}
           onApplyDraft={(draft: AdminPartnerFileDraft) => {
             const categoryNotice =
               draft.categoryLabel && !draft.categoryId
-                ? `파일의 신규 카테고리 "${draft.categoryLabel}"는 아직 등록되어 있지 않습니다. 브랜드 관리 > 카테고리 탭에서 먼저 추가한 뒤 이 브랜드 폼에서 선택하세요.`
+                ? `파일의 신규 카테고리 "${draft.categoryLabel}"는 아직 등록되어 있지 않습니다. 카테고리 관리에서 먼저 추가한 뒤 이 제휴처 폼에서 선택하세요.`
                 : null;
             setPartnerDraft((current) => ({
               ...draft.partner,
@@ -143,7 +155,7 @@ export default function AdminPartnerCreateWorkspace({
             setDraftRevision((current) => current + 1);
             setDraftNotice(
               categoryNotice ??
-                "파일 값이 반영되었습니다. 검토 후 브랜드 추가를 눌러 저장하세요.",
+                "파일 값이 반영되었습니다. 검토 후 제휴처 추가를 눌러 저장하세요.",
             );
             setMode("single");
           }}

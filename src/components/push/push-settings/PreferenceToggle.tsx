@@ -36,7 +36,7 @@ export function PreferenceToggle({
         <span
           className={
             checked
-              ? "min-w-10 text-right text-xs font-semibold text-emerald-600 dark:text-emerald-300"
+              ? "min-w-10 text-right text-xs font-semibold text-success"
               : "min-w-10 text-right text-xs font-semibold text-muted-foreground"
           }
         >

@@ -10,10 +10,9 @@ export default function AdminPartnerCreateToast() {
 
   useEffect(() => {
     if (searchParams.get("created") === "partner_created") {
-      notify("브랜드를 추가했습니다.");
+      notify("제휴처를 추가했습니다.");
     }
   }, [notify, searchParams]);
 
   return null;
 }
-

@@ -40,7 +40,7 @@ export function PartnerSetupFormPanel({
                 이미 초기 설정이 완료되었습니다
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                이 링크에서는 더 설정할 내용이 없습니다.<br />협력사 포털 로그인으로
+                이 링크에서는 더 설정할 내용이 없습니다.<br />파트너사 포털 로그인으로
                 이동해 바로 사용하면 됩니다.
               </p>
             </div>
@@ -50,7 +50,7 @@ export function PartnerSetupFormPanel({
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">다음 단계</p>
               <p className="text-sm leading-6 text-muted-foreground">
-                로그인 후 연결된 브랜드의 소개, 이미지, 운영 정보를 관리하세요.
+                로그인 후 연결된 제휴처의 소개, 이미지, 운영 정보를 관리하세요.
               </p>
             </div>
             <Button className="mt-4 w-full sm:mt-0 sm:w-auto" href="/partner/login">
@@ -102,13 +102,13 @@ export function PartnerSetupCompanyCard({
           </h2>
         </div>
         <p className="text-sm leading-6 text-muted-foreground">
-          {context.company.description ?? "연결된 브랜드 정보를 확인할 수 있습니다."}
+          {context.company.description ?? "연결된 제휴처 정보를 확인할 수 있습니다."}
         </p>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">브랜드</h3>
+          <h3 className="text-sm font-semibold text-foreground">제휴처</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             이 계정으로 수정할 수 있는 대상입니다.
           </p>

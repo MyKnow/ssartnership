@@ -1,8 +1,15 @@
 import AdminShell from "@/components/admin/AdminShell";
-import AdminCompanyWorkspace from "@/components/admin/AdminCompanyWorkspace";
-import FormMessage from "@/components/ui/FormMessage";
-import ShellHeader from "@/components/ui/ShellHeader";
-import StatsRow from "@/components/ui/StatsRow";
+import AdminCompaniesView from "@/components/admin/AdminCompaniesView";
+import {
+  createPartnerAccount,
+  createPartnerAccountInitialSetupUrl,
+  createPartnerCompany,
+  deletePartnerCompany,
+  sendPartnerAccountInitialSetupUrl,
+  updatePartnerAccount,
+  updatePartnerAccountCompanyConnection,
+  updatePartnerCompany,
+} from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
@@ -233,12 +240,6 @@ export default async function AdminCompaniesPage({
     )
     .filter((account): account is PartnerAccountRow => Boolean(account))
     .filter((account) => !managedCampusFilter || account.links.length > 0);
-  const activeCompanyCount = safeCompanies.filter((company) => company.is_active !== false).length;
-  const activeAccountCount = safeAccounts.filter((account) => account.is_active !== false).length;
-  const totalAccountLinks = safeAccounts.reduce(
-    (sum, account) => sum + account.links.length,
-    0,
-  );
   const brandCountByCompanyId = new Map<string, number>();
   for (const partner of safePartners) {
     const companyId =
@@ -277,33 +278,25 @@ export default async function AdminCompaniesPage({
 
   return (
     <AdminShell title="파트너사/계정 관리" backHref="/admin" backLabel="관리 홈">
-      <section className="grid gap-6">
-        <ShellHeader
-          eyebrow="Partner Companies"
-          title="파트너사와 계정 연결 관리"
-          description="여러 제휴처를 보유한 회사 단위, 담당 계정, 다대다 연결을 한 화면에서 정리합니다."
-        />
-        {companyError ? (
-          <FormMessage variant="error">{companyError}</FormMessage>
-        ) : null}
-        <StatsRow
-          items={[
-            { label: "파트너사", value: `${safeCompanies.length}개`, hint: `활성 ${activeCompanyCount}개` },
-            { label: "제휴처", value: `${safePartners.length}개`, hint: "파트너사에 연결된 전체 브랜드" },
-            { label: "계정", value: `${safeAccounts.length}개`, hint: `활성 ${activeAccountCount}개` },
-            { label: "연결", value: `${totalAccountLinks}건`, hint: "계정과 파트너사 전체 연결 수" },
-          ]}
-          minItemWidth="13rem"
-        />
-
-        <AdminCompanyWorkspace
-          companies={companyCards}
-          accounts={safeAccounts}
-          generatedSetupUrl={generatedSetupUrl}
-          generatedSetupAccountId={generatedSetupAccountId}
-          initialTab={initialTab}
-        />
-      </section>
+      <AdminCompaniesView
+        companies={companyCards}
+        accounts={safeAccounts}
+        partnerCount={safePartners.length}
+        errorMessage={companyError}
+        generatedSetupUrl={generatedSetupUrl}
+        generatedSetupAccountId={generatedSetupAccountId}
+        initialTab={initialTab}
+        actions={{
+          createCompanyAction: createPartnerCompany,
+          updateCompanyAction: updatePartnerCompany,
+          deleteCompanyAction: deletePartnerCompany,
+          updateConnectionAction: updatePartnerAccountCompanyConnection,
+          createAccountAction: createPartnerAccount,
+          updateAccountAction: updatePartnerAccount,
+          createSetupUrlAction: createPartnerAccountInitialSetupUrl,
+          sendSetupUrlAction: sendPartnerAccountInitialSetupUrl,
+        }}
+      />
     </AdminShell>
   );
 }

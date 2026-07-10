@@ -2,12 +2,16 @@ import { cn } from "@/lib/cn";
 
 export default function Select({
   className,
+  "aria-label": ariaLabel,
+  name,
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <div className="relative">
       <select
         {...props}
+        name={name}
+        aria-label={ariaLabel ?? name ?? "옵션 선택"}
         className={cn(
           "h-11 w-full appearance-none rounded-[1rem] border border-border bg-surface-control px-3.5 pr-10 text-base text-foreground shadow-flat transition-field duration-200 ease-out sm:text-sm",
           "focus:border-strong focus:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-primary/15",

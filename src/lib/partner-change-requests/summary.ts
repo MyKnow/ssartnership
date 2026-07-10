@@ -18,7 +18,7 @@ import { REQUEST_SELECT as REQUEST_SELECT_VALUE, wrapPartnerChangeRequestDbError
 
 export function extractCategoryLabel(categories: PartnerRow["categories"]) {
   const category = normalizeRelation(categories);
-  return category?.label ?? "브랜드";
+  return category?.label ?? "제휴처";
 }
 
 export function extractCategoryColor(categories: PartnerRow["categories"]) {

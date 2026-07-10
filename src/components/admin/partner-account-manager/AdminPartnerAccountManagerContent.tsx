@@ -5,12 +5,14 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import PartnerAccountCreateForm from "@/components/admin/partner-account-manager/PartnerAccountCreateForm";
 import PartnerAccountCard from "@/components/admin/partner-account-manager/PartnerAccountCard";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 
 export default function AdminPartnerAccountManagerContent({
   accounts,
   companies,
   generatedSetupUrl,
   generatedSetupAccountId,
+  actions,
 }: {
   accounts: AdminPartnerAccount[];
   companies: {
@@ -20,18 +22,22 @@ export default function AdminPartnerAccountManagerContent({
   }[];
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
+  actions: AdminCompanyFormActions;
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] md:items-start xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
       <aside className="md:sticky md:top-24 md:order-2">
-        <PartnerAccountCreateForm companies={companies} />
+        <PartnerAccountCreateForm
+          companies={companies}
+          createAccountAction={actions.createAccountAction}
+        />
       </aside>
 
       <section className="grid min-w-0 gap-4 md:order-1">
         {accounts.length === 0 ? (
           <Card tone="elevated" padding="md">
             <EmptyState
-              title="협력사 계정이 없습니다."
+              title="파트너사 계정이 없습니다."
               description="새 계정을 추가하면 이곳에서 연결과 초기 설정을 관리할 수 있습니다."
             />
           </Card>
@@ -52,6 +58,7 @@ export default function AdminPartnerAccountManagerContent({
               generatedSetupUrl={
                 generatedSetupAccountId === account.id ? generatedSetupUrl : null
               }
+              actions={actions}
             />
           ))}
           </>

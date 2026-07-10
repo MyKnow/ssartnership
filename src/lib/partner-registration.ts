@@ -185,7 +185,7 @@ export const PARTNER_REGISTRATION_SERVICE_OPTIONS = [
     value: "online",
     label: ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS.online,
     shortLabel: "온라인",
-    description: "웹사이트, 예약몰, 멤버십 페이지처럼 온라인에서 이용하는 서비스",
+    description: "웹사이트, 예약몰, 멤버십 페이지처럼 온라인에서 이용하는 제휴처",
   },
 ] as const satisfies Array<{
   value: AdminPartnerFileTemplateOptions["serviceMode"];
@@ -478,20 +478,20 @@ export function validatePartnerRegistrationInput(
   } as AdminPartnerFileTemplateOptions;
 
   if (!isAdminPartnerFileTemplateOptions(options)) {
-    fieldErrors.serviceMode = "브랜드 유형과 혜택 이용 방식을 확인해 주세요.";
-    fieldErrors.benefitActionType = "브랜드 유형과 혜택 이용 방식을 확인해 주세요.";
+    fieldErrors.serviceMode = "제휴처 유형과 혜택 이용 방식을 확인해 주세요.";
+    fieldErrors.benefitActionType = "제휴처 유형과 혜택 이용 방식을 확인해 주세요.";
   }
   if (!values.brandName) {
-    fieldErrors.brandName = "브랜드명을 입력해 주세요.";
+    fieldErrors.brandName = "제휴처명을 입력해 주세요.";
   }
   if (!values.categoryLabel) {
     fieldErrors.categoryLabel = "카테고리를 선택하거나 새로 입력해 주세요.";
   }
   if (values.serviceMode === "offline" && !values.location) {
-    fieldErrors.location = "오프라인 브랜드는 위치를 입력해 주세요.";
+    fieldErrors.location = "오프라인 제휴처는 지점 위치를 입력해 주세요.";
   }
   if (values.serviceMode === "online" && !values.siteLink) {
-    fieldErrors.siteLink = "온라인 브랜드는 사이트 링크를 입력해 주세요.";
+    fieldErrors.siteLink = "온라인 제휴처는 사이트 링크를 입력해 주세요.";
   }
   if (values.benefitActionType === "external_link" && !values.benefitActionLink) {
     fieldErrors.benefitActionLink = "외부 링크 방식은 혜택 이용 링크가 필요합니다.";
@@ -503,7 +503,7 @@ export function validatePartnerRegistrationInput(
     fieldErrors.conditions = "이용 조건을 입력해 주세요.";
   }
   if (!values.companyName) {
-    fieldErrors.companyName = "협력사명을 입력해 주세요.";
+    fieldErrors.companyName = "파트너사명을 입력해 주세요.";
   }
   if (!values.contactName) {
     fieldErrors.contactName = "담당자명을 입력해 주세요.";
@@ -540,7 +540,7 @@ export function validatePartnerRegistrationInput(
     ? sanitizePartnerLinkValue(values.brandPhone)
     : null;
   if (values.brandPhone && !safeBrandPhone) {
-    fieldErrors.brandPhone = "브랜드 전화번호 형식을 확인해 주세요.";
+    fieldErrors.brandPhone = "제휴처 전화번호 형식을 확인해 주세요.";
   }
 
   const safeMapUrl = values.mapUrl ? sanitizeHttpUrl(values.mapUrl) : null;

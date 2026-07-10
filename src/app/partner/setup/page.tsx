@@ -41,7 +41,7 @@ export default async function PartnerSetupIndexPage() {
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
               제휴 체결 후 관리자에게 받은 초기 설정 링크에서 새 비밀번호만
-              설정하면, 이후부터는 업체 포털로 로그인할 수 있습니다.
+              설정하면, 이후부터는 파트너 포털로 로그인할 수 있습니다.
             </p>
             <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
               <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
@@ -88,7 +88,7 @@ export default async function PartnerSetupIndexPage() {
                   <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
                     <div className="rounded-2xl border border-border bg-surface-inset/80 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                        서비스 수
+                        제휴처 수
                       </p>
                       <p className="mt-2 text-lg font-semibold text-foreground">
                         {setup.serviceCount}개

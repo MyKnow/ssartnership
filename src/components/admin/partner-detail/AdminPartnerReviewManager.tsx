@@ -54,13 +54,13 @@ export default function AdminPartnerReviewManager({
 
       <SectionHeading
         title="리뷰 관리"
-        description="이 브랜드에 작성된 리뷰를 필터링하고, 수정·비공개·복원·삭제합니다."
+        description="이 제휴처에 작성된 리뷰를 필터링하고, 수정·비공개·복원·삭제합니다."
       />
 
       <form action={basePath} method="get">
         <FilterBar
           title="리뷰 필터"
-          description="브랜드 범위는 현재 페이지에 고정됩니다."
+          description="제휴처 범위는 현재 페이지에 고정됩니다."
           trailing={
             <Button href={basePath} variant="secondary">
               초기화

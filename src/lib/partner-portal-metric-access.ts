@@ -15,7 +15,7 @@ const METRIC_ACCESS_ITEMS = [
   {
     key: "favoriteCount",
     label: "즐겨찾기",
-    description: "브랜드를 저장한 사용자 수",
+    description: "제휴처를 저장한 사용자 수",
   },
   {
     key: "reviewCount",
@@ -25,12 +25,12 @@ const METRIC_ACCESS_ITEMS = [
   {
     key: "detailViews",
     label: "PV",
-    description: "브랜드 상세 페이지 총 조회 수",
+    description: "제휴처 상세 페이지 총 조회 수",
   },
   {
     key: "detailUv",
     label: "UV",
-    description: "브랜드 상세 페이지 고유 방문자 수",
+    description: "제휴처 상세 페이지 고유 방문자 수",
   },
   {
     key: "cardClicks",

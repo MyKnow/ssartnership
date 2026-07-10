@@ -28,6 +28,7 @@ export default function PartnerCardView({
   isFavorited = false,
   metrics,
   onFavoriteChange,
+  returnTo,
 }: {
   partner: Partner;
   categoryLabel?: string;
@@ -39,6 +40,7 @@ export default function PartnerCardView({
   isFavorited?: boolean;
   metrics?: PartnerPopularityMetrics;
   onFavoriteChange?: (partnerId: string, nextFavorited: boolean) => void;
+  returnTo?: string | null;
 }) {
   const router = useRouter();
   const { badgeStyle } = createCategoryAccentStyles(categoryColor);
@@ -46,11 +48,8 @@ export default function PartnerCardView({
     lockKind,
     thumbnailUrl,
     isActive,
-    reservationAction,
-    inquiryAction,
-    mapLink,
     detailHref,
-  } = createPartnerCardPresentation(partner, viewerAuthenticated);
+  } = createPartnerCardPresentation(partner, viewerAuthenticated, returnTo);
   const canNavigate = detailHref.length > 0 && !lockKind;
 
   if (lockKind) {
@@ -69,47 +68,9 @@ export default function PartnerCardView({
     <article
       data-testid="partner-card"
       className={cn(
-        "@container/card relative flex h-full w-full flex-col gap-5 rounded-card border border-border/80 bg-surface-overlay p-5 shadow-flat backdrop-blur-md transition-surface-transform duration-200 ease-out hover:-translate-y-1 hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
-        canNavigate ? "cursor-pointer" : null,
+        "@container/card relative flex h-full w-full min-w-0 flex-col gap-5 rounded-card border border-border/80 bg-surface-overlay p-5 shadow-flat backdrop-blur-md transition-surface duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
         className,
       )}
-      role={canNavigate ? "link" : undefined}
-      tabIndex={canNavigate ? 0 : undefined}
-      aria-label={canNavigate ? `${partner.name} 상세 보기` : undefined}
-      onClick={(event) => {
-        if (!canNavigate) {
-          return;
-        }
-        const target = event.target as HTMLElement | null;
-        if (target?.closest("a,button,input,select,textarea,label")) {
-          return;
-        }
-        trackProductEvent({
-          eventName: "partner_card_click",
-          targetType: "partner",
-          targetId: partner.id,
-          properties: trackingProperties,
-        });
-        router.push(detailHref);
-      }}
-      onKeyDown={(event) => {
-        if (!canNavigate) {
-          return;
-        }
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          trackProductEvent({
-            eventName: "partner_card_click",
-            targetType: "partner",
-            targetId: partner.id,
-            properties: {
-              ...trackingProperties,
-              source: "keyboard",
-            },
-          });
-          router.push(detailHref);
-        }
-      }}
     >
       <PartnerCardMeta
         partner={partner}
@@ -117,7 +78,6 @@ export default function PartnerCardView({
         badgeStyle={badgeStyle}
         detailHref={detailHref}
         canNavigate={canNavigate}
-        mapLink={mapLink}
         onCategoryClick={onCategoryClick}
         onTitleClick={(event) => {
           trackProductEvent({
@@ -142,17 +102,6 @@ export default function PartnerCardView({
           event.preventDefault();
           router.push(detailHref);
         }}
-        onMapClick={() =>
-          trackProductEvent({
-            eventName: "partner_map_click",
-            targetType: "partner",
-            targetId: partner.id,
-            properties: {
-              ...trackingProperties,
-              source: "card",
-            },
-          })
-        }
         headerAction={
           currentUserId ? (
             <PartnerFavoriteButton
@@ -174,27 +123,16 @@ export default function PartnerCardView({
       />
       <PartnerCardActions
         isActive={isActive}
-        reservationAction={reservationAction}
-        inquiryAction={inquiryAction}
-        onReservationClick={() =>
+        detailHref={detailHref}
+        canNavigate={canNavigate}
+        onDetailClick={() =>
           trackProductEvent({
-            eventName: "reservation_click",
+            eventName: "partner_card_click",
             targetType: "partner",
             targetId: partner.id,
             properties: {
               ...trackingProperties,
-              source: "card",
-            },
-          })
-        }
-        onInquiryClick={() =>
-          trackProductEvent({
-            eventName: "inquiry_click",
-            targetType: "partner",
-            targetId: partner.id,
-            properties: {
-              ...trackingProperties,
-              source: "card",
+              source: "detail_cta",
             },
           })
         }

@@ -24,7 +24,7 @@ export default function PartnerServiceContacts({
       <Card className="w-full p-4 sm:p-5">
         <SectionHeading title="혜택 이용/문의" />
         <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
-          현재 브랜드 제휴기간이 아니므로, 혜택 이용/문의를 할 수 없습니다.
+          현재 제휴처 제휴기간이 아니므로, 혜택 이용/문의를 할 수 없습니다.
         </div>
       </Card>
     );

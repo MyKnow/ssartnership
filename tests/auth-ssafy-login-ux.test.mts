@@ -11,9 +11,12 @@ function readRepoFile(path: string) {
 
 test("signup page opens SSAFY Verify directly instead of linking to the intermediate auth page", () => {
   const signupPage = readRepoFile("src/app/auth/signup/page.tsx");
+  const authEntryViews = readRepoFile("src/components/auth/AuthEntryViews.tsx");
 
-  assert.match(signupPage, /SsafyVerifyButton/);
-  assert.doesNotMatch(signupPage, /href=\{`\/auth\/ssafy/);
+  assert.match(signupPage, /<SignupPageView\b/);
+  assert.match(authEntryViews, /function SignupPageView/);
+  assert.match(authEntryViews, /SsafyVerifyButton/);
+  assert.doesNotMatch(authEntryViews, /href=\{`\/auth\/ssafy/);
 });
 
 test("SSAFY callback route is not a user-facing auth start page", () => {
@@ -35,13 +38,19 @@ test("SSAFY callback route is not a user-facing auth start page", () => {
 
 test("member login starts with SSAFY Verify and keeps password login as a legacy fallback", () => {
   const loginPage = readRepoFile("src/app/auth/login/page.tsx");
+  const authEntryViews = readRepoFile("src/components/auth/AuthEntryViews.tsx");
   const loginForm = readRepoFile("src/components/auth/LoginForm.tsx");
 
-  assert.match(loginPage, /SsafyVerifyButton/);
-  assert.match(loginPage, /SSAFY Verify 로그인/);
-  assert.match(loginPage, /기존 사이트 비밀번호로 로그인/);
-  assert.match(loginPage, /전환 기간/);
-  assert.doesNotMatch(loginPage, /Mattermost 아이디와 사이트 비밀번호로 로그인합니다/);
+  assert.match(loginPage, /<LoginPageView\b/);
+  assert.match(authEntryViews, /function LoginPageView/);
+  assert.match(authEntryViews, /SsafyVerifyButton/);
+  assert.match(authEntryViews, /SSAFY Verify 로그인/);
+  assert.match(authEntryViews, /기존 사이트 비밀번호로 로그인/);
+  assert.match(authEntryViews, /전환 기간/);
+  assert.doesNotMatch(
+    authEntryViews,
+    /Mattermost 아이디와 사이트 비밀번호로 로그인합니다/,
+  );
   assert.match(loginForm, /ID 저장하기/);
   assert.match(loginForm, /기존 비밀번호로 로그인/);
   assert.match(loginForm, /localStorage\.setItem\(savedLoginIdStorageKey/);

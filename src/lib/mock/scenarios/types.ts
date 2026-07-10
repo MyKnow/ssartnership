@@ -1,5 +1,11 @@
 export type MockScenarioSurface = "public" | "auth" | "admin" | "partner";
 
+export type MockRouteKind =
+  | "canonical"
+  | "conditional"
+  | "compat-redirect"
+  | "mock-only";
+
 export type MockScenarioDataSource =
   | "repository"
   | "service"
@@ -13,6 +19,7 @@ export type MockViewportKey =
   | "mobile-390"
   | "tablet-768"
   | "tablet-820"
+  | "tablet-1024"
   | "desktop-1366"
   | "desktop-1440"
   | "desktop-1536";
@@ -47,8 +54,19 @@ export type MockRequiredStateKey =
 export type MockCoverageLevel =
   | "storybook-complete"
   | "storybook-partial"
+  | "storybook-reference-only"
   | "storybook-missing"
   | "route-inventory-only";
+
+export type MockStoryRenderKind =
+  | "actual-view"
+  | "component-fragment"
+  | "state-model";
+
+export type MockStateStoryStatus =
+  | "actual-view"
+  | "reference-only"
+  | "missing";
 
 export type MockScenarioSeed = {
   accountId?: string;
@@ -72,6 +90,9 @@ export type MockScenario = {
 
 export type MockRouteInventoryItem = {
   routePath: string;
+  routeKind: MockRouteKind;
+  screenContractId: string | null;
+  primaryTask: string;
   surface: MockScenarioSurface;
   authScope:
     | "public"
@@ -82,6 +103,7 @@ export type MockRouteInventoryItem = {
   viewComponent: string;
   dataSources: MockScenarioDataSource[];
   requiredScenarioIds: string[];
+  requiredStateKeys: MockRequiredStateKey[];
   notes?: string;
 };
 
@@ -90,11 +112,26 @@ export type MockStorybookScenarioCoverage = {
   scenarioId: string;
   storyId: string;
   storyFile: string;
+  renderKind: MockStoryRenderKind;
+  actualViewComponent?: string;
+  coveredStateKeys: MockRequiredStateKey[];
   viewportKeys: MockViewportKey[];
+};
+
+export type MockStateStoryTrace = {
+  stateKey: MockRequiredStateKey;
+  status: MockStateStoryStatus;
+  actualViewStoryIds: string[];
+  referenceStoryIds: string[];
+  coveredViewportKeys: MockViewportKey[];
+  missingViewportKeys: MockViewportKey[];
 };
 
 export type MockCoverageMatrixRow = {
   routePath: string;
+  routeKind: MockRouteKind;
+  screenContractId: string | null;
+  primaryTask: string;
   surface: MockScenarioSurface;
   authScope: MockRouteInventoryItem["authScope"];
   viewComponent: string;
@@ -103,7 +140,9 @@ export type MockCoverageMatrixRow = {
   requiredStateKeys: MockRequiredStateKey[];
   viewportKeys: MockViewportKey[];
   storybookStories: MockStorybookScenarioCoverage[];
+  stateStoryTrace: MockStateStoryTrace[];
   missingStorybookScenarioIds: string[];
+  missingActualViewStateKeys: MockRequiredStateKey[];
   coverageLevel: MockCoverageLevel;
 };
 
@@ -112,6 +151,7 @@ export type MockCoverageSummary = {
   scenarioCount: number;
   storybookCompleteRoutes: number;
   storybookPartialRoutes: number;
+  storybookReferenceOnlyRoutes: number;
   storybookMissingRoutes: number;
   routeInventoryOnlyRoutes: number;
   storybookStoryCount: number;

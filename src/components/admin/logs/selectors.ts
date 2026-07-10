@@ -91,7 +91,7 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
     const actorDisplayName = getStringProperty(log.properties ?? null, "actorDisplayName");
     const isPartnerAudit = isPartnerPortalAuditAction(String(log.action));
     const actorSearchLabel = isPartnerAudit
-      ? actorLoginId ?? actorDisplayName ?? log.actor_id ?? "협력사 계정"
+      ? actorLoginId ?? actorDisplayName ?? log.actor_id ?? "파트너사 계정"
       : log.actor_id ?? "admin";
     return {
       id: log.id,

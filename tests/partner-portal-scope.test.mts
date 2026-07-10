@@ -49,7 +49,7 @@ describe("partner portal company scope", () => {
     );
     assert.equal(
       getCompanyScopedPortalHref("company-a", "notifications"),
-      "/partner/companies/company-a/notifications",
+      "/partner/notifications?companyId=company-a",
     );
     assert.equal(
       getCompanyScopedPortalHref("company-a", "plans"),
@@ -57,11 +57,11 @@ describe("partner portal company scope", () => {
     );
     assert.equal(
       getCompanyScopedPortalHref("company-a", "account"),
-      "/partner/companies/company-a/account",
+      "/partner/account?companyId=company-a",
     );
     assert.equal(
       getCompanyScopedPortalHref("company-a", "support"),
-      "/partner/companies/company-a/support",
+      "/partner/support?companyId=company-a",
     );
     assert.equal(
       getCompanyScopedPartnerServiceHref("company-a", "partner/b"),

@@ -1,6 +1,25 @@
 import React from "react";
 import { vi } from "vitest";
 
+const nativeMatchMedia = window.matchMedia.bind(window);
+
+vi.stubGlobal("matchMedia", (query: string) => {
+  const result = nativeMatchMedia(query);
+  if (!query.includes("prefers-reduced-motion")) {
+    return result;
+  }
+  return {
+    matches: true,
+    media: query,
+    onchange: result.onchange,
+    addListener: result.addListener.bind(result),
+    removeListener: result.removeListener.bind(result),
+    addEventListener: result.addEventListener.bind(result),
+    removeEventListener: result.removeEventListener.bind(result),
+    dispatchEvent: result.dispatchEvent.bind(result),
+  };
+});
+
 vi.mock("next/image", () => {
   const MockNextImage = React.forwardRef<
     HTMLImageElement,

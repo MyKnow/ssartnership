@@ -1,7 +1,7 @@
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
-import { updatePartnerAccount } from "@/app/admin/(protected)/actions";
+import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import FieldGroup from "@/components/admin/partner-account-manager/FieldGroup";
 import { formatPartnerAccountDateTime } from "@/components/admin/partner-account-manager/helpers";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
@@ -9,9 +9,11 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 export default function PartnerAccountForm({
   account,
   formId,
+  updateAccountAction,
 }: {
   account: AdminPartnerAccount;
   formId: string;
+  updateAccountAction: AdminFormAction;
 }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
@@ -34,7 +36,7 @@ export default function PartnerAccountForm({
 
       <form
         id={formId}
-        action={updatePartnerAccount}
+        action={updateAccountAction}
         className="mt-4 grid gap-4 md:grid-cols-2"
       >
         <input type="hidden" name="id" value={account.id} />

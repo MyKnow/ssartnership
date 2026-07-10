@@ -198,7 +198,7 @@ export default function PartnerSetupForm({ context }: PartnerSetupFormProps) {
         <div className="space-y-1">
           <p className="text-sm font-semibold text-foreground">설정 완료</p>
           <p className="text-sm leading-6 text-muted-foreground">
-            완료하면 협력사 포털 로그인 화면으로 이동합니다.
+            완료하면 파트너사 포털 로그인 화면으로 이동합니다.
           </p>
         </div>
         <Button

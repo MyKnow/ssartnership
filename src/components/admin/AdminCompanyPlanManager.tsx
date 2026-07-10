@@ -166,7 +166,7 @@ export default function AdminCompanyPlanManager({
                   <p className="text-sm font-semibold text-foreground">{definition.label}</p>
                   <p className="text-xs leading-5 text-muted-foreground">{definition.description}</p>
                 </div>
-                <Badge variant="neutral">{count}개 브랜드</Badge>
+                <Badge variant="neutral">제휴처 {count}개</Badge>
               </div>
               <p className="text-lg font-semibold text-foreground">
                 {definition.monthlyPriceKrw === 0 ? "무료" : `월 ${formatCurrency(definition.monthlyPriceKrw)}`}
@@ -273,7 +273,7 @@ export default function AdminCompanyPlanManager({
 
       <section className="grid gap-4">
         <SectionHeading
-          title="브랜드별 플랜"
+          title="제휴처별 플랜"
           description="Basic은 제휴기간과 동일하게 적용되고, Partner/Boost는 별도 계약 기간을 입력합니다."
         />
         <div className="grid gap-3">
@@ -351,7 +351,7 @@ export default function AdminCompanyPlanManager({
               return (
                 <Card key={event.id} tone="muted" padding="sm" className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">{brand?.name ?? event.brandName ?? "브랜드"}</span>
+                    <span className="text-sm font-semibold text-foreground">{brand?.name ?? event.brandName ?? "제휴처"}</span>
                     {event.previousPlanTier ? <PlanBadge tier={event.previousPlanTier} /> : null}
                     <span className="text-sm text-muted-foreground">→</span>
                     <PlanBadge tier={event.nextPlanTier} />

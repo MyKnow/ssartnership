@@ -264,7 +264,7 @@ function mapUpgradeRequest(row: UpgradeRequestRow): PartnerPlanUpgradeRequestRec
   return {
     id: row.id,
     partnerId: row.partner_id ?? brand?.id ?? "",
-    brandName: brand?.name ?? "미지정 브랜드",
+    brandName: brand?.name ?? "미지정 제휴처",
     companyId: row.company_id,
     companyName: company?.name ?? "미지정",
     requestedByAccountId: row.requested_by_account_id,
@@ -510,7 +510,7 @@ async function loadBrandPlanOrThrow(partnerId: string) {
     .maybeSingle();
 
   if (error || !data) {
-    throw new Error("브랜드를 찾을 수 없습니다.");
+    throw new Error("제휴처를 찾을 수 없습니다.");
   }
   return mapBrand(data as BrandRow);
 }
@@ -547,7 +547,7 @@ export async function createPartnerPlanUpgradeRequest(input: {
 }) {
   const brand = await assertPartnerBrandAccess(input.accountId, input.partnerId);
   if (input.companyId && brand.companyId !== input.companyId) {
-    throw new Error("브랜드 접근 권한이 없습니다.");
+    throw new Error("제휴처 접근 권한이 없습니다.");
   }
   const requestedPlanTier = normalizeRequestedPlanTier(
     input.requestedPlanTier,
@@ -891,7 +891,7 @@ export async function updatePartnerBrandPlanByAdmin(input: {
 }) {
   const brand = await loadBrandPlanOrThrow(input.partnerId);
   if (!brand.companyId) {
-    throw new Error("파트너사가 연결된 브랜드만 플랜을 변경할 수 있습니다.");
+    throw new Error("파트너사가 연결된 제휴처만 플랜을 변경할 수 있습니다.");
   }
   const now = new Date().toISOString();
   const planWindow = resolvePartnerBrandPlanWindow({
@@ -963,7 +963,7 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
 
   const request = mapUpgradeRequest(data as UpgradeRequestRow);
   if (!request.partnerId) {
-    throw new Error("브랜드를 찾을 수 없습니다.");
+    throw new Error("제휴처를 찾을 수 없습니다.");
   }
   assertPartnerPlanUpgradeTransition(request.status, input.nextStatus);
   const reviewedAt = new Date().toISOString();

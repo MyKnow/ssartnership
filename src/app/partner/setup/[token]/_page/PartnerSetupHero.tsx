@@ -25,10 +25,10 @@ export default function PartnerSetupHero({
 
       <div className="mt-4 space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          {context.company.name} 협력사 포털 시작하기
+          {context.company.name} 파트너사 포털 시작하기
         </h1>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
-          링크에서 바로 비밀번호를 설정한 뒤 로그인하면, 연결된 브랜드를 바로
+          링크에서 바로 비밀번호를 설정한 뒤 로그인하면, 연결된 제휴처를 바로
           관리할 수 있습니다.
         </p>
       </div>
@@ -52,7 +52,7 @@ export default function PartnerSetupHero({
         </div>
         <div className="rounded-2xl border border-border bg-surface-inset/85 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            소유 브랜드 수
+            소유 제휴처 수
           </p>
           <p className="mt-2 text-sm font-semibold text-foreground">
             {context.company.services.length}개

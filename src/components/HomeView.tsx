@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   startTransition,
@@ -11,7 +12,7 @@ import {
 } from "react";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
 import PartnerFilters, {
-  PartnerSortOption,
+  type PartnerSortOption,
 } from "@/components/PartnerFilters";
 import MotionReveal from "@/components/ui/MotionReveal";
 import PartnerCardView from "@/components/PartnerCardView";
@@ -20,17 +21,18 @@ import EmptyState from "@/components/ui/EmptyState";
 import { HOME_COPY } from "@/lib/content";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
-import {
-  type PartnerAudienceFilter,
-} from "@/lib/partner-audience";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import {
   createHomeCategoryMap,
   filterHomePartners,
   normalizeHomePartners,
 } from "@/components/home-view/selectors";
+import {
+  parseHomeDirectoryState,
+  serializeHomeDirectoryState,
+  type HomeDirectoryState,
+} from "@/lib/home-directory-state";
 
-const APPLIES_TO_FILTER_STORAGE_KEY = "home:partner-applies-to-filter";
 const INITIAL_PARTNER_CARD_COUNT = 12;
 const PARTNER_CARD_INCREMENT = 12;
 
@@ -51,29 +53,21 @@ export default function HomeView({
   partnerFavoriteStateById?: Record<string, boolean | undefined>;
   loadedPartnerStateIds?: string[];
 }) {
-  const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">(
-    "all",
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const categoryKeys = useMemo(
+    () => categories.map((category) => category.key),
+    [categories],
   );
-  const [appliesToFilter, setAppliesToFilter] = useState<PartnerAudienceFilter>(
-    () => {
-      if (typeof window === "undefined") {
-        return "all";
-      }
-      try {
-        const saved = window.localStorage.getItem(
-          APPLIES_TO_FILTER_STORAGE_KEY,
-        );
-        if (saved === "all" || saved === "staff" || saved === "student" || saved === "graduate") {
-          return saved;
-        }
-      } catch {
-        return "all";
-      }
-      return "all";
-    },
+  const directoryState = useMemo(
+    () => parseHomeDirectoryState(searchParams, categoryKeys),
+    [categoryKeys, searchParams],
   );
-  const [searchValue, setSearchValue] = useState("");
-  const [sortValue, setSortValue] = useState<PartnerSortOption>("popular");
+  const activeCategory = directoryState.category;
+  const appliesToFilter = directoryState.audience;
+  const sortValue = directoryState.sort;
+  const searchValue = directoryState.q;
   const [visibleCardState, setVisibleCardState] = useState({
     key: "",
     limit: INITIAL_PARTNER_CARD_COUNT,
@@ -92,6 +86,26 @@ export default function HomeView({
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const lastLoggedSearchRef = useRef("");
   const { notify } = useToast();
+
+  const replaceDirectoryState = useCallback(
+    (nextState: Partial<HomeDirectoryState>) => {
+      const params = serializeHomeDirectoryState(
+        { ...directoryState, ...nextState },
+        searchParams,
+      );
+      const query = params.toString();
+      router.replace(
+        query ? `${pathname}?${query}#benefits` : `${pathname}#benefits`,
+        { scroll: false },
+      );
+    },
+    [directoryState, pathname, router, searchParams],
+  );
+
+  const directoryReturnTo = useMemo(() => {
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}#benefits` : `${pathname}#benefits`;
+  }, [pathname, searchParams]);
 
   const categoryMap = useMemo(() => {
     return createHomeCategoryMap(categories);
@@ -165,17 +179,6 @@ export default function HomeView({
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [hasMoreDisplayPartners, loadMorePartners]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    try {
-      window.localStorage.setItem(APPLIES_TO_FILTER_STORAGE_KEY, appliesToFilter);
-    } catch {
-      // Ignore storage failures.
-    }
-  }, [appliesToFilter]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -287,7 +290,7 @@ export default function HomeView({
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
     startTransition(() => {
-      setActiveCategory(nextCategory);
+      replaceDirectoryState({ category: nextCategory });
     });
     trackProductEvent({
       eventName: "category_filter_change",
@@ -301,7 +304,7 @@ export default function HomeView({
 
   const handleSortChange = (nextSort: PartnerSortOption) => {
     startTransition(() => {
-      setSortValue(nextSort);
+      replaceDirectoryState({ sort: nextSort });
     });
     trackProductEvent({
       eventName: "sort_change",
@@ -314,7 +317,9 @@ export default function HomeView({
   };
 
   const handleSearchChange = (nextValue: string) => {
-    setSearchValue(nextValue);
+    startTransition(() => {
+      replaceDirectoryState({ q: nextValue });
+    });
   };
 
   const handleFavoriteChange = (partnerId: string, nextFavorited: boolean) => {
@@ -340,11 +345,12 @@ export default function HomeView({
   return (
     <>
       <MotionReveal delay={0.04}>
-        <section className="mt-10 flex flex-col gap-6">
+        <section id="benefits" className="scroll-mt-24 pt-10 flex flex-col gap-6">
           <SectionHeading
             eyebrow="Directory"
             title={HOME_COPY.categoryTitle}
             description={HOME_COPY.categoryDescription}
+            headingLevel="h2"
           />
           <div data-nosnippet>
             <PartnerFilters
@@ -354,7 +360,11 @@ export default function HomeView({
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
               appliesToFilter={appliesToFilter}
-              onAppliesToFilterChange={setAppliesToFilter}
+              onAppliesToFilterChange={(nextAudience) =>
+                startTransition(() => {
+                  replaceDirectoryState({ audience: nextAudience });
+                })
+              }
               sortValue={sortValue}
               onSortChange={handleSortChange}
             />
@@ -399,6 +409,7 @@ export default function HomeView({
                     metrics={localPopularityById?.[partner.id]}
                     onCategoryClick={handleCategoryChange}
                     onFavoriteChange={handleFavoriteChange}
+                    returnTo={directoryReturnTo}
                   />
                 ))}
               </div>

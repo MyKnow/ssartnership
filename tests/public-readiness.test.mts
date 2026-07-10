@@ -30,14 +30,18 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   }
 });
 
-test("Chromatic Storybook publish stays manual-only while free quota is exhausted", () => {
+test("Storybook and visual baselines run on every push and pull request without Chromatic", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
 
-  assert.match(workflow, /name: Publish Storybook/);
+  assert.match(workflow, /name: Storybook and Visual Baselines/);
+  assert.match(workflow, /^\s+push:\s*$/m);
+  assert.match(workflow, /^\s+pull_request:\s*$/m);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /chromaui\/action@latest/);
-  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
-  assert.doesNotMatch(workflow, /^\s+pull_request:\s*$/m);
+  assert.match(workflow, /npm run build-storybook/);
+  assert.match(workflow, /npm run test-storybook/);
+  assert.match(workflow, /playwright install --with-deps chromium/);
+  assert.match(workflow, /npm run test:visual/);
+  assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });
 
 test("playwright config can use the CI-hosted Chrome channel", () => {

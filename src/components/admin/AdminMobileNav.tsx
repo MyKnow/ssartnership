@@ -55,9 +55,9 @@ function NavButton({
         active ? "border-primary" : null,
       )}
     >
-      <span className="grid justify-items-start gap-0.5 text-left">
-        <span>{label}</span>
-        <span className={cn("text-xs font-medium", active ? "text-primary-foreground/80" : "text-muted-foreground")}>
+      <span className="grid min-w-0 justify-items-start gap-0.5 text-left">
+        <span className="truncate">{label}</span>
+        <span className={cn("truncate text-xs font-medium", active ? "text-primary-foreground/80" : "text-muted-foreground")}>
           {description}
         </span>
       </span>
@@ -129,7 +129,7 @@ export default function AdminMobileNav({
 
       {open && typeof document !== "undefined"
         ? createPortal(
-            <div className="fixed inset-0 z-[70] sm:hidden" aria-hidden={!open}>
+            <div className="fixed inset-0 z-[70] md:hidden" aria-hidden={!open}>
               <button
                 type="button"
                 className="absolute inset-0 bg-black/55"
@@ -137,9 +137,10 @@ export default function AdminMobileNav({
                 onClick={() => setOpen(false)}
               />
 
-              <aside
+              <div
                 role="dialog"
                 aria-modal="true"
+                aria-label="관리자 메뉴"
                 className="fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay"
               >
                 <div className="flex h-full flex-col bg-surface-overlay">
@@ -245,7 +246,7 @@ export default function AdminMobileNav({
                     </div>
                   </div>
                 </div>
-              </aside>
+              </div>
             </div>,
             document.body,
           )

@@ -63,7 +63,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
     if (!partnerName || !partnerLocation) {
       throw new PartnerChangeRequestError(
         "invalid_request",
-        "브랜드명과 위치를 입력해 주세요.",
+        "제휴처명과 위치를 입력해 주세요.",
       );
     }
     let detailDescription: string | null = null;
@@ -143,7 +143,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
       type: "partner_change_request",
       title: "파트너 변경 요청 접수",
       body: `${request.companyName} · ${request.partnerName} 변경 요청이 접수되었습니다.`,
-      targetUrl: "/admin/partners?tab=requests",
+      targetUrl: "/admin/partner-requests",
       metadata: {
         requestId: request.id,
         partnerId,
