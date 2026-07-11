@@ -39,6 +39,7 @@ export default defineConfig({
         timeout: 120_000,
         env: {
           E2E_MOCK_MUTATIONS: "1",
+          NEXT_DIST_DIR: ".next-e2e",
           NEXT_PUBLIC_DATA_SOURCE: "mock",
           NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock",
         },
