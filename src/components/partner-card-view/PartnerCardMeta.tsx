@@ -124,11 +124,7 @@ export default function PartnerCardMeta({
               )}
             >
               {categoryBadge}
-              {compact && headerAction ? (
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {headerAction}
-                </div>
-              ) : null}
+              {compact ? headerAction : null}
             </div>
             {!compact && headerAction ? (
               <div className="flex shrink-0 items-center gap-1.5">

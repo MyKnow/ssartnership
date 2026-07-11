@@ -5,7 +5,6 @@ import type {
 import type {
   PartnerPortalServiceDashboard,
 } from "../../partner-dashboard.ts";
-import { isE2eMockMutationEnabled } from "../../e2e-mutation-mode.ts";
 import { hashPassword } from "../../password.ts";
 
 export type MockPortalAccountRecord = {
@@ -270,14 +269,12 @@ seededSetups[0].account.linkedCompanyIds = [
   seededSetups[1].company.id,
 ];
 
-if (isE2eMockMutationEnabled()) {
-  const readyPartnerPassword = hashPassword("Partner!123");
-  seededSetups[1].account.mustChangePassword = false;
-  seededSetups[1].account.emailVerifiedAt = "2026-07-01T00:00:00.000Z";
-  seededSetups[1].account.initialSetupCompletedAt = "2026-07-01T00:00:00.000Z";
-  seededSetups[1].account.passwordHash = readyPartnerPassword.hash;
-  seededSetups[1].account.passwordSalt = readyPartnerPassword.salt;
-}
+const readyPartnerPassword = hashPassword("Partner!123");
+seededSetups[1].account.mustChangePassword = false;
+seededSetups[1].account.emailVerifiedAt = "2026-07-01T00:00:00.000Z";
+seededSetups[1].account.initialSetupCompletedAt = "2026-07-01T00:00:00.000Z";
+seededSetups[1].account.passwordHash = readyPartnerPassword.hash;
+seededSetups[1].account.passwordSalt = readyPartnerPassword.salt;
 
 export function cloneSetupRecord(setup: MockPortalSetupRecord): MockPortalSetupRecord {
   return {
