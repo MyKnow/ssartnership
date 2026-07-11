@@ -15,8 +15,8 @@
 # repo-local or global model overrides.
 
 # Top-level runtime settings (current Codex schema)
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
 web_search = "live"
 
 # External notifications receive a JSON payload on stdin.
