@@ -55,7 +55,7 @@ Before accepting UI E2E assertions:
 - Add explicit navigation/hydration timeouts for first-compile redirects instead of relying only on `networkidle`.
 - Keep mock auth isolated from Supabase infrastructure. When the partner portal repository is mock, do not call the Supabase-backed rate-limit lookup; production/supabase paths must retain the guard.
 - Keep mock SSR read paths isolated too. Under `NEXT_PUBLIC_DATA_SOURCE=mock`, render dependencies such as registration categories must come through the repository instead of a direct `getSupabaseAdminClient()` call; CI intentionally has no Supabase secrets.
-- A cookie-setting login can update the URL before the dynamic chooser has received the session. Do not navigate away at that point. Wait up to 45 seconds for the chooser under cold CI compilation, raise the flow timeout to 90 seconds, then continue through its canonical company link.
+- A cookie-setting login can update the URL before `partner_session` is committed. Do not infer session readiness from the URL or chooser text. Poll `browserContext.cookies()` for the non-empty session cookie, then navigate to the canonical protected company path.
 
 When intentional UI changes affect visual baselines, run `npm run test:visual -- --update-snapshots`, inspect the six affected 360/820/1366 images, then rerun plain `npm run test:visual`. Never update snapshots merely to silence an unexplained diff.
 

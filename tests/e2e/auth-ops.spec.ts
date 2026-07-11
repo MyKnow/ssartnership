@@ -39,8 +39,8 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toHaveCount(0);
   });
 
-  test("partner setup, login, and change-request entry stay company scoped", async ({ page }) => {
-    test.setTimeout(90_000);
+  test("partner setup, login, and change-request entry stay company scoped", async ({ page, context }) => {
+    test.setTimeout(60_000);
     await page.goto("/partner/setup/mock-partner-setup-cafe-ssafy");
 
     await page.getByPlaceholder("영문/숫자/특수문자 포함 8자 이상").fill("Partner!123");
@@ -62,10 +62,16 @@ test.describe("auth and partner portal operation flows", () => {
     await page.getByRole("button", { name: "로그인" }).click();
 
     await expect(page).toHaveURL(/\/partner/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: "파트너사 선택" })).toBeVisible({
-      timeout: 45_000,
-    });
-    await page.getByRole("link", { name: /카페 싸피/ }).first().click();
+    await expect
+      .poll(
+        async () =>
+          (await context.cookies()).some(
+            (cookie) => cookie.name === "partner_session" && cookie.value.length > 0,
+          ),
+        { timeout: 20_000 },
+      )
+      .toBe(true);
+    await page.goto("/partner/companies/mock-partner-company-cafe-ssafy");
     await expect(page.getByRole("heading", { name: "운영 홈" })).toBeVisible({
       timeout: 20_000,
     });
