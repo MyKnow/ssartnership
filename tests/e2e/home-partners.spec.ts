@@ -8,42 +8,33 @@ async function typeSearch(page: Page, value: string) {
 }
 
 test.describe("public partner discovery", () => {
-  test("keeps the mobile list detail action in the compact summary row", async ({ page }) => {
+  test("keeps the mobile list summary compact without a separate detail action", async ({ page }) => {
     for (const width of [320, 360]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/?view=list#benefits");
 
       const card = page.getByTestId("partner-card").first();
       const detailAction = card.getByRole("link", { name: "제휴 상세 보기" });
-      const thumbnail = card.locator("img").first();
+      const titleLink = card.getByRole("link", { name: /상세 보기/ });
+      const thumbnail = card.locator("[data-partner-card-media]");
       const categoryControl = card.getByRole("button", { name: /필터 적용$/ });
       const favoriteMetric = card.getByLabel(/즐겨찾기 \d+개/);
-      await expect(detailAction).toBeVisible();
+      await expect(detailAction).toHaveCount(0);
+      await expect(titleLink).toBeVisible();
       await expect(thumbnail).toBeVisible();
 
       const cardBox = await card.boundingBox();
-      const actionBox = await detailAction.boundingBox();
       const thumbnailBox = await thumbnail.boundingBox();
       const categoryBox = await categoryControl.boundingBox();
       const favoriteBox = await favoriteMetric.boundingBox();
       expect(cardBox).not.toBeNull();
-      expect(actionBox).not.toBeNull();
       expect(thumbnailBox).not.toBeNull();
       expect(categoryBox).not.toBeNull();
       expect(favoriteBox).not.toBeNull();
 
-      if (!cardBox || !actionBox || !thumbnailBox || !categoryBox || !favoriteBox) {
+      if (!cardBox || !thumbnailBox || !categoryBox || !favoriteBox) {
         continue;
       }
-
-      const trailingInset = cardBox.x + cardBox.width - (actionBox.x + actionBox.width);
-      const expectedInset = width === 320 ? 12 : 16;
-      expect(Math.abs(trailingInset - expectedInset)).toBeLessThanOrEqual(1);
-      expect(actionBox.width).toBeGreaterThanOrEqual(44);
-      expect(actionBox.height).toBeGreaterThanOrEqual(44);
-      expect(actionBox.x).toBeGreaterThan(thumbnailBox.x + thumbnailBox.width);
-      expect(actionBox.y + actionBox.height).toBeGreaterThan(thumbnailBox.y);
-      expect(actionBox.y).toBeLessThan(thumbnailBox.y + thumbnailBox.height);
       expect(Math.abs(categoryBox.y - favoriteBox.y)).toBeLessThanOrEqual(1);
       expect(Math.abs(categoryBox.height - favoriteBox.height)).toBeLessThanOrEqual(1);
       expect(cardBox.height).toBeLessThanOrEqual(144);
@@ -68,21 +59,17 @@ test.describe("public partner discovery", () => {
 
       const filterPanel = page.getByTestId("partner-filter-panel");
       const resultsPane = page.getByTestId("partner-results-pane");
-      const cards = page.getByTestId("partner-card");
+      const partnerGrid = page.getByTestId("partner-grid");
       await expect(filterPanel).toBeVisible();
       await expect(resultsPane).toBeVisible();
-      await expect(cards.nth(1)).toBeVisible();
+      await expect(partnerGrid).toBeVisible();
 
       const filterBox = await filterPanel.boundingBox();
       const resultsBox = await resultsPane.boundingBox();
-      const firstCardBox = await cards.nth(0).boundingBox();
-      const secondCardBox = await cards.nth(1).boundingBox();
       expect(filterBox).not.toBeNull();
       expect(resultsBox).not.toBeNull();
-      expect(firstCardBox).not.toBeNull();
-      expect(secondCardBox).not.toBeNull();
 
-      if (!filterBox || !resultsBox || !firstCardBox || !secondCardBox) {
+      if (!filterBox || !resultsBox) {
         continue;
       }
 
@@ -92,12 +79,11 @@ test.describe("public partner discovery", () => {
         expect(filterBox.y + filterBox.height).toBeLessThan(resultsBox.y);
       }
 
-      if (scenario.columns === 2) {
-        expect(Math.abs(firstCardBox.y - secondCardBox.y)).toBeLessThanOrEqual(2);
-        expect(secondCardBox.x).toBeGreaterThan(firstCardBox.x);
-      } else {
-        expect(secondCardBox.y).toBeGreaterThan(firstCardBox.y + firstCardBox.height);
-      }
+      const gridColumnCount = await partnerGrid.evaluate((element) =>
+        window.getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean)
+          .length,
+      );
+      expect(gridColumnCount).toBe(scenario.columns);
     }
   });
 

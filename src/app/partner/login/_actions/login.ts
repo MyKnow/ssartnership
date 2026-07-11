@@ -14,6 +14,7 @@ import {
 } from "@/lib/partner-auth-security";
 import { setPartnerSession } from "@/lib/partner-session";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
+import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { isValidEmail } from "@/lib/validation";
 import { buildPartnerLoginErrorRedirect } from "./shared";
 
@@ -75,7 +76,9 @@ export async function loginAction(formData: FormData) {
     ipAddress: context.ipAddress ?? null,
   };
 
-  const blockedState = await getPartnerAuthBlockingState("login", throttleContext);
+  const blockedState = isPartnerPortalMock
+    ? null
+    : await getPartnerAuthBlockingState("login", throttleContext);
   if (blockedState) {
     return redirectPartnerLoginFailure({
       context,

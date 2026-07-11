@@ -6,17 +6,17 @@ test("partner registration reaches a review-ready submit through all five steps"
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto("/partner-registration");
 
-  await expect(page.getByText("1/5 제휴처", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "1/5 제휴처" })).toBeVisible();
   await page.getByLabel(/^제휴처명/).fill("E2E 테스트 제휴처");
   await page.getByLabel(/^카테고리/).fill("카페");
   await page.getByLabel(/^위치/).fill("서울 강남구 테헤란로 212");
   await page.getByRole("button", { name: /현장 제시/ }).click();
   await page.getByRole("button", { name: "다음 단계" }).click();
 
-  await expect(page.getByText("2/5 지점", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "2/5 지점" })).toBeVisible();
   await page.getByRole("button", { name: "다음 단계" }).click();
 
-  await expect(page.getByText("3/5 혜택", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "3/5 혜택" })).toBeVisible();
   const benefitInput = page.getByPlaceholder("예: 아메리카노 10% 할인");
   await benefitInput.fill("아메리카노 10% 할인");
   await benefitInput.press("Enter");
@@ -25,10 +25,10 @@ test("partner registration reaches a review-ready submit through all five steps"
   await conditionInput.press("Enter");
   await page.getByRole("button", { name: "다음 단계" }).click();
 
-  await expect(page.getByText("4/5 소개", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "4/5 소개" })).toBeVisible();
   await page.getByRole("button", { name: "다음 단계" }).click();
 
-  await expect(page.getByText("5/5 담당자", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "5/5 담당자" })).toBeVisible();
   await page.getByLabel(/^파트너사명/).fill("E2E 테스트 파트너사");
   await page.getByLabel(/^담당자명/).fill("김테스트");
   await page.getByLabel(/^담당자 이메일/).fill("e2e@example.com");

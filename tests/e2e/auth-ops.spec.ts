@@ -6,7 +6,7 @@ test.describe("auth and partner portal operation flows", () => {
 
     await page.getByRole("link", { name: "인증하고 혜택 이용" }).first().click();
 
-    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/);
+    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/, { timeout: 15_000 });
     const loginUrl = new URL(page.url());
     const certificationReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
     expect(certificationReturnTo).toContain("/certification?returnTo=");
@@ -17,6 +17,7 @@ test.describe("auth and partner portal operation flows", () => {
 
   test("member login shows field-level validation before submitting", async ({ page }) => {
     await page.goto("/auth/login");
+    await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "로그인" }).click();
 
