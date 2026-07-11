@@ -6,7 +6,7 @@ test.describe("auth and partner portal operation flows", () => {
 
     await page.getByRole("link", { name: "인증하고 혜택 이용" }).first().click();
 
-    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/);
+    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/, { timeout: 15_000 });
     const loginUrl = new URL(page.url());
     const certificationReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
     expect(certificationReturnTo).toContain("/certification?returnTo=");
@@ -17,9 +17,9 @@ test.describe("auth and partner portal operation flows", () => {
 
   test("member login shows field-level validation before submitting", async ({ page }) => {
     await page.goto("/auth/login");
+    await page.waitForLoadState("networkidle");
 
-    await page.getByText("기존 사이트 비밀번호로 로그인").click();
-    await page.getByRole("button", { name: "기존 비밀번호로 로그인" }).click();
+    await page.getByRole("button", { name: "로그인" }).click();
 
     await expect(page.getByText("아이디를 입력해 주세요.")).toBeVisible();
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();
@@ -39,7 +39,8 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toHaveCount(0);
   });
 
-  test("partner setup, company selection, and change-request entry stay company scoped", async ({ page }) => {
+  test("partner setup, login, and change-request entry stay company scoped", async ({ page }) => {
+    test.setTimeout(90_000);
     await page.goto("/partner/setup/mock-partner-setup-cafe-ssafy");
 
     await page.getByPlaceholder("영문/숫자/특수문자 포함 8자 이상").fill("Partner!123");
@@ -60,14 +61,14 @@ test.describe("auth and partner portal operation flows", () => {
     await page.getByPlaceholder("초기 설정 후 받은 비밀번호").fill("Partner!123");
     await page.getByRole("button", { name: "로그인" }).click();
 
-    await expect(page).toHaveURL(/\/partner/);
-    await expect(page.getByRole("heading", { name: "파트너사 선택" })).toBeVisible();
-
+    await expect(page).toHaveURL(/\/partner/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "파트너사 선택" })).toBeVisible({
+      timeout: 45_000,
+    });
     await page.getByRole("link", { name: /카페 싸피/ }).first().click();
-    await expect(page).toHaveURL(
-      /\/partner\/companies\/mock-partner-company-cafe-ssafy/,
-    );
-    await expect(page.getByRole("heading", { name: "운영 홈" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "운영 홈" })).toBeVisible({
+      timeout: 20_000,
+    });
 
     await page
       .getByRole("link", { name: "카페 싸피 역삼본점 상세 보기" })

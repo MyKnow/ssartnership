@@ -1,7 +1,6 @@
 ---
 name: verification-loop
 description: "A comprehensive verification system for Claude Code sessions."
-origin: ECC
 ---
 
 # Verification Loop Skill
@@ -42,6 +41,23 @@ For Supabase work, local validation is not enough by itself. Confirm the new mig
 For E2E work, a CI-wide failure that mentions missing `ffmpeg` or a missing Playwright executable is an environment/install problem. Fix the Playwright install step or use `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome` before debugging app behavior.
 
 For page-smoke failures, a 404 response body means the test route list and App Router tree are out of sync. Update the route, compatibility redirect, or smoke fixture deliberately.
+
+For a broad UI wave, run the full CI-equivalent E2E suite, not only focused tests. A focused `BASE_URL` run can hide mock-source and server-start failures. Use an isolated Playwright server with the same mock environment as `playwright.config.ts`; if a developer server already holds the Next.js lock for the workspace, use a clean worktree or let CI run before merge.
+
+Before accepting UI E2E assertions:
+
+- Assert the current product contract. If mobile intentionally removes a generic icon CTA, assert its absence and use the visible title/card navigation path.
+- Prefer accessible names (`getByRole`) over duplicated visible step text. Compact steppers may render only a number while exposing `1/5 제휴처` through `aria-label`.
+- Verify responsive grid columns from computed `grid-template-columns`; do not require a second data row merely to prove layout.
+- Assert step progress through the shared semantic contract (`nav` and visible `aria-current="step"`) rather than a compact-only accessible name. Responsive implementations can leave both hidden and visible stepper DOMs mounted, so include `:visible` to avoid strict-mode collisions.
+- Match the company-selection expectation to the fixture cardinality. Multi-company mock accounts show the chooser, while exactly one company redirects to its dashboard; allow 15 seconds for the first compiled redirect/render.
+- URL query synchronization can trail client-side filtering. After asserting visible results, allow up to 15 seconds for the router-backed URL assertion.
+- Add explicit navigation/hydration timeouts for first-compile redirects instead of relying only on `networkidle`.
+- Keep mock auth isolated from Supabase infrastructure. When the partner portal repository is mock, do not call the Supabase-backed rate-limit lookup; production/supabase paths must retain the guard.
+- Keep mock SSR read paths isolated too. Under `NEXT_PUBLIC_DATA_SOURCE=mock`, render dependencies such as registration categories must come through the repository instead of a direct `getSupabaseAdminClient()` call; CI intentionally has no Supabase secrets.
+- A cookie-setting login can update the URL before the dynamic chooser has received the session. Do not navigate away at that point. Wait up to 45 seconds for the chooser under cold CI compilation, raise the flow timeout to 90 seconds, then continue through its canonical company link.
+
+When intentional UI changes affect visual baselines, run `npm run test:visual -- --update-snapshots`, inspect the six affected 360/820/1366 images, then rerun plain `npm run test:visual`. Never update snapshots merely to silence an unexplained diff.
 
 ### Phase 1: Build Verification
 ```bash

@@ -10,7 +10,6 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { trackProductEvent } from "@/lib/product-events";
 import type { PromotionSlide } from "@/lib/promotions/catalog";
-import Button from "@/components/ui/Button";
 
 function isInlineImageSrc(src: string) {
   return src.startsWith("blob:") || src.startsWith("data:");
@@ -104,7 +103,7 @@ export default function PromotionCarousel({
       aria-roledescription="carousel"
       aria-label="광고 캐러셀"
     >
-      <div className="mb-4 grid min-w-0 gap-3 px-1 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+      <div className="mb-4 grid min-w-0 gap-3 px-1">
         <div className="min-w-0 space-y-1.5">
           <Heading className="text-ko-title text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">
             {activeSlide.title}
@@ -113,9 +112,6 @@ export default function PromotionCarousel({
             {activeSlide.description}
           </p>
         </div>
-        <Button variant="soft" href="/#benefits" className="w-fit">
-          혜택 찾기
-        </Button>
       </div>
 
       <div className="relative">
@@ -142,7 +138,7 @@ export default function PromotionCarousel({
                 })
               }
             >
-              <div className="relative h-[clamp(11rem,38vw,22rem)] w-full overflow-hidden rounded-overlay border border-border/70 bg-surface-muted shadow-raised">
+              <div className="relative aspect-[21/9] w-full overflow-hidden rounded-overlay border border-border/70 bg-surface-muted shadow-raised">
                 {slide.sponsorLabel ? (
                   <span className="absolute left-3 top-3 z-10 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 text-xs font-semibold text-white shadow-flat backdrop-blur-md">
                     스폰서 · {slide.sponsorLabel}
@@ -153,7 +149,7 @@ export default function PromotionCarousel({
                   <img
                     src={slide.imageSrc}
                     alt={slide.imageAlt}
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-cover"
                     draggable={false}
                   />
                 ) : (
@@ -164,7 +160,7 @@ export default function PromotionCarousel({
                     sizes="(min-width: 1280px) 1084px, calc(100vw - 32px)"
                     priority={index === 0}
                     unoptimized={isRemoteImageSrc(slide.imageSrc)}
-                    className="object-contain"
+                    className="object-cover"
                   />
                 )}
               </div>

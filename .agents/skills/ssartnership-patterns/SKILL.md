@@ -1,9 +1,6 @@
 ---
 name: ssartnership-patterns
 description: Coding patterns extracted from ssartnership git history. Use when working in this repo on Next.js App Router routes, Tailwind UI, Supabase migrations, repository-pattern data access, mock/supabase switches, admin/member/partner workflows, tests, commits, or validation.
-version: 1.0.0
-source: local-git-analysis
-analyzed_commits: 200
 ---
 
 # Ssartnership Patterns
@@ -133,6 +130,14 @@ Recent failed Actions clustered into four workflows: `Sync Preview Supabase`, `V
 - Dependency or package graph changes: run `npm run check:lockfile` and commit any `package-lock.json` diff. Linux/amd64 optional dependency metadata can drift even when macOS installs look clean.
 - Storybook/client UI changes: run `npm run build-storybook`; when stories have interaction tests or media/crop dialogs, run `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test-storybook` and update story assertions with the component contract.
 - Public readiness/E2E changes: run the focused E2E locally with `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome`. If CI failures all mention missing `ffmpeg`, fix the Playwright install/config before debugging product behavior.
+- Broad UI waves: focused E2E is insufficient. Run or wait for the full `Public Readiness` E2E suite with the same mock-source environment as `playwright.config.ts`. Update assertions when the UI contract intentionally changes, use accessible step names, derive responsive columns from computed CSS instead of fixture cardinality, and give first-compile redirects an explicit timeout.
+- Registration step E2E must use the breakpoint-independent semantic state (`파트너 등록 단계` navigation and visible `aria-current="step"`) instead of compact-only labels. Use `:visible` because both responsive stepper DOMs can remain mounted.
+- Match partner navigation assertions to fixture cardinality: multi-company accounts show the chooser, while a single-company session redirects to its canonical dashboard. Allow 15 seconds for the initial compiled render.
+- Debounced/router-backed query-string synchronization may lag behind visible filtering, so URL assertions need an explicit 15-second timeout.
+- Mock partner authentication: `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE=mock` must not depend on the Supabase-backed rate-limit lookup. Keep that bypass restricted to the mock repository path; never weaken the production/supabase guard.
+- Mock public SSR must also stay repository-backed. Do not call `getSupabaseAdminClient()` directly for render dependencies such as registration categories when `NEXT_PUBLIC_DATA_SOURCE=mock`; CI intentionally has no Supabase secrets.
+- A cookie-setting partner login can reach `/partner` before the dynamic chooser receives the session. Preserve that navigation, allow the chooser up to 45 seconds under cold CI compilation, give the flow 90 seconds, and continue through the chooser link.
+- Visual baseline changes: after reviewing intentional diffs, run `npm run test:visual -- --update-snapshots` and then a plain `npm run test:visual`. Treat an unexplained screenshot diff as a blocker, not as permission to regenerate.
 - Route smoke failures: a rendered Korean 404 page means the route inventory, redirect, or app route changed. Update the smoke fixture and the route/redirect intentionally in the same work unit.
 - Supabase Preview changes: run `npm run validate:migrations`, inspect sorted migration order, and wait for the Supabase Preview external status to become green. Do not treat local migration validation as proof that the remote Preview branch applied successfully.
 - Preview sync failures: inspect sanitizer diagnostics and missing relation errors first. Production-to-Preview sync may fail when Production has tables not present in Preview, so the sync script must tolerate or explicitly map schema drift.

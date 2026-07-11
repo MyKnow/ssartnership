@@ -1,5 +1,6 @@
 "use client";
 
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { CategoryKey, Partner } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -22,6 +23,7 @@ export default function PartnerCardView({
   categoryLabel,
   categoryColor,
   className,
+  variant = "card",
   onCategoryClick,
   viewerAuthenticated = false,
   currentUserId,
@@ -34,6 +36,7 @@ export default function PartnerCardView({
   categoryLabel?: string;
   categoryColor?: string;
   className?: string;
+  variant?: "card" | "list";
   onCategoryClick?: (categoryKey: CategoryKey) => void;
   viewerAuthenticated?: boolean;
   currentUserId?: string | null;
@@ -63,12 +66,46 @@ export default function PartnerCardView({
   }
 
   const trackingProperties = buildPartnerCardTrackingProperties(partner);
+  const trackPartnerClick = (source: "card_surface" | "title_link" | "detail_cta") => {
+    trackProductEvent({
+      eventName: "partner_card_click",
+      targetType: "partner",
+      targetId: partner.id,
+      properties: {
+        ...trackingProperties,
+        source,
+      },
+    });
+  };
+  const handleCardSurfaceClick = (event: ReactMouseEvent<HTMLElement>) => {
+    if (!canNavigate || event.defaultPrevented) {
+      return;
+    }
+
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest(
+        "a, button, input, select, textarea, summary, [role='button'], [role='link']",
+      )
+    ) {
+      return;
+    }
+
+    trackPartnerClick("card_surface");
+    router.push(detailHref);
+  };
 
   return (
     <article
       data-testid="partner-card"
+      onClick={handleCardSurfaceClick}
       className={cn(
-        "@container/card relative flex h-full w-full min-w-0 flex-col gap-5 rounded-card border border-border/80 bg-surface-overlay p-5 shadow-flat backdrop-blur-md transition-surface duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
+        "@container/card relative h-full w-full min-w-0 rounded-card border border-border/80 bg-surface-overlay shadow-flat backdrop-blur-md transition-surface duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
+        variant === "list"
+          ? "grid grid-cols-1 items-center gap-2 p-3 min-[360px]:gap-3 min-[360px]:p-4 min-[480px]:grid-cols-[minmax(0,1fr)_2.75rem]"
+          : "flex flex-col gap-5 p-5",
+        canNavigate && "cursor-pointer",
         className,
       )}
     >
@@ -78,17 +115,10 @@ export default function PartnerCardView({
         badgeStyle={badgeStyle}
         detailHref={detailHref}
         canNavigate={canNavigate}
+        isActive={isActive}
         onCategoryClick={onCategoryClick}
         onTitleClick={(event) => {
-          trackProductEvent({
-            eventName: "partner_card_click",
-            targetType: "partner",
-            targetId: partner.id,
-            properties: {
-              ...trackingProperties,
-              source: "title_link",
-            },
-          });
+          trackPartnerClick("title_link");
           if (
             event.defaultPrevented ||
             event.metaKey ||
@@ -114,27 +144,25 @@ export default function PartnerCardView({
                   : undefined
               }
               compact
+              className={variant === "list" ? "!h-11 !px-3" : undefined}
             />
           ) : (
-            <PartnerFavoriteCountLabel favoriteCount={metrics?.favoriteCount ?? undefined} />
+            <PartnerFavoriteCountLabel
+              favoriteCount={metrics?.favoriteCount ?? undefined}
+              className={variant === "list" ? "!px-3" : undefined}
+            />
           )
         }
-        media={<PartnerCardMedia thumbnailUrl={thumbnailUrl} />}
+        media={<PartnerCardMedia thumbnailUrl={thumbnailUrl} compact={variant === "list"} />}
+        compact={variant === "list"}
       />
       <PartnerCardActions
         isActive={isActive}
         detailHref={detailHref}
         canNavigate={canNavigate}
+        compact={variant === "list"}
         onDetailClick={() =>
-          trackProductEvent({
-            eventName: "partner_card_click",
-            targetType: "partner",
-            targetId: partner.id,
-            properties: {
-              ...trackingProperties,
-              source: "detail_cta",
-            },
-          })
+          trackPartnerClick("detail_cta")
         }
       />
     </article>

@@ -135,26 +135,31 @@ export default function CertificationView({
         campusLabel={campusLabel}
         description=""
         footer={
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:items-end">
-            <div className="min-w-0 space-y-1">
-              <p className={cn("text-xs font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
+          <div className="flex h-full flex-nowrap items-center justify-between gap-[2cqw]">
+            <div className="min-w-0 space-y-[0.4cqw]">
+              <p className={cn("text-[clamp(0.5rem,1.5cqw,0.875rem)] font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
                 인증 시간
               </p>
-              <p className="whitespace-nowrap text-sm font-semibold sm:text-base">
+              <p className="whitespace-nowrap text-[clamp(0.625rem,2.4cqw,1.25rem)] font-semibold">
                 {dateLabel} {timeLabel}
               </p>
-              <div className={cn("flex items-center gap-2 text-xs", scheme.subduedTextClassName)}>
-                <span className={cn("inline-flex h-2 w-2 rounded-full", scheme.accentClassName)} />
+              <div className={cn("flex items-center gap-[1cqw] text-[clamp(0.5rem,1.5cqw,0.875rem)]", scheme.subduedTextClassName)}>
+                <span className={cn("inline-flex h-[1cqw] w-[1cqw] rounded-full", scheme.accentClassName)} />
                 {year === 0 ? "운영진 인증" : "교육생 인증"}
               </div>
             </div>
-            <CertificationQrButton
-              roleLabel={roleLabel}
-              className={cn(
-                scheme.qrButtonClassName,
-                "!h-11 !min-h-11 !px-4 text-sm whitespace-nowrap",
-              )}
-            />
+            <div
+              data-certification-qr-touch-target
+              className="flex min-h-11 min-w-11 items-center justify-center"
+            >
+              <CertificationQrButton
+                roleLabel={roleLabel}
+                className={cn(
+                  scheme.qrButtonClassName,
+                  "relative !h-[8cqw] !min-h-0 !w-[15cqw] !min-w-0 !rounded-[2.5cqw] !px-[2cqw] text-[clamp(0.625rem,2cqw,1rem)] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
+                )}
+              />
+            </div>
           </div>
         }
         avatarSrc={avatarSrc}

@@ -9,6 +9,7 @@ import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
 import { getHeaderSession } from "@/lib/header-session";
+import { partnerRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -24,15 +25,28 @@ export const metadata: Metadata = {
   },
 };
 
+async function loadRegistrationCategories() {
+  if (process.env.NEXT_PUBLIC_DATA_SOURCE === "mock") {
+    const categories = await partnerRepository.getCategories();
+    return categories.map((category) => ({
+      id: category.key,
+      key: category.key,
+      label: category.label,
+    }));
+  }
+
+  const result = await getSupabaseAdminClient()
+    .from("categories")
+    .select("id,key,label")
+    .order("created_at", { ascending: true });
+  return result.data ?? [];
+}
+
 export default async function PartnerRegistrationPage() {
-  const [headerSession, categoriesResult] = await Promise.all([
+  const [headerSession, categories] = await Promise.all([
     getHeaderSession(),
-    getSupabaseAdminClient()
-      .from("categories")
-      .select("id,key,label")
-      .order("created_at", { ascending: true }),
+    loadRegistrationCategories(),
   ]);
-  const categories = categoriesResult.data ?? [];
 
   return (
     <div className="min-h-screen bg-background">

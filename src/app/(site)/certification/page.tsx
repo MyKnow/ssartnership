@@ -9,7 +9,6 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
 import CertificationProfileSync from "@/components/certification/CertificationProfileSync";
-import Button from "@/components/ui/Button";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
@@ -87,18 +86,13 @@ export default async function CertificationPage({
       <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10" size="wide">
-          <div className="mx-auto max-w-4xl space-y-6">
+          <div className="mx-auto w-full max-w-4xl space-y-6">
             <PageHeader
               eyebrow="Member"
               title="내 인증"
               description="현재 계정의 인증 상태와 표시 정보를 확인합니다."
-              actions={
-                benefitReturnTo ? (
-                  <Button href={benefitReturnTo} variant="secondary">
-                    혜택 화면으로 돌아가기
-                  </Button>
-                ) : undefined
-              }
+              backHref={benefitReturnTo}
+              backLabel="혜택 화면으로 돌아가기"
             />
             <CertificationView
               member={{
@@ -113,9 +107,9 @@ export default async function CertificationPage({
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
             />
-          </div>
-          <div className="mx-auto mt-10 max-w-4xl border-t border-border/70 pt-8">
-            <CertificationFooterActions />
+            <div className="mt-10 w-full border-t border-border/70 pt-8">
+              <CertificationFooterActions />
+            </div>
           </div>
           <CertificationProfileSync />
         </Container>

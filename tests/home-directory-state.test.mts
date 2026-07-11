@@ -17,15 +17,19 @@ test("parseHomeDirectoryState accepts the canonical URL filter keys", async () =
       new URLSearchParams({
         q: "  역삼 헬스  ",
         category: "health",
+        campus: "seoul",
         audience: "student",
         sort: "endingSoon",
+        view: "list",
       }),
     ),
     {
       q: "역삼 헬스",
       category: "health",
+      campus: "seoul",
       audience: "student",
       sort: "endingSoon",
+      view: "list",
     },
   );
 });
@@ -37,24 +41,30 @@ test("parseHomeDirectoryState falls back safely for unsupported values", async (
     parseHomeDirectoryState(
       new URLSearchParams({
         category: "not-a-category",
+        campus: "invalid",
         audience: "admin",
         sort: "oldest",
+        view: "table",
       }),
       ["cafe", "health"],
     ),
     {
       q: "",
       category: "all",
+      campus: "all",
       audience: "all",
       sort: "popular",
+      view: "card",
     },
   );
 
   assert.deepEqual(parseHomeDirectoryState(new URLSearchParams()), {
     q: "",
     category: "all",
+    campus: "all",
     audience: "all",
     sort: "popular",
+    view: "card",
   });
   assert.equal(
     parseHomeDirectoryState(new URLSearchParams({ category: "한글 카테고리" }))
@@ -70,13 +80,18 @@ test("serializeHomeDirectoryState omits defaults and preserves unrelated URL key
     {
       q: "카페",
       category: "all",
+      campus: "daejeon",
       audience: "staff",
       sort: "popular",
+      view: "list",
     },
     new URLSearchParams({ campaign: "summer" }),
   );
 
-  assert.equal(result.toString(), "campaign=summer&q=%EC%B9%B4%ED%8E%98&audience=staff");
+  assert.equal(
+    result.toString(),
+    "campaign=summer&q=%EC%B9%B4%ED%8E%98&campus=daejeon&audience=staff&view=list",
+  );
 });
 
 test("buildPartnerDetailHref stores the full directory URL for filter-aware return", async () => {

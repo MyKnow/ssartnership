@@ -11,14 +11,20 @@ export default function CategoryTabs({
   options,
   activeKey,
   onChange,
+  layout = "scroll",
 }: {
   options: CategoryTabOption[];
   activeKey: CategoryKey | "all";
   onChange: (key: CategoryKey | "all") => void;
+  layout?: "scroll" | "responsive";
 }) {
   return (
     <div
-      className="-mx-1 flex min-w-0 snap-x gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className={cn(
+        "-mx-1 flex min-w-0 snap-x gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        layout === "responsive" &&
+          "min-[840px]:mx-0 min-[840px]:flex-wrap min-[840px]:overflow-visible min-[840px]:px-0",
+      )}
       role="group"
       aria-label="제휴처 카테고리"
     >

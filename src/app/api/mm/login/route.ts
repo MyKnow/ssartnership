@@ -46,10 +46,12 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as {
       username?: string;
       password?: string;
+      autoLogin?: boolean;
     };
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
     const password = String(payload.password ?? "").trim();
+    const autoLogin = payload.autoLogin === true;
     const throttleContext = {
       ipAddress: context.ipAddress ?? null,
       accountIdentifier: username || null,
@@ -161,7 +163,9 @@ export async function POST(request: Request) {
     }
 
     const policyStatus = await getMemberRequiredPolicyStatus(member.id);
-    await setUserSession(member.id, Boolean(member.must_change_password));
+    await setUserSession(member.id, Boolean(member.must_change_password), {
+      persistent: autoLogin,
+    });
     revalidatePath("/");
     revalidatePath("/auth/consent");
     revalidatePath("/auth/change-password");
@@ -178,6 +182,7 @@ export async function POST(request: Request) {
       properties: {
         mustChangePassword: Boolean(member.must_change_password),
         requiresConsent: policyStatus.requiresConsent,
+        autoLogin,
       },
     });
     return NextResponse.json({

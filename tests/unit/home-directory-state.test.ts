@@ -12,33 +12,48 @@ describe("home directory URL state", () => {
         new URLSearchParams({
           q: "  역삼 카페 ",
           category: "cafe",
+          campus: "seoul",
           audience: "student",
           sort: "recent",
+          view: "list",
         }),
         ["cafe", "health"],
       ),
     ).toEqual({
       q: "역삼 카페",
       category: "cafe",
+      campus: "seoul",
       audience: "student",
       sort: "recent",
+      view: "list",
     });
 
     expect(
       parseHomeDirectoryState(
         new URLSearchParams({
           category: "unknown",
+          campus: "unknown",
           audience: "admin",
           sort: "oldest",
+          view: "table",
         }),
         ["cafe"],
       ),
-    ).toEqual({ q: "", category: "all", audience: "all", sort: "popular" });
+    ).toEqual({
+      q: "",
+      category: "all",
+      campus: "all",
+      audience: "all",
+      sort: "popular",
+      view: "card",
+    });
     expect(parseHomeDirectoryState(new URLSearchParams())).toEqual({
       q: "",
       category: "all",
+      campus: "all",
       audience: "all",
       sort: "popular",
+      view: "card",
     });
     expect(
       parseHomeDirectoryState(
@@ -53,21 +68,25 @@ describe("home directory URL state", () => {
         {
           q: "카페",
           category: "all",
+          campus: "gumi",
           audience: "staff",
           sort: "endingSoon",
+          view: "list",
         },
         new URLSearchParams({ campaign: "summer", category: "old" }),
       ).toString(),
     ).toBe(
-      "campaign=summer&q=%EC%B9%B4%ED%8E%98&audience=staff&sort=endingSoon",
+      "campaign=summer&q=%EC%B9%B4%ED%8E%98&campus=gumi&audience=staff&sort=endingSoon&view=list",
     );
 
     expect(
       serializeHomeDirectoryState({
         q: "",
         category: "all",
+        campus: "all",
         audience: "all",
         sort: "popular",
+        view: "card",
       }).toString(),
     ).toBe("");
   });

@@ -8,10 +8,8 @@ import {
   DocumentTextIcon,
   LockClosedIcon,
   MegaphoneIcon,
-  UserCircleIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
-import CampusFooterSelect from "@/components/CampusFooterSelect";
 import PwaInstallButton from "@/components/PwaInstallButton";
 import ThemeModeButtons from "@/components/ThemeModeButtons";
 import Button from "@/components/ui/Button";
@@ -52,19 +50,12 @@ export default function Footer() {
           >
             <BrandWordmark className="text-base sm:text-lg" />
           </Link>
-          <p className="max-w-xl leading-6">
-            SSAFY 구성원을 위한 제휴 혜택, 공지와 정책을 한곳에서 확인합니다.
-          </p>
           <p className="text-xs leading-6">
             Copyright © 2026 {SITE_NAME}. All rights reserved.
           </p>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-5">
-          <FooterSection title="캠퍼스">
-            <CampusFooterSelect className="w-full" />
-          </FooterSection>
-
+        <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-4">
           <FooterSection title="운영">
             <Button variant="secondary" href="/admin" className="w-full justify-start gap-2">
               <ShieldCheckIcon className="h-5 w-5" />
@@ -111,14 +102,6 @@ export default function Footer() {
             <Button variant="secondary" href="/notifications" className="w-full justify-start gap-2">
               <BellIcon className="h-5 w-5" />
               알림센터
-            </Button>
-            <Button
-              variant="secondary"
-              href="/certification"
-              className="w-full justify-start gap-2"
-            >
-              <UserCircleIcon className="h-5 w-5" />
-              내 인증
             </Button>
           </FooterSection>
 

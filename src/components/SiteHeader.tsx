@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { BellIcon } from "@heroicons/react/24/outline";
+import { BellIcon, TicketIcon } from "@heroicons/react/24/outline";
 import { BellAlertIcon } from "@heroicons/react/24/solid";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
@@ -58,24 +58,6 @@ export default function SiteHeader({
             >
               <BrandWordmark className="text-lg sm:text-xl" />
             </Link>
-            <nav
-              aria-label="주요 메뉴"
-              className="hidden min-w-0 flex-1 items-center justify-center gap-1 md:flex"
-            >
-              {[
-                { href: "/#events", label: "이벤트" },
-                { href: "/#benefits", label: "혜택 찾기" },
-                { href: "/campuses/seoul", label: "캠퍼스" },
-              ].map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-muted-foreground transition-interactive hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
             <div className="flex items-center gap-2">
               <div className="hidden items-center gap-2 xl:flex">
                 <Button variant="soft" href={suggestHref}>
@@ -113,6 +95,20 @@ export default function SiteHeader({
               <div className="hidden md:flex">
                 <ThemeToggle />
               </div>
+              {initialSession ? (
+                <div className="xl:hidden">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    href="/coupons"
+                    prefetch={false}
+                    ariaLabel="쿠폰함"
+                    title="쿠폰함"
+                  >
+                    <TicketIcon className="h-5 w-5" />
+                  </Button>
+                </div>
+              ) : null}
               {initialSession ? (
                 <div className="xl:hidden">
                   <Button

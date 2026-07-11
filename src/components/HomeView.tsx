@@ -14,10 +14,13 @@ import type { Category, CategoryKey, Partner } from "@/lib/types";
 import PartnerFilters, {
   type PartnerSortOption,
 } from "@/components/PartnerFilters";
+import PartnerActiveFilters from "@/components/partner-filters/PartnerActiveFilters";
+import PartnerDirectoryToolbar from "@/components/partner-filters/PartnerDirectoryToolbar";
 import MotionReveal from "@/components/ui/MotionReveal";
 import PartnerCardView from "@/components/PartnerCardView";
 import SectionHeading from "@/components/ui/SectionHeading";
 import EmptyState from "@/components/ui/EmptyState";
+import { cn } from "@/lib/cn";
 import { HOME_COPY } from "@/lib/content";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
@@ -65,9 +68,11 @@ export default function HomeView({
     [categoryKeys, searchParams],
   );
   const activeCategory = directoryState.category;
+  const campusFilter = directoryState.campus;
   const appliesToFilter = directoryState.audience;
   const sortValue = directoryState.sort;
   const searchValue = directoryState.q;
+  const viewMode = directoryState.view;
   const [visibleCardState, setVisibleCardState] = useState({
     key: "",
     limit: INITIAL_PARTNER_CARD_COUNT,
@@ -125,13 +130,21 @@ export default function HomeView({
     return filterHomePartners({
       partners: normalizedPartners,
       activeCategory,
+      campusFilter,
       appliesToFilter,
       searchValue: deferredSearchValue,
       sortValue,
     });
-  }, [activeCategory, appliesToFilter, deferredSearchValue, normalizedPartners, sortValue]);
+  }, [
+    activeCategory,
+    campusFilter,
+    appliesToFilter,
+    deferredSearchValue,
+    normalizedPartners,
+    sortValue,
+  ]);
 
-  const visibleCardKey = `${activeCategory}:${appliesToFilter}:${deferredSearchValue}:${sortValue}`;
+  const visibleCardKey = `${activeCategory}:${campusFilter}:${appliesToFilter}:${deferredSearchValue}:${sortValue}:${viewMode}`;
   const visibleCardLimit =
     visibleCardState.key === visibleCardKey
       ? visibleCardState.limit
@@ -145,6 +158,7 @@ export default function HomeView({
   );
 
   const visibleResultCount = filteredPartners.visible.length;
+  const directoryResultCount = filteredPartners.display.length;
 
   const loadMorePartners = useCallback(() => {
     if (!hasMoreDisplayPartners) {
@@ -262,7 +276,7 @@ export default function HomeView({
     }
 
     searchTimeoutRef.current = window.setTimeout(() => {
-      const dedupeKey = `${activeCategory}:${appliesToFilter}:${sortValue}:${query}`;
+      const dedupeKey = `${activeCategory}:${campusFilter}:${appliesToFilter}:${sortValue}:${query}`;
       if (lastLoggedSearchRef.current === dedupeKey) {
         return;
       }
@@ -273,6 +287,7 @@ export default function HomeView({
         properties: {
           query,
           categoryKey: activeCategory,
+          campusFilter,
           appliesToFilter,
           sortValue,
           resultCount: visibleResultCount,
@@ -286,7 +301,14 @@ export default function HomeView({
         searchTimeoutRef.current = null;
       }
     };
-  }, [activeCategory, appliesToFilter, deferredSearchValue, sortValue, visibleResultCount]);
+  }, [
+    activeCategory,
+    campusFilter,
+    appliesToFilter,
+    deferredSearchValue,
+    sortValue,
+    visibleResultCount,
+  ]);
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
     startTransition(() => {
@@ -312,6 +334,36 @@ export default function HomeView({
       targetId: nextSort,
       properties: {
         sortValue: nextSort,
+      },
+    });
+  };
+
+  const handleCampusFilterChange = (
+    nextCampus: HomeDirectoryState["campus"],
+  ) => {
+    startTransition(() => {
+      replaceDirectoryState({ campus: nextCampus });
+    });
+  };
+
+  const handleAppliesToFilterChange = (
+    nextAudience: HomeDirectoryState["audience"],
+  ) => {
+    startTransition(() => {
+      replaceDirectoryState({ audience: nextAudience });
+    });
+  };
+
+  const handleViewModeChange = (nextViewMode: HomeDirectoryState["view"]) => {
+    startTransition(() => {
+      replaceDirectoryState({ view: nextViewMode });
+    });
+    trackProductEvent({
+      eventName: "directory_view_change",
+      targetType: "partner_directory",
+      targetId: nextViewMode,
+      properties: {
+        viewMode: nextViewMode,
       },
     });
   };
@@ -343,37 +395,56 @@ export default function HomeView({
   };
 
   return (
-    <>
-      <MotionReveal delay={0.04}>
-        <section id="benefits" className="scroll-mt-24 pt-10 flex flex-col gap-6">
-          <SectionHeading
-            eyebrow="Directory"
-            title={HOME_COPY.categoryTitle}
-            description={HOME_COPY.categoryDescription}
-            headingLevel="h2"
-          />
-          <div data-nosnippet>
+    <MotionReveal delay={0.04}>
+      <section id="benefits" className="flex scroll-mt-24 flex-col gap-6 pt-10">
+        <SectionHeading
+          eyebrow="Directory"
+          title={HOME_COPY.categoryTitle}
+          description={HOME_COPY.categoryDescription}
+          headingLevel="h2"
+        />
+        <div className="grid min-w-0 gap-6 min-[840px]:grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] min-[840px]:items-start min-[1200px]:grid-cols-[18rem_minmax(0,1fr)]">
+          <div
+            className="min-w-0 min-[840px]:sticky min-[840px]:top-24 min-[840px]:self-start"
+            data-nosnippet
+          >
             <PartnerFilters
               categories={categories}
               activeCategory={activeCategory}
               onCategoryChange={handleCategoryChange}
               searchValue={searchValue}
               onSearchChange={handleSearchChange}
+              campusFilter={campusFilter}
+              onCampusFilterChange={handleCampusFilterChange}
               appliesToFilter={appliesToFilter}
-              onAppliesToFilterChange={(nextAudience) =>
-                startTransition(() => {
-                  replaceDirectoryState({ audience: nextAudience });
-                })
-              }
+              onAppliesToFilterChange={handleAppliesToFilterChange}
               sortValue={sortValue}
               onSortChange={handleSortChange}
+              mode="home-directory"
             />
           </div>
-        </section>
-      </MotionReveal>
-
-      <MotionReveal delay={0.08}>
-        <section className="mt-10">
+          <div
+            className="grid min-w-0 content-start gap-5"
+            data-testid="partner-results-pane"
+          >
+            <PartnerActiveFilters
+              categories={categories}
+              searchValue={searchValue}
+              activeCategory={activeCategory}
+              campusFilter={campusFilter}
+              appliesToFilter={appliesToFilter}
+              sortValue={sortValue}
+              onSearchChange={handleSearchChange}
+              onCategoryChange={handleCategoryChange}
+              onCampusFilterChange={handleCampusFilterChange}
+              onAppliesToFilterChange={handleAppliesToFilterChange}
+              onSortChange={handleSortChange}
+            />
+            <PartnerDirectoryToolbar
+              resultCount={directoryResultCount}
+              viewMode={viewMode}
+              onViewModeChange={handleViewModeChange}
+            />
           {displayPartners.length === 0 ? (
             <div data-testid="partner-no-results">
               <EmptyState
@@ -392,8 +463,14 @@ export default function HomeView({
           ) : (
             <div className="grid gap-6">
               <div
-                className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3 xl:gap-5"
+                className={cn(
+                  "grid grid-cols-1",
+                  viewMode === "list"
+                    ? "gap-3"
+                    : "gap-4 min-[600px]:max-[840px]:grid-cols-2 min-[1200px]:grid-cols-2 min-[1200px]:gap-5",
+                )}
                 data-testid="partner-grid"
+                data-view-mode={viewMode}
               >
                 {displayPartners.map((partner) => (
                   <PartnerCardView
@@ -410,6 +487,7 @@ export default function HomeView({
                     onCategoryClick={handleCategoryChange}
                     onFavoriteChange={handleFavoriteChange}
                     returnTo={directoryReturnTo}
+                    variant={viewMode}
                   />
                 ))}
               </div>
@@ -425,8 +503,9 @@ export default function HomeView({
               ) : null}
             </div>
           )}
-        </section>
-      </MotionReveal>
-    </>
+          </div>
+        </div>
+      </section>
+    </MotionReveal>
   );
 }

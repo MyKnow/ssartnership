@@ -15,7 +15,7 @@ export default function PartnerFavoriteCountLabel({
   return (
     <span
       className={cn(
-        "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium leading-none text-muted-foreground",
+        "inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium leading-none text-muted-foreground",
         className,
       )}
       aria-label={`즐겨찾기 ${count.toLocaleString("ko-KR")}개`}

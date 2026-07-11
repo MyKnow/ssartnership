@@ -36,7 +36,7 @@ test("SSAFY callback route is not a user-facing auth start page", () => {
   assert.doesNotMatch(relay, /\.verify\(/);
 });
 
-test("member login starts with SSAFY Verify and keeps password login as a legacy fallback", () => {
+test("member login prioritizes password login and keeps SSAFY Verify as the secondary action", () => {
   const loginPage = readRepoFile("src/app/auth/login/page.tsx");
   const authEntryViews = readRepoFile("src/components/auth/AuthEntryViews.tsx");
   const loginForm = readRepoFile("src/components/auth/LoginForm.tsx");
@@ -44,18 +44,37 @@ test("member login starts with SSAFY Verify and keeps password login as a legacy
   assert.match(loginPage, /<LoginPageView\b/);
   assert.match(authEntryViews, /function LoginPageView/);
   assert.match(authEntryViews, /SsafyVerifyButton/);
-  assert.match(authEntryViews, /SSAFY Verify 로그인/);
-  assert.match(authEntryViews, /기존 사이트 비밀번호로 로그인/);
-  assert.match(authEntryViews, /전환 기간/);
+  assert.match(authEntryViews, /<LoginForm returnTo=\{returnTo\}/);
+  assert.match(authEntryViews, /role="separator"/);
+  assert.match(authEntryViews, />\s*회원가입\s*</);
+  assert.match(authEntryViews, /label="SSAFY Verify로 시작하기"/);
   assert.doesNotMatch(
     authEntryViews,
-    /Mattermost 아이디와 사이트 비밀번호로 로그인합니다/,
+    /아이디와 사이트 비밀번호로 싸트너십에 로그인합니다/,
   );
-  assert.match(loginForm, /ID 저장하기/);
-  assert.match(loginForm, /기존 비밀번호로 로그인/);
-  assert.match(loginForm, /localStorage\.setItem\(savedLoginIdStorageKey/);
-  assert.match(loginForm, /localStorage\.removeItem\(savedLoginIdStorageKey/);
+  assert.match(loginForm, /자동 로그인/);
+  assert.match(loginForm, />\s*로그인\s*</);
+  assert.match(loginForm, /autoLogin/);
+  assert.doesNotMatch(loginForm, /localStorage\.setItem/);
   assert.doesNotMatch(loginForm, /localStorage\.setItem\([^,]+,\s*password/);
+
+  const passwordFormIndex = authEntryViews.indexOf("<LoginForm");
+  const dividerIndex = authEntryViews.indexOf('role="separator"');
+  const signupIndex = authEntryViews.indexOf("회원가입");
+  const verifyIndex = authEntryViews.indexOf("<SsafyVerifyButton");
+  assert.ok(passwordFormIndex < dividerIndex);
+  assert.ok(dividerIndex < signupIndex);
+  assert.ok(signupIndex < verifyIndex);
+});
+
+test("password login forwards the automatic-login choice to persistent session creation", () => {
+  const loginRoute = readRepoFile("src/app/api/mm/login/route.ts");
+  const userAuth = readRepoFile("src/lib/user-auth.ts");
+
+  assert.match(loginRoute, /autoLogin\?: boolean/);
+  assert.match(loginRoute, /persistent:\s*autoLogin/);
+  assert.match(userAuth, /persistent\?: boolean/);
+  assert.match(userAuth, /\.\.\.\(persistent \? \{ maxAge:/);
 });
 
 test("SSAFY Verify token route signs in existing verified members", () => {

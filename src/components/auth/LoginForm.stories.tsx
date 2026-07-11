@@ -24,7 +24,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const legacyLoginButtonName = "기존 비밀번호로 로그인";
+const legacyLoginButtonName = "로그인";
 
 export const Default: Story = {};
 
@@ -50,6 +50,25 @@ export const ValidationErrors: Story = {
       canvas.getByRole("button", { name: legacyLoginButtonName }),
     );
     await expect(canvas.getByText("아이디에 공백을 넣을 수 없습니다.")).toBeInTheDocument();
+  },
+};
+
+export const KeyboardSubmit: Story = {
+  play: async ({ canvasElement }) => {
+    let submitted = false;
+    window.fetch = async () => {
+      submitted = true;
+      return Response.json({ error: "invalid_credentials" }, { status: 401 });
+    };
+    const canvas = within(canvasElement);
+
+    await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "ssafy15");
+    await userEvent.type(
+      canvas.getByPlaceholderText("사이트 비밀번호"),
+      "wrong-password{Enter}",
+    );
+
+    await expect(submitted).toBe(true);
   },
 };
 
