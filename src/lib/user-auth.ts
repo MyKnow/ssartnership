@@ -21,6 +21,7 @@ type SignedUserSession = {
   issuedAt: number;
   expiresAt: number;
   mustChangePassword?: boolean;
+  persistent?: boolean;
   policyConsentSnapshot?: PolicyConsentSnapshot | null;
 };
 
@@ -66,6 +67,12 @@ function verifyToken(token: string) {
       return null;
     }
     if (
+      parsed.persistent !== undefined &&
+      typeof parsed.persistent !== "boolean"
+    ) {
+      return null;
+    }
+    if (
       parsed.policyConsentSnapshot !== undefined &&
       parsed.policyConsentSnapshot !== null &&
       (typeof parsed.policyConsentSnapshot !== "object" ||
@@ -95,6 +102,7 @@ export async function setUserSession(
   mustChangePassword = false,
   options?: {
     policyConsentSnapshot?: PolicyConsentSnapshot | null;
+    persistent?: boolean;
   },
 ) {
   const now = Date.now();
@@ -105,9 +113,11 @@ export async function setUserSession(
       : currentSession?.userId === userId
         ? currentSession.policyConsentSnapshot ?? undefined
         : undefined;
+  const persistent = options?.persistent ?? currentSession?.persistent ?? true;
   const payload = JSON.stringify({
     userId,
     mustChangePassword,
+    persistent,
     issuedAt: now,
     expiresAt: now + SESSION_TTL_MS,
     ...(resolvedPolicyConsentSnapshot !== undefined
@@ -120,7 +130,7 @@ export async function setUserSession(
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+    ...(persistent ? { maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 } : {}),
     path: "/",
   });
 }

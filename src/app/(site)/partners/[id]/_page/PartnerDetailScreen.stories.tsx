@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import PageHeader from "@/components/ui/PageHeader";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import AppErrorScreen from "@/components/errors/AppErrorScreen";
@@ -40,14 +41,6 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
         backHref="/?category=health#benefits"
         backLabel="혜택 목록으로"
       />
-      <PartnerDetailContactSection
-        isActive
-        contactCount={1}
-        benefitUseAction={action}
-        inquiryDisplay={null}
-        normalizedLinks={{ benefitActionLink: "", reservationLink: "", inquiryLink: "" }}
-        partnerId={value.id}
-      />
       <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
         <PartnerDetailSummaryCard
           partner={value}
@@ -65,8 +58,50 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
             inquiryClicks: 12,
             totalClicks: 198,
           }}
+          detailPanel={
+            <PartnerDetailContactSection
+              isActive
+              contactCount={2}
+              benefitUseAction={action}
+              inquiryDisplay={{
+                label: "0507-1382-2343",
+                href: "tel:050713822343",
+                type: "phone",
+              }}
+              normalizedLinks={{
+                benefitActionLink: "",
+                reservationLink: "",
+                inquiryLink: "0507-1382-2343",
+              }}
+              partnerId={value.id}
+            />
+          }
+          primaryActionPanel={
+            <PartnerDetailContactSection
+              isActive
+              contactCount={2}
+              benefitUseAction={action}
+              inquiryDisplay={{
+                label: "0507-1382-2343",
+                href: "tel:050713822343",
+                type: "phone",
+              }}
+              normalizedLinks={{
+                benefitActionLink: "",
+                reservationLink: "",
+                inquiryLink: "0507-1382-2343",
+              }}
+              partnerId={value.id}
+              mode="primary"
+              className="hidden md:block"
+            />
+          }
         />
-        <PartnerImageCarousel images={value.images ?? []} name={value.name} />
+        <PartnerImageCarousel
+          images={value.images ?? []}
+          name={value.name}
+          className="order-1 xl:order-2"
+        />
       </div>
     </div>
   );
@@ -82,7 +117,170 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const benefitList = canvas.getByRole("list", { name: "제휴 혜택" });
+    await expect(within(benefitList).getAllByRole("listitem")).toHaveLength(2);
+    await expect(canvas.queryByText("SSAFY 구성원 혜택")).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByText("방문하거나 이용하기 전에 적용 대상과 기간을 확인하세요."),
+    ).not.toBeInTheDocument();
+    await expect(canvas.queryByText("바로 이용")).not.toBeInTheDocument();
+
+    const usageInformation = canvas.getByRole("group", { name: "이용 정보" });
+    await expect(usageInformation).toHaveTextContent("이용 위치");
+    await expect(usageInformation).toHaveTextContent("적용 대상");
+
+    const audienceList = within(usageInformation).getByRole("list", {
+      name: "적용 대상 목록",
+    });
+    await expect(audienceList).toHaveClass("grid-cols-2");
+    await expect(audienceList).toHaveClass("min-[480px]:grid-cols-3");
+    const staffAudience = within(audienceList).getByRole("listitem", {
+      name: "운영진: 적용 대상",
+    });
+    await expect(staffAudience).toBeVisible();
+    await expect(staffAudience.firstElementChild).toHaveClass("!bg-primary");
+    await expect(staffAudience.firstElementChild).toHaveClass(
+      "!text-primary-foreground",
+    );
+    await expect(
+      within(audienceList).getByRole("listitem", {
+        name: "교육생: 적용 대상",
+      }),
+    ).toBeVisible();
+    const graduateAudience = within(audienceList).getByRole("listitem", {
+      name: "수료생: 적용 대상 아님",
+    });
+    await expect(graduateAudience).toBeVisible();
+    await expect(graduateAudience.firstElementChild).toHaveClass(
+      "border-dashed",
+    );
+    await expect(
+      graduateAudience.querySelector("[data-audience-status-dot]"),
+    ).toHaveClass("bg-muted-foreground");
+
+    const summaryCard = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-summary]",
+    );
+    await expect(summaryCard).not.toBeNull();
+    if (!summaryCard) {
+      return;
+    }
+    await expect(summaryCard).toHaveClass("order-2", "xl:order-1");
+    const imageCarouselButton = canvas.getByRole("button", {
+      name: "바디라인 역삼점 이미지 크게 보기",
+    });
+    await expect(imageCarouselButton.parentElement).toHaveClass(
+      "order-1",
+      "xl:order-2",
+    );
+
+    const primaryAction = summaryCard.querySelector<HTMLElement>(
+      "[data-primary-benefit-action]",
+    );
+    await expect(primaryAction).not.toBeNull();
+    await expect(primaryAction).toHaveClass("w-full");
+    const inquirySection = summaryCard.querySelector<HTMLElement>(
+      "[data-inquiry-section]",
+    );
+    await expect(inquirySection).not.toBeNull();
+    await expect(inquirySection).toBeVisible();
+    await expect(
+      within(inquirySection!).getByText("연락처"),
+    ).toBeInTheDocument();
+    await expect(
+      within(inquirySection!).queryByText("문의"),
+    ).not.toBeInTheDocument();
+    await expect(
+      within(inquirySection!).getByText("0507-1382-2343"),
+    ).toBeInTheDocument();
+    const inquiryLink = within(inquirySection!).getByRole("link", {
+      name: "0507-1382-2343",
+    });
+    await expect(inquiryLink.scrollWidth).toBeLessThanOrEqual(
+      inquiryLink.clientWidth,
+    );
+    await expect(inquirySection).toHaveAttribute("data-detail-info-row");
+    await expect(
+      within(summaryCard).getByRole("heading", {
+        level: 2,
+        name: "세부 정보",
+      }),
+    ).toBeInTheDocument();
+
+    const usageInformationLayout = summaryCard.querySelector<HTMLElement>(
+      "[data-usage-information-layout]",
+    );
+    await expect(usageInformationLayout).toHaveClass("grid-cols-1");
+    await expect(usageInformationLayout).toHaveClass("gap-3");
+    await expect(usageInformationLayout).not.toHaveClass("md:grid-cols-2");
+    const usageSections = usageInformationLayout?.querySelectorAll(
+      "[data-usage-information-section]",
+    );
+    await expect(usageSections).toHaveLength(2);
+    usageSections?.forEach((section) => {
+      expect(section).toHaveClass("rounded-[1.25rem]");
+      expect(section).toHaveClass("border");
+    });
+
+    const detailInformationRows = summaryCard.querySelectorAll(
+      "[data-detail-info-row]",
+    );
+    await expect(detailInformationRows).toHaveLength(3);
+    await expect(detailInformationRows[0]?.parentElement).toBe(
+      detailInformationRows[1]?.parentElement,
+    );
+    await expect(detailInformationRows[1]?.parentElement).toBe(
+      detailInformationRows[2]?.parentElement,
+    );
+    detailInformationRows.forEach((row) => {
+      expect(row.querySelector("[data-detail-info-divider]")).not.toBeNull();
+      expect(row).toHaveClass("flex");
+      expect(row).toHaveClass("items-center");
+      expect(
+        row.querySelector("[data-detail-info-row-layout]"),
+      ).toHaveClass("grid-cols-1", "gap-y-3");
+      expect(
+        row.querySelector("[data-detail-info-row-layout]"),
+      ).toHaveClass("min-[480px]:grid-cols-[6rem_1px_minmax(0,1fr)]");
+      expect(
+        row.querySelector("[data-detail-info-row-layout]"),
+      ).toHaveClass("w-full");
+      expect(
+        row.querySelector("[data-detail-info-label]"),
+      ).toHaveClass("justify-start", "min-[480px]:justify-center");
+      expect(
+        row.querySelector("[data-detail-info-divider]"),
+      ).toHaveClass("h-px", "w-full", "min-[480px]:h-8", "min-[480px]:w-px");
+    });
+
+    const additionalInformationSummary = summaryCard.querySelector<HTMLElement>(
+      "[data-additional-information-summary]",
+    );
+    await expect(additionalInformationSummary).toHaveClass("truncate");
+    await expect(additionalInformationSummary).toHaveTextContent(
+      "이용 조건과 제휴처 정보 · 조건 2 · 태그 5 · 제휴처 소개",
+    );
+    const additionalInformation = additionalInformationSummary?.closest("details");
+    await expect(additionalInformation).not.toHaveAttribute("open");
+
+    const tagList = summaryCard.querySelector<HTMLElement>(
+      "[data-partner-tag-list]",
+    );
+    await expect(tagList).not.toBeNull();
+    await expect(tagList?.querySelectorAll("[data-partner-tag]")).toHaveLength(5);
+    await expect(tagList).not.toHaveTextContent("+");
+
+    const summaryContent = summaryCard.querySelector<HTMLElement>(
+      "[data-partner-detail-summary-content]",
+    );
+    await expect(summaryContent?.lastElementChild).toHaveAttribute(
+      "data-primary-benefit-action-panel",
+    );
+  },
+};
 
 export const ManyAndLongKorean: Story = {
   args: {

@@ -57,6 +57,7 @@ const meta = {
   component: HomeDirectoryStory,
   parameters: {
     viewport: { defaultViewport: "mobile1" },
+    chromatic: { viewports: [360, 820, 1366] },
   },
   args: { partners: defaultPartners },
 } satisfies Meta<typeof HomeDirectoryStory>;

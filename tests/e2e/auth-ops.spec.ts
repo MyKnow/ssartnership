@@ -18,8 +18,7 @@ test.describe("auth and partner portal operation flows", () => {
   test("member login shows field-level validation before submitting", async ({ page }) => {
     await page.goto("/auth/login");
 
-    await page.getByText("기존 사이트 비밀번호로 로그인").click();
-    await page.getByRole("button", { name: "기존 비밀번호로 로그인" }).click();
+    await page.getByRole("button", { name: "로그인" }).click();
 
     await expect(page.getByText("아이디를 입력해 주세요.")).toBeVisible();
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();

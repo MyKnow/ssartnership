@@ -142,6 +142,123 @@ export const WithThumbnail: Story = {
   },
 };
 
+export const CompactListCard: Story = {
+  args: {
+    variant: "list",
+    partner: {
+      ...basePartner,
+      thumbnail: demoImage,
+      images: [demoImage],
+    },
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile2",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const detailAction = canvas.getByRole("link", {
+      name: "제휴 상세 보기",
+      hidden: true,
+    });
+    const actionContainer = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-card-actions]",
+    );
+    const card = canvas.getByTestId("partner-card");
+
+    await expect(detailAction).not.toBeVisible();
+    await expect(actionContainer).toHaveClass("hidden", "min-[480px]:flex");
+    await expect(card).toHaveClass(
+      "grid-cols-1",
+      "min-[480px]:grid-cols-[minmax(0,1fr)_2.75rem]",
+    );
+    await expect(
+      canvas.getByRole("link", {
+        name: "역삼 캠퍼스 샐러드 바 상세 보기",
+      }),
+    ).toBeVisible();
+  },
+};
+
+export const CompactListFavoritable: Story = {
+  args: {
+    variant: "list",
+    currentUserId: "member-1",
+    isFavorited: true,
+    partner: {
+      ...basePartner,
+      thumbnail: demoImage,
+      images: [demoImage],
+    },
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile2",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const favoriteButton = canvas.getByRole("button", {
+      name: "즐겨찾기 해제",
+    });
+
+    await expect(favoriteButton).toHaveClass("!px-3");
+    await expect(favoriteButton.getBoundingClientRect().width).toBeGreaterThan(
+      favoriteButton.getBoundingClientRect().height,
+    );
+    const media = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-card-media]",
+    );
+    const primaryContent = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-card-primary-content]",
+    );
+    await expect(media).not.toBeNull();
+    await expect(primaryContent).not.toBeNull();
+    await expect(media?.getBoundingClientRect().height).toBe(
+      primaryContent?.getBoundingClientRect().height,
+    );
+    await expect(media?.getBoundingClientRect().width).toBe(
+      media?.getBoundingClientRect().height,
+    );
+  },
+};
+
+export const CompactListWithoutAddress: Story = {
+  args: {
+    variant: "list",
+    partner: {
+      ...basePartner,
+      location: "온라인",
+      thumbnail: demoImage,
+      images: [demoImage],
+    },
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile2",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const locationSlot = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-card-location]",
+    );
+    const media = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-card-media]",
+    );
+    const primaryContent = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-card-primary-content]",
+    );
+
+    await expect(locationSlot).not.toBeNull();
+    await expect(locationSlot).toHaveClass("min-h-4", "sm:min-h-5");
+    await expect(locationSlot).toHaveAttribute("aria-hidden", "true");
+    await expect(media?.getBoundingClientRect().height).toBe(
+      primaryContent?.getBoundingClientRect().height,
+    );
+  },
+};
+
 export const InactivePeriod: Story = {
   args: {
     partner: {
@@ -158,6 +275,35 @@ export const InactivePeriod: Story = {
       canvas.getByText("현재 이용할 수 없는 제휴입니다."),
     ).toBeInTheDocument();
     await expect(canvas.queryByRole("link", { name: "혜택 이용" })).not.toBeInTheDocument();
+  },
+};
+
+export const CompactInactivePeriod: Story = {
+  args: {
+    variant: "list",
+    partner: {
+      ...basePartner,
+      period: {
+        start: "2025-01-01",
+        end: "2025-12-31",
+      },
+    },
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile2",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("link", {
+        name: "역삼 캠퍼스 샐러드 바 상세 보기 · 현재 이용할 수 없는 제휴",
+      }),
+    ).toHaveAttribute("href", "/partners/partner-1");
+    await expect(
+      canvas.queryByText("현재 이용할 수 없는 제휴입니다."),
+    ).not.toBeInTheDocument();
   },
 };
 

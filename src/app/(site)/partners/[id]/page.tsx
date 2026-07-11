@@ -222,21 +222,6 @@ export default async function PartnerDetailPage({
               }
             />
 
-            <div
-              className={
-                isActive && contactCount > 0 ? "hidden md:block" : "block"
-              }
-            >
-              <PartnerDetailContactSection
-                isActive={isActive}
-                contactCount={contactCount}
-                benefitUseAction={resolvedBenefitUseAction}
-                inquiryDisplay={inquiryDisplay}
-                normalizedLinks={normalizedLinks}
-                partnerId={partner.id}
-              />
-            </div>
-
             <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
               <PartnerDetailSummaryCard
                 partner={partner}
@@ -247,11 +232,33 @@ export default async function PartnerDetailPage({
                 currentUserId={currentUserId}
                 isFavorited={isFavorited}
                 metrics={metrics}
+                detailPanel={
+                  <PartnerDetailContactSection
+                    isActive={isActive}
+                    contactCount={contactCount}
+                    benefitUseAction={resolvedBenefitUseAction}
+                    inquiryDisplay={inquiryDisplay}
+                    normalizedLinks={normalizedLinks}
+                    partnerId={partner.id}
+                  />
+                }
+                primaryActionPanel={
+                  <PartnerDetailContactSection
+                    isActive={isActive}
+                    contactCount={contactCount}
+                    benefitUseAction={resolvedBenefitUseAction}
+                    inquiryDisplay={inquiryDisplay}
+                    normalizedLinks={normalizedLinks}
+                    partnerId={partner.id}
+                    mode="primary"
+                    className="hidden md:block"
+                  />
+                }
               />
 
               <PartnerImageCarousel
                 key={carouselKey}
-                className="order-2 xl:order-2"
+                className="order-1 xl:order-2"
                 images={partner.images ?? []}
                 name={partner.name}
                 matchHeightSelector="[data-partner-detail-summary]"

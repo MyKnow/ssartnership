@@ -5,11 +5,11 @@
 <!-- screen-contract: public.home -->
 ## `/` — 이벤트와 혜택 탐색 시작
 
-- 목표·위계: 대표 이벤트 → `혜택 찾기` 진입 → 검색/카테고리 → 제휴처 결과 순으로 읽힌다.
-- 액션·흐름: primary는 대표 이벤트 참여, 보조는 혜택 찾기와 캠퍼스 이동이다. 상세 복귀 시 `q`, `category`, `audience`, `sort`를 보존한다.
+- 목표·위계: 대표 이벤트 → 혜택 디렉터리의 검색 → 카테고리/고급 필터 → 결과 요약 → 제휴처 목록 순으로 읽힌다.
+- 액션·흐름: primary는 대표 이벤트 참여이며 혜택 탐색은 별도 CTA를 반복하지 않고 검색 입력에서 바로 시작한다. 상세 복귀 시 `q`, `category`, `campus`, `audience`, `sort`, `view`를 보존한다.
 - 경계·상태: 공개 repository와 회원의 campus/year만 사용한다. 기본, 빈 결과, 로딩, 오류, 긴 한국어, 프로모션 없음 상태를 제공한다.
-- 반응형·분석: 360×844와 1366×900 첫 화면에 이벤트 CTA와 혜택 찾기가 함께 보여야 한다. `page_view`, `home_banner_click`, `benefit_directory_start`를 기록한다.
-- 수용 기준: 설명 없는 compact category chip을 쓰고 URL이 필터의 단일 기준이며 카드에는 혜택 최대 2개와 `+N`, 대상 요약, 상세, 즐겨찾기만 노출한다.
+- 반응형·분석: Compact `<600`은 단일 pane, Medium `600–839`는 상단 필터와 최대 2열 결과, Expanded `840–1199`는 필터 sidebar와 결과 pane, Large `1200–1599`는 sidebar와 최대 2열 비교, Extra Large `1600 이상`은 wide container 최대 폭을 유지한다. `page_view`, `home_banner_click`, `benefit_directory_start`, `directory_view_change`를 기록한다.
+- 수용 기준: 검색이 카테고리보다 먼저 오고 설명 없는 compact category chip을 쓴다. 적용 필터와 결과 수를 닫힌 상태에서도 확인할 수 있어야 하며 URL이 필터의 단일 기준이다. 카드형은 혜택 최대 2개와 `+N`, 대상 요약, 위치, 상세, 즐겨찾기를 유지하고 카드 표면 클릭으로도 상세에 진입한다. 카테고리·즐겨찾기·내부 링크는 각 고유 동작을 유지한다. 리스트형은 모바일·태블릿에서 혜택/대상을 생략하고 Large 데스크톱부터 비교 정보로 노출한다. Compact 리스트는 썸네일·핵심 정보·상세 아이콘을 한 행에 유지하고 44px 조작 영역을 보존한 채 이미지·글자·간격을 축소한다.
 
 <!-- screen-contract: public.campus-directory -->
 ## `/campuses/[campus]` — 캠퍼스별 혜택 탐색
@@ -53,8 +53,8 @@
 - 목표·위계: 제휴처 이름과 핵심 혜택 → 이용 CTA·인증 상태 → 조건/대상 → 지점·리뷰 → 갤러리/태그 순이다.
 - 액션·흐름: primary는 혜택 이용이며 보조는 즐겨찾기, 지도, 문의, 리뷰다. 목록의 전체 query를 return context로 받아 그대로 복귀한다.
 - 경계·상태: visibility, 기간, benefit visibility, member eligibility를 서버에서 판정한다. 공개, 로그인 필요, 대상 아님, 만료, not-found, 이미지 오류, 리뷰 없음 상태를 제공한다.
-- 반응형·분석: 모바일은 sticky action bar, 넓은 화면은 핵심 혜택과 CTA를 상단 우측에 둔다. `partner_detail_view`, `benefit_cta_click`, 지도·문의·예약 클릭을 기록한다.
-- 수용 기준: 잠긴 혜택은 민감 조건과 URL을 노출하지 않고, CTA는 한 화면에서 중복 primary로 보이지 않으며 복귀 필터가 보존된다.
+- 반응형·분석: 모바일은 sticky action bar를 유지하면서 복사 가능한 연락처 정보도 본문에 표시하고, 넓은 화면은 혜택 이용 CTA를 핵심 혜택 카드 최하단의 full-width primary action으로 둔다. 연락처·위치·대상·조건은 `세부 정보` 그룹으로 묶는다. `partner_detail_view`, `benefit_cta_click`, 지도·문의·예약 클릭을 기록한다.
+- 수용 기준: 잠긴 혜택은 민감 조건과 URL을 노출하지 않고, CTA는 한 화면에서 중복 primary로 보이지 않으며 복귀 필터가 보존된다. 공개 혜택은 번호가 있는 핵심 목록으로 먼저 읽히고 연락처·이용 기간·위치·대상은 한 단계 낮은 정보 그룹으로 둔다. 위치와 적용 대상은 화면 폭과 관계없이 각각 한 행과 독립된 surface로 분리하고 사이에 여백을 둔다. 운영진·교육생·수료생은 항상 함께 표시하되 적용 대상만 강조한다. 조건·소개·태그는 기본 닫힘 disclosure로 유지하고 닫힌 상태에서도 포함 항목을 한 줄로 요약한다. disclosure를 열면 등록된 태그를 생략 없이 모두 표시한다.
 
 <!-- screen-contract: public.suggest -->
 ## `/suggest` — 제휴처 제안

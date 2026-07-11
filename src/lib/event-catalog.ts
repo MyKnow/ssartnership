@@ -3,6 +3,7 @@ export const PRODUCT_EVENT_NAMES = [
   'partner_detail_view',
   'partner_card_click',
   'category_filter_change',
+  'directory_view_change',
   'search_execute',
   'sort_change',
   'partner_map_click',
