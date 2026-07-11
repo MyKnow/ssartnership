@@ -49,6 +49,9 @@ Before accepting UI E2E assertions:
 - Assert the current product contract. If mobile intentionally removes a generic icon CTA, assert its absence and use the visible title/card navigation path.
 - Prefer accessible names (`getByRole`) over duplicated visible step text. Compact steppers may render only a number while exposing `1/5 제휴처` through `aria-label`.
 - Verify responsive grid columns from computed `grid-template-columns`; do not require a second data row merely to prove layout.
+- Assert step progress through the shared semantic contract (`nav` and visible `aria-current="step"`) rather than a compact-only accessible name. Responsive implementations can leave both hidden and visible stepper DOMs mounted, so include `:visible` to avoid strict-mode collisions.
+- Match the company-selection expectation to the fixture cardinality. Multi-company mock accounts show the chooser, while exactly one company redirects to its dashboard; allow 15 seconds for the first compiled redirect/render.
+- URL query synchronization can trail client-side filtering. After asserting visible results, allow up to 15 seconds for the router-backed URL assertion.
 - Add explicit navigation/hydration timeouts for first-compile redirects instead of relying only on `networkidle`.
 - Keep mock auth isolated from Supabase infrastructure. When the partner portal repository is mock, do not call the Supabase-backed rate-limit lookup; production/supabase paths must retain the guard.
 

@@ -60,8 +60,10 @@ test.describe("auth and partner portal operation flows", () => {
     await page.getByPlaceholder("초기 설정 후 받은 비밀번호").fill("Partner!123");
     await page.getByRole("button", { name: "로그인" }).click();
 
-    await expect(page).toHaveURL(/\/partner/);
-    await expect(page.getByRole("heading", { name: "파트너사 선택" })).toBeVisible();
+    await expect(page).toHaveURL(/\/partner/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "파트너사 선택" })).toBeVisible({
+      timeout: 15_000,
+    });
 
     await page.getByRole("link", { name: /카페 싸피/ }).first().click();
     await expect(page).toHaveURL(

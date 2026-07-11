@@ -205,7 +205,7 @@ test.describe("public partner discovery", () => {
     await typeSearch(page, firstPartnerName);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
     await expect(cards).toHaveCount(1);
-    await expect(page).toHaveURL(/q=/);
+    await expect(page).toHaveURL(/q=/, { timeout: 15_000 });
 
     await typeSearch(page, "");
     await expect(cards).toHaveCount(initialCount);
