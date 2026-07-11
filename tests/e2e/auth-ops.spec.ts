@@ -58,6 +58,8 @@ test.describe("auth and partner portal operation flows", () => {
   });
 
   test("partner login and change-request entry stay company scoped", async ({ page, context }) => {
+    test.setTimeout(90_000);
+
     await page.goto("/partner/login");
 
     await page.getByLabel("담당자 이메일").fill("admin@urbangym.example");
@@ -92,7 +94,7 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(changeRequestLink).toHaveAttribute(
       "href",
       changeRequestHref,
-      { timeout: 20_000 },
+      { timeout: 45_000 },
     );
     await page.goto(changeRequestHref);
     await page.getByRole("button", { name: /승인 요청/ }).click();

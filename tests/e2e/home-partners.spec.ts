@@ -27,18 +27,28 @@ test.describe("public partner discovery", () => {
 
       const cardBox = await card.boundingBox();
       const thumbnailBox = await thumbnail.boundingBox();
-      const categoryBox = await categoryControl.boundingBox();
-      const favoriteBox = await favoriteMetric.boundingBox();
       expect(cardBox).not.toBeNull();
       expect(thumbnailBox).not.toBeNull();
-      expect(categoryBox).not.toBeNull();
-      expect(favoriteBox).not.toBeNull();
 
-      if (!cardBox || !thumbnailBox || !categoryBox || !favoriteBox) {
+      if (!cardBox || !thumbnailBox) {
         continue;
       }
-      expect(Math.abs(categoryBox.y - favoriteBox.y)).toBeLessThanOrEqual(1);
-      expect(Math.abs(categoryBox.height - favoriteBox.height)).toBeLessThanOrEqual(1);
+      await expect
+        .poll(
+          async () => {
+            const categoryBox = await categoryControl.boundingBox();
+            const favoriteBox = await favoriteMetric.boundingBox();
+            if (!categoryBox || !favoriteBox) {
+              return false;
+            }
+            return (
+              Math.abs(categoryBox.y - favoriteBox.y) <= 1 &&
+              Math.abs(categoryBox.height - favoriteBox.height) <= 1
+            );
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(true);
       expect(cardBox.height).toBeLessThanOrEqual(144);
     }
   });

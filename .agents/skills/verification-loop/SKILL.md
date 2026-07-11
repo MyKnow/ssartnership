@@ -61,6 +61,8 @@ Before accepting UI E2E assertions:
 - Playwright mock authentication requires a test-only `PARTNER_SESSION_SECRET` of at least 32 characters; otherwise CI can fail after successful credential validation when the session cookie is signed.
 - Pixel geometry assertions must wait for `networkidle` and `document.fonts.ready` before measuring layout.
 - For cold-compiled Next.js routes, separate the link destination contract from the destination task: assert `href`, then navigate explicitly. Do not let server-rendered visibility race client hydration in CI.
+- Assign an explicit per-test timeout to cold multi-route flows; do not hide the cost by increasing the global Playwright timeout.
+- Poll exact responsive geometry until hydration settles instead of loosening the visual contract or depending on CI retries.
 
 When intentional UI changes affect visual baselines, run `npm run test:visual -- --update-snapshots`, inspect the six affected 360/820/1366 images, then rerun plain `npm run test:visual`. Never update snapshots merely to silence an unexplained diff.
 
