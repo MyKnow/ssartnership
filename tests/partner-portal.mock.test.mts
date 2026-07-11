@@ -48,6 +48,10 @@ test("lists seeded partner portal demo setups", async () => {
     setups.map((setup) => setup.companyName),
     ["카페 싸피", "어반짐 역삼"],
   );
+  assert.deepStrictEqual(
+    setups.map((setup) => setup.isSetupComplete),
+    [false, true],
+  );
 });
 
 test("returns setup context for a seeded token", async () => {
@@ -97,7 +101,7 @@ test("rejects password mismatch", async () => {
   const { PartnerPortalSetupError } = await partnerPortalModulePromise;
   try {
     await completeMockPartnerPortalInitialSetup({
-      token: mockPartnerPortalSetupTokens[1].token,
+      token: mockPartnerPortalSetupTokens[0].token,
       password: "Partner!123",
       confirmPassword: "Partner!1234",
     });

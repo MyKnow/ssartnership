@@ -6,6 +6,7 @@ import {
   fetchPartnerMetricRollupRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "./partner-metric-rollups.ts";
+import { isPartnerPortalMock } from "./partner-portal.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -227,6 +228,10 @@ export async function getPartnerMetricTimeseriesSnapshot(
   partnerId: string,
   partnerCreatedAt: string,
 ): Promise<PartnerMetricTimeseriesSnapshot> {
+  if (isPartnerPortalMock) {
+    return buildPartnerMetricTimeseriesSnapshot(partnerCreatedAt, [], new Date());
+  }
+
   const supabase = getSupabaseAdminClient();
   const result = await fetchPartnerMetricRollupRows(supabase, {
     partnerIds: [partnerId],

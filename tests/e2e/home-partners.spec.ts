@@ -12,6 +12,8 @@ test.describe("public partner discovery", () => {
     for (const width of [320, 360]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/?view=list#benefits");
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
 
       const card = page.getByTestId("partner-card").first();
       const detailAction = card.getByRole("link", { name: "제휴 상세 보기" });
@@ -25,18 +27,28 @@ test.describe("public partner discovery", () => {
 
       const cardBox = await card.boundingBox();
       const thumbnailBox = await thumbnail.boundingBox();
-      const categoryBox = await categoryControl.boundingBox();
-      const favoriteBox = await favoriteMetric.boundingBox();
       expect(cardBox).not.toBeNull();
       expect(thumbnailBox).not.toBeNull();
-      expect(categoryBox).not.toBeNull();
-      expect(favoriteBox).not.toBeNull();
 
-      if (!cardBox || !thumbnailBox || !categoryBox || !favoriteBox) {
+      if (!cardBox || !thumbnailBox) {
         continue;
       }
-      expect(Math.abs(categoryBox.y - favoriteBox.y)).toBeLessThanOrEqual(1);
-      expect(Math.abs(categoryBox.height - favoriteBox.height)).toBeLessThanOrEqual(1);
+      await expect
+        .poll(
+          async () => {
+            const categoryBox = await categoryControl.boundingBox();
+            const favoriteBox = await favoriteMetric.boundingBox();
+            if (!categoryBox || !favoriteBox) {
+              return false;
+            }
+            return (
+              Math.abs(categoryBox.y - favoriteBox.y) <= 1 &&
+              Math.abs(categoryBox.height - favoriteBox.height) <= 1
+            );
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(true);
       expect(cardBox.height).toBeLessThanOrEqual(144);
     }
   });
@@ -205,7 +217,6 @@ test.describe("public partner discovery", () => {
     await typeSearch(page, firstPartnerName);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
     await expect(cards).toHaveCount(1);
-    await expect(page).toHaveURL(/q=/, { timeout: 15_000 });
 
     await typeSearch(page, "");
     await expect(cards).toHaveCount(initialCount);

@@ -42,12 +42,12 @@ export default function PartnerCardMeta({
       }
     : null;
   const categoryBadgeClass =
-    "min-h-11 px-2 py-1 text-xs font-medium tracking-[0.02em]";
+    "h-11 whitespace-nowrap px-2 py-1 text-xs font-medium tracking-[0.02em]";
   const categoryBadge = handleCategoryClick ? (
     <button
       type="button"
       onClick={handleCategoryClick}
-      className="inline-flex min-h-11 min-w-11 items-center self-start"
+      className="inline-flex h-11 min-w-11 items-center"
       aria-label={`${categoryLabel ?? "카테고리"} 필터 적용`}
     >
       <Badge
@@ -124,11 +124,7 @@ export default function PartnerCardMeta({
               )}
             >
               {categoryBadge}
-              {compact && headerAction ? (
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {headerAction}
-                </div>
-              ) : null}
+              {compact ? headerAction : null}
             </div>
             {!compact && headerAction ? (
               <div className="flex shrink-0 items-center gap-1.5">

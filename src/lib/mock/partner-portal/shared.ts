@@ -5,6 +5,7 @@ import type {
 import type {
   PartnerPortalServiceDashboard,
 } from "../../partner-dashboard.ts";
+import { hashPassword } from "../../password.ts";
 
 export type MockPortalAccountRecord = {
   id: string;
@@ -267,6 +268,13 @@ seededSetups[0].account.linkedCompanyIds = [
   seededSetups[0].company.id,
   seededSetups[1].company.id,
 ];
+
+const readyPartnerPassword = hashPassword("Partner!123");
+seededSetups[1].account.mustChangePassword = false;
+seededSetups[1].account.emailVerifiedAt = "2026-07-01T00:00:00.000Z";
+seededSetups[1].account.initialSetupCompletedAt = "2026-07-01T00:00:00.000Z";
+seededSetups[1].account.passwordHash = readyPartnerPassword.hash;
+seededSetups[1].account.passwordSalt = readyPartnerPassword.salt;
 
 export function cloneSetupRecord(setup: MockPortalSetupRecord): MockPortalSetupRecord {
   return {
