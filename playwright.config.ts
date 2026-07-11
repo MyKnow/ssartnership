@@ -42,6 +42,7 @@ export default defineConfig({
           NEXT_DIST_DIR: ".next-e2e",
           NEXT_PUBLIC_DATA_SOURCE: "mock",
           NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock",
+          PARTNER_SESSION_SECRET: "e2e-partner-session-secret-for-playwright-only",
         },
       },
 });

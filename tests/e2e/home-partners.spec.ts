@@ -12,6 +12,8 @@ test.describe("public partner discovery", () => {
     for (const width of [320, 360]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/?view=list#benefits");
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
 
       const card = page.getByTestId("partner-card").first();
       const detailAction = card.getByRole("link", { name: "제휴 상세 보기" });

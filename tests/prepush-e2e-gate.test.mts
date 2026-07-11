@@ -32,4 +32,5 @@ test("pre-push gate runs the full Playwright suite with CI parity", async () => 
     "utf8",
   );
   assert.match(playwrightConfig, /NEXT_DIST_DIR: "\.next-e2e"/);
+  assert.match(playwrightConfig, /PARTNER_SESSION_SECRET:/);
 });

@@ -58,6 +58,8 @@ Before accepting UI E2E assertions:
 - Never combine an in-memory mock setup mutation and login in one E2E flow. Next.js cold compilation can evaluate setup and login in different module graphs, so the login cannot see the mutated store and no `partner_session` cookie is created. Test setup independently and log in with a deterministically pre-seeded, completed mock account.
 - This repository opts into the full CI-parity Playwright suite before push through `package.json#prepush`. The global ECC hook runs the optional repository `prepush` script after lint/test/build for ordinary pushes. `npm run release` intentionally uses `git push --no-verify`, so `scripts/release.sh` must invoke `npm run prepush` directly before both branch pushes and main tag pushes.
 - Keep the always-on local dev server and Playwright web server on separate Next.js build directories. `playwright.config.ts` must set `NEXT_DIST_DIR=.next-e2e`; a different port alone does not avoid Next's `.next/dev/lock` singleton.
+- Playwright mock authentication requires a test-only `PARTNER_SESSION_SECRET` of at least 32 characters; otherwise CI can fail after successful credential validation when the session cookie is signed.
+- Pixel geometry assertions must wait for `networkidle` and `document.fonts.ready` before measuring layout.
 
 When intentional UI changes affect visual baselines, run `npm run test:visual -- --update-snapshots`, inspect the six affected 360/820/1366 images, then rerun plain `npm run test:visual`. Never update snapshots merely to silence an unexplained diff.
 
