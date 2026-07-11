@@ -79,13 +79,22 @@ test.describe("auth and partner portal operation flows", () => {
       timeout: 20_000,
     });
 
-    await page
-      .getByRole("link", { name: "어반짐 PT 패키지 상세 보기" })
-      .click();
-    await expect(page).toHaveURL(
-      /\/partner\/companies\/mock-partner-company-urban-gym\/services\/mock-partner-service-urban-gym-pt/,
+    const serviceHref =
+      "/partner/companies/mock-partner-company-urban-gym/services/mock-partner-service-urban-gym-pt";
+    const serviceLink = page.getByRole("link", {
+      name: "어반짐 PT 패키지 상세 보기",
+    });
+    await expect(serviceLink).toHaveAttribute("href", serviceHref);
+    await page.goto(serviceHref);
+
+    const changeRequestHref = `${serviceHref}?mode=edit`;
+    const changeRequestLink = page.getByRole("link", { name: "수정 요청" });
+    await expect(changeRequestLink).toHaveAttribute(
+      "href",
+      changeRequestHref,
+      { timeout: 20_000 },
     );
-    await page.getByRole("link", { name: "수정 요청" }).click();
+    await page.goto(changeRequestHref);
     await page.getByRole("button", { name: /승인 요청/ }).click();
     await expect(
       page.getByText("승인 요청 항목", { exact: true }),

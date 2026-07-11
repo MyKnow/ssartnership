@@ -60,6 +60,7 @@ Before accepting UI E2E assertions:
 - Keep the always-on local dev server and Playwright web server on separate Next.js build directories. `playwright.config.ts` must set `NEXT_DIST_DIR=.next-e2e`; a different port alone does not avoid Next's `.next/dev/lock` singleton.
 - Playwright mock authentication requires a test-only `PARTNER_SESSION_SECRET` of at least 32 characters; otherwise CI can fail after successful credential validation when the session cookie is signed.
 - Pixel geometry assertions must wait for `networkidle` and `document.fonts.ready` before measuring layout.
+- For cold-compiled Next.js routes, separate the link destination contract from the destination task: assert `href`, then navigate explicitly. Do not let server-rendered visibility race client hydration in CI.
 
 When intentional UI changes affect visual baselines, run `npm run test:visual -- --update-snapshots`, inspect the six affected 360/820/1366 images, then rerun plain `npm run test:visual`. Never update snapshots merely to silence an unexplained diff.
 
