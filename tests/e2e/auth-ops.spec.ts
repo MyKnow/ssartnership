@@ -39,8 +39,7 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toHaveCount(0);
   });
 
-  test("partner setup, login, and change-request entry stay company scoped", async ({ page, context }) => {
-    test.setTimeout(60_000);
+  test("partner setup accepts a valid initial password", async ({ page }) => {
     await page.goto("/partner/setup/mock-partner-setup-cafe-ssafy");
 
     await page.getByPlaceholder("영문/숫자/특수문자 포함 8자 이상").fill("Partner!123");
@@ -56,8 +55,12 @@ test.describe("auth and partner portal operation flows", () => {
     expect(setupResult.ok()).toBe(true);
 
     await expect(page).toHaveURL(/\/partner\/login(?:\?setup=completed)?$/);
+  });
 
-    await page.getByLabel("담당자 이메일").fill("partner@cafessafy.example");
+  test("partner login and change-request entry stay company scoped", async ({ page, context }) => {
+    await page.goto("/partner/login");
+
+    await page.getByLabel("담당자 이메일").fill("admin@urbangym.example");
     await page.getByPlaceholder("초기 설정 후 받은 비밀번호").fill("Partner!123");
     await page.getByRole("button", { name: "로그인" }).click();
 
@@ -71,16 +74,16 @@ test.describe("auth and partner portal operation flows", () => {
         { timeout: 20_000 },
       )
       .toBe(true);
-    await page.goto("/partner/companies/mock-partner-company-cafe-ssafy");
+    await page.goto("/partner/companies/mock-partner-company-urban-gym");
     await expect(page.getByRole("heading", { name: "운영 홈" })).toBeVisible({
       timeout: 20_000,
     });
 
     await page
-      .getByRole("link", { name: "카페 싸피 역삼본점 상세 보기" })
+      .getByRole("link", { name: "어반짐 PT 패키지 상세 보기" })
       .click();
     await expect(page).toHaveURL(
-      /\/partner\/companies\/mock-partner-company-cafe-ssafy\/services\/mock-partner-service-cafe-ssafy-yeoksam/,
+      /\/partner\/companies\/mock-partner-company-urban-gym\/services\/mock-partner-service-urban-gym-pt/,
     );
     await page.getByRole("link", { name: "수정 요청" }).click();
     await page.getByRole("button", { name: /승인 요청/ }).click();

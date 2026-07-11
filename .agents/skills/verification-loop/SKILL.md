@@ -51,11 +51,12 @@ Before accepting UI E2E assertions:
 - Verify responsive grid columns from computed `grid-template-columns`; do not require a second data row merely to prove layout.
 - Assert step progress through the shared semantic contract (`nav` and visible `aria-current="step"`) rather than a compact-only accessible name. Responsive implementations can leave both hidden and visible stepper DOMs mounted, so include `:visible` to avoid strict-mode collisions.
 - Match the company-selection expectation to the fixture cardinality. Multi-company mock accounts show the chooser, while exactly one company redirects to its dashboard; allow 15 seconds for the first compiled redirect/render.
-- URL query synchronization can trail client-side filtering. After asserting visible results, allow up to 15 seconds for the router-backed URL assertion.
+- Keep visible filtering assertions separate from URL-state assertions. Rapid `router.replace` transitions can make a combined search-result test flaky; cover serialization in unit tests and filter restoration in a dedicated navigation E2E.
 - Add explicit navigation/hydration timeouts for first-compile redirects instead of relying only on `networkidle`.
 - Keep mock auth isolated from Supabase infrastructure. When the partner portal repository is mock, do not call the Supabase-backed rate-limit lookup; production/supabase paths must retain the guard.
 - Keep mock SSR read paths isolated too. Under `NEXT_PUBLIC_DATA_SOURCE=mock`, render dependencies such as registration categories must come through the repository instead of a direct `getSupabaseAdminClient()` call; CI intentionally has no Supabase secrets.
-- A cookie-setting login can update the URL before `partner_session` is committed. Do not infer session readiness from the URL or chooser text. Poll `browserContext.cookies()` for the non-empty session cookie, then navigate to the canonical protected company path.
+- Never combine an in-memory mock setup mutation and login in one E2E flow. Next.js cold compilation can evaluate setup and login in different module graphs, so the login cannot see the mutated store and no `partner_session` cookie is created. Test setup independently and log in with a deterministically pre-seeded, completed mock account.
+- This repository opts into the full CI-parity Playwright suite before push through `package.json#prepush`. The global ECC hook must run an optional repository `prepush` script after lint/test/build; do not bypass it for ordinary pushes.
 
 When intentional UI changes affect visual baselines, run `npm run test:visual -- --update-snapshots`, inspect the six affected 360/820/1366 images, then rerun plain `npm run test:visual`. Never update snapshots merely to silence an unexplained diff.
 

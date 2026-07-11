@@ -20,6 +20,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "CI=1 PLAYWRIGHT_CHROMIUM_CHANNEL=chrome playwright test",
+    "prepush": "npm run test:e2e:ci",
     "sync:preview": "node scripts/supabase-sync-preview.mjs",
     "rss:refresh": "node scripts/refresh-rss.mjs",
     "perf:lighthouse": "npm run build && node scripts/lighthouse-check.mjs",
