@@ -256,6 +256,7 @@ This repo has already failed `Public Readiness` for Playwright environment and r
 
 - If many or all tests fail before assertions with `Executable doesn't exist`, `ffmpeg-linux`, or `Video rendering requires ffmpeg binary`, treat it as a CI install/config failure. Install `ffmpeg` with Playwright or disable video for that CI job before changing app code.
 - Mock partner-auth E2E must provide a test-only `PARTNER_SESSION_SECRET` of at least 32 characters. Without it, credential validation can succeed while cookie signing fails only in CI.
+- Treat partner metrics and timeseries as part of the mock SSR boundary. A plan-gated branch can still call Supabase after the main repository has switched to mock, turning the whole page into an error boundary only in secret-free CI.
 - Before pixel-level `boundingBox()` assertions, wait for both `networkidle` and `document.fonts.ready` so font loading and final layout cannot race the measurement.
 - When a flow verifies a cold-compiled Next.js link destination, assert the anchor `href` contract and navigate to that URL explicitly before testing the destination task. Server-rendered visibility can precede hydration in CI, making an immediate client-side click nondeterministic.
 - Give cold-compiled multi-route tasks an explicit per-test timeout budget instead of relying on Playwright's 30-second default. Keep locator timeouts scoped to the slow destination rather than raising the global suite timeout.
