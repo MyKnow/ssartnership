@@ -22,7 +22,8 @@ Invoke this skill:
 Before the generic phases, add checks that mirror the CI failures this repo has already seen:
 
 ```bash
-# Dependency or package-lock changes
+# Always run before commit/push, even when package.json and package-lock.json were not edited.
+# Optional platform packages can drift in lockfile metadata without a manifest change.
 npm run check:lockfile
 
 # Supabase migration changes
@@ -34,7 +35,11 @@ npm run build-storybook
 PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test-storybook
 ```
 
-Use only the checks relevant to the changed files, but never skip `npm run check:lockfile` when `package.json`, `package-lock.json`, Playwright, Storybook, or native/optional dependencies changed.
+Always run `npm run check:lockfile` before every commit or push. Do not scope this check only to dependency changes: Linux/npm canonicalization can add metadata such as `dev: true` to optional platform packages (for example `node_modules/fsevents`) even when application files are the only files changed.
+
+If the command changes `package-lock.json`, review that diff, keep the canonical change, stage it with the work unit, and rerun the command until it reports a clean lockfile. Never discard the generated canonical diff just because `package.json` is unchanged. The GitHub `Verify Node Lockfile` job runs the Linux/amd64 Node 20/npm 10 resolution first and blocks `Public Readiness` at the same step, so a lockfile drift failure must be fixed before investigating later CI stages. When Docker is unavailable locally, the repository script's npm 10 fallback is the required local parity check; run `npm ci` after canonicalizing the lockfile.
+
+Use only the other checks relevant to the changed files, but never skip `npm run check:lockfile` when `package.json`, `package-lock.json`, Playwright, Storybook, or native/optional dependencies changed.
 
 For Supabase work, local validation is not enough by itself. Confirm the new migration sorts after the latest existing file and wait for the remote Preview/Supabase branch status to leave `MIGRATIONS_FAILED`.
 
@@ -59,6 +64,7 @@ Before accepting UI E2E assertions:
 - Never combine an in-memory mock setup mutation and login in one E2E flow. Next.js cold compilation can evaluate setup and login in different module graphs, so the login cannot see the mutated store and no `partner_session` cookie is created. Test setup independently and log in with a deterministically pre-seeded, completed mock account.
 - This repository opts into the full CI-parity Playwright suite before push through `package.json#prepush`. The global ECC hook runs the optional repository `prepush` script after lint/test/build for ordinary pushes. `npm run release` intentionally uses `git push --no-verify`, so `scripts/release.sh` must invoke `npm run prepush` directly before both branch pushes and main tag pushes.
 - Keep the always-on local dev server and Playwright web server on separate Next.js build directories. `playwright.config.ts` must set `NEXT_DIST_DIR=.next-e2e`; a different port alone does not avoid Next's `.next/dev/lock` singleton.
+- Keep `.next-e2e/**` in both `.gitignore` and ESLint's `globalIgnores`. After running E2E locally, `npm run lint` must not traverse generated Next bundles; otherwise the next push hook can fail on generated `@ts-ignore` and unused-variable diagnostics rather than source code.
 - Playwright mock authentication requires a test-only `PARTNER_SESSION_SECRET` of at least 32 characters; otherwise CI can fail after successful credential validation when the session cookie is signed.
 - Pixel geometry assertions must wait for `networkidle` and `document.fonts.ready` before measuring layout.
 - For cold-compiled Next.js routes, separate the link destination contract from the destination task: assert `href`, then navigate explicitly. Do not let server-rendered visibility race client hydration in CI.

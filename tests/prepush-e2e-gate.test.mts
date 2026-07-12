@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("pre-push gate runs the full Playwright suite with CI parity", async () => {
+test("pre-push gate verifies the canonical lockfile before the full Playwright suite", async () => {
   const packageJson = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   ) as { scripts?: Record<string, string> };
 
-  assert.equal(packageJson.scripts?.prepush, "npm run test:e2e:ci");
+  assert.equal(
+    packageJson.scripts?.prepush,
+    "npm run check:lockfile && npm run test:e2e:ci",
+  );
   assert.match(packageJson.scripts?.["test:e2e:ci"] ?? "", /CI=1/);
   assert.match(
     packageJson.scripts?.["test:e2e:ci"] ?? "",
@@ -33,4 +36,10 @@ test("pre-push gate runs the full Playwright suite with CI parity", async () => 
   );
   assert.match(playwrightConfig, /NEXT_DIST_DIR: "\.next-e2e"/);
   assert.match(playwrightConfig, /PARTNER_SESSION_SECRET:/);
+
+  const eslintConfig = await readFile(
+    new URL("../eslint.config.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(eslintConfig, /"\.next-e2e\/\*\*"/);
 });
