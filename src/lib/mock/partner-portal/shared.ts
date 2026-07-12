@@ -5,7 +5,6 @@ import type {
 import type {
   PartnerPortalServiceDashboard,
 } from "../../partner-dashboard.ts";
-import { hashPassword } from "../../password.ts";
 
 export type MockPortalAccountRecord = {
   id: string;
@@ -269,7 +268,13 @@ seededSetups[0].account.linkedCompanyIds = [
   seededSetups[1].company.id,
 ];
 
-const readyPartnerPassword = hashPassword("Partner!123");
+// This fixture is intentionally deterministic so Storybook can render the
+// client-side mock catalog without importing Node's `crypto` module. It is a
+// PBKDF2 record for the synthetic `Partner!123` fixture only.
+const readyPartnerPassword = {
+  salt: "mock-ready-partner-password-salt",
+  hash: "fa5d3442a73a4cf9b14a95b675974dacbe031e8ffb1819f69d4dad3773329d5af44c5a5d14f6b239f4e575e9e9f76f7fb01412e75f4c7d8b6906ef5519ba648b",
+};
 seededSetups[1].account.mustChangePassword = false;
 seededSetups[1].account.emailVerifiedAt = "2026-07-01T00:00:00.000Z";
 seededSetups[1].account.initialSetupCompletedAt = "2026-07-01T00:00:00.000Z";

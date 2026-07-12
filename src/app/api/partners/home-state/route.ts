@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   const member = session?.userId
     ? await getSupabaseAdminClient()
         .from("members")
-        .select("year")
+        .select("year,graduate_verified_at")
         .eq("id", session.userId)
         .maybeSingle()
         .then(({ data }) => data)
@@ -51,6 +51,9 @@ export async function GET(request: Request) {
     authenticated: Boolean(session?.userId),
     viewerAudience: resolvePartnerAudienceFromMemberYear(
       typeof member?.year === "number" ? member.year : null,
+      new Date(),
+      undefined,
+      { graduateVerifiedAt: member?.graduate_verified_at ?? null },
     ),
   });
   const allowedIds = new Set(allowedPartners.map((partner) => partner.id));

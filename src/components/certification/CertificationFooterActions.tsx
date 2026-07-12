@@ -6,7 +6,11 @@ import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { useToast } from "@/components/ui/Toast";
 
-export default function CertificationFooterActions() {
+export default function CertificationFooterActions({
+  canChangeProfilePhoto = false,
+}: {
+  canChangeProfilePhoto?: boolean;
+}) {
   const { notify } = useToast();
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -24,6 +28,15 @@ export default function CertificationFooterActions() {
         </p>
       </div>
       <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+        {canChangeProfilePhoto ? (
+          <Button
+            variant="ghost"
+            href="/certification/photo"
+            prefetch={false}
+          >
+            본인 사진 변경
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           href="/auth/change-password?returnTo=%2Fcertification"

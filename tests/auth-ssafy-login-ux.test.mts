@@ -67,11 +67,13 @@ test("member login prioritizes password login and keeps SSAFY Verify as the seco
   assert.ok(signupIndex < verifyIndex);
 });
 
-test("password login forwards the automatic-login choice to persistent session creation", () => {
-  const loginRoute = readRepoFile("src/app/api/mm/login/route.ts");
+test("password login resolves MM 아이디와 수료생 이메일을 분리하고 자동 로그인 선택을 세션 생성에 전달한다", () => {
+  const loginRoute = readRepoFile("src/app/api/auth/login/route.ts");
   const userAuth = readRepoFile("src/lib/user-auth.ts");
 
-  assert.match(loginRoute, /autoLogin\?: boolean/);
+  assert.match(loginRoute, /identifier\?: unknown/);
+  assert.match(loginRoute, /graduate_email/);
+  assert.match(loginRoute, /member_auth_identities/);
   assert.match(loginRoute, /persistent:\s*autoLogin/);
   assert.match(userAuth, /persistent\?: boolean/);
   assert.match(userAuth, /\.\.\.\(persistent \? \{ maxAge:/);

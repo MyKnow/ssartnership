@@ -41,7 +41,7 @@ export const ValidationErrors: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),
     );
-    await expect(canvas.getByText("아이디를 입력해 주세요.")).toBeInTheDocument();
+    await expect(canvas.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeInTheDocument();
     await expect(canvas.getByText("비밀번호를 입력해 주세요.")).toBeInTheDocument();
 
     await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "bad id!");

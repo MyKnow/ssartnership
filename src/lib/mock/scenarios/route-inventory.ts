@@ -55,6 +55,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["public.certification.qr-valid"],
   },
   {
+    routePath: "/certification/photo",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "GraduateProfilePhotoForm",
+    dataSources: ["api-route", "service", "storybook"],
+    requiredScenarioIds: ["public.certification.graduate-photo"],
+  },
+  {
     routePath: "/coupons",
     surface: "public",
     authScope: "member",
@@ -186,6 +194,22 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["auth.signup.default"],
   },
   {
+    routePath: "/auth/signup/graduate",
+    surface: "auth",
+    authScope: "public",
+    viewComponent: "GraduateVerificationApplicationView",
+    dataSources: ["api-route", "service", "storybook"],
+    requiredScenarioIds: ["auth.graduate-verification.application"],
+  },
+  {
+    routePath: "/auth/graduate/setup",
+    surface: "auth",
+    authScope: "setup-token",
+    viewComponent: "GraduatePasswordSetupView",
+    dataSources: ["api-route", "storybook"],
+    requiredScenarioIds: ["auth.graduate-password-setup"],
+  },
+  {
     routePath: "/auth/signup/complete",
     surface: "auth",
     authScope: "public",
@@ -297,6 +321,14 @@ const mockRouteInventoryBase = [
     viewComponent: "AdminMemberManager",
     dataSources: ["repository", "service", "storybook"],
     requiredScenarioIds: ["admin.members.list"],
+  },
+  {
+    routePath: "/admin/graduate-verifications",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminGraduateVerificationQueue",
+    dataSources: ["service", "api-route", "storybook"],
+    requiredScenarioIds: ["admin.graduate-verifications.queue"],
   },
   {
     routePath: "/admin/members/[memberId]",
@@ -571,6 +603,11 @@ const routeContracts = {
     screenContractId: "member.certification",
     primaryTask: "내 SSAFY 구성원 인증 상태와 QR을 제시한다.",
   },
+  "/certification/photo": {
+    routeKind: "canonical",
+    screenContractId: "member.certification-photo",
+    primaryTask: "수료생 인증 카드에 표시할 본인 사진 교체를 요청한다.",
+  },
   "/coupons": {
     routeKind: "canonical",
     screenContractId: "member.coupons",
@@ -649,7 +686,17 @@ const routeContracts = {
   "/auth/signup": {
     routeKind: "canonical",
     screenContractId: "auth.signup",
-    primaryTask: "SSAFY 구성원 인증을 시작해 회원가입한다.",
+    primaryTask: "회원 유형을 선택해 SSAFY Verify 또는 수료생 인증 가입을 시작한다.",
+  },
+  "/auth/signup/graduate": {
+    routeKind: "canonical",
+    screenContractId: "auth.graduate-verification",
+    primaryTask: "이메일, 교육이수증, 본인 사진으로 수료생 인증을 신청한다.",
+  },
+  "/auth/graduate/setup": {
+    routeKind: "conditional",
+    screenContractId: "auth.graduate-password-setup",
+    primaryTask: "승인 또는 이메일 재설정 토큰으로 수료생 계정 비밀번호를 설정한다.",
   },
   "/auth/signup/complete": {
     routeKind: "conditional",
@@ -720,6 +767,11 @@ const routeContracts = {
     routeKind: "canonical",
     screenContractId: "admin.members",
     primaryTask: "회원 목록을 핵심 조건으로 검색하고 상세로 이동한다.",
+  },
+  "/admin/graduate-verifications": {
+    routeKind: "canonical",
+    screenContractId: "admin.graduate-verifications",
+    primaryTask: "수료생 신규 인증과 본인 사진 변경 요청을 검토하고 결정한다.",
   },
   "/admin/members/[memberId]": {
     routeKind: "canonical",

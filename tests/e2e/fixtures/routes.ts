@@ -25,6 +25,8 @@ export const publicSmokeRoutes: SmokeRoute[] = [
 export const authSmokeRoutes: SmokeRoute[] = [
   { path: "/auth/login", expected: /로그인/ },
   { path: "/auth/signup", expected: /회원가입/ },
+  { path: "/auth/signup/graduate", expected: /수료생 인증/ },
+  { path: "/auth/graduate/setup", expected: /비밀번호 설정/ },
   { path: "/auth/reset", expected: /비밀번호|재설정/ },
   { path: "/auth/reset/complete", expected: /비밀번호|재설정|토큰/ },
   { path: "/auth/change-password", expected: /로그인|비밀번호/ },
@@ -41,6 +43,7 @@ export const authSmokeRoutes: SmokeRoute[] = [
 
 export const memberProtectedRoutes: RedirectRoute[] = [
   { path: "/certification", expectedPath: "/auth/login" },
+  { path: "/certification/photo", expectedPath: "/auth/login" },
   { path: "/coupons", expectedPath: "/auth/login" },
   { path: "/notifications", expectedPath: "/auth/login" },
 ];
@@ -74,6 +77,7 @@ export const adminProtectedRoutes: RedirectRoute[] = [
   { path: "/admin/cycle", expectedPath: "/auth/login" },
   { path: "/admin/event", expectedPath: "/auth/login" },
   { path: "/admin/event/signup-reward", expectedPath: "/auth/login" },
+  { path: "/admin/graduate-verifications", expectedPath: "/auth/login" },
   { path: "/admin/logs", expectedPath: "/auth/login" },
   { path: "/admin/members", expectedPath: "/auth/login" },
   { path: "/admin/members/mock", expectedPath: "/auth/login" },

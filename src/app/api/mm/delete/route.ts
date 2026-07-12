@@ -4,6 +4,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession, clearUserSession } from "@/lib/user-auth";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MEMBER_PROFILE_IMAGES_BUCKET } from "@/lib/graduate-verification-storage";
 
 export const runtime = "nodejs";
 
@@ -61,6 +62,30 @@ export async function POST(request: Request) {
       .from("member_auth_attempts")
       .delete()
       .in("identifier", memberAuthCleanupKeys);
+  }
+
+  const { data: profileImages } = await supabase
+    .from("member_profile_images")
+    .select("storage_path")
+    .eq("member_id", session.userId);
+  const profileImagePaths = (profileImages ?? [])
+    .map((image) => (image as { storage_path?: string | null }).storage_path)
+    .filter((path): path is string => Boolean(path));
+  if (profileImagePaths.length > 0) {
+    const { error: removeProfileImagesError } = await supabase.storage
+      .from(MEMBER_PROFILE_IMAGES_BUCKET)
+      .remove(profileImagePaths);
+    if (removeProfileImagesError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_delete",
+        status: "failure",
+        actorType: "member",
+        actorId: session.userId,
+        properties: { reason: "profile_image_cleanup_failed" },
+      });
+      return NextResponse.json({ error: "delete_failed" }, { status: 503 });
+    }
   }
 
   await supabase.from("members").delete().eq("id", session.userId);

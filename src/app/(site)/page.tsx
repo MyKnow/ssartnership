@@ -69,7 +69,7 @@ export default async function Home() {
     session?.userId
       ? getSupabaseAdminClient()
           .from("members")
-          .select("year,campus")
+          .select("year,campus,graduate_verified_at")
           .eq("id", session.userId)
           .maybeSingle()
           .then(({ data }) => data)
@@ -130,6 +130,9 @@ export default async function Home() {
               currentUserId={session?.userId ?? null}
               viewerAudience={resolvePartnerAudienceFromMemberYear(
                 typeof member?.year === "number" ? member.year : null,
+                new Date(),
+                undefined,
+                { graduateVerifiedAt: member?.graduate_verified_at ?? null },
               )}
             />
           </Suspense>

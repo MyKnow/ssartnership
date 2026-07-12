@@ -961,6 +961,49 @@ const mockStorybookScenarioCoverageBase = [
     storyFile: "src/components/partner/PartnerPageStates.stories.tsx",
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
+  {
+    routePath: "/auth/signup/graduate",
+    scenarioId: "auth.graduate-verification.application",
+    storyId: "screens-auth-graduateverificationapplication--email-verification",
+    storyFile:
+      "src/components/graduate-verification/GraduateVerificationApplicationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "GraduateVerificationApplicationView",
+    coveredStateKeys: ["default", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/auth/graduate/setup",
+    scenarioId: "auth.graduate-password-setup",
+    storyId: "screens-auth-graduatepasswordsetup--default",
+    storyFile:
+      "src/components/graduate-verification/GraduatePasswordSetupView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "GraduatePasswordSetupView",
+    coveredStateKeys: ["default", "setup-token", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/certification/photo",
+    scenarioId: "public.certification.graduate-photo",
+    storyId: "screens-member-graduateprofilephotoform--default",
+    storyFile:
+      "src/components/graduate-verification/GraduateProfilePhotoForm.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "GraduateProfilePhotoForm",
+    coveredStateKeys: ["default", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/admin/graduate-verifications",
+    scenarioId: "admin.graduate-verifications.queue",
+    storyId: "domains-admin-graduateverificationqueue--default",
+    storyFile: "src/components/admin/AdminGraduateVerificationQueue.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "AdminGraduateVerificationQueue",
+    coveredStateKeys: ["default", "pending", "long-korean", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
 ] as const satisfies MockStorybookScenarioCoverageInput[];
 
 const stateModelStoryFiles = new Set([

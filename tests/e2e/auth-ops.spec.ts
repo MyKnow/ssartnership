@@ -21,8 +21,26 @@ test.describe("auth and partner portal operation flows", () => {
 
     await page.getByRole("button", { name: "로그인" }).click();
 
-    await expect(page.getByText("아이디를 입력해 주세요.")).toBeVisible();
+    await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();
+  });
+
+  test("signup separates SSAFY Verify and graduate certificate application entrypoints", async ({ page }) => {
+    await page.goto("/auth/signup");
+
+    await expect(
+      page.getByRole("tab", { name: "운영진·재학생", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
+    await expect(graduateTab).toHaveAttribute("aria-selected", "false");
+    await graduateTab.click();
+
+    await expect(page).toHaveURL(/\/auth\/signup\/graduate/);
+    await expect(
+      page.getByRole("heading", { name: "수료생 인증" }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "이메일" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "인증 코드 보내기" })).toBeVisible();
   });
 
   test("partner login maps safe server validation errors to fields", async ({ page }) => {

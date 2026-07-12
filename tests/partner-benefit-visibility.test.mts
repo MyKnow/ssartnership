@@ -115,6 +115,12 @@ test("member year maps to partner audience for benefit eligibility", async () =>
   assert.equal(resolvePartnerAudienceFromMemberYear(0), "staff");
   assert.equal(resolvePartnerAudienceFromMemberYear(15), "student");
   assert.equal(resolvePartnerAudienceFromMemberYear(13), "graduate");
+  assert.equal(
+    resolvePartnerAudienceFromMemberYear(16, new Date(), undefined, {
+      graduateVerifiedAt: "2026-07-12T00:00:00.000Z",
+    }),
+    "graduate",
+  );
   assert.equal(resolvePartnerAudienceFromMemberYear(null), null);
 });
 

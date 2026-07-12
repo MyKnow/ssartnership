@@ -101,6 +101,15 @@ export const ADMIN_AUDIT_ACTIONS = [
   'admin_account_status_update',
   'admin_account_permissions_update',
   'admin_account_template_apply',
+  'graduate_verification_review_start',
+  'graduate_verification_approve',
+  'graduate_verification_setup_email_resend',
+  'graduate_verification_reject',
+  'graduate_verification_resubmission_request',
+  'graduate_profile_photo_approve',
+  'graduate_profile_photo_reject',
+  'graduate_certificate_view',
+  'graduate_profile_photo_view',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];
@@ -117,6 +126,10 @@ export const AUTH_SECURITY_EVENT_NAMES = [
   'member_password_reset',
   'member_password_change',
   'member_delete',
+  'graduate_email_verification',
+  'graduate_verification_submit',
+  'graduate_password_setup',
+  'graduate_password_reset',
   'admin_login',
   'admin_access',
   'partner_login',

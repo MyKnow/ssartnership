@@ -8,6 +8,7 @@
 
 - [공개·회원 화면](./public-and-member.md)
 - [인증 화면](./auth.md)
+- [수료생 증명서·본인 사진 인증](./graduate-verification.md)
 - [파트너 포털](./partner.md)
 - [관리자 화면](./admin.md)
 - [용어 기준](./terminology.md)

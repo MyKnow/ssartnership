@@ -54,6 +54,8 @@ export default async function CertificationVerifyPage({
         campus?: string | null;
         avatar_content_type?: string | null;
         avatar_url?: string | null;
+        graduate_verified_at?: string | null;
+        active_profile_image_id?: string | null;
         must_change_password?: boolean | null;
       }
     | null = null;
@@ -63,7 +65,7 @@ export default async function CertificationVerifyPage({
     const { data } = await supabase
       .from("members")
       .select(
-        "id,display_name,year,campus,avatar_content_type,avatar_url,must_change_password",
+        "id,display_name,year,campus,avatar_content_type,avatar_url,must_change_password,graduate_verified_at,active_profile_image_id",
       )
       .eq("id", verification.payload.userId)
       .maybeSingle();
@@ -76,15 +78,17 @@ export default async function CertificationVerifyPage({
   const isValid = verification.ok && Boolean(member);
   const cohortCardThemes = member ? await listCohortCardThemes() : [];
   const profile = member ? parseSsafyProfile(member.display_name ?? "") : null;
-  const roleLabel = member ? getCertificationRoleLabel(member.year) : null;
-  const scheme = member ? getCertificationScheme(member.year, cohortCardThemes) : null;
+  const roleLabel = member
+    ? getCertificationRoleLabel(member.year, { graduateVerifiedAt: member.graduate_verified_at })
+    : null;
+  const scheme = member
+    ? getCertificationScheme(member.year, cohortCardThemes, { graduateVerifiedAt: member.graduate_verified_at })
+    : null;
   const campusLabel = member?.campus ?? profile?.campus ?? null;
   const yearLabel = member?.year && member.year > 0 ? `${member.year}기` : null;
-  const avatarSrc = member?.avatar_url
-    ? member.avatar_url
-    : member?.avatar_content_type
-      ? `/api/certification/avatar/${encodeURIComponent(rawToken)}`
-      : "/avatar-default.svg";
+  const avatarSrc = member?.active_profile_image_id || member?.avatar_content_type
+    ? `/api/certification/avatar/${encodeURIComponent(rawToken)}`
+    : member?.avatar_url ?? "/avatar-default.svg";
   const name = profile?.displayName ?? member?.display_name ?? "이름 미지정";
 
   return (

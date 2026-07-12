@@ -89,6 +89,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "members" },
       },
       {
+        href: "/admin/graduate-verifications",
+        label: "수료생 인증",
+        description: "수료증과 본인 사진 검토",
+        iconKey: "shield",
+        permission: { resource: "graduate_verifications" },
+      },
+      {
         href: "/admin/reviews",
         label: "리뷰 관리",
         description: "리뷰 검수와 공개 상태",

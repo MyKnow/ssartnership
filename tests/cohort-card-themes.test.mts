@@ -7,7 +7,10 @@ import {
   parseCohortCardThemePayload,
   type CohortCardTheme,
 } from "../src/lib/cohort-card-themes.ts";
-import { getCertificationScheme } from "../src/lib/certification-scheme.ts";
+import {
+  getCertificationRoleLabel,
+  getCertificationScheme,
+} from "../src/lib/certification-scheme.ts";
 
 function buildFormData(entries: Record<string, string>) {
   const formData = new FormData();
@@ -96,6 +99,20 @@ test("graduate certification scheme keeps readable dark text on the light card",
   assert.match(scheme.roleBadgeClassName, /!text-white/);
   assert.match(scheme.subduedTextClassName, /text-slate-700/);
   assert.match(scheme.qrButtonClassName, /!text-slate-800/);
+});
+
+test("승인된 수료생은 현재 기수와 무관하게 수료생 카드 역할을 우선한다", () => {
+  const scheme = getCertificationScheme(16, [year16Theme], {
+    graduateVerifiedAt: "2026-07-12T00:00:00.000Z",
+  });
+
+  assert.equal(
+    getCertificationRoleLabel(16, {
+      graduateVerifiedAt: "2026-07-12T00:00:00.000Z",
+    }),
+    "수료생",
+  );
+  assert.match(scheme.roleBadgeClassName, /!bg-slate-900/);
 });
 
 test("staff certification scheme keeps the role chip readable on the dark card", () => {

@@ -22,6 +22,7 @@
 
 - [이벤트 로깅 기준](./event-logging.md)
 - [SSAFY Verify 외부 API 위임](./ssafy-verify-external-api-delegation.md)
+- [수료생 증명서·프로필 사진 인증 v1](./graduate-verification-v1.md)
 - [디자인 시스템](../design-system/README.md)
 - [성능 문서](../performance/README.md)
 - [보안 문서](../security/security_2026-05-13_01.md)

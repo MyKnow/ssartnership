@@ -1,5 +1,6 @@
+import Link from "next/link";
 import LoginForm from "@/components/auth/LoginForm";
-import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import PasswordResetMethodTabs from "@/components/auth/PasswordResetMethodTabs";
 import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -51,10 +52,7 @@ export function ResetPasswordPageView() {
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             비밀번호 재설정
           </h1>
-          <p className="text-ko-pretty mt-2 text-sm text-muted-foreground">
-            SSAFY Verify 인증을 완료하면 새 비밀번호 설정 페이지로 이동합니다.
-          </p>
-          <ResetPasswordForm />
+          <PasswordResetMethodTabs />
         </Card>
       </Container>
     </main>
@@ -62,6 +60,8 @@ export function ResetPasswordPageView() {
 }
 
 export function SignupPageView({ returnTo }: { returnTo: string }) {
+  const graduateHref = `/auth/signup/graduate?returnTo=${encodeURIComponent(returnTo)}`;
+
   return (
     <main>
       <Container className="pb-16 pt-10">
@@ -69,14 +69,29 @@ export function SignupPageView({ returnTo }: { returnTo: string }) {
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             회원가입
           </h1>
-          <p className="text-ko-pretty mt-2 text-sm text-muted-foreground">
-            SSAFY Verify로 구성원 인증을 완료하면 가입 여부를 확인합니다.
-          </p>
-          <SsafyVerifyButton returnTo={returnTo} />
-          <div className="mt-3 flex flex-col gap-3">
-            <Button variant="ghost" href="/auth/login">
-              로그인으로 돌아가기
-            </Button>
+          <div
+            role="tablist"
+            aria-label="회원가입 유형"
+            className="mt-6 grid grid-cols-2 gap-2 rounded-[1.35rem] border border-border bg-surface-inset p-2"
+          >
+            <span
+              role="tab"
+              aria-selected="true"
+              className="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-raised"
+            >
+              운영진·재학생
+            </span>
+            <Link
+              role="tab"
+              aria-selected="false"
+              href={graduateHref}
+              className="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] px-3 text-sm font-semibold text-foreground transition hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+            >
+              수료생
+            </Link>
+          </div>
+          <div className="mt-5">
+            <SsafyVerifyButton returnTo={returnTo} label="SSAFY Verify로 시작하기" />
           </div>
         </Card>
       </Container>

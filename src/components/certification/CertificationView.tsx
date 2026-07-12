@@ -20,13 +20,16 @@ import { formatKoreanDateTime } from "@/lib/datetime";
 
 type Member = {
   id?: string | null;
-  mm_username: string;
+  mm_username?: string | null;
   display_name?: string | null;
   year?: number | null;
   campus?: string | null;
   avatar_url?: string | null;
   avatar_updated_at?: string | null;
   has_legacy_avatar?: boolean | null;
+  graduate_verified_at?: string | null;
+  has_profile_image?: boolean | null;
+  profile_image_url?: string | null;
 };
 
 export default function CertificationView({
@@ -42,13 +45,18 @@ export default function CertificationView({
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
-  const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
+  const profile = parseSsafyProfile(member.display_name ?? member.mm_username ?? "");
   const hasTrackedViewRef = useRef(false);
   const year = member.year ?? getCurrentSsafyYear();
-  const roleLabel = getCertificationRoleLabel(year);
-  const scheme = getCertificationScheme(year, cohortCardThemes);
+  const roleLabel = getCertificationRoleLabel(year, {
+    graduateVerifiedAt: member.graduate_verified_at,
+  });
+  const scheme = getCertificationScheme(year, cohortCardThemes, {
+    graduateVerifiedAt: member.graduate_verified_at,
+  });
   const campusLabel = member.campus ?? profile.campus ?? null;
   const yearLabel = year > 0 ? formatSsafyYearLabel(year) : null;
+  const hasProfileImage = Boolean(member.has_profile_image && member.profile_image_url);
   const hasAvatarUrl = Boolean(member.avatar_url);
   const hasLegacyAvatar = Boolean(member.has_legacy_avatar);
   const avatarVersion = member.avatar_updated_at
@@ -57,7 +65,9 @@ export default function CertificationView({
   const legacyAvatarSrc = avatarVersion
     ? `/api/mm/avatar?v=${avatarVersion}`
     : "/api/mm/avatar";
-  const avatarSrc = member.avatar_url ?? (hasLegacyAvatar ? legacyAvatarSrc : "/avatar-default.svg");
+  const avatarSrc = hasProfileImage
+    ? member.profile_image_url!
+    : member.avatar_url ?? (hasLegacyAvatar ? legacyAvatarSrc : "/avatar-default.svg");
   const name = profile.displayName ?? member.display_name ?? "이름 미지정";
 
   useEffect(() => {
@@ -145,7 +155,7 @@ export default function CertificationView({
               </p>
               <div className={cn("flex items-center gap-[1cqw] text-[clamp(0.5rem,1.5cqw,0.875rem)]", scheme.subduedTextClassName)}>
                 <span className={cn("inline-flex h-[1cqw] w-[1cqw] rounded-full", scheme.accentClassName)} />
-                {year === 0 ? "운영진 인증" : "교육생 인증"}
+                {roleLabel === "운영진" ? "운영진 인증" : roleLabel === "수료생" ? "수료생 인증" : "교육생 인증"}
               </div>
             </div>
             <div
@@ -163,12 +173,12 @@ export default function CertificationView({
           </div>
         }
         avatarSrc={avatarSrc}
-        avatarAlt={hasAvatarUrl || hasLegacyAvatar ? "프로필" : "기본 프로필 이미지"}
-        avatarOnClick={hasAvatarUrl || hasLegacyAvatar ? () => setAvatarOpen(true) : undefined}
+        avatarAlt={hasProfileImage || hasAvatarUrl || hasLegacyAvatar ? "프로필" : "기본 프로필 이미지"}
+        avatarOnClick={hasProfileImage || hasAvatarUrl || hasLegacyAvatar ? () => setAvatarOpen(true) : undefined}
         avatarButtonLabel="프로필 이미지 크게 보기"
       />
 
-      {(hasAvatarUrl || hasLegacyAvatar) && isAvatarOpen ? (
+      {(hasProfileImage || hasAvatarUrl || hasLegacyAvatar) && isAvatarOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6">
           <button
             type="button"

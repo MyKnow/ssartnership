@@ -17,9 +17,9 @@ function shouldSkipSync(key: string) {
   return false;
 }
 
-export default function CertificationProfileSync() {
+export default function CertificationProfileSync({ enabled = true }: { enabled?: boolean }) {
   useEffect(() => {
-    if (shouldSkipSync(PROFILE_SYNC_KEY)) {
+    if (!enabled || shouldSkipSync(PROFILE_SYNC_KEY)) {
       return;
     }
 
@@ -34,7 +34,7 @@ export default function CertificationProfileSync() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, []);
+  }, [enabled]);
 
   return null;
 }

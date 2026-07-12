@@ -141,7 +141,13 @@ export function buildStudentCertificationScheme(
   };
 }
 
-export function getCertificationRoleLabel(year: number | null | undefined) {
+export function getCertificationRoleLabel(
+  year: number | null | undefined,
+  options: { graduateVerifiedAt?: string | null } = {},
+) {
+  if (options.graduateVerifiedAt) {
+    return "수료생";
+  }
   if (typeof year !== "number") {
     return "교육생";
   }
@@ -158,12 +164,16 @@ export function getCertificationRoleLabel(year: number | null | undefined) {
 export function getCertificationScheme(
   year: number | null | undefined,
   cohortThemes?: readonly CohortCardTheme[] | null,
+  options: { graduateVerifiedAt?: string | null } = {},
 ) {
   if (year === 0) {
     return STAFF_SCHEME;
   }
 
-  if (typeof year === "number" && getSsafyMemberLifecycle(year).kind === "graduate") {
+  if (
+    options.graduateVerifiedAt ||
+    (typeof year === "number" && getSsafyMemberLifecycle(year).kind === "graduate")
+  ) {
     return GRADUATE_SCHEME;
   }
 

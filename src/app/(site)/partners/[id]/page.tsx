@@ -119,7 +119,7 @@ export default async function PartnerDetailPage({
   const member = headerSession?.userId
     ? await getSupabaseAdminClient()
         .from("members")
-        .select("year")
+        .select("year,graduate_verified_at")
         .eq("id", headerSession.userId)
         .maybeSingle()
         .then(({ data }) => data)
@@ -130,6 +130,9 @@ export default async function PartnerDetailPage({
     headerSession?.userId ?? null,
     resolvePartnerAudienceFromMemberYear(
       typeof member?.year === "number" ? member.year : null,
+      new Date(),
+      undefined,
+      { graduateVerifiedAt: member?.graduate_verified_at ?? null },
     ),
   );
   if (!pageData) {

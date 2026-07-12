@@ -215,6 +215,50 @@ const storybookViewportKeys = [
 const routeOwnedStateOverrides: Partial<
   Record<string, MockRequiredStateKey[]>
 > = {
+  "/auth/signup/graduate": [
+    "default",
+    "validation-error",
+    "pending",
+    "success",
+    "rejected",
+    "expired",
+    "long-korean",
+    "mobile-overflow",
+    "image-gallery",
+    "broken-image",
+    "async-pending",
+  ],
+  "/auth/graduate/setup": [
+    "default",
+    "validation-error",
+    "expired",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
+  "/certification/photo": [
+    "default",
+    "validation-error",
+    "pending",
+    "rejected",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "image-gallery",
+    "broken-image",
+    "async-pending",
+  ],
+  "/admin/graduate-verifications": [
+    "default",
+    "empty",
+    "pending",
+    "rejected",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "forbidden",
+  ],
   // Category lookup fails soft and has no route loading/error surface. Submitted
   // request review states belong to admin queues, while action feedback remains here.
   "/partner-registration": [

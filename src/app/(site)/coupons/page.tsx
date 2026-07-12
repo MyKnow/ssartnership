@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 
 type MemberRow = {
   year?: number | null;
+  graduate_verified_at?: string | null;
 };
 
 function getVisiblePartnerIds(
@@ -44,7 +45,7 @@ export default async function CouponsPage() {
 
   const supabase = getSupabaseAdminClient();
   const [{ data: member }, headerSession] = await Promise.all([
-    supabase.from("members").select("year").eq("id", session.userId).maybeSingle(),
+    supabase.from("members").select("year,graduate_verified_at").eq("id", session.userId).maybeSingle(),
     getHeaderSession(session.userId),
   ]);
   if (!member) {
@@ -53,6 +54,9 @@ export default async function CouponsPage() {
 
   const viewerAudience = resolvePartnerAudienceFromMemberYear(
     typeof (member as MemberRow).year === "number" ? (member as MemberRow).year : null,
+    new Date(),
+    undefined,
+    { graduateVerifiedAt: (member as MemberRow).graduate_verified_at ?? null },
   );
   const partners = await partnerRepository.getPartners({
     authenticated: true,
