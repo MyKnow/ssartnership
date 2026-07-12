@@ -9,7 +9,15 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import ImageCropDialog from "@/components/media/ImageCropDialog";
 import {
+  formatGraduateEmailCodeRemainingTime,
+  getGraduateEmailCodeRemainingSeconds,
+  GRADUATE_EMAIL_CODE_TTL_SECONDS,
+} from "@/lib/graduate-verification-email-code";
+import {
+  clampGraduateEducationEnd,
+  getGraduateCurrentYearMonth,
   getSsafyCohortFromEducationStart,
+  GRADUATE_CAMPUS_OPTIONS,
   MAX_GRADUATE_CERTIFICATE_BYTES,
   MAX_GRADUATE_PROFILE_IMAGE_BYTES,
   type GraduateCompletionStage,
@@ -95,6 +103,8 @@ export default function GraduateVerificationApplicationView() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [emailVerified, setEmailVerified] = useState(false);
   const [legalName, setLegalName] = useState("");
   const [completionStage, setCompletionStage] = useState<GraduateCompletionStage>("semester_1");
@@ -116,11 +126,19 @@ export default function GraduateVerificationApplicationView() {
   const [consented, setConsented] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<{ tone: "danger" | "success" | "info"; text: string } | null>(null);
+  const currentYearMonth = useMemo(() => getGraduateCurrentYearMonth(), []);
 
   useEffect(() => () => {
     if (photoSourceUrlRef.current) URL.revokeObjectURL(photoSourceUrlRef.current);
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!codeExpiresAt) return;
+
+    const intervalId = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(intervalId);
+  }, [codeExpiresAt]);
 
   const inferredCohort = useMemo(
     () => getSsafyCohortFromEducationStart(Number(startYear), Number(startMonth)),
@@ -131,6 +149,45 @@ export default function GraduateVerificationApplicationView() {
     !isResubmission || resubmissionTargets.includes("education_period");
   const requiresCertificate = !isResubmission || resubmissionTargets.includes("certificate");
   const requiresProfileImage = !isResubmission || resubmissionTargets.includes("profile_image");
+  const codeRemainingSeconds = codeExpiresAt
+    ? getGraduateEmailCodeRemainingSeconds(codeExpiresAt, now)
+    : 0;
+  const isCodeExpired = codeSent && codeRemainingSeconds === 0;
+
+  const normalizeEducationYear = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "";
+    return String(Math.min(Number(digits), currentYearMonth.year));
+  };
+
+  useEffect(() => {
+    const startYearNumber = Number(startYear);
+    const startMonthNumber = Number(startMonth);
+    const endYearNumber = Number(endYear);
+    const endMonthNumber = Number(endMonth);
+    if (!Number.isInteger(startYearNumber) || !Number.isInteger(startMonthNumber)) return;
+
+    const normalizedStartMonth =
+      startYearNumber === currentYearMonth.year
+        ? Math.min(startMonthNumber, currentYearMonth.month)
+        : startMonthNumber;
+    if (normalizedStartMonth !== startMonthNumber) {
+      setStartMonth(String(normalizedStartMonth));
+      return;
+    }
+    if (!Number.isInteger(endYearNumber) || !Number.isInteger(endMonthNumber)) return;
+
+    const normalizedEnd = clampGraduateEducationEnd({
+      startYear: startYearNumber,
+      startMonth: normalizedStartMonth,
+      endYear: endYearNumber,
+      endMonth: endMonthNumber,
+      currentYear: currentYearMonth.year,
+      currentMonth: currentYearMonth.month,
+    });
+    if (normalizedEnd.year !== endYearNumber) setEndYear(String(normalizedEnd.year));
+    if (normalizedEnd.month !== endMonthNumber) setEndMonth(String(normalizedEnd.month));
+  }, [currentYearMonth, endMonth, endYear, startMonth, startYear]);
 
   const chooseCertificate = () => certificateInputRef.current?.click();
   const choosePhoto = () => photoInputRef.current?.click();
@@ -146,8 +203,14 @@ export default function GraduateVerificationApplicationView() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "인증 코드를 보내지 못했습니다.");
+      const expiresInSeconds =
+        typeof data.expiresInSeconds === "number" && data.expiresInSeconds > 0
+          ? data.expiresInSeconds
+          : GRADUATE_EMAIL_CODE_TTL_SECONDS;
       setCodeSent(true);
-      setMessage({ tone: "info", text: "인증 코드를 이메일로 보냈습니다. 10분 안에 입력해 주세요." });
+      setCode("");
+      setCodeExpiresAt(Date.now() + expiresInSeconds * 1_000);
+      setNow(Date.now());
     } catch (error) {
       setMessage({ tone: "danger", text: error instanceof Error ? error.message : "인증 코드를 보내지 못했습니다." });
     } finally {
@@ -261,8 +324,8 @@ export default function GraduateVerificationApplicationView() {
   }
 
   function continueToFiles() {
-    if (!legalName.trim() || !inferredCohort) {
-      setMessage({ tone: "danger", text: "이름과 교육 시작 연·월을 확인해 주세요." });
+    if (!legalName.trim() || !inferredCohort || !campus) {
+      setMessage({ tone: "danger", text: "이름, 캠퍼스, 교육 시작 연·월을 확인해 주세요." });
       return;
     }
     const start = Number(startYear) * 12 + Number(startMonth);
@@ -417,9 +480,14 @@ export default function GraduateVerificationApplicationView() {
           {codeSent ? <label className="grid gap-2 text-sm font-medium">6자리 인증 코드
             <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))} placeholder="000000" />
           </label> : null}
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={requestCode} loading={pending} loadingText="전송 중">{codeSent ? "인증 코드 다시 보내기" : "인증 코드 보내기"}</Button>
-            {codeSent ? <Button variant="secondary" onClick={verifyCode} loading={pending} loadingText="확인 중">이메일 인증하기</Button> : null}
+          {codeSent ? <p className={isCodeExpired ? "text-sm text-danger" : "text-sm text-muted-foreground"}>
+            {isCodeExpired
+              ? "인증 코드가 만료되었습니다. 다시 보내 주세요."
+              : `인증 코드 만료까지 ${formatGraduateEmailCodeRemainingTime(codeRemainingSeconds)} 남음`}
+          </p> : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant={codeSent ? "secondary" : "primary"} onClick={requestCode} loading={pending} loadingText="전송 중">{codeSent ? "인증 코드 다시 보내기" : "인증 코드 보내기"}</Button>
+            {codeSent ? <Button onClick={verifyCode} disabled={isCodeExpired} loading={pending} loadingText="확인 중">이메일 인증하기</Button> : null}
           </div>
         </section>
       ) : null}
@@ -430,10 +498,10 @@ export default function GraduateVerificationApplicationView() {
           <label className="grid gap-2 text-sm font-medium">이름<Input value={legalName} onChange={(event) => setLegalName(event.target.value)} maxLength={100} disabled={isResubmission} /></label>
           <label className="grid gap-2 text-sm font-medium">이수 학기<Select value={completionStage} onChange={(event) => setCompletionStage(event.target.value as GraduateCompletionStage)} disabled={isResubmission}><option value="semester_1">1학기 교육이수</option><option value="semester_2">2학기 교육이수</option></Select></label>
           <div className="grid gap-4 sm:grid-cols-2">
-            <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 시작 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 시작 연도" value={startYear} onChange={(event) => setStartYear(event.target.value.replace(/\D/g, ""))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 시작 월" value={startMonth} onChange={(event) => setStartMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</Select></div></fieldset>
-            <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 종료 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 종료 연도" value={endYear} onChange={(event) => setEndYear(event.target.value.replace(/\D/g, ""))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 종료 월" value={endMonth} onChange={(event) => setEndMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}월</option>)}</Select></div></fieldset>
+            <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 시작 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 시작 연도" max={currentYearMonth.year} value={startYear} onChange={(event) => setStartYear(normalizeEducationYear(event.target.value))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 시작 월" value={startMonth} onChange={(event) => setStartMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1} disabled={Number(startYear) === currentYearMonth.year && index + 1 > currentYearMonth.month}>{index + 1}월</option>)}</Select></div></fieldset>
+            <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 종료 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 종료 연도" max={currentYearMonth.year} value={endYear} onChange={(event) => setEndYear(normalizeEducationYear(event.target.value))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 종료 월" value={endMonth} onChange={(event) => setEndMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1} disabled={Number(endYear) === currentYearMonth.year && index + 1 > currentYearMonth.month}>{index + 1}월</option>)}</Select></div></fieldset>
           </div>
-          <label className="grid gap-2 text-sm font-medium">캠퍼스 <span className="font-normal text-muted-foreground">(선택, 혜택 권한에 사용하지 않음)</span><Input value={campus} onChange={(event) => setCampus(event.target.value)} maxLength={80} placeholder="예: 서울" disabled={isResubmission} /></label>
+          <label className="grid gap-2 text-sm font-medium">캠퍼스<Select aria-label="캠퍼스" value={campus} onChange={(event) => setCampus(event.target.value)} disabled={isResubmission}><option value="" disabled>캠퍼스를 선택해 주세요</option>{GRADUATE_CAMPUS_OPTIONS.map((option) => <option key={option} value={option}>{option} 캠퍼스</option>)}</Select></label>
           {isResubmission && !canEditEducationPeriod ? <p className="text-sm text-muted-foreground">기존 교육 정보는 유지됩니다. 교육 기간 보완 요청이 있을 때만 수정할 수 있습니다.</p> : null}
           <InlineMessage tone={inferredCohort ? "info" : "warning"} title={inferredCohort ? `자동 계산된 ${inferredCohort}기` : "기수 계산 불가"} description={inferredCohort ? "교육 시작 연·월로 계산되며 직접 수정할 수 없습니다." : "2018년 12월 이후의 교육 시작 연·월을 입력해 주세요."} />
           <div className="flex gap-2"><Button variant="ghost" onClick={() => setStep("email")}>이전</Button><Button onClick={continueToFiles}>파일 제출로 계속</Button></div>

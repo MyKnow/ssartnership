@@ -331,6 +331,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.graduate-verifications.queue"],
   },
   {
+    routePath: "/admin/profile-photos",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminProfilePhotoReviewQueue",
+    dataSources: ["service", "api-route", "storybook"],
+    requiredScenarioIds: ["admin.profile-photos.queue"],
+  },
+  {
     routePath: "/admin/members/[memberId]",
     surface: "admin",
     authScope: "admin",
@@ -771,7 +779,12 @@ const routeContracts = {
   "/admin/graduate-verifications": {
     routeKind: "canonical",
     screenContractId: "admin.graduate-verifications",
-    primaryTask: "수료생 신규 인증과 본인 사진 변경 요청을 검토하고 결정한다.",
+    primaryTask: "수료생 신규 인증과 교육 이수 증빙을 검토하고 결정한다.",
+  },
+  "/admin/profile-photos": {
+    routeKind: "canonical",
+    screenContractId: "admin.profile-photos",
+    primaryTask: "회원의 사진 변경 요청과 기존 프로필 사진 적합성을 검토한다.",
   },
   "/admin/members/[memberId]": {
     routeKind: "canonical",

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { submitGraduateProfileImageReplacement } from "@/lib/graduate-verification-service";
+import { submitMemberProfileImageReplacement } from "@/lib/graduate-verification-service";
 import {
   isGraduateVerificationBlocked,
   recordGraduateVerificationAttempt,
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
   }
   const rateLimitContext = {
-    route: "graduate-profile-photo-submit" as const,
+    route: "member-profile-photo-submit" as const,
     accountIdentifier: session.userId,
   };
   if (await isGraduateVerificationBlocked(rateLimitContext)) {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "사진 업로드를 확인해 주세요." }, { status: 400 });
   }
   try {
-    const result = await submitGraduateProfileImageReplacement({
+    const result = await submitMemberProfileImageReplacement({
       memberId: session.userId,
       uploadId,
     });

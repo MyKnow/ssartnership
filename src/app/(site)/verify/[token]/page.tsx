@@ -56,6 +56,7 @@ export default async function CertificationVerifyPage({
         avatar_url?: string | null;
         graduate_verified_at?: string | null;
         active_profile_image_id?: string | null;
+        profile_photo_review_status?: string | null;
         must_change_password?: boolean | null;
       }
     | null = null;
@@ -65,12 +66,16 @@ export default async function CertificationVerifyPage({
     const { data } = await supabase
       .from("members")
       .select(
-        "id,display_name,year,campus,avatar_content_type,avatar_url,must_change_password,graduate_verified_at,active_profile_image_id",
+        "id,display_name,year,campus,avatar_content_type,avatar_url,must_change_password,graduate_verified_at,active_profile_image_id,profile_photo_review_status",
       )
       .eq("id", verification.payload.userId)
       .maybeSingle();
 
-    if (data?.id && !data.must_change_password) {
+    if (
+      data?.id &&
+      !data.must_change_password &&
+      data.profile_photo_review_status === "approved"
+    ) {
       member = data;
     }
   }

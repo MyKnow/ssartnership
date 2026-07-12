@@ -6,6 +6,7 @@ import {
 } from "@/lib/policy-documents";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 
 const COOKIE_NAME = "user_session";
 const SESSION_TTL_DAYS = 7;
@@ -151,7 +152,7 @@ export async function getUserSession() {
   const memberPromise = supabase
     .from("members")
     .select(
-      "id,must_change_password,service_policy_version,privacy_policy_version",
+      "id,must_change_password,service_policy_version,privacy_policy_version,profile_photo_review_status",
     )
     .eq("id", session.userId)
     .maybeSingle();
@@ -175,5 +176,8 @@ export async function getUserSession() {
     ...session,
     mustChangePassword: Boolean(member.must_change_password),
     requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+    requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
+      member.profile_photo_review_status,
+    ),
   };
 }

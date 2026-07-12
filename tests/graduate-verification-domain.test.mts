@@ -11,6 +11,7 @@ import {
   normalizeGraduateDocumentNumber,
   validateGraduateDocumentNumber,
   validateGraduateEducationPeriod,
+  clampGraduateEducationEnd,
   validateGraduatePhotoUpload,
   validateGraduateCertificateUpload,
 } from "@/lib/graduate-verification";
@@ -48,6 +49,42 @@ test("교육 종료 연월은 시작 연월보다 빠를 수 없다", () => {
   );
 });
 
+test("교육 종료 연월은 시작일보다 이르거나 현재보다 늦을 수 없다", () => {
+  assert.deepEqual(
+    clampGraduateEducationEnd({
+      startYear: 2025,
+      startMonth: 1,
+      endYear: 2024,
+      endMonth: 3,
+      currentYear: 2026,
+      currentMonth: 7,
+    }),
+    { year: 2025, month: 1 },
+  );
+  assert.deepEqual(
+    clampGraduateEducationEnd({
+      startYear: 2026,
+      startMonth: 1,
+      endYear: 2027,
+      endMonth: 1,
+      currentYear: 2026,
+      currentMonth: 7,
+    }),
+    { year: 2026, month: 7 },
+  );
+  assert.match(
+    validateGraduateEducationPeriod({
+      startYear: 2026,
+      startMonth: 1,
+      endYear: 2026,
+      endMonth: 8,
+      currentYear: 2026,
+      currentMonth: 7,
+    }) ?? "",
+    /현재 연·월/,
+  );
+});
+
 test("서버는 클라이언트가 보낸 기수가 아니라 교육 시작 연월로 기수를 다시 계산한다", () => {
   const result = createGraduateVerificationSubmission({
     email: " Graduate@Example.com ",
@@ -68,6 +105,33 @@ test("서버는 클라이언트가 보낸 기수가 아니라 교육 시작 연�
     assert.equal(result.value.cohortRuleVersion, "ssafy-half-year-v1");
   }
   assert.equal(normalizeGraduateEmail(" Graduate@Example.com "), "graduate@example.com");
+});
+
+test("수료생 인증은 지정된 캠퍼스를 반드시 선택해야 한다", () => {
+  const baseInput = {
+    email: "graduate@example.com",
+    legalName: "홍길동",
+    completionStage: "semester_1",
+    educationStartYear: 2026,
+    educationStartMonth: 1,
+    educationEndYear: 2026,
+    educationEndMonth: 6,
+  } as const;
+
+  const missingCampus = createGraduateVerificationSubmission(baseInput);
+  assert.equal(missingCampus.ok, false);
+  if (!missingCampus.ok) {
+    assert.match(missingCampus.error, /캠퍼스/);
+  }
+
+  const invalidCampus = createGraduateVerificationSubmission({
+    ...baseInput,
+    campus: "창업",
+  });
+  assert.equal(invalidCampus.ok, false);
+  if (!invalidCampus.ok) {
+    assert.match(invalidCampus.error, /캠퍼스/);
+  }
 });
 
 test("수료증 문서 번호는 원문을 저장하지 않을 정규화 값으로 제한한다", () => {

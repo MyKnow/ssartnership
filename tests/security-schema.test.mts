@@ -121,6 +121,26 @@ test("수료생 인증 상태 전이는 데이터베이스에서도 강제한다
   );
 });
 
+test("수료생 검토자는 현재 관리자 회원 식별자를 참조한다", () => {
+  for (const tableName of [
+    "graduate_verification_requests",
+    "member_profile_images",
+  ]) {
+    const tableSection = schemaSql.match(
+      new RegExp(
+        `create\\s+table\\s+if\\s+not\\s+exists\\s+public\\.${tableName}\\s*\\([\\s\\S]*?\\n\\);`,
+        "i",
+      ),
+    )?.[0];
+
+    assert.ok(tableSection, `${tableName} table definition must exist`);
+    assert.match(
+      tableSection,
+      /reviewer_admin_id\s+uuid\s+references\s+public\.members\(id\)\s+on\s+delete\s+set\s+null/i,
+    );
+  }
+});
+
 test("수료증 파일 해시는 활성 신청과 승인 상태에서 중복될 수 없다", () => {
   assert.match(
     schemaSql,

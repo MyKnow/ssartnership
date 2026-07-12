@@ -23,7 +23,7 @@ export async function GET(
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
-    .select("avatar_content_type,avatar_base64,avatar_url,updated_at,must_change_password,active_profile_image_id")
+    .select("avatar_content_type,avatar_base64,avatar_url,updated_at,must_change_password,active_profile_image_id,profile_photo_review_status")
     .eq("id", verification.payload.userId)
     .maybeSingle();
 
@@ -34,7 +34,7 @@ export async function GET(
     );
   }
 
-  if (!data || data.must_change_password) {
+  if (!data || data.must_change_password || data.profile_photo_review_status !== "approved") {
     return NextResponse.json(
       { message: "아바타를 찾을 수 없습니다." },
       { status: 404 },

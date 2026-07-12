@@ -24,14 +24,6 @@ const meta = {
         created_at: "2026-07-12T00:00:00.000Z",
       },
     ],
-    photoReplacements: [
-      {
-        id: "00000000-0000-4000-8000-000000000103",
-        member_id: "00000000-0000-4000-8000-000000000104",
-        created_at: "2026-07-12T00:00:00.000Z",
-        member: { display_name: "합성 수료생 회원", year: 15 },
-      },
-    ],
     setupEmailRetries: [
       {
         id: "00000000-0000-4000-8000-000000000105",
@@ -45,8 +37,6 @@ const meta = {
       requestResubmission: noop,
       approveRequest: noop,
       rejectRequest: noop,
-      approvePhoto: noop,
-      rejectPhoto: noop,
       resendSetupEmail: noop,
     },
   },
@@ -62,5 +52,5 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Empty: Story = {
-  args: { requests: [], photoReplacements: [], setupEmailRetries: [] },
+  args: { requests: [], setupEmailRetries: [] },
 };

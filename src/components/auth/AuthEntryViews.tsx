@@ -1,6 +1,6 @@
-import Link from "next/link";
 import LoginForm from "@/components/auth/LoginForm";
 import PasswordResetMethodTabs from "@/components/auth/PasswordResetMethodTabs";
+import SignupMethodTabs, { type SignupMethod } from "@/components/auth/SignupMethodTabs";
 import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -59,9 +59,13 @@ export function ResetPasswordPageView() {
   );
 }
 
-export function SignupPageView({ returnTo }: { returnTo: string }) {
-  const graduateHref = `/auth/signup/graduate?returnTo=${encodeURIComponent(returnTo)}`;
-
+export function SignupPageView({
+  returnTo,
+  initialMethod,
+}: {
+  returnTo: string;
+  initialMethod?: SignupMethod;
+}) {
   return (
     <main>
       <Container className="pb-16 pt-10">
@@ -69,30 +73,7 @@ export function SignupPageView({ returnTo }: { returnTo: string }) {
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             회원가입
           </h1>
-          <div
-            role="tablist"
-            aria-label="회원가입 유형"
-            className="mt-6 grid grid-cols-2 gap-2 rounded-[1.35rem] border border-border bg-surface-inset p-2"
-          >
-            <span
-              role="tab"
-              aria-selected="true"
-              className="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-raised"
-            >
-              운영진·재학생
-            </span>
-            <Link
-              role="tab"
-              aria-selected="false"
-              href={graduateHref}
-              className="inline-flex min-h-11 items-center justify-center rounded-[0.95rem] px-3 text-sm font-semibold text-foreground transition hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-            >
-              수료생
-            </Link>
-          </div>
-          <div className="mt-5">
-            <SsafyVerifyButton returnTo={returnTo} label="SSAFY Verify로 시작하기" />
-          </div>
+          <SignupMethodTabs returnTo={returnTo} initialMethod={initialMethod} />
         </Card>
       </Container>
     </main>

@@ -20,13 +20,6 @@ export type AdminGraduateVerificationRequest = {
   created_at: string;
 };
 
-export type AdminGraduateProfileImageReplacement = {
-  id: string;
-  member_id: string;
-  created_at: string;
-  member: { display_name: string | null; year: number | null } | null;
-};
-
 export type AdminGraduateSetupEmailRetry = {
   id: string;
   email: string;
@@ -39,8 +32,6 @@ type QueueActions = {
   requestResubmission: (formData: FormData) => Promise<void>;
   approveRequest: (formData: FormData) => Promise<void>;
   rejectRequest: (formData: FormData) => Promise<void>;
-  approvePhoto: (formData: FormData) => Promise<void>;
-  rejectPhoto: (formData: FormData) => Promise<void>;
   resendSetupEmail: (formData: FormData) => Promise<void>;
 };
 
@@ -53,12 +44,10 @@ function statusBadgeVariant(status: string) {
 
 export default function AdminGraduateVerificationQueue({
   requests,
-  photoReplacements,
   setupEmailRetries,
   actions,
 }: {
   requests: AdminGraduateVerificationRequest[];
-  photoReplacements: AdminGraduateProfileImageReplacement[];
   setupEmailRetries: AdminGraduateSetupEmailRetry[];
   actions: QueueActions;
 }) {
@@ -97,10 +86,6 @@ export default function AdminGraduateVerificationQueue({
             ))}
           </div>
         )}
-      </section>
-      <section className="space-y-4" aria-labelledby="graduate-photo-queue-heading">
-        <div><p className="ui-kicker">Photo replacement</p><h2 id="graduate-photo-queue-heading" className="text-xl font-semibold">사진 변경</h2></div>
-        {photoReplacements.length === 0 ? <EmptyState title="검토할 사진 변경 요청이 없습니다." description="기존 승인 사진은 새 사진이 승인될 때까지 계속 유지됩니다." /> : <div className="grid gap-4">{photoReplacements.map((image) => <Card key={image.id} padding="md" className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">{image.member?.display_name || "회원"} · {image.member?.year ? `${image.member.year}기` : "기수 미입력"}</h3><p className="mt-1 text-sm text-muted-foreground">새 본인 사진 검토 대기</p></div><Link className="inline-flex min-h-11 items-center rounded-[1rem] border border-border px-3 text-sm font-semibold hover:bg-surface-inset" href={`/api/admin/graduate-verifications/images/${encodeURIComponent(image.id)}`} target="_blank" rel="noreferrer">사진 보기</Link></div><div className="flex flex-wrap gap-2"><form action={actions.approvePhoto}><input type="hidden" name="imageId" value={image.id} /><Button type="submit">사진 교체 승인</Button></form><form action={actions.rejectPhoto} className="flex flex-wrap gap-2"><input type="hidden" name="imageId" value={image.id} /><input name="reason" required maxLength={500} className="h-11 min-w-56 rounded-[1rem] border border-border bg-surface px-3 text-sm" placeholder="반려 사유" /><Button variant="danger" type="submit">반려</Button></form></div></Card>)}</div>}
       </section>
     </div>
   );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { sendGraduateVerificationCodeEmail } from "@/lib/graduate-verification-email";
+import { GRADUATE_EMAIL_CODE_TTL_SECONDS } from "@/lib/graduate-verification-email-code";
 import { normalizeGraduateEmail } from "@/lib/graduate-verification";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
       email_normalized: email,
       purpose: "application",
       code_hash: hashGraduateEmailCode(email, code),
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + GRADUATE_EMAIL_CODE_TTL_SECONDS * 1_000).toISOString(),
     })
     .select("id")
     .single();
@@ -61,7 +62,11 @@ export async function POST(request: Request) {
 
   try {
     if (!isE2eMockMutationEnabled()) {
-      await sendGraduateVerificationCodeEmail({ to: email, code });
+      await sendGraduateVerificationCodeEmail({
+        to: email,
+        code,
+        expiresInSeconds: GRADUATE_EMAIL_CODE_TTL_SECONDS,
+      });
     }
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: true });
     await logAuthSecurity({
@@ -73,7 +78,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({
       ok: true,
-      expiresInSeconds: 600,
+      expiresInSeconds: GRADUATE_EMAIL_CODE_TTL_SECONDS,
       ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
     });
   } catch {

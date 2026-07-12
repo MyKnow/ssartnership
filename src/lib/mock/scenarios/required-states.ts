@@ -259,6 +259,16 @@ const routeOwnedStateOverrides: Partial<
     "mobile-overflow",
     "forbidden",
   ],
+  "/admin/profile-photos": [
+    "default",
+    "empty",
+    "pending",
+    "rejected",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "forbidden",
+  ],
   // Category lookup fails soft and has no route loading/error surface. Submitted
   // request review states belong to admin queues, while action feedback remains here.
   "/partner-registration": [

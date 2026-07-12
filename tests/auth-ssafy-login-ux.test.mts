@@ -19,6 +19,18 @@ test("signup page opens SSAFY Verify directly instead of linking to the intermed
   assert.doesNotMatch(authEntryViews, /href=\{`\/auth\/ssafy/);
 });
 
+test("signup 유형 탭은 같은 카드 안에서 인증 시작 콘텐츠를 교체한다", () => {
+  const authEntryViews = readRepoFile("src/components/auth/AuthEntryViews.tsx");
+  const signupMethodTabs = readRepoFile("src/components/auth/SignupMethodTabs.tsx");
+
+  assert.match(authEntryViews, /<SignupMethodTabs\b/);
+  assert.match(signupMethodTabs, /role="tablist"/);
+  assert.match(signupMethodTabs, /role="tabpanel"/);
+  assert.match(signupMethodTabs, /수료생 인증으로 시작하기/);
+  assert.match(signupMethodTabs, /aria-selected=\{method === "graduate"\}/);
+  assert.doesNotMatch(signupMethodTabs, /<Link[\s\S]*role="tab"/);
+});
+
 test("SSAFY callback route is not a user-facing auth start page", () => {
   const ssafyPage = readRepoFile("src/app/auth/ssafy/page.tsx");
   const relay = readRepoFile("src/components/auth/SsafyVerifyCallbackRelay.tsx");

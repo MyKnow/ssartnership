@@ -1,4 +1,5 @@
 import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { formatGraduateEmailCodeExpirationNotice } from "@/lib/graduate-verification-email-code";
 import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 
 function escapeHtml(value: string) {
@@ -11,6 +12,7 @@ function escapeHtml(value: string) {
 }
 
 type GraduateVerificationCodeEmailPurpose = "application" | "password_reset";
+const DEFAULT_GRADUATE_EMAIL_CODE_TTL_SECONDS = 10 * 60;
 
 function getCodeEmailCopy(purpose: GraduateVerificationCodeEmailPurpose) {
   if (purpose === "password_reset") {
@@ -31,11 +33,15 @@ export async function sendGraduateVerificationCodeEmail(input: {
   to: string;
   code: string;
   purpose?: GraduateVerificationCodeEmailPurpose;
+  expiresInSeconds?: number;
 }) {
   const smtpConfig = getSmtpConfig();
   const transporter = createSmtpTransport(smtpConfig);
   const code = escapeHtml(input.code);
   const copy = getCodeEmailCopy(input.purpose ?? "application");
+  const expirationNotice = formatGraduateEmailCodeExpirationNotice(
+    input.expiresInSeconds ?? DEFAULT_GRADUATE_EMAIL_CODE_TTL_SECONDS,
+  );
 
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
@@ -46,14 +52,14 @@ export async function sendGraduateVerificationCodeEmail(input: {
       "",
       `인증 코드: ${input.code}`,
       "",
-      "코드는 10분 동안만 유효합니다. 본인이 요청하지 않았다면 이 메일을 무시해 주세요.",
+      expirationNotice,
     ].join("\n"),
     html: `
       <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
         <h2 style="margin: 0 0 12px;">${copy.heading}</h2>
         <p style="margin: 0 0 16px; color: #334155;">${copy.description}</p>
         <p style="margin: 0; border: 1px solid #cbd5e1; border-radius: 16px; padding: 16px; background: #f8fafc; font-size: 24px; font-weight: 700; letter-spacing: 0.16em;">${code}</p>
-        <p style="margin: 16px 0 0; color: #475569;">코드는 10분 동안만 유효합니다. 본인이 요청하지 않았다면 이 메일을 무시해 주세요.</p>
+        <p style="margin: 16px 0 0; color: #475569;">${expirationNotice}</p>
       </div>
     `,
   });

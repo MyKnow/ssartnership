@@ -25,16 +25,23 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();
   });
 
-  test("signup separates SSAFY Verify and graduate certificate application entrypoints", async ({ page }) => {
+  test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
     await page.goto("/auth/signup");
 
-    await expect(
-      page.getByRole("tab", { name: "운영진·재학생", exact: true }),
-    ).toHaveAttribute("aria-selected", "true");
+    const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
+    await expect(memberTab).toHaveAttribute("aria-selected", "true");
     const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
     await expect(graduateTab).toHaveAttribute("aria-selected", "false");
-    await graduateTab.click();
+    await memberTab.focus();
+    await page.keyboard.press("ArrowRight");
 
+    await expect(page).toHaveURL(/\/auth\/signup$/);
+    await expect(graduateTab).toBeFocused();
+    await expect(graduateTab).toHaveAttribute("aria-selected", "true");
+    const graduateStart = page.getByRole("link", { name: "수료생 인증으로 시작하기" });
+    await expect(graduateStart).toHaveAttribute("href", "/auth/signup/graduate?returnTo=%2F");
+
+    await graduateStart.click();
     await expect(page).toHaveURL(/\/auth\/signup\/graduate/);
     await expect(
       page.getByRole("heading", { name: "수료생 인증" }),

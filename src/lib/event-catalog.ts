@@ -106,10 +106,12 @@ export const ADMIN_AUDIT_ACTIONS = [
   'graduate_verification_setup_email_resend',
   'graduate_verification_reject',
   'graduate_verification_resubmission_request',
-  'graduate_profile_photo_approve',
-  'graduate_profile_photo_reject',
+  'member_profile_photo_approve',
+  'member_profile_photo_reject',
+  'member_profile_photo_active_reject',
   'graduate_certificate_view',
   'graduate_profile_photo_view',
+  'member_profile_photo_view',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

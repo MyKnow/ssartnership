@@ -14,8 +14,8 @@ export type GraduateVerificationRateLimitRoute =
   | "graduate-password-setup"
   | "graduate-password-reset-send"
   | "graduate-password-reset-verify"
-  | "graduate-profile-photo-sign"
-  | "graduate-profile-photo-submit";
+  | "member-profile-photo-sign"
+  | "member-profile-photo-submit";
 
 const GRADUATE_VERIFICATION_RATE_LIMIT: Record<
   GraduateVerificationRateLimitRoute,
@@ -63,13 +63,13 @@ const GRADUATE_VERIFICATION_RATE_LIMIT: Record<
     maxAttempts: 5,
     blockMs: 30 * 60 * 1000,
   },
-  "graduate-profile-photo-sign": {
+  "member-profile-photo-sign": {
     table: "member_auth_attempts",
     windowMs: 10 * 60 * 1000,
     maxAttempts: 8,
     blockMs: 30 * 60 * 1000,
   },
-  "graduate-profile-photo-submit": {
+  "member-profile-photo-submit": {
     table: "member_auth_attempts",
     windowMs: 10 * 60 * 1000,
     maxAttempts: 5,

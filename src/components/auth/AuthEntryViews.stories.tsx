@@ -64,3 +64,12 @@ export const ResetPassword: Story = {
 export const Signup: Story = {
   render: (args) => <SignupPageView returnTo={args.returnTo} />,
 };
+
+export const SignupGraduate: Story = {
+  render: (args) => <SignupPageView returnTo={args.returnTo} initialMethod="graduate" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("tab", { name: "수료생" })).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByRole("link", { name: "수료생 인증으로 시작하기" })).toBeVisible();
+  },
+};

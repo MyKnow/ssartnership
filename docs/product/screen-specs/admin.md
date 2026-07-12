@@ -85,6 +85,15 @@
 - 반응형·분석: 모바일 compact row와 filter disclosure, 데스크톱 dense list를 쓴다. 조회·export·변경을 audit한다.
 - 수용 기준: 기본 page size가 20이고 11개 보조 조건은 고급 필터 안에 있으며 URL 필터와 결과가 일치한다.
 
+<!-- screen-contract: admin.profile-photos -->
+## `/admin/profile-photos` — 프로필 사진 검토
+
+- 목표·위계: 사진 변경 대기 → 제출 사진·적합성 판단 → 승인/반려 → 기존 승인 사진 점검 순이다. 수료생 신청의 수료증·교육기간 검토와는 별도 화면에서 운영한다.
+- 액션·흐름: 사진 변경 요청의 primary는 승인 또는 반려이며, 기존 사진은 반려 후 사진 재제출을 요구한다. 반려된 회원과 사진 검토 중인 회원은 `/certification/photo`로 이동해 인증 카드·QR을 사용할 수 없다.
+- 경계·상태: `profile_images.read/update` 권한을 요구하며, 이미지와 원본 storage path는 관리자 인증 API로만 제공한다. 기본, 빈 큐, 사진 변경 대기, 반려, 승인, 권한 없음 상태를 제공한다.
+- 반응형·분석: 모바일은 사진·이름·사유 입력·액션을 한 열로 배치하고, 데스크톱은 변경 요청과 기존 사진 점검을 다열로 표시한다. 사진 열람·승인·반려를 개인정보 원문 없이 audit한다.
+- 수용 기준: 모든 회원이 사진 교체를 요청할 수 있고, pending/rejected 상태에서는 인증 카드와 유효 QR 이미지가 노출되지 않는다. 기존 MM 사진 반려도 동일한 재제출 흐름을 사용한다.
+
 <!-- screen-contract: admin.member-detail -->
 ## `/admin/members/[memberId]` — 회원 상세
 

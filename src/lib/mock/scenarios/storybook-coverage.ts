@@ -1004,6 +1004,16 @@ const mockStorybookScenarioCoverageBase = [
     coveredStateKeys: ["default", "pending", "long-korean", "mobile-overflow"],
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
+  {
+    routePath: "/admin/profile-photos",
+    scenarioId: "admin.profile-photos.queue",
+    storyId: "domains-admin-profilephotoreviewqueue--default",
+    storyFile: "src/components/admin/AdminProfilePhotoReviewQueue.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "AdminProfilePhotoReviewQueue",
+    coveredStateKeys: ["default", "pending", "long-korean", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
 ] as const satisfies MockStorybookScenarioCoverageInput[];
 
 const stateModelStoryFiles = new Set([

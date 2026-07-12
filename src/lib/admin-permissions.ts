@@ -10,6 +10,7 @@ export const ADMIN_PERMISSION_RESOURCES = [
   "cycles",
   "admin_management",
   "graduate_verifications",
+  "profile_images",
 ] as const;
 
 export type AdminPermissionResource = (typeof ADMIN_PERMISSION_RESOURCES)[number];
@@ -55,6 +56,7 @@ const RESOURCE_LABELS: Record<AdminPermissionResource, string> = {
   cycles: "기수",
   admin_management: "관리자 관리",
   graduate_verifications: "수료생 인증",
+  profile_images: "프로필 사진",
 };
 
 const ACTION_LABELS: Record<AdminPermissionAction, string> = {
@@ -181,6 +183,7 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
       events: { create: true, read: true, update: true, delete: true },
       cycles: { read: true, update: true },
       graduate_verifications: { read: true, update: true },
+      profile_images: { read: true, update: true },
     }),
   },
   {
@@ -218,6 +221,7 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
       notifications: { read: true },
       events: { read: true },
       graduate_verifications: { read: true, update: true },
+      profile_images: { read: true, update: true },
     }),
   },
   {

@@ -1,4 +1,5 @@
 import { isValidEmail } from "@/lib/validation";
+import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 
 export const GRADUATE_COHORT_RULE_VERSION = "ssafy-half-year-v1" as const;
 
@@ -47,6 +48,11 @@ export const MAX_GRADUATE_CERTIFICATE_PAGES = 5;
 export const MAX_GRADUATE_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MIN_GRADUATE_PROFILE_IMAGE_DIMENSION = 320;
 export const GRADUATE_PROFILE_IMAGE_SIZE = 640;
+export const GRADUATE_CAMPUS_OPTIONS = CAMPUS_DIRECTORY.map(
+  (campus) => campus.label,
+);
+
+export type GraduateCampus = (typeof GRADUATE_CAMPUS_OPTIONS)[number];
 
 const ALLOWED_PROFILE_IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -67,6 +73,7 @@ const TRANSITIONS: Record<GraduateVerificationStatus, readonly GraduateVerificat
 };
 
 const RESUBMISSION_TARGET_SET = new Set<string>(GRADUATE_RESUBMISSION_TARGETS);
+const GRADUATE_CAMPUS_SET = new Set<string>(GRADUATE_CAMPUS_OPTIONS);
 
 function isValidMonth(value: number) {
   return Number.isInteger(value) && value >= 1 && value <= 12;
@@ -77,6 +84,38 @@ function isValidEducationStart(year: number, month: number) {
     return false;
   }
   return year > 2018 || (year === 2018 && month === 12);
+}
+
+function toYearMonthIndex(year: number, month: number) {
+  return year * 12 + month;
+}
+
+function fromYearMonthIndex(index: number) {
+  return {
+    year: Math.floor((index - 1) / 12),
+    month: ((index - 1) % 12) + 1,
+  };
+}
+
+export function getGraduateCurrentYearMonth(now = new Date()) {
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+  };
+}
+
+export function clampGraduateEducationEnd(input: {
+  startYear: number;
+  startMonth: number;
+  endYear: number;
+  endMonth: number;
+  currentYear: number;
+  currentMonth: number;
+}) {
+  const start = toYearMonthIndex(input.startYear, input.startMonth);
+  const end = toYearMonthIndex(input.endYear, input.endMonth);
+  const current = toYearMonthIndex(input.currentYear, input.currentMonth);
+  return fromYearMonthIndex(Math.min(Math.max(end, start), current));
 }
 
 export function getSsafyCohortFromEducationStart(year: number, month: number) {
@@ -120,7 +159,7 @@ export type GraduateVerificationSubmission = {
   educationEndMonth: number;
   inferredCohort: number;
   cohortRuleVersion: typeof GRADUATE_COHORT_RULE_VERSION;
-  campus: string | null;
+  campus: GraduateCampus;
 };
 
 type GraduateSubmissionInput = {
@@ -131,7 +170,7 @@ type GraduateSubmissionInput = {
   educationStartMonth: number;
   educationEndYear: number;
   educationEndMonth: number;
-  campus?: string | null;
+  campus?: unknown;
   /** Client display-only value. This is intentionally never trusted. */
   claimedCohort?: unknown;
 };
@@ -173,7 +212,10 @@ export function createGraduateVerificationSubmission(
     return { ok: false, error: "기수를 계산할 수 없는 교육 시작 연·월입니다." };
   }
 
-  const campus = input.campus?.trim() || null;
+  const campus = typeof input.campus === "string" ? input.campus.trim() : "";
+  if (!GRADUATE_CAMPUS_SET.has(campus)) {
+    return { ok: false, error: "캠퍼스를 선택해 주세요." };
+  }
   return {
     ok: true,
     value: {
@@ -187,7 +229,7 @@ export function createGraduateVerificationSubmission(
       educationEndMonth: input.educationEndMonth,
       inferredCohort,
       cohortRuleVersion: GRADUATE_COHORT_RULE_VERSION,
-      campus,
+      campus: campus as GraduateCampus,
     },
   };
 }
@@ -197,6 +239,8 @@ export function validateGraduateEducationPeriod(input: {
   startMonth: number;
   endYear: number;
   endMonth: number;
+  currentYear?: number;
+  currentMonth?: number;
 }) {
   if (!isValidEducationStart(input.startYear, input.startMonth)) {
     return "교육 시작 연·월을 확인해 주세요.";
@@ -204,10 +248,16 @@ export function validateGraduateEducationPeriod(input: {
   if (!Number.isInteger(input.endYear) || !isValidMonth(input.endMonth)) {
     return "교육 종료 연·월을 확인해 주세요.";
   }
-  const start = input.startYear * 12 + input.startMonth;
-  const end = input.endYear * 12 + input.endMonth;
+  const start = toYearMonthIndex(input.startYear, input.startMonth);
+  const end = toYearMonthIndex(input.endYear, input.endMonth);
   if (end < start) {
     return "교육 종료 연·월은 시작 연·월보다 빠를 수 없습니다.";
+  }
+  const current = getGraduateCurrentYearMonth();
+  const currentYear = input.currentYear ?? current.year;
+  const currentMonth = input.currentMonth ?? current.month;
+  if (!isValidMonth(currentMonth) || end > toYearMonthIndex(currentYear, currentMonth)) {
+    return "교육 종료 연·월은 현재 연·월보다 늦을 수 없습니다.";
   }
   return null;
 }

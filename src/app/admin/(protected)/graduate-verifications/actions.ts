@@ -3,10 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
-  approveGraduateProfileImageReplacement,
   approveGraduateVerificationRequest,
   markGraduateVerificationInReview,
-  rejectGraduateProfileImageReplacement,
   rejectGraduateVerificationRequest,
   resendGraduateAccountSetupEmail,
   requestGraduateVerificationResubmission,
@@ -165,51 +163,5 @@ export async function rejectGraduateVerificationAction(formData: FormData) {
       reason: "rejection_failed",
     });
     throw new Error("수료생 인증을 반려하지 못했습니다.");
-  }
-}
-
-export async function approveGraduateProfileImageAction(formData: FormData) {
-  const imageId = getRequiredId(formData, "imageId");
-  const session = await requireAdminPermission("graduate_verifications", "update", {
-    path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
-  });
-  try {
-    await approveGraduateProfileImageReplacement({ imageId, adminId: session.adminId });
-    await logAdminAction("graduate_profile_photo_approve", {
-      targetType: "member_profile_image",
-      targetId: imageId,
-    });
-    revalidateGraduateVerificationPaths();
-  } catch {
-    scheduleAdminActionFailureLog("graduate_profile_photo_approve", {
-      targetType: "member_profile_image",
-      targetId: imageId,
-      reason: "approval_failed",
-    });
-    throw new Error("본인 사진 교체를 승인하지 못했습니다.");
-  }
-}
-
-export async function rejectGraduateProfileImageAction(formData: FormData) {
-  const imageId = getRequiredId(formData, "imageId");
-  const reason = String(formData.get("reason") ?? "");
-  const session = await requireAdminPermission("graduate_verifications", "update", {
-    path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
-  });
-  try {
-    await rejectGraduateProfileImageReplacement({ imageId, adminId: session.adminId, reason });
-    await logAdminAction("graduate_profile_photo_reject", {
-      targetType: "member_profile_image",
-      targetId: imageId,
-      properties: { reasonLength: reason.trim().length },
-    });
-    revalidateGraduateVerificationPaths();
-  } catch {
-    scheduleAdminActionFailureLog("graduate_profile_photo_reject", {
-      targetType: "member_profile_image",
-      targetId: imageId,
-      reason: "rejection_failed",
-    });
-    throw new Error("본인 사진 교체를 반려하지 못했습니다.");
   }
 }

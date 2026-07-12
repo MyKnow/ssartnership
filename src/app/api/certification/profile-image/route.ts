@@ -13,11 +13,19 @@ export async function GET() {
   const supabase = getSupabaseAdminClient();
   const { data: member } = await supabase
     .from("members")
-    .select("active_profile_image_id,must_change_password")
+    .select("active_profile_image_id,must_change_password,profile_photo_review_status")
     .eq("id", session.userId)
     .maybeSingle();
-  const imageId = (member as { active_profile_image_id?: string | null; must_change_password?: boolean | null } | null)?.active_profile_image_id;
-  if (!imageId || member?.must_change_password) {
+  const imageId = (member as {
+    active_profile_image_id?: string | null;
+    must_change_password?: boolean | null;
+    profile_photo_review_status?: string | null;
+  } | null)?.active_profile_image_id;
+  if (
+    !imageId ||
+    member?.must_change_password ||
+    member?.profile_photo_review_status !== "approved"
+  ) {
     return NextResponse.json({ message: "본인 사진을 찾을 수 없습니다." }, { status: 404 });
   }
   const { data: image } = await supabase

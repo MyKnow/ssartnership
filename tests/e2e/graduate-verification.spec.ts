@@ -10,7 +10,11 @@ test.describe("graduate verification application", () => {
     page,
   }) => {
     await page.route("**/api/graduate-verification/email/send", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ expiresInSeconds: 300 }),
+      }),
     );
     await page.route("**/api/graduate-verification/email/verify", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
@@ -47,6 +51,7 @@ test.describe("graduate verification application", () => {
     await page.goto("/auth/signup/graduate");
     await page.getByRole("textbox", { name: "이메일" }).fill("graduate@example.com");
     await page.getByRole("button", { name: "인증 코드 보내기" }).click();
+    await expect(page.getByText(/인증 코드 만료까지 [45]:[0-5]\d 남음/)).toBeVisible();
     await page.getByRole("textbox", { name: "인증 코드" }).fill("123456");
     await page.getByRole("button", { name: "이메일 인증하기" }).click();
 
@@ -56,7 +61,7 @@ test.describe("graduate verification application", () => {
     await page.getByRole("combobox", { name: "교육 시작 월" }).selectOption("1");
     await page.getByRole("textbox", { name: "교육 종료 연도" }).fill("2026");
     await page.getByRole("combobox", { name: "교육 종료 월" }).selectOption("6");
-    await page.getByRole("textbox", { name: /캠퍼스/ }).fill("서울");
+    await page.getByRole("combobox", { name: "캠퍼스" }).selectOption("서울");
     await expect(page.getByText("자동 계산된 15기")).toBeVisible();
     await page.getByRole("button", { name: "파일 제출로 계속" }).click();
 

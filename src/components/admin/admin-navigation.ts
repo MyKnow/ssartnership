@@ -91,9 +91,16 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       {
         href: "/admin/graduate-verifications",
         label: "수료생 인증",
-        description: "수료증과 본인 사진 검토",
+        description: "수료증과 교육 이수 정보 검토",
         iconKey: "shield",
         permission: { resource: "graduate_verifications" },
+      },
+      {
+        href: "/admin/profile-photos",
+        label: "프로필 사진",
+        description: "사진 변경과 기존 사진 점검",
+        iconKey: "users",
+        permission: { resource: "profile_images" },
       },
       {
         href: "/admin/reviews",

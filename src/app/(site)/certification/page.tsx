@@ -117,7 +117,7 @@ export default async function CertificationPage({
             />
             <div className="mt-10 w-full border-t border-border/70 pt-8">
               <CertificationFooterActions
-                canChangeProfilePhoto={Boolean(member.graduate_verified_at)}
+                canChangeProfilePhoto
               />
             </div>
           </div>

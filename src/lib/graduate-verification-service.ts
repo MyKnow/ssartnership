@@ -875,7 +875,7 @@ export async function rejectGraduateVerificationRequest(input: {
   }
 }
 
-export async function approveGraduateProfileImageReplacement(input: {
+export async function approveMemberProfileImageReplacement(input: {
   imageId: string;
   adminId: string;
 }) {
@@ -889,7 +889,7 @@ export async function approveGraduateProfileImageReplacement(input: {
   return data;
 }
 
-export async function rejectGraduateProfileImageReplacement(input: {
+export async function rejectMemberProfileImageReplacement(input: {
   imageId: string;
   adminId: string;
   reason: string;
@@ -898,37 +898,55 @@ export async function rejectGraduateProfileImageReplacement(input: {
   if (!reason || reason.length > 500) {
     throw new Error("반려 사유를 1~500자로 입력해 주세요.");
   }
-  const { data, error } = await getSupabaseAdminClient()
-    .from("member_profile_images")
-    .update({
-      status: "rejected",
-      reviewer_admin_id: input.adminId,
-      review_reason: reason,
-      reviewed_at: new Date().toISOString(),
-      delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    })
-    .eq("id", input.imageId)
-    .is("graduate_verification_request_id", null)
-    .eq("status", "pending")
-    .select("id")
-    .maybeSingle();
-  if (error || !data?.id) {
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "reject_member_profile_image_replacement",
+    {
+      p_image_id: input.imageId,
+      p_admin_id: input.adminId,
+      p_reason: reason,
+    },
+  );
+  if (error || typeof data !== "string") {
     throw new Error("본인 사진 교체 반려를 처리하지 못했습니다.");
   }
+  return data;
 }
 
-export async function submitGraduateProfileImageReplacement(input: {
+export async function rejectMemberActiveProfilePhoto(input: {
+  memberId: string;
+  adminId: string;
+  reason: string;
+}) {
+  const reason = input.reason.trim();
+  if (!reason || reason.length > 500) {
+    throw new Error("반려 사유는 1~500자로 입력해 주세요.");
+  }
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "reject_member_active_profile_photo",
+    {
+      p_member_id: input.memberId,
+      p_admin_id: input.adminId,
+      p_reason: reason,
+    },
+  );
+  if (error || typeof data !== "string") {
+    throw new Error("기존 프로필 사진을 반려하지 못했습니다.");
+  }
+  return data;
+}
+
+export async function submitMemberProfileImageReplacement(input: {
   memberId: string;
   uploadId: string;
 }) {
   const supabase = getSupabaseAdminClient();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id,graduate_verified_at")
+    .select("id")
     .eq("id", input.memberId)
     .maybeSingle();
-  if (memberError || !(member as { graduate_verified_at?: string | null } | null)?.graduate_verified_at) {
-    throw new Error("수료생 인증이 완료된 계정만 본인 사진을 변경할 수 있습니다.");
+  if (memberError || !member?.id) {
+    throw new Error("회원 정보를 확인하지 못했습니다.");
   }
   const upload = await getGraduateMemberProfileReplacementUpload({
     uploadId: input.uploadId,
@@ -949,6 +967,7 @@ export async function submitGraduateProfileImageReplacement(input: {
     requestId: `replacement-${input.memberId}`,
     buffer: image.buffer,
   });
+  let profileImageId: string | null = null;
   try {
     await supabase
       .from("member_profile_images")
@@ -973,9 +992,33 @@ export async function submitGraduateProfileImageReplacement(input: {
       .select("id")
       .single();
     if (error || !data?.id) throw new Error("본인 사진 변경 요청을 저장하지 못했습니다.");
+    profileImageId = data.id;
+    const { error: memberUpdateError } = await supabase
+      .from("members")
+      .update({
+        profile_photo_review_status: "pending",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.memberId);
+    if (memberUpdateError) {
+      throw new Error("사진 변경 검토 상태를 저장하지 못했습니다.");
+    }
     return { imageId: data.id };
   } catch (error) {
+    if (profileImageId) {
+      await supabase
+        .from("member_profile_images")
+        .delete()
+        .eq("id", profileImageId)
+        .eq("status", "pending");
+    }
     await removeGraduateStoredObject("member-profile-images", path).catch(() => undefined);
     throw error;
   }
 }
+
+// Backward-compatible aliases while graduate verification actions move to the
+// dedicated common profile-photo review surface.
+export const approveGraduateProfileImageReplacement = approveMemberProfileImageReplacement;
+export const rejectGraduateProfileImageReplacement = rejectMemberProfileImageReplacement;
+export const submitGraduateProfileImageReplacement = submitMemberProfileImageReplacement;

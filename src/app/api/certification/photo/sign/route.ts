@@ -4,7 +4,6 @@ import {
   isGraduateVerificationBlocked,
   recordGraduateVerificationAttempt,
 } from "@/lib/graduate-verification-rate-limit";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
@@ -22,17 +21,8 @@ export async function POST(request: Request) {
   if (!session?.userId) {
     return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
   }
-  const { data: member } = await getSupabaseAdminClient()
-    .from("members")
-    .select("graduate_verified_at")
-    .eq("id", session.userId)
-    .maybeSingle();
-  if (!(member as { graduate_verified_at?: string | null } | null)?.graduate_verified_at) {
-    return NextResponse.json({ ok: false, message: "수료생 인증이 완료된 계정만 본인 사진을 변경할 수 있습니다." }, { status: 403 });
-  }
-
   const rateLimitContext = {
-    route: "graduate-profile-photo-sign" as const,
+    route: "member-profile-photo-sign" as const,
     accountIdentifier: session.userId,
   };
   if (await isGraduateVerificationBlocked(rateLimitContext)) {
