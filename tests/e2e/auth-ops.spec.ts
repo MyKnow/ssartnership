@@ -51,6 +51,51 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByRole("button", { name: "인증 코드 보내기" })).toBeVisible();
   });
 
+  test("SSAFY Verify popup failures show a generic message and report only safe diagnostics", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.ssafyVerify = {
+        verify: async () => {
+          throw {
+            error_code: "SCOPE_NOT_ALLOWED",
+            request_id: "req_5wVyW3iRc7JLFWi8",
+            phase: "authorize",
+            codeVerifier: "must-not-be-reported",
+          };
+        },
+      };
+    });
+    await page.route("https://verify.myknow.xyz/sdk/ssafy-verify.js", (route) =>
+      route.fulfill({ contentType: "application/javascript", body: "" }),
+    );
+    await page.route("**/api/ssafy/client-failure", (route) =>
+      route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      }),
+    );
+
+    await page.goto("/auth/signup");
+    await page.waitForLoadState("networkidle");
+
+    const reportRequest = page.waitForRequest(
+      (request) => request.url().includes("/api/ssafy/client-failure"),
+    );
+    await page.getByRole("button", { name: "SSAFY Verify로 시작하기" }).click();
+    const report = await reportRequest;
+
+    expect(JSON.parse(report.postData() ?? "{}")).toEqual({
+      purpose: "member-login",
+      errorCode: "SCOPE_NOT_ALLOWED",
+      requestId: "req_5wVyW3iRc7JLFWi8",
+      phase: "authorize",
+    });
+    await expect(
+      page.getByText("SSAFY 인증을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요."),
+    ).toBeVisible();
+    await expect(page.getByText("임시 진단 정보")).toHaveCount(0);
+  });
+
   test("partner login maps safe server validation errors to fields", async ({ page }) => {
     await page.goto("/partner/login?error=invalid_request");
 

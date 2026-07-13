@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import SsafyVerifyDiagnosticDetails from "@/components/auth/SsafyVerifyDiagnosticDetails";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   clearSsafyVerifyRedirectSession,
@@ -15,6 +14,10 @@ import {
   type SsafyVerifyCallbackPayload,
   type SsafyVerifyClientFailure,
 } from "@/lib/ssafy-verify/client-errors";
+import {
+  reportSsafyVerifyClientFailure,
+} from "@/lib/ssafy-verify/client-failure-reporter";
+import type { SsafyVerifyClientFailurePurpose } from "@/lib/ssafy-verify/client-failure-report";
 
 type MemberVerifyResult =
   | {
@@ -104,14 +107,20 @@ export default function SsafyVerifyCallbackRelay() {
     "waiting",
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [diagnostic, setDiagnostic] = useState<SsafyVerifyClientFailure | null>(null);
   const didRelayRef = useRef(false);
 
-  const fail = useCallback((failure: SsafyVerifyClientFailure, message: string) => {
-    setDiagnostic(failure);
-    setErrorMessage(message);
-    setStatus("failed");
-  }, []);
+  const fail = useCallback(
+    (
+      failure: SsafyVerifyClientFailure,
+      message: string,
+      purpose: SsafyVerifyClientFailurePurpose,
+    ) => {
+      setErrorMessage(message);
+      setStatus("failed");
+      reportSsafyVerifyClientFailure({ purpose, failure });
+    },
+    [],
+  );
 
   const relayCallback = useCallback(async () => {
     if (didRelayRef.current) {
@@ -138,6 +147,7 @@ export default function SsafyVerifyCallbackRelay() {
       fail(
         failure,
         getSsafyVerifyClientErrorMessage(failure.errorCode),
+        "member-login",
       );
       return;
     }
@@ -150,7 +160,11 @@ export default function SsafyVerifyCallbackRelay() {
         requestId: callback.request_id,
         phase: "callback",
       });
-      fail(failure, getSsafyVerifyClientErrorMessage(failure.errorCode));
+      fail(
+        failure,
+        getSsafyVerifyClientErrorMessage(failure.errorCode),
+        session.purpose,
+      );
       return;
     }
 
@@ -159,6 +173,7 @@ export default function SsafyVerifyCallbackRelay() {
       fail(
         { ...failure, phase: failure.phase ?? "callback" },
         getSsafyVerifyClientErrorMessage(failure.errorCode),
+        session.purpose,
       );
       return;
     }
@@ -169,7 +184,11 @@ export default function SsafyVerifyCallbackRelay() {
         requestId: callback.request_id,
         phase: "callback",
       });
-      fail(failure, getSsafyVerifyClientErrorMessage(failure.errorCode));
+      fail(
+        failure,
+        getSsafyVerifyClientErrorMessage(failure.errorCode),
+        session.purpose,
+      );
       return;
     }
 
@@ -198,6 +217,7 @@ export default function SsafyVerifyCallbackRelay() {
         fail(
           { ...failure, phase: failure.phase ?? "token-exchange" },
           getResetPasswordErrorMessage(failure.errorCode),
+          "reset-password",
         );
         return;
       }
@@ -208,7 +228,11 @@ export default function SsafyVerifyCallbackRelay() {
           requestId: null,
           phase: "token-exchange",
         });
-        fail(failure, getSsafyVerifyClientErrorMessage(failure.errorCode));
+        fail(
+          failure,
+          getSsafyVerifyClientErrorMessage(failure.errorCode),
+          "reset-password",
+        );
         return;
       }
 
@@ -244,6 +268,7 @@ export default function SsafyVerifyCallbackRelay() {
       fail(
         { ...failure, phase: failure.phase ?? "token-exchange" },
         getMemberVerifyErrorMessage(failure.errorCode),
+        "member-login",
       );
       return;
     }
@@ -290,9 +315,6 @@ export default function SsafyVerifyCallbackRelay() {
         >
           {message}
         </p>
-        {status === "failed" && diagnostic ? (
-          <SsafyVerifyDiagnosticDetails failure={diagnostic} />
-        ) : null}
       </div>
     </main>
   );

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -49,22 +49,41 @@ test("SSAFY Verify uses the same allowed enrollment scopes for popup and redirec
   assert.equal(scopeUsages?.length, 2);
 });
 
-test("SSAFY Verify failures render sanitized temporary diagnostics in popup and redirect paths", () => {
+test("SSAFY Verify failures keep diagnostics in server audit logs without rendering them to users", () => {
   const button = readRepoFile("src/components/auth/SsafyVerifyButton.tsx");
   const relay = readRepoFile("src/components/auth/SsafyVerifyCallbackRelay.tsx");
-  const diagnosticDetails = readRepoFile(
-    "src/components/auth/SsafyVerifyDiagnosticDetails.tsx",
+  const verifyTokenRoute = readRepoFile(
+    "src/app/api/ssafy/verify-token/route.ts",
+  );
+  const failureReporter = readRepoFile(
+    "src/lib/ssafy-verify/client-failure-reporter.ts",
+  );
+  const clientFailureRoute = readRepoFile(
+    "src/app/api/ssafy/client-failure/route.ts",
   );
 
-  assert.match(button, /SsafyVerifyDiagnosticDetails/);
-  assert.match(relay, /SsafyVerifyDiagnosticDetails/);
+  assert.doesNotMatch(button, /SsafyVerifyDiagnosticDetails/);
+  assert.doesNotMatch(relay, /SsafyVerifyDiagnosticDetails/);
   assert.match(button, /normalizeSsafyVerifyClientFailure/);
   assert.match(relay, /normalizeSsafyVerifyClientFailure/);
-  assert.match(diagnosticDetails, /failure\.errorCode/);
-  assert.match(diagnosticDetails, /failure\.phase/);
-  assert.match(diagnosticDetails, /failure\.requestId/);
-  assert.doesNotMatch(diagnosticDetails, /JSON\.stringify/);
-  assert.doesNotMatch(diagnosticDetails, /codeVerifier/);
+  assert.match(button, /reportSsafyVerifyClientFailure/);
+  assert.match(relay, /reportSsafyVerifyClientFailure/);
+  assert.match(button, /<FormMessage variant="error">\{getErrorMessage\(error\)\}<\/FormMessage>/);
+  assert.equal(
+    existsSync(join(repoRoot, "src/components/auth/SsafyVerifyDiagnosticDetails.tsx")),
+    false,
+  );
+  assert.match(verifyTokenRoute, /await logAuthSecurity\(/);
+  assert.match(verifyTokenRoute, /providerRequestId:/);
+  assert.match(verifyTokenRoute, /diagnosticCause:/);
+  assert.doesNotMatch(verifyTokenRoute, /SSAFY_VERIFY_DEBUG_ERRORS/);
+  assert.doesNotMatch(verifyTokenRoute, /debug:\s*\{/);
+  assert.match(failureReporter, /createSsafyVerifyClientFailureReport/);
+  assert.doesNotMatch(failureReporter, /codeVerifier/);
+  assert.match(clientFailureRoute, /isTrustedSameOriginRequest/);
+  assert.match(clientFailureRoute, /consumeProductEventQuota/);
+  assert.match(clientFailureRoute, /logAuthSecurity/);
+  assert.match(clientFailureRoute, /source: "client_failure_report"/);
 });
 
 test("SSAFY callback route is not a user-facing auth start page", () => {
