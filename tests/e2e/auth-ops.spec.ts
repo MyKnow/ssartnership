@@ -27,6 +27,7 @@ test.describe("auth and partner portal operation flows", () => {
 
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
     await page.goto("/auth/signup");
+    await page.waitForLoadState("networkidle");
 
     const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
