@@ -84,6 +84,19 @@ export function normalizeSsafyVerifySdkError(
   };
 }
 
+export function normalizeSsafyVerifyClientFailure(
+  error: unknown,
+): SsafyVerifyClientFailure {
+  const record = isRecord(error) ? error : {};
+
+  return {
+    ok: false,
+    errorCode: normalizeErrorCode(record.errorCode),
+    requestId: normalizeRequestId(record.requestId),
+    phase: normalizePhase(record.phase),
+  };
+}
+
 export function normalizeSsafyVerifyCallbackFailure(
   callback: CallbackFailurePayload,
 ): SsafyVerifyClientFailure {
