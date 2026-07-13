@@ -45,6 +45,46 @@ test("SSAFY Verify SDK errors drop unsafe arbitrary fields", async () => {
   );
 });
 
+test("SSAFY Verify API failures preserve only safe diagnostic fields", async () => {
+  const { normalizeSsafyVerifyClientFailure } = await clientErrorsModulePromise;
+
+  assert.deepEqual(
+    normalizeSsafyVerifyClientFailure({
+      errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
+      requestId: "req_api_123",
+      phase: "token-exchange",
+      message: "provider details must not be rendered directly",
+      code: "authorization-code-must-not-leak",
+      codeVerifier: "pkce-verifier-must-not-leak",
+    }),
+    {
+      ok: false,
+      errorCode: "SSAFY_SIGNUP_PROFILE_UNAVAILABLE",
+      requestId: "req_api_123",
+      phase: "token-exchange",
+    },
+  );
+});
+
+test("SSAFY Verify API failure diagnostics drop malformed public fields", async () => {
+  const { normalizeSsafyVerifyClientFailure } = await clientErrorsModulePromise;
+
+  assert.deepEqual(
+    normalizeSsafyVerifyClientFailure({
+      errorCode: "invalid code with spaces",
+      requestId: "req_123<script>",
+      phase: "token exchange",
+      detail: "raw provider payload must not be rendered",
+    }),
+    {
+      ok: false,
+      errorCode: "VERIFY_POPUP_FAILED",
+      requestId: null,
+      phase: null,
+    },
+  );
+});
+
 test("SSAFY Verify callback failures map to stable client failures", async () => {
   const { normalizeSsafyVerifyCallbackFailure } = await clientErrorsModulePromise;
 

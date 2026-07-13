@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import SsafyVerifyDiagnosticDetails from "@/components/auth/SsafyVerifyDiagnosticDetails";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { cn } from "@/lib/cn";
@@ -14,6 +15,7 @@ import {
 import {
   getSsafyVerifyClientErrorMessage,
   normalizeSsafyVerifyCallbackFailure,
+  normalizeSsafyVerifyClientFailure,
   normalizeSsafyVerifySdkError,
   type SsafyVerifyCallbackPayload,
   type SsafyVerifyClient,
@@ -35,7 +37,6 @@ type VerifyResult =
     }
   | (SsafyVerifyClientFailure & {
       redirectTo?: string;
-      debug?: Record<string, unknown>;
     });
 
 declare global {
@@ -47,7 +48,7 @@ declare global {
 const sdkUrl = "https://verify.myknow.xyz/sdk/ssafy-verify.js";
 const defaultIssuer = "https://verify.myknow.xyz";
 
-function getErrorMessage(result: Extract<VerifyResult, { ok: false }>) {
+function getErrorMessage(result: SsafyVerifyClientFailure) {
   if (result.errorCode === "MEMBER_NOT_FOUND") {
     return "기존 회원 정보와 연결하지 못했습니다. 기존 로그인 후 다시 시도해 주세요.";
   }
@@ -72,10 +73,6 @@ function getErrorMessage(result: Extract<VerifyResult, { ok: false }>) {
   return getSsafyVerifyClientErrorMessage(result.errorCode);
 }
 
-function formatDebugValue(value: unknown) {
-  return JSON.stringify(value, null, 2);
-}
-
 export default function SsafyVerifyButton({
   returnTo,
   label = "SSAFY 인증으로 계속하기",
@@ -86,7 +83,7 @@ export default function SsafyVerifyButton({
   className?: string;
 }) {
   const [status, setStatus] = useState<"idle" | "working" | "failed">("idle");
-  const [error, setError] = useState<Extract<VerifyResult, { ok: false }> | null>(null);
+  const [error, setError] = useState<SsafyVerifyClientFailure | null>(null);
   const router = useRouter();
 
   async function verify() {
@@ -161,11 +158,13 @@ export default function SsafyVerifyButton({
 
     if (callback.iss !== expectedIssuer) {
       setStatus("failed");
-      setError({
-        ok: false,
-        errorCode: "CALLBACK_ISSUER_MISMATCH",
-        requestId: callback.request_id,
-      });
+      setError(
+        normalizeSsafyVerifyClientFailure({
+          errorCode: "CALLBACK_ISSUER_MISMATCH",
+          requestId: callback.request_id,
+          phase: "callback",
+        }),
+      );
       return;
     }
 
@@ -182,7 +181,13 @@ export default function SsafyVerifyButton({
 
     if (!response) {
       setStatus("failed");
-      setError({ ok: false, errorCode: "VERIFY_NETWORK_FAILED", requestId: null });
+      setError(
+        normalizeSsafyVerifyClientFailure({
+          errorCode: "VERIFY_NETWORK_FAILED",
+          requestId: null,
+          phase: "token-exchange",
+        }),
+      );
       return;
     }
 
@@ -192,7 +197,8 @@ export default function SsafyVerifyButton({
     );
 
     if (!result.ok) {
-      if (result.errorCode === "MEMBER_ALREADY_REGISTERED") {
+      const failure = normalizeSsafyVerifyClientFailure(result);
+      if (failure.errorCode === "MEMBER_ALREADY_REGISTERED") {
         sessionStorage.setItem("signup:alreadyRegistered", "1");
         router.replace(
           "redirectTo" in result && result.redirectTo
@@ -202,7 +208,10 @@ export default function SsafyVerifyButton({
         return;
       }
       setStatus("failed");
-      setError(result);
+      setError({
+        ...failure,
+        phase: failure.phase ?? "token-exchange",
+      });
       return;
     }
 
@@ -227,19 +236,10 @@ export default function SsafyVerifyButton({
         {label}
       </Button>
       {error ? (
-        <FormMessage variant="error">
-          {getErrorMessage(error)}
-          {error.debug ? (
-            <details className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-left text-xs leading-5 text-red-950">
-              <summary className="cursor-pointer font-semibold">
-                진단 정보
-              </summary>
-              <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap">
-                {formatDebugValue(error.debug)}
-              </pre>
-            </details>
-          ) : null}
-        </FormMessage>
+        <div className="space-y-2">
+          <FormMessage variant="error">{getErrorMessage(error)}</FormMessage>
+          <SsafyVerifyDiagnosticDetails failure={error} />
+        </div>
       ) : null}
     </div>
   );

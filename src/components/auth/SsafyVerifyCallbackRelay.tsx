@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import SsafyVerifyDiagnosticDetails from "@/components/auth/SsafyVerifyDiagnosticDetails";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   clearSsafyVerifyRedirectSession,
@@ -10,6 +11,7 @@ import {
 import {
   getSsafyVerifyClientErrorMessage,
   normalizeSsafyVerifyCallbackFailure,
+  normalizeSsafyVerifyClientFailure,
   type SsafyVerifyCallbackPayload,
   type SsafyVerifyClientFailure,
 } from "@/lib/ssafy-verify/client-errors";
@@ -102,9 +104,11 @@ export default function SsafyVerifyCallbackRelay() {
     "waiting",
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [diagnostic, setDiagnostic] = useState<SsafyVerifyClientFailure | null>(null);
   const didRelayRef = useRef(false);
 
-  const fail = useCallback((message: string) => {
+  const fail = useCallback((failure: SsafyVerifyClientFailure, message: string) => {
+    setDiagnostic(failure);
     setErrorMessage(message);
     setStatus("failed");
   }, []);
@@ -126,8 +130,14 @@ export default function SsafyVerifyCallbackRelay() {
 
     const session = readSsafyVerifyRedirectSession();
     if (!session) {
+      const failure = normalizeSsafyVerifyClientFailure({
+        errorCode: "SSAFY_VERIFY_REDIRECT_SESSION_MISSING",
+        requestId: null,
+        phase: "redirect-session",
+      });
       fail(
-        getSsafyVerifyClientErrorMessage("SSAFY_VERIFY_REDIRECT_SESSION_MISSING"),
+        failure,
+        getSsafyVerifyClientErrorMessage(failure.errorCode),
       );
       return;
     }
@@ -135,21 +145,31 @@ export default function SsafyVerifyCallbackRelay() {
     clearSsafyVerifyRedirectSession();
 
     if (callback.state !== session.state) {
-      fail(getSsafyVerifyClientErrorMessage("SSAFY_VERIFY_STATE_MISMATCH"));
+      const failure = normalizeSsafyVerifyClientFailure({
+        errorCode: "SSAFY_VERIFY_STATE_MISMATCH",
+        requestId: callback.request_id,
+        phase: "callback",
+      });
+      fail(failure, getSsafyVerifyClientErrorMessage(failure.errorCode));
       return;
     }
 
     if (callback.error || !callback.code) {
+      const failure = normalizeSsafyVerifyCallbackFailure(callback);
       fail(
-        getSsafyVerifyClientErrorMessage(
-          normalizeSsafyVerifyCallbackFailure(callback).errorCode,
-        ),
+        { ...failure, phase: failure.phase ?? "callback" },
+        getSsafyVerifyClientErrorMessage(failure.errorCode),
       );
       return;
     }
 
     if (callback.iss !== defaultIssuer) {
-      fail(getSsafyVerifyClientErrorMessage("CALLBACK_ISSUER_MISMATCH"));
+      const failure = normalizeSsafyVerifyClientFailure({
+        errorCode: "CALLBACK_ISSUER_MISMATCH",
+        requestId: callback.request_id,
+        phase: "callback",
+      });
+      fail(failure, getSsafyVerifyClientErrorMessage(failure.errorCode));
       return;
     }
 
@@ -174,12 +194,21 @@ export default function SsafyVerifyCallbackRelay() {
       });
 
       if (!result.ok) {
-        fail(getResetPasswordErrorMessage(result.errorCode));
+        const failure = normalizeSsafyVerifyClientFailure(result);
+        fail(
+          { ...failure, phase: failure.phase ?? "token-exchange" },
+          getResetPasswordErrorMessage(failure.errorCode),
+        );
         return;
       }
 
       if (!result.resetPath) {
-        fail(getSsafyVerifyClientErrorMessage("VERIFY_RESPONSE_INVALID"));
+        const failure = normalizeSsafyVerifyClientFailure({
+          errorCode: "VERIFY_RESPONSE_INVALID",
+          requestId: null,
+          phase: "token-exchange",
+        });
+        fail(failure, getSsafyVerifyClientErrorMessage(failure.errorCode));
         return;
       }
 
@@ -206,12 +235,16 @@ export default function SsafyVerifyCallbackRelay() {
     });
 
     if (!result.ok) {
-      if (result.errorCode === "MEMBER_ALREADY_REGISTERED") {
+      const failure = normalizeSsafyVerifyClientFailure(result);
+      if (failure.errorCode === "MEMBER_ALREADY_REGISTERED") {
         sessionStorage.setItem("signup:alreadyRegistered", "1");
         window.location.replace(result.redirectTo ?? "/auth/login");
         return;
       }
-      fail(getMemberVerifyErrorMessage(result.errorCode));
+      fail(
+        { ...failure, phase: failure.phase ?? "token-exchange" },
+        getMemberVerifyErrorMessage(failure.errorCode),
+      );
       return;
     }
 
@@ -248,13 +281,19 @@ export default function SsafyVerifyCallbackRelay() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6 py-10">
-      <p
-        className={`text-center text-sm font-medium ${
-          status === "failed" ? "text-red-600" : "text-muted-foreground"
-        }`}
-      >
-        {message}
-      </p>
+      <div className="w-full max-w-md space-y-3">
+        <p
+          className={`text-center text-sm font-medium ${
+            status === "failed" ? "text-red-600" : "text-muted-foreground"
+          }`}
+          role={status === "failed" ? "alert" : undefined}
+        >
+          {message}
+        </p>
+        {status === "failed" && diagnostic ? (
+          <SsafyVerifyDiagnosticDetails failure={diagnostic} />
+        ) : null}
+      </div>
     </main>
   );
 }
