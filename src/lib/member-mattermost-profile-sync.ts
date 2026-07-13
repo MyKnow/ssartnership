@@ -21,11 +21,8 @@ type MemberMattermostSyncRow = {
   display_name: string | null;
   campus: string | null;
   generation: number | null;
-  year: number | null;
   active_profile_image_id: string | null;
   mattermost_account_id: string | null;
-  mm_user_id: string | null;
-  mm_username: string | null;
 };
 
 type MattermostDirectoryRow = {
@@ -81,25 +78,15 @@ export function decodeMattermostProfileImageData(
 }
 
 async function loadMattermostDirectory(member: MemberMattermostSyncRow) {
-  const supabase = getSupabaseAdminClient();
-  if (member.mattermost_account_id) {
-    const { data } = await supabase
-      .from("mm_user_directory")
-      .select("id,mm_user_id,mm_username")
-      .eq("id", member.mattermost_account_id)
-      .maybeSingle();
-    if (data?.id) {
-      return data as MattermostDirectoryRow;
-    }
-  }
-
-  if (!member.mm_user_id) {
+  if (!member.mattermost_account_id) {
     return null;
   }
+
+  const supabase = getSupabaseAdminClient();
   const { data } = await supabase
     .from("mm_user_directory")
     .select("id,mm_user_id,mm_username")
-    .eq("mm_user_id", member.mm_user_id)
+    .eq("id", member.mattermost_account_id)
     .maybeSingle();
   return (data as MattermostDirectoryRow | null) ?? null;
 }
@@ -156,7 +143,9 @@ export async function syncMemberMattermostProfile(memberId: string): Promise<Mat
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
-    .select("id,display_name,campus,generation,year,active_profile_image_id,mattermost_account_id,mm_user_id,mm_username")
+    .select(
+      "id,display_name,campus,generation,active_profile_image_id,mattermost_account_id",
+    )
     .eq("id", memberId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -166,17 +155,16 @@ export async function syncMemberMattermostProfile(memberId: string): Promise<Mat
 
   const member = data as MemberMattermostSyncRow;
   const linkedDirectory = await loadMattermostDirectory(member);
-  const mmUserId = linkedDirectory?.mm_user_id ?? member.mm_user_id;
-  if (!mmUserId) {
+  if (!linkedDirectory?.mm_user_id) {
     return null;
   }
 
-  const snapshot = await fetchMemberSnapshotByUserId(mmUserId);
+  const snapshot = await fetchMemberSnapshotByUserId(linkedDirectory.mm_user_id);
   if (!snapshot) {
     return null;
   }
 
-  const generation = member.generation ?? member.year;
+  const generation = member.generation;
   await upsertMmUserDirectorySnapshot({
     mmUserId: snapshot.mmUserId,
     mmUsername: snapshot.mmUsername,
@@ -194,7 +182,7 @@ export async function syncMemberMattermostProfile(memberId: string): Promise<Mat
     {
       displayName: member.display_name,
       campus: member.campus,
-      mmUsername: linkedDirectory?.mm_username ?? member.mm_username,
+      mmUsername: linkedDirectory.mm_username,
     },
     {
       displayName: snapshot.displayName,
@@ -249,10 +237,6 @@ export async function syncMemberMattermostProfile(memberId: string): Promise<Mat
   const memberUpdate = {
     ...patch.member,
     mattermost_account_id: refreshedDirectory.id,
-    // Compatibility fields are written until the contract migration removes
-    // legacy MM columns after the deployed readers have switched.
-    mm_user_id: snapshot.mmUserId,
-    mm_username: snapshot.mmUsername,
     ...(activeProfileImageId
       ? {
           active_profile_image_id: activeProfileImageId,

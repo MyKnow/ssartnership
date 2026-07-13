@@ -110,3 +110,16 @@ test("마케팅 수신 상태는 contract 전에 push preference로 보존한다
   );
   assert.match(migration, /on conflict \(member_id\) do update/);
 });
+
+test("명시적 Mattermost 프로필 동기화는 디렉터리 FK와 이미지 ledger만 갱신한다", () => {
+  const profileSync = readRepoFile(
+    "src/lib/member-mattermost-profile-sync.ts",
+  );
+
+  assert.match(profileSync, /mattermost_account_id/);
+  assert.match(profileSync, /\.from\("member_profile_images"\)/);
+  assert.doesNotMatch(
+    profileSync,
+    /member\.year|member\.mm_user_id|member\.mm_username|Compatibility fields/,
+  );
+});
