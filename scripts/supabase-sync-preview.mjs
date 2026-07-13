@@ -7,12 +7,15 @@ import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
 import {
   formatStorageError,
+  isPreviewRedactedStorageBucket,
+  isPreviewRedactedStoragePath,
   runStorageOperation,
 } from "./supabase-sync-preview-storage.mjs";
 import { isMissingSupabasePoolerTenantErrorMessage } from "./supabase-db-health-lib.mjs";
 import {
   hashPreviewSeedPassword,
   isValidPreviewSeedPassword,
+  resolvePreviewMemberCredentialSeedTarget,
   resolvePreviewMemberCredentialSeedConfig,
 } from "./preview-credential-seed-lib.mjs";
 import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
@@ -295,6 +298,18 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
     );
   }
 
+  if (stats.memberProfileImageRowsSkipped > 0) {
+    console.log(
+      [
+        "Preview sync member profile image sanitization:",
+        `memberProfileImageCopyBlocksSeen=${stats.memberProfileImageCopyBlocksSeen}`,
+        `memberProfileImageCopyBlocksSkipped=${stats.memberProfileImageCopyBlocksSkipped}`,
+        `memberProfileImageRowsSkipped=${stats.memberProfileImageRowsSkipped}`,
+        "production member profile photos are intentionally not restored to preview.",
+      ].join(" "),
+    );
+  }
+
   if (stats.partnerCopyBlocksSeen > 0) {
     console.log(
       [
@@ -427,21 +442,35 @@ async function seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey) {
   }
 
   const previewClient = createStorageClient(previewUrl, previewServiceRoleKey);
-  const { data: member, error: findError } = await previewClient
-    .from("members")
-    .select("id,mm_username")
-    .eq("mm_username", seedConfig.username)
-    .maybeSingle();
-
-  if (findError) {
-    throw findError;
-  }
-
-  if (!member?.id) {
-    throw new Error(
-      `Preview test member "${seedConfig.username}" was not found after sync.`,
-    );
-  }
+  const member = await resolvePreviewMemberCredentialSeedTarget(
+    {
+      async findDirectoryByUsername(username) {
+        const { data, error } = await previewClient
+          .from("mm_user_directory")
+          .select("id")
+          .eq("mm_username", username)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (error) {
+          throw error;
+        }
+        return data;
+      },
+      async findActiveMemberByMattermostAccountId(directoryId) {
+        const { data, error } = await previewClient
+          .from("members")
+          .select("id")
+          .eq("mattermost_account_id", directoryId)
+          .is("deleted_at", null)
+          .maybeSingle();
+        if (error) {
+          throw error;
+        }
+        return data;
+      },
+    },
+    seedConfig.username,
+  );
 
   const passwordRecord = hashPreviewSeedPassword(seedConfig.password);
   const updatedAt = new Date().toISOString();
@@ -590,6 +619,9 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
     for (const entry of entries) {
       const objectPath = joinStoragePath(prefix, entry.name);
+      if (isPreviewRedactedStoragePath(bucketName, objectPath)) {
+        continue;
+      }
       if (isFolderEntry(entry)) {
         await syncBucketPrefix(prodClient, previewClient, bucketName, objectPath);
         continue;
@@ -639,7 +671,9 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 async function removePreviewOnlyObjects(prodClient, previewClient, bucketName) {
   const sourcePaths = await collectBucketFilePaths(prodClient, bucketName);
   const previewPaths = await collectBucketFilePaths(previewClient, bucketName);
-  const extraPaths = [...previewPaths].filter((path) => !sourcePaths.has(path));
+  const extraPaths = [...previewPaths].filter(
+    (path) => isPreviewRedactedStoragePath(bucketName, path) || !sourcePaths.has(path),
+  );
 
   if (extraPaths.length === 0) {
     return;
@@ -663,10 +697,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       prodClient.storage.listBuckets(),
     );
   } catch (error) {
-    console.warn(
-      `Skipping storage sync because production buckets could not be listed: ${formatStorageError(error)}`,
+    throw new Error(
+      `Production storage buckets could not be listed: ${formatStorageError(error)}`,
     );
-    return;
   }
 
   const buckets = prodBuckets ?? [];
@@ -681,10 +714,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       previewClient.storage.listBuckets(),
     );
   } catch (error) {
-    console.warn(
-      `Skipping storage sync because preview buckets could not be listed: ${formatStorageError(error)}`,
+    throw new Error(
+      `Preview storage buckets could not be listed: ${formatStorageError(error)}`,
     );
-    return;
   }
 
   const previewBucketsByName = new Map(
@@ -709,11 +741,19 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       try {
         await removePreviewOnlyObjects(prodClient, previewClient, bucketName);
       } catch (error) {
+        if (isPreviewRedactedStorageBucket(bucketName)) {
+          throw error;
+        }
         console.warn(
           `Skipping stale-object cleanup for ${bucketName}: ${formatStorageError(error)}`,
         );
       }
     } catch (error) {
+      if (isPreviewRedactedStorageBucket(bucketName)) {
+        throw new Error(
+          `Preview member profile image storage could not be sanitized: ${formatStorageError(error)}`,
+        );
+      }
       console.warn(`Skipping bucket ${bucketName} after storage sync failure: ${formatStorageError(error)}`);
     }
   }
@@ -779,7 +819,24 @@ async function main() {
   }
 }
 
+function formatSyncFailure(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (!error || typeof error !== "object") {
+    return String(error);
+  }
+
+  const message = typeof error.message === "string" ? error.message.trim() : "";
+  const code = typeof error.code === "string" ? error.code.trim() : "";
+  const hint = typeof error.hint === "string" ? error.hint.trim() : "";
+  const labels = [message || "Preview sync failed", code && `[${code}]`, hint && `hint: ${hint}`]
+    .filter(Boolean)
+    .join(" ");
+  return labels;
+}
+
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(formatSyncFailure(error));
   process.exit(1);
 });

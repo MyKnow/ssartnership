@@ -48,3 +48,31 @@ export function hashPreviewSeedPassword(password) {
 
   return { hash, salt };
 }
+
+/**
+ * Resolves the Preview test-account target through the canonical Mattermost
+ * directory relation. `members.mm_username` is a retired mirror column.
+ *
+ * @param {{
+ *   findDirectoryByUsername: (username: string) => Promise<{ id?: string | null } | null>,
+ *   findActiveMemberByMattermostAccountId: (directoryId: string) => Promise<{ id?: string | null } | null>,
+ * }} repository
+ * @param {string} username
+ */
+export async function resolvePreviewMemberCredentialSeedTarget(repository, username) {
+  const directory = await repository.findDirectoryByUsername(username);
+  if (!directory?.id) {
+    throw new Error(
+      `Preview test member "${username}" has no active Mattermost directory entry after sync.`,
+    );
+  }
+
+  const member = await repository.findActiveMemberByMattermostAccountId(directory.id);
+  if (!member?.id) {
+    throw new Error(
+      `Preview test member "${username}" is not linked to an active member after sync.`,
+    );
+  }
+
+  return member;
+}

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   hashPreviewSeedPassword,
   isValidPreviewSeedPassword,
+  resolvePreviewMemberCredentialSeedTarget,
   resolvePreviewMemberCredentialSeedConfig,
 } from "../scripts/preview-credential-seed-lib.mjs";
 
@@ -55,4 +56,45 @@ test("preview credential seed hash creates pbkdf2-shaped values", () => {
   assert.match(first.hash, /^[a-f0-9]{128}$/);
   assert.notEqual(first.salt, second.salt);
   assert.notEqual(first.hash, second.hash);
+});
+
+test("preview credential seed resolves a member through the canonical Mattermost directory relation", async () => {
+  const directoryLookups: string[] = [];
+  const memberLookups: string[] = [];
+
+  const member = await resolvePreviewMemberCredentialSeedTarget(
+    {
+      async findDirectoryByUsername(username) {
+        directoryLookups.push(username);
+        return { id: "directory-1" };
+      },
+      async findActiveMemberByMattermostAccountId(directoryId) {
+        memberLookups.push(directoryId);
+        return { id: "member-1" };
+      },
+    },
+    "ssafy15",
+  );
+
+  assert.deepEqual(member, { id: "member-1" });
+  assert.deepEqual(directoryLookups, ["ssafy15"]);
+  assert.deepEqual(memberLookups, ["directory-1"]);
+});
+
+test("preview credential seed rejects a directory entry that is not linked to an active member", async () => {
+  await assert.rejects(
+    () =>
+      resolvePreviewMemberCredentialSeedTarget(
+        {
+          async findDirectoryByUsername() {
+            return { id: "directory-1" };
+          },
+          async findActiveMemberByMattermostAccountId() {
+            return null;
+          },
+        },
+        "ssafy15",
+      ),
+    /is not linked to an active member after sync/,
+  );
 });
