@@ -83,9 +83,18 @@ export function assertSupabaseProjectRef({ supabaseUrl, projectRef }) {
   }
 }
 
-export function resolveLegacyMemberAvatarKind({ avatarBase64, avatarUrl }) {
-  if (readNonEmptyString(avatarBase64)) return "base64";
-  if (readNonEmptyString(avatarUrl)) return "url";
+export function resolveLegacyMemberAvatarKind({
+  avatarBase64,
+  avatarUrl,
+  avatar_base64: avatarBase64FromDatabase,
+  avatar_url: avatarUrlFromDatabase,
+}) {
+  const base64 =
+    readNonEmptyString(avatarBase64) ?? readNonEmptyString(avatarBase64FromDatabase);
+  const url = readNonEmptyString(avatarUrl) ?? readNonEmptyString(avatarUrlFromDatabase);
+
+  if (base64) return "base64";
+  if (url) return "url";
   return null;
 }
 

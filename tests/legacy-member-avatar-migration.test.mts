@@ -102,6 +102,13 @@ test("기존 아바타 대상과 Storage 경로는 결정적이고 검증 가능
   );
   assert.equal(
     migrationLib.resolveLegacyMemberAvatarKind({
+      avatar_base64: "YWJj",
+      avatar_url: null,
+    }),
+    "base64",
+  );
+  assert.equal(
+    migrationLib.resolveLegacyMemberAvatarKind({
       avatarBase64: "  ",
       avatarUrl: "  ",
     }),
