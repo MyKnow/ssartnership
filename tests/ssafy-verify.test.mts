@@ -325,6 +325,256 @@ test("SSAFY Verify signup payload maps staff to the staff year with source year"
   assert.equal(payload.marketing_policy_consented_at, null);
 });
 
+test("SSAFY Verify signup payload does not store staff cohort 0 as a source year", async () => {
+  const { buildSsafySignupMemberInsertPayload } = await signupModulePromise;
+  const payload = buildSsafySignupMemberInsertPayload({
+    session: {
+      sub: "staff-zero-subject",
+      mattermostUserId: "staff.zero",
+      mattermostUsername: "staff.zero",
+      displayName: "운영진",
+      cohort: 0,
+      campus: "서울",
+      isStaff: true,
+      sourceYears: [0],
+      track: null,
+      trackName: null,
+      avatarUrl: null,
+      authTime: 1_781_740_800,
+      verificationId: "verification-id",
+      scope: "ssafy.verify ssafy.affiliation ssafy.role ssafy.mattermost_id",
+    },
+    passwordRecord: { hash: "password-hash", salt: "password-salt" },
+    activePolicies: {
+      service: { id: "service-policy", version: 2 },
+      privacy: { id: "privacy-policy", version: 3 },
+    },
+    marketingPolicy: null,
+    marketingPolicyChecked: false,
+    agreedAt: "2026-06-22T02:00:00.000Z",
+  });
+
+  assert.equal(payload.year, 0);
+  assert.equal(payload.staff_source_year, null);
+});
+
+test("SSAFY Verify signup profile uses the stable subject lookup for staff cohort 0", async () => {
+  const originalEnv = {
+    issuer: process.env.SSAFY_VERIFY_ISSUER,
+    serverClientId: process.env.SSAFY_VERIFY_SERVER_CLIENT_ID,
+    serverClientSecret: process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET,
+    apiBaseUrl: process.env.SSAFY_VERIFY_SERVER_API_BASE_URL,
+  };
+  const originalFetch = globalThis.fetch;
+
+  try {
+    process.env.SSAFY_VERIFY_ISSUER = "https://verify.example.com";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = "server-api-client";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = "server-secret";
+    process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = "https://verify.example.com/v1";
+
+    const requestedUrls: string[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      requestedUrls.push(url);
+      if (url === "https://verify.example.com/v1/server/token") {
+        return new Response(
+          JSON.stringify({
+            access_token: "access-token-1",
+            token_type: "Bearer",
+            expires_in: 600,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+
+      assert.equal(
+        url,
+        "https://verify.example.com/v1/ssafy-members/pairwise-subject/profile",
+      );
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            sub: "pairwise-subject",
+            ssafy_mattermost_user_id: "staff.zero",
+            username: "staff.zero",
+            name: "운영진",
+            ssafy_cohort: "0",
+            ssafy_campus: "서울",
+            ssafy_is_staff: true,
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    const { resolveSsafySignupProfile } = await signupProfileModulePromise;
+    const result = await resolveSsafySignupProfile({
+      claims: {
+        sub: "pairwise-subject",
+        verified: true,
+        authTime: 1_781_740_800,
+        cohort: "0",
+        campus: "서울",
+        region: "서울",
+        track: null,
+        trackName: null,
+        name: "운영진",
+        picture: null,
+        role: "admin",
+        roleName: "운영진",
+        teamCode: null,
+        isStaff: true,
+        mattermostUserId: "staff.zero",
+      },
+      verificationId: "verification-id",
+      scope: "ssafy.verify ssafy.affiliation ssafy.role ssafy.mattermost_id",
+    });
+
+    assert.deepEqual(result, {
+      ok: true,
+      session: {
+        sub: "pairwise-subject",
+        mattermostUserId: "staff.zero",
+        mattermostUsername: "staff.zero",
+        displayName: "운영진",
+        cohort: 0,
+        campus: "서울",
+        isStaff: true,
+        sourceYears: [0],
+        track: null,
+        trackName: null,
+        avatarUrl: null,
+        authTime: 1_781_740_800,
+        verificationId: "verification-id",
+        scope: "ssafy.verify ssafy.affiliation ssafy.role ssafy.mattermost_id",
+      },
+    });
+    assert.deepEqual(requestedUrls, [
+      "https://verify.example.com/v1/server/token",
+      "https://verify.example.com/v1/ssafy-members/pairwise-subject/profile",
+    ]);
+  } finally {
+    if (originalEnv.issuer === undefined) delete process.env.SSAFY_VERIFY_ISSUER;
+    else process.env.SSAFY_VERIFY_ISSUER = originalEnv.issuer;
+    if (originalEnv.serverClientId === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_ID;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = originalEnv.serverClientId;
+    if (originalEnv.serverClientSecret === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = originalEnv.serverClientSecret;
+    if (originalEnv.apiBaseUrl === undefined) delete process.env.SSAFY_VERIFY_SERVER_API_BASE_URL;
+    else process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = originalEnv.apiBaseUrl;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("SSAFY Verify signup profile falls back to Mattermost id when subject profile is unavailable", async () => {
+  const originalEnv = {
+    issuer: process.env.SSAFY_VERIFY_ISSUER,
+    serverClientId: process.env.SSAFY_VERIFY_SERVER_CLIENT_ID,
+    serverClientSecret: process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET,
+    apiBaseUrl: process.env.SSAFY_VERIFY_SERVER_API_BASE_URL,
+  };
+  const originalFetch = globalThis.fetch;
+
+  try {
+    process.env.SSAFY_VERIFY_ISSUER = "https://verify.example.com";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = "server-api-client";
+    process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = "server-secret";
+    process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = "https://verify.example.com/v1";
+
+    const requestedUrls: string[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      requestedUrls.push(url);
+      if (url === "https://verify.example.com/v1/server/token") {
+        return new Response(
+          JSON.stringify({
+            access_token: "access-token-1",
+            token_type: "Bearer",
+            expires_in: 600,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url === "https://verify.example.com/v1/ssafy-members/pairwise-subject/profile") {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            error: {
+              code: "PROFILE_NOT_FOUND",
+              message: "프로필을 찾을 수 없습니다.",
+              request_id: "icn1::profile-sub-404",
+            },
+          }),
+          { status: 404, headers: { "content-type": "application/json" } },
+        );
+      }
+
+      assert.equal(
+        url,
+        "https://verify.example.com/v1/mattermost-users/staff.zero/profile",
+      );
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: {
+            sub: "pairwise-subject",
+            ssafy_mattermost_user_id: "staff.zero",
+            username: "staff.zero",
+            name: "운영진",
+            ssafy_cohort: "0",
+            ssafy_campus: "서울",
+            ssafy_is_staff: true,
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    const { resolveSsafySignupProfile } = await signupProfileModulePromise;
+    const result = await resolveSsafySignupProfile({
+      claims: {
+        sub: "pairwise-subject",
+        verified: true,
+        authTime: 1_781_740_800,
+        cohort: "0",
+        campus: "서울",
+        region: "서울",
+        track: null,
+        trackName: null,
+        name: "운영진",
+        picture: null,
+        role: "admin",
+        roleName: "운영진",
+        teamCode: null,
+        isStaff: true,
+        mattermostUserId: "staff.zero",
+      },
+      verificationId: "verification-id",
+      scope: "ssafy.verify ssafy.affiliation ssafy.role ssafy.mattermost_id",
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(requestedUrls, [
+      "https://verify.example.com/v1/server/token",
+      "https://verify.example.com/v1/ssafy-members/pairwise-subject/profile",
+      "https://verify.example.com/v1/server/token",
+      "https://verify.example.com/v1/mattermost-users/staff.zero/profile",
+    ]);
+  } finally {
+    if (originalEnv.issuer === undefined) delete process.env.SSAFY_VERIFY_ISSUER;
+    else process.env.SSAFY_VERIFY_ISSUER = originalEnv.issuer;
+    if (originalEnv.serverClientId === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_ID;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = originalEnv.serverClientId;
+    if (originalEnv.serverClientSecret === undefined) delete process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET;
+    else process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = originalEnv.serverClientSecret;
+    if (originalEnv.apiBaseUrl === undefined) delete process.env.SSAFY_VERIFY_SERVER_API_BASE_URL;
+    else process.env.SSAFY_VERIFY_SERVER_API_BASE_URL = originalEnv.apiBaseUrl;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("SSAFY Verify signup profile maps missing Verify profile to a specific error", async () => {
   const originalEnv = {
     issuer: process.env.SSAFY_VERIFY_ISSUER,

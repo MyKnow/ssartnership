@@ -3,6 +3,7 @@ import { getSsafyVerifyServerApiConfig } from "./config";
 import type { SsafyVerificationClaims } from "./claims";
 import {
   createSsafyVerifyServerApiClient,
+  isValidMattermostId,
   SsafyVerifyServerApiError,
 } from "./server-api";
 import type { SsafyVerifyApiTraceHandler } from "./api-trace";
@@ -51,6 +52,34 @@ function sourceYearsFromClaims(claims: SsafyVerificationClaims) {
   return cohort === null ? [] : [cohort];
 }
 
+function uniqueSortedYears(values: Iterable<number | null | undefined>) {
+  return Array.from(
+    new Set(
+      Array.from(values).filter(
+        (value): value is number =>
+          typeof value === "number" &&
+          Number.isInteger(value) &&
+          value >= 0 &&
+          value <= 99,
+      ),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+type SsafySignupProfileLookup = "mattermost_user_id" | "sub";
+
+function getProfileLookupOrder(claims: SsafyVerificationClaims) {
+  if (!claims.mattermostUserId) {
+    return ["sub"] as const satisfies readonly SsafySignupProfileLookup[];
+  }
+
+  if (!isValidMattermostId(claims.mattermostUserId)) {
+    return ["mattermost_user_id"] as const satisfies readonly SsafySignupProfileLookup[];
+  }
+
+  return ["sub", "mattermost_user_id"] as const satisfies readonly SsafySignupProfileLookup[];
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -87,16 +116,48 @@ export async function resolveSsafySignupProfile(input: {
   scope: string | null;
   trace?: SsafyVerifyApiTraceHandler | null;
 }): Promise<SsafySignupProfileResult> {
-  const lookup = input.claims.mattermostUserId ? "mattermost_user_id" : "sub";
+  const lookupOrder = getProfileLookupOrder(input.claims);
+  let lookup: SsafySignupProfileLookup = lookupOrder[0];
 
   try {
     const client = createSsafyVerifyServerApiClient(
       getSsafyVerifyServerApiConfig(),
       { trace: input.trace ?? null },
     );
-    const payload = input.claims.mattermostUserId
-      ? await client.getMattermostUserProfile(input.claims.mattermostUserId)
-      : await client.getSsafyMemberProfile(input.claims.sub);
+    let payload: unknown;
+    let loaded = false;
+    let profileNotFound: SsafyVerifyServerApiError | null = null;
+
+    for (const [index, candidate] of lookupOrder.entries()) {
+      lookup = candidate;
+      try {
+        if (candidate === "mattermost_user_id") {
+          const mattermostUserId = input.claims.mattermostUserId;
+          if (!mattermostUserId) {
+            throw new Error("Mattermost user id is required for this lookup.");
+          }
+          payload = await client.getMattermostUserProfile(mattermostUserId);
+        } else {
+          payload = await client.getSsafyMemberProfile(input.claims.sub);
+        }
+        loaded = true;
+        break;
+      } catch (error) {
+        const isProfileNotFound =
+          error instanceof SsafyVerifyServerApiError &&
+          error.status === 404 &&
+          error.errorCode === "PROFILE_NOT_FOUND";
+        if (!isProfileNotFound || index === lookupOrder.length - 1) {
+          throw error;
+        }
+        profileNotFound = error;
+      }
+    }
+
+    if (!loaded) {
+      throw profileNotFound ?? new Error("SSAFY Verify profile lookup failed.");
+    }
+
     const profiles = extractSsafyVerifyMemberProfiles(payload);
     const profile =
       profiles.find(
@@ -139,12 +200,13 @@ export async function resolveSsafySignupProfile(input: {
       };
     }
 
-    const sourceYears =
-      profile.sourceYears.length > 0
-        ? profile.sourceYears
-        : sourceYearsFromClaims(input.claims);
+    const sourceYears = uniqueSortedYears([
+      ...profile.sourceYears,
+      ...sourceYearsFromClaims(input.claims),
+    ]);
     const cohort = profile.cohort ?? parseCohort(input.claims.cohort);
-    const year = profile.isStaff ? 0 : cohort ?? sourceYears.find((item) => item > 0);
+    const isStaff = profile.isStaff || input.claims.isStaff === true || cohort === 0;
+    const year = isStaff ? 0 : cohort ?? sourceYears.find((item) => item > 0);
     if (typeof year !== "number" || !getSignupSsafyYears().includes(year)) {
       return {
         ok: false,
@@ -169,7 +231,7 @@ export async function resolveSsafySignupProfile(input: {
         displayName: profile.displayName,
         cohort,
         campus: profile.campus ?? input.claims.campus,
-        isStaff: profile.isStaff,
+        isStaff,
         sourceYears,
         track: profile.track ?? input.claims.track,
         trackName: profile.trackName ?? input.claims.trackName,

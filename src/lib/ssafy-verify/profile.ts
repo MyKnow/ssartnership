@@ -224,7 +224,10 @@ export function normalizeSsafyVerifyMemberProfile(
   const explicitStaff = readBoolean(input, ["ssafy_is_staff", "is_staff", "isStaff"]);
   const roleIndicatesStaff =
     role === "staff" || role === "admin" || role === "operator";
-  const isStaff = explicitStaff ?? roleIndicatesStaff;
+  const isStaff =
+    explicitStaff === true ||
+    roleIndicatesStaff ||
+    cohort === SSAFY_STAFF_YEAR;
   const sourceYears = uniqueSortedYears([
     ...readSourceYears(input),
     cohort,
