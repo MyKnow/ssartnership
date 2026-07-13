@@ -49,7 +49,6 @@ const sensitiveTables = [
   "admin_permission_templates",
   "admin_audit_logs",
   "auth_security_logs",
-  "member_auth_identities",
   "graduate_verification_requests",
   "member_profile_images",
   "graduate_email_challenges",

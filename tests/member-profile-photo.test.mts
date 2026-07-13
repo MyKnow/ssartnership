@@ -44,16 +44,20 @@ test("사진 상태는 사용자에게 필요한 다음 행동만 노출한다",
   });
 });
 
-test("회원 사진 상태와 전용 관리자 권한은 스키마에 강제된다", async () => {
+test("회원 사진 상태는 canonical ledger와 단일 승인 이미지 제약으로 강제된다", async () => {
   const schema = await readFile(schemaPath, "utf8");
 
   assert.match(
     schema,
-    /add column if not exists profile_photo_review_status text not null default 'approved'/i,
+    /member_profile_images_one_approved_per_member_idx/i,
   );
   assert.match(
     schema,
-    /profile_photo_review_status in \('approved', 'pending', 'rejected'\)/i,
+    /drop column if exists profile_photo_review_status/i,
+  );
+  assert.match(
+    schema,
+    /old\.status = 'approved' and new\.status in \('superseded', 'rejected'\)/i,
   );
   assert.match(
     schema,
