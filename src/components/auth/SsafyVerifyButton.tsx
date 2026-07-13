@@ -3,7 +3,6 @@
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import SsafyVerifyDiagnosticDetails from "@/components/auth/SsafyVerifyDiagnosticDetails";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { cn } from "@/lib/cn";
@@ -21,6 +20,7 @@ import {
   type SsafyVerifyClient,
   type SsafyVerifyClientFailure,
 } from "@/lib/ssafy-verify/client-errors";
+import { reportSsafyVerifyClientFailure } from "@/lib/ssafy-verify/client-failure-reporter";
 import { buildSsafyVerifyRedirectUri } from "@/lib/ssafy-verify/redirect";
 import { SSAFY_VERIFY_PROFILE_SCOPES } from "@/lib/ssafy-verify/scopes";
 
@@ -86,6 +86,15 @@ export default function SsafyVerifyButton({
   const [error, setError] = useState<SsafyVerifyClientFailure | null>(null);
   const router = useRouter();
 
+  function showFailure(failure: SsafyVerifyClientFailure) {
+    setStatus("failed");
+    setError(failure);
+    reportSsafyVerifyClientFailure({
+      purpose: "member-login",
+      failure,
+    });
+  }
+
   async function verify() {
     if (status === "working") {
       return;
@@ -109,8 +118,7 @@ export default function SsafyVerifyButton({
       try {
         await startSsafyVerifyRedirectFlow(redirectFlowOptions);
       } catch (redirectError) {
-        setStatus("failed");
-        setError(normalizeSsafyVerifySdkError(redirectError));
+        showFailure(normalizeSsafyVerifySdkError(redirectError));
       }
     }
 
@@ -145,20 +153,17 @@ export default function SsafyVerifyButton({
         await startRedirectFlow();
         return;
       }
-      setStatus("failed");
-      setError(normalizedError);
+      showFailure(normalizedError);
       return;
     }
 
     if (callback.error || !callback.code) {
-      setStatus("failed");
-      setError(normalizeSsafyVerifyCallbackFailure(callback));
+      showFailure(normalizeSsafyVerifyCallbackFailure(callback));
       return;
     }
 
     if (callback.iss !== expectedIssuer) {
-      setStatus("failed");
-      setError(
+      showFailure(
         normalizeSsafyVerifyClientFailure({
           errorCode: "CALLBACK_ISSUER_MISMATCH",
           requestId: callback.request_id,
@@ -180,8 +185,7 @@ export default function SsafyVerifyButton({
     }).then((value) => value, () => null);
 
     if (!response) {
-      setStatus("failed");
-      setError(
+      showFailure(
         normalizeSsafyVerifyClientFailure({
           errorCode: "VERIFY_NETWORK_FAILED",
           requestId: null,
@@ -207,8 +211,7 @@ export default function SsafyVerifyButton({
         );
         return;
       }
-      setStatus("failed");
-      setError({
+      showFailure({
         ...failure,
         phase: failure.phase ?? "token-exchange",
       });
@@ -236,10 +239,7 @@ export default function SsafyVerifyButton({
         {label}
       </Button>
       {error ? (
-        <div className="space-y-2">
-          <FormMessage variant="error">{getErrorMessage(error)}</FormMessage>
-          <SsafyVerifyDiagnosticDetails failure={error} />
-        </div>
+        <FormMessage variant="error">{getErrorMessage(error)}</FormMessage>
       ) : null}
     </div>
   );
