@@ -1,76 +1,62 @@
+import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 
-type PartnerAction = {
-  href: string;
-  label: string;
-  disabled?: boolean;
-};
-
 export default function PartnerCardActions({
   isActive,
-  reservationAction,
-  inquiryAction,
-  onReservationClick,
-  onInquiryClick,
+  detailHref,
+  canNavigate,
+  compact = false,
+  onDetailClick,
 }: {
   isActive: boolean;
-  reservationAction: PartnerAction | null;
-  inquiryAction: PartnerAction | null;
-  onReservationClick: () => void;
-  onInquiryClick: () => void;
+  detailHref: string;
+  canNavigate: boolean;
+  compact?: boolean;
+  onDetailClick: () => void;
 }) {
-  if (isActive && (reservationAction || inquiryAction)) {
-    const hasBothActions = Boolean(reservationAction && inquiryAction);
+  const detailActionLabel = isActive
+    ? "제휴 상세 보기"
+    : "현재 이용할 수 없는 제휴";
 
-    return (
-      <div
-        className={cn(
-          "mt-auto gap-2 pt-1",
-          hasBothActions ? "grid grid-cols-2" : "flex flex-col",
-        )}
-      >
-        {reservationAction ? (
-          <Button
-            variant="primary"
-            href={reservationAction.href}
-            target={reservationAction.href.startsWith("http") ? "_blank" : undefined}
-            rel={reservationAction.href.startsWith("http") ? "noreferrer" : undefined}
-            className="w-full justify-center"
-            onClick={onReservationClick}
-            disabled={reservationAction.disabled}
-          >
-            {reservationAction.label}
-          </Button>
-        ) : null}
-        {inquiryAction ? (
-          <Button
-            variant="primary"
-            href={inquiryAction.href}
-            target={inquiryAction.href.startsWith("http") ? "_blank" : undefined}
-            rel={inquiryAction.href.startsWith("http") ? "noreferrer" : undefined}
-            className={cn(
-              "w-full justify-center",
-              hasBothActions
-                ? "!border-primary/20 !bg-primary-foreground !text-primary shadow-flat hover:!bg-primary-soft hover:!text-primary-emphasis"
-                : null,
-            )}
-            onClick={onInquiryClick}
-          >
-            {inquiryAction.label}
-          </Button>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (!isActive) {
-    return (
-      <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200">
-        현재 제휴기간이 아니므로, 혜택 이용/문의를 할 수 없습니다.
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <div
+      data-partner-card-actions
+      className={cn(
+        compact
+          ? "hidden h-full items-center justify-end gap-2 min-[480px]:flex"
+          : "mt-auto space-y-3 pt-1",
+      )}
+    >
+      {!isActive && !compact ? (
+        <p className="text-ko-pretty text-sm text-amber-800 dark:text-amber-200">
+          현재 이용할 수 없는 제휴입니다.
+        </p>
+      ) : null}
+      {compact ? (
+        <Button
+          variant={isActive ? "primary" : "secondary"}
+          size="icon"
+          href={detailHref}
+          className="self-end rounded-full"
+          onClick={onDetailClick}
+          disabled={!canNavigate}
+          ariaLabel={detailActionLabel}
+          title={detailActionLabel}
+        >
+          <ArrowRightIcon className="size-4" aria-hidden="true" />
+        </Button>
+      ) : (
+        <Button
+          variant={isActive ? "primary" : "secondary"}
+          href={detailHref}
+          className="w-full justify-center"
+          onClick={onDetailClick}
+          disabled={!canNavigate}
+        >
+          제휴 상세 보기
+        </Button>
+      )}
+    </div>
+  );
 }

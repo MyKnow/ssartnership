@@ -24,8 +24,8 @@ export default function PartnerCompanySelectionView({
           <MotionReveal>
             <ShellHeader
               eyebrow="Partner Portal"
-              title="협력사 선택"
-              description="관리할 협력사를 선택하면 해당 협력사가 소유한 브랜드의 대시보드와 운영 메뉴로 이동합니다."
+              title="파트너사 선택"
+              description="관리할 파트너사를 선택하면 해당 파트너사가 소유한 제휴처의 대시보드와 운영 메뉴로 이동합니다."
               actions={
                 <Badge
                   variant="primary"
@@ -39,8 +39,8 @@ export default function PartnerCompanySelectionView({
 
           {companies.length === 0 ? (
             <EmptyState
-              title="연결된 협력사가 없습니다."
-              description="관리자에서 이 계정과 협력사를 먼저 연결해야 합니다."
+              title="연결된 파트너사가 없습니다."
+              description="관리자에서 이 계정과 파트너사를 먼저 연결해야 합니다."
             />
           ) : (
             <MotionReveal delay={0.08}>
@@ -53,13 +53,13 @@ export default function PartnerCompanySelectionView({
                     </p>
                   </div>
                   <div>
-                    <p className="ui-kicker">협력사</p>
+                    <p className="ui-kicker">파트너사</p>
                     <p className="mt-1 text-sm font-semibold text-foreground">
                       {companies.length.toLocaleString("ko-KR")}개 연결
                     </p>
                   </div>
                   <div>
-                    <p className="ui-kicker">브랜드</p>
+                    <p className="ui-kicker">제휴처</p>
                     <p className="mt-1 text-sm font-semibold text-foreground">
                       {companies
                         .reduce((sum, company) => sum + company.serviceCount, 0)
@@ -84,7 +84,7 @@ export default function PartnerCompanySelectionView({
                           <span className="inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-border bg-surface-control text-primary">
                             <Building2 className="h-5 w-5" />
                           </span>
-                          <Badge variant="neutral">{company.serviceCount}개 브랜드</Badge>
+                          <Badge variant="neutral">{company.serviceCount}개 제휴처</Badge>
                         </div>
                         <div className="min-w-0 space-y-2">
                           <h2 className="truncate text-xl font-semibold text-foreground">
@@ -92,7 +92,7 @@ export default function PartnerCompanySelectionView({
                           </h2>
                           <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
                             {company.description?.trim() ||
-                              "연결된 브랜드 현황과 운영 알림을 확인합니다."}
+                              "연결된 제휴처 현황과 운영 알림을 확인합니다."}
                           </p>
                         </div>
                         <div className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-primary">

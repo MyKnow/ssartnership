@@ -2,7 +2,7 @@ import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
-import { updatePartnerAccountCompanyConnection } from "@/app/admin/(protected)/actions";
+import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import FieldGroup from "@/components/admin/partner-account-manager/FieldGroup";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
@@ -15,9 +15,11 @@ type AdminCompany = {
 export default function PartnerAccountLinks({
   account,
   companies,
+  updateConnectionAction,
 }: {
   account: AdminPartnerAccount;
   companies: AdminCompany[];
+  updateConnectionAction: AdminFormAction;
 }) {
   const connectionFormId = `partner-account-company-connection-${account.id}`;
 
@@ -25,23 +27,23 @@ export default function PartnerAccountLinks({
     <div className="rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-foreground">협력사 연결</h4>
+          <h4 className="text-sm font-semibold text-foreground">파트너사 연결</h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            연결된 협력사마다 활성 상태를 조정할 수 있습니다.
+            연결된 파트너사마다 활성 상태를 조정할 수 있습니다.
           </p>
         </div>
       </div>
 
       <form
         id={connectionFormId}
-        action={updatePartnerAccountCompanyConnection}
+        action={updateConnectionAction}
         className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
       >
         <input type="hidden" name="accountId" value={account.id} />
-        <FieldGroup label="협력사 선택">
+        <FieldGroup label="파트너사 선택">
           <Select name="companyId" defaultValue="" required disabled={companies.length === 0}>
             <option value="" disabled>
-              협력사를 선택해 주세요
+              파트너사를 선택해 주세요
             </option>
             {companies.map((company) => {
               const isLinked = account.links.some(
@@ -76,22 +78,22 @@ export default function PartnerAccountLinks({
             className="w-full md:w-auto"
             disabled={companies.length === 0}
           >
-            협력사 연결
+            파트너사 연결
           </SubmitButton>
         </div>
       </form>
 
       {companies.length === 0 ? (
         <p className="mt-4 text-xs text-muted-foreground">
-          등록된 협력사가 없어 새 연결을 추가할 수 없습니다.
+          등록된 파트너사가 없어 새 연결을 추가할 수 없습니다.
         </p>
       ) : null}
 
       <div className="mt-4 space-y-3">
         {account.links.length === 0 ? (
           <EmptyState
-            title="연결된 협력사가 없습니다."
-            description="이 계정에 연결할 협력사를 추가해 주세요."
+            title="연결된 파트너사가 없습니다."
+            description="이 계정에 연결할 파트너사를 추가해 주세요."
           />
         ) : null}
 
@@ -106,7 +108,7 @@ export default function PartnerAccountLinks({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold text-foreground">
-                    {link.company?.name ?? "협력사 정보 없음"}
+                    {link.company?.name ?? "파트너사 정보 없음"}
                   </p>
                   <p className="mt-1 break-all text-xs text-muted-foreground">
                     {link.company?.slug ?? link.company?.id ?? link.id}
@@ -121,7 +123,7 @@ export default function PartnerAccountLinks({
 
               <form
                 id={linkFormId}
-                action={updatePartnerAccountCompanyConnection}
+                action={updateConnectionAction}
                 className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]"
               >
                 <input type="hidden" name="accountId" value={account.id} />

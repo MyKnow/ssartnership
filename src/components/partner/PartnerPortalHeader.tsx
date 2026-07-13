@@ -15,13 +15,13 @@ export default async function PartnerPortalHeader() {
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <PartnerPendingLink
             href="/partner"
-            aria-label="협력사 포털 홈"
+            aria-label="파트너사 포털 홈"
             className="inline-flex items-center text-foreground hover:opacity-80"
           >
             <BrandWordmark className="text-lg sm:text-xl" />
           </PartnerPendingLink>
           <span className="rounded-full border border-border bg-surface-muted/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-            협력사 포털
+            파트너사 포털
           </span>
         </div>
 

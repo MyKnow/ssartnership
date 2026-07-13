@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
-import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+import PartnerNotificationsScreen from "@/components/partner/PartnerNotificationsScreen";
+import {
+  getPartnerOperationalNotificationPreferences,
+  listOperationalPushSubscriptionDevices,
+} from "@/lib/operational-notifications";
+import { getPartnerNotificationCenter } from "@/lib/partner-notifications";
 import { getPartnerSession } from "@/lib/partner-session";
+import { getPushPublicKey, isPushConfigured } from "@/lib/push";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `알림센터 | ${SITE_NAME}`,
-  robots: {
-    index: false,
-    follow: false,
-  },
+  title: `알림 | ${SITE_NAME}`,
+  robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
@@ -24,9 +26,22 @@ export default async function PartnerNotificationsPage() {
     redirect("/partner/change-password");
   }
 
-  const companies = await getPartnerPortalCompanySummaries(session.companyIds);
-  if (companies.length === 1 && companies[0]) {
-    redirect(getCompanyScopedPortalHref(companies[0].id, "notifications"));
-  }
-  redirect("/partner");
+  const [data, preferences, devices] = await Promise.all([
+    getPartnerNotificationCenter(session.companyIds, session.accountId),
+    getPartnerOperationalNotificationPreferences(session.accountId),
+    listOperationalPushSubscriptionDevices({
+      ownerType: "partner",
+      ownerId: session.accountId,
+    }),
+  ]);
+
+  return (
+    <PartnerNotificationsScreen
+      data={data}
+      pushConfigured={isPushConfigured()}
+      publicKey={getPushPublicKey()}
+      preferences={preferences}
+      deviceCount={devices.length}
+    />
+  );
 }

@@ -2,15 +2,15 @@ import type { EventCampaign } from "@/lib/promotions/catalog";
 
 export const REVIEW_REWARD_EVENT: EventCampaign = {
   slug: "review-reward",
-  title: "브랜드 리뷰 추첨권 이벤트",
+  title: "제휴처 리뷰 추첨권 이벤트",
   shortTitle: "리뷰 이벤트",
   description:
-    "이벤트 기간 내 브랜드 리뷰를 작성하면 추첨권을 받을 수 있습니다.",
+    "이벤트 기간 내 제휴처 리뷰를 작성하면 추첨권을 받을 수 있습니다.",
   periodLabel: "이벤트 종료 시점 기준으로 조건이 유지되어야 인정됩니다.",
   startsAt: "2026-04-21T00:00:00+09:00",
   endsAt: "2026-06-30T23:59:59+09:00",
   heroImageSrc: "/ads/review-reward.svg",
-  heroImageAlt: "브랜드 리뷰 작성으로 추첨권을 받는 이벤트",
+  heroImageAlt: "제휴처 리뷰 작성으로 추첨권을 받는 이벤트",
   conditions: [
     {
       key: "review",

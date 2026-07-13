@@ -4,7 +4,7 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import FormMessage from '@/components/ui/FormMessage';
 import Input from '@/components/ui/Input';
-import SectionHeading from '@/components/ui/SectionHeading';
+import AdminSectionHeading from '@/components/admin/AdminSectionHeading';
 import {
   ActivityChart,
   ExportDialog,
@@ -30,7 +30,7 @@ export default function AdminLogsManagerContent({
       <div className="grid min-w-0 gap-6 overflow-x-clip">
         <section className="grid gap-4 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat sm:px-6 sm:py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <SectionHeading
+            <AdminSectionHeading
               title="로그 집계 뷰"
               description="조회 범위를 바꾸면 카드, 대시보드, 원본 로그가 모두 같은 범위 기준으로 다시 집계됩니다."
             />

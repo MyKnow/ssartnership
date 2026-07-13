@@ -23,6 +23,12 @@ export default async function SiteLayout({
   if (session?.mustChangePassword) {
     redirect(`/auth/change-password?returnTo=${encodeURIComponent(returnTo)}`);
   }
+  if (
+    session?.requiresProfilePhotoUpdate &&
+    !returnTo.startsWith("/certification/photo")
+  ) {
+    redirect(`/certification/photo?returnTo=${encodeURIComponent(returnTo)}`);
+  }
   return (
     <div className="flex min-h-screen flex-col">
       <Suspense fallback={null}>

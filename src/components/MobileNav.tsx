@@ -60,7 +60,7 @@ export default function MobileNav({
     <>
       <button
         type="button"
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground sm:hidden"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground xl:hidden"
         aria-label="메뉴 열기"
         onClick={() => setOpen(true)}
       >
@@ -85,7 +85,7 @@ export default function MobileNav({
         ? createPortal(
             <div
               className={cn(
-                "fixed inset-0 z-[70] sm:hidden",
+                "fixed inset-0 z-[70] xl:hidden",
                 open ? "pointer-events-auto" : "pointer-events-none",
               )}
               aria-hidden={!open}

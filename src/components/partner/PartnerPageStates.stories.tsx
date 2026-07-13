@@ -96,7 +96,7 @@ const notificationData = {
       tone: "neutral",
       badgeLabel: "운영 안내",
       title: "증빙 프로필을 플랜 요청에서 다시 사용할 수 있습니다",
-      body: "프로필 탭에서 저장한 입금자와 세금계산서 정보가 모든 협력사 화면에서 동일하게 제공됩니다.",
+      body: "프로필 탭에서 저장한 입금자와 세금계산서 정보가 모든 파트너사 화면에서 동일하게 제공됩니다.",
       companyId: null,
       companyName: "계정 전역",
       partnerId: null,
@@ -159,7 +159,7 @@ function RegistrationWebInputState() {
   return (
     <PartnerStateFrame
       title="신규 파트너사 등록"
-      description="단계별 등록 화면에서 브랜드 유형, 혜택 방식, 이미지, 담당자 정보를 한 번에 접수합니다."
+      description="단계별 등록 화면에서 제휴처 유형, 혜택 방식, 이미지, 담당자 정보를 한 번에 접수합니다."
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <Card className="grid min-w-0 gap-5" padding="md">
@@ -170,9 +170,9 @@ function RegistrationWebInputState() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <CompactField
-              label="브랜드 유형"
+              label="제휴처 유형"
               tone="primary"
-              value="오프라인 매장, 지점, 시설처럼 방문 주소와 지도 링크가 필요한 브랜드"
+              value="오프라인 매장, 지점, 시설처럼 방문 주소와 지도 링크가 필요한 제휴처"
             />
             <CompactField
               label="혜택 이용 방식"
@@ -182,7 +182,7 @@ function RegistrationWebInputState() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {[
-              ["브랜드명", "카페 싸피 역삼본점", "danger"],
+              ["제휴처명", "카페 싸피 역삼본점", "danger"],
               ["카테고리", "카페, 디저트, 스터디 공간", "danger"],
               ["위치", "서울 강남구 역삼로 123 카페 싸피 빌딩 1층", "danger"],
               ["담당자 이메일", "partner@cafessafy.example", "neutral"],
@@ -220,7 +220,7 @@ function RegistrationWebInputState() {
           </div>
         </Card>
         <Card tone="muted" padding="md" className="grid content-start gap-3">
-          <SectionHeading title="이미지" description="대표 1장, 상세 최대 5장" />
+          <SectionHeading headingLevel="h2" title="이미지" description="대표 1장, 상세 최대 5장" />
           <div className="aspect-square rounded-[1rem] border border-dashed border-border bg-surface-control p-4 text-sm font-semibold text-muted-foreground">
             대표 이미지는 1:1로 조정 후 저장됩니다.
           </div>
@@ -245,7 +245,7 @@ function RegistrationExcelState() {
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           <Card tone="muted" padding="md" className="grid gap-3">
-            <SectionHeading title="브랜드 유형" description="업체 성격에 맞는 기본 항목을 고릅니다." />
+            <SectionHeading headingLevel="h2" title="제휴처 유형" description="파트너사 성격에 맞는 기본 항목을 고릅니다." />
             {["오프라인", "온라인", "오프라인+온라인"].map((label) => (
               <Button key={label} variant={label === "오프라인" ? "soft" : "secondary"}>
                 {label}
@@ -253,7 +253,7 @@ function RegistrationExcelState() {
             ))}
           </Card>
           <Card tone="muted" padding="md" className="grid gap-3">
-            <SectionHeading title="혜택 이용 방식" description="인증 확인, 외부 링크, 현장 제시 중 선택합니다." />
+            <SectionHeading headingLevel="h2" title="혜택 이용 방식" description="인증 확인, 외부 링크, 현장 제시 중 선택합니다." />
             {["인증 확인", "외부 링크", "현장 제시"].map((label) => (
               <Button key={label} variant={label === "인증 확인" ? "soft" : "secondary"}>
                 {label}
@@ -264,7 +264,7 @@ function RegistrationExcelState() {
         <div className="grid gap-3 rounded-[1rem] border border-dashed border-danger/40 bg-danger/5 p-4">
           <p className="font-semibold text-danger">XLSX 파일을 업로드해 주세요.</p>
           <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-            현재 템플릿은 브랜드 1개 접수 기준입니다. 여러 지점은 지점별로 파일을 나눠 제출합니다.
+            현재 템플릿은 제휴처 1개 접수 기준입니다. 여러 지점은 지점별로 파일을 나눠 제출합니다.
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="secondary">XLSX 다운로드</Button>
@@ -281,12 +281,12 @@ function AccountProfileState() {
   return (
     <PartnerStateFrame
       title="프로필"
-      description="계정 정보, 비밀번호 변경, 입금자와 세금계산서 증빙 프로필을 모든 협력사에서 동일하게 사용합니다."
+      description="계정 정보, 비밀번호 변경, 입금자와 세금계산서 증빙 프로필을 모든 파트너사에서 동일하게 사용합니다."
     >
       <StatsRow
         minItemWidth="12rem"
         items={[
-          { label: "담당자", value: displayName, hint: "모든 협력사 공통 계정" },
+          { label: "담당자", value: displayName, hint: "모든 파트너사 공통 계정" },
           {
             label: "로그인 ID",
             value: <span className="text-token">{loginId}</span>,
@@ -297,7 +297,7 @@ function AccountProfileState() {
       />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card padding="md" className="grid gap-4">
-          <SectionHeading title="저장된 증빙 프로필" description="입금자와 세금계산서 정보를 재사용합니다." />
+          <SectionHeading headingLevel="h2" title="저장된 증빙 프로필" description="입금자와 세금계산서 정보를 재사용합니다." />
           <CompactField
             label="카페 싸피 본점"
             tone="primary"
@@ -317,7 +317,7 @@ function AccountProfileState() {
           />
         </Card>
         <Card padding="md" className="grid gap-4">
-          <SectionHeading title="비밀번호 변경" description="현재 비밀번호 확인 후 새 비밀번호를 저장합니다." />
+          <SectionHeading headingLevel="h2" title="비밀번호 변경" description="현재 비밀번호 확인 후 새 비밀번호를 저장합니다." />
           <CompactField label="현재 상태" tone="success" value="최근 로그인 2026년 7월 5일 09:10" />
           <Button>비밀번호 변경 저장</Button>
         </Card>
@@ -330,7 +330,7 @@ function NotificationsInboxState() {
   return (
     <PartnerStateFrame
       title="알림"
-      description="선택 협력사의 알림과 계정 전역 알림을 함께 확인하고 수신 설정은 계정 단위로 관리합니다."
+      description="선택 파트너사의 알림과 계정 전역 알림을 함께 확인하고 수신 설정은 계정 단위로 관리합니다."
     >
       <PartnerNotificationCenter data={notificationData} />
     </PartnerStateFrame>
@@ -341,12 +341,13 @@ function PlansBillingState() {
   return (
     <PartnerStateFrame
       title="플랜"
-      description="브랜드별 현재 플랜, 결제 대기, 증빙 상태, 업그레이드 가능 플랜을 같은 구조로 확인합니다."
+      description="제휴처별 현재 플랜, 결제 대기, 증빙 상태, 업그레이드 가능 플랜을 같은 구조로 확인합니다."
     >
       <Card padding="md" className="grid gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <SectionHeading
-            title="브랜드별 플랜"
+            headingLevel="h2"
+            title="제휴처별 플랜"
             description="미납 7일 경과 시 Basic으로 조정될 수 있습니다."
           />
           <Badge variant="warning">입금 확인 대기 1건</Badge>
@@ -413,7 +414,7 @@ function PlansBillingState() {
 function ServiceDetailState() {
   return (
     <PartnerStateFrame
-      title="브랜드 상세"
+      title="제휴처 상세"
       description="공개 상태, 승인 상태, 플랜, 수정 요청, 지표 권한, 리뷰를 한 화면에서 스캔합니다."
     >
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
@@ -425,6 +426,7 @@ function ServiceDetailState() {
             <Badge variant="warning">잠긴 지표 있음</Badge>
           </div>
           <SectionHeading
+            headingLevel="h2"
             title="카페 싸피 역삼본점"
             description="SSAFY 서울캠퍼스 인근 프랜차이즈 카페입니다."
           />
@@ -440,7 +442,7 @@ function ServiceDetailState() {
           </div>
         </Card>
         <Card tone="muted" padding="md" className="grid content-start gap-3">
-          <SectionHeading title="최근 리뷰" description="필터 변경 시 목록 갱신 상태가 표시됩니다." />
+          <SectionHeading headingLevel="h2" title="최근 리뷰" description="필터 변경 시 목록 갱신 상태가 표시됩니다." />
           {["시그니처 라떼 할인 적용이 빨랐어요.", "좌석이 넓어서 스터디하기 좋았습니다."].map((review) => (
             <div key={review} className="rounded-[1rem] border border-border bg-surface-control p-4">
               <p className="line-clamp-2 text-sm leading-6 text-foreground">{review}</p>
@@ -461,19 +463,19 @@ function ServiceNewState() {
 function ServiceRequestState() {
   return (
     <PartnerStateFrame
-      title="브랜드 수정 요청"
+      title="제휴처 수정 요청"
       description="즉시 반영 항목과 관리자 승인 필요 항목을 분리해 수정 흐름을 명확하게 보여줍니다."
     >
       <div className="grid gap-4 lg:grid-cols-2">
         <Card padding="md" className="grid gap-3">
           <Badge variant="success">즉시 반영</Badge>
-          <SectionHeading title="이미지와 링크" description="대표 이미지, 추가 이미지, 혜택 이용 링크, 태그는 저장 직후 반영됩니다." />
+          <SectionHeading headingLevel="h2" title="이미지와 링크" description="대표 이미지, 추가 이미지, 혜택 이용 링크, 태그는 저장 직후 반영됩니다." />
           <Button variant="secondary">이미지 추가</Button>
           <FormMessage variant="info">저장 중에는 폼 섹션에 처리 중 상태가 표시됩니다.</FormMessage>
         </Card>
         <Card padding="md" className="grid gap-3">
           <Badge variant="warning">승인 필요</Badge>
-          <SectionHeading title="브랜드 핵심 정보" description="브랜드명, 위치, 기간, 혜택, 이용 조건은 관리자 검토 후 반영됩니다." />
+          <SectionHeading headingLevel="h2" title="제휴처 핵심 정보" description="제휴처명, 지점 위치, 기간, 혜택, 이용 조건은 관리자 검토 후 반영됩니다." />
           <CompactField label="대기 요청" tone="warning" value="카페 싸피 잠실점 지도 URL 확인 필요" />
           <Button>승인 요청 제출</Button>
         </Card>
@@ -487,7 +489,7 @@ function SupportTemplateState() {
     <ToastProvider>
       <PartnerStateFrame
         title="기술 지원"
-        description="문의 유형을 고르면 협력사, 로그인 계정, 브랜드 목록, 현재 URL이 들어간 템플릿이 갱신됩니다."
+        description="문의 유형을 고르면 파트너사, 로그인 계정, 제휴처 목록, 현재 URL이 들어간 템플릿이 갱신됩니다."
       >
         <PartnerSupportRequestPanel
           to="support@ssartnership.example"
@@ -507,20 +509,20 @@ function SetupInitialState() {
   return (
     <PartnerStateFrame
       title="초기 설정"
-      description="관리자가 발급한 링크로 담당자 계정의 비밀번호를 설정하고 협력사 연결 상태를 확인합니다."
+      description="관리자가 발급한 링크로 담당자 계정의 비밀번호를 설정하고 파트너사 연결 상태를 확인합니다."
     >
       <Card padding="md" className="grid gap-4">
         <div className="flex flex-wrap gap-2">
           <Badge variant="success">토큰 유효</Badge>
           <Badge variant="primary">{companyName}</Badge>
-          <Badge variant="neutral">6개 브랜드 연결</Badge>
+          <Badge variant="neutral">6개 제휴처 연결</Badge>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <CompactField label="로그인 ID" value={loginId} />
           <CompactField label="담당자" value={displayName} />
         </div>
         <FormMessage variant="info">
-          비밀번호 설정 후 파트너 포털에서 협력사를 선택해 운영 화면으로 이동합니다.
+          비밀번호 설정 후 파트너 포털에서 파트너사를 선택해 운영 화면으로 이동합니다.
         </FormMessage>
         <Button>비밀번호 설정 완료</Button>
       </Card>
@@ -565,7 +567,7 @@ export const AccountProfile: Story = {
   render: () => <AccountProfileState />,
   parameters: {
     mockScenario: {
-      routePath: "/partner/companies/[companyId]/account",
+      routePath: "/partner/account",
       scenarioId: "partner.account.profile",
     },
   },
@@ -575,7 +577,7 @@ export const NotificationsInbox: Story = {
   render: () => <NotificationsInboxState />,
   parameters: {
     mockScenario: {
-      routePath: "/partner/companies/[companyId]/notifications",
+      routePath: "/partner/notifications",
       scenarioId: "partner.notifications.inbox",
     },
   },
@@ -625,7 +627,7 @@ export const SupportTemplate: Story = {
   render: () => <SupportTemplateState />,
   parameters: {
     mockScenario: {
-      routePath: "/partner/companies/[companyId]/support",
+      routePath: "/partner/support",
       scenarioId: "partner.support.template",
     },
   },

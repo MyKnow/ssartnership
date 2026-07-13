@@ -1,13 +1,15 @@
-name: Publish Storybook
+name: Storybook and Visual Baselines
 
 on:
+  push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
-  chromatic:
-    name: Publish Storybook to Chromatic
+  verify:
+    name: Build, A11y, Visual Diff
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -18,7 +20,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -27,8 +29,11 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
-      - name: Publish Storybook to Chromatic
-        uses: chromaui/action@latest
-        with:
-          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          exitOnceUploaded: true
+      - name: Storybook interaction and a11y tests
+        run: npm run test-storybook
+
+      - name: Install fixed Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Compare core visual baselines
+        run: npm run test:visual

@@ -23,7 +23,7 @@ function appendSearchParam(
 }
 
 export const metadata: Metadata = {
-  title: `브랜드 상세 | ${SITE_NAME}`,
+  title: `제휴처 상세 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,

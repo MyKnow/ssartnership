@@ -80,7 +80,7 @@ export function PushLogsSection({
   onDeleteLog,
   onLoadLog,
   onUpdateFilter,
-  title = "알림 운영 로그",
+  title = "발송 로그",
   description = "최근 발송 이력을 검색하고 같은 구성을 다시 불러옵니다.",
 }: Props) {
   return (
@@ -96,6 +96,7 @@ export function PushLogsSection({
         <div className="grid min-w-[14rem] flex-1 gap-1">
           <span className="ui-caption">검색</span>
           <Input
+            aria-label="발송 로그 검색"
             value={filters.search}
             onChange={(event) => onUpdateFilter("search", event.target.value)}
             placeholder="제목, 내용, URL, 대상 검색"
@@ -104,6 +105,7 @@ export function PushLogsSection({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">유형</span>
           <Select
+            aria-label="발송 로그 유형"
             value={filters.typeFilter}
             onChange={(event) => onUpdateFilter("typeFilter", event.target.value)}
           >
@@ -117,6 +119,7 @@ export function PushLogsSection({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">상태</span>
           <Select
+            aria-label="발송 로그 상태"
             value={filters.statusFilter}
             onChange={(event) => onUpdateFilter("statusFilter", event.target.value)}
           >
@@ -131,6 +134,7 @@ export function PushLogsSection({
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">정렬</span>
           <Select
+            aria-label="발송 로그 정렬"
             value={filters.sort}
             onChange={(event) => onUpdateFilter("sort", event.target.value)}
           >
@@ -145,7 +149,7 @@ export function PushLogsSection({
       <div className="grid min-w-0 gap-3">
         {filteredLogs.length === 0 ? (
           <div className="min-w-0 overflow-hidden rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-8 text-center text-sm text-muted-foreground">
-            조건에 맞는 알림 운영 로그가 없습니다.
+            조건에 맞는 발송 로그가 없습니다.
           </div>
         ) : (
           filteredLogs.map((log) => (

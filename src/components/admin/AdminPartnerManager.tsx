@@ -30,9 +30,11 @@ export {
 export default function AdminPartnerManager({
   categories,
   partners,
+  canCreate = true,
 }: {
   categories: AdminCategory[];
   partners: AdminPartner[];
+  canCreate?: boolean;
 }) {
   const [activeCategory, setActiveCategory] = useState<CategoryKey | "all">("all");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
@@ -100,6 +102,7 @@ export default function AdminPartnerManager({
         setSortValue={setSortValue}
         visibilityFilter={visibilityFilter}
         setVisibilityFilter={setVisibilityFilter}
+        canCreate={canCreate}
       />
 
       <AdminPartnerManagerList

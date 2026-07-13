@@ -345,9 +345,6 @@ export default function AdminNotificationInbox({
             return (
               <div
                 key={item.adminNotificationRecipientId}
-                role="button"
-                tabIndex={0}
-                aria-label={`${item.title} 알림 열기`}
                 className={cn(
                   "group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3.5 outline-none transition-colors hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 sm:px-5 sm:py-4",
                   item.isUnread
@@ -355,17 +352,17 @@ export default function AdminNotificationInbox({
                     : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)] opacity-[0.74]",
                   isBusy ? "pointer-events-none opacity-70" : null,
                 )}
-                onClick={() => {
-                  void markAsReadAndOpen(item);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    void markAsReadAndOpen(item);
-                  }
-                }}
               >
-                <div className="mt-1 shrink-0 pt-1">
+                <button
+                  type="button"
+                  className="absolute inset-0 z-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                  aria-label={`${item.title} 알림 열기`}
+                  onClick={() => {
+                    void markAsReadAndOpen(item);
+                  }}
+                />
+
+                <div className="pointer-events-none relative z-10 mt-1 shrink-0 pt-1">
                   <span
                     aria-hidden="true"
                     className={cn(
@@ -375,7 +372,7 @@ export default function AdminNotificationInbox({
                   />
                 </div>
 
-                <div className="min-w-0 space-y-2">
+                <div className="pointer-events-none relative z-10 min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant={item.isUnread ? "primary" : "neutral"}
@@ -417,7 +414,7 @@ export default function AdminNotificationInbox({
                   </div>
                 </div>
 
-                <IconActionGroup className="self-center">
+                <IconActionGroup className="relative z-20 self-center">
                   {item.isUnread ? (
                     <IconActionButton
                       tone="success"

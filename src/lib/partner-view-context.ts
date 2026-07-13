@@ -11,7 +11,7 @@ export async function getPartnerViewerContext(
 
   const { data } = await getSupabaseAdminClient()
     .from("members")
-    .select("year")
+    .select("year,graduate_verified_at")
     .eq("id", userId)
     .maybeSingle();
 
@@ -19,6 +19,9 @@ export async function getPartnerViewerContext(
     authenticated: true,
     viewerAudience: resolvePartnerAudienceFromMemberYear(
       typeof data?.year === "number" ? data.year : null,
+      new Date(),
+      undefined,
+      { graduateVerifiedAt: data?.graduate_verified_at ?? null },
     ),
   };
 }

@@ -24,7 +24,7 @@ const partner: AdminPartner = {
     id: "company-1",
     name: "분식랩",
     slug: "bunsik-lab",
-    description: "캠퍼스 인근 즉석 분식 브랜드",
+    description: "캠퍼스 인근 즉석 분식 제휴처를 운영하는 파트너사",
     is_active: true,
   },
   metrics: {

@@ -1,10 +1,14 @@
+import { permanentRedirect, redirect } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPartnerCreateToast from "@/components/admin/AdminPartnerCreateToast";
+import AdminPartnerManager from "@/components/admin/AdminPartnerManager";
+import AdminCompanyPlanManager from "@/components/admin/AdminCompanyPlanManager";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
-import ShellHeader from "@/components/ui/ShellHeader";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
-import AdminPartnerWorkspace from "@/components/admin/AdminPartnerWorkspace";
+import InlineMessage from "@/components/ui/InlineMessage";
+import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
@@ -15,16 +19,9 @@ import {
 } from "@/lib/partner-company-plans";
 import { normalizePartnerPlanUpgradeRequestStatus } from "@/lib/partner-plan-upgrades";
 import { getPartnerBillingInvoiceSummariesForUpgradeRequests } from "@/lib/partner-plan-service";
-import {
-  createCategory,
-  approvePartnerChangeRequest,
-  deleteCategory,
-  rejectPartnerChangeRequest,
-  updateCategory,
-} from "@/app/admin/(protected)/actions";
-import { listPartnerChangeRequests } from "@/lib/partner-change-requests";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { normalizeAdminPartnerWorkspaceTab } from "@/components/admin/partner-workspace-tabs";
+import { resolveAdminPartnerTabRedirect } from "@/lib/admin-ia";
+import { canAdmin } from "@/lib/admin-permissions";
 import {
   getManagedCampusFilterValues,
   isRegionalAdminAccount,
@@ -113,7 +110,19 @@ export default async function AdminPartnersPage({
   const canManageGlobalSections = !isRegionalAdminAccount(adminSession.account);
   const params = (await searchParams) ?? {};
   const partnerFormError = params.error ? adminPartnersErrorMessages[params.error] : null;
-  const initialTab = normalizeAdminPartnerWorkspaceTab(params.tab);
+  const legacyTabRedirect = resolveAdminPartnerTabRedirect(params.tab);
+  if (legacyTabRedirect) {
+    permanentRedirect(legacyTabRedirect);
+  }
+  const showPlans = params.tab === "plans" && canManageGlobalSections;
+  const canCreatePartner = canAdmin(
+    adminSession.account.permissions,
+    "brands",
+    "create",
+  );
+  if (params.tab === "plans" && !canManageGlobalSections) {
+    redirect("/admin/partners");
+  }
   let partnersQuery = supabase
     .from("partners")
     .select("id,name,category_id,company_id,location,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)")
@@ -122,31 +131,28 @@ export default async function AdminPartnersPage({
     partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusFilter);
   }
 
-  const [
-    categoriesResult,
-    partnersResult,
-    planRequestsResult,
-    planEventsResult,
-    changeRequests,
-  ] = await Promise.all([
+  const [categoriesResult, partnersResult, planRequestsResult, planEventsResult] = await Promise.all([
     supabase
       .from("categories")
       .select("id,key,label,description,color")
       .order("created_at", { ascending: true }),
     partnersQuery,
-    supabase
+    showPlans
+      ? supabase
       .from("partner_plan_upgrade_requests")
       .select(
         "id,partner_id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_at,created_at,brand:partners!partner_plan_upgrade_requests_partner_id_fkey(id,name),company:partner_companies(id,name,slug),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
       )
       .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
+      .limit(50)
+      : Promise.resolve({ data: [], error: null }),
+    showPlans
+      ? supabase
       .from("partner_brand_plan_events")
       .select("id,partner_id,company_id,previous_plan_tier,next_plan_tier,source,note,created_at,brand:partners(id,name)")
       .order("created_at", { ascending: false })
-      .limit(100),
-    listPartnerChangeRequests(),
+      .limit(100)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (partnersResult.error) {
@@ -217,7 +223,7 @@ export default async function AdminPartnersPage({
     return {
       id: request.id,
       partnerId: request.partner_id ?? brand?.id ?? "",
-      brandName: brand?.name ?? "미지정 브랜드",
+      brandName: brand?.name ?? "미지정 제휴처",
       companyId: request.company_id,
       companyName: company?.name ?? "미지정",
       requestedByDisplayName: requestedBy?.display_name ?? null,
@@ -267,64 +273,89 @@ export default async function AdminPartnersPage({
       createdAt: event.created_at,
     };
     });
-  const scopedChangeRequests = managedCampusFilter
-    ? changeRequests.filter((request) => scopedPartnerIds.has(request.partnerId))
-    : changeRequests;
-
   return (
     <AdminShell
-      title="제휴처(브랜드) 관리"
+      title={showPlans ? "플랜/과금" : "제휴처"}
       backHref="/admin"
       backLabel="관리 홈"
     >
       <section className="grid gap-6">
         <AdminPartnerCreateToast />
-        <ShellHeader
+        <AdminPageHeader
           eyebrow="Partner Brands"
-          title="제휴처와 브랜드 운영"
-          description="고객에게 노출되는 제휴처 카드, 승인 대기 요청, 카테고리를 탭으로 나눠 관리합니다."
+          title={showPlans ? "플랜과 과금 관리" : "제휴처 목록"}
+          description={
+            showPlans
+              ? "제휴처별 플랜, 결제 요청, 변경 이력을 관리합니다."
+              : "사용자에게 노출되는 제휴처의 혜택과 공개 상태를 검색하고 상세 화면에서 수정합니다."
+          }
           actions={
-            <>
-              <Button variant="secondary" href="/admin/partner-registrations">
-                등록 신청 검토
+            showPlans ? (
+              <Button variant="secondary" href="/admin/partners">
+                제휴처 목록
               </Button>
-              <Button variant="secondary" href="/admin/companies">
-                파트너사/계정 관리
-              </Button>
-              <Button variant="soft" href="/admin/partners/new">
-                제휴처 추가
-              </Button>
-            </>
+            ) : (
+              <>
+                <Button variant="secondary" href="/admin/partner-requests">
+                  변경 요청
+                </Button>
+                {canManageGlobalSections ? (
+                  <Button variant="secondary" href="/admin/categories">
+                    카테고리
+                  </Button>
+                ) : null}
+                {canCreatePartner ? (
+                  <Button variant="soft" href="/admin/partners/new">
+                    제휴처 추가
+                  </Button>
+                ) : null}
+              </>
+            )
           }
         />
         <StatsRow
           items={[
-            { label: "제휴처", value: `${normalizedPartners.length.toLocaleString()}개`, hint: "현재 등록된 전체 브랜드" },
+            { label: "제휴처", value: `${normalizedPartners.length.toLocaleString()}개`, hint: "현재 등록된 노출 단위" },
             { label: "카테고리", value: `${safeCategories.length.toLocaleString()}개`, hint: "운영 중인 분류 체계" },
             { label: "공개/대외비", value: `${publicCount.toLocaleString()} · ${confidentialCount.toLocaleString()}`, hint: "public · confidential" },
-            { label: "비공개/요청", value: `${privateCount.toLocaleString()}개`, hint: `승인 대기 ${changeRequests.length.toLocaleString()}건` },
+            { label: "비공개", value: `${privateCount.toLocaleString()}개`, hint: "사용자 화면 비노출" },
           ]}
           minItemWidth="13rem"
         />
         {partnerFormError ? (
           <FormMessage variant="error">{partnerFormError}</FormMessage>
         ) : null}
-        <AdminPartnerWorkspace
-          categories={safeCategories}
-          partners={normalizedPartners}
-          changeRequests={scopedChangeRequests}
-          planBrands={planBrands}
-          planRequests={planRequests}
-          planEvents={planEvents}
-          partnerMetrics={partnerMetrics}
-          initialTab={initialTab}
-          approveAction={approvePartnerChangeRequest}
-          rejectAction={rejectPartnerChangeRequest}
-          createCategoryAction={createCategory}
-          updateCategoryAction={updateCategory}
-          deleteCategoryAction={deleteCategory}
-          canManageGlobalSections={canManageGlobalSections}
-        />
+        {showPlans ? (
+          <section className="grid min-w-0 gap-4">
+            <AdminSectionHeading
+              title="제휴처 플랜"
+              description="결제 요청과 플랜 변경 이력을 같은 기준으로 확인합니다."
+            />
+            <AdminCompanyPlanManager
+              brands={planBrands}
+              requests={planRequests}
+              events={planEvents}
+            />
+          </section>
+        ) : (
+          <section className="grid min-w-0 gap-4">
+            {partnerMetrics.warningMessage ? (
+              <InlineMessage
+                tone="warning"
+                title="제휴처 집계 일부를 불러오지 못했습니다."
+                description={partnerMetrics.warningMessage}
+              />
+            ) : null}
+            <AdminPartnerManager
+              categories={safeCategories}
+              canCreate={canCreatePartner}
+              partners={normalizedPartners.map((partner) => ({
+                ...partner,
+                metrics: partnerMetrics.metricsByPartnerId.get(partner.id) ?? null,
+              }))}
+            />
+          </section>
+        )}
 
       </section>
     </AdminShell>

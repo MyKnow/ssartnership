@@ -91,6 +91,7 @@ export function buildHomePartnerDirectory({
   const filteredPartners = filterHomePartners({
     partners: normalizedPartners,
     activeCategory: resolvedQuery.activeCategory,
+    campusFilter: "all",
     appliesToFilter: resolvedQuery.appliesToFilter,
     searchValue: resolvedQuery.searchValue,
     sortValue: resolvedQuery.sortValue,

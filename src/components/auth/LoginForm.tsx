@@ -2,66 +2,39 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import MmUsernameInput from "@/components/auth/MmUsernameInput";
+import Link from "next/link";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
+import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { sanitizeReturnTo } from "@/lib/return-to";
-import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
-
-const savedLoginIdStorageKey = "ssartnership:member-login-id";
-
-function readSavedLoginId() {
-  try {
-    return window.localStorage.getItem(savedLoginIdStorageKey) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function writeSavedLoginId(rememberLoginId: boolean, loginId: string) {
-  try {
-    if (rememberLoginId) {
-      window.localStorage.setItem(savedLoginIdStorageKey, loginId);
-      return;
-    }
-    window.localStorage.removeItem(savedLoginIdStorageKey);
-  } catch {
-    // Login should not fail when browser storage is unavailable.
-  }
-}
+import { isValidEmail, normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 export default function LoginForm({
   returnTo,
 }: {
   returnTo?: string;
 }) {
-  const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberLoginId, setRememberLoginId] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
-    username?: string;
+    identifier?: string;
     password?: string;
   }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
   const router = useRouter();
-  const usernameRef = useRef<HTMLInputElement>(null);
+  const identifierRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
-    const savedLoginId = readSavedLoginId();
-    if (savedLoginId) {
-      setUsername(savedLoginId);
-      setRememberLoginId(true);
-    }
-
     const flag = sessionStorage.getItem("reset:success");
     if (flag) {
       sessionStorage.removeItem("reset:success");
@@ -81,7 +54,7 @@ export default function LoginForm({
     }
   }, [notify]);
 
-  function clearFieldError(field: "username" | "password") {
+  function clearFieldError(field: "identifier" | "password") {
     setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     setFormError(null);
   }
@@ -91,21 +64,26 @@ export default function LoginForm({
       return;
     }
 
-    if (!username.trim() || !password) {
+    if (!identifier.trim() || !password) {
       setFieldErrors({
-        username: username.trim() ? undefined : "아이디를 입력해 주세요.",
+        identifier: identifier.trim() ? undefined : "아이디 또는 이메일을 입력해 주세요.",
         password: password ? undefined : "비밀번호를 입력해 주세요.",
       });
       setFormError(null);
-      focusField(username.trim() ? passwordRef : usernameRef);
+      focusField(identifier.trim() ? passwordRef : identifierRef);
       return;
     }
 
-    const usernameError = validateMmUsername(username, "아이디");
-    if (usernameError) {
-      setFieldErrors({ username: usernameError });
+    const identifierValue = identifier.trim();
+    const identifierError = identifierValue.includes("@")
+      ? isValidEmail(identifierValue)
+        ? null
+        : "이메일 주소를 확인해 주세요."
+      : validateMmUsername(identifierValue, "아이디");
+    if (identifierError) {
+      setFieldErrors({ identifier: identifierError });
       setFormError(null);
-      focusField(usernameRef);
+      focusField(identifierRef);
       return;
     }
 
@@ -114,13 +92,16 @@ export default function LoginForm({
     setPending(true);
 
     try {
-      const normalizedUsername = normalizeMmUsername(username);
-      const response = await fetch("/api/mm/login", {
+      const normalizedLoginIdentifier = identifierValue.includes("@")
+        ? identifierValue.toLowerCase()
+        : normalizeMmUsername(identifierValue);
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: normalizedUsername,
+          identifier: normalizedLoginIdentifier,
           password,
+          autoLogin,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -136,7 +117,6 @@ export default function LoginForm({
 
       setFieldErrors({});
       setFormError(null);
-      writeSavedLoginId(rememberLoginId, normalizedUsername);
       notify("로그인되었습니다.");
       const safeReturnTo = sanitizeReturnTo(returnTo, "/");
       const nextHref = data.requiresConsent
@@ -150,26 +130,35 @@ export default function LoginForm({
   };
 
   return (
-    <div className="mt-6 flex flex-col gap-4">
+    <form
+      className="mt-6 flex flex-col gap-4"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleLogin();
+      }}
+    >
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        MM 아이디
-        <MmUsernameInput
-          ref={usernameRef}
-          value={username}
+        아이디 또는 이메일
+        <Input
+          ref={identifierRef}
+          autoComplete="username"
+          placeholder="예시: myknow 또는 name@example.com"
+          value={identifier}
           onChange={(event) => {
-            setUsername(event.target.value);
-            clearFieldError("username");
+            setIdentifier(event.target.value);
+            clearFieldError("identifier");
           }}
-          aria-invalid={Boolean(fieldErrors.username) || undefined}
-          className={getFieldErrorClass(Boolean(fieldErrors.username))}
+          aria-invalid={Boolean(fieldErrors.identifier) || undefined}
+          className={getFieldErrorClass(Boolean(fieldErrors.identifier))}
         />
-        {fieldErrors.username ? (
-          <FormMessage variant="error">{fieldErrors.username}</FormMessage>
+        {fieldErrors.identifier ? (
+          <FormMessage variant="error">{fieldErrors.identifier}</FormMessage>
         ) : null}
       </label>
 
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        사이트 비밀번호
+        비밀번호
         <PasswordInput
           ref={passwordRef}
           value={password}
@@ -187,30 +176,29 @@ export default function LoginForm({
         ) : null}
       </label>
 
-      <label className="inline-flex items-center gap-2 self-start text-sm font-medium text-muted-foreground">
-        <input
-          type="checkbox"
-          checked={rememberLoginId}
-          onChange={(event) => {
-            const checked = event.target.checked;
-            setRememberLoginId(checked);
-            if (!checked) {
-              writeSavedLoginId(false, "");
-            }
-          }}
-          className="h-4 w-4 rounded border-border bg-surface-control text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-        />
-        ID 저장하기
-      </label>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <label className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={autoLogin}
+            onChange={(event) => setAutoLogin(event.target.checked)}
+            className="h-5 w-5 rounded border-border bg-surface-control text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+          />
+          자동 로그인
+        </label>
+        <Link
+          href="/auth/reset"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        >
+          비밀번호 재설정
+        </Link>
+      </div>
 
-      <Button onClick={handleLogin} loading={pending} loadingText="로그인 중">
-        기존 비밀번호로 로그인
-      </Button>
-      <Button variant="ghost" href="/auth/reset">
-        사이트 비밀번호 재설정
+      <Button type="submit" loading={pending} loadingText="로그인 중">
+        로그인
       </Button>
 
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
-    </div>
+    </form>
   );
 }

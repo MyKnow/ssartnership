@@ -13,7 +13,7 @@ import { getSupabaseAdminClient } from "./supabase/server.ts";
 import { fetchPartnerEngagementCounts } from "./partner-counts.ts";
 
 const PARTNER_SERVICE_METRICS_WARNING_MESSAGE =
-  "일부 브랜드 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
+  "일부 제휴처 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
 
 export type PartnerServiceMetricsSnapshot = {
   metrics: PartnerPortalServiceMetrics;

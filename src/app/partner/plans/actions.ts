@@ -42,7 +42,7 @@ function readAuthorizedCompanyId(
 ) {
   const companyId = getString(formData, "companyId");
   if (!companyId || !isPartnerPortalCompanyAllowed(session, companyId)) {
-    redirectPartnerPlanError("", new Error("협력사 접근 권한이 없습니다."));
+    redirectPartnerPlanError("", new Error("파트너사 접근 권한이 없습니다."));
   }
   return companyId;
 }
@@ -61,7 +61,7 @@ export async function requestPartnerPlanUpgradeAction(formData: FormData) {
   if (!partnerId) {
     redirectPartnerPlanError(
       companyId,
-      new Error("브랜드 접근 권한이 없습니다."),
+      new Error("제휴처 접근 권한이 없습니다."),
     );
   }
   const billingProfileId = getString(formData, "billingProfileId");

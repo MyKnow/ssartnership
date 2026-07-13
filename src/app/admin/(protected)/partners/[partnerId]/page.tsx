@@ -8,8 +8,8 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
-import SectionHeading from "@/components/ui/SectionHeading";
-import ShellHeader from "@/components/ui/ShellHeader";
+import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
@@ -213,12 +213,12 @@ export default async function AdminPartnerDetailPage({
   const hiddenReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.hiddenCount;
 
   return (
-    <AdminShell title={partner.name} backHref="/admin/partners" backLabel="브랜드 관리">
+    <AdminShell title={partner.name} backHref="/admin/partners" backLabel="제휴처">
       <section className="grid min-w-0 gap-6">
-        <ShellHeader
+        <AdminPageHeader
           eyebrow="Partner Detail"
           title={partner.name}
-          description="브랜드 정보, 성과 집계, 리뷰 운영을 한 화면에서 관리합니다."
+          description="제휴처 정보, 성과 집계, 리뷰 운영을 한 화면에서 관리합니다."
         />
 
         {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
@@ -292,7 +292,7 @@ export default async function AdminPartnerDetailPage({
             <InlineMessage
               className="mt-6"
               tone="warning"
-              title="브랜드 집계 일부를 불러오지 못했습니다."
+              title="제휴처 집계 일부를 불러오지 못했습니다."
               description={metricsResult.warningMessage}
             />
           ) : null}
@@ -302,9 +302,9 @@ export default async function AdminPartnerDetailPage({
 
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">
           <div className="grid min-w-0 gap-4">
-            <SectionHeading
-              title="브랜드 수정"
-              description="리스트 화면이 아니라 상세 편집 화면에서 브랜드 정보를 수정합니다."
+            <AdminSectionHeading
+              title="제휴처 수정"
+              description="목록에서는 핵심 정보만 확인하고 이 상세 화면에서 제휴처 정보를 수정합니다."
             />
             <PartnerCardForm
               mode="edit"
@@ -354,7 +354,7 @@ export default async function AdminPartnerDetailPage({
               categoryId={partner.category_id}
               formAction={updatePartner}
               deleteAction={deletePartner}
-              submitLabel="브랜드 저장"
+              submitLabel="제휴처 저장"
               hiddenFields={[
                 { name: "updateRedirectTo", value: detailPath },
                 { name: "deleteRedirectTo", value: "/admin/partners" },

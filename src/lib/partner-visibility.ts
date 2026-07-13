@@ -105,12 +105,12 @@ export function getPartnerLockCopy(lockKind: "confidential" | "private") {
         badge: "대외비",
         title: "로그인하면 확인할 수 있어요",
         description:
-          "다른 업체가 더 있는 건 알겠지만\n지금은 내용을 확인할 수 없어요.",
+          "다른 제휴처가 더 있는 건 알겠지만\n지금은 내용을 확인할 수 없어요.",
       };
     case "private":
       return {
         badge: "비공개",
-        title: "아직 추진 중인 제휴 업체예요",
+        title: "아직 추진 중인 제휴처예요",
         description:
           "제휴가 확정되기 전이라 누구에게도 공개되지 않아요.",
       };

@@ -7,6 +7,7 @@ export default function SectionHeading({
   eyebrow,
   align = "left",
   size = "section",
+  headingLevel = "h3",
 }: {
   title: string;
   description?: string;
@@ -14,7 +15,9 @@ export default function SectionHeading({
   eyebrow?: string;
   align?: "left" | "center";
   size?: "hero" | "page" | "section";
+  headingLevel?: "h1" | "h2" | "h3" | "h4";
 }) {
+  const Heading = headingLevel;
   const titleClassName =
     size === "hero"
       ? "ui-display"
@@ -31,7 +34,7 @@ export default function SectionHeading({
       )}
     >
       {eyebrow ? <p className="ui-kicker">{eyebrow}</p> : null}
-      <h3 className={titleClassName}>{title}</h3>
+      <Heading className={titleClassName}>{title}</Heading>
       {description ? (
         <p className="ui-body max-w-3xl">{description}</p>
       ) : null}

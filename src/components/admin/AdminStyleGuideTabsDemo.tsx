@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Tabs from "@/components/ui/Tabs";
+import AdminTabs from "@/components/admin/AdminTabs";
 
 const tabOptions = [
   {
@@ -19,5 +19,5 @@ const tabOptions = [
 export default function AdminStyleGuideTabsDemo() {
   const [value, setValue] = useState<(typeof tabOptions)[number]["value"]>("immediate");
 
-  return <Tabs value={value} onChange={setValue} options={tabOptions} />;
+  return <AdminTabs value={value} onChange={setValue} options={tabOptions} />;
 }

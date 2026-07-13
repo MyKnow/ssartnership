@@ -50,9 +50,9 @@ export const BUG_REPORT_HREF = "/support/bug-report";
 
 export const TECH_SUPPORT_TEMPLATE = buildSupportMailTemplate({
   to: BUG_REPORT_EMAIL,
-  subject: `[${SITE_NAME} 협력사 포털] 기술 지원 요청`,
+  subject: `[${SITE_NAME} 파트너사 포털] 기술 지원 요청`,
   bodyLines: [
-    "1. 업체명 / 브랜드명:",
+    "1. 파트너사명 / 제휴처명:",
     "2. 담당자명:",
     "3. 로그인 이메일:",
     "4. 연락 가능한 전화번호:",

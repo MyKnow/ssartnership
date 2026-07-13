@@ -1,9 +1,7 @@
-import Link from "next/link";
 import AdminShell from "@/components/admin/AdminShell";
-import Card from "@/components/ui/Card";
-import FormMessage from "@/components/ui/FormMessage";
-import ShellHeader from "@/components/ui/ShellHeader";
-import StatsRow from "@/components/ui/StatsRow";
+import AdminEventListView, {
+  type AdminEventListItem,
+} from "@/components/admin/AdminEventListView";
 import { listEventPageDefinitions } from "@/lib/event-pages";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { PROMOTION_AUDIENCE_OPTIONS } from "@/lib/promotions/catalog";
@@ -47,27 +45,13 @@ function getEventState(campaign: ManagedEventCampaign | null) {
   return { label: state.label, className };
 }
 
-function EventPill({
-  children,
-  className = "border-border/70 bg-surface-inset text-muted-foreground",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}>
-      {children}
-    </span>
-  );
-}
-
-function EventCard({
+function buildEventListItem({
   definition,
   registration,
 }: {
   definition: ReturnType<typeof listEventPageDefinitions>[number];
   registration: ManagedEventCampaign | null;
-}) {
+}): AdminEventListItem {
   const isRegistered = registration?.source === "database" && Boolean(registration.id);
   const state = getEventState(isRegistered ? registration : null);
   const periodStarts = formatEventDate(registration?.startsAt ?? definition.startsAt);
@@ -77,66 +61,20 @@ function EventCard({
       (audience) => PROMOTION_AUDIENCE_OPTIONS.find((option) => option.key === audience)?.label ?? audience,
     ).join(" · ") ?? "전체";
 
-  return (
-    <article className="grid gap-4 rounded-panel border border-border bg-surface p-5 shadow-flat">
-      <div className="flex flex-wrap items-center gap-2">
-        <EventPill className={state.className}>{state.label}</EventPill>
-        <EventPill>/{definition.slug}</EventPill>
-        <EventPill>
-          {registration?.pagePath ?? `/events/${definition.slug}`}
-        </EventPill>
-      </div>
-
-      <div className="grid gap-2">
-        <h3 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
-          {definition.title}
-        </h3>
-        <p className="text-sm leading-6 text-muted-foreground">{definition.description}</p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            공개 기간
-          </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {periodStarts} - {periodEnds}
-          </p>
-        </div>
-        <div className="rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            노출 대상
-          </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {targetLabel}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {definition.conditions.map((condition) => (
-          <EventPill key={condition.key}>
-            {condition.title} · {condition.tickets}장
-          </EventPill>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <Link
-          href={`/admin/event/${definition.slug}`}
-          className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface px-4 text-sm font-semibold text-foreground transition hover:border-strong hover:bg-surface-elevated"
-        >
-          {isRegistered ? "운영 설정" : "등록하기"}
-        </Link>
-        <Link
-          href={`/events/${definition.slug}`}
-          className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface-muted px-4 text-sm font-semibold text-foreground transition hover:border-strong hover:bg-surface-elevated"
-        >
-          랜딩 보기
-        </Link>
-      </div>
-    </article>
-  );
+  return {
+    slug: definition.slug,
+    title: definition.title,
+    description: definition.description,
+    pagePath: registration?.pagePath ?? `/events/${definition.slug}`,
+    stateLabel: state.label,
+    stateClassName: state.className,
+    periodLabel: `${periodStarts} - ${periodEnds}`,
+    targetLabel,
+    conditionLabels: definition.conditions.map(
+      (condition) => `${condition.title} · ${condition.tickets}장`,
+    ),
+    isRegistered,
+  };
 }
 
 export default async function AdminEventPage({
@@ -153,71 +91,30 @@ export default async function AdminEventPage({
   const sections = (["진행 전", "진행 중", "진행 후", "비활성", "등록 필요"] as const).map(
     (bucket) => ({
       bucket,
-      items: definitions.filter((definition) => {
-        const registration = registrationMap.get(definition.slug) ?? null;
-        const isRegistered = registration?.source === "database" && Boolean(registration.id);
-        if (!isRegistered) {
-          return bucket === "등록 필요";
-        }
-        return getEventState(registration).label === bucket;
-      }),
+      items: definitions
+        .filter((definition) => {
+          const registration = registrationMap.get(definition.slug) ?? null;
+          const isRegistered = registration?.source === "database" && Boolean(registration.id);
+          if (!isRegistered) {
+            return bucket === "등록 필요";
+          }
+          return getEventState(registration).label === bucket;
+        })
+        .map((definition) =>
+          buildEventListItem({
+            definition,
+            registration: registrationMap.get(definition.slug) ?? null,
+          }),
+        ),
     }),
   );
-  const countsByBucket = new Map(sections.map((section) => [section.bucket, section.items.length]));
 
   return (
     <AdminShell title="이벤트 관리" backHref="/admin" backLabel="관리 홈">
-      <div className="grid gap-6">
-        <ShellHeader
-          eyebrow="Events"
-          title="이벤트 관리"
-          description="코드로 만든 이벤트 페이지를 등록하고, 공개 전·중·후 상태와 노출 대상을 확인합니다."
-        />
-        <StatsRow
-          items={[
-            { label: "진행 전", value: `${countsByBucket.get("진행 전") ?? 0}개`, hint: "오픈 대기" },
-            { label: "진행 중", value: `${countsByBucket.get("진행 중") ?? 0}개`, hint: "현재 노출 중" },
-            { label: "진행 후", value: `${countsByBucket.get("진행 후") ?? 0}개`, hint: "종료 후 보관" },
-            { label: "미등록/비활성", value: `${(countsByBucket.get("등록 필요") ?? 0) + (countsByBucket.get("비활성") ?? 0)}개`, hint: "등록 필요 + 비활성" },
-          ]}
-          minItemWidth="13rem"
-        />
-        {statusMessage(params.status) ? (
-          <FormMessage variant="info">{statusMessage(params.status)}</FormMessage>
-        ) : null}
-
-        {sections.map((section) => (
-          <section key={section.bucket} className="grid gap-4" aria-label={`${section.bucket} 이벤트`}>
-            <div className="flex items-end justify-between gap-3 px-1">
-              <div>
-                <p className="ui-kicker">Events</p>
-                <h2 className="mt-2 text-xl font-semibold text-foreground">
-                  {section.bucket}
-                </h2>
-              </div>
-              <span className="text-sm font-semibold text-muted-foreground">
-                {section.items.length}개
-              </span>
-            </div>
-
-            {section.items.length > 0 ? (
-              <div className="grid gap-5">
-                {section.items.map((definition) => (
-                  <EventCard
-                    key={definition.slug}
-                    definition={definition}
-                    registration={registrationMap.get(definition.slug) ?? null}
-                  />
-                ))}
-              </div>
-            ) : (
-              <Card tone="muted" className="text-sm text-muted-foreground">
-                해당 상태의 이벤트가 없습니다.
-              </Card>
-            )}
-          </section>
-        ))}
-      </div>
+      <AdminEventListView
+        sections={sections}
+        statusMessage={statusMessage(params.status)}
+      />
     </AdminShell>
   );
 }

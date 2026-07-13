@@ -51,4 +51,4 @@ jobs:
       - name: E2E tests
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
-        run: npm run test:e2e
+        run: npm run test:e2e:ci

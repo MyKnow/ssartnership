@@ -38,7 +38,7 @@ export async function POST(
   const partnerId = resolvedParams?.id ? safeDecodeSegment(resolvedParams.id) : "";
   if (!partnerId) {
     return NextResponse.json(
-      { message: "유효한 브랜드를 찾을 수 없습니다." },
+      { message: "유효한 제휴처를 찾을 수 없습니다." },
       { status: 400 },
     );
   }
@@ -46,7 +46,7 @@ export async function POST(
   const exists = await partnerRepository.partnerExists(partnerId);
   if (!exists) {
     return NextResponse.json(
-      { message: "유효한 브랜드를 찾을 수 없습니다." },
+      { message: "유효한 제휴처를 찾을 수 없습니다." },
       { status: 404 },
     );
   }

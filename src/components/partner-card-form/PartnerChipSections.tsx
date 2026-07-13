@@ -71,7 +71,7 @@ export default function PartnerChipSections({
               <input type="hidden" name="benefits" value={COUPON_ONLY_BENEFIT_TEXT} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">
-                  쿠폰 전용 브랜드로 저장
+                  쿠폰 전용 제휴처로 저장
                 </p>
                 <p className="mt-1 text-ko-pretty text-sm leading-6">
                   상시 혜택 없이 저장하고, 쿠폰 관리에서 쿠폰명, 수량, 사용 기간, 1인당 사용 횟수를 설정합니다.

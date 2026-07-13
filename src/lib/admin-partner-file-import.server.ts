@@ -33,7 +33,13 @@ const SSAFY_SKY = "00AEEF";
 const SSAFY_NAVY = "0B1B3F";
 const SSAFY_SOFT = "EAF4FF";
 const SSAFY_LINE = "B8CCE8";
-const REQUIRED_INPUT_HEADERS = new Set(["브랜드명", "카테고리"]);
+const REQUIRED_INPUT_HEADERS = new Set(["제휴처명", "카테고리"]);
+const LEGACY_INPUT_HEADER_ALIASES: Readonly<Record<string, string>> = {
+  브랜드명: "제휴처명",
+  "브랜드 전화번호": "제휴처 전화번호",
+  협력사명: "파트너사명",
+  "협력사 설명": "파트너사 설명",
+};
 const URL_INPUT_HEADERS = new Set([
   "문의 링크",
   "지도 URL",
@@ -42,10 +48,10 @@ const URL_INPUT_HEADERS = new Set([
 ]);
 
 const SAMPLE_GUIDE_ROWS = [
-  ["브랜드명", "필수", "사용자에게 노출되는 브랜드 이름"],
+  ["제휴처명", "필수", "사용자에게 노출되는 서비스 또는 매장 이름"],
   ["카테고리", "필수", "드롭다운에서 선택하거나 새 카테고리명을 직접 입력"],
-  ["브랜드 전화번호", "선택", "협력사 담당자 번호가 아닌 브랜드/지점 연락처"],
-  ["상세 설명", "선택", "구성원이 브랜드를 이해할 수 있도록 1200자 이내로 입력"],
+  ["제휴처 전화번호", "선택", "파트너사 담당자 번호가 아닌 제휴처/지점 연락처"],
+  ["상세 설명", "선택", "구성원이 제휴처를 이해할 수 있도록 1200자 이내로 입력"],
   ["혜택", "선택", "여러 개면 | 로 구분. 예: 아메리카노 할인|베이커리 할인"],
   ["이용 조건", "선택", "여러 개면 | 로 구분. 예: 싸트너십 인증|현장 제시"],
   ["태그", "선택", "여러 개면 | 로 구분. 예: 카페|역삼"],
@@ -125,7 +131,8 @@ function mapVerticalInputRows(sheet: ExcelJS.Worksheet, maxInputRow: number) {
     if (!field) {
       return;
     }
-    mapped.set(field, getCellString(row.getCell(INPUT_VALUE_COLUMN)));
+    const canonicalField = LEGACY_INPUT_HEADER_ALIASES[field] ?? field;
+    mapped.set(canonicalField, getCellString(row.getCell(INPUT_VALUE_COLUMN)));
   });
 
   return { mapped, outOfRangeRows };
@@ -209,18 +216,18 @@ function getInputExample(
   options: AdminPartnerFileTemplateOptions,
 ) {
   const examples: Record<string, string> = {
-    브랜드명: "카페 싸피 역삼본점",
+    제휴처명: "카페 싸피 역삼본점",
     카테고리: "카페",
     시작일: "2026-05-01",
     종료일: "2026-12-31",
     "문의 링크": "https://pf.kakao.com/_cafessafy",
-    "브랜드 전화번호": "02-3429-5100",
+    "제휴처 전화번호": "02-3429-5100",
     "상세 설명": "SSAFY 서울캠퍼스 인근에서 이용하기 좋은 가상의 프랜차이즈 카페입니다.",
-    협력사명: "카페 싸피",
+    파트너사명: "카페 싸피",
     담당자명: "김싸피",
     "담당자 이메일": "partner@cafessafy.example",
     "담당자 전화번호": "010-1500-1234",
-    "협력사 설명": "여러 지점을 운영하는 가상의 프랜차이즈 카페",
+    "파트너사 설명": "여러 지점을 운영하는 가상의 프랜차이즈 카페",
     혜택: "아메리카노 10% 할인|시그니처 라떼 500원 할인",
     "이용 조건": "싸트너십 인증|현장 제시",
     태그: "카페|역삼|프랜차이즈",
@@ -238,19 +245,19 @@ function getInputExample(
 
 function getInputGuide(header: string, options: AdminPartnerFileTemplateOptions) {
   const guides: Record<string, string> = {
-    브랜드명: "필수. 사용자에게 노출되는 브랜드 이름입니다.",
+    제휴처명: "필수. 사용자에게 노출되는 서비스 또는 매장 이름입니다.",
     카테고리:
       "필수. 드롭다운에서 선택합니다. 목록에 없으면 새 카테고리명을 직접 입력합니다.",
     시작일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     종료일: "선택. YYYY-MM-DD 형식으로 입력합니다.",
     "문의 링크": "선택. 문의 채널 URL을 입력합니다.",
-    "브랜드 전화번호": "선택. 협력사 담당자 번호와 다른 브랜드/지점 연락처입니다.",
-    "상세 설명": "선택. 상세 페이지에 표시할 브랜드 설명입니다. 1200자 이내로 입력합니다.",
-    협력사명: "선택. 기존 협력사명과 정확히 같으면 자동 연결됩니다.",
-    담당자명: "선택. 협력사 담당자 이름입니다.",
+    "제휴처 전화번호": "선택. 파트너사 담당자 번호와 다른 제휴처/지점 연락처입니다.",
+    "상세 설명": "선택. 상세 페이지에 표시할 제휴처 설명입니다. 1200자 이내로 입력합니다.",
+    파트너사명: "선택. 기존 파트너사명과 정확히 같으면 자동 연결됩니다.",
+    담당자명: "선택. 파트너사 담당자 이름입니다.",
     "담당자 이메일": "선택. 이메일 형식으로 입력합니다.",
     "담당자 전화번호": "선택. 연락 가능한 번호입니다.",
-    "협력사 설명": "선택. 협력사 내부 설명입니다.",
+    "파트너사 설명": "선택. 파트너사 내부 설명입니다.",
     혜택: "선택. 여러 개면 | 로 구분합니다.",
     "이용 조건": "선택. 여러 개면 | 로 구분합니다.",
     태그: "선택. 여러 개면 | 로 구분합니다.",
@@ -636,15 +643,15 @@ export async function parseAdminPartnerXlsxDraft({
   }
 
   const row = inputRows;
-  const name = getValue(row, "브랜드명");
+  const name = getValue(row, "제휴처명");
   const categoryLabelRaw = getValue(row, "카테고리");
   const category = resolveCategory(categoryLabelRaw, categories);
   const periodStart = getValue(row, "시작일");
   const periodEnd = getValue(row, "종료일");
-  const brandPhoneRaw = getValue(row, "브랜드 전화번호");
+  const brandPhoneRaw = getValue(row, "제휴처 전화번호");
   const inquiryLinkRaw = getValue(row, "문의 링크") || brandPhoneRaw;
   const detailDescription = getValue(row, "상세 설명");
-  const companyNameRaw = getValue(row, "협력사명");
+  const companyNameRaw = getValue(row, "파트너사명");
   const company = resolveCompanyByName(companyNameRaw, companies);
   const location =
     options.serviceMode === "online" ? ONLINE_PARTNER_LOCATION : getValue(row, "위치");
@@ -658,7 +665,7 @@ export async function parseAdminPartnerXlsxDraft({
       : "";
 
   if (!name) {
-    errors.push("브랜드명이 필요합니다.");
+    errors.push("제휴처명이 필요합니다.");
   }
   if (!categoryLabelRaw) {
     errors.push("카테고리가 필요합니다.");
@@ -690,7 +697,7 @@ export async function parseAdminPartnerXlsxDraft({
   }
   const brandPhone = sanitizePartnerLinkValue(brandPhoneRaw);
   if (brandPhoneRaw && !brandPhone) {
-    errors.push("브랜드 전화번호가 올바르지 않습니다.");
+    errors.push("제휴처 전화번호가 올바르지 않습니다.");
   }
   const companyContactEmail = getValue(row, "담당자 이메일");
   if (!company && companyContactEmail && !isValidEmail(companyContactEmail)) {
@@ -739,7 +746,7 @@ export async function parseAdminPartnerXlsxDraft({
           contactName: getValue(row, "담당자명"),
           contactEmail: companyContactEmail,
           contactPhone: getValue(row, "담당자 전화번호"),
-          description: getValue(row, "협력사 설명"),
+          description: getValue(row, "파트너사 설명"),
         },
       },
     },

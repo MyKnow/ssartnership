@@ -30,8 +30,8 @@ export const SUGGEST_FIELD_ORDER: SuggestFieldName[] = [
 ];
 
 const requiredFieldMessages: Record<Exclude<SuggestFieldName, "companyUrl">, string> = {
-  companyName: "업체명을 입력해 주세요.",
-  businessArea: "업체 분야 소개를 입력해 주세요.",
+  companyName: "파트너사명을 입력해 주세요.",
+  businessArea: "사업 분야 소개를 입력해 주세요.",
   partnershipConditions: "제안 제휴 조건을 입력해 주세요.",
   contactName: "담당자 이름을 입력해 주세요.",
   contactRole: "담당자 직위를 입력해 주세요.",

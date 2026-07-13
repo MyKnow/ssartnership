@@ -2,19 +2,20 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
-import ShellHeader from "@/components/ui/ShellHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
-import CertificationProfileSync from "@/components/certification/CertificationProfileSync";
+import CertificationEmailAction from "@/components/certification/CertificationEmailAction";
+import CertificationMattermostSyncAction from "@/components/certification/CertificationMattermostSyncAction";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 
 export const metadata: Metadata = {
-  title: `SSAFY 인증 | ${SITE_NAME}`,
+  title: `내 인증 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: true,
@@ -24,13 +25,21 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type CertificationMember = {
-  mm_username: string;
+  mm_username?: string | null;
   display_name?: string | null;
+  generation?: number | null;
   year?: number | null;
   campus?: string | null;
   avatar_url?: string | null;
   avatar_updated_at?: string | null;
   has_legacy_avatar?: boolean | null;
+  graduate_verified_at?: string | null;
+  has_profile_image?: boolean | null;
+  profile_image_url?: string | null;
+  mattermost_account_id?: string | null;
+  mm_user_id?: string | null;
+  email?: string | null;
+  email_verified_at?: string | null;
 };
 
 function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
@@ -53,6 +62,10 @@ export default async function CertificationPage({
 }) {
   const initialTimestamp = new Date().toISOString();
   const params = (await searchParams) ?? {};
+  const benefitReturnTo = sanitizeReturnTo(
+    Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo,
+    "",
+  );
   const returnTo = buildCertificationReturnTo(params.returnTo);
   const session = await getSignedUserSession();
   if (!session?.userId) {
@@ -68,9 +81,10 @@ export default async function CertificationPage({
   const { data: member } = await supabase
     .from("members")
     .select(
-      "mm_username,display_name,year,campus,avatar_content_type,avatar_url,updated_at",
+      "mm_username,display_name,generation,year,campus,avatar_content_type,avatar_url,updated_at,graduate_verified_at,active_profile_image_id,mattermost_account_id,mm_user_id,email,email_verified_at",
     )
     .eq("id", session.userId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!member) {
@@ -82,29 +96,44 @@ export default async function CertificationPage({
       <SiteHeader initialSession={headerSession} />
       <main>
         <Container className="pb-16 pt-10" size="wide">
-          <div className="mx-auto max-w-4xl space-y-6">
-            <ShellHeader
-              eyebrow="Certification"
-              title="SSAFY 인증"
+          <div className="mx-auto w-full max-w-4xl space-y-6">
+            <PageHeader
+              eyebrow="Member"
+              title="내 인증"
               description="현재 계정의 인증 상태와 표시 정보를 확인합니다."
-              className="mx-auto max-w-2xl"
+              backHref={benefitReturnTo}
+              backLabel="혜택 화면으로 돌아가기"
             />
             <CertificationView
               member={{
                 mm_username: member.mm_username,
                 display_name: member.display_name,
+                generation: member.generation,
                 year: member.year,
                 campus: member.campus,
                 avatar_url: member.avatar_url,
                 avatar_updated_at: member.updated_at,
                 has_legacy_avatar: Boolean(member.avatar_content_type),
+                graduate_verified_at: member.graduate_verified_at,
+                has_profile_image: Boolean(member.active_profile_image_id),
+                profile_image_url: member.active_profile_image_id
+                  ? "/api/certification/profile-image"
+                  : null,
               } satisfies CertificationMember}
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
             />
+            {member.mattermost_account_id || member.mm_user_id ? (
+              <CertificationMattermostSyncAction />
+            ) : null}
+            <CertificationEmailAction
+              initialEmail={member.email}
+              emailVerified={Boolean(member.email_verified_at)}
+            />
+            <div className="mt-10 w-full border-t border-border/70 pt-8">
+              <CertificationFooterActions canChangeProfilePhoto />
+            </div>
           </div>
-          <CertificationFooterActions />
-          <CertificationProfileSync />
         </Container>
       </main>
     </div>

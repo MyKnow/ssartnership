@@ -42,9 +42,9 @@ export default function AdminReviewFilters({
         </div>
 
         <div className="grid min-w-[10rem] gap-1">
-          <span className="ui-caption">협력사</span>
+          <span className="ui-caption">파트너사</span>
           <Select name="companyId" defaultValue={filters.companyId || "all"}>
-            <option value="all">전체 협력사</option>
+            <option value="all">전체 파트너사</option>
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
                 {company.name}
@@ -54,9 +54,9 @@ export default function AdminReviewFilters({
         </div>
 
         <div className="grid min-w-[12rem] gap-1">
-          <span className="ui-caption">브랜드</span>
+          <span className="ui-caption">제휴처</span>
           <Select name="partnerId" defaultValue={filters.partnerId || "all"}>
-            <option value="all">전체 브랜드</option>
+            <option value="all">전체 제휴처</option>
             {partners.map((partner) => (
               <option key={partner.id} value={partner.id}>
                 {partner.name}

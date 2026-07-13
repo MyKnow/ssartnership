@@ -26,7 +26,7 @@ export default function PartnerFormActions({
               pendingText="저장 중"
               className="min-h-12 flex-1 rounded-full px-5 sm:flex-none"
             >
-              {submitLabel ?? "브랜드 저장"}
+              {submitLabel ?? "제휴처 저장"}
             </SubmitButton>
 
             {deleteAction && partnerId ? (
@@ -51,7 +51,7 @@ export default function PartnerFormActions({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">
-          {submitLabel ?? "브랜드 추가"}
+          {submitLabel ?? "제휴처 추가"}
         </SubmitButton>
       </div>
     </>

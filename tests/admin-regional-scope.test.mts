@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canAdminAccessManagedCampuses,
+  canAdminMutateGlobalPartnerAccount,
   isRegionalAdminPermission,
   normalizeAdminManagedCampusSlugs,
   resolveCreatedManagedCampusSlugs,
@@ -68,6 +69,25 @@ describe("regional admin scope", () => {
     assert.deepEqual(
       resolveCreatedManagedCampusSlugs(operationsAccount, ["daejeon", "gumi"]),
       ["daejeon", "gumi"],
+    );
+  });
+
+  it("blocks regional admins from mutating shared global partner accounts", () => {
+    const regionalAccount = createAccount("regional_partner_manager", ["seoul"]);
+    const operationsAccount = createAccount("operations_manager", []);
+
+    assert.equal(
+      canAdminMutateGlobalPartnerAccount(regionalAccount, [["seoul"], ["seoul"]]),
+      true,
+    );
+    assert.equal(
+      canAdminMutateGlobalPartnerAccount(regionalAccount, [["seoul"], ["daejeon"]]),
+      false,
+    );
+    assert.equal(canAdminMutateGlobalPartnerAccount(regionalAccount, []), false);
+    assert.equal(
+      canAdminMutateGlobalPartnerAccount(operationsAccount, [["daejeon"]]),
+      true,
     );
   });
 });

@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
-import {
-  buildMemberSyncLogProperties,
-  syncMemberById,
-} from "@/lib/mm-member-sync";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
 
 export const runtime = "nodejs";
 
@@ -21,7 +18,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const syncResult = await syncMemberById(session.userId);
+    const syncResult = await syncMemberMattermostProfile(session.userId);
+    if (!syncResult) {
+      return NextResponse.json(
+        {
+          ok: false,
+          updated: false,
+          message: "연결된 Mattermost 계정을 찾지 못했습니다.",
+        },
+        { status: 409 },
+      );
+    }
     if (syncResult?.updated) {
       await logAdminAudit({
         ...context,
@@ -29,18 +36,22 @@ export async function POST(request: Request) {
         actorId: session.userId,
         targetType: "member",
         targetId: session.userId,
-        properties: buildMemberSyncLogProperties(syncResult, {
-          source: "profile_view",
-        }),
+        properties: {
+          source: "member_profile_action",
+          changedFields: syncResult.changedFields,
+          imageUpdated: syncResult.imageUpdated,
+          imageSkipped: syncResult.imageSkipped,
+        },
       });
     }
 
     return NextResponse.json({
       ok: true,
-      updated: Boolean(syncResult?.updated),
+      updated: syncResult.updated,
+      changedFields: syncResult.changedFields,
+      imageSkipped: syncResult.imageSkipped,
     });
-  } catch (error) {
-    console.error("member profile sync failed", error);
+  } catch {
     return NextResponse.json(
       {
         ok: false,

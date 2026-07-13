@@ -45,6 +45,23 @@ export function canAdminAccessManagedCampuses(
   return targetSlugs.some((slug) => accountSlugs.includes(slug));
 }
 
+export function canAdminMutateGlobalPartnerAccount(
+  account: AdminScopeAccountLike,
+  linkedCompanyManagedCampusSlugs: Array<string[] | null | undefined>,
+) {
+  if (!isRegionalAdminAccount(account)) {
+    return true;
+  }
+
+  if (linkedCompanyManagedCampusSlugs.length === 0) {
+    return false;
+  }
+
+  return linkedCompanyManagedCampusSlugs.every((managedCampusSlugs) =>
+    canAdminAccessManagedCampuses(account, managedCampusSlugs),
+  );
+}
+
 export function resolveCreatedManagedCampusSlugs(
   account: AdminScopeAccountLike,
   requestedManagedCampusSlugs: string[] | null | undefined,

@@ -1,6 +1,6 @@
 export const partnerFormErrorMessages: Record<string, string> = {
-  partner_form_missing_required: "업체명, 카테고리, 위치를 입력해 주세요.",
-  partner_form_missing_name: "업체명을 입력해 주세요.",
+  partner_form_missing_required: "제휴처명, 카테고리, 지점 위치를 입력해 주세요.",
+  partner_form_missing_name: "제휴처명을 입력해 주세요.",
   partner_form_missing_category: "카테고리를 선택해 주세요.",
   partner_form_missing_location: "위치를 입력해 주세요.",
   partner_form_invalid_detail_description: "상세 설명은 1,200자 이내로 입력해 주세요.",
@@ -17,8 +17,8 @@ export const partnerFormErrorMessages: Record<string, string> = {
   partner_form_invalid_applies_to: "적용 대상을 하나 이상 선택해 주세요.",
   partner_form_invalid_branch_list: "지점 목록 입력값을 확인해 주세요.",
   partner_form_invalid_request: "입력값을 확인해 주세요.",
-  partner_company_missing_name: "협력사명을 입력해 주세요.",
+  partner_company_missing_name: "파트너사명을 입력해 주세요.",
   partner_company_missing_email: "담당자 이메일을 입력해 주세요.",
   partner_company_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
-  partner_company_invalid_request: "협력사 입력값을 확인해 주세요.",
+  partner_company_invalid_request: "파트너사 입력값을 확인해 주세요.",
 };

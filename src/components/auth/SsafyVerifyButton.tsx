@@ -6,6 +6,7 @@ import { useState } from "react";
 import SsafyVerifyDiagnosticDetails from "@/components/auth/SsafyVerifyDiagnosticDetails";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
+import { cn } from "@/lib/cn";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   shouldUseSsafyVerifyRedirectFlow,
@@ -74,8 +75,12 @@ function getErrorMessage(result: SsafyVerifyClientFailure) {
 
 export default function SsafyVerifyButton({
   returnTo,
+  label = "SSAFY 인증으로 계속하기",
+  className,
 }: {
   returnTo?: string;
+  label?: string;
+  className?: string;
 }) {
   const [status, setStatus] = useState<"idle" | "working" | "failed">("idle");
   const [error, setError] = useState<SsafyVerifyClientFailure | null>(null);
@@ -225,10 +230,10 @@ export default function SsafyVerifyButton({
   }
 
   return (
-    <div className="mt-6 flex flex-col gap-4">
+    <div className={cn("flex flex-col gap-4", className ?? "mt-6")}>
       <Script src={sdkUrl} strategy="afterInteractive" />
       <Button onClick={verify} loading={status === "working"} loadingText="인증 중">
-        SSAFY 인증으로 계속하기
+        {label}
       </Button>
       {error ? (
         <div className="space-y-2">

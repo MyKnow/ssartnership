@@ -20,13 +20,17 @@ import { formatKoreanDateTime } from "@/lib/datetime";
 
 type Member = {
   id?: string | null;
-  mm_username: string;
+  mm_username?: string | null;
   display_name?: string | null;
+  generation?: number | null;
   year?: number | null;
   campus?: string | null;
   avatar_url?: string | null;
   avatar_updated_at?: string | null;
   has_legacy_avatar?: boolean | null;
+  graduate_verified_at?: string | null;
+  has_profile_image?: boolean | null;
+  profile_image_url?: string | null;
 };
 
 export default function CertificationView({
@@ -42,13 +46,18 @@ export default function CertificationView({
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
-  const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
+  const profile = parseSsafyProfile(member.display_name ?? member.mm_username ?? "");
   const hasTrackedViewRef = useRef(false);
-  const year = member.year ?? getCurrentSsafyYear();
-  const roleLabel = getCertificationRoleLabel(year);
-  const scheme = getCertificationScheme(year, cohortCardThemes);
+  const generation = member.generation ?? member.year ?? getCurrentSsafyYear();
+  const roleLabel = getCertificationRoleLabel(generation, {
+    graduateVerifiedAt: member.graduate_verified_at,
+  });
+  const scheme = getCertificationScheme(generation, cohortCardThemes, {
+    graduateVerifiedAt: member.graduate_verified_at,
+  });
   const campusLabel = member.campus ?? profile.campus ?? null;
-  const yearLabel = year > 0 ? formatSsafyYearLabel(year) : null;
+  const yearLabel = generation > 0 ? formatSsafyYearLabel(generation) : null;
+  const hasProfileImage = Boolean(member.has_profile_image && member.profile_image_url);
   const hasAvatarUrl = Boolean(member.avatar_url);
   const hasLegacyAvatar = Boolean(member.has_legacy_avatar);
   const avatarVersion = member.avatar_updated_at
@@ -57,7 +66,9 @@ export default function CertificationView({
   const legacyAvatarSrc = avatarVersion
     ? `/api/mm/avatar?v=${avatarVersion}`
     : "/api/mm/avatar";
-  const avatarSrc = member.avatar_url ?? (hasLegacyAvatar ? legacyAvatarSrc : "/avatar-default.svg");
+  const avatarSrc = hasProfileImage
+    ? member.profile_image_url!
+    : member.avatar_url ?? (hasLegacyAvatar ? legacyAvatarSrc : "/avatar-default.svg");
   const name = profile.displayName ?? member.display_name ?? "이름 미지정";
 
   useEffect(() => {
@@ -77,7 +88,7 @@ export default function CertificationView({
       eventName: "certification_view",
       targetType: "member",
       properties: {
-        year,
+        generation,
         campus: member.campus ?? profile.campus ?? null,
         role: roleLabel,
       },
@@ -85,7 +96,7 @@ export default function CertificationView({
   }, [
     disableTracking,
     member.campus,
-    year,
+    generation,
     profile.campus,
     roleLabel,
   ]);
@@ -135,35 +146,40 @@ export default function CertificationView({
         campusLabel={campusLabel}
         description=""
         footer={
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:items-end">
-            <div className="min-w-0 space-y-1">
-              <p className={cn("text-xs font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
+          <div className="flex h-full flex-nowrap items-center justify-between gap-[2cqw]">
+            <div className="min-w-0 space-y-[0.4cqw]">
+              <p className={cn("text-[clamp(0.5rem,1.5cqw,0.875rem)] font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
                 인증 시간
               </p>
-              <p className="whitespace-nowrap text-sm font-semibold sm:text-base">
+              <p className="whitespace-nowrap text-[clamp(0.625rem,2.4cqw,1.25rem)] font-semibold">
                 {dateLabel} {timeLabel}
               </p>
-              <div className={cn("flex items-center gap-2 text-xs", scheme.subduedTextClassName)}>
-                <span className={cn("inline-flex h-2 w-2 rounded-full", scheme.accentClassName)} />
-                {year === 0 ? "운영진 인증" : "교육생 인증"}
+              <div className={cn("flex items-center gap-[1cqw] text-[clamp(0.5rem,1.5cqw,0.875rem)]", scheme.subduedTextClassName)}>
+                <span className={cn("inline-flex h-[1cqw] w-[1cqw] rounded-full", scheme.accentClassName)} />
+                {roleLabel === "운영진" ? "운영진 인증" : roleLabel === "수료생" ? "수료생 인증" : "교육생 인증"}
               </div>
             </div>
-            <CertificationQrButton
-              roleLabel={roleLabel}
-              className={cn(
-                scheme.qrButtonClassName,
-                "!h-11 !min-h-11 !px-4 text-sm whitespace-nowrap",
-              )}
-            />
+            <div
+              data-certification-qr-touch-target
+              className="flex min-h-11 min-w-11 items-center justify-center"
+            >
+              <CertificationQrButton
+                roleLabel={roleLabel}
+                className={cn(
+                  scheme.qrButtonClassName,
+                  "relative !h-[8cqw] !min-h-0 !w-[15cqw] !min-w-0 !rounded-[2.5cqw] !px-[2cqw] text-[clamp(0.625rem,2cqw,1rem)] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
+                )}
+              />
+            </div>
           </div>
         }
         avatarSrc={avatarSrc}
-        avatarAlt={hasAvatarUrl || hasLegacyAvatar ? "프로필" : "기본 프로필 이미지"}
-        avatarOnClick={hasAvatarUrl || hasLegacyAvatar ? () => setAvatarOpen(true) : undefined}
+        avatarAlt={hasProfileImage || hasAvatarUrl || hasLegacyAvatar ? "프로필" : "기본 프로필 이미지"}
+        avatarOnClick={hasProfileImage || hasAvatarUrl || hasLegacyAvatar ? () => setAvatarOpen(true) : undefined}
         avatarButtonLabel="프로필 이미지 크게 보기"
       />
 
-      {(hasAvatarUrl || hasLegacyAvatar) && isAvatarOpen ? (
+      {(hasProfileImage || hasAvatarUrl || hasLegacyAvatar) && isAvatarOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6">
           <button
             type="button"

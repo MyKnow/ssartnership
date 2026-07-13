@@ -59,7 +59,7 @@ export const SignedInEscapeClose: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "메뉴 열기" }));
 
     const body = within(document.body);
-    await expect(body.getByRole("link", { name: "내 프로필 조회" })).toHaveAttribute("href", "/certification");
+    await expect(body.getByRole("link", { name: "내 인증" })).toHaveAttribute("href", "/certification");
     await userEvent.keyboard("{Escape}");
     await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
   },

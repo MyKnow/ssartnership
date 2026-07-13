@@ -193,7 +193,7 @@ export async function completeSupabasePartnerPortalInitialSetup(
   if (companyIds.length === 0) {
     throw new PartnerPortalSetupError(
       "not_found",
-      "연결된 협력사를 찾을 수 없습니다.",
+      "연결된 파트너사를 찾을 수 없습니다.",
     );
   }
   const basePayload = {

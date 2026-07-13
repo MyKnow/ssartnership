@@ -62,7 +62,7 @@ test("partner registration validation requires online site and contact email", a
     contactEmail: "not-email",
   });
 
-  assert.equal(result.fieldErrors.siteLink, "온라인 브랜드는 사이트 링크를 입력해 주세요.");
+  assert.equal(result.fieldErrors.siteLink, "온라인 제휴처는 사이트 링크를 입력해 주세요.");
   assert.equal(result.fieldErrors.contactEmail, "이메일 형식을 확인해 주세요.");
 });
 

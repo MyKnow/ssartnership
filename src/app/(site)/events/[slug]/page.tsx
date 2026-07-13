@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import EventLanding from "@/components/events/EventLanding";
+import EventPageView from "@/components/events/EventPageView";
 import SiteHeader from "@/components/SiteHeader";
-import Container from "@/components/ui/Container";
-import Card from "@/components/ui/Card";
 import { getHeaderSession } from "@/lib/header-session";
 import { getEventPageDefinition, listEventPageDefinitions } from "@/lib/event-pages";
 import {
@@ -145,27 +143,15 @@ export default async function EventPage({
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
-      <main>
-        <Container className="pb-16 pt-8 sm:pt-10" size="wide">
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-          />
-          <EventLanding
-            campaign={campaign}
-            summary={summary}
-            showHeroImage={campaign.slug !== "signup-reward"}
-          />
-          {registration?.source !== "database" || !registration.isActive ? (
-            <Card tone="muted" padding="md" className="mt-5">
-              <p className="text-sm text-muted-foreground">
-                아직 운영 등록 전인 이벤트 페이지입니다. 관리 화면에서 기간과 대상을 등록하면
-                공개 메타가 활성화됩니다.
-              </p>
-            </Card>
-          ) : null}
-        </Container>
-      </main>
+      <EventPageView
+        campaign={campaign}
+        summary={summary}
+        showHeroImage={campaign.slug !== "signup-reward"}
+        showRegistrationNotice={
+          registration?.source !== "database" || !registration.isActive
+        }
+        structuredData={jsonLd}
+      />
     </div>
   );
 }

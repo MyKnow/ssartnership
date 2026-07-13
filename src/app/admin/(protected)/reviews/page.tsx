@@ -1,6 +1,6 @@
 import AdminReviewManager from "@/components/admin/AdminReviewManager";
 import AdminShell from "@/components/admin/AdminShell";
-import ShellHeader from "@/components/ui/ShellHeader";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import {
   adminActionErrorMessages,
 } from "@/lib/admin-action-errors";
@@ -38,7 +38,7 @@ export default async function AdminReviewsPage({
   return (
     <AdminShell title="리뷰 관리" backHref="/admin" backLabel="관리 홈">
       <div className="grid gap-6">
-        <ShellHeader
+        <AdminPageHeader
           eyebrow="Reviews"
           title="리뷰 관리"
           description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."

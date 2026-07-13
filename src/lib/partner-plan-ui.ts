@@ -135,7 +135,7 @@ export function getPartnerPlanRequestProgress(input: {
       label: "플랜 적용 완료",
       tone: "success" as const satisfies PartnerPlanRequestProgressTone,
       headline: "승인 완료 후 플랜이 적용되었습니다.",
-      nextStep: "브랜드 상세와 대시보드에서 확장 지표를 확인할 수 있습니다.",
+      nextStep: "제휴처 상세와 대시보드에서 확장 지표를 확인할 수 있습니다.",
       steps: buildPlanRequestSteps("applied"),
     };
   }
@@ -155,7 +155,7 @@ export function getPartnerPlanRequestProgress(input: {
       label: "요청 취소",
       tone: "neutral" as const satisfies PartnerPlanRequestProgressTone,
       headline: "파트너가 취소한 업그레이드 요청입니다.",
-      nextStep: "필요하면 브랜드 카드에서 새 업그레이드 요청을 만들 수 있습니다.",
+      nextStep: "필요하면 제휴처 카드에서 새 업그레이드 요청을 만들 수 있습니다.",
       steps: buildPlanRequestSteps("requested"),
     };
   }

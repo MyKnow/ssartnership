@@ -79,8 +79,8 @@ export const ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS: Record<
   PartnerServiceMode,
   string
 > = {
-  offline: "오프라인 서비스",
-  online: "온라인 서비스",
+  offline: "오프라인 제휴처",
+  online: "온라인 제휴처",
 };
 
 export const ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS: Record<
@@ -94,18 +94,18 @@ export const ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS: Record<
 };
 
 const BASE_HEADERS = [
-  "브랜드명",
+  "제휴처명",
   "카테고리",
   "시작일",
   "종료일",
   "문의 링크",
-  "브랜드 전화번호",
+  "제휴처 전화번호",
   "상세 설명",
-  "협력사명",
+  "파트너사명",
   "담당자명",
   "담당자 이메일",
   "담당자 전화번호",
-  "협력사 설명",
+  "파트너사 설명",
   "혜택",
   "이용 조건",
   "태그",

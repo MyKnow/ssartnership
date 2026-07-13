@@ -19,7 +19,7 @@ export default function PartnerFormHero({
   periodEnd: string;
 }) {
   const heroTitle =
-    mode === "create" ? "상세 페이지처럼 새 브랜드를 추가합니다" : "상세 페이지처럼 브랜드를 수정합니다";
+    mode === "create" ? "상세 페이지처럼 새 제휴처를 추가합니다" : "상세 페이지처럼 제휴처를 수정합니다";
   const heroDescription =
     mode === "create"
       ? "기본 정보, 썸네일, 갤러리, 조건과 혜택을 카드 단위로 나눠 입력하세요."
@@ -36,7 +36,7 @@ export default function PartnerFormHero({
       <div className="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="grid gap-2">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-            {mode === "create" ? "새 브랜드 추가" : "브랜드 정보 수정"}
+            {mode === "create" ? "새 제휴처 추가" : "제휴처 정보 수정"}
           </p>
           <h2 className="text-3xl font-semibold tracking-tight text-foreground">
             {heroTitle}

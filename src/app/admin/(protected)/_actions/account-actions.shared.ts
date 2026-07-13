@@ -2,6 +2,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   assertAdminCanAccessManagedCampuses,
   canAdminAccessManagedCampuses,
+  canAdminMutateGlobalPartnerAccount,
   isRegionalAdminAccount,
   type AdminScopeAccountLike,
 } from "@/lib/admin-scope";
@@ -63,14 +64,18 @@ export async function loadScopedPartnerCompanyOrRedirect(
   return result;
 }
 
-export async function assertPartnerAccountInManagedScopeOrRedirect(
-  accountId: string,
-  adminAccount: AdminScopeAccountLike,
-) {
-  if (!isRegionalAdminAccount(adminAccount)) {
-    return;
-  }
+type PartnerAccountCompanyScope = {
+  managed_campus_slugs?: string[] | null;
+};
 
+function getLinkedCompanyScope(link: unknown) {
+  const company = (link as {
+    company?: PartnerAccountCompanyScope | PartnerAccountCompanyScope[] | null;
+  }).company;
+  return Array.isArray(company) ? (company[0] ?? null) : (company ?? null);
+}
+
+async function loadPartnerAccountActiveCompanyManagedCampusSlugsOrRedirect(accountId: string) {
   const supabase = getPartnerAccountSupabase();
   const { data: links, error } = await supabase
     .from("partner_account_companies")
@@ -82,17 +87,40 @@ export async function assertPartnerAccountInManagedScopeOrRedirect(
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
   }
 
-  const hasAccessibleCompany = (links ?? []).some((link) => {
-    const company = Array.isArray((link as { company?: unknown }).company)
-      ? ((link as { company?: Array<{ managed_campus_slugs?: string[] | null }> }).company?.[0] ?? null)
-      : ((link as { company?: { managed_campus_slugs?: string[] | null } | null }).company ?? null);
-    return canAdminAccessManagedCampuses(
-      adminAccount,
-      company?.managed_campus_slugs,
-    );
-  });
+  return (links ?? []).map((link) => getLinkedCompanyScope(link)?.managed_campus_slugs);
+}
+
+export async function assertPartnerAccountHasAccessibleCompanyOrRedirect(
+  accountId: string,
+  adminAccount: AdminScopeAccountLike,
+) {
+  if (!isRegionalAdminAccount(adminAccount)) {
+    return;
+  }
+
+  const linkedCompanyManagedCampusSlugs =
+    await loadPartnerAccountActiveCompanyManagedCampusSlugsOrRedirect(accountId);
+  const hasAccessibleCompany = linkedCompanyManagedCampusSlugs.some((managedCampusSlugs) =>
+    canAdminAccessManagedCampuses(adminAccount, managedCampusSlugs),
+  );
 
   if (!hasAccessibleCompany) {
+    redirectAdminActionError("/admin/companies?tab=accounts", "regional_admin_scope_denied");
+  }
+}
+
+export async function assertPartnerAccountGlobalMutationScopeOrRedirect(
+  accountId: string,
+  adminAccount: AdminScopeAccountLike,
+) {
+  if (!isRegionalAdminAccount(adminAccount)) {
+    return;
+  }
+
+  const linkedCompanyManagedCampusSlugs =
+    await loadPartnerAccountActiveCompanyManagedCampusSlugsOrRedirect(accountId);
+
+  if (!canAdminMutateGlobalPartnerAccount(adminAccount, linkedCompanyManagedCampusSlugs)) {
     redirectAdminActionError("/admin/companies?tab=accounts", "regional_admin_scope_denied");
   }
 }

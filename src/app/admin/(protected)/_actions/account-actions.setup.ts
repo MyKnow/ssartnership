@@ -8,7 +8,7 @@ import {
   revalidatePartnerAccountData,
 } from "./shared-helpers";
 import {
-  assertPartnerAccountInManagedScopeOrRedirect,
+  assertPartnerAccountGlobalMutationScopeOrRedirect,
   getPartnerAccountSupabase,
 } from "./account-actions.shared";
 
@@ -20,7 +20,7 @@ export async function createPartnerAccountInitialSetupUrlAction(formData: FormDa
   if (!accountId) {
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
   }
-  await assertPartnerAccountInManagedScopeOrRedirect(accountId, adminSession.account);
+  await assertPartnerAccountGlobalMutationScopeOrRedirect(accountId, adminSession.account);
 
   const supabase = getPartnerAccountSupabase();
   let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;
@@ -56,7 +56,7 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
   if (!accountId) {
     redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_missing_id");
   }
-  await assertPartnerAccountInManagedScopeOrRedirect(accountId, adminSession.account);
+  await assertPartnerAccountGlobalMutationScopeOrRedirect(accountId, adminSession.account);
 
   const supabase = getPartnerAccountSupabase();
   let issued: Awaited<ReturnType<typeof issuePartnerAccountInitialSetupLink>>;

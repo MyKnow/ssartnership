@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 type PartnerMetricTimeseriesModule =
@@ -7,6 +8,34 @@ type PartnerMetricTimeseriesModule =
 const partnerMetricTimeseriesModulePromise = import(
   new URL("../src/lib/partner-metric-timeseries.ts", import.meta.url).href,
 ) as Promise<PartnerMetricTimeseriesModule>;
+
+test("mock partner timeseries does not require Supabase secrets", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "./tests/alias-register.mjs",
+      "--input-type=module",
+      "--eval",
+      `const { getPartnerMetricTimeseriesSnapshot } = await import("./src/lib/partner-metric-timeseries.ts");
+       const snapshot = await getPartnerMetricTimeseriesSnapshot("mock-partner", "2026-01-01T00:00:00.000Z");
+       if (snapshot.hour.hasData || snapshot.weekday.hasData || snapshot.warningMessage) process.exit(2);`,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_DATA_SOURCE: "mock",
+        NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock",
+        SUPABASE_SERVICE_ROLE_KEY: "",
+        SUPABASE_URL: "",
+      },
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+});
 
 test("hour averages use partial-day denominators and keep zero buckets", async () => {
   const { buildPartnerMetricTimeseriesSnapshot } =

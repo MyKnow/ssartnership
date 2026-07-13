@@ -14,7 +14,6 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import SubmitButton from "@/components/ui/SubmitButton";
-import { cancelPartnerPlanUpgradeRequestAction } from "@/app/partner/plans/actions";
 import { calculatePartnerPlanUpgradeCharge } from "@/lib/partner-billing";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
@@ -39,6 +38,7 @@ import {
   type PartnerPlanFilter,
 } from "@/lib/partner-plan-ui";
 import { cn } from "@/lib/cn";
+import type { PartnerPlanActions } from "@/components/partner/PartnerPlanManagementView";
 
 function formatDateTime(value?: string | null) {
   return value ? formatKoreanDateTimeToMinute(value) : "없음";
@@ -158,12 +158,14 @@ export default function PartnerPlanBrandList({
   companyId,
   bankTransferAccount,
   billingProfiles,
+  actions,
   nowIso,
 }: {
   data: PartnerPlanPortalData;
   companyId: string;
   bankTransferAccount: PartnerBankTransferAccount;
   billingProfiles: PartnerBillingProfileRecord[];
+  actions: PartnerPlanActions;
   nowIso: string;
 }) {
   const [selectedFilter, setSelectedFilter] = useState<PartnerPlanFilter>("all");
@@ -245,7 +247,7 @@ export default function PartnerPlanBrandList({
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex max-w-full min-w-0 flex-col gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-2 sm:flex-row sm:items-center sm:justify-between">
         <div
-          aria-label="브랜드 플랜 필터"
+          aria-label="제휴처 플랜 필터"
           className="flex max-w-full min-w-0 gap-1 overflow-x-auto"
         >
           {PARTNER_PLAN_FILTERS.map((filter) => {
@@ -284,15 +286,15 @@ export default function PartnerPlanBrandList({
           aria-live="polite"
         >
           {selectedFilterLabel} 필터 적용됨 ·{" "}
-          {visibleItems.length.toLocaleString("ko-KR")}개 브랜드
+          {visibleItems.length.toLocaleString("ko-KR")}개 제휴처
         </p>
       </div>
 
       {visibleItems.length === 0 ? (
         <Card tone="muted" padding="md">
           <EmptyState
-            title="조건에 맞는 브랜드가 없습니다."
-            description="다른 필터를 선택해 브랜드 플랜 상태를 확인해 주세요."
+            title="조건에 맞는 제휴처가 없습니다."
+            description="다른 필터를 선택해 제휴처 플랜 상태를 확인해 주세요."
           />
         </Card>
       ) : (
@@ -492,7 +494,7 @@ export default function PartnerPlanBrandList({
                         />
                       </div>
 
-                      <form action={cancelPartnerPlanUpgradeRequestAction} className="grid gap-2">
+                      <form action={actions.cancelUpgrade} className="grid gap-2">
                         <input type="hidden" name="companyId" value={companyId} />
                         <input type="hidden" name="requestId" value={pendingRequest.id} />
                         <PartnerFormPendingNotice message="플랜 요청 취소를 처리 중입니다." />
@@ -569,6 +571,7 @@ export default function PartnerPlanBrandList({
                           upgradeOptions={upgradeOptions}
                           bankTransferAccount={bankTransferAccount}
                           billingProfiles={billingProfiles}
+                          action={actions.requestUpgrade}
                         />
                       ) : null}
                     </div>

@@ -147,7 +147,7 @@ export default function AdminPartnerChangeHistory({
       {!hasHistory ? (
         <EmptyState
           title="수정 이력이 없습니다."
-          description="아직 이 브랜드에 대한 수정 로그가 생성되지 않았습니다."
+          description="아직 이 제휴처에 대한 수정 로그가 생성되지 않았습니다."
         />
       ) : (
         <div className="grid gap-4">

@@ -402,7 +402,7 @@ export function useAdminPushManager({
     if (deletingLogId) {
       return;
     }
-    const ok = window.confirm("이 알림 운영 로그를 삭제하시겠습니까?");
+    const ok = window.confirm("이 발송 로그를 삭제하시겠습니까?");
     if (!ok) {
       return;
     }
@@ -416,17 +416,17 @@ export function useAdminPushManager({
       const data = await parseAdminResponse<{ message?: string }>(response);
 
       if (!response.ok) {
-        setErrorMessage(data?.message ?? "알림 운영 로그 삭제에 실패했습니다.");
+        setErrorMessage(data?.message ?? "발송 로그 삭제에 실패했습니다.");
         return;
       }
 
       setLogs((current) => current.filter((log) => log.id !== logId));
-      notify("알림 운영 로그를 삭제했습니다.");
+      notify("발송 로그를 삭제했습니다.");
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "알림 운영 로그 삭제에 실패했습니다.",
+          : "발송 로그 삭제에 실패했습니다.",
       );
     } finally {
       setDeletingLogId(null);

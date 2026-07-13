@@ -86,7 +86,7 @@ export function createNewPartnerPayload(params: {
     title: `신규 제휴: ${params.name}`,
     body: params.categoryLabel
       ? `${params.categoryLabel} 카테고리에 새 제휴가 등록되었습니다. ${place}`
-      : `새 제휴 업체가 등록되었습니다. ${place}`,
+      : `새 제휴처가 등록되었습니다. ${place}`,
     url: `/partners/${params.partnerId}`,
     tag: `new-partner-${params.partnerId}`,
   };

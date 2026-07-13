@@ -331,7 +331,7 @@ function getProgressModel(item: PartnerNotificationEntry): {
       currentStepLabel: currentIndex >= 2 ? "변경 반영 완료" : "관리자 검토 중",
       nextStepLabel:
         currentIndex >= 2
-          ? "브랜드 상세 화면에서 반영된 정보를 확인할 수 있습니다."
+          ? "제휴처 상세 화면에서 반영된 정보를 확인할 수 있습니다."
           : "검토가 완료되면 승인 또는 반려 결과를 다시 알려드립니다.",
       progressSteps: createProgressSteps(["요청 접수", "관리자 검토", "결과 안내"], currentIndex),
     };

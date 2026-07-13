@@ -48,13 +48,13 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
   if (currentPartnerError) {
     throw wrapPartnerChangeRequestDbError(
       currentPartnerError,
-      "현재 브랜드 정보를 불러오지 못했습니다.",
+      "현재 제휴처 정보를 불러오지 못했습니다.",
     );
   }
   if (!currentPartner) {
     throw new PartnerChangeRequestError(
       "not_found",
-      "대상 협력사를 찾을 수 없습니다.",
+      "대상 파트너사를 찾을 수 없습니다.",
     );
   }
 
@@ -82,7 +82,7 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
   if (updatePartnerError) {
     throw wrapPartnerChangeRequestDbError(
       updatePartnerError,
-      "브랜드 정보를 반영하지 못했습니다.",
+      "제휴처 정보를 반영하지 못했습니다.",
     );
   }
 
@@ -159,7 +159,7 @@ export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInp
   if (currentPartnerError) {
     throw wrapPartnerChangeRequestDbError(
       currentPartnerError,
-      "현재 브랜드 정보를 불러오지 못했습니다.",
+      "현재 제휴처 정보를 불러오지 못했습니다.",
     );
   }
 

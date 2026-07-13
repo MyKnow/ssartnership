@@ -9,11 +9,6 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
-import {
-  archivePartnerBillingProfileAction,
-  createPartnerBillingProfileAction,
-  setDefaultPartnerBillingProfileAction,
-} from "@/app/partner/account/actions";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -25,6 +20,7 @@ import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNot
 import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import { cn } from "@/lib/cn";
+import { getPartnerGlobalPortalHref } from "@/lib/partner-portal-paths";
 
 type BusinessStatusState =
   | { status: "idle" }
@@ -36,6 +32,24 @@ type BusinessStatusState =
       checkedAt: string;
     }
   | { status: "error"; message: string; checkedAt: string };
+
+export type PartnerAccountFormAction = (
+  formData: FormData,
+) => void | Promise<void>;
+
+export type PartnerAccountInfoActions = {
+  createProfile: PartnerAccountFormAction;
+  setDefaultProfile: PartnerAccountFormAction;
+  archiveProfile: PartnerAccountFormAction;
+};
+
+export type PartnerAccountInfoViewProps = {
+  companyId: string;
+  displayName: string;
+  loginId: string;
+  profiles: PartnerBillingProfileRecord[];
+  actions: PartnerAccountInfoActions;
+};
 
 function formatBusinessRegistrationNumber(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -100,7 +114,13 @@ function BusinessStatusMessage({ state }: { state: BusinessStatusState }) {
   );
 }
 
-function BillingProfileCreateForm({ companyId }: { companyId: string }) {
+function BillingProfileCreateForm({
+  companyId,
+  action,
+}: {
+  companyId: string;
+  action: PartnerAccountFormAction;
+}) {
   const [businessRegistrationNumber, setBusinessRegistrationNumber] =
     useState("");
   const [businessStatus, setBusinessStatus] = useState<BusinessStatusState>({
@@ -179,9 +199,9 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
     <Card tone="default" padding="md" className="grid gap-5">
       <SectionHeading
         title="새 프로필 추가"
-        description="플랜 요청에서 전체 협력사에 재사용할 입금자와 세금계산서 정보를 저장합니다."
+        description="플랜 요청에서 전체 파트너사에 재사용할 입금자와 세금계산서 정보를 저장합니다."
       />
-      <form action={createPartnerBillingProfileAction} className="grid gap-4">
+      <form action={action} className="grid gap-4">
         <input type="hidden" name="companyId" value={companyId} />
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -289,9 +309,13 @@ function BillingProfileCreateForm({ companyId }: { companyId: string }) {
 function BillingProfileCard({
   companyId,
   profile,
+  setDefaultAction,
+  archiveAction,
 }: {
   companyId: string;
   profile: PartnerBillingProfileRecord;
+  setDefaultAction: PartnerAccountFormAction;
+  archiveAction: PartnerAccountFormAction;
 }) {
   const isLegacyProfile = profile.accountId === null;
   return (
@@ -304,9 +328,9 @@ function BillingProfileCard({
             </h3>
             {profile.isDefault ? <Badge variant="primary">기본</Badge> : null}
             {isLegacyProfile ? (
-              <Badge variant="neutral">기존 협력사 정보</Badge>
+              <Badge variant="neutral">기존 파트너사 정보</Badge>
             ) : (
-              <Badge variant="success">전체 협력사</Badge>
+              <Badge variant="success">전체 파트너사</Badge>
             )}
           </div>
           <p className="mt-1 line-clamp-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
@@ -315,7 +339,7 @@ function BillingProfileCard({
         </div>
         <div className="flex flex-wrap gap-2">
           {!profile.isDefault && !isLegacyProfile ? (
-            <form action={setDefaultPartnerBillingProfileAction} className="grid gap-2">
+            <form action={setDefaultAction} className="grid gap-2">
               <input type="hidden" name="companyId" value={companyId} />
               <input type="hidden" name="profileId" value={profile.id} />
               <PartnerFormPendingNotice message="기본 프로필로 변경하는 중입니다." />
@@ -326,7 +350,7 @@ function BillingProfileCard({
             </form>
           ) : null}
           {!isLegacyProfile ? (
-            <form action={archivePartnerBillingProfileAction} className="grid gap-2">
+            <form action={archiveAction} className="grid gap-2">
               <input type="hidden" name="companyId" value={companyId} />
               <input type="hidden" name="profileId" value={profile.id} />
               <PartnerFormPendingNotice message="증빙 프로필을 삭제하는 중입니다." />
@@ -383,22 +407,16 @@ function BillingProfileCard({
 
 export default function PartnerAccountInfoView({
   companyId,
-  companyName,
   displayName,
   loginId,
   profiles,
-}: {
-  companyId: string;
-  companyName: string;
-  displayName: string;
-  loginId: string;
-  profiles: PartnerBillingProfileRecord[];
-}) {
+  actions,
+}: PartnerAccountInfoViewProps) {
   const defaultProfile = useMemo(
     () => profiles.find((profile) => profile.isDefault) ?? profiles[0] ?? null,
     [profiles],
   );
-  const successRedirectHref = `/partner/companies/${encodeURIComponent(companyId)}/account`;
+  const successRedirectHref = `${getPartnerGlobalPortalHref("account", companyId)}#security`;
 
   return (
     <div className="grid gap-6">
@@ -407,7 +425,7 @@ export default function PartnerAccountInfoView({
           <div className="min-w-0">
             <p className="ui-kicker">프로필</p>
             <h2 className="mt-2 text-ko-title text-xl font-semibold leading-tight text-foreground">
-              모든 협력사에서 동일하게 쓰는 계정 프로필입니다.
+              모든 파트너사에서 동일하게 쓰는 계정 프로필입니다.
             </h2>
             <p className="mt-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
               로그인 정보, 비밀번호, 입금자와 세금계산서 정보를 한 곳에서
@@ -429,7 +447,7 @@ export default function PartnerAccountInfoView({
             </div>
           ) : null}
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <UserRound className="h-4 w-4 text-primary" />
@@ -448,22 +466,13 @@ export default function PartnerAccountInfoView({
               {loginId}
             </p>
           </div>
-          <div className="min-w-0 rounded-[0.9rem] border border-border bg-surface-control p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Landmark className="h-4 w-4 text-primary" />
-              현재 진입 협력사
-            </div>
-            <p className="mt-2 truncate text-sm text-muted-foreground">
-              {companyName}
-            </p>
-          </div>
         </div>
       </Card>
 
       <section className="grid gap-4">
         <SectionHeading
           title="저장된 증빙 프로필"
-          description="입금자와 세금계산서 정보를 여러 개 저장해 모든 협력사의 플랜 요청에서 재사용합니다."
+          description="입금자와 세금계산서 정보를 여러 개 저장해 모든 파트너사의 플랜 요청에서 재사용합니다."
         />
         {profiles.length === 0 ? (
           <Card tone="muted" padding="md">
@@ -479,13 +488,18 @@ export default function PartnerAccountInfoView({
                 key={profile.id}
                 companyId={companyId}
                 profile={profile}
+                setDefaultAction={actions.setDefaultProfile}
+                archiveAction={actions.archiveProfile}
               />
             ))}
           </div>
         )}
       </section>
 
-      <BillingProfileCreateForm companyId={companyId} />
+      <BillingProfileCreateForm
+        companyId={companyId}
+        action={actions.createProfile}
+      />
 
       <section id="security" className="grid gap-4 scroll-mt-24">
         <SectionHeading

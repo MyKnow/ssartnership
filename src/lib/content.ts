@@ -12,7 +12,7 @@ export const HOME_COPY = {
   noResultsDescription: "다른 키워드나 카테고리를 선택해보세요.",
   suggestionTitle: "제휴 제안",
   suggestionDescription:
-    "SSAFY 제휴를 추진했으면 하는 카테고리나 업체가 있으신가요?",
+    "SSAFY 제휴를 추진했으면 하는 카테고리나 제휴처가 있으신가요?",
   suggestionPrimary: "제안하기",
   suggestionCancel: "취소",
 };
@@ -20,7 +20,7 @@ export const HOME_COPY = {
 export const ADMIN_COPY = {
   emptyCategoryTitle: "등록된 카테고리가 없습니다.",
   emptyCategoryDescription: "새 카테고리를 추가해 주세요.",
-  emptyPartnerTitle: "등록된 제휴 업체가 없습니다.",
+  emptyPartnerTitle: "등록된 제휴처가 없습니다.",
   emptyPartnerDescription: "새 제휴를 등록해 주세요.",
   noResultsTitle: "검색 결과가 없습니다.",
   noResultsDescription: "필터 조건을 변경해보세요.",

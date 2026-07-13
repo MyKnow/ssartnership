@@ -31,7 +31,7 @@ export async function createSupabaseRequest(
   if (!context) {
     throw new PartnerChangeRequestError(
       "forbidden",
-      "해당 브랜드의 변경 요청을 만들 수 없습니다.",
+      "해당 제휴처의 변경 요청을 만들 수 없습니다.",
     );
   }
   if (context.pendingRequest) {
@@ -75,7 +75,7 @@ export async function createSupabaseRequest(
   if (!requestedPartnerName || !requestedPartnerLocation) {
     throw new PartnerChangeRequestError(
       "invalid_request",
-      "브랜드명과 위치를 입력해 주세요.",
+      "제휴처명과 지점 위치를 입력해 주세요.",
     );
   }
   if (requestedCampusSlugs.length === 0) {

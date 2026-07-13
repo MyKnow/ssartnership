@@ -57,12 +57,12 @@ export const PARTNER_REGISTRATION_MODE_OPTIONS = [
   {
     value: "full_new",
     label: "전체 신규 등록",
-    description: "브랜드 공통 정보, 혜택, 적용 지점을 함께 접수합니다.",
+    description: "제휴처 공통 정보, 혜택, 적용 지점을 함께 접수합니다.",
   },
   {
     value: "add_benefit_group",
     label: "새 혜택 그룹 추가",
-    description: "기존 브랜드에 혜택이 다른 적용 지점을 추가합니다.",
+    description: "기존 제휴처에 혜택이 다른 적용 지점을 추가합니다.",
   },
   {
     value: "add_branches",

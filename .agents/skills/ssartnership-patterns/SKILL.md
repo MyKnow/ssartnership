@@ -1,9 +1,6 @@
 ---
 name: ssartnership-patterns
 description: Coding patterns extracted from ssartnership git history. Use when working in this repo on Next.js App Router routes, Tailwind UI, Supabase migrations, repository-pattern data access, mock/supabase switches, admin/member/partner workflows, tests, commits, or validation.
-version: 1.0.0
-source: local-git-analysis
-analyzed_commits: 200
 ---
 
 # Ssartnership Patterns
@@ -130,9 +127,21 @@ Run `next build` only when build/runtime behavior changed broadly or when explic
 
 Recent failed Actions clustered into four workflows: `Sync Preview Supabase`, `Verify Node Lockfile`, `Publish Storybook`, and `Public Readiness`. Before PR, `dev` merge, or `main` promotion, check the relevant guardrail instead of waiting for CI to rediscover the same issue.
 
-- Dependency or package graph changes: run `npm run check:lockfile` and commit any `package-lock.json` diff. Linux/amd64 optional dependency metadata can drift even when macOS installs look clean.
+- Before every commit or push, run `npm run check:lockfile`, even when `package.json` and `package-lock.json` were not edited. Linux/amd64 optional dependency metadata can drift even when macOS installs look clean; if the command adds canonical metadata such as `dev: true` to `node_modules/fsevents`, review, stage, and commit that `package-lock.json` diff, then rerun the check until clean. Dependency or package graph changes still require the same check.
 - Storybook/client UI changes: run `npm run build-storybook`; when stories have interaction tests or media/crop dialogs, run `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome npm run test-storybook` and update story assertions with the component contract.
 - Public readiness/E2E changes: run the focused E2E locally with `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome`. If CI failures all mention missing `ffmpeg`, fix the Playwright install/config before debugging product behavior.
+- Broad UI waves: focused E2E is insufficient. Run or wait for the full `Public Readiness` E2E suite with the same mock-source environment as `playwright.config.ts`. Update assertions when the UI contract intentionally changes, use accessible step names, derive responsive columns from computed CSS instead of fixture cardinality, and give first-compile redirects an explicit timeout.
+- Do not chain an in-memory mock setup mutation into login. Cold Next.js compilation can create separate module graphs, making the mutation invisible and preventing `partner_session` creation. Keep setup E2E independent and use a pre-seeded completed account for login/company-scope E2E.
+- The project `prepush` script is the required local Public Readiness gate: it runs `npm run check:lockfile` first and then `CI=1 PLAYWRIGHT_CHROMIUM_CHANNEL=chrome playwright test`. The ECC global pre-push hook executes this optional repository gate after lint/test/build. Because the canonical release script pushes with `--no-verify`, `scripts/release.sh` must also call `npm run prepush` explicitly before branch and main/tag pushes.
+- An always-on `npm run dev` and Playwright's web server cannot share `.next/dev/lock`, even on ports 3000 and 3100. Preserve the user dev server and give Playwright `NEXT_DIST_DIR=.next-e2e`; keep that directory ignored by both Git and ESLint so a later pre-push lint does not scan generated bundles.
+- Keep search result behavior and URL serialization as separate contracts: visible filtering belongs in E2E, serialization in unit tests, and URL restoration in its dedicated back-navigation flow.
+- Registration step E2E must use the breakpoint-independent semantic state (`파트너 등록 단계` navigation and visible `aria-current="step"`) instead of compact-only labels. Use `:visible` because both responsive stepper DOMs can remain mounted.
+- Match partner navigation assertions to fixture cardinality: multi-company accounts show the chooser, while a single-company session redirects to its canonical dashboard. Allow 15 seconds for the initial compiled render.
+- Debounced/router-backed query-string synchronization may lag behind visible filtering. Keep result filtering, URL serialization, and back-navigation restoration as separate contracts instead of extending a combined assertion timeout.
+- Mock partner authentication: `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE=mock` must not depend on the Supabase-backed rate-limit lookup. Keep that bypass restricted to the mock repository path; never weaken the production/supabase guard.
+- Mock public SSR must also stay repository-backed. Do not call `getSupabaseAdminClient()` directly for render dependencies such as registration categories when `NEXT_PUBLIC_DATA_SOURCE=mock`; CI intentionally has no Supabase secrets.
+- A partner login can reach `/partner` before `partner_session` is committed. In E2E, poll `browserContext.cookies()` for the non-empty cookie rather than treating URL or chooser text as session readiness, then open the canonical protected company path.
+- Visual baseline changes: after reviewing intentional diffs, run `npm run test:visual -- --update-snapshots` and then a plain `npm run test:visual`. Treat an unexplained screenshot diff as a blocker, not as permission to regenerate.
 - Route smoke failures: a rendered Korean 404 page means the route inventory, redirect, or app route changed. Update the smoke fixture and the route/redirect intentionally in the same work unit.
 - Supabase Preview changes: run `npm run validate:migrations`, inspect sorted migration order, and wait for the Supabase Preview external status to become green. Do not treat local migration validation as proof that the remote Preview branch applied successfully.
 - Preview sync failures: inspect sanitizer diagnostics and missing relation errors first. Production-to-Preview sync may fail when Production has tables not present in Preview, so the sync script must tolerate or explicitly map schema drift.

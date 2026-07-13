@@ -203,7 +203,7 @@ export default function LightboxModal({
               />
             </div>
           ) : (
-            fallback
+            <div className="text-white">{fallback}</div>
           )}
         </div>
       </div>

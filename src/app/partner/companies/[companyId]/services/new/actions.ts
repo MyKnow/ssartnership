@@ -42,7 +42,7 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
   if (!scope) {
     return {
       status: "error",
-      message: "선택한 협력사로 브랜드를 추가할 권한이 없습니다.",
+      message: "선택한 파트너사로 제휴처를 추가할 권한이 없습니다.",
     };
   }
 
@@ -89,7 +89,7 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
     const message =
       error instanceof Error && error.message
         ? error.message
-        : "브랜드 추가 신청을 저장하지 못했습니다.";
+        : "제휴처 추가 신청을 저장하지 못했습니다.";
     console.error("[partner-portal:brand-registration] insert failed", message);
     return {
       status: "error",
@@ -120,7 +120,7 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
 
   return {
     status: "success",
-    message: "브랜드 추가 신청이 접수되었습니다. 관리자가 확인 후 반영합니다.",
+    message: "제휴처 추가 신청이 접수되었습니다. 관리자가 확인 후 반영합니다.",
     requestId: insertedRequest.requestId,
   };
 }

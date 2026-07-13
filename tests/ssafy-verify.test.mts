@@ -199,8 +199,11 @@ test("SSAFY Verify claim validator enforces issuer, audience, assurance, and aut
 });
 
 test("SSAFY Verify member update payload stores minimal verification fields", async () => {
-  const { buildSsafyMemberUpdatePayload } = await memberModulePromise;
-  const payload = buildSsafyMemberUpdatePayload({
+  const {
+    buildMemberSsafyVerificationUpsertPayload,
+    buildSsafyMemberUpdatePayload,
+  } = await memberModulePromise;
+  const input = {
     sub: "pairwise-subject",
     verified: true,
     authTime: 1_781_740_800,
@@ -218,7 +221,8 @@ test("SSAFY Verify member update payload stores minimal verification fields", as
     mattermostUserId: "mattermost-user-id",
     verificationId: "verification-id",
     scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
-  });
+  } as const;
+  const payload = buildSsafyMemberUpdatePayload(input);
 
   assert.deepEqual(payload, {
     ssafy_sub: "pairwise-subject",
@@ -232,6 +236,22 @@ test("SSAFY Verify member update payload stores minimal verification fields", as
     updated_at: payload.updated_at,
   });
   assert.match(payload.updated_at, /^\d{4}-\d{2}-\d{2}T/);
+
+  const normalizedPayload = buildMemberSsafyVerificationUpsertPayload(
+    "member-1",
+    input,
+  );
+  assert.deepEqual(normalizedPayload, {
+    member_id: "member-1",
+    ssafy_sub: "pairwise-subject",
+    verified_at: new Date(1_781_740_800 * 1000).toISOString(),
+    auth_time: new Date(1_781_740_800 * 1000).toISOString(),
+    verification_id: "verification-id",
+    track: "java-major",
+    track_name: "자바 전공",
+    last_scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
+    updated_at: normalizedPayload.updated_at,
+  });
 });
 
 test("SSAFY Verify signup payload creates a member from verified profile and policies", async () => {
@@ -267,7 +287,9 @@ test("SSAFY Verify signup payload creates a member from verified profile and pol
     mm_user_id: "mm.user-123",
     mm_username: "student.name",
     display_name: "김싸피",
+    generation: 15,
     year: 15,
+    staff_source_generation: null,
     staff_source_year: null,
     campus: "서울",
     password_hash: "password-hash",
@@ -287,7 +309,7 @@ test("SSAFY Verify signup payload creates a member from verified profile and pol
     ssafy_track: "java-major",
     ssafy_track_name: "자바 전공",
     ssafy_last_scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
-    avatar_url: "https://verify.myknow.xyz/api/mattermost/avatar/mm.user-123",
+    avatar_url: null,
     created_at: "2026-06-22T02:00:00.000Z",
     updated_at: "2026-06-22T02:00:00.000Z",
   });
@@ -323,7 +345,9 @@ test("SSAFY Verify signup payload maps staff to the staff year with source year"
   });
 
   assert.equal(payload.year, 0);
+  assert.equal(payload.generation, 0);
   assert.equal(payload.staff_source_year, 15);
+  assert.equal(payload.staff_source_generation, 15);
   assert.equal(payload.marketing_policy_version, null);
   assert.equal(payload.marketing_policy_consented_at, null);
 });
@@ -763,6 +787,9 @@ test("SSAFY Verify member lookup rejects duplicate subject linking", async () =>
             eq(column: string, value: string) {
               calls.push({ table, column, value });
               return {
+                is() {
+                  return this;
+                },
                 async maybeSingle() {
                   return responses.shift() ?? { data: null, error: null };
                 },

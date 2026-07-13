@@ -42,6 +42,7 @@ export type AdminNavItem = {
   permission: {
     resource: AdminPermissionResource;
   };
+  globalOnly?: boolean;
 };
 
 export type AdminNavGroup = {
@@ -88,6 +89,20 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "members" },
       },
       {
+        href: "/admin/graduate-verifications",
+        label: "수료생 인증",
+        description: "수료증과 교육 이수 정보 검토",
+        iconKey: "shield",
+        permission: { resource: "graduate_verifications" },
+      },
+      {
+        href: "/admin/profile-photos",
+        label: "프로필 사진",
+        description: "사진 변경과 기존 사진 점검",
+        iconKey: "users",
+        permission: { resource: "profile_images" },
+      },
+      {
         href: "/admin/reviews",
         label: "리뷰 관리",
         description: "리뷰 검수와 공개 상태",
@@ -108,10 +123,25 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       {
         href: "/admin/partners",
-        label: "제휴처/브랜드",
-        description: "노출 카드와 카테고리",
+        label: "제휴처",
+        description: "노출 카드와 혜택 정보",
         iconKey: "tag",
         permission: { resource: "brands" },
+      },
+      {
+        href: "/admin/partner-requests",
+        label: "변경 요청",
+        description: "제휴처 변경 승인 큐",
+        iconKey: "queue",
+        permission: { resource: "brands" },
+      },
+      {
+        href: "/admin/categories",
+        label: "카테고리",
+        description: "제휴처 분류 체계",
+        iconKey: "tag",
+        permission: { resource: "brands" },
+        globalOnly: true,
       },
       {
         href: "/admin/partner-registrations",
@@ -141,8 +171,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       },
       {
         href: "/admin/push",
-        label: "알림 운영",
-        description: "발송과 운영 로그 확인",
+        label: "발송 관리",
+        description: "메시지 발송과 로그 확인",
         iconKey: "megaphone",
         permission: { resource: "notifications" },
       },
@@ -174,7 +204,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       },
       {
         href: "/admin/admins",
-        label: "어드민 관리",
+        label: "관리자 관리",
         description: "계정과 권한 템플릿",
         iconKey: "shield",
         permission: { resource: "admin_management" },
@@ -200,14 +230,18 @@ export function findAdminNavItem(pathname: string) {
 export function filterAdminNavGroupsByPermissions(
   groups: AdminNavGroup[],
   permissions: AdminPermissionMatrix,
+  options: { includeGlobalItems?: boolean } = {},
 ) {
+  const includeGlobalItems = options.includeGlobalItems ?? true;
+
   return groups
     .map((group) => ({
       ...group,
       items: group.items.filter(
         (item) =>
-          item.href === "/admin" ||
-          canAdmin(permissions, item.permission.resource, "read"),
+          (includeGlobalItems || !item.globalOnly) &&
+          (item.href === "/admin" ||
+            canAdmin(permissions, item.permission.resource, "read")),
       ),
     }))
     .filter((group) => group.items.length > 0);

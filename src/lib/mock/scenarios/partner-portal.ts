@@ -104,9 +104,9 @@ function toCompanyScope(setup: MockPortalSetupRecord): PartnerPortalCompanyScope
 function createEmptyCompanyScope(): PartnerPortalCompanyScope {
   return {
     id: "mock-partner-company-empty",
-    name: "브랜드 미연결 협력사",
+    name: "제휴처 미연결 파트너사",
     slug: "empty-company",
-    description: "아직 등록된 브랜드가 없어 브랜드 추가 신청부터 시작하는 상태입니다.",
+    description: "아직 등록된 제휴처가 없어 제휴처 추가 신청부터 시작하는 상태입니다.",
     serviceCount: 0,
   };
 }

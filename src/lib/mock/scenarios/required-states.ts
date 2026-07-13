@@ -42,6 +42,12 @@ export const mockViewportPolicy = [
     requiredForCapture: true,
   },
   {
+    key: "tablet-1024",
+    width: 1024,
+    label: "1024px 태블릿",
+    requiredForCapture: true,
+  },
+  {
     key: "desktop-1366",
     width: 1366,
     label: "1366px 데스크탑",
@@ -206,6 +212,101 @@ const storybookViewportKeys = [
   "desktop-1366",
 ] as const satisfies MockViewportKey[];
 
+const routeOwnedStateOverrides: Partial<
+  Record<string, MockRequiredStateKey[]>
+> = {
+  "/auth/signup/graduate": [
+    "default",
+    "validation-error",
+    "pending",
+    "success",
+    "rejected",
+    "expired",
+    "long-korean",
+    "mobile-overflow",
+    "image-gallery",
+    "broken-image",
+    "async-pending",
+  ],
+  "/auth/graduate/setup": [
+    "default",
+    "validation-error",
+    "expired",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
+  "/certification/photo": [
+    "default",
+    "validation-error",
+    "pending",
+    "rejected",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "image-gallery",
+    "broken-image",
+    "async-pending",
+  ],
+  "/admin/graduate-verifications": [
+    "default",
+    "empty",
+    "pending",
+    "rejected",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "forbidden",
+  ],
+  "/admin/profile-photos": [
+    "default",
+    "empty",
+    "pending",
+    "rejected",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "forbidden",
+  ],
+  // Category lookup fails soft and has no route loading/error surface. Submitted
+  // request review states belong to admin queues, while action feedback remains here.
+  "/partner-registration": [
+    "default",
+    "long-korean",
+    "mobile-overflow",
+    "validation-error",
+    "error",
+    "success",
+    "async-pending",
+    "image-gallery",
+    "broken-image",
+  ],
+  // Auth redirects/not-found and route skeletons are server-boundary concerns.
+  // Billing/payment states belong to the company plans screen, not the flat dashboard.
+  "/partner/companies/[companyId]": [
+    "default",
+    "empty",
+    "many",
+    "pending",
+    "rejected",
+    "long-korean",
+    "mobile-overflow",
+    "locked-metric",
+  ],
+};
+
+const collectionRoutes = new Set([
+  "/admin/logs",
+  "/admin/members",
+  "/admin/partners",
+  "/admin/partner-requests",
+  "/admin/categories",
+  "/admin/reviews",
+  "/admin/notifications",
+  "/partner/notifications",
+]);
+
 export const requiredCaptureViewportKeys = mockViewportPolicy
   .filter((viewport) => viewport.requiredForCapture)
   .map((viewport) => viewport.key);
@@ -226,9 +327,18 @@ export function getPolicyViewportKeysForRoute(
 export function getRequiredStateKeysForRoute(
   route: Pick<
     MockRouteInventoryItem,
-    "routePath" | "authScope" | "dataSources"
+    "routePath" | "routeKind" | "authScope" | "dataSources"
   >,
 ): MockRequiredStateKey[] {
+  if (route.routeKind === "compat-redirect") {
+    return ["redirect"];
+  }
+
+  const routeOwnedStates = routeOwnedStateOverrides[route.routePath];
+  if (routeOwnedStates) {
+    return [...routeOwnedStates];
+  }
+
   const keys: MockRequiredStateKey[] = [...defaultRequiredStateKeys];
 
   if (route.authScope !== "public") {
@@ -264,14 +374,14 @@ export function getRequiredStateKeysForRoute(
   ) {
     keys.push("image-gallery", "broken-image");
   }
-  if (
-    route.routePath.includes("logs") ||
-    route.routePath.includes("members") ||
-    route.routePath.includes("partners") ||
-    route.routePath.includes("reviews") ||
-    route.routePath.includes("notifications")
-  ) {
+  if (collectionRoutes.has(route.routePath)) {
     keys.push("many", "empty", "filter", "pagination");
+  }
+  if (
+    route.routePath.includes("registration") ||
+    route.routePath.includes("partner-requests")
+  ) {
+    keys.push("pending", "rejected");
   }
   if (route.routePath.includes("plans") || route.routePath.includes("companies")) {
     keys.push("locked-metric", "payment-pending", "billing-profile");

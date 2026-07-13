@@ -55,6 +55,7 @@ export function revalidateAdminAndPublicPaths(partnerId?: string) {
   revalidateTag("partners", "max");
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/admin/partner-requests");
   if (partnerId) {
     revalidatePath(`/admin/partners/${partnerId}`);
     revalidatePath(`/partners/${partnerId}`);
@@ -72,6 +73,7 @@ export function revalidatePartnerPortalPaths(partnerId?: string) {
 
 export function revalidateCategoryData() {
   revalidateTag("categories", "max");
+  revalidatePath("/admin/categories");
 }
 
 export function revalidatePartnerData() {

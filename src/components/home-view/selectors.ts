@@ -1,4 +1,6 @@
 import type { Category, CategoryKey, Partner } from "../../lib/types.ts";
+import type { CampusSlug } from "../../lib/campuses.ts";
+import { doesPartnerMatchCampus } from "../../lib/campuses.ts";
 import { getPartnerAudienceLabel, type PartnerAudienceFilter } from "../../lib/partner-audience.ts";
 import {
   getPartnerLockKind,
@@ -83,12 +85,14 @@ export function normalizeHomePartners(
 export function filterHomePartners({
   partners,
   activeCategory,
+  campusFilter,
   appliesToFilter,
   searchValue,
   sortValue,
 }: {
   partners: HomePartnerViewModel[];
   activeCategory: CategoryKey | "all";
+  campusFilter: CampusSlug | "all";
   appliesToFilter: PartnerAudienceFilter;
   searchValue: string;
   sortValue: HomePartnerSortOption;
@@ -106,7 +110,14 @@ export function filterHomePartners({
           partner.appliesTo.includes(appliesToFilter),
         );
 
-  const activeFiltered = appliesFiltered.filter((partner) => !partner._isExpired);
+  const campusFiltered =
+    campusFilter === "all"
+      ? appliesFiltered
+      : appliesFiltered.filter((partner) =>
+          doesPartnerMatchCampus(partner, campusFilter),
+        );
+
+  const activeFiltered = campusFiltered.filter((partner) => !partner._isExpired);
   const searchFiltered = query
     ? activeFiltered.filter((partner) => partner._search.includes(query))
     : activeFiltered;

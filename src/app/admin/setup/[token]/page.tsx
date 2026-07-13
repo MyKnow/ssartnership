@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 export const metadata = {
   title: "관리자 초기설정 종료",
@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function AdminSetupPage() {
-  redirect("/admin");
+  permanentRedirect("/admin");
 }

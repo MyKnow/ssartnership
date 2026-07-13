@@ -91,7 +91,7 @@ export default function PartnerBasicInfoSection({
           className="w-full"
         />
 
-        <FieldGroup label="브랜드명" error={fieldErrors?.name}>
+        <FieldGroup label="제휴처명" error={fieldErrors?.name}>
           <Input
             name="name"
             value={values.nameValue}
@@ -160,7 +160,7 @@ export default function PartnerBasicInfoSection({
               ))}
             </Select>
           </FieldGroup>
-          <FieldGroup label="브랜드 운영 형태">
+          <FieldGroup label="제휴처 운영 형태">
             <Select
               name="serviceMode"
               value={values.serviceModeValue}
@@ -172,7 +172,7 @@ export default function PartnerBasicInfoSection({
               <option value="online">온라인</option>
             </Select>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              온라인 브랜드는 위치 대신 사이트 링크를 노출합니다.
+              온라인 제휴처는 지점 위치 대신 사이트 링크를 노출합니다.
             </p>
           </FieldGroup>
         </div>
@@ -205,7 +205,7 @@ export default function PartnerBasicInfoSection({
         {isOnlineService ? (
           <input type="hidden" name="location" value={ONLINE_PARTNER_LOCATION} />
         ) : (
-          <FieldGroup label="위치" error={fieldErrors?.location}>
+          <FieldGroup label="지점 위치" error={fieldErrors?.location}>
             <Input
               name="location"
               value={values.locationValue}
@@ -240,7 +240,7 @@ export default function PartnerBasicInfoSection({
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {isOnlineService
                 ? "카드에서는 위치 문구 없이 웹사이트 바로가기 아이콘으로 표시됩니다."
-                : "지도 URL이 없으면 위치와 브랜드명으로 지도 검색 링크를 만듭니다."}
+                : "지도 URL이 없으면 지점 위치와 제휴처명으로 지도 검색 링크를 만듭니다."}
             </p>
           </FieldGroup>
           <FieldGroup label="혜택 이용 방식" error={fieldErrors?.benefitActionType}>
@@ -331,7 +331,7 @@ export default function PartnerBasicInfoSection({
               Boolean(fieldErrors?.detailDescription),
             )}
             maxLength={PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH}
-            placeholder="구성원이 브랜드의 특징, 이용 흐름, 추천 상황을 이해할 수 있도록 설명해 주세요."
+            placeholder="구성원이 제휴처의 특징, 이용 흐름, 추천 상황을 이해할 수 있도록 설명해 주세요."
           />
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             상세 페이지에만 표시됩니다. 최대{" "}

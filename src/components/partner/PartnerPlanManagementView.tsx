@@ -20,6 +20,23 @@ import {
 } from "@/lib/partner-plan-ui";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
+export type PartnerPlanFormAction = (
+  formData: FormData,
+) => void | Promise<void>;
+
+export type PartnerPlanActions = {
+  requestUpgrade: PartnerPlanFormAction;
+  cancelUpgrade: PartnerPlanFormAction;
+};
+
+export type PartnerPlanManagementViewProps = {
+  data: PartnerPlanPortalData;
+  companyId: string;
+  bankTransferAccount: PartnerBankTransferAccount;
+  billingProfiles: PartnerBillingProfileRecord[];
+  actions: PartnerPlanActions;
+};
+
 function formatDateTime(value?: string | null) {
   return value ? formatKoreanDateTimeToMinute(value) : "없음";
 }
@@ -82,17 +99,13 @@ export default function PartnerPlanManagementView({
   companyId,
   bankTransferAccount,
   billingProfiles,
-}: {
-  data: PartnerPlanPortalData;
-  companyId: string;
-  bankTransferAccount: PartnerBankTransferAccount;
-  billingProfiles: PartnerBillingProfileRecord[];
-}) {
+  actions,
+}: PartnerPlanManagementViewProps) {
   if (data.brands.length === 0) {
     return (
       <EmptyState
-        title="연결된 브랜드가 없습니다."
-        description="관리자에서 담당 계정과 브랜드가 속한 파트너사를 먼저 연결해야 합니다."
+        title="연결된 제휴처가 없습니다."
+        description="관리자에서 담당 계정과 제휴처가 속한 파트너사를 먼저 연결해야 합니다."
       />
     );
   }
@@ -119,7 +132,7 @@ export default function PartnerPlanManagementView({
           <div className="min-w-0">
             <p className="ui-kicker">플랜 운영 요약</p>
             <h2 className="mt-2 break-keep text-lg font-semibold leading-7 text-foreground sm:text-xl">
-              브랜드별 플랜, 요청 상태, 결제 예정액을 한 화면에서 관리합니다.
+              제휴처별 플랜, 요청 상태, 결제 예정액을 한 화면에서 관리합니다.
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -174,14 +187,15 @@ export default function PartnerPlanManagementView({
 
       <section className="flex min-w-0 flex-col gap-4">
         <SectionHeading
-          title="브랜드별 플랜"
-          description="필요한 브랜드만 펼쳐 업그레이드 요청과 결제 예정액을 확인합니다."
+          title="제휴처별 플랜"
+          description="필요한 제휴처만 펼쳐 업그레이드 요청과 결제 예정액을 확인합니다."
         />
         <PartnerPlanBrandList
           data={data}
           companyId={companyId}
           bankTransferAccount={bankTransferAccount}
           billingProfiles={billingProfiles}
+          actions={actions}
           nowIso={nowIso}
         />
       </section>

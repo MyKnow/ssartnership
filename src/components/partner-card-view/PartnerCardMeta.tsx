@@ -1,13 +1,12 @@
 import type { MouseEvent } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
-import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import PartnerValueBadge from "@/components/PartnerValueBadge";
-import {
-  getPartnerPlaceLinkLabel,
-  getPartnerServiceMode,
-} from "@/lib/partner-service-mode";
+import { cn } from "@/lib/cn";
+import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
+import { getPartnerAudienceLabel } from "@/lib/partner-audience";
+import { applyContentBudget } from "@/lib/content-budget";
 import type { CategoryKey, Partner } from "@/lib/types";
 
 export default function PartnerCardMeta({
@@ -16,24 +15,24 @@ export default function PartnerCardMeta({
   badgeStyle,
   detailHref,
   canNavigate,
-  mapLink,
+  isActive,
   onCategoryClick,
   onTitleClick,
-  onMapClick,
   headerAction,
   media,
+  compact = false,
 }: {
   partner: Partner;
   categoryLabel?: string;
   badgeStyle?: React.CSSProperties;
   detailHref: string;
   canNavigate: boolean;
-  mapLink?: string | null;
+  isActive: boolean;
   onCategoryClick?: (categoryKey: CategoryKey) => void;
   onTitleClick: (event: MouseEvent<HTMLAnchorElement>) => void;
-  onMapClick: () => void;
   headerAction?: React.ReactNode;
   media: React.ReactNode;
+  compact?: boolean;
 }) {
   const handleCategoryClick = onCategoryClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
@@ -42,12 +41,13 @@ export default function PartnerCardMeta({
         onCategoryClick(partner.category);
       }
     : null;
-  const categoryBadgeClass = "min-h-8 px-2.5 py-1 text-[11px] font-medium tracking-[0.04em]";
+  const categoryBadgeClass =
+    "h-11 whitespace-nowrap px-2 py-1 text-xs font-medium tracking-[0.02em]";
   const categoryBadge = handleCategoryClick ? (
     <button
       type="button"
       onClick={handleCategoryClick}
-      className="inline-flex min-h-10 min-w-10 items-center self-start"
+      className="inline-flex h-11 min-w-11 items-center"
       aria-label={`${categoryLabel ?? "카테고리"} 필터 적용`}
     >
       <Badge
@@ -75,70 +75,59 @@ export default function PartnerCardMeta({
   );
   const serviceMode = getPartnerServiceMode(partner.location);
   const isOnlineService = serviceMode === "online";
-  const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);
   const branchScopeLabel = getPartnerBranchScopeLabel(
     partner.branchScopeType,
     serviceMode,
   );
   const showBranchScopeBadge =
     !isOnlineService && partner.branchScopeType && partner.branchScopeType !== "single_location";
-  const placeLinkAction = mapLink ? (
-    <a
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-control text-foreground shadow-flat hover:border-strong hover:bg-surface-elevated"
-      href={mapLink}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={onMapClick}
-      aria-label={placeLinkLabel}
-      title={placeLinkLabel}
-    >
-      {isOnlineService ? (
-        <svg
-          width={15}
-          height={15}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M7 17 17 7" />
-          <path d="M8 7h9v9" />
-        </svg>
-      ) : (
-        <svg
-          width={15}
-          height={15}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
-          <path d="M9 3v15" />
-          <path d="M15 6v15" />
-        </svg>
-      )}
-    </a>
-  ) : null;
+  const benefitBudget = applyContentBudget(partner.benefits, 2);
+  const audienceSummary = partner.appliesTo
+    .map((audience) => getPartnerAudienceLabel(audience))
+    .join(" · ");
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid min-w-0 gap-4 @2xs/card:grid-cols-[minmax(8rem,9rem)_minmax(0,1fr)] @2xs/card:items-start">
+    <div
+      className={cn(
+        "min-w-0",
+        compact
+          ? "grid gap-2 min-[1200px]:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] min-[1200px]:items-center min-[1200px]:gap-3"
+          : "flex flex-col gap-4",
+      )}
+    >
+      <div
+        className={cn(
+          "grid min-w-0 gap-4 @xs/card:items-start",
+          compact
+            ? "grid-cols-[auto_minmax(0,1fr)] !items-stretch gap-2 sm:gap-3"
+            : "@xs/card:grid-cols-[minmax(8rem,9rem)_minmax(0,1fr)]",
+        )}
+      >
         {media}
-        <div className="grid min-w-0 flex-1 gap-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div
+          data-partner-card-primary-content
+          className={cn(
+            "grid min-w-0 flex-1",
+            compact ? "h-full gap-1.5" : "gap-2",
+          )}
+        >
+          <div
+            className={cn(
+              "flex items-start gap-3",
+              compact ? "justify-start" : "justify-between",
+            )}
+          >
+            <div
+              className={cn(
+                "flex min-w-0 flex-1 flex-wrap items-center",
+                compact ? "gap-1" : "gap-2",
+              )}
+            >
               {categoryBadge}
+              {compact ? headerAction : null}
             </div>
-            {placeLinkAction || headerAction ? (
+            {!compact && headerAction ? (
               <div className="flex shrink-0 items-center gap-1.5">
-                {placeLinkAction}
                 {headerAction}
               </div>
             ) : null}
@@ -147,21 +136,41 @@ export default function PartnerCardMeta({
             {canNavigate ? (
               <Link
                 href={detailHref}
-                className="min-w-0 flex-1 text-left text-xl font-semibold leading-tight text-foreground line-clamp-2 hover:underline"
-                aria-label={`${partner.name} 상세 보기`}
+                className={cn(
+                  "min-w-0 flex-1 truncate text-left font-semibold leading-tight text-foreground hover:underline",
+                  compact ? "text-base sm:text-lg" : "text-lg",
+                )}
+                aria-label={`${partner.name} 상세 보기${
+                  isActive ? "" : " · 현재 이용할 수 없는 제휴"
+                }`}
                 onClick={onTitleClick}
               >
                 {partner.name}
               </Link>
             ) : (
-              <h3 className="min-w-0 flex-1 text-xl font-semibold leading-tight text-foreground line-clamp-2">
+              <h3
+                className={cn(
+                  "min-w-0 flex-1 truncate font-semibold leading-tight text-foreground",
+                  compact ? "text-base sm:text-lg" : "text-lg",
+                )}
+              >
                 {partner.name}
               </h3>
             )}
           </div>
-          {!isOnlineService ? (
-            <p className="min-w-0 break-words text-sm leading-snug text-muted-foreground">
-              {partner.location}
+          {compact || !isOnlineService ? (
+            <p
+              data-partner-card-location
+              className={cn(
+                "min-w-0 text-muted-foreground",
+                compact
+                  ? "min-h-4 line-clamp-1 break-words text-xs leading-normal sm:min-h-5 sm:text-sm"
+                  : "break-words text-sm leading-snug",
+              )}
+              title={compact && !isOnlineService ? partner.location : undefined}
+              aria-hidden={compact && isOnlineService ? true : undefined}
+            >
+              {isOnlineService ? "\u00a0" : partner.location}
             </p>
           ) : null}
           {showBranchScopeBadge ? (
@@ -171,19 +180,32 @@ export default function PartnerCardMeta({
           ) : null}
         </div>
       </div>
-      <div className="text-sm text-foreground">
-        <p className="font-medium text-foreground">혜택</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {partner.benefits.map((benefit) => (
-            <PartnerValueBadge key={benefit}>
-              {benefit}
-            </PartnerValueBadge>
-          ))}
+      <div
+        className={
+          compact
+            ? "hidden min-w-0 gap-3 min-[1200px]:grid"
+            : "contents"
+        }
+      >
+        <div className="min-w-0 text-sm text-foreground">
+          <p className="font-medium text-foreground">혜택</p>
+          <div className="mt-2 flex min-w-0 flex-wrap gap-2">
+            {benefitBudget.visible.map((benefit) => (
+              <PartnerValueBadge key={benefit}>
+                {benefit}
+              </PartnerValueBadge>
+            ))}
+            {benefitBudget.hiddenCount > 0 ? (
+              <PartnerValueBadge>+{benefitBudget.hiddenCount}</PartnerValueBadge>
+            ) : null}
+          </div>
         </div>
-      </div>
-      <div className="text-sm text-foreground">
-        <p className="font-medium text-foreground">적용 대상</p>
-        <PartnerAudienceChips appliesTo={partner.appliesTo} className="mt-2" />
+        <div className="min-w-0 text-sm text-foreground">
+          <p className="font-medium text-foreground">적용 대상</p>
+          <p className="mt-1.5 truncate text-sm text-muted-foreground">
+            {audienceSummary || "대상 정보 없음"}
+          </p>
+        </div>
       </div>
     </div>
   );

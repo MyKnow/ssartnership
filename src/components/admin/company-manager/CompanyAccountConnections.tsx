@@ -5,7 +5,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
-import { updatePartnerAccountCompanyConnection } from "@/app/admin/(protected)/actions";
+import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import type {
   AdminPartnerAccount,
   AdminPartnerAccountCompany,
@@ -56,10 +56,12 @@ export default function CompanyAccountConnections({
   company,
   accountOptions,
   linkedAccounts,
+  updateConnectionAction,
 }: {
   company: CompanySummary;
   accountOptions: CompanyAccountOption[];
   linkedAccounts: LinkedCompanyAccount[];
+  updateConnectionAction: AdminFormAction;
 }) {
   const connectionFormId = `company-account-connection-${company.id}`;
   const hasAccountOptions = accountOptions.length > 0;
@@ -70,7 +72,7 @@ export default function CompanyAccountConnections({
         <div>
           <h4 className="text-sm font-semibold text-foreground">기존 계정 연결</h4>
           <p className="mt-1 text-xs text-muted-foreground">
-            이미 존재하는 계정을 선택해 이 협력사를 관리하도록 추가합니다.
+            이미 존재하는 계정을 선택해 이 파트너사를 관리하도록 추가합니다.
           </p>
         </div>
         <Badge variant="neutral">
@@ -80,7 +82,7 @@ export default function CompanyAccountConnections({
 
       <form
         id={connectionFormId}
-        action={updatePartnerAccountCompanyConnection}
+        action={updateConnectionAction}
         className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
       >
         <input type="hidden" name="companyId" value={company.id} />
@@ -135,7 +137,7 @@ export default function CompanyAccountConnections({
         {linkedAccounts.length === 0 ? (
           <EmptyState
             title="연결된 계정이 없습니다."
-            description="위 드롭박스로 기존 계정을 선택해 이 협력사의 관리 권한을 추가하세요."
+            description="위 드롭박스로 기존 계정을 선택해 이 파트너사의 관리 권한을 추가하세요."
           />
         ) : (
           linkedAccounts.map(({ account, link }) => {
@@ -162,7 +164,7 @@ export default function CompanyAccountConnections({
                   </Badge>
                   <form
                     id={linkFormId}
-                    action={updatePartnerAccountCompanyConnection}
+                    action={updateConnectionAction}
                     className="grid gap-3 sm:grid-cols-[auto_auto]"
                   >
                     <input type="hidden" name="accountId" value={account.id} />

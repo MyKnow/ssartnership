@@ -63,6 +63,7 @@ test("home selectors apply search before splitting visible and locked cards", as
   const result = filterHomePartners({
     partners: normalized,
     activeCategory: "all",
+    campusFilter: "all",
     appliesToFilter: "all",
     searchValue: "레코디드",
     sortValue: "recent",
@@ -77,6 +78,7 @@ test("home selectors apply search before splitting visible and locked cards", as
   const lockedResult = filterHomePartners({
     partners: normalized,
     activeCategory: "all",
+    campusFilter: "all",
     appliesToFilter: "all",
     searchValue: "어반짐",
     sortValue: "recent",
@@ -93,6 +95,7 @@ test("home selectors apply search before splitting visible and locked cards", as
   const emptyResult = filterHomePartners({
     partners: normalized,
     activeCategory: "all",
+    campusFilter: "all",
     appliesToFilter: "all",
     searchValue: "없는제휴처",
     sortValue: "recent",
@@ -351,8 +354,8 @@ test("log selectors expose partner portal activity as a virtual group", async ()
     getAvailableLogNames(unified, "partner").map((item) => item.label),
     [
       "페이지 조회",
-      "협력사 포털 로그인",
-      "협력사 포털 변경 요청 제출",
+      "파트너사 포털 로그인",
+      "파트너사 포털 변경 요청 제출",
       "api_request",
     ].sort((a, b) => a.localeCompare(b, "ko-KR")),
   );

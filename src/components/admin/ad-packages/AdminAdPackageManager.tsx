@@ -160,6 +160,7 @@ export default function AdminAdPackageManager({
       <SectionHeading
         title="광고 패키지 운영"
         description="쿠폰, 홈 스폰서 배너, 광고성 푸시를 캠페인 단위로 묶어 판매하고 성과를 확인합니다."
+        headingLevel="h2"
       />
 
       <StatsRow

@@ -11,6 +11,10 @@
 - 충분한 폭이 확보될 때만 2열/3열로 확장
 - 컨트롤 바와 필터는 작은 화면에서 세로 스택, 큰 화면에서 행 정렬
 - 작은 화면에서 과도한 chip 군집과 좌우 padding으로 줄바꿈을 유발하지 않는다
+- 기준 검증 폭은 320/360/390, 768/820/1024, 1366/1440/1536px다.
+- 핵심 시각 기준선은 360/820/1366px actual View Story로 관리한다.
+- 긴 한국어 제목은 의미 단위 줄바꿈을 허용하되 액션·상태를 밀어내지 않고, URL·식별자는 `min-width: 0`과 안전한 word break로 containment한다.
+- 모바일 sticky action은 콘텐츠 마지막 action과 같은 primary를 중복 강조하지 않는다.
 
 ## Decorate
 - hero는 navy gradient + subtle accent glow

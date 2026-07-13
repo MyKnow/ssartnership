@@ -6,6 +6,7 @@ import {
 } from "@/lib/policy-documents";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 
 const COOKIE_NAME = "user_session";
 const SESSION_TTL_DAYS = 7;
@@ -21,6 +22,7 @@ type SignedUserSession = {
   issuedAt: number;
   expiresAt: number;
   mustChangePassword?: boolean;
+  persistent?: boolean;
   policyConsentSnapshot?: PolicyConsentSnapshot | null;
 };
 
@@ -66,6 +68,12 @@ function verifyToken(token: string) {
       return null;
     }
     if (
+      parsed.persistent !== undefined &&
+      typeof parsed.persistent !== "boolean"
+    ) {
+      return null;
+    }
+    if (
       parsed.policyConsentSnapshot !== undefined &&
       parsed.policyConsentSnapshot !== null &&
       (typeof parsed.policyConsentSnapshot !== "object" ||
@@ -80,7 +88,7 @@ function verifyToken(token: string) {
   }
 }
 
-export async function getSignedUserSession() {
+async function getRawSignedUserSession() {
   noStore();
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
@@ -90,24 +98,54 @@ export async function getSignedUserSession() {
   return verifyToken(token);
 }
 
+/**
+ * Returns a cryptographically valid session only while the underlying member
+ * remains active. This DB check is deliberate: cookie signatures alone cannot
+ * revoke access after a soft delete.
+ */
+export async function getSignedUserSession() {
+  const session = (await getRawSignedUserSession()) as SignedUserSession | null;
+  if (!session?.userId) {
+    return null;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data } = await supabase
+      .from("members")
+      .select("id")
+      .eq("id", session.userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    return data?.id ? session : null;
+  } catch {
+    return null;
+  }
+}
+
+export const getActiveUserSession = getSignedUserSession;
+
 export async function setUserSession(
   userId: string,
   mustChangePassword = false,
   options?: {
     policyConsentSnapshot?: PolicyConsentSnapshot | null;
+    persistent?: boolean;
   },
 ) {
   const now = Date.now();
-  const currentSession = (await getSignedUserSession()) as SignedUserSession | null;
+  const currentSession = (await getRawSignedUserSession()) as SignedUserSession | null;
   const resolvedPolicyConsentSnapshot =
     options?.policyConsentSnapshot !== undefined
       ? options.policyConsentSnapshot
       : currentSession?.userId === userId
         ? currentSession.policyConsentSnapshot ?? undefined
         : undefined;
+  const persistent = options?.persistent ?? currentSession?.persistent ?? true;
   const payload = JSON.stringify({
     userId,
     mustChangePassword,
+    persistent,
     issuedAt: now,
     expiresAt: now + SESSION_TTL_MS,
     ...(resolvedPolicyConsentSnapshot !== undefined
@@ -120,7 +158,7 @@ export async function setUserSession(
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+    ...(persistent ? { maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 } : {}),
     path: "/",
   });
 }
@@ -141,9 +179,10 @@ export async function getUserSession() {
   const memberPromise = supabase
     .from("members")
     .select(
-      "id,must_change_password,service_policy_version,privacy_policy_version",
+      "id,must_change_password,service_policy_version,privacy_policy_version,profile_photo_review_status",
     )
     .eq("id", session.userId)
+    .is("deleted_at", null)
     .maybeSingle();
   const activePoliciesPromise = getActiveRequiredPolicies();
 
@@ -165,5 +204,8 @@ export async function getUserSession() {
     ...session,
     mustChangePassword: Boolean(member.must_change_password),
     requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+    requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
+      member.profile_photo_review_status,
+    ),
   };
 }

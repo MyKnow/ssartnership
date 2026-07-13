@@ -224,8 +224,8 @@ export async function manualAddMembersAction(
     status: result.failed > 0 ? (result.success > 0 ? "partial" : "error") : "success",
     message:
       result.success > 0
-        ? `${result.success}명의 유저를 추가했습니다.`
-        : "추가할 수 있는 유저가 없습니다.",
+        ? `${result.success}명의 회원을 추가했습니다.`
+        : "추가할 수 있는 회원이 없습니다.",
     ...result,
   };
 }

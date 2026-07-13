@@ -6,26 +6,26 @@ import {
   Building2,
   CreditCard,
   ExternalLink,
-  Gauge,
   Home,
   IdCard,
   LifeBuoy,
   LogOut,
+  MoreHorizontal,
   Settings,
   Store,
 } from "lucide-react";
 import BrandWordmark from "@/components/BrandWordmark";
 import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 import ThemeToggle from "@/components/ThemeToggle";
-import Badge from "@/components/ui/Badge";
 import Container from "@/components/ui/Container";
 import { cn } from "@/lib/cn";
 import {
   getCompanyScopedPortalHref,
+  getPartnerGlobalPortalHref,
   getPartnerCompanyIdFromSearchParams,
   getPartnerCompanyIdFromPathname,
+  getPartnerPortalMobileNavigation,
   PARTNER_PASSWORD_CHANGE_PATH,
-  type PartnerPortalSection,
 } from "@/lib/partner-portal-paths";
 import {
   shouldShowPartnerPortalMobileNavigation,
@@ -42,19 +42,28 @@ type PartnerPortalShellViewProps = {
   isMock: boolean;
 };
 
-const primaryNavItems = [
+const companyNavItems = [
   {
     section: "dashboard",
-    label: "대시보드",
+    label: "홈",
     description: "운영 요약",
-    icon: Gauge,
+    icon: Home,
   },
   {
-    section: "brands",
-    label: "브랜드",
+    section: "services",
+    label: "제휴처",
     description: "목록과 상세",
     icon: Store,
   },
+  {
+    section: "plans",
+    label: "플랜",
+    description: "요금제와 요청",
+    icon: CreditCard,
+  },
+] as const;
+
+const globalNavItems = [
   {
     section: "notifications",
     label: "알림",
@@ -62,14 +71,8 @@ const primaryNavItems = [
     icon: Bell,
   },
   {
-    section: "plans",
-    label: "플랜 관리",
-    description: "요금제와 요청",
-    icon: CreditCard,
-  },
-  {
     section: "account",
-    label: "프로필",
+    label: "계정",
     description: "계정과 증빙",
     icon: IdCard,
   },
@@ -80,6 +83,8 @@ const primaryNavItems = [
     icon: LifeBuoy,
   },
 ] as const;
+
+const primaryNavItems = [...companyNavItems, ...globalNavItems] as const;
 
 const setupNavItem = {
   href: "/partner/setup",
@@ -92,23 +97,26 @@ type PrimaryNavItem = (typeof primaryNavItems)[number];
 type PortalNavItem = PrimaryNavItem | typeof setupNavItem;
 type PrimaryNavSection = PrimaryNavItem["section"];
 
-function isCompanyScopedSection(
+function isGlobalSection(
   section: PrimaryNavSection,
-): section is PartnerPortalSection {
-  return section !== "brands";
+): section is "notifications" | "account" | "support" {
+  return (
+    section === "notifications" ||
+    section === "account" ||
+    section === "support"
+  );
 }
 
 function getPrimaryNavHref(item: PrimaryNavItem, companyId: string | null) {
   if (!companyId) {
-    return "/partner";
+    return isGlobalSection(item.section)
+      ? getPartnerGlobalPortalHref(item.section)
+      : "/partner";
   }
-  if (item.section === "brands") {
-    return `${getCompanyScopedPortalHref(companyId)}#brands`;
+  if (isGlobalSection(item.section)) {
+    return getPartnerGlobalPortalHref(item.section, companyId);
   }
-  return getCompanyScopedPortalHref(
-    companyId,
-    item.section,
-  );
+  return getCompanyScopedPortalHref(companyId, item.section);
 }
 
 function getPortalNavHref(item: PortalNavItem, companyId: string | null) {
@@ -128,19 +136,22 @@ function isActivePrimaryPath(
   companyId: string | null,
 ) {
   if (!companyId) {
+    if (isGlobalSection(item.section)) {
+      return pathname === `/partner/${item.section}`;
+    }
     return pathname === "/partner" && item.section === "dashboard";
   }
-  const scopedHref = getCompanyScopedPortalHref(
-    companyId,
-    isCompanyScopedSection(item.section) ? item.section : "dashboard",
-  );
+  if (isGlobalSection(item.section)) {
+    return pathname === `/partner/${item.section}`;
+  }
+  const scopedHref = getCompanyScopedPortalHref(companyId);
   if (item.section === "dashboard") {
     return pathname === scopedHref;
   }
-  if (item.section === "brands") {
+  if (item.section === "services") {
     return pathname.startsWith(`${scopedHref}/services/`);
   }
-  return pathname === scopedHref || pathname.startsWith(`${scopedHref}/`);
+  return pathname === `${scopedHref}/plans`;
 }
 
 function isActivePortalNavPath(
@@ -160,14 +171,14 @@ function getCurrentNavLabel(
   companyId: string | null,
 ) {
   if (pathname.startsWith(PARTNER_PASSWORD_CHANGE_PATH)) {
-    return "프로필";
+    return "계정";
   }
   const navItems = isMock
     ? [...primaryNavItems, setupNavItem]
     : primaryNavItems;
   return (
     navItems.find((item) => isActivePortalNavPath(pathname, item, companyId))
-      ?.label ?? "협력사 포털"
+      ?.label ?? "파트너 포털"
   );
 }
 
@@ -176,27 +187,42 @@ function MobileTopBar({
   session,
   isMock,
   currentCompanyId,
+  currentCompany,
   showNavigation,
 }: {
   pathname: string;
   session: PartnerSession | null;
   isMock: boolean;
   currentCompanyId: string | null;
+  currentCompany: PartnerPortalCompanyScope | null;
   showNavigation: boolean;
 }) {
+  const mobileItems = getPartnerPortalMobileNavigation(currentCompanyId);
+  const moreActive =
+    pathname === "/partner/account" ||
+    pathname === "/partner/support" ||
+    pathname.endsWith("/plans");
+
   return (
-    <header className="overflow-x-hidden border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:hidden">
+    <header className="relative z-40 border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:hidden">
       <Container
         size="wide"
-        className="flex flex-wrap items-center justify-between gap-3 py-4"
+        className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3"
       >
-        <PartnerPendingLink
-          href="/partner"
-          aria-label="협력사 포털 홈"
-          className="inline-flex items-center text-foreground hover:opacity-80"
-        >
-          <BrandWordmark className="text-lg" />
-        </PartnerPendingLink>
+        <div className="min-w-0">
+          <PartnerPendingLink
+            href={currentCompanyId ? getCompanyScopedPortalHref(currentCompanyId) : "/partner"}
+            aria-label="파트너 포털 홈"
+            className="inline-flex items-center text-foreground hover:opacity-80"
+          >
+            <BrandWordmark className="text-lg" />
+          </PartnerPendingLink>
+          {currentCompany ? (
+            <p className="mt-0.5 max-w-40 truncate text-xs font-semibold text-muted-foreground min-[390px]:max-w-52">
+              {currentCompany.name}
+            </p>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {session ? (
@@ -220,36 +246,96 @@ function MobileTopBar({
         {session && showNavigation ? (
           <div className="w-full min-w-0">
             <nav
-              aria-label="협력사 포털 주요 메뉴"
-              className="grid w-full min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3"
+              aria-label="파트너 포털 주요 메뉴"
+              className="grid w-full min-w-0 grid-cols-4 gap-1.5"
             >
-              {[...primaryNavItems, ...(isMock ? [setupNavItem] : [])].map(
-                (item) => {
-                  const Icon = item.icon;
-                  const href = getPortalNavHref(item, currentCompanyId);
-                  const active = isActivePortalNavPath(
-                    pathname,
-                    item,
-                    currentCompanyId,
-                  );
-                  return (
-                    <PartnerPendingLink
-                      key={"section" in item ? item.section : item.href}
-                      href={href}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-[0.95rem] border px-2.5 py-2 text-xs font-semibold shadow-flat transition-surface",
-                        active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-surface-control text-foreground",
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0 truncate">{item.label}</span>
-                    </PartnerPendingLink>
-                  );
-                },
-              )}
+              {mobileItems.slice(0, 3).map((item) => {
+                const Icon =
+                  item.id === "home"
+                    ? Home
+                    : item.id === "services"
+                      ? Store
+                      : Bell;
+                const active =
+                  item.id === "home"
+                    ? pathname === getCompanyScopedPortalHref(currentCompanyId ?? "")
+                    : item.id === "services"
+                      ? Boolean(
+                          currentCompanyId &&
+                            pathname.startsWith(
+                              `${getCompanyScopedPortalHref(currentCompanyId)}/services`,
+                            ),
+                        )
+                      : pathname === "/partner/notifications";
+                return (
+                  <PartnerPendingLink
+                    key={item.id}
+                    href={item.href ?? "/partner"}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "inline-flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[0.9rem] border px-1.5 py-1.5 text-[11px] font-semibold shadow-flat transition-surface",
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-surface-control text-foreground",
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 truncate">{item.label}</span>
+                  </PartnerPendingLink>
+                );
+              })}
+              <details className="group relative min-w-0">
+                <summary
+                  aria-current={moreActive ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-11 min-w-0 cursor-pointer list-none flex-col items-center justify-center gap-0.5 rounded-[0.9rem] border px-1.5 py-1.5 text-[11px] font-semibold shadow-flat transition-surface marker:content-none",
+                    moreActive
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-surface-control text-foreground",
+                  )}
+                >
+                  <MoreHorizontal className="h-4 w-4 shrink-0" />
+                  <span className="truncate">더보기</span>
+                </summary>
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 grid w-[min(16rem,calc(100vw-2rem))] gap-1 rounded-[1rem] border border-border bg-surface-overlay p-2 shadow-overlay">
+                  {[
+                    ...(currentCompanyId
+                      ? [
+                          {
+                            href: getCompanyScopedPortalHref(currentCompanyId, "plans"),
+                            label: "플랜 관리",
+                            icon: CreditCard,
+                          },
+                        ]
+                      : []),
+                    {
+                      href: getPartnerGlobalPortalHref("account", currentCompanyId),
+                      label: "계정",
+                      icon: IdCard,
+                    },
+                    {
+                      href: getPartnerGlobalPortalHref("support", currentCompanyId),
+                      label: "기술 지원",
+                      icon: LifeBuoy,
+                    },
+                    ...(isMock
+                      ? [{ href: setupNavItem.href, label: setupNavItem.label, icon: Settings }]
+                      : []),
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <PartnerPendingLink
+                        key={item.href}
+                        href={item.href}
+                        className="flex min-h-11 min-w-0 items-center gap-3 rounded-[0.85rem] px-3 text-sm font-semibold text-foreground hover:bg-surface-control"
+                      >
+                        <Icon className="h-4 w-4 shrink-0 text-primary" />
+                        <span className="truncate">{item.label}</span>
+                      </PartnerPendingLink>
+                    );
+                  })}
+                </div>
+              </details>
             </nav>
           </div>
         ) : null}
@@ -265,7 +351,7 @@ function SimpleFooter() {
         size="wide"
         className="flex flex-col gap-2 text-xs leading-6 text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
       >
-        <p>협력사 담당자 전용 공간입니다. 정보 변경은 승인 절차를 거칩니다.</p>
+        <p>파트너사 담당자 전용 공간입니다. 정보 변경은 승인 절차를 거칩니다.</p>
         <a
           href={TECH_SUPPORT_HREF}
           className="font-medium text-foreground hover:opacity-80"
@@ -297,7 +383,7 @@ function DashboardSidebar({
       <div className="flex h-full flex-col gap-6 px-3 py-4 xl:px-4">
         <PartnerPendingLink
           href="/partner"
-          aria-label="협력사 포털 홈"
+          aria-label="파트너 포털 홈"
           className="flex h-14 items-center gap-3 rounded-[1.1rem] border border-border bg-surface-control px-3 shadow-flat"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-[0.85rem] border border-border bg-background text-primary">
@@ -310,26 +396,6 @@ function DashboardSidebar({
             </span>
           </span>
         </PartnerPendingLink>
-
-        {currentCompany ? (
-          <div className="hidden rounded-[1rem] border border-border bg-surface-control p-3 shadow-flat xl:block">
-            <div className="flex items-center justify-between gap-2">
-              <Badge variant="primary">선택됨</Badge>
-              <PartnerPendingLink
-                href="/partner"
-                className="text-xs font-semibold text-primary hover:opacity-80"
-              >
-                변경
-              </PartnerPendingLink>
-            </div>
-            <p className="mt-3 truncate text-sm font-semibold text-foreground">
-              {currentCompany.name}
-            </p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              {currentCompany.serviceCount}개 브랜드 관리 중
-            </p>
-          </div>
-        ) : null}
 
         <nav className="space-y-1">
           <p className="hidden px-2 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground xl:block">
@@ -382,7 +448,7 @@ function DashboardSidebar({
             >
               <Building2 className="h-4 w-4" />
               <span className="hidden min-w-0 truncate xl:inline">
-                협력사 선택
+                파트너사 선택
               </span>
             </PartnerPendingLink>
           ) : null}
@@ -429,10 +495,10 @@ function DashboardTopBar({
         className="flex min-h-16 items-center justify-between gap-4 py-3"
       >
         <div className="min-w-0">
-          <p className="ui-kicker">협력사 포털 · {currentLabel}</p>
-          <h1 className="truncate text-lg font-semibold tracking-[-0.03em] text-foreground">
+          <p className="ui-kicker">파트너 포털 · {currentLabel}</p>
+          <p className="truncate text-lg font-semibold tracking-[-0.03em] text-foreground">
             {currentCompany?.name ?? session.displayName}
-          </h1>
+          </p>
           {currentCompany ? (
             <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
               담당자 · {session.displayName}
@@ -485,6 +551,7 @@ export default function PartnerPortalShellView({
           session={session}
           isMock={isMock}
           currentCompanyId={currentCompanyId}
+          currentCompany={currentCompany}
           showNavigation={showMobileNavigation}
         />
         <div className="hidden border-b border-border/70 bg-surface-overlay/95 shadow-flat backdrop-blur-xl md:block">
@@ -494,12 +561,12 @@ export default function PartnerPortalShellView({
           >
             <PartnerPendingLink
               href="/partner"
-              aria-label="협력사 포털 홈"
+              aria-label="파트너 포털 홈"
               className="inline-flex items-center gap-3 text-foreground hover:opacity-80"
             >
               <BrandWordmark className="text-xl" />
               <span className="rounded-full border border-border bg-surface-muted/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                협력사 포털
+                파트너 포털
               </span>
             </PartnerPendingLink>
             <div className="flex items-center gap-2">
@@ -526,6 +593,7 @@ export default function PartnerPortalShellView({
         session={session}
         isMock={isMock}
         currentCompanyId={currentCompanyId}
+        currentCompany={currentCompany}
         showNavigation={showMobileNavigation}
       />
       <DashboardSidebar

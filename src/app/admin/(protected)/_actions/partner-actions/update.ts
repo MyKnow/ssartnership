@@ -41,7 +41,7 @@ export async function updatePartnerAction(formData: FormData) {
   });
   const id = String(formData.get("id") || "").trim();
   if (!id) {
-    throw new Error("수정할 업체를 찾을 수 없습니다.");
+    throw new Error("수정할 제휴처를 찾을 수 없습니다.");
   }
 
   const redirectPath = getSafeAdminPartnerPath(
@@ -63,7 +63,7 @@ export async function updatePartnerAction(formData: FormData) {
     throw new Error(previousPartnerError.message);
   }
   if (!previousPartner) {
-    throw new Error("수정할 업체를 찾을 수 없습니다.");
+    throw new Error("수정할 제휴처를 찾을 수 없습니다.");
   }
   const previousManagedCampusSlugs =
     (previousPartner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs ??
@@ -196,14 +196,14 @@ export async function updatePartnerAction(formData: FormData) {
           .maybeSingle()).data?.label ?? payload.categoryId;
   const previousCompanyLabel = previousCompany?.name ?? "없음";
   const nextCompanyLabel = nextCompany?.name ?? "없음";
-  const partnerAudit = buildAuditChangeSummary("브랜드", [
+  const partnerAudit = buildAuditChangeSummary("제휴처", [
     {
       label: "회사 연결",
       before: previousCompanyLabel,
       after: nextCompanyLabel,
     },
     {
-      label: "브랜드명",
+      label: "제휴처명",
       before: previousPartner.name ?? "",
       after: payload.name,
     },

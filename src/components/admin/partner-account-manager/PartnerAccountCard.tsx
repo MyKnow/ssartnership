@@ -8,11 +8,13 @@ import {
   getPartnerInitialSetupBadge,
 } from "@/components/admin/partner-account-manager/helpers";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 
 export default function PartnerAccountCard({
   account,
   companies,
   generatedSetupUrl,
+  actions,
 }: {
   account: AdminPartnerAccount;
   companies: {
@@ -21,6 +23,7 @@ export default function PartnerAccountCard({
     slug: string;
   }[];
   generatedSetupUrl?: string | null;
+  actions: AdminCompanyFormActions;
 }) {
   const accountFormId = `partner-account-form-${account.id}`;
   const setupBadge = getPartnerInitialSetupBadge(account);
@@ -38,7 +41,7 @@ export default function PartnerAccountCard({
                 {account.must_change_password ? "비밀번호 변경 필요" : "일반"}
               </Badge>
               <Badge variant="neutral">
-                협력사 {account.links.length}개
+                파트너사 {account.links.length}개
               </Badge>
               <Badge variant={setupBadge.variant}>{setupBadge.label}</Badge>
             </div>
@@ -62,11 +65,24 @@ export default function PartnerAccountCard({
         </summary>
 
         <div className="grid gap-5 border-t border-border/70 bg-surface-inset/40 p-5 md:p-6">
-          <PartnerAccountHeader account={account} generatedSetupUrl={generatedSetupUrl} />
+          <PartnerAccountHeader
+            account={account}
+            generatedSetupUrl={generatedSetupUrl}
+            createSetupUrlAction={actions.createSetupUrlAction}
+            sendSetupUrlAction={actions.sendSetupUrlAction}
+          />
 
           <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-            <PartnerAccountForm account={account} formId={accountFormId} />
-            <PartnerAccountLinks account={account} companies={companies} />
+            <PartnerAccountForm
+              account={account}
+              formId={accountFormId}
+              updateAccountAction={actions.updateAccountAction}
+            />
+            <PartnerAccountLinks
+              account={account}
+              companies={companies}
+              updateConnectionAction={actions.updateConnectionAction}
+            />
           </div>
         </div>
       </details>

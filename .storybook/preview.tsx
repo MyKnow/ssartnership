@@ -20,7 +20,17 @@ function PreviewTheme({
   }, [theme]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground" data-storybook-preview>
+      <style>{`
+        [data-storybook-preview] *,
+        [data-storybook-preview] *::before,
+        [data-storybook-preview] *::after {
+          animation-duration: 0.001ms !important;
+          animation-delay: 0ms !important;
+          transition-duration: 0.001ms !important;
+          transition-delay: 0ms !important;
+        }
+      `}</style>
       <div className="ui-page-shell-wide py-8">{children}</div>
     </div>
   );
@@ -49,6 +59,9 @@ const preview: Preview = {
     },
     backgrounds: {
       disabled: true,
+    },
+    a11y: {
+      test: "error",
     },
   },
   globalTypes: {

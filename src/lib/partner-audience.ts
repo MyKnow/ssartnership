@@ -96,7 +96,11 @@ export function resolvePartnerAudienceFromMemberYear(
   year?: number | null,
   now: Date = new Date(),
   rule?: SsafyYearRule,
+  options: { graduateVerifiedAt?: string | null } = {},
 ): PartnerAudienceKey | null {
+  if (options.graduateVerifiedAt) {
+    return "graduate";
+  }
   if (typeof year !== "number") {
     return null;
   }

@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { parseAdminPartnerXlsxFileAction } from "@/app/admin/(protected)/partners/new/actions";
 import {
   ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS,
   ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS,
   ADMIN_PARTNER_FILE_MAX_BYTES,
   type AdminPartnerFileBenefitActionType,
   type AdminPartnerFileDraft,
+  type AdminPartnerFileParseResult,
 } from "@/lib/admin-partner-file-import";
 import type { PartnerServiceMode } from "@/lib/partner-service-mode";
 import Button from "@/components/ui/Button";
@@ -27,9 +27,9 @@ const benefitActionOptions: Array<{
 ];
 
 const guideItems = [
-  "템플릿은 한 브랜드만 입력합니다. 입력 시트의 입력값 열만 채워 주세요.",
+  "템플릿에는 한 제휴처만 입력합니다. 입력 시트의 입력값 열만 채워 주세요.",
   "카테고리는 드롭다운에서 선택하거나, 목록에 없으면 새 카테고리명을 직접 입력합니다.",
-  "브랜드 전화번호는 협력사 담당자 전화번호와 별도로 입력합니다.",
+  "제휴처 전화번호는 파트너사 담당자 전화번호와 별도로 입력합니다.",
   "혜택, 이용 조건, 태그, 이미지 URL은 여러 개면 | 로 구분합니다.",
   "노출 캠퍼스와 적용 대상은 파일에서 받지 않고, 반영 후 단건 추가 폼에서 직접 지정합니다.",
   "검증이 끝나도 바로 저장되지 않습니다. 단건 추가 폼에서 확인 후 저장합니다.",
@@ -37,8 +37,10 @@ const guideItems = [
 
 export default function AdminPartnerFileImportForm({
   onApplyDraft,
+  parseFileAction,
 }: {
   onApplyDraft: (draft: AdminPartnerFileDraft) => void;
+  parseFileAction: (formData: FormData) => Promise<AdminPartnerFileParseResult>;
 }) {
   const [serviceMode, setServiceMode] = useState<PartnerServiceMode>("offline");
   const [benefitActionType, setBenefitActionType] =
@@ -69,7 +71,7 @@ export default function AdminPartnerFileImportForm({
     startTransition(async () => {
       const formData = new FormData();
       formData.set("file", file);
-      const result = await parseAdminPartnerXlsxFileAction(formData);
+      const result = await parseFileAction(formData);
       if (!result.ok) {
         setErrors(result.errors);
         return;
@@ -94,8 +96,8 @@ export default function AdminPartnerFileImportForm({
                 setServiceMode(event.target.value as PartnerServiceMode)
               }
             >
-              <option value="offline">오프라인 서비스</option>
-              <option value="online">온라인 서비스</option>
+              <option value="offline">오프라인 제휴처</option>
+              <option value="online">온라인 제휴처</option>
             </Select>
           </label>
           <label className="grid gap-2 text-sm font-semibold text-foreground">

@@ -20,6 +20,10 @@ export type {
   MockCoverageMatrixRow,
   MockCoverageSummary,
   MockRequiredStateKey,
+  MockRouteKind,
+  MockStateStoryStatus,
+  MockStateStoryTrace,
+  MockStoryRenderKind,
   MockStorybookScenarioCoverage,
   MockViewportKey,
 } from "./types.ts";
@@ -90,6 +94,7 @@ function cloneRouteInventoryItem(
     ...item,
     dataSources: [...item.dataSources],
     requiredScenarioIds: [...item.requiredScenarioIds],
+    requiredStateKeys: [...item.requiredStateKeys],
   };
 }
 

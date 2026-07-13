@@ -33,7 +33,7 @@ export default function AppErrorScreen({
       ? {
           href: TECH_SUPPORT_HREF,
           label: "기술 지원",
-          helper: "협력사 포털 문제는 기술 지원 템플릿으로 문의합니다.",
+          helper: "파트너 포털 문제는 기술 지원 템플릿으로 문의합니다.",
         }
       : {
           href: BUG_REPORT_HREF,

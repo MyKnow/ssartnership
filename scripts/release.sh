@@ -45,6 +45,11 @@ run_editor() {
   sh -c "$editor_command \"\$1\"" sh "$file_path"
 }
 
+run_repository_prepush() {
+  echo "CI와 동일한 저장소 pre-push 게이트를 실행합니다."
+  npm run prepush
+}
+
 prompt_lighthouse_check() {
   while true; do
     echo "Lighthouse 검사를 실행할까요?"
@@ -272,6 +277,7 @@ if [[ "$CURRENT_BRANCH" == "main" ]]; then
     exit 0
   fi
 
+  run_repository_prepush
   git tag -a "$TAG_NAME" -m "$TAG_NAME"
   git push --no-verify origin "$CURRENT_BRANCH"
   git push --no-verify origin "$TAG_NAME"
@@ -338,11 +344,19 @@ else
   echo "Lighthouse 검사를 건너뜁니다."
 fi
 
+echo "Node/Vitest 단위 테스트와 80% 커버리지 게이트를 실행합니다."
+npm test
+
 echo "Storybook 정적 빌드를 실행합니다."
 npm run build-storybook
 
 echo "Storybook interaction/smoke 테스트를 실행합니다."
 npm run test-storybook
+
+echo "핵심 화면 시각 기준선 비교를 실행합니다."
+npm run test:visual
+
+run_repository_prepush
 
 NEXT_VERSION="$CURRENT_VERSION"
 if [[ "$RELEASE_TYPE" != "none" ]]; then

@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Footer from "@/components/Footer";
+import LegalPolicyView from "@/components/legal/LegalPolicyView";
 import SiteHeader from "@/components/SiteHeader";
-import Container from "@/components/ui/Container";
-import BackButton from "@/components/ui/BackButton";
-import PolicyDocumentVersionSelect from "@/components/legal/PolicyDocumentVersionSelect";
-import PolicyDocumentView from "@/components/legal/PolicyDocumentView";
 import { getHeaderSession } from "@/lib/header-session";
 import {
-  getPolicyDescription,
   getPolicyDocumentsByKind,
   getPolicyKindLabel,
   isPolicyKind,
@@ -78,32 +74,7 @@ export default async function LegalPolicyPage({
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
-      <main>
-        <Container className="pb-16 pt-10">
-          <div className="mx-auto max-w-4xl space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <BackButton />
-              <PolicyDocumentVersionSelect
-                kind={kind}
-                policies={policies}
-                currentVersion={policy.version}
-              />
-            </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                LEGAL
-              </p>
-              <h1 className="text-3xl font-semibold text-foreground">
-                {policy.title}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {getPolicyDescription(kind)}
-              </p>
-            </div>
-            <PolicyDocumentView policy={policy} />
-          </div>
-        </Container>
-      </main>
+      <LegalPolicyView kind={kind} policies={policies} policy={policy} />
       <Footer />
     </div>
   );

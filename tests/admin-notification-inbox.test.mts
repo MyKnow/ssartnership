@@ -130,6 +130,6 @@ test("admin navigation separates personal inbox from notification operations", a
 
   assert.equal(inboxItem?.label, "내 알림");
   assert.equal(inboxItem?.href, "/admin/notifications");
-  assert.equal(operationsItem?.label, "알림 운영");
+  assert.equal(operationsItem?.label, "발송 관리");
   assert.equal(operationsItem?.href, "/admin/push");
 });

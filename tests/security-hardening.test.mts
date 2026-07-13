@@ -265,6 +265,20 @@ test("admin edge guard covers admin pages and admin APIs", async () => {
   assert.equal(isProtectedAdminPath("/api/push/admin/broadcast"), true);
 });
 
+test("soft-deleted members are hidden from public QR verification and avatar delivery", () => {
+  const qrPage = readFileSync(
+    new URL("../src/app/(site)/verify/[token]/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const avatarRoute = readFileSync(
+    new URL("../src/app/api/certification/avatar/[token]/route.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(qrPage, /\.is\("deleted_at", null\)/);
+  assert.match(avatarRoute, /\.is\("deleted_at", null\)/);
+});
+
 test("admin basic auth validates credentials without direct string equality", async () => {
   const originalUsername = process.env.ADMIN_BASIC_AUTH_USERNAME;
   const originalPassword = process.env.ADMIN_BASIC_AUTH_PASSWORD;
@@ -402,6 +416,9 @@ test("session mutation routes require same-origin guards", () => {
     "../src/app/api/mm/consent/route.ts",
     "../src/app/api/mm/delete/route.ts",
     "../src/app/api/mm/profile-sync/route.ts",
+    "../src/app/api/auth/login/route.ts",
+    "../src/app/api/member/email/send/route.ts",
+    "../src/app/api/member/email/verify/route.ts",
     "../src/app/api/mm/_shared/reset-password-complete.ts",
     "../src/app/api/partner/change-password/route.ts",
     "../src/app/api/partner/reset-password/route.ts",
@@ -410,6 +427,16 @@ test("session mutation routes require same-origin guards", () => {
     "../src/app/api/ssafy/reset-password/route.ts",
     "../src/app/api/ssafy/signup/route.ts",
     "../src/app/api/ssafy/verify-token/route.ts",
+    "../src/app/api/graduate-verification/email/send/route.ts",
+    "../src/app/api/graduate-verification/email/verify/route.ts",
+    "../src/app/api/graduate-verification/uploads/sign/route.ts",
+    "../src/app/api/graduate-verification/submit/route.ts",
+    "../src/app/api/graduate-verification/withdraw/route.ts",
+    "../src/app/api/graduate-verification/account/setup/route.ts",
+    "../src/app/api/graduate-verification/password-reset/send/route.ts",
+    "../src/app/api/graduate-verification/password-reset/verify/route.ts",
+    "../src/app/api/certification/photo/sign/route.ts",
+    "../src/app/api/certification/photo/route.ts",
   ];
 
   for (const relativePath of guardedMutationFiles) {
@@ -420,6 +447,38 @@ test("session mutation routes require same-origin guards", () => {
       `${relativePath} should guard state-changing requests`,
     );
   }
+});
+
+test("수료생 본인 사진은 세션 또는 유효 QR 토큰으로만 private 객체를 읽는다", () => {
+  const sessionImageRoute = readFileSync(
+    new URL("../src/app/api/certification/profile-image/route.ts", import.meta.url),
+    "utf8",
+  );
+  const qrImageRoute = readFileSync(
+    new URL("../src/app/api/certification/avatar/[token]/route.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(sessionImageRoute, /getSignedUserSession/);
+  assert.match(sessionImageRoute, /downloadPrivateMemberProfileImage/);
+  assert.match(qrImageRoute, /verifyCertificationQrToken/);
+  assert.match(qrImageRoute, /downloadPrivateMemberProfileImage/);
+
+  for (const source of [sessionImageRoute, qrImageRoute]) {
+    assert.doesNotMatch(source, /createSignedUrl|publicUrl|storage\.from\([^)]*\)\.getPublicUrl/);
+  }
+});
+
+test("수료생 업로드 서명 URL은 이메일 인증 세션과 속도 제한에 묶인다", () => {
+  const uploadSignRoute = readFileSync(
+    new URL("../src/app/api/graduate-verification/uploads/sign/route.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(uploadSignRoute, /getGraduateApplicationSession/);
+  assert.match(uploadSignRoute, /getVerifiedGraduateApplicationChallenge/);
+  assert.match(uploadSignRoute, /isGraduateVerificationBlocked/);
+  assert.match(uploadSignRoute, /recordGraduateVerificationAttempt/);
 });
 
 test("member avatar helper accepts only safe image sources", async () => {

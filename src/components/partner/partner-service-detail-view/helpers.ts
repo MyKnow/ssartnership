@@ -18,16 +18,16 @@ export function withAlpha(color: string, alphaHex: string) {
 export function getPartnerServiceVisualState(context: PartnerChangeRequestContext) {
   const isActive = isWithinPeriod(context.periodStart, context.periodEnd);
   const badgeStyle = context.categoryColor
-    ? {
+      ? {
         backgroundColor: withAlpha(context.categoryColor, "1f"),
-        color: context.categoryColor,
+        color: "var(--foreground)",
       }
     : undefined;
   const chipStyle = context.categoryColor
     ? {
         backgroundColor: withAlpha(context.categoryColor, "14"),
         borderColor: withAlpha(context.categoryColor, "55"),
-        color: context.categoryColor,
+        color: "var(--foreground)",
       }
     : undefined;
   const thumbnailUrl = context.thumbnail ? getCachedImageUrl(context.thumbnail) : "";

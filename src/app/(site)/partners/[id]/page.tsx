@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
+import PageHeader from "@/components/ui/PageHeader";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import ShareLinkButton from "@/components/ShareLinkButton";
 import { SITE_NAME } from "@/lib/site";
@@ -17,9 +17,11 @@ import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import PartnerDetailCoupons from "./_page/PartnerDetailCoupons";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
 import PartnerDetailSummaryCard from "./_page/PartnerDetailSummaryCard";
+import PartnerDetailMobileActionBar from "./_page/PartnerDetailMobileActionBar";
 import PartnerDetailReviews, {
   PartnerDetailReviewsFallback,
 } from "./_page/PartnerDetailReviews";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -97,12 +99,16 @@ export async function generateMetadata({
 
 export default async function PartnerDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ returnTo?: string | string[] }>;
 }) {
-  const [headerSession, resolvedParams] = await Promise.all([
+  const [headerSession, resolvedParams, resolvedSearchParams] = await Promise.all([
     getHeaderSession(),
     params,
+    searchParams ??
+      Promise.resolve<{ returnTo?: string | string[] }>({}),
   ]);
   const rawId = resolvedParams?.id
     ? decodeURIComponent(resolvedParams.id).trim()
@@ -113,7 +119,7 @@ export default async function PartnerDetailPage({
   const member = headerSession?.userId
     ? await getSupabaseAdminClient()
         .from("members")
-        .select("year")
+        .select("year,graduate_verified_at")
         .eq("id", headerSession.userId)
         .maybeSingle()
         .then(({ data }) => data)
@@ -124,6 +130,9 @@ export default async function PartnerDetailPage({
     headerSession?.userId ?? null,
     resolvePartnerAudienceFromMemberYear(
       typeof member?.year === "number" ? member.year : null,
+      new Date(),
+      undefined,
+      { graduateVerifiedAt: member?.graduate_verified_at ?? null },
     ),
   );
   if (!pageData) {
@@ -143,7 +152,6 @@ export default async function PartnerDetailPage({
     partner,
     categoryLabel,
     isActive,
-    thumbnailUrl,
     mapLink,
     normalizedLinks,
     benefitUseAction,
@@ -159,13 +167,27 @@ export default async function PartnerDetailPage({
     currentUserId,
     adCoupons,
   } = pageData;
-  const partnerReturnTo = `/partners/${encodeURIComponent(partner.id)}`;
+  const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
+    ? resolvedSearchParams.returnTo[0]
+    : resolvedSearchParams.returnTo;
+  const directoryReturnTo = sanitizeReturnTo(rawReturnTo, "/#benefits");
+  const partnerPath = `/partners/${encodeURIComponent(partner.id)}`;
+  const partnerReturnTo = rawReturnTo
+    ? `${partnerPath}?${new URLSearchParams({ returnTo: directoryReturnTo }).toString()}`
+    : partnerPath;
+  const resolvedBenefitUseAction =
+    benefitUseAction?.type === "certification"
+      ? {
+          ...benefitUseAction,
+          href: `/certification?${new URLSearchParams({ returnTo: partnerReturnTo }).toString()}`,
+        }
+      : benefitUseAction;
 
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
-        <Container className="pb-16 pt-10">
+        <Container className="pb-28 pt-10 md:pb-16">
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
@@ -189,28 +211,19 @@ export default async function PartnerDetailPage({
             dedupeKey={`partner-detail:${partner.id}`}
           />
           <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-2">
-              <Link
-                href="/"
-                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground hover:border-strong"
-                aria-label="목록으로 돌아가기"
-              >
-                <svg
-                  width={20}
-                  height={20}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </Link>
-              <ShareLinkButton targetType="partner" targetId={partner.id} />
-            </div>
+            <PageHeader
+              eyebrow={categoryLabel}
+              title={partner.name}
+              description={
+                partner.detailDescription ||
+                "혜택과 이용 조건을 확인하고 바로 이용할 수 있습니다."
+              }
+              backHref={directoryReturnTo}
+              backLabel="혜택 목록으로"
+              actions={
+                <ShareLinkButton targetType="partner" targetId={partner.id} />
+              }
+            />
 
             <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
               <PartnerDetailSummaryCard
@@ -218,31 +231,43 @@ export default async function PartnerDetailPage({
                 categoryLabel={categoryLabel}
                 badgeStyle={badgeStyle}
                 chipStyle={chipStyle}
-                thumbnailUrl={thumbnailUrl}
                 mapLink={mapLink}
                 currentUserId={currentUserId}
                 isFavorited={isFavorited}
                 metrics={metrics}
+                detailPanel={
+                  <PartnerDetailContactSection
+                    isActive={isActive}
+                    contactCount={contactCount}
+                    benefitUseAction={resolvedBenefitUseAction}
+                    inquiryDisplay={inquiryDisplay}
+                    normalizedLinks={normalizedLinks}
+                    partnerId={partner.id}
+                  />
+                }
+                primaryActionPanel={
+                  <PartnerDetailContactSection
+                    isActive={isActive}
+                    contactCount={contactCount}
+                    benefitUseAction={resolvedBenefitUseAction}
+                    inquiryDisplay={inquiryDisplay}
+                    normalizedLinks={normalizedLinks}
+                    partnerId={partner.id}
+                    mode="primary"
+                    className="hidden md:block"
+                  />
+                }
               />
 
               <PartnerImageCarousel
                 key={carouselKey}
-                className="order-2 xl:order-2"
+                className="order-1 xl:order-2"
                 images={partner.images ?? []}
                 name={partner.name}
                 matchHeightSelector="[data-partner-detail-summary]"
                 priority
               />
             </div>
-
-            <PartnerDetailContactSection
-              isActive={isActive}
-              contactCount={contactCount}
-              benefitUseAction={benefitUseAction}
-              inquiryDisplay={inquiryDisplay}
-              normalizedLinks={normalizedLinks}
-              partnerId={partner.id}
-            />
 
             <PartnerDetailCoupons
               coupons={adCoupons}
@@ -259,6 +284,17 @@ export default async function PartnerDetailPage({
             </Suspense>
           </div>
         </Container>
+        {isActive ? (
+          <PartnerDetailMobileActionBar
+            partnerId={partner.id}
+            benefitUseAction={resolvedBenefitUseAction}
+            inquiryAction={
+              inquiryDisplay
+                ? { href: inquiryDisplay.href, label: inquiryDisplay.label }
+                : null
+            }
+          />
+        ) : null}
       </main>
     </div>
   );

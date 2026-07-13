@@ -6,7 +6,11 @@ import {
   createPartnerBillingProfile,
   setDefaultPartnerBillingProfile,
 } from "@/lib/partner-billing-profiles";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import type { PartnerBillingActionErrorCode } from "@/lib/partner-billing-action-errors";
+import {
+  appendPartnerPortalSearchParam,
+  getPartnerGlobalPortalHref,
+} from "@/lib/partner-portal-paths";
 import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 
@@ -15,22 +19,29 @@ function getString(formData: FormData, key: string) {
 }
 
 function getAccountPath(companyId: string) {
-  if (!companyId) {
-    return "/partner";
-  }
-  return getCompanyScopedPortalHref(companyId, "account");
+  return getPartnerGlobalPortalHref("account", companyId);
+}
+
+function getAccountPathWithStatus(
+  companyId: string,
+  key: "status" | "error",
+  value: string,
+) {
+  return appendPartnerPortalSearchParam(getAccountPath(companyId), key, value);
 }
 
 function redirectAccountInfo(
   companyId: string,
   param: "created" | "defaulted" | "archived",
 ): never {
-  redirect(`${getAccountPath(companyId)}?status=${param}`);
+  redirect(getAccountPathWithStatus(companyId, "status", param));
 }
 
-function redirectAccountInfoError(companyId: string, error: unknown): never {
-  const message = error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
-  redirect(`${getAccountPath(companyId)}?error=${encodeURIComponent(message)}`);
+function redirectAccountInfoError(
+  companyId: string,
+  code: PartnerBillingActionErrorCode,
+): never {
+  redirect(getAccountPathWithStatus(companyId, "error", code));
 }
 
 async function readAuthorizedSessionCompany(formData: FormData) {
@@ -44,7 +55,7 @@ async function readAuthorizedSessionCompany(formData: FormData) {
 
   const companyId = getString(formData, "companyId");
   if (!companyId || !isPartnerPortalCompanyAllowed(session, companyId)) {
-    redirectAccountInfoError(companyId, new Error("협력사 접근 권한이 없습니다."));
+    redirectAccountInfoError(companyId, "access_denied");
   }
 
   return { session, companyId };
@@ -74,7 +85,12 @@ export async function createPartnerBillingProfileAction(formData: FormData) {
       },
     });
   } catch (error) {
-    redirectAccountInfoError(companyId, error);
+    console.error("[partner-account] billing profile create failed", {
+      accountId: session.accountId,
+      companyId,
+      error,
+    });
+    redirectAccountInfoError(companyId, "profile_create_failed");
   }
 
   redirectAccountInfo(companyId, "created");
@@ -84,7 +100,7 @@ export async function setDefaultPartnerBillingProfileAction(formData: FormData) 
   const { session, companyId } = await readAuthorizedSessionCompany(formData);
   const profileId = getString(formData, "profileId");
   if (!profileId) {
-    redirectAccountInfoError(companyId, new Error("프로필을 찾을 수 없습니다."));
+    redirectAccountInfoError(companyId, "profile_not_found");
   }
 
   try {
@@ -94,7 +110,13 @@ export async function setDefaultPartnerBillingProfileAction(formData: FormData) 
       profileId,
     });
   } catch (error) {
-    redirectAccountInfoError(companyId, error);
+    console.error("[partner-account] default billing profile failed", {
+      accountId: session.accountId,
+      companyId,
+      profileId,
+      error,
+    });
+    redirectAccountInfoError(companyId, "profile_default_failed");
   }
 
   redirectAccountInfo(companyId, "defaulted");
@@ -104,7 +126,7 @@ export async function archivePartnerBillingProfileAction(formData: FormData) {
   const { session, companyId } = await readAuthorizedSessionCompany(formData);
   const profileId = getString(formData, "profileId");
   if (!profileId) {
-    redirectAccountInfoError(companyId, new Error("프로필을 찾을 수 없습니다."));
+    redirectAccountInfoError(companyId, "profile_not_found");
   }
 
   try {
@@ -114,7 +136,13 @@ export async function archivePartnerBillingProfileAction(formData: FormData) {
       profileId,
     });
   } catch (error) {
-    redirectAccountInfoError(companyId, error);
+    console.error("[partner-account] billing profile archive failed", {
+      accountId: session.accountId,
+      companyId,
+      profileId,
+      error,
+    });
+    redirectAccountInfoError(companyId, "profile_archive_failed");
   }
 
   redirectAccountInfo(companyId, "archived");

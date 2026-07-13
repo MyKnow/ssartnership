@@ -1,36 +1,34 @@
 import { notFound } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
-import AdminMemberSecurityLogExplorer, {
+import AdminMemberDetailView from "@/components/admin/AdminMemberDetailView";
+import {
   type AdminMemberSecurityLog,
 } from "@/components/admin/member-detail/AdminMemberSecurityLogExplorer";
-import Badge from "@/components/ui/Badge";
-import Card from "@/components/ui/Card";
-import SectionHeading from "@/components/ui/SectionHeading";
-import ShellHeader from "@/components/ui/ShellHeader";
-import StatsRow from "@/components/ui/StatsRow";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { formatSsafyMemberLifecycleLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { canAdmin } from "@/lib/admin-permissions";
+import {
+  buildAdminMemberPolicyOverview,
+  normalizeAdminMemberNotificationPreferences,
+  type AdminMemberConsentActivityRow,
+  type AdminMemberConsentHistoryRow,
+  type AdminMemberPushPreferenceRow,
+} from "@/lib/admin-member-detail";
+import {
+  getActiveRequiredPolicies,
+  getPolicyDocumentByKind,
+} from "@/lib/policy-documents";
+import {
+  deleteMember,
+  updateMember,
+} from "@/app/admin/(protected)/actions";
 
 export const dynamic = "force-dynamic";
 
 const SECURITY_LOG_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const DEFAULT_SECURITY_LOG_PAGE_SIZE = 50;
-
-function formatDate(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-  return formatKoreanDateTimeToMinute(value);
-}
-
-function getPolicyBadgeClass(value?: number | null) {
-  return value
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200"
-    : "border-border bg-surface-muted text-muted-foreground";
-}
 
 type AdminMemberDetailSearchParams = {
   logPage?: string;
@@ -58,7 +56,9 @@ export default async function AdminMemberDetailPage({
   params: Promise<{ memberId: string }>;
   searchParams?: Promise<AdminMemberDetailSearchParams>;
 }) {
-  await requireAdminPermission("members", "read", { path: "/admin/members" });
+  const adminSession = await requireAdminPermission("members", "read", {
+    path: "/admin/members",
+  });
   const { memberId } = await params;
   const query = (await searchParams) ?? {};
   const securityLogPage = parsePositiveInteger(query.logPage, 1);
@@ -67,19 +67,51 @@ export default async function AdminMemberDetailPage({
   const securityLogTo = securityLogFrom + securityLogPageSize - 1;
   const supabase = getSupabaseAdminClient();
 
-  const [memberResult, subscriptionsResult, securityLogsResult] = await Promise.all([
+  const [
+    memberResult,
+    preferenceResult,
+    subscriptionsResult,
+    consentHistoryResult,
+    consentActivityResult,
+    securityLogsResult,
+    activePolicies,
+    activeMarketingPolicy,
+  ] = await Promise.all([
     supabase
       .from("members")
       .select(
-        "id,display_name,mm_username,mm_user_id,year,campus,must_change_password,service_policy_version,privacy_policy_version,marketing_policy_version,avatar_content_type,avatar_url,created_at,updated_at",
+        "id,display_name,mm_username,mm_user_id,year,campus,must_change_password,service_policy_version,service_policy_consented_at,privacy_policy_version,privacy_policy_consented_at,marketing_policy_version,marketing_policy_consented_at,avatar_content_type,avatar_url,created_at,updated_at",
       )
       .eq("id", memberId)
+      .maybeSingle(),
+    supabase
+      .from("push_preferences")
+      .select(
+        "enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
+      )
+      .eq("member_id", memberId)
       .maybeSingle(),
     supabase
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("member_id", memberId)
       .eq("is_active", true),
+    supabase
+      .from("member_policy_consents")
+      .select(
+        "kind,version,agreed_at,policy_documents(title,effective_at)",
+      )
+      .eq("member_id", memberId)
+      .order("agreed_at", { ascending: false }),
+    supabase
+      .from("auth_security_logs")
+      .select("properties,created_at")
+      .eq("event_name", "member_policy_consent")
+      .eq("status", "success")
+      .eq("actor_type", "member")
+      .eq("actor_id", memberId)
+      .order("created_at", { ascending: false })
+      .limit(100),
     supabase
       .from("auth_security_logs")
       .select("id,event_name,status,identifier,path,ip_address,properties,created_at", {
@@ -89,6 +121,8 @@ export default async function AdminMemberDetailPage({
       .eq("actor_id", memberId)
       .order("created_at", { ascending: false })
       .range(securityLogFrom, securityLogTo),
+    getActiveRequiredPolicies(),
+    getPolicyDocumentByKind("marketing").catch(() => null),
   ]);
 
   if (memberResult.error || !memberResult.data) {
@@ -115,125 +149,82 @@ export default async function AdminMemberDetailPage({
   const year = member.year ?? getCurrentSsafyYear();
   const yearLabel = formatSsafyMemberLifecycleLabel(year);
   const campus = member.campus ?? profile.campus ?? "-";
-  const avatarLabel = (displayName || member.mm_username || "?").trim().charAt(0).toUpperCase();
   const hasAvatar = Boolean(member.avatar_content_type || member.avatar_url);
   const avatarUrl = `/api/admin/members/${member.id}/avatar${member.updated_at ? `?v=${encodeURIComponent(member.updated_at)}` : ""}`;
+  const notificationPreferences = normalizeAdminMemberNotificationPreferences(
+    (preferenceResult.data ?? null) as AdminMemberPushPreferenceRow | null,
+    subscriptionsResult.count,
+  );
+  const consentActivity: AdminMemberConsentActivityRow[] = (
+    consentActivityResult.data ?? []
+  ).map((row) => ({
+    properties:
+      row.properties &&
+      typeof row.properties === "object" &&
+      !Array.isArray(row.properties)
+        ? (row.properties as Record<string, unknown>)
+        : null,
+    created_at: row.created_at,
+  }));
+  const policyOverview = buildAdminMemberPolicyOverview({
+    member: {
+      servicePolicyVersion: member.service_policy_version,
+      servicePolicyConsentedAt: member.service_policy_consented_at,
+      privacyPolicyVersion: member.privacy_policy_version,
+      privacyPolicyConsentedAt: member.privacy_policy_consented_at,
+      marketingPolicyVersion: member.marketing_policy_version,
+      marketingPolicyConsentedAt: member.marketing_policy_consented_at,
+    },
+    activeVersions: {
+      service: activePolicies.service.version,
+      privacy: activePolicies.privacy.version,
+      marketing: activeMarketingPolicy?.version ?? null,
+    },
+    consentHistory: (consentHistoryResult.data ?? []) as AdminMemberConsentHistoryRow[],
+    consentActivity,
+  });
 
   return (
     <AdminShell title="회원 상세" backHref="/admin/members" backLabel="회원 관리">
-      <div className="grid gap-6">
-        <ShellHeader
-          eyebrow="Member"
-          title={displayName}
-          description="회원 프로필, 약관 상태, 활성 기기, 인증/보안 활동을 한 화면에서 확인합니다."
-        />
-
-        <StatsRow
-          items={[
-            { label: "MM 아이디", value: member.mm_username ? `@${member.mm_username}` : "-", hint: member.mm_user_id ?? "외부 식별자 없음" },
-            { label: "기수/캠퍼스", value: `${yearLabel} · ${campus}`, hint: "가입 프로필 기준" },
-            { label: "비밀번호 상태", value: member.must_change_password ? "변경 필요" : "정상", hint: `활성 기기 ${subscriptionsResult.count ?? 0}개` },
-            { label: "최근 갱신", value: formatDate(member.updated_at), hint: `가입 ${formatDate(member.created_at)}` },
-          ]}
-          minItemWidth="13rem"
-        />
-
-        <div className="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
-          <div className="grid gap-6 xl:sticky xl:top-24">
-            <Card tone="elevated" className="grid gap-5">
-              <div className="overflow-hidden rounded-[1.5rem] border border-border bg-surface-inset">
-                <div className="aspect-square w-full">
-                  {hasAvatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={avatarUrl}
-                      alt={`${displayName} 프로필 사진`}
-                      loading="eager"
-                      decoding="async"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-surface-muted text-6xl font-semibold text-foreground">
-                      {avatarLabel || "?"}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={member.must_change_password ? "warning" : "success"}>
-                    {member.must_change_password ? "비밀번호 변경 필요" : "비밀번호 정상"}
-                  </Badge>
-                  <Badge variant="neutral">{yearLabel}</Badge>
-                </div>
-                <h2 className="break-words text-2xl font-semibold tracking-[-0.03em] text-foreground">
-                  {displayName}
-                </h2>
-                <p className="break-all text-sm text-muted-foreground">
-                  @{member.mm_username ?? "mm_username 없음"}
-                </p>
-              </div>
-
-              <div className="grid gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-4 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <span>캠퍼스</span>
-                  <span className="font-medium text-foreground">{campus}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>MM User ID</span>
-                  <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
-                    {member.mm_user_id ?? "-"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>활성 푸시 기기</span>
-                  <span className="font-medium text-foreground">{subscriptionsResult.count ?? 0}개</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>보안 로그</span>
-                  <span className="font-medium text-foreground">
-                    {securityLogTotalCount.toLocaleString()}건
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            <Card tone="default" className="grid gap-4">
-              <SectionHeading
-                title="계정/약관 요약"
-                description="정책 버전과 기본 식별자를 확인합니다."
-              />
-              <div className="grid gap-3 text-sm text-muted-foreground">
-                <div className="grid gap-1 rounded-2xl border border-border bg-surface-inset px-4 py-3">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em]">회원 ID</span>
-                  <span className="break-all font-medium text-foreground">{member.id}</span>
-                </div>
-                <div className="grid gap-2">
-                  <Badge className={getPolicyBadgeClass(member.service_policy_version)}>
-                    서비스 약관 v{member.service_policy_version ?? "-"}
-                  </Badge>
-                  <Badge className={getPolicyBadgeClass(member.privacy_policy_version)}>
-                    개인정보 약관 v{member.privacy_policy_version ?? "-"}
-                  </Badge>
-                  <Badge className={getPolicyBadgeClass(member.marketing_policy_version)}>
-                    마케팅 약관 v{member.marketing_policy_version ?? "-"}
-                  </Badge>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          <AdminMemberSecurityLogExplorer
-            logs={securityLogs}
-            pagination={{
-              totalCount: securityLogTotalCount,
-              page: securityLogPage,
-              pageSize: securityLogPageSize,
-              pageSizeOptions: SECURITY_LOG_PAGE_SIZE_OPTIONS,
-            }}
-          />
-        </div>
-      </div>
+      <AdminMemberDetailView
+        member={{
+          id: member.id,
+          displayName,
+          mmUsername: member.mm_username ?? "",
+          mmUserId: member.mm_user_id,
+          year,
+          yearLabel,
+          campus,
+          mustChangePassword: member.must_change_password,
+          createdAt: member.created_at,
+          updatedAt: member.updated_at,
+          hasAvatar,
+          avatarUrl,
+        }}
+        activeDeviceCount={subscriptionsResult.count ?? 0}
+        securityLogs={securityLogs}
+        securityLogPagination={{
+          totalCount: securityLogTotalCount,
+          page: securityLogPage,
+          pageSize: securityLogPageSize,
+          pageSizeOptions: SECURITY_LOG_PAGE_SIZE_OPTIONS,
+        }}
+        preferences={notificationPreferences}
+        policyStates={policyOverview.states}
+        consentTimeline={policyOverview.timeline}
+        updateAction={updateMember}
+        deleteAction={deleteMember}
+        canUpdate={canAdmin(
+          adminSession.account.permissions,
+          "members",
+          "update",
+        )}
+        canDelete={canAdmin(
+          adminSession.account.permissions,
+          "members",
+          "delete",
+        )}
+      />
     </AdminShell>
   );
 }

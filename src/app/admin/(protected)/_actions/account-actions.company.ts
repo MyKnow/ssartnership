@@ -8,7 +8,7 @@ import {
   revalidatePartnerCompanyData,
 } from "./shared-helpers";
 import {
-  assertPartnerAccountInManagedScopeOrRedirect,
+  assertPartnerAccountHasAccessibleCompanyOrRedirect,
   getPartnerAccountSupabase,
   loadScopedPartnerCompanyOrRedirect,
 } from "./account-actions.shared";
@@ -42,7 +42,7 @@ export async function updatePartnerAccountCompanyConnectionAction(formData: Form
 
   const createdLink = !existingLink;
   if (createdLink) {
-    await assertPartnerAccountInManagedScopeOrRedirect(
+    await assertPartnerAccountHasAccessibleCompanyOrRedirect(
       payload.accountId,
       adminSession.account,
     );

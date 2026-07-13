@@ -1,21 +1,15 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import PartnerRegistrationClient from "@/components/partner-registration/PartnerRegistrationClient";
-import Container from "@/components/ui/Container";
-import ShellHeader from "@/components/ui/ShellHeader";
-import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
+import PartnerServiceNewScreen from "@/components/partner/PartnerServiceNewScreen";
 import { createPartnerPortalBrandRegistrationRequestAction } from "@/app/partner/companies/[companyId]/services/new/actions";
-import {
-  getCompanyScopedPortalHref,
-  getPartnerPasswordChangeHref,
-} from "@/lib/partner-portal-paths";
+import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: `브랜드 추가 | ${SITE_NAME}`,
+  title: `제휴처 추가 | ${SITE_NAME}`,
   robots: {
     index: false,
     follow: false,
@@ -78,49 +72,22 @@ export default async function PartnerCompanyServiceNewPage({
   const fallbackEmail = session.loginId.includes("@") ? session.loginId : "";
 
   return (
-    <div className="bg-background">
-      <Container size="wide" className="pb-16 pt-6 lg:pt-8">
-        <div className="mx-auto grid max-w-6xl min-w-0 gap-5">
-          <ShellHeader
-            eyebrow="Partner Portal"
-            title="브랜드 추가"
-            description={`${scope.name}에 연결할 새 브랜드 또는 지점을 신청합니다. 제출 후 관리자가 검토합니다.`}
-            actions={
-              <PartnerPendingButtonLink
-                href={getCompanyScopedPortalHref(scope.id)}
-                variant="secondary"
-              >
-                대시보드로 돌아가기
-              </PartnerPendingButtonLink>
-            }
-          />
-
-          <PartnerRegistrationClient
-            categories={categoriesResult.data ?? []}
-            brandProfiles={(brandProfilesResult.data ?? []).map((profile) => ({
-              id: profile.id,
-              name: profile.name,
-              categoryLabel: profile.category_label,
-              detailDescription: profile.description,
-              inquiryLink: profile.inquiry_link,
-              brandPhone: profile.brand_phone,
-            }))}
-            webAction={createPartnerPortalBrandRegistrationRequestAction}
-            showExcelTab={false}
-            lockCompanyName
-            titleBadge="파트너 포털 신청"
-            submitLabel="브랜드 추가 신청"
-            submitPendingLabel="신청 중"
-            hiddenFields={{ companyId: scope.id }}
-            initialValues={{
-              companyName: scope.name,
-              companyDescription: scope.description ?? "",
-              contactName: session.displayName,
-              contactEmail: accountEmail || fallbackEmail,
-            }}
-          />
-        </div>
-      </Container>
-    </div>
+    <PartnerServiceNewScreen
+      companyId={scope.id}
+      companyName={scope.name}
+      companyDescription={scope.description}
+      displayName={session.displayName}
+      contactEmail={accountEmail || fallbackEmail}
+      categories={categoriesResult.data ?? []}
+      brandProfiles={(brandProfilesResult.data ?? []).map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        categoryLabel: profile.category_label,
+        detailDescription: profile.description,
+        inquiryLink: profile.inquiry_link,
+        brandPhone: profile.brand_phone,
+      }))}
+      webAction={createPartnerPortalBrandRegistrationRequestAction}
+    />
   );
 }

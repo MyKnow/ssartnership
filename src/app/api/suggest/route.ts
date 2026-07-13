@@ -85,8 +85,8 @@ export async function POST(request: Request) {
     const safeCompanyUrl = toHtml(safeCompanyUrlValue ?? "-");
 
     const bodyText = [
-      `업체명: ${payload.companyName ?? ""}`,
-      `업체분야 소개: ${payload.businessArea ?? ""}`,
+      `파트너사명: ${payload.companyName ?? ""}`,
+      `사업 분야 소개: ${payload.businessArea ?? ""}`,
       `제안 제휴 조건: ${payload.partnershipConditions ?? ""}`,
       `담당자 이름: ${payload.contactName ?? ""}`,
       `담당자 직위: ${payload.contactRole ?? ""}`,
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       `회사 사이트 URL: ${safeCompanyUrlValue ?? "-"}`,
     ].join("\n");
 
-    const bodyHtml = `\n      <div style=\"font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;\">\n        <h2 style=\"margin: 0 0 12px;\">제휴 제안을 접수했습니다.</h2>\n        <p style=\"margin: 0 0 16px; color: #334155;\">\n          안녕하세요 ${safeContactName} ${safeContactRole}님,\n          SSARTNERSHIP 파트너십 제안을 보내주셔서 감사합니다.\n          보내주신 내용을 아래와 같이 정리해 전달드립니다.\n        </p>\n        <div style=\"border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc;\">\n          <p style=\"margin: 0 0 8px;\"><strong>업체명</strong><br />${safeCompanyName}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>업체분야 소개</strong><br />${safeBusiness}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>제안 제휴 조건</strong><br />${safeConditions}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>담당자</strong><br />${safeContactName} ${safeContactRole}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>담당자 이메일</strong><br />${safeContactEmail}</p>\n          <p style=\"margin: 0;\"><strong>회사 사이트</strong><br />${safeCompanyUrl}</p>\n        </div>\n        <p style=\"margin: 16px 0 0; color: #334155;\">\n          담당자가 확인 후 안내드리겠습니다. 추가로 전달하실 내용이 있으면\n          이 메일에 회신해 주세요.\n        </p>\n        <p style=\"margin: 20px 0 0; color: #64748b; font-size: 12px;\">\n          SSARTNERSHIP · SSAFY 15기 서울 캠퍼스\n        </p>\n      </div>\n    `;
+    const bodyHtml = `\n      <div style=\"font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;\">\n        <h2 style=\"margin: 0 0 12px;\">제휴 제안을 접수했습니다.</h2>\n        <p style=\"margin: 0 0 16px; color: #334155;\">\n          안녕하세요 ${safeContactName} ${safeContactRole}님,\n          SSARTNERSHIP 파트너십 제안을 보내주셔서 감사합니다.\n          보내주신 내용을 아래와 같이 정리해 전달드립니다.\n        </p>\n        <div style=\"border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc;\">\n          <p style=\"margin: 0 0 8px;\"><strong>파트너사명</strong><br />${safeCompanyName}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>사업 분야 소개</strong><br />${safeBusiness}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>제안 제휴 조건</strong><br />${safeConditions}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>담당자</strong><br />${safeContactName} ${safeContactRole}</p>\n          <p style=\"margin: 0 0 8px;\"><strong>담당자 이메일</strong><br />${safeContactEmail}</p>\n          <p style=\"margin: 0;\"><strong>회사 사이트</strong><br />${safeCompanyUrl}</p>\n        </div>\n        <p style=\"margin: 16px 0 0; color: #334155;\">\n          담당자가 확인 후 안내드리겠습니다. 추가로 전달하실 내용이 있으면\n          이 메일에 회신해 주세요.\n        </p>\n        <p style=\"margin: 20px 0 0; color: #64748b; font-size: 12px;\">\n          SSARTNERSHIP · SSAFY 15기 서울 캠퍼스\n        </p>\n      </div>\n    `;
 
     await transporter.sendMail({
       from: `SSARTNERSHIP <${smtpConfig.fromEmail}>`,

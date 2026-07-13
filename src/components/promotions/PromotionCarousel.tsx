@@ -98,19 +98,20 @@ export default function PromotionCarousel({
 
   return (
     <section
-      className={cn("relative mt-5", className)}
+      id="events"
+      className={cn("relative mt-5 scroll-mt-24", className)}
       aria-roledescription="carousel"
       aria-label="광고 캐러셀"
     >
-      <div className="mb-4 flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <Heading className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-1xl">
+      <div className="mb-4 grid min-w-0 gap-3 px-1">
+        <div className="min-w-0 space-y-1.5">
+          <Heading className="text-ko-title text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">
             {activeSlide.title}
           </Heading>
+          <p className="text-ko-pretty max-w-2xl text-sm leading-6 text-muted-foreground">
+            {activeSlide.description}
+          </p>
         </div>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          {activeSlide.description}
-        </p>
       </div>
 
       <div className="relative">
@@ -148,7 +149,7 @@ export default function PromotionCarousel({
                   <img
                     src={slide.imageSrc}
                     alt={slide.imageAlt}
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-cover"
                     draggable={false}
                   />
                 ) : (
@@ -159,7 +160,7 @@ export default function PromotionCarousel({
                     sizes="(min-width: 1280px) 1084px, calc(100vw - 32px)"
                     priority={index === 0}
                     unoptimized={isRemoteImageSrc(slide.imageSrc)}
-                    className="object-contain"
+                    className="object-cover"
                   />
                 )}
               </div>

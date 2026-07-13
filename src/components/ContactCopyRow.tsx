@@ -4,6 +4,7 @@ import Button from "@/components/ui/Button";
 import type { ProductEventName } from "@/lib/event-catalog";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
+import { cn } from "@/lib/cn";
 
 function getCompactContactLabel(label: string) {
   if (!label.startsWith("http")) {
@@ -27,6 +28,9 @@ export default function ContactCopyRow({
   eventName,
   targetType,
   targetId,
+  compact = false,
+  className,
+  contentClassName,
 }: {
   href: string;
   label: string;
@@ -34,15 +38,30 @@ export default function ContactCopyRow({
   eventName?: ProductEventName;
   targetType?: string;
   targetId?: string | null;
+  compact?: boolean;
+  className?: string;
+  contentClassName?: string;
 }) {
   const { notify } = useToast();
   const compactLabel = getCompactContactLabel(label);
 
   return (
-    <div className="mt-4 flex items-center gap-2 overflow-hidden rounded-2xl border border-border bg-surface-muted px-3 py-2 sm:px-4 sm:py-2.5">
+    <div
+      className={cn(
+        "flex items-center gap-2 overflow-hidden border border-border bg-surface-muted",
+        compact
+          ? "mt-0 min-h-[3.75rem] rounded-[0.85rem] p-2"
+          : "mt-4 rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5",
+        className,
+      )}
+    >
       <a
         href={href}
-        className="min-w-0 flex-1 truncate text-xs font-medium leading-5 text-foreground hover:opacity-80 sm:text-sm"
+        className={cn(
+          "min-w-0 flex-1 truncate text-xs font-medium leading-5 text-foreground hover:opacity-80 sm:text-sm",
+          compact && "px-2",
+          contentClassName,
+        )}
         target={href.startsWith("http") ? "_blank" : undefined}
         rel={href.startsWith("http") ? "noreferrer" : undefined}
         title={label}
@@ -65,7 +84,12 @@ export default function ContactCopyRow({
       <Button
         size="icon"
         variant="ghost"
-        className="!h-10 !w-10 !min-h-10 !min-w-10 shrink-0 sm:!h-12 sm:!w-12 sm:!min-h-12 sm:!min-w-12"
+        className={cn(
+          "shrink-0",
+          compact
+            ? "!h-11 !w-11 !min-h-11 !min-w-11"
+            : "!h-10 !w-10 !min-h-10 !min-w-10 sm:!h-12 sm:!w-12 sm:!min-h-12 sm:!min-w-12",
+        )}
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(rawValue);

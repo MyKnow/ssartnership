@@ -28,6 +28,7 @@ import {
   resolvePartnerRegistrationBranchPayload,
   resolvePartnerRegistrationMediaPayload,
 } from "@/lib/partner-registration-submit.server";
+import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -46,8 +47,12 @@ export async function createPartnerRegistrationRequestAction(
   void _prevState;
   const headerStore = await headers();
   const identifier = getClientIdentifier(headerStore);
+  const mockMutation = isE2eMockMutationEnabled();
 
-  if (await isBlocked(identifier, PARTNER_REGISTRATION_RATE_LIMIT)) {
+  if (
+    !mockMutation &&
+    (await isBlocked(identifier, PARTNER_REGISTRATION_RATE_LIMIT))
+  ) {
     return {
       status: "error",
       message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
@@ -56,11 +61,21 @@ export async function createPartnerRegistrationRequestAction(
 
   const validation = validatePartnerRegistrationInput(formData);
   if (hasPartnerRegistrationFieldErrors(validation.fieldErrors)) {
-    await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+    if (!mockMutation) {
+      await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+    }
     return {
       status: "error",
       message: "입력값을 확인해 주세요.",
       fieldErrors: validation.fieldErrors,
+    };
+  }
+
+  if (mockMutation) {
+    return {
+      status: "success",
+      message: "신청이 접수되었습니다. 담당자가 확인 후 안내드리겠습니다.",
+      requestId: "e2e-mock-partner-registration",
     };
   }
 

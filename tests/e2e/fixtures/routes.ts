@@ -15,6 +15,7 @@ export const publicSmokeRoutes: SmokeRoute[] = [
   { path: "/legal/service", expected: /서비스 이용약관/ },
   { path: "/legal/privacy", expected: /개인정보/ },
   { path: "/legal/marketing", expected: /마케팅/ },
+  { path: "/partner-registration", expected: /신규 파트너사 등록|단계별 등록/ },
   { path: "/partners/health-001", expected: /바디라인 피트니스|혜택/ },
   { path: "/suggest", expected: /제휴 제안|제안/ },
   { path: "/support/bug-report", expected: /버그|문의|제보/ },
@@ -24,6 +25,8 @@ export const publicSmokeRoutes: SmokeRoute[] = [
 export const authSmokeRoutes: SmokeRoute[] = [
   { path: "/auth/login", expected: /로그인/ },
   { path: "/auth/signup", expected: /회원가입/ },
+  { path: "/auth/signup/graduate", expected: /수료생 인증/ },
+  { path: "/auth/graduate/setup", expected: /비밀번호 설정/ },
   { path: "/auth/reset", expected: /비밀번호|재설정/ },
   { path: "/auth/reset/complete", expected: /비밀번호|재설정|토큰/ },
   { path: "/auth/change-password", expected: /로그인|비밀번호/ },
@@ -40,12 +43,14 @@ export const authSmokeRoutes: SmokeRoute[] = [
 
 export const memberProtectedRoutes: RedirectRoute[] = [
   { path: "/certification", expectedPath: "/auth/login" },
+  { path: "/certification/photo", expectedPath: "/auth/login" },
   { path: "/coupons", expectedPath: "/auth/login" },
   { path: "/notifications", expectedPath: "/auth/login" },
 ];
 
 export const partnerProtectedRoutes: RedirectRoute[] = [
   { path: "/partner", expectedPath: "/partner/login" },
+  { path: "/partner/account", expectedPath: "/partner/login" },
   { path: "/partner/notifications", expectedPath: "/partner/login" },
   { path: "/partner/plans", expectedPath: "/partner/login" },
   { path: "/partner/support", expectedPath: "/partner/login" },
@@ -65,15 +70,20 @@ export const partnerProtectedRoutes: RedirectRoute[] = [
 
 export const adminProtectedRoutes: RedirectRoute[] = [
   { path: "/admin", expectedPath: "/auth/login" },
+  { path: "/admin/admins", expectedPath: "/auth/login" },
   { path: "/admin/advertisement", expectedPath: "/auth/login" },
+  { path: "/admin/categories", expectedPath: "/auth/login" },
   { path: "/admin/companies", expectedPath: "/auth/login" },
   { path: "/admin/cycle", expectedPath: "/auth/login" },
   { path: "/admin/event", expectedPath: "/auth/login" },
   { path: "/admin/event/signup-reward", expectedPath: "/auth/login" },
+  { path: "/admin/graduate-verifications", expectedPath: "/auth/login" },
   { path: "/admin/logs", expectedPath: "/auth/login" },
   { path: "/admin/members", expectedPath: "/auth/login" },
   { path: "/admin/members/mock", expectedPath: "/auth/login" },
   { path: "/admin/notifications", expectedPath: "/auth/login" },
+  { path: "/admin/partner-registrations", expectedPath: "/auth/login" },
+  { path: "/admin/partner-requests", expectedPath: "/auth/login" },
   { path: "/admin/partners", expectedPath: "/auth/login" },
   {
     path: "/admin/partners/mock-partner-service-cafe-ssafy-yeoksam",

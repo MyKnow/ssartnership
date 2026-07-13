@@ -218,7 +218,7 @@ export const seededSetups: MockPortalSetupRecord[] = [
       id: "mock-partner-company-urban-gym",
       name: "어반짐 역삼",
       slug: "urban-gym",
-      description: "헬스와 PT 패키지를 운영하는 복합 피트니스 브랜드입니다.",
+      description: "헬스와 PT 패키지를 운영하는 복합 피트니스 제휴처입니다.",
       services: [
         {
           id: "mock-partner-service-urban-gym-pt",
@@ -267,6 +267,19 @@ seededSetups[0].account.linkedCompanyIds = [
   seededSetups[0].company.id,
   seededSetups[1].company.id,
 ];
+
+// This fixture is intentionally deterministic so Storybook can render the
+// client-side mock catalog without importing Node's `crypto` module. It is a
+// PBKDF2 record for the synthetic `Partner!123` fixture only.
+const readyPartnerPassword = {
+  salt: "mock-ready-partner-password-salt",
+  hash: "fa5d3442a73a4cf9b14a95b675974dacbe031e8ffb1819f69d4dad3773329d5af44c5a5d14f6b239f4e575e9e9f76f7fb01412e75f4c7d8b6906ef5519ba648b",
+};
+seededSetups[1].account.mustChangePassword = false;
+seededSetups[1].account.emailVerifiedAt = "2026-07-01T00:00:00.000Z";
+seededSetups[1].account.initialSetupCompletedAt = "2026-07-01T00:00:00.000Z";
+seededSetups[1].account.passwordHash = readyPartnerPassword.hash;
+seededSetups[1].account.passwordSalt = readyPartnerPassword.salt;
 
 export function cloneSetupRecord(setup: MockPortalSetupRecord): MockPortalSetupRecord {
   return {

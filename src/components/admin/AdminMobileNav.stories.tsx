@@ -10,7 +10,7 @@ const meta = {
     title: "관리 대시보드",
     description: "모바일 환경에서 관리자 주요 화면으로 이동합니다.",
     backHref: "/admin/partners",
-    backLabel: "브랜드 관리",
+    backLabel: "목록으로 돌아가기",
     logoutAction: fn(),
     navGroups: ADMIN_NAV_GROUPS,
   },
@@ -43,7 +43,7 @@ export const OpenAndClose: Story = {
     await expect(body.getByRole("dialog")).toBeInTheDocument();
     await expect(body.getByText("관리 대시보드")).toBeInTheDocument();
     await expect(body.getByRole("link", { name: /^관리 홈/ })).toHaveAttribute("href", "/admin");
-    await expect(body.getByRole("link", { name: /^제휴처\/브랜드/ })).toHaveAttribute("href", "/admin/partners");
+    await expect(body.getByRole("link", { name: /^제휴처/ })).toHaveAttribute("href", "/admin/partners");
     await expect(body.getByRole("link", { name: /^파트너사\/계정/ })).toHaveAttribute("href", "/admin/companies");
     await expect(body.getByRole("link", { name: "사용자 화면" })).toHaveAttribute("href", "/");
     await expect(body.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
@@ -75,7 +75,7 @@ export const WithoutBackLink: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "관리 메뉴 열기" }));
 
     const body = within(document.body);
-    await expect(body.getByRole("link", { name: /^제휴처\/브랜드/ })).toBeInTheDocument();
+    await expect(body.getByRole("link", { name: /^제휴처/ })).toBeInTheDocument();
     await expect(body.getByRole("link", { name: /^파트너사\/계정/ })).toBeInTheDocument();
     await expect(body.getByRole("link", { name: "사용자 화면" })).toBeInTheDocument();
   },

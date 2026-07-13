@@ -27,6 +27,7 @@ export default function ShellHeader({
         title={title}
         description={typeof description === "string" ? description : undefined}
         size="page"
+        headingLevel="h1"
         className="min-w-0"
       />
       {typeof description !== "string" && description ? (

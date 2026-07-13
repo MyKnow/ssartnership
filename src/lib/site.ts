@@ -6,7 +6,7 @@ export const SSAFY_SHORT_NAME = "SSAFY";
 export const SSAFY_SHORT_KOR_NAME = "싸피";
 export const SSAFY_FULL_NAME = "삼성 청년 SW·AI 아카데미";
 export const SITE_DESCRIPTION =
-  "싸트너십(SSARTNERSHIP)은 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다. 싸피 제휴 업체와 혜택 정보를 한곳에서 빠르게 확인하세요.";
+  "싸트너십(SSARTNERSHIP)은 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다. 싸피 제휴처와 혜택 정보를 한곳에서 빠르게 확인하세요.";
 
 function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));

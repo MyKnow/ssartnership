@@ -7,6 +7,7 @@ import {
 } from "../../lib/partner-links.ts";
 import { getPartnerLockKind } from "../../lib/partner-visibility.ts";
 import { isWithinPeriod } from "../../lib/partner-utils.ts";
+import { buildPartnerDetailHref } from "../../lib/home-directory-state.ts";
 
 export function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
@@ -20,14 +21,14 @@ export function createCategoryAccentStyles(categoryColor?: string) {
     badgeStyle: categoryColor
       ? {
           backgroundColor: withAlpha(categoryColor, "1f"),
-          color: categoryColor,
+          color: "var(--foreground)",
         }
       : undefined,
     chipStyle: categoryColor
       ? {
           backgroundColor: withAlpha(categoryColor, "14"),
           borderColor: withAlpha(categoryColor, "55"),
-          color: categoryColor,
+          color: "var(--foreground)",
         }
       : undefined,
   };
@@ -36,6 +37,7 @@ export function createCategoryAccentStyles(categoryColor?: string) {
 export function createPartnerCardPresentation(
   partner: Partner,
   viewerAuthenticated: boolean,
+  returnTo?: string | null,
 ) {
   const lockKind = getPartnerLockKind(partner.visibility, viewerAuthenticated);
   const thumbnailUrl =
@@ -75,7 +77,9 @@ export function createPartnerCardPresentation(
       partner.location,
       partner.name,
     ),
-    detailHref: partner.id ? `/partners/${encodeURIComponent(partner.id)}` : "",
+    detailHref: partner.id
+      ? buildPartnerDetailHref(partner.id, returnTo)
+      : "",
   };
 }
 

@@ -75,7 +75,7 @@ export default function PartnerCampusSlugField({
           <span>
             전체 캠퍼스
             <span className="mt-1 block text-xs font-medium text-slate-500">
-              모든 캠퍼스 페이지에 이 브랜드를 노출합니다.
+              모든 캠퍼스 페이지에 이 제휴처를 노출합니다.
             </span>
           </span>
         </label>

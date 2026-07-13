@@ -21,6 +21,7 @@ export default function AdminPartnerManagerFilters({
   setSortValue,
   visibilityFilter,
   setVisibilityFilter,
+  canCreate,
 }: {
   categoryOptions: Array<{
     key: string;
@@ -36,6 +37,7 @@ export default function AdminPartnerManagerFilters({
   setSortValue: Dispatch<SetStateAction<PartnerSortOption>>;
   visibilityFilter: VisibilityFilter;
   setVisibilityFilter: Dispatch<SetStateAction<VisibilityFilter>>;
+  canCreate: boolean;
 }) {
   return (
     <>
@@ -51,12 +53,12 @@ export default function AdminPartnerManagerFilters({
 
       <FilterBar
         title="Partner Admin"
-        description={`총 ${partnersCount}개 브랜드를 검색, 필터, 정렬합니다.`}
-        trailing={
+        description={`총 ${partnersCount}개 제휴처를 검색, 필터, 정렬합니다.`}
+        trailing={canCreate ? (
           <Button variant="soft" href="/admin/partners/new">
-            브랜드 추가
+            제휴처 추가
           </Button>
-        }
+        ) : null}
         tone="elevated"
       >
         <div className="grid min-w-0 gap-1 lg:w-56">

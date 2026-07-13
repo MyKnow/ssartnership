@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { BellIcon } from "@heroicons/react/24/outline";
+import { BellIcon, TicketIcon } from "@heroicons/react/24/outline";
 import { BellAlertIcon } from "@heroicons/react/24/solid";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
@@ -50,25 +50,25 @@ export default function SiteHeader({
             hidden ? "-translate-y-full" : "translate-y-0",
           )}
         >
-          <Container className="flex items-center justify-between gap-3 py-4" size="wide">
+          <Container className="flex min-w-0 items-center justify-between gap-3 py-3" size="wide">
             <Link
               href="/"
               aria-label={SITE_NAME}
-              className="inline-flex min-h-11 items-center text-foreground transition-opacity hover:opacity-80"
+              className="inline-flex min-h-11 shrink-0 items-center text-foreground transition-opacity hover:opacity-80"
             >
               <BrandWordmark className="text-lg sm:text-xl" />
             </Link>
             <div className="flex items-center gap-2">
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className="hidden items-center gap-2 xl:flex">
                 <Button variant="soft" href={suggestHref}>
                   제휴 제안하기
                 </Button>
               </div>
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className="hidden items-center gap-2 xl:flex">
                 <UserMenu initialSession={initialSession} logoutIconOnly />
               </div>
               {initialSession ? (
-                <div className="relative hidden items-center sm:flex">
+                <div className="relative hidden items-center xl:flex">
                   <Button
                     variant="secondary"
                     size="icon"
@@ -92,11 +92,25 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div className="hidden sm:flex">
+              <div className="hidden md:flex">
                 <ThemeToggle />
               </div>
               {initialSession ? (
-                <div className="sm:hidden">
+                <div className="xl:hidden">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    href="/coupons"
+                    prefetch={false}
+                    ariaLabel="쿠폰함"
+                    title="쿠폰함"
+                  >
+                    <TicketIcon className="h-5 w-5" />
+                  </Button>
+                </div>
+              ) : null}
+              {initialSession ? (
+                <div className="xl:hidden">
                   <Button
                     variant="secondary"
                     size="icon"
@@ -120,9 +134,6 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div className="sm:hidden">
-                <ThemeToggle />
-              </div>
               <MobileNav initialSession={initialSession} />
             </div>
           </Container>

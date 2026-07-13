@@ -62,7 +62,7 @@ export default function PartnerChangeRequestForm({
           {
             value: "approval",
             label: "승인 요청",
-            description: "브랜드 정보 · 기간 · 조건 · 혜택 · 적용 대상",
+            description: "제휴처 정보 · 기간 · 조건 · 혜택 · 적용 대상",
           },
         ]}
       />

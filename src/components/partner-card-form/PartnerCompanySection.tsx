@@ -42,12 +42,12 @@ export default function PartnerCompanySection({
   return (
     <Card className="overflow-hidden">
       <SectionHeading
-        title="협력사 / 담당자"
-        description="한 협력사가 여러 브랜드를 가질 수 있으니, 기존 협력사를 연결하거나 새 협력사를 생성합니다."
+        title="파트너사 / 담당자"
+        description="한 파트너사가 여러 제휴처를 운영할 수 있으니, 기존 파트너사를 연결하거나 새 파트너사를 생성합니다."
       />
 
       <div className="mt-6 grid gap-5">
-        <FieldGroup label="기존 협력사 연결" error={fieldErrors?.companyId}>
+        <FieldGroup label="기존 파트너사 연결" error={fieldErrors?.companyId}>
           <Select
             name="companyId"
             value={values.selectedCompanyId}
@@ -56,7 +56,7 @@ export default function PartnerCompanySection({
             aria-invalid={Boolean(fieldErrors?.companyId) || undefined}
             className={getPartnerCardInvalidClass(Boolean(fieldErrors?.companyId))}
           >
-            <option value="">새 협력사 생성</option>
+            <option value="">새 파트너사 생성</option>
             {(companyOptions ?? []).map((company) => (
               <option key={company.id} value={company.id}>
                 {company.name}
@@ -65,26 +65,26 @@ export default function PartnerCompanySection({
           </Select>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             {companyFieldsLocked
-              ? "기존 협력사를 선택했으므로 아래 협력사명, 담당자 정보, 설명은 잠깁니다. 협력사 정보 수정은 /admin/companies에서 진행하세요."
-              : "기존 협력사를 선택하면 아래 협력사명, 담당자 정보, 설명은 사용되지 않습니다. 협력사 정보 수정은 /admin/companies에서 진행하세요."}
+              ? "기존 파트너사를 선택했으므로 아래 파트너사명, 담당자 정보, 설명은 잠깁니다. 파트너사 정보 수정은 /admin/companies에서 진행하세요."
+              : "기존 파트너사를 선택하면 아래 파트너사명, 담당자 정보, 설명은 사용되지 않습니다. 파트너사 정보 수정은 /admin/companies에서 진행하세요."}
           </p>
         </FieldGroup>
 
         <section className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset p-4">
           <div>
-            <p className="text-sm font-semibold text-foreground">협력사 정보</p>
+            <p className="text-sm font-semibold text-foreground">파트너사 정보</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               법인/사업자 단위의 기본 정보를 먼저 정리합니다.
             </p>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            <FieldGroup label="협력사명" error={fieldErrors?.companyName}>
+            <FieldGroup label="파트너사명" error={fieldErrors?.companyName}>
               <Input
                 name="companyName"
                 value={values.companyNameValue}
                 onChange={(event) => setters.setCompanyNameValue(event.target.value)}
-                placeholder="협력사명"
+                placeholder="파트너사명"
                 disabled={companyFieldsLocked}
                 autoFocus={focusField === "companyName"}
                 aria-invalid={Boolean(fieldErrors?.companyName) || undefined}
@@ -92,7 +92,7 @@ export default function PartnerCompanySection({
               />
             </FieldGroup>
 
-            <FieldGroup label="협력사 설명" error={fieldErrors?.companyDescription}>
+            <FieldGroup label="파트너사 설명" error={fieldErrors?.companyDescription}>
               <Textarea
                 name="companyDescription"
                 value={values.companyDescriptionValue}
@@ -100,7 +100,7 @@ export default function PartnerCompanySection({
                   setters.setCompanyDescriptionValue(event.target.value)
                 }
                 rows={3}
-                placeholder="포털에서 함께 보일 협력사 소개를 입력합니다."
+                placeholder="포털에서 함께 보일 파트너사 소개를 입력합니다."
                 disabled={companyFieldsLocked}
                 autoFocus={focusField === "companyDescription"}
                 aria-invalid={Boolean(fieldErrors?.companyDescription) || undefined}
@@ -174,8 +174,8 @@ export default function PartnerCompanySection({
 
         <p className="text-xs leading-5 text-muted-foreground">
           {companyFieldsLocked
-            ? "기존 협력사를 연결할 때는 아래 입력값이 저장에 반영되지 않습니다."
-            : "담당자 이메일은 이후 포털 로그인 아이디와 초기 설정 안내에 사용됩니다. 기존 협력사를 연결할 때는 비워 두고 저장해도 됩니다."}
+            ? "기존 파트너사를 연결할 때는 아래 입력값이 저장에 반영되지 않습니다."
+            : "담당자 이메일은 이후 포털 로그인 아이디와 초기 설정 안내에 사용됩니다. 기존 파트너사를 연결할 때는 비워 두고 저장해도 됩니다."}
         </p>
       </div>
     </Card>

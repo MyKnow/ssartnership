@@ -13,7 +13,7 @@ import {
   revalidatePartnerCompanyData,
 } from "./shared-helpers";
 import {
-  assertPartnerAccountInManagedScopeOrRedirect,
+  assertPartnerAccountGlobalMutationScopeOrRedirect,
   getPartnerAccountSupabase,
   loadPartnerAccountOrRedirect,
   loadScopedPartnerCompanyOrRedirect,
@@ -34,7 +34,7 @@ export async function updatePartnerAccountAction(formData: FormData) {
   }
 
   const { supabase, account: existingAccount } = await loadPartnerAccountOrRedirect(payload.id);
-  await assertPartnerAccountInManagedScopeOrRedirect(payload.id, adminSession.account);
+  await assertPartnerAccountGlobalMutationScopeOrRedirect(payload.id, adminSession.account);
   const nextAccount = {
     login_id: payload.loginId,
     display_name: payload.displayName,

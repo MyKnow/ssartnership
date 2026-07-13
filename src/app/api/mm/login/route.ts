@@ -1,20 +1,13 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 import {
   getMemberRequiredPolicyStatus,
 } from "@/lib/policy-documents";
-import {
-  resolveSelectableMemberByUsername,
-} from "@/lib/ssafy-verify/directory";
-import {
-  findMmUserDirectoryEntryByUsername,
-  upsertMmUserDirectorySnapshot,
-} from "@/lib/mm-directory";
+import { resolveActiveMemberForLogin } from "@/lib/member-authentication";
 import {
   delayMemberAuthAttempt,
   getMemberAuthAttemptScope,
@@ -46,10 +39,12 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as {
       username?: string;
       password?: string;
+      autoLogin?: boolean;
     };
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
     const password = String(payload.password ?? "").trim();
+    const autoLogin = payload.autoLogin === true;
     const throttleContext = {
       ipAddress: context.ipAddress ?? null,
       accountIdentifier: username || null,
@@ -102,33 +97,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "login_failed" }, { status: 400 });
     }
 
-    const supabase = getSupabaseAdminClient();
-    const memberSelect =
-      "id,mm_user_id,mm_username,password_hash,password_salt,must_change_password,year";
-
-    let member = null;
-    const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
-    if (directoryEntry?.mm_user_id) {
-      const { data: memberById } = await supabase
-        .from("members")
-        .select(memberSelect)
-        .eq("mm_user_id", directoryEntry.mm_user_id)
-        .maybeSingle();
-      member = memberById ?? null;
-    } else {
-      const resolved = await resolveSelectableMemberByUsername(username);
-      if (resolved) {
-        if (resolved.directorySnapshot) {
-          await upsertMmUserDirectorySnapshot(resolved.directorySnapshot);
-        }
-        const { data: memberById } = await supabase
-          .from("members")
-          .select(memberSelect)
-          .eq("mm_user_id", resolved.user.id)
-          .maybeSingle();
-        member = memberById ?? null;
-      }
-    }
+    const member = await resolveActiveMemberForLogin({
+      kind: "mattermost_username",
+      value: username,
+    });
 
     if (!member || !member.password_hash || !member.password_salt) {
       await logAuthSecurity({
@@ -161,7 +133,9 @@ export async function POST(request: Request) {
     }
 
     const policyStatus = await getMemberRequiredPolicyStatus(member.id);
-    await setUserSession(member.id, Boolean(member.must_change_password));
+    await setUserSession(member.id, Boolean(member.must_change_password), {
+      persistent: autoLogin,
+    });
     revalidatePath("/");
     revalidatePath("/auth/consent");
     revalidatePath("/auth/change-password");
@@ -178,6 +152,7 @@ export async function POST(request: Request) {
       properties: {
         mustChangePassword: Boolean(member.must_change_password),
         requiresConsent: policyStatus.requiresConsent,
+        autoLogin,
       },
     });
     return NextResponse.json({

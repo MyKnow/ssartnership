@@ -1,23 +1,38 @@
 import Image from "next/image";
+import { cn } from "@/lib/cn";
 import { getBlurDataURL } from "@/lib/image-blur";
 import { getCachedImageUrl, isProxiedCachedImageUrl } from "@/lib/image-cache";
 
 export default function PartnerCardMedia({
   thumbnailUrl,
+  compact = false,
 }: {
   thumbnailUrl?: string | null;
+  compact?: boolean;
 }) {
   const cachedThumbnailUrl = getCachedImageUrl(thumbnailUrl ?? "");
   const blurDataURL = getBlurDataURL(32, 32);
 
   return (
-    <div className="relative aspect-square w-32 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted sm:w-36">
+    <div
+      data-partner-card-media
+      className={cn(
+        "relative aspect-square shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted",
+        compact
+          ? "h-full min-h-16 w-auto max-w-24 self-stretch"
+          : "w-32 sm:w-36",
+      )}
+    >
       {cachedThumbnailUrl ? (
         <Image
           src={cachedThumbnailUrl}
           alt=""
           fill
-          sizes="(max-width: 640px) 128px, 144px"
+          sizes={
+            compact
+              ? "(max-width: 389px) 64px, (max-width: 640px) 80px, 96px"
+              : "(max-width: 640px) 128px, 144px"
+          }
           className="object-cover"
           placeholder="blur"
           blurDataURL={blurDataURL}
