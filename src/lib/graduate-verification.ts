@@ -3,14 +3,6 @@ import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 
 export const GRADUATE_COHORT_RULE_VERSION = "ssafy-half-year-v1" as const;
 
-export const GRADUATE_COMPLETION_STAGES = [
-  "semester_1",
-  "semester_2",
-] as const;
-
-export type GraduateCompletionStage =
-  (typeof GRADUATE_COMPLETION_STAGES)[number];
-
 export const GRADUATE_VERIFICATION_STATUSES = [
   "draft",
   "submitted",
@@ -128,6 +120,12 @@ export function getSsafyCohortFromEducationStart(year: number, month: number) {
   return (year - 2019) * 2 + (month >= 7 ? 2 : 1);
 }
 
+// `cohort` was the former internal term. New member-domain code uses
+// generation consistently; keep the old export only for existing callers.
+export function getSsafyGenerationFromEducationStart(year: number, month: number) {
+  return getSsafyCohortFromEducationStart(year, month);
+}
+
 export function normalizeGraduateEmail(value: string) {
   return value.trim().toLowerCase();
 }
@@ -152,12 +150,11 @@ export type GraduateVerificationSubmission = {
   email: string;
   emailNormalized: string;
   legalName: string;
-  completionStage: GraduateCompletionStage;
   educationStartYear: number;
   educationStartMonth: number;
   educationEndYear: number;
   educationEndMonth: number;
-  inferredCohort: number;
+  inferredGeneration: number;
   cohortRuleVersion: typeof GRADUATE_COHORT_RULE_VERSION;
   campus: GraduateCampus;
 };
@@ -165,14 +162,11 @@ export type GraduateVerificationSubmission = {
 type GraduateSubmissionInput = {
   email: string;
   legalName: string;
-  completionStage: unknown;
   educationStartYear: number;
   educationStartMonth: number;
   educationEndYear: number;
   educationEndMonth: number;
   campus?: unknown;
-  /** Client display-only value. This is intentionally never trusted. */
-  claimedCohort?: unknown;
 };
 
 export function createGraduateVerificationSubmission(
@@ -190,10 +184,6 @@ export function createGraduateVerificationSubmission(
     return { ok: false, error: "이름은 1~100자로 입력해 주세요." };
   }
 
-  if (!isGraduateCompletionStage(input.completionStage)) {
-    return { ok: false, error: "이수 학기를 선택해 주세요." };
-  }
-
   const periodError = validateGraduateEducationPeriod({
     startYear: input.educationStartYear,
     startMonth: input.educationStartMonth,
@@ -204,11 +194,11 @@ export function createGraduateVerificationSubmission(
     return { ok: false, error: periodError };
   }
 
-  const inferredCohort = getSsafyCohortFromEducationStart(
+  const inferredGeneration = getSsafyGenerationFromEducationStart(
     input.educationStartYear,
     input.educationStartMonth,
   );
-  if (inferredCohort === null) {
+  if (inferredGeneration === null) {
     return { ok: false, error: "기수를 계산할 수 없는 교육 시작 연·월입니다." };
   }
 
@@ -222,12 +212,11 @@ export function createGraduateVerificationSubmission(
       email: input.email.trim(),
       emailNormalized,
       legalName,
-      completionStage: input.completionStage,
       educationStartYear: input.educationStartYear,
       educationStartMonth: input.educationStartMonth,
       educationEndYear: input.educationEndYear,
       educationEndMonth: input.educationEndMonth,
-      inferredCohort,
+      inferredGeneration,
       cohortRuleVersion: GRADUATE_COHORT_RULE_VERSION,
       campus: campus as GraduateCampus,
     },
@@ -292,10 +281,6 @@ export function getGraduateSubmissionFileRequirements(
     certificate: resubmissionTargets.includes("certificate"),
     profileImage: resubmissionTargets.includes("profile_image"),
   } as const;
-}
-
-export function isGraduateCompletionStage(value: unknown): value is GraduateCompletionStage {
-  return typeof value === "string" && (GRADUATE_COMPLETION_STAGES as readonly string[]).includes(value);
 }
 
 export function isGraduateVerificationStatus(

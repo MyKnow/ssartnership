@@ -11,7 +11,7 @@ import {
 } from "./shared";
 
 const DIRECTORY_SELECT =
-  "id,mm_user_id,mm_username,display_name,campus,is_staff,source_years,synced_at,created_at,updated_at";
+  "id,mm_user_id,mm_username,display_name,campus,display_name_snapshot,campus_snapshot,is_staff,source_years,source_generations,is_active,synced_at,last_seen_at,created_at,updated_at";
 
 export async function findMmUserDirectoryEntryByUsername(username: string) {
   const supabase = getSupabaseAdminClient();
@@ -24,6 +24,7 @@ export async function findMmUserDirectoryEntryByUsername(username: string) {
     .from("mm_user_directory")
     .select(DIRECTORY_SELECT)
     .eq("mm_username", normalized)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (error) {
@@ -50,6 +51,7 @@ export async function findMmUserDirectoryStudentEntryByUsernameAndYear(
     .from("mm_user_directory")
     .select(DIRECTORY_SELECT)
     .eq("mm_username", normalized)
+    .eq("is_active", true)
     .contains("source_years", [year])
     .maybeSingle();
 
@@ -80,6 +82,7 @@ export async function findMmUserDirectoryStaffEntryByUsername(
     .from("mm_user_directory")
     .select(DIRECTORY_SELECT)
     .eq("mm_username", normalized)
+    .eq("is_active", true)
     .eq("is_staff", true)
     .or("source_years.cs.{14},source_years.cs.{15}")
     .maybeSingle();
@@ -124,9 +127,14 @@ export async function upsertMmUserDirectorySnapshot(snapshot: MmUserDirectorySna
       mm_username: snapshot.mmUsername,
       display_name: snapshot.displayName,
       campus: nextCampus ?? null,
+      display_name_snapshot: snapshot.displayName,
+      campus_snapshot: nextCampus ?? null,
       is_staff: nextIsStaff,
       source_years: sourceYears,
+      source_generations: sourceYears,
+      is_active: true,
       synced_at: now,
+      last_seen_at: now,
       updated_at: now,
     },
     {
@@ -176,9 +184,14 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
       mm_username: snapshot.mmUsername,
       display_name: snapshot.displayName,
       campus: snapshot.campus ?? existing?.campus ?? null,
+      display_name_snapshot: snapshot.displayName,
+      campus_snapshot: snapshot.campus ?? existing?.campus ?? null,
       is_staff: Boolean(existing?.is_staff || snapshot.isStaff),
       source_years: sourceYears,
+      source_generations: sourceYears,
+      is_active: true,
       synced_at: now,
+      last_seen_at: now,
       updated_at: now,
     };
   });
@@ -224,13 +237,13 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
       .filter((mmUserId) => !seenIds.has(mmUserId));
 
     if (staleIds.length > 0) {
-      const { error: deleteError } = await supabase
+      const { error: deactivateError } = await supabase
         .from("mm_user_directory")
-        .delete()
+        .update({ is_active: false, updated_at: now })
         .in("mm_user_id", staleIds);
-      if (deleteError) {
+      if (deactivateError) {
         throw wrapMmDirectoryDbError(
-          deleteError,
+          deactivateError,
           "MM 유저 디렉토리를 정리하지 못했습니다.",
         );
       }

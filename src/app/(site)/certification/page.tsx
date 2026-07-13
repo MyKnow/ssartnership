@@ -8,7 +8,8 @@ import { getSignedUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
-import CertificationProfileSync from "@/components/certification/CertificationProfileSync";
+import CertificationEmailAction from "@/components/certification/CertificationEmailAction";
+import CertificationMattermostSyncAction from "@/components/certification/CertificationMattermostSyncAction";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
@@ -26,6 +27,7 @@ export const dynamic = "force-dynamic";
 type CertificationMember = {
   mm_username?: string | null;
   display_name?: string | null;
+  generation?: number | null;
   year?: number | null;
   campus?: string | null;
   avatar_url?: string | null;
@@ -34,6 +36,10 @@ type CertificationMember = {
   graduate_verified_at?: string | null;
   has_profile_image?: boolean | null;
   profile_image_url?: string | null;
+  mattermost_account_id?: string | null;
+  mm_user_id?: string | null;
+  email?: string | null;
+  email_verified_at?: string | null;
 };
 
 function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
@@ -75,9 +81,10 @@ export default async function CertificationPage({
   const { data: member } = await supabase
     .from("members")
     .select(
-      "mm_username,display_name,year,campus,avatar_content_type,avatar_url,updated_at,graduate_verified_at,active_profile_image_id",
+      "mm_username,display_name,generation,year,campus,avatar_content_type,avatar_url,updated_at,graduate_verified_at,active_profile_image_id,mattermost_account_id,mm_user_id,email,email_verified_at",
     )
     .eq("id", session.userId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!member) {
@@ -101,6 +108,7 @@ export default async function CertificationPage({
               member={{
                 mm_username: member.mm_username,
                 display_name: member.display_name,
+                generation: member.generation,
                 year: member.year,
                 campus: member.campus,
                 avatar_url: member.avatar_url,
@@ -115,13 +123,17 @@ export default async function CertificationPage({
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
             />
+            {member.mattermost_account_id || member.mm_user_id ? (
+              <CertificationMattermostSyncAction />
+            ) : null}
+            <CertificationEmailAction
+              initialEmail={member.email}
+              emailVerified={Boolean(member.email_verified_at)}
+            />
             <div className="mt-10 w-full border-t border-border/70 pt-8">
-              <CertificationFooterActions
-                canChangeProfilePhoto
-              />
+              <CertificationFooterActions canChangeProfilePhoto />
             </div>
           </div>
-          <CertificationProfileSync enabled={Boolean(member.mm_username)} />
         </Container>
       </main>
     </div>

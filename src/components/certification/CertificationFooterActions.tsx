@@ -24,7 +24,7 @@ export default function CertificationFooterActions({
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">계정 관리</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          비밀번호 변경 또는 회원 탈퇴를 진행할 수 있습니다.
+          비밀번호 변경 또는 회원 탈퇴를 진행할 수 있습니다. 탈퇴 후 30일이 지나면 개인 식별 정보와 프로필 사진이 익명화됩니다.
         </p>
       </div>
       <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
@@ -53,13 +53,13 @@ export default function CertificationFooterActions({
               return;
             }
             const first = window.confirm(
-              "정말 탈퇴하시겠습니까? 저장된 인증 정보가 삭제됩니다.",
+              "정말 탈퇴하시겠습니까? 탈퇴 후에는 로그인과 혜택 이용이 중지됩니다.",
             );
             if (!first) {
               return;
             }
             const second = window.confirm(
-              "한 번 더 확인합니다. 탈퇴하면 되돌릴 수 없습니다.",
+              "한 번 더 확인합니다. 30일 후 개인 식별 정보와 프로필 사진이 익명화됩니다.",
             );
             if (!second) {
               return;
@@ -68,7 +68,7 @@ export default function CertificationFooterActions({
             try {
               const response = await fetch("/api/mm/delete", { method: "POST" });
               if (response.ok) {
-                notify("회원 탈퇴가 완료되었습니다.");
+                notify("회원 탈퇴가 처리되었습니다.");
                 router.replace("/");
                 return;
               }

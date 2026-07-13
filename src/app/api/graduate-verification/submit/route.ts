@@ -22,13 +22,11 @@ type GraduateSubmissionBody = {
   profileImageUploadId?: unknown;
   email?: unknown;
   legalName?: unknown;
-  completionStage?: unknown;
   educationStartYear?: unknown;
   educationStartMonth?: unknown;
   educationEndYear?: unknown;
   educationEndMonth?: unknown;
   campus?: unknown;
-  claimedCohort?: unknown;
   consented?: unknown;
 };
 
@@ -72,13 +70,11 @@ export async function POST(request: Request) {
       profileImageUploadId: typeof body.profileImageUploadId === "string" ? body.profileImageUploadId : null,
       email: String(body.email ?? ""),
       legalName: String(body.legalName ?? ""),
-      completionStage: body.completionStage,
       educationStartYear: toInteger(body.educationStartYear),
       educationStartMonth: toInteger(body.educationStartMonth),
       educationEndYear: toInteger(body.educationEndYear),
       educationEndMonth: toInteger(body.educationEndMonth),
       campus: typeof body.campus === "string" ? body.campus : null,
-      claimedCohort: body.claimedCohort,
       consented: body.consented === true,
     });
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: true });
@@ -87,7 +83,7 @@ export async function POST(request: Request) {
       eventName: "graduate_verification_submit",
       status: "success",
       actorType: "guest",
-      properties: { inferredCohort: result.inferredCohort },
+      properties: { inferredGeneration: result.inferredGeneration },
     });
     return NextResponse.json({ ok: true, result });
   } catch (error) {

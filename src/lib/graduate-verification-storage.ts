@@ -198,6 +198,26 @@ export async function storeGraduateProfileImage(input: {
   return path;
 }
 
+export async function storeMemberProfileImage(input: {
+  memberId: string;
+  sha256: string;
+  buffer: Buffer;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const path = `members/${input.memberId}/${input.sha256}.webp`;
+  const { error } = await supabase.storage
+    .from(MEMBER_PROFILE_IMAGES_BUCKET)
+    .upload(path, input.buffer, {
+      contentType: "image/webp",
+      cacheControl: "private, no-store",
+      upsert: true,
+    });
+  if (error) {
+    throw new Error("프로필 사진을 안전하게 보관하지 못했습니다.");
+  }
+  return path;
+}
+
 export async function markGraduateVerificationUploadsConsumed(uploadIds: string[]) {
   if (uploadIds.length === 0) return;
   const supabase = getSupabaseAdminClient();

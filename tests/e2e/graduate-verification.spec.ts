@@ -86,7 +86,6 @@ test.describe("graduate verification application", () => {
       email: "graduate@example.com",
       educationStartYear: 2026,
       educationStartMonth: 1,
-      claimedCohort: 15,
       certificateUploadId: "certificate-upload",
       profileImageUploadId: "profile_image-upload",
     });

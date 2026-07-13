@@ -26,7 +26,7 @@ function CertificationScreenStory({
         member={{
           mm_username: "story-member",
           display_name: displayName,
-          year: 15,
+          generation: 15,
           campus,
           avatar_url: null,
         }}

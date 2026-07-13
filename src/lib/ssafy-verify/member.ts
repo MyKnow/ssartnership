@@ -14,6 +14,24 @@ export type SsafyVerificationForMember = SsafyVerificationClaims & {
   scope: string | null;
 };
 
+export function buildMemberSsafyVerificationUpsertPayload(
+  memberId: string,
+  input: SsafyVerificationForMember,
+) {
+  const authTimeIso = new Date(input.authTime * 1000).toISOString();
+  return {
+    member_id: memberId,
+    ssafy_sub: input.sub,
+    verified_at: authTimeIso,
+    auth_time: authTimeIso,
+    verification_id: input.verificationId,
+    track: input.track,
+    track_name: input.trackName,
+    last_scope: input.scope,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export function buildSsafyMemberUpdatePayload(input: SsafyVerificationForMember) {
   const authTimeIso = new Date(input.authTime * 1000).toISOString();
 
@@ -45,6 +63,7 @@ export async function findSsafyVerifiedMember(
       .from("members")
       .select(select)
       .eq("id", input.currentMemberId)
+      .is("deleted_at", null)
       .maybeSingle();
     if (error) {
       return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
@@ -57,6 +76,7 @@ export async function findSsafyVerifiedMember(
         .from("members")
         .select(select)
         .eq("ssafy_sub", input.sub)
+        .is("deleted_at", null)
         .maybeSingle();
       if (subjectError) {
         return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
@@ -74,6 +94,7 @@ export async function findSsafyVerifiedMember(
     .from("members")
     .select(select)
     .eq("ssafy_sub", input.sub)
+    .is("deleted_at", null)
     .maybeSingle();
   if (subError) {
     return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
@@ -90,6 +111,7 @@ export async function findSsafyVerifiedMember(
     .from("members")
     .select(select)
     .eq("mm_user_id", input.mattermostUserId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (mattermostError) {
     return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
@@ -114,8 +136,18 @@ export async function updateMemberSsafyVerification(
     .from("members")
     .update(payload)
     .eq("id", memberId);
+  if (error) {
+    return { ok: false as const, errorCode: "MEMBER_UPDATE_FAILED" };
+  }
 
-  return error
-    ? { ok: false as const, errorCode: "MEMBER_UPDATE_FAILED" }
-    : { ok: true as const, payload };
+  const { error: verificationError } = await supabase
+    .from("member_ssafy_verifications")
+    .upsert(buildMemberSsafyVerificationUpsertPayload(memberId, input), {
+      onConflict: "member_id",
+    });
+  if (verificationError) {
+    return { ok: false as const, errorCode: "MEMBER_UPDATE_FAILED" };
+  }
+
+  return { ok: true as const, payload };
 }

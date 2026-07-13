@@ -22,6 +22,7 @@ type Member = {
   id?: string | null;
   mm_username?: string | null;
   display_name?: string | null;
+  generation?: number | null;
   year?: number | null;
   campus?: string | null;
   avatar_url?: string | null;
@@ -47,15 +48,15 @@ export default function CertificationView({
   const [isAvatarOpen, setAvatarOpen] = useState(false);
   const profile = parseSsafyProfile(member.display_name ?? member.mm_username ?? "");
   const hasTrackedViewRef = useRef(false);
-  const year = member.year ?? getCurrentSsafyYear();
-  const roleLabel = getCertificationRoleLabel(year, {
+  const generation = member.generation ?? member.year ?? getCurrentSsafyYear();
+  const roleLabel = getCertificationRoleLabel(generation, {
     graduateVerifiedAt: member.graduate_verified_at,
   });
-  const scheme = getCertificationScheme(year, cohortCardThemes, {
+  const scheme = getCertificationScheme(generation, cohortCardThemes, {
     graduateVerifiedAt: member.graduate_verified_at,
   });
   const campusLabel = member.campus ?? profile.campus ?? null;
-  const yearLabel = year > 0 ? formatSsafyYearLabel(year) : null;
+  const yearLabel = generation > 0 ? formatSsafyYearLabel(generation) : null;
   const hasProfileImage = Boolean(member.has_profile_image && member.profile_image_url);
   const hasAvatarUrl = Boolean(member.avatar_url);
   const hasLegacyAvatar = Boolean(member.has_legacy_avatar);
@@ -87,7 +88,7 @@ export default function CertificationView({
       eventName: "certification_view",
       targetType: "member",
       properties: {
-        year,
+        generation,
         campus: member.campus ?? profile.campus ?? null,
         role: roleLabel,
       },
@@ -95,7 +96,7 @@ export default function CertificationView({
   }, [
     disableTracking,
     member.campus,
-    year,
+    generation,
     profile.campus,
     roleLabel,
   ]);

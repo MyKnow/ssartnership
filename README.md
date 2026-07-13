@@ -99,7 +99,7 @@ src/
     repositories/          Repository 패턴
     ssafy-verify/          SSAFY Verify Hosted Auth / Server API 연동
     mm-directory.ts        Verify 위임 디렉토리 조회 / 동기화
-    mm-member-sync.ts      회원 프로필 동기화
+    member-mattermost-profile-sync.ts  회원의 명시적 MM 프로필 동기화
     member-manual-add.ts   관리자 수동 회원 추가
     policy-documents.ts    약관 버전 / 동의 상태 계산
     user-auth.ts           사용자 세션
@@ -172,13 +172,15 @@ npm run ci:local
 - 사용자 세션 / QR
   - `USER_SESSION_SECRET`
   - `CERTIFICATION_QR_SECRET`
+  - `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`
+  - `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET` (권장: 식별자 예약 키와 분리)
 - 파트너 계좌이체 결제
   - `PARTNER_BILLING_BANK_NAME`
   - `PARTNER_BILLING_BANK_ACCOUNT`
   - `PARTNER_BILLING_ACCOUNT_HOLDER`
   - `NTS_BUSINESS_STATUS_SERVICE_KEY` (선택, 사업자등록 상태조회)
   - `DATA_GO_KR_SERVICE_KEY` (선택, `NTS_BUSINESS_STATUS_SERVICE_KEY` fallback)
-- 제휴 제안 메일
+- 제휴 제안 / 회원 이메일 인증 메일
   - `SMTP_HOST`
   - `SMTP_PORT`
   - `SMTP_SECURE`
@@ -250,54 +252,135 @@ npm run ci:local
 
 ## 회원 / 인증 모델
 
-### 식별 기준
+### 핵심 원칙
 
-- 최종 식별자는 `mm_user_id`입니다.
-- `mm_username`은 변경 가능한 스냅샷 값으로만 취급합니다.
-- 회원가입 이후 주요 API는 `mm_user_id` 기준으로 동작합니다.
+- `members`는 공통 계정·프로필의 원장이다. 교육생, 수료생, 운영진을 별도 회원 테이블로 나누지 않는다.
+- 교육생과 수료생의 핵심 분류값은 `generation`(기수)이다. 수료생의 이수/졸업 학기는 신규 신청·승인 판단에 사용하지 않는다.
+- 운영진은 `generation = 0`으로 표현하고, 확인 원본 기수는 `staff_source_generation`에 보관한다.
+- Mattermost, SSAFY Verify, 수료생, 관리자 권한, 약관 동의는 모두 1:1 또는 이력 확장 테이블로 분리한다.
+- `deleted_at`이 있는 회원은 즉시 로그인·권한·혜택 접근이 차단된다. 30일 후 개인정보와 비공개 파일을 익명화하지만, HMAC 식별자 예약과 필요한 감사 이력은 남긴다.
 
-### 기수 체계
+### 관계도
 
-- `14`: 14기 교육생
-- `15`: 15기 교육생
-- `0`: 운영진
-- 1월은 1학기 시작, 7월은 2학기 시작입니다.
-- 현재 기수는 `ssafy_cycle_settings`의 앵커 기준과 날짜를 함께 사용해 계산합니다.
-- `staff`, `student`, `graduate`는 저장값이 아니라 현재 날짜와 기수 기준으로 파생됩니다.
-- 2027년 7월 기준 예시
-  - `18기`: 1학기 교육생
-  - `17기`: 2학기 교육생
-  - `16기 이하`: 수료생
+```mermaid
+erDiagram
+    MEMBERS ||--o| MM_USER_DIRECTORY : "nullable mattermost_account_id"
+    MEMBERS ||--o| MEMBER_SSAFY_VERIFICATIONS : "SSAFY proof"
+    MEMBERS ||--o| GRADUATE_PROFILES : "graduate extension"
+    GRADUATE_VERIFICATION_REQUESTS ||--o| GRADUATE_PROFILES : "approved from"
+    MEMBERS ||--o| ADMIN_PROFILES : "admin extension"
 
-운영진은 `members.staff_source_year`에 어느 기수 팀에서 확인된 계정인지 함께 저장합니다.
-트랙 정보는 SSAFY Verify의 `ssafy.track` scope에서만 받으며, `members.ssafy_track`에는 slug를, `members.ssafy_track_name`에는 표시명을 nullable로 저장합니다. 트랙 규칙이 없거나 매칭되지 않는 사용자는 인증 성공 상태에서도 두 값이 `null`일 수 있습니다.
-반/강의실 운영 정보인 `floor`, `classroom`, `classLeader`, `classCaNames` 계열 값은 저장하지 않습니다.
+    MEMBERS ||--o{ MEMBER_PROFILE_IMAGES : "owns"
+    GRADUATE_VERIFICATION_REQUESTS ||--o{ MEMBER_PROFILE_IMAGES : "submits"
+    MEMBERS ||--o{ MEMBER_EMAIL_CHALLENGES : "verifies email"
 
-기수 기준을 조정하거나 조기 시작을 적용하려면 관리자 화면의 `기수 관리`를 사용합니다.
+    MEMBERS ||--o{ MEMBER_POLICY_CONSENTS : "accepts"
+    POLICY_DOCUMENTS ||--o{ MEMBER_POLICY_CONSENTS : "versioned by"
 
-### SSAFY Verify 위임 디렉토리
+    MEMBERS {
+      uuid id PK
+      integer generation "cohort; 0 = staff"
+      integer staff_source_generation
+      text email
+      text email_normalized UK
+      timestamptz email_verified_at
+      text password_hash
+      text display_name
+      text campus
+      uuid mattermost_account_id FK "nullable"
+      uuid active_profile_image_id FK
+      timestamptz deleted_at
+      timestamptz anonymized_at
+    }
 
-- `mm_user_directory` 테이블에 유저 스냅샷을 저장합니다.
-- 보관 값
-  - `mm_user_id`
-  - `mm_username`
-  - `display_name`
-  - `campus`
-  - `is_staff`
-  - `source_years`
-  - `synced_at`
-- 회원가입 / 로그인 / 재설정은 이 디렉토리를 먼저 조회하고, 없으면 SSAFY Verify Server API의 directory lookup으로 보강합니다.
-- Mattermost 프로필 조회, 디렉토리 lookup, 프로필 이벤트, DM 발송은 SSAFY Verify Server API로 위임합니다. SSARTNERSHIP은 Mattermost base URL, team name, sender credential을 보유하지 않습니다.
-- Server API profile에 `ssafy_track`, `ssafy_track_name`이 포함되면 회원 row에만 반영합니다. `mm_user_directory`는 기존 lookup 보조 스냅샷으로 유지합니다.
+    MM_USER_DIRECTORY {
+      uuid id PK
+      text mm_user_id UK
+      text mm_username UK
+      text display_name_snapshot
+      text campus_snapshot
+      boolean is_staff
+      integer[] source_generations
+      boolean is_active
+      timestamptz last_seen_at
+    }
 
-### 닉네임 파싱
+    MEMBER_SSAFY_VERIFICATIONS {
+      uuid member_id PK_FK
+      text ssafy_sub UK
+      timestamptz verified_at
+      text track
+      text track_name
+    }
 
-- 반 / 팀코드는 더 이상 저장하지 않습니다.
-- 중요 값은 다음만 유지합니다.
-  - 이름
-  - 캠퍼스
-  - 운영진 여부
-- 운영진 추정 역할명, 창업 캠퍼스, 14기/15기 다양한 닉네임 패턴을 지원합니다.
+    GRADUATE_PROFILES {
+      uuid member_id PK_FK
+      uuid verification_request_id FK
+      timestamptz verified_at
+      text verification_source
+    }
+
+    ADMIN_PROFILES {
+      uuid id PK
+      uuid member_id FK
+      text permission_template_key FK
+      text[] managed_campus_slugs
+      boolean is_active
+      integer permission_version
+    }
+
+    MEMBER_PROFILE_IMAGES {
+      uuid id PK
+      uuid member_id FK
+      uuid graduate_verification_request_id FK
+      text storage_path
+      text sha256
+      text content_type "image/webp"
+      text source
+      text status
+    }
+
+    POLICY_DOCUMENTS {
+      uuid id PK
+      text kind
+      integer version
+      text content
+      boolean is_active
+    }
+
+    MEMBER_POLICY_CONSENTS {
+      uuid id PK
+      uuid member_id FK
+      uuid policy_document_id FK
+      timestamptz agreed_at
+    }
+```
+
+### 인증과 기수
+
+- 로그인 식별자는 Mattermost 아이디 또는 **인증된 이메일**이다. 이메일은 `/certification`에서 6자리 코드로 등록·변경한다.
+- `mm_username`은 로그인 입력과 디렉토리 조회에 쓰는 변경 가능한 외부 식별자다. 회원 테이블에서는 nullable FK만 보유하고, MM 세부값은 `mm_user_directory`가 보관한다.
+- `member_ssafy_verifications`는 SSAFY pairwise subject, 검증 시각, 트랙 정보를 보관한다. 기존 `members.ssafy_*` 컬럼은 Preview 검증이 끝날 때까지 호환 목적으로만 함께 쓴다.
+- 기수 계산은 `ssafy_cycle_settings`와 날짜를 사용한다. 예를 들어 `generation = 15`는 15기이며, 현재 시점에 따라 교육생·수료생 역할 표시는 파생한다.
+- 반·강의실·반장·CA 등 운영에 불필요한 닉네임 파생값은 저장하지 않는다.
+
+### 외부 프로필과 이미지
+
+- Mattermost 프로필은 주기 Cron으로 덮어쓰지 않는다. 회원이 `/certification`에서 명시적으로 동기화할 때 이름·캠퍼스·사진을 즉시 반영하고 감사 로그를 남긴다.
+- 외부 사진은 원본/데이터 URL을 보관하지 않는다. 서버에서 640×640 WebP로 정규화해 private `member-profile-images` 버킷에 저장하고, 권한을 확인하는 private 이미지 API로만 읽는다.
+
+### 수료생·관리자·약관
+
+- 수료생 승인 시 `members.email`을 검증 완료 상태로 만들고 `graduate_profiles`를 생성한다. 교육 시작 연·월로 계산한 `inferred_generation`만 사용하며, `completion_stage`는 레거시 이력 컬럼이다.
+- 관리자 권한의 원천은 `admin_profiles.permission_template_key`와 템플릿이다. 현재 관리자 세션/감사 FK는 안전한 전환을 위해 회원 ID를 유지하며, Preview 검증 후 관리자 프로필 ID로 계약 전환한다.
+- `policy_documents`는 버전 콘텐츠를 수정하지 않고 새 버전을 발행한다. `member_policy_consents`는 약관 동의 이력을 보존한다.
+
+### 전환 순서
+
+1. 확장: 새 테이블·FK·인덱스를 추가하고 기존 컬럼을 유지한다.
+2. 백필 및 이중 쓰기: 기존 회원을 새 모델로 옮기고 신규 가입·승인·권한 변경도 두 모델에 쓴다.
+3. Preview 검증: 로그인, 인증, 수료생 승인, 관리자 권한, 탈퇴 익명화, 이미지 접근을 검증한다.
+4. 계약: 모든 reader가 새 모델만 사용한 뒤 레거시 MM/SSAFY/권한/약관 미러 컬럼을 별도 migration으로 제거한다.
 
 ## SSAFY Verify 인증 플로우
 
@@ -323,7 +406,7 @@ Server API 위임에는 Hosted User Auth client와 분리된 confidential creden
 
 1. 사용자가 회원가입 화면에서 SSAFY Verify를 실행합니다.
 2. SSAFY Verify callback을 서버에서 교환·검증합니다.
-3. Verify claim의 Mattermost user_id 또는 SSAFY subject로 기존 회원 레코드와 연결합니다.
+3. Verify claim을 `member_ssafy_verifications`에 기록하고, Mattermost 계정을 `mm_user_directory`와 nullable FK로 연결합니다.
 4. 가입 시 최신 이용약관 / 개인정보 동의 버전도 함께 저장합니다.
 5. 기수별 허용 범위는 관리자 `기수 관리` 설정을 따른 뒤, 그 기준으로 signup / backfill / 디렉토리 조회가 동작합니다.
 
@@ -347,11 +430,11 @@ SSAFY_VERIFY_LIVE_SMOKE=1 SSAFY_VERIFY_SMOKE_SEND_MM=1 npm run test:ssafy-verify
 
 ### 로그인
 
-1. `mm_username`으로 디렉토리 조회
-2. 필요 시 SSAFY Verify Server API directory lookup으로 보강
-3. DB에서 `mm_user_id`로 회원 조회
-4. 비밀번호 검증
-5. 최신 약관 미동의 시 `/auth/consent`로 리다이렉트
+1. 입력값을 인증된 이메일 또는 Mattermost 아이디로 구분합니다.
+2. 이메일은 `members.email_normalized`와 `email_verified_at`으로, MM 아이디는 `mm_user_directory`와 `mattermost_account_id`로 조회합니다.
+3. MM 디렉토리에 없으면 SSAFY Verify Server API directory lookup으로 보강합니다.
+4. soft-deleted 회원을 제외하고 비밀번호를 검증합니다.
+5. 최신 약관 미동의 시 `/auth/consent`로 리다이렉트합니다.
 
 ### 비밀번호 재설정
 
@@ -419,7 +502,8 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 
 - 공개 제휴 목록은 캐시를 사용합니다.
 - 관리자 변경 후 관련 캐시를 무효화합니다.
-- Verify 프로필 이벤트는 Vercel cron으로 하루 1회 반영합니다.
+- MM 프로필은 회원이 `/certification`에서 명시적으로 동기화할 때 즉시 반영합니다.
+- 탈퇴 후 30일이 지난 회원은 Vercel cron으로 익명화합니다.
 - 제휴 종료 예정 알림도 하루 1회 실행합니다.
 
 [vercel.json](/Users/myknow/coding/ssartnership/vercel.json)
@@ -432,8 +516,8 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/member-sync",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/anonymize-deleted-members",
+      "schedule": "40 0 * * *"
     }
   ]
 }
@@ -537,7 +621,7 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 
 권장:
 
-- `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `CRON_SECRET`는 충분히 긴 난수 사용
+- `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `CRON_SECRET`, `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`, `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET`는 충분히 긴 난수 사용
 - `SUPABASE_SERVICE_ROLE_KEY`, `SSAFY_VERIFY_SERVER_CLIENT_SECRET`, SMTP 계정, VAPID private key는 절대 클라이언트에 노출되지 않도록 관리
 - 운영 환경에서는 `ADMIN_ALLOWED_IPS` 또는 Basic Auth 중 최소 하나를 같이 두는 편이 안전
 
@@ -545,7 +629,7 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 
 - `npm run lint` 통과
 - `npm run test:mm-profile` 통과
-- 회원가입 / 로그인 / 재설정 / 약관 동의 / 운영진 가입 흐름은 `mm_user_id` 중심으로 정리되어 있습니다.
+- 회원가입 / 로그인 / 재설정 / 약관 동의 / 운영진 권한 흐름은 `members` 공통 원장과 확장 프로필 모델로 전환 중입니다.
 - SSAFY Verify Server API 위임과 request-response trace 로깅은 [프로젝트 완성도 점검 문서](/Users/myknow/coding/ssartnership/docs/operations/project-completeness-audit-2026-06-24.md)에 현재 판단과 잔여 운영 TODO를 정리해 두었습니다.
 - 공개 제휴 페이지는 SEO, sitemap, RSS, robots를 포함합니다.
 
