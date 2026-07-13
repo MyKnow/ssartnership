@@ -1,7 +1,6 @@
 export const SSAFY_VERIFY_PROFILE_SCOPES = [
   "ssafy.verify",
   "ssafy.affiliation",
-  "ssafy.track",
   "ssafy.name",
   "ssafy.profile_image",
   "ssafy.role",

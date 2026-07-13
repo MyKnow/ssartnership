@@ -6,11 +6,11 @@ SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, 
 
 ## 현재 판단
 
-- 회원가입 또는 최초 SSAFY Verify 연결 시에는 `ssafy.verify`, `ssafy.affiliation`, `ssafy.track`, `ssafy.name`, `ssafy.profile_image`, `ssafy.role`, `ssafy.mattermost_id`를 요청한다.
+- 회원가입 또는 최초 SSAFY Verify 연결 시에는 `ssafy.verify`, `ssafy.affiliation`, `ssafy.name`, `ssafy.profile_image`, `ssafy.role`, `ssafy.mattermost_id`를 요청한다. `ssafy.track`은 Hosted User Auth client 허용 scope가 동기화되기 전까지 요청하지 않는다.
 - 비밀번호 재설정 등 본인 재확인 플로우에서는 `ssafy.verify`, `ssafy.mattermost_id`만 요청한다.
 - 본인 재확인은 Verify 응답의 Mattermost user id가 기존 회원의 `mm_user_id`와 같은지만 대조한다.
 - 프로필 이미지는 Verify `picture` URL을 `members.avatar_url`에 저장하고, 기존 base64 아바타는 fallback으로 유지한다.
-- 트랙은 Verify `ssafy.track` scope의 `ssafy_track`, `ssafy_track_name`을 `members.ssafy_track`, `members.ssafy_track_name`에 nullable로 저장한다. 권한/검색/분기 기준은 표시명이 아니라 slug인 `ssafy_track`을 우선한다.
+- 트랙 정보가 Verify profile 응답에 제공되면 `ssafy_track`, `ssafy_track_name`을 `members.ssafy_track`, `members.ssafy_track_name`에 nullable로 저장한다. 권한/검색/분기 기준은 표시명이 아니라 slug인 `ssafy_track`을 우선한다.
 - `ssafy.affiliation`은 기수/캠퍼스/지역만 제공한다고 가정하며, `floor`, `classroom`, `classLeader`, `classCaNames`, `class_leader`, `class_ca_names` 계열 값은 저장하지 않는다.
 - Server API v1은 Hosted User Auth client와 분리된 confidential credential로 호출한다.
 - Server API credential이 설정되지 않으면 Mattermost DM, 디렉터리 lookup, 프로필 동기화 기능은 직접 Mattermost fallback 없이 실패한다.
