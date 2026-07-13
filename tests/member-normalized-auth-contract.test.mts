@@ -354,6 +354,23 @@ test("관리자 로그 작성자 조회는 회원·MM 디렉터리 관계를 조
   );
 });
 
+test("회원 mock도 canonical 뷰 모델을 사용한다", () => {
+  const memberPreview = readRepoFile("src/lib/mock/member-preview.ts");
+  const mockReviewRepository = readRepoFile(
+    "src/lib/repositories/mock/partner-review-repository.mock.ts",
+  );
+
+  assert.match(memberPreview, /mattermostUsername/);
+  assert.match(memberPreview, /generation/);
+  assert.doesNotMatch(
+    memberPreview,
+    /mm_user_id|mm_username|avatar_base64|avatar_content_type|avatar_url|staff_source_year|service_policy_version|privacy_policy_version|marketing_policy_version|\byear:/,
+  );
+  assert.match(mockReviewRepository, /member\?\.displayName/);
+  assert.match(mockReviewRepository, /member\?\.generation/);
+  assert.doesNotMatch(mockReviewRepository, /member\?\.display_name|member\?\.year/);
+});
+
 test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
   const provision = readRepoFile("src/lib/member-manual-add/provision.ts");
