@@ -108,6 +108,15 @@ export default function SsafyVerifyButton({
       returnTo: returnTo ?? null,
     };
 
+    async function startRedirectFlow() {
+      try {
+        await startSsafyVerifyRedirectFlow(redirectFlowOptions);
+      } catch (redirectError) {
+        setStatus("failed");
+        setError(normalizeSsafyVerifySdkError(redirectError));
+      }
+    }
+
     if (
       shouldUseSsafyVerifyRedirectFlow({
         userAgent: window.navigator.userAgent,
@@ -115,19 +124,13 @@ export default function SsafyVerifyButton({
         maxTouchPoints: window.navigator.maxTouchPoints,
       })
     ) {
-      try {
-        await startSsafyVerifyRedirectFlow(redirectFlowOptions);
-      } catch (redirectError) {
-        setStatus("failed");
-        setError(normalizeSsafyVerifySdkError(redirectError));
-      }
+      await startRedirectFlow();
       return;
     }
 
     const sdk = window.ssafyVerify;
     if (!sdk) {
-      setStatus("failed");
-      setError({ ok: false, errorCode: "SDK_NOT_READY", requestId: null });
+      await startRedirectFlow();
       return;
     }
 
@@ -142,12 +145,7 @@ export default function SsafyVerifyButton({
     } catch (sdkError) {
       const normalizedError = normalizeSsafyVerifySdkError(sdkError);
       if (normalizedError.errorCode === "SSAFY_VERIFY_POPUP_BLOCKED") {
-        try {
-          await startSsafyVerifyRedirectFlow(redirectFlowOptions);
-        } catch (redirectError) {
-          setStatus("failed");
-          setError(normalizeSsafyVerifySdkError(redirectError));
-        }
+        await startRedirectFlow();
         return;
       }
       setStatus("failed");
