@@ -243,6 +243,22 @@ test("푸시 대상과 발송 화면은 세대·MM 디렉터리 관계만 사용
   assert.match(send, /\.eq\("generation", resolvedAudience\.year\)/);
 });
 
+test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용한다", () => {
+  const operations = readRepoFile("src/lib/admin-notification-ops.ts");
+  const delivery = readRepoFile("src/lib/admin-notification-ops-delivery.ts");
+
+  assert.match(operations, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(operations, /\.from\("member_policy_consents"\)/);
+  assert.match(operations, /\.eq\("policy_document_id", activeMarketingPolicy\.id\)/);
+  assert.match(operations, /\.eq\("generation", resolvedAudience\.year\)/);
+  assert.doesNotMatch(
+    operations,
+    /mm_user_id,mm_username|marketing_policy_version|marketing_policy_consented_at|\.eq\("year"/,
+  );
+  assert.doesNotMatch(delivery, /mm_user_id|source_years|\byear: number/);
+  assert.match(delivery, /mattermostUserId/);
+});
+
 test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
   const provision = readRepoFile("src/lib/member-manual-add/provision.ts");
