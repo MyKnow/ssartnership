@@ -229,6 +229,20 @@ test("수료생 계정과 탈퇴 식별자 예약은 정규화 인증 관계만 
   );
 });
 
+test("푸시 대상과 발송 화면은 세대·MM 디렉터리 관계만 사용한다", () => {
+  const audience = readRepoFile("src/lib/push/audience.ts");
+  const send = readRepoFile("src/lib/push/send.ts");
+  const adminPushPage = readRepoFile("src/app/admin/(protected)/push/page.tsx");
+
+  for (const source of [audience, send, adminPushPage]) {
+    assert.doesNotMatch(source, /\.eq\("year"|\.select\("id,display_name,mm_username,year,campus"/);
+  }
+  assert.match(audience, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(adminPushPage, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(audience, /\.eq\("generation", audience\.year\)/);
+  assert.match(send, /\.eq\("generation", resolvedAudience\.year\)/);
+});
+
 test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
   const provision = readRepoFile("src/lib/member-manual-add/provision.ts");
