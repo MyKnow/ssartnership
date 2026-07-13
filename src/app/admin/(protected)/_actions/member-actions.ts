@@ -18,6 +18,10 @@ import {
 } from "@/lib/validation";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 import {
+  getMmUserDirectoryEntriesByAccountIds,
+  type MmUserDirectoryIdentity,
+} from "@/lib/mm-directory/identities";
+import {
   logAdminAction,
   redirectAdminActionError,
   revalidateMemberPaths,
@@ -82,7 +86,7 @@ export async function updateMemberAction(formData: FormData) {
   await requireAdminPermission("members", "update", { path: "/admin/members" });
   const id = String(formData.get("id") || "").trim();
   const displayName = String(formData.get("displayName") || "").trim();
-  const yearRaw = String(formData.get("year") || "").trim();
+  const generationRaw = String(formData.get("generation") || "").trim();
   const campus = String(formData.get("campus") || "").trim();
   const mustChangePassword =
     String(formData.get("mustChangePassword") || "false").trim() === "true";
@@ -95,14 +99,14 @@ export async function updateMemberAction(formData: FormData) {
     });
   }
 
-  const yearError = validateMemberYear(yearRaw);
-  const year = parseMemberYearValue(yearRaw);
-  if (yearError || year === null) {
+  const generationError = validateMemberYear(generationRaw);
+  const generation = parseMemberYearValue(generationRaw);
+  if (generationError || generation === null) {
     redirectAdminActionError("/admin/members", "member_invalid_year", {
       action: "member_update",
       targetType: "member",
       targetId: id,
-      properties: { yearRaw },
+      properties: { generationRaw },
     });
   }
 
@@ -111,7 +115,7 @@ export async function updateMemberAction(formData: FormData) {
     .from("members")
     .update({
       display_name: displayName || null,
-      year,
+      generation,
       campus: campus || null,
       must_change_password: mustChangePassword,
       updated_at: new Date().toISOString(),
@@ -132,7 +136,7 @@ export async function updateMemberAction(formData: FormData) {
     targetId: id,
     properties: {
       displayName,
-      year,
+      generation,
       campus,
       mustChangePassword,
     },
@@ -245,7 +249,7 @@ export async function deleteMemberAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("mm_user_id,mm_username")
+    .select("mattermost_account_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -257,7 +261,7 @@ export async function deleteMemberAction(formData: FormData) {
       properties: { errorCode: memberError.code },
     });
   }
-  if (!member?.mm_user_id && !member?.mm_username) {
+  if (!member) {
     redirectAdminActionError("/admin/members", "member_missing_id", {
       action: "member_delete",
       targetType: "member",
@@ -266,16 +270,36 @@ export async function deleteMemberAction(formData: FormData) {
     });
   }
 
-  if (member.mm_user_id) {
-    await supabase.from("password_reset_attempts").delete().eq("identifier", member.mm_user_id);
+  let directoryEntry: MmUserDirectoryIdentity | null = null;
+  try {
+    const directoryByAccountId = await getMmUserDirectoryEntriesByAccountIds(
+      member.mattermost_account_id ? [member.mattermost_account_id] : [],
+    );
+    directoryEntry = member.mattermost_account_id
+      ? directoryByAccountId.get(member.mattermost_account_id) ?? null
+      : null;
+  } catch {
+    redirectAdminActionError("/admin/members", "member_invalid_request", {
+      action: "member_delete",
+      targetType: "member",
+      targetId: id,
+      properties: { reason: "mattermost_directory_lookup_failed" },
+    });
   }
-  if (member.mm_username && member.mm_username !== member.mm_user_id) {
-    await supabase.from("password_reset_attempts").delete().eq("identifier", member.mm_username);
+
+  const cleanupIdentifiers = [
+    directoryEntry?.mm_user_id,
+    directoryEntry?.mm_username,
+  ].filter((identifier): identifier is string => Boolean(identifier));
+  for (const identifier of new Set(cleanupIdentifiers)) {
+    await supabase
+      .from("password_reset_attempts")
+      .delete()
+      .eq("identifier", identifier);
   }
 
   const memberAuthCleanupKeys = getMemberAuthCleanupKeys([
-    member.mm_user_id,
-    member.mm_username,
+    ...cleanupIdentifiers,
     id,
   ]);
   if (memberAuthCleanupKeys.length > 0) {
@@ -299,8 +323,8 @@ export async function deleteMemberAction(formData: FormData) {
     targetType: "member",
     targetId: id,
     properties: {
-      mmUserId: member.mm_user_id,
-      mmUsername: member.mm_username,
+      mmUserId: directoryEntry?.mm_user_id ?? null,
+      mmUsername: directoryEntry?.mm_username ?? null,
     },
   });
   revalidateMemberPaths();

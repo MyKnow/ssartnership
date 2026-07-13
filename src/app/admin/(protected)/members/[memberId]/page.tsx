@@ -20,6 +20,7 @@ import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
 } from "@/lib/policy-documents";
+import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import {
   deleteMember,
   updateMember,
@@ -68,7 +69,7 @@ export default async function AdminMemberDetailPage({
   const supabase = getSupabaseAdminClient();
 
   const [
-    memberResult,
+    member,
     preferenceResult,
     subscriptionsResult,
     consentHistoryResult,
@@ -77,13 +78,7 @@ export default async function AdminMemberDetailPage({
     activePolicies,
     activeMarketingPolicy,
   ] = await Promise.all([
-    supabase
-      .from("members")
-      .select(
-        "id,display_name,mm_username,mm_user_id,year,campus,must_change_password,service_policy_version,service_policy_consented_at,privacy_policy_version,privacy_policy_consented_at,marketing_policy_version,marketing_policy_consented_at,avatar_content_type,avatar_url,created_at,updated_at",
-      )
-      .eq("id", memberId)
-      .maybeSingle(),
+    getMemberCanonicalProfile(memberId),
     supabase
       .from("push_preferences")
       .select(
@@ -125,11 +120,10 @@ export default async function AdminMemberDetailPage({
     getPolicyDocumentByKind("marketing").catch(() => null),
   ]);
 
-  if (memberResult.error || !memberResult.data) {
+  if (!member) {
     notFound();
   }
 
-  const member = memberResult.data;
   const securityLogs: AdminMemberSecurityLog[] = (securityLogsResult.data ?? []).map((log) => ({
     id: log.id,
     eventName: log.event_name,
@@ -144,13 +138,22 @@ export default async function AdminMemberDetailPage({
     createdAt: log.created_at,
   }));
   const securityLogTotalCount = securityLogsResult.count ?? securityLogs.length;
-  const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
-  const displayName = profile.displayName ?? member.display_name ?? member.mm_username ?? "회원 상세";
-  const year = member.year ?? getCurrentSsafyYear();
-  const yearLabel = formatSsafyMemberLifecycleLabel(year);
+  const profile = parseSsafyProfile(
+    member.displayName ?? member.mattermostUsername ?? undefined,
+  );
+  const displayName =
+    profile.displayName ??
+    member.displayName ??
+    member.mattermostUsername ??
+    "회원 상세";
+  const generation = member.generation ?? getCurrentSsafyYear();
+  const generationLabel = formatSsafyMemberLifecycleLabel(generation);
   const campus = member.campus ?? profile.campus ?? "-";
-  const hasAvatar = Boolean(member.avatar_content_type || member.avatar_url);
-  const avatarUrl = `/api/admin/members/${member.id}/avatar${member.updated_at ? `?v=${encodeURIComponent(member.updated_at)}` : ""}`;
+  const hasAvatar = Boolean(
+    member.activeProfileImageId &&
+      member.profilePhotoReviewStatus === "approved",
+  );
+  const avatarUrl = `/api/admin/members/${member.id}/avatar${member.updatedAt ? `?v=${encodeURIComponent(member.updatedAt)}` : ""}`;
   const notificationPreferences = normalizeAdminMemberNotificationPreferences(
     (preferenceResult.data ?? null) as AdminMemberPushPreferenceRow | null,
     subscriptionsResult.count,
@@ -167,14 +170,6 @@ export default async function AdminMemberDetailPage({
     created_at: row.created_at,
   }));
   const policyOverview = buildAdminMemberPolicyOverview({
-    member: {
-      servicePolicyVersion: member.service_policy_version,
-      servicePolicyConsentedAt: member.service_policy_consented_at,
-      privacyPolicyVersion: member.privacy_policy_version,
-      privacyPolicyConsentedAt: member.privacy_policy_consented_at,
-      marketingPolicyVersion: member.marketing_policy_version,
-      marketingPolicyConsentedAt: member.marketing_policy_consented_at,
-    },
     activeVersions: {
       service: activePolicies.service.version,
       privacy: activePolicies.privacy.version,
@@ -190,14 +185,14 @@ export default async function AdminMemberDetailPage({
         member={{
           id: member.id,
           displayName,
-          mmUsername: member.mm_username ?? "",
-          mmUserId: member.mm_user_id,
-          year,
-          yearLabel,
+          mmUsername: member.mattermostUsername ?? "",
+          mmUserId: member.mattermostUserId,
+          generation,
+          generationLabel,
           campus,
-          mustChangePassword: member.must_change_password,
-          createdAt: member.created_at,
-          updatedAt: member.updated_at,
+          mustChangePassword: member.mustChangePassword,
+          createdAt: member.createdAt,
+          updatedAt: member.updatedAt,
           hasAvatar,
           avatarUrl,
         }}

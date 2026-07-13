@@ -5,11 +5,6 @@ import {
 import { validatePasswordPolicy } from "@/lib/validation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type MinimalPolicyDocument = {
-  id: string;
-  version: number;
-};
-
 type PasswordRecord = {
   hash: string;
   salt: string;
@@ -98,11 +93,11 @@ export function parseSsafySignupCompleteInput(input: unknown):
     : { ok: true, data };
 }
 
-function resolveSignupYear(session: SsafySignupSessionData) {
+function resolveSignupGeneration(session: SsafySignupSessionData) {
   if (session.isStaff) {
     return {
-      year: SSAFY_STAFF_YEAR,
-      staffSourceYear:
+      generation: SSAFY_STAFF_YEAR,
+      staffSourceGeneration:
         getPreferredStaffSourceYear(session.sourceYears) ??
         (session.cohort !== null && session.cohort > SSAFY_STAFF_YEAR
           ? session.cohort
@@ -111,60 +106,27 @@ function resolveSignupYear(session: SsafySignupSessionData) {
   }
 
   return {
-    year: session.cohort ?? session.sourceYears.find((year) => year > 0) ?? 0,
-    staffSourceYear: null,
+    generation:
+      session.cohort ?? session.sourceYears.find((generation) => generation > 0) ?? 0,
+    staffSourceGeneration: null,
   };
 }
 
 export function buildSsafySignupMemberInsertPayload(input: {
   session: SsafySignupSessionData;
   passwordRecord: PasswordRecord;
-  activePolicies: {
-    service: MinimalPolicyDocument;
-    privacy: MinimalPolicyDocument;
-  };
-  marketingPolicy: MinimalPolicyDocument | null;
-  marketingPolicyChecked: boolean;
   agreedAt: string;
 }) {
-  const { year, staffSourceYear } = resolveSignupYear(input.session);
-  const authTimeIso = new Date(input.session.authTime * 1000).toISOString();
-  const marketingPolicyVersion =
-    input.marketingPolicyChecked && input.marketingPolicy
-      ? input.marketingPolicy.version
-      : null;
+  const { generation, staffSourceGeneration } = resolveSignupGeneration(input.session);
 
   return {
-    mm_user_id: input.session.mattermostUserId,
-    mm_username: input.session.mattermostUsername,
     display_name: input.session.displayName,
-    generation: year,
-    year,
-    staff_source_generation: staffSourceYear,
-    staff_source_year: staffSourceYear,
+    generation,
+    staff_source_generation: staffSourceGeneration,
     campus: input.session.campus,
     password_hash: input.passwordRecord.hash,
     password_salt: input.passwordRecord.salt,
     must_change_password: false,
-    service_policy_version: input.activePolicies.service.version,
-    service_policy_consented_at: input.agreedAt,
-    privacy_policy_version: input.activePolicies.privacy.version,
-    privacy_policy_consented_at: input.agreedAt,
-    marketing_policy_version: marketingPolicyVersion,
-    marketing_policy_consented_at:
-      marketingPolicyVersion === null ? null : input.agreedAt,
-    ssafy_sub: input.session.sub,
-    ssafy_verified_at: authTimeIso,
-    ssafy_auth_time: authTimeIso,
-    ssafy_verification_id: input.session.verificationId,
-    ssafy_mattermost_user_id: input.session.mattermostUserId,
-    ssafy_track: input.session.track,
-    ssafy_track_name: input.session.trackName,
-    ssafy_last_scope: input.session.scope,
-    // External avatar URLs are intentionally not persisted. The explicit
-    // Mattermost sync action downloads, validates, and stores one canonical
-    // private WebP image instead.
-    avatar_url: null,
     created_at: input.agreedAt,
     updated_at: input.agreedAt,
   };
@@ -184,12 +146,12 @@ export async function persistSsafySignupMemberDomainRecords(
     persistedAt: string;
   },
 ) {
-  const { year, staffSourceYear } = resolveSignupYear(input.session);
+  const { generation, staffSourceGeneration } = resolveSignupGeneration(input.session);
   const authTimeIso = new Date(input.session.authTime * 1000).toISOString();
   const sourceGenerations = uniqueSortedGenerations([
     ...input.session.sourceYears,
-    year,
-    ...(staffSourceYear === null ? [] : [staffSourceYear]),
+    generation,
+    ...(staffSourceGeneration === null ? [] : [staffSourceGeneration]),
   ]);
   const { data: directory, error: directoryError } = await supabase
     .from("mm_user_directory")
@@ -242,8 +204,8 @@ export async function persistSsafySignupMemberDomainRecords(
     .from("members")
     .update({
       mattermost_account_id: directory.id,
-      generation: year,
-      staff_source_generation: staffSourceYear,
+      generation,
+      staff_source_generation: staffSourceGeneration,
       updated_at: input.persistedAt,
     })
     .eq("id", input.memberId);

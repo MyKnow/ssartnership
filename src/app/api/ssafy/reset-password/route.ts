@@ -219,7 +219,36 @@ export async function POST(request: Request) {
       return publicError(memberResult.errorCode, null, status);
     }
 
-    if (!memberResult.member.mm_user_id || !memberResult.member.mm_username) {
+    if (!memberResult.member.mattermost_account_id) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_reset_ssafy",
+        status: "failure",
+        actorType: "member",
+        actorId: memberResult.member.id,
+        identifier: verified.claims.sub,
+        properties: { reason: "missing_mm_identity" },
+      });
+      await recordMemberAuthAttempt(
+        "ssafy-reset-password",
+        verifiedThrottleContext,
+        false,
+      );
+      await delayMemberAuthAttempt("ssafy-reset-password");
+      return publicError("MEMBER_NOT_FOUND", null, 404);
+    }
+
+    const { data: directoryEntry, error: directoryError } = await supabase
+      .from("mm_user_directory")
+      .select("mm_user_id,mm_username")
+      .eq("id", memberResult.member.mattermost_account_id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (
+      directoryError
+      || !directoryEntry?.mm_user_id
+      || !directoryEntry.mm_username
+    ) {
       await logAuthSecurity({
         ...context,
         eventName: "member_password_reset_ssafy",
@@ -262,9 +291,9 @@ export async function POST(request: Request) {
 
     const completionToken = issueResetPasswordCompletionToken({
       memberId: memberResult.member.id,
-      mmUserId: memberResult.member.mm_user_id,
-      mmUsername: memberResult.member.mm_username,
-      memberUpdatedAt: updateResult.payload.updated_at,
+      mmUserId: directoryEntry.mm_user_id,
+      mmUsername: directoryEntry.mm_username,
+      memberUpdatedAt: memberResult.member.updated_at,
     });
 
     await recordMemberAuthAttempt(
@@ -293,7 +322,7 @@ export async function POST(request: Request) {
       ok: true,
       verified: true,
       resetPath: "/auth/reset/complete",
-      mmUsername: memberResult.member.mm_username,
+      mmUsername: directoryEntry.mm_username,
       authTime: verified.claims.authTime,
     });
     response.cookies.set(

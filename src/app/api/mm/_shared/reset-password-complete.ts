@@ -136,11 +136,30 @@ export async function handleResetPasswordCompletePost(request: Request) {
       });
     }
 
-    const { data: memberRow, error: memberFetchError } = await getSupabaseAdminClient()
-      .from("members")
-      .select("id,mm_user_id,mm_username,year,campus,updated_at")
-      .eq("id", tokenPayload.memberId)
+    const supabase = getSupabaseAdminClient();
+    const { data: directoryEntry, error: directoryFetchError } = await supabase
+      .from("mm_user_directory")
+      .select("id,mm_user_id,mm_username")
       .eq("mm_user_id", tokenPayload.mmUserId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (directoryFetchError || !directoryEntry?.id) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "reset_failed",
+        status: 400,
+        reason: "not_registered",
+        identifier: tokenPayload.mmUserId,
+      });
+    }
+
+    const { data: memberRow, error: memberFetchError } = await supabase
+      .from("members")
+      .select("id,generation,campus,updated_at")
+      .eq("id", tokenPayload.memberId)
+      .eq("mattermost_account_id", directoryEntry.id)
+      .is("deleted_at", null)
       .maybeSingle();
     if (memberFetchError || !memberRow) {
       return failResetPasswordComplete({
@@ -171,7 +190,6 @@ export async function handleResetPasswordCompletePost(request: Request) {
     }
 
     const passwordRecord = hashPassword(nextPassword);
-    const supabase = getSupabaseAdminClient();
     const { error } = await supabase
       .from("members")
       .update({
@@ -215,9 +233,9 @@ export async function handleResetPasswordCompletePost(request: Request) {
       actorId: memberRow.id,
       identifier: tokenPayload.mmUserId,
       properties: {
-        mmUserId: memberRow.mm_user_id,
-        mmUsername: memberRow.mm_username,
-        year: memberRow.year,
+        mmUserId: directoryEntry.mm_user_id,
+        mmUsername: directoryEntry.mm_username,
+        generation: memberRow.generation,
         campus: memberRow.campus ?? null,
       },
     });

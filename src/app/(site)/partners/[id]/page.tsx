@@ -10,8 +10,7 @@ import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import ShareLinkButton from "@/components/ShareLinkButton";
 import { SITE_NAME } from "@/lib/site";
 import { createCanonicalAlternates } from "@/lib/seo";
-import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import PartnerDetailCoupons from "./_page/PartnerDetailCoupons";
@@ -116,24 +115,12 @@ export default async function PartnerDetailPage({
   if (!rawId) {
     notFound();
   }
-  const member = headerSession?.userId
-    ? await getSupabaseAdminClient()
-        .from("members")
-        .select("year,graduate_verified_at")
-        .eq("id", headerSession.userId)
-        .maybeSingle()
-        .then(({ data }) => data)
-    : null;
+  const viewerContext = await getPartnerViewerContext(headerSession?.userId);
   const pageData = await getPartnerDetailPageData(
     rawId,
-    Boolean(headerSession?.userId),
+    viewerContext.authenticated,
     headerSession?.userId ?? null,
-    resolvePartnerAudienceFromMemberYear(
-      typeof member?.year === "number" ? member.year : null,
-      new Date(),
-      undefined,
-      { graduateVerifiedAt: member?.graduate_verified_at ?? null },
-    ),
+    viewerContext.viewerAudience,
   );
   if (!pageData) {
     notFound();

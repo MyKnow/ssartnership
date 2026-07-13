@@ -54,8 +54,8 @@ type GraduateImageRow = {
 
 type GraduateEmailMember = {
   id: string;
-  display_name: string | null;
-  graduate_verified_at: string | null;
+  displayName: string | null;
+  graduateVerifiedAt: string;
 };
 
 export class GraduateVerificationServiceError extends Error {
@@ -114,33 +114,12 @@ export async function findGraduateVerifiedMemberByEmail(emailNormalized: string)
     if (!profileError && profile?.verified_at) {
       return {
         id: normalizedMember.id as string,
-        display_name: normalizedMember.display_name as string | null,
-        graduate_verified_at: profile.verified_at as string,
+        displayName: normalizedMember.display_name as string | null,
+        graduateVerifiedAt: profile.verified_at as string,
       } satisfies GraduateEmailMember;
     }
   }
-
-  // Temporary fallback while an old Preview database completes the backfill.
-  const { data: identity, error: identityError } = await supabase
-    .from("member_auth_identities")
-    .select("member_id")
-    .eq("provider", "graduate_email")
-    .eq("identifier_normalized", emailNormalized)
-    .maybeSingle();
-  if (identityError || !identity?.member_id) {
-    return null;
-  }
-
-  const { data: member, error: memberError } = await supabase
-    .from("members")
-    .select("id,display_name,graduate_verified_at")
-    .eq("id", identity.member_id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (memberError || !member?.id || !member.graduate_verified_at) {
-    return null;
-  }
-  return member as GraduateEmailMember;
+  return null;
 }
 
 export async function issueGraduatePasswordResetAction(input: {
@@ -181,8 +160,8 @@ export async function issueGraduatePasswordResetAction(input: {
   }
   return {
     id: member.id as string,
-    display_name: member.display_name as string | null,
-    graduate_verified_at: profile.verified_at as string,
+    displayName: member.display_name as string | null,
+    graduateVerifiedAt: profile.verified_at as string,
   } satisfies GraduateEmailMember;
 }
 
@@ -393,19 +372,7 @@ export async function submitGraduateVerificationRequest(input: {
       "수료생 인증 신청 상태를 확인하지 못했습니다.",
     );
   }
-  const { data: existingIdentity, error: identityError } = await supabase
-    .from("member_auth_identities")
-    .select("id")
-    .eq("provider", "graduate_email")
-    .eq("identifier_normalized", submission.value.emailNormalized)
-    .maybeSingle();
-  if (identityError) {
-    throw new GraduateVerificationServiceError(
-      "submission_invalid",
-      "수료생 인증 신청 상태를 확인하지 못했습니다.",
-    );
-  }
-  if (existingMember?.id || existingIdentity?.id) {
+  if (existingMember?.id) {
     throw new GraduateVerificationServiceError(
       "request_conflict",
       "이미 수료생 계정이 있는 이메일입니다. 로그인 또는 비밀번호 재설정을 이용해 주세요.",
@@ -1092,16 +1059,6 @@ export async function submitMemberProfileImageReplacement(input: {
       .single();
     if (error || !data?.id) throw new Error("본인 사진 변경 요청을 저장하지 못했습니다.");
     profileImageId = data.id;
-    const { error: memberUpdateError } = await supabase
-      .from("members")
-      .update({
-        profile_photo_review_status: "pending",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", input.memberId);
-    if (memberUpdateError) {
-      throw new Error("사진 변경 검토 상태를 저장하지 못했습니다.");
-    }
     return { imageId: data.id };
   } catch (error) {
     if (profileImageId) {

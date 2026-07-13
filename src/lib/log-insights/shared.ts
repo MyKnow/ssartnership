@@ -11,9 +11,9 @@ export type LogGroup = 'product' | 'audit' | 'security';
 
 export type MemberLookupRecord = {
   id: string;
-  display_name: string | null;
-  mm_username: string | null;
-  actor_name: string | null;
+  displayName: string | null;
+  mattermostUsername: string | null;
+  actorName: string | null;
 };
 
 export type ProductLogRow = {

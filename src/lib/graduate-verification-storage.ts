@@ -202,9 +202,11 @@ export async function storeMemberProfileImage(input: {
   memberId: string;
   sha256: string;
   buffer: Buffer;
+  variant?: string;
 }) {
   const supabase = getSupabaseAdminClient();
-  const path = `members/${input.memberId}/${input.sha256}.webp`;
+  const variant = input.variant?.trim();
+  const path = `members/${input.memberId}/${input.sha256}${variant ? `-${variant}` : ""}.webp`;
   const { error } = await supabase.storage
     .from(MEMBER_PROFILE_IMAGES_BUCKET)
     .upload(path, input.buffer, {

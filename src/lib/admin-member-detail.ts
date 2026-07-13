@@ -18,15 +18,6 @@ export type AdminMemberNotificationPreferences = ReturnType<
   activeDeviceCount: number;
 };
 
-export type AdminMemberPolicySnapshot = {
-  servicePolicyVersion?: number | null;
-  servicePolicyConsentedAt?: string | null;
-  privacyPolicyVersion?: number | null;
-  privacyPolicyConsentedAt?: string | null;
-  marketingPolicyVersion?: number | null;
-  marketingPolicyConsentedAt?: string | null;
-};
-
 export type AdminMemberActivePolicyVersions = Record<
   AdminMemberPolicyKind,
   number | null
@@ -138,28 +129,6 @@ function buildActivityEvents(
   return events;
 }
 
-function getSnapshotValue(
-  member: AdminMemberPolicySnapshot,
-  kind: AdminMemberPolicyKind,
-) {
-  if (kind === "service") {
-    return {
-      version: member.servicePolicyVersion ?? null,
-      at: member.servicePolicyConsentedAt ?? null,
-    };
-  }
-  if (kind === "privacy") {
-    return {
-      version: member.privacyPolicyVersion ?? null,
-      at: member.privacyPolicyConsentedAt ?? null,
-    };
-  }
-  return {
-    version: member.marketingPolicyVersion ?? null,
-    at: member.marketingPolicyConsentedAt ?? null,
-  };
-}
-
 function getPolicyStatus(
   agreed: boolean,
   version: number | null,
@@ -222,12 +191,10 @@ export function normalizeAdminMemberNotificationPreferences(
 }
 
 export function buildAdminMemberPolicyOverview({
-  member,
   activeVersions,
   consentHistory,
   consentActivity,
 }: {
-  member: AdminMemberPolicySnapshot;
   activeVersions: AdminMemberActivePolicyVersions;
   consentHistory: readonly AdminMemberConsentHistoryRow[];
   consentActivity: readonly AdminMemberConsentActivityRow[];
@@ -271,9 +238,8 @@ export function buildAdminMemberPolicyOverview({
 
   const states = POLICY_META.map(({ kind, label }) => {
     const latest = timeline.find((event) => event.kind === kind) ?? null;
-    const snapshot = getSnapshotValue(member, kind);
-    const version = latest?.version ?? snapshot.version;
-    const agreed = latest ? latest.agreed : snapshot.version !== null;
+    const version = latest?.version ?? null;
+    const agreed = latest?.agreed ?? false;
     const status =
       latest && !latest.agreed
         ? ("revoked" as const)
@@ -285,7 +251,7 @@ export function buildAdminMemberPolicyOverview({
       status,
       statusLabel: getPolicyStatusLabel(status),
       version,
-      eventAt: latest?.at ?? snapshot.at,
+      eventAt: latest?.at ?? null,
       eventLabel: status === "revoked" ? "철회 시각" : "동의 시각",
       title: latest?.title ?? null,
       effectiveAt: latest?.effectiveAt ?? null,

@@ -23,9 +23,6 @@ const adminSecurityModulePromise = import(
 const authSecurityLogSanitizeModulePromise = import(
   new URL("../src/lib/auth-security-log-sanitize.ts", import.meta.url).href
 );
-const memberAvatarModulePromise = import(
-  new URL("../src/lib/member-avatar.ts", import.meta.url).href
-);
 
 test("product event locations mask verification tokens", async () => {
   const { normalizeProductEventLocation } = await pathModulePromise;
@@ -274,9 +271,19 @@ test("soft-deleted members are hidden from public QR verification and avatar del
     new URL("../src/app/api/certification/avatar/[token]/route.ts", import.meta.url),
     "utf8",
   );
+  const profileView = readFileSync(
+    new URL("../src/lib/member-profile-view.ts", import.meta.url),
+    "utf8",
+  );
+  const profileImages = readFileSync(
+    new URL("../src/lib/member-profile-images.ts", import.meta.url),
+    "utf8",
+  );
 
-  assert.match(qrPage, /\.is\("deleted_at", null\)/);
-  assert.match(avatarRoute, /\.is\("deleted_at", null\)/);
+  assert.match(qrPage, /getMemberCanonicalProfile/);
+  assert.match(avatarRoute, /getActiveMemberProfileImage/);
+  assert.match(profileView, /\.is\("deleted_at", null\)/);
+  assert.match(profileImages, /\.is\("deleted_at", null\)/);
 });
 
 test("admin basic auth validates credentials without direct string equality", async () => {
@@ -481,28 +488,20 @@ test("수료생 업로드 서명 URL은 이메일 인증 세션과 속도 제한
   assert.match(uploadSignRoute, /recordGraduateVerificationAttempt/);
 });
 
-test("member avatar helper accepts only safe image sources", async () => {
-  const { normalizeMemberAvatarUrl, resolveMemberAvatarSource } =
-    await memberAvatarModulePromise;
+test("member avatar APIs serve only private storage objects", () => {
+  const routes = [
+    "../src/app/api/mm/avatar/route.ts",
+    "../src/app/api/certification/avatar/[token]/route.ts",
+    "../src/app/api/admin/profile-photos/current/[memberId]/route.ts",
+  ].map((relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8"));
 
-  assert.equal(normalizeMemberAvatarUrl("javascript:alert(1)"), null);
-  assert.equal(normalizeMemberAvatarUrl("https://example.com/a.png#token"), "https://example.com/a.png");
-
-  assert.equal(
-    resolveMemberAvatarSource({
-      avatarBase64: Buffer.from("<svg />").toString("base64"),
-      avatarContentType: "image/svg+xml",
-    }).kind,
-    "unsupported",
-  );
-
-  assert.equal(
-    resolveMemberAvatarSource({
-      avatarBase64: Buffer.from("image").toString("base64"),
-      avatarContentType: "image/png",
-    }).kind,
-    "image",
-  );
+  for (const source of routes) {
+    assert.match(source, /downloadPrivateMemberProfileImage/);
+    assert.doesNotMatch(
+      source,
+      /NextResponse\.redirect|avatarUrl|avatarBase64|createMemberAvatarResponse/,
+    );
+  }
 });
 
 test("certification pages do not inline avatar base64 payloads", () => {

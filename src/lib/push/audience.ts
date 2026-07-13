@@ -1,4 +1,5 @@
 import { formatSsafyYearLabel } from "../ssafy-year.ts";
+import { getMmUserDirectoryEntriesByAccountIds } from "../mm-directory/identities.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { parseMemberYearValue } from "../validation.ts";
 import { wrapPushDbError } from "./config.ts";
@@ -79,7 +80,7 @@ export async function resolvePushAudience(
     const { data, error } = await supabase
       .from("members")
       .select("id")
-      .eq("year", audience.year);
+      .eq("generation", audience.year);
 
     if (error) {
       throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
@@ -124,7 +125,7 @@ export async function resolvePushAudience(
     memberIds.length > 0 ? Array.from(new Set(memberIds)) : fallbackMemberId ? [fallbackMemberId] : [];
   const { data, error } = await supabase
     .from("members")
-    .select("id,display_name,mm_username")
+    .select("id,display_name,mattermost_account_id")
     .in("id", targetIds);
 
   if (error) {
@@ -134,17 +135,38 @@ export async function resolvePushAudience(
     throw new PushError("not_found", "개인 발송 대상을 찾을 수 없습니다.");
   }
 
-  const sortedMembers = data.sort((left, right) =>
-    (left.display_name ?? left.mm_username).localeCompare(right.display_name ?? right.mm_username, "ko-KR"),
+  const directoryByAccountId = await getMmUserDirectoryEntriesByAccountIds(
+    data
+      .map((member) => member.mattermost_account_id)
+      .filter((accountId): accountId is string => Boolean(accountId)),
   );
+  const sortedMembers = data
+    .map((member) => {
+      const directory = member.mattermost_account_id
+        ? directoryByAccountId.get(member.mattermost_account_id)
+        : null;
+      return {
+        ...member,
+        mattermostUsername: directory?.mm_username ?? null,
+      };
+    })
+    .sort((left, right) =>
+      (left.display_name ?? left.mattermostUsername ?? "회원").localeCompare(
+        right.display_name ?? right.mattermostUsername ?? "회원",
+        "ko-KR",
+      ),
+    );
   const first = sortedMembers[0];
-  const memberName = first.display_name?.trim() || first.mm_username;
+  const memberName = first.display_name?.trim() || first.mattermostUsername || "회원";
+  const memberLabel = first.mattermostUsername
+    ? `${memberName} (@${first.mattermostUsername})`
+    : memberName;
   return {
     scope: "member",
     label:
       sortedMembers.length === 1
-        ? `${memberName} (@${first.mm_username})`
-        : `${memberName} (@${first.mm_username}) 외 ${sortedMembers.length - 1}명`,
+        ? memberLabel
+        : `${memberLabel} 외 ${sortedMembers.length - 1}명`,
     year: null,
     campus: null,
     memberId: first.id,

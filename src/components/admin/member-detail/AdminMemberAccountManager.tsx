@@ -19,7 +19,7 @@ export default function AdminMemberAccountManager({
     id: string;
     displayName: string;
     campus: string;
-    year: number;
+    generation: number;
     mmUsername: string;
     mustChangePassword: boolean;
   };
@@ -53,7 +53,13 @@ export default function AdminMemberAccountManager({
           <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
               기수
-              <Input type="number" min={0} max={99} name="year" defaultValue={member.year} />
+              <Input
+                type="number"
+                min={0}
+                max={99}
+                name="generation"
+                defaultValue={member.generation}
+              />
             </label>
             <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
               비밀번호 상태

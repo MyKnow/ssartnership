@@ -1,299 +1,107 @@
-import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
-import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
+import {
+  getConfiguredBackfillableSsafyYears,
+  getSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
-  getMemberSyncCandidateYears,
-  loadBackfillableMembers,
-  loadMemberById,
-  resolveMemberSnapshotForYears,
-} from "./snapshot";
-import {
-  type MemberRow,
   type MemberSyncBatchResult,
   type MemberSyncResult,
-  type MemberSyncSnapshot,
-  type SenderSession,
   wrapMmMemberSyncDbError,
 } from "./shared";
-import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 
 function buildMemberSyncSummary(result: MemberSyncResult) {
-  const summaryParts = [`@${result.snapshot.mmUsername}`];
-
-  if (result.changes.mmUsername) {
-    summaryParts[0] = `@${result.snapshot.mmUsername} (${result.changes.mmUsername})`;
-  }
-  if (result.changes.displayName) {
-    summaryParts.push(`이름 ${result.changes.displayName}`);
-  }
-  if (result.changes.campus) {
-    summaryParts.push(`캠퍼스 ${result.changes.campus}`);
-  }
-  if (result.changes.track) {
-    summaryParts.push(`트랙 ${result.changes.track}`);
-  }
-  if (result.changes.avatar) {
-    summaryParts.push("프로필 사진 업데이트");
-  }
-
-  return summaryParts.join(" / ");
+  const labels: Record<MemberSyncResult["changedFields"][number], string> = {
+    mmUsername: "MM 아이디",
+    displayName: "이름",
+    campus: "캠퍼스",
+    track: "트랙",
+    avatar: "프로필 사진",
+  };
+  const changedLabels = result.changedFields.map((field) => labels[field]);
+  return [
+    `@${result.snapshot.mmUsername}`,
+    ...(changedLabels.length > 0 ? [changedLabels.join(", ")] : []),
+  ].join(" / ");
 }
-
-type MemberSyncYearBatchResult = {
-  results: MemberSyncResult[];
-  failures: Array<{ memberId: string; mmUserId: string; reason: string }>;
-};
 
 export function buildMemberSyncLogProperties(
   result: MemberSyncResult,
   extra: Record<string, unknown> = {},
 ) {
   return {
-    mmUserId: result.member.mm_user_id,
-    year: result.member.year,
+    mmUserId: result.member.mmUserId,
+    generation: result.member.generation,
     summary: buildMemberSyncSummary(result),
     changedFields: result.changedFields,
-    ...result.changes,
     ...extra,
-  };
-}
-
-export async function syncMemberSnapshot(
-  member: MemberRow,
-  snapshot: MemberSyncSnapshot,
-) {
-  const nextCampus = snapshot.campus ?? member.campus ?? null;
-  const nextTrack = snapshot.track ?? member.ssafy_track ?? null;
-  const nextTrackName = snapshot.track ? snapshot.trackName : member.ssafy_track_name ?? null;
-  const nextAvatarContentType = snapshot.avatarFetched
-    ? snapshot.avatarContentType
-    : member.avatar_content_type ?? null;
-  const nextAvatarBase64 = snapshot.avatarFetched
-    ? snapshot.avatarBase64
-    : member.avatar_base64 ?? null;
-  const nextAvatarUrl = snapshot.avatarUrl ?? member.avatar_url ?? null;
-
-  const changedFields: Array<"mmUsername" | "displayName" | "campus" | "track" | "avatar"> = [];
-  const changes: Partial<Record<"mmUsername" | "displayName" | "campus" | "track" | "avatar", string>> = {};
-
-  if (member.mm_username !== snapshot.mmUsername) {
-    changedFields.push("mmUsername");
-    changes.mmUsername = `${member.mm_username} → ${snapshot.mmUsername}`;
-  }
-  if ((member.display_name ?? null) !== snapshot.displayName) {
-    changedFields.push("displayName");
-    changes.displayName = `${member.display_name ?? "-"} → ${snapshot.displayName}`;
-  }
-  if ((member.campus ?? null) !== nextCampus) {
-    changedFields.push("campus");
-    changes.campus = `${member.campus ?? "-"} → ${nextCampus ?? "-"}`;
-  }
-  if (
-    snapshot.track &&
-    ((member.ssafy_track ?? null) !== nextTrack ||
-      (member.ssafy_track_name ?? null) !== nextTrackName)
-  ) {
-    changedFields.push("track");
-    changes.track = `${member.ssafy_track_name ?? member.ssafy_track ?? "-"} → ${
-      nextTrackName ?? nextTrack
-    }`;
-  }
-
-  const avatarChanged =
-    (snapshot.avatarFetched &&
-      ((member.avatar_content_type ?? null) !== nextAvatarContentType ||
-        (member.avatar_base64 ?? null) !== nextAvatarBase64)) ||
-    (Boolean(snapshot.avatarUrl) &&
-      (member.avatar_url ?? null) !== nextAvatarUrl);
-  if (avatarChanged) {
-    changedFields.push("avatar");
-    changes.avatar = "업데이트";
-  }
-
-  if (changedFields.length === 0) {
-    return {
-      member,
-      snapshot,
-      updated: false,
-      changedFields,
-      changes,
-    } satisfies MemberSyncResult;
-  }
-
-  const updatedAt = new Date().toISOString();
-  const nextMember: MemberRow = {
-    ...member,
-    mm_username: snapshot.mmUsername,
-    display_name: snapshot.displayName,
-    campus: nextCampus,
-    ssafy_track: nextTrack,
-    ssafy_track_name: nextTrackName,
-    avatar_content_type: nextAvatarContentType,
-    avatar_base64: nextAvatarBase64,
-    avatar_url: nextAvatarUrl,
-    updated_at: updatedAt,
-  };
-
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("members")
-    .update({
-      mm_username: nextMember.mm_username,
-      display_name: nextMember.display_name,
-      campus: nextMember.campus,
-      ssafy_track: nextMember.ssafy_track,
-      ssafy_track_name: nextMember.ssafy_track_name,
-      avatar_content_type: nextMember.avatar_content_type,
-      avatar_base64: nextMember.avatar_base64,
-      avatar_url: nextMember.avatar_url,
-      updated_at: updatedAt,
-    })
-    .eq("id", member.id);
-
-  if (error) {
-    throw wrapMmMemberSyncDbError(error, "회원 정보를 저장하지 못했습니다.");
-  }
-
-  return {
-    member: nextMember,
-    snapshot,
-    updated: true,
-    changedFields,
-    changes,
-  } satisfies MemberSyncResult;
-}
-
-async function syncMembersForYear(
-  yearMembers: MemberRow[],
-  senderSessionCache: Map<number, Promise<SenderSession>>,
-  ssafyVerifyClient: ReturnType<typeof createSsafyVerifyServerApiClient>,
-): Promise<MemberSyncYearBatchResult> {
-  const results: MemberSyncResult[] = [];
-  const failures: Array<{ memberId: string; mmUserId: string; reason: string }> = [];
-
-  for (const member of yearMembers) {
-    try {
-      const resolved = await resolveMemberSnapshotForYears(
-        member,
-        getMemberSyncCandidateYears(member.year),
-        senderSessionCache,
-        ssafyVerifyClient,
-      );
-      if (!resolved) {
-        failures.push({
-          memberId: member.id,
-          mmUserId: member.mm_user_id,
-          reason: "MM 사용자 조회 실패",
-        });
-        continue;
-      }
-
-      const result = await syncMemberSnapshot(member, resolved.snapshot);
-      if (result.updated) {
-        results.push(result);
-      }
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "MM 동기화 실패";
-      failures.push({
-        memberId: member.id,
-        mmUserId: member.mm_user_id,
-        reason,
-      });
-    }
-  }
-
-  return {
-    results,
-    failures,
   };
 }
 
 export async function syncMemberById(
   memberId: string,
 ): Promise<MemberSyncResult | null> {
-  const member = await loadMemberById(memberId);
-  if (!member) {
+  const result = await syncMemberMattermostProfile(memberId);
+  if (!result) {
     return null;
-  }
-
-  const senderSessionCache = new Map<number, Promise<SenderSession>>();
-  const ssafyVerifyClient = createSsafyVerifyServerApiClient(
-    getSsafyVerifyServerApiConfig(),
-    {
-      trace: createSsafyVerifyApiTraceLogger({
-        actorType: "system",
-        properties: {
-          flow: "member_profile_sync",
-        },
-      }),
-    },
-  );
-  const resolved = await resolveMemberSnapshotForYears(
-    member,
-    getMemberSyncCandidateYears(member.year),
-    senderSessionCache,
-    ssafyVerifyClient,
-  );
-  if (!resolved) {
-    return null;
-  }
-
-  return syncMemberSnapshot(member, resolved.snapshot);
-}
-
-export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchResult> {
-  const { years, members } = await loadBackfillableMembers();
-
-  const results: MemberSyncResult[] = [];
-  const failures: Array<{ memberId: string; mmUserId: string; reason: string }> = [];
-  const groupedMembers = new Map<number, MemberRow[]>();
-  members.forEach((member) => {
-    const year = member.year ?? null;
-    if (year === null || !years.includes(year)) {
-      failures.push({
-        memberId: member.id,
-        mmUserId: member.mm_user_id,
-        reason: "year_missing",
-      });
-      return;
-    }
-    const list = groupedMembers.get(year) ?? [];
-    list.push(member);
-    groupedMembers.set(year, list);
-  });
-
-  const senderSessionCache = new Map<number, Promise<SenderSession>>();
-  const ssafyVerifyClient = createSsafyVerifyServerApiClient(
-    getSsafyVerifyServerApiConfig(),
-    {
-      trace: createSsafyVerifyApiTraceLogger({
-        actorType: "system",
-        properties: {
-          flow: "member_profile_sync",
-        },
-      }),
-    },
-  );
-  const orderedYears = [...years].sort((a, b) => b - a);
-  const yearResults = await Promise.all(
-    orderedYears.map((year) =>
-      syncMembersForYear(
-        groupedMembers.get(year) ?? [],
-        senderSessionCache,
-        ssafyVerifyClient,
-      ),
-    ),
-  );
-
-  for (const yearResult of yearResults) {
-    results.push(...yearResult.results);
-    failures.push(...yearResult.failures);
   }
 
   return {
-    checked: members.length,
+    member: result.member,
+    snapshot: result.snapshot,
+    updated: result.updated,
+    changedFields: result.changedFields,
+  };
+}
+
+export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchResult> {
+  const cycleSettings = await getSsafyCycleSettings();
+  const generations = getConfiguredBackfillableSsafyYears(cycleSettings);
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("members")
+    .select("id")
+    .in("generation", generations)
+    .is("deleted_at", null)
+    .order("generation", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    throw wrapMmMemberSyncDbError(error, "회원 정보를 불러오지 못했습니다.");
+  }
+
+  const memberIds = (data ?? [])
+    .map((member) => member.id as string | null)
+    .filter((memberId): memberId is string => Boolean(memberId));
+  const results: MemberSyncResult[] = [];
+  const failures: MemberSyncBatchResult["failures"] = [];
+
+  for (const memberId of memberIds) {
+    try {
+      const result = await syncMemberById(memberId);
+      if (!result) {
+        failures.push({
+          memberId,
+          mmUserId: null,
+          reason: "SSAFY Verify 프로필을 찾을 수 없습니다.",
+        });
+        continue;
+      }
+      if (result.updated) {
+        results.push(result);
+      }
+    } catch {
+      failures.push({
+        memberId,
+        mmUserId: null,
+        reason: "MM 동기화 실패",
+      });
+    }
+  }
+
+  return {
+    checked: memberIds.length,
     updated: results.length,
-    skipped: members.length - results.length - failures.length,
+    skipped: memberIds.length - results.length - failures.length,
     results,
     failures,
   };

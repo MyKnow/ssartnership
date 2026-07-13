@@ -18,6 +18,7 @@ import type {
   StoredSubscription,
   WebPushModule,
 } from "@/lib/push/types";
+import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   EMPTY_CHANNEL_RESULTS,
@@ -31,7 +32,6 @@ import {
   isMattermostConfigured,
   mergeExclusionReasons,
   normalizeSelectedChannels,
-  normalizeSourceYears,
   parseLogMetadata,
 } from "@/lib/admin-notification-ops-utils";
 import {
@@ -166,15 +166,13 @@ export type AutomaticNotificationRuleSummary = {
 
 type AudienceMember = {
   id: string;
-  mm_user_id: string;
-  mm_username: string;
-  display_name: string | null;
-  year: number;
+  mattermostUserId: string | null;
+  mattermostUsername: string | null;
+  displayName: string | null;
+  generation: number;
   campus: string | null;
-  is_staff: boolean;
-  source_years: number[];
-  marketing_policy_version: number | null;
-  marketing_policy_consented_at: string | null;
+  isStaff: boolean;
+  sourceYears: number[];
 };
 
 type AudienceContext = {
@@ -268,12 +266,12 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
   const baseQuery = supabase
     .from("members")
     .select(
-      "id,mm_user_id,mm_username,display_name,year,campus,marketing_policy_version,marketing_policy_consented_at",
+      "id,mattermost_account_id,display_name,generation,campus",
     );
 
   const query =
     resolvedAudience.scope === "year"
-      ? baseQuery.eq("year", resolvedAudience.year)
+      ? baseQuery.eq("generation", resolvedAudience.year)
       : resolvedAudience.scope === "campus"
         ? baseQuery.eq("campus", resolvedAudience.campus)
         : resolvedAudience.scope === "member"
@@ -285,36 +283,26 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
     throw new Error("발송 대상을 불러오지 못했습니다.");
   }
 
-  const members = (data ?? []) as Array<Omit<AudienceMember, "is_staff" | "source_years">>;
-  const mmUserIds = members.map((member) => member.mm_user_id).filter(Boolean);
-
-  const { data: directoryRows, error: directoryError } = mmUserIds.length
-    ? await supabase
-        .from("mm_user_directory")
-        .select("mm_user_id,is_staff,source_years")
-        .in("mm_user_id", mmUserIds)
-    : { data: [], error: null };
-
-  if (directoryError) {
-    throw new Error("Mattermost 유저 디렉토리를 불러오지 못했습니다.");
-  }
-
-  const directoryMap = new Map(
-    (directoryRows ?? []).map((row) => [
-      row.mm_user_id,
-      {
-        is_staff: Boolean(row.is_staff),
-        source_years: normalizeSourceYears(row.source_years),
-      },
-    ]),
+  const members = data ?? [];
+  const directoryByAccountId = await getMmUserDirectoryEntriesByAccountIds(
+    members
+      .map((member) => member.mattermost_account_id)
+      .filter((accountId): accountId is string => Boolean(accountId)),
   );
 
   return members.map((member) => {
-    const directoryEntry = directoryMap.get(member.mm_user_id);
+    const directoryEntry = member.mattermost_account_id
+      ? directoryByAccountId.get(member.mattermost_account_id)
+      : null;
     return {
-      ...member,
-      is_staff: directoryEntry?.is_staff ?? member.year === 0,
-      source_years: directoryEntry?.source_years ?? [],
+      id: member.id,
+      mattermostUserId: directoryEntry?.mm_user_id ?? null,
+      mattermostUsername: directoryEntry?.mm_username ?? null,
+      displayName: member.display_name,
+      generation: member.generation ?? 0,
+      campus: member.campus,
+      isStaff: directoryEntry?.is_staff ?? member.generation === 0,
+      sourceYears: directoryEntry?.source_years ?? [],
     } satisfies AudienceMember;
   });
 }
@@ -346,11 +334,10 @@ async function buildAudienceContext(
   const activeMarketingPolicy = await getPolicyDocumentByKind("marketing").catch(
     () => null,
   );
-  const activeMarketingPolicyVersion = activeMarketingPolicy?.version ?? null;
   const memberIds = members.map((member) => member.id);
   const supabase = getSupabaseAdminClient();
 
-  const [{ data: preferences }, { data: subscriptions }] = await Promise.all([
+  const [preferenceResult, subscriptionResult, marketingConsentResult] = await Promise.all([
     memberIds.length
       ? supabase
           .from("push_preferences")
@@ -366,10 +353,30 @@ async function buildAudienceContext(
           .eq("is_active", true)
           .in("member_id", memberIds)
       : Promise.resolve({ data: [], error: null }),
+    activeMarketingPolicy && memberIds.length
+      ? supabase
+          .from("member_policy_consents")
+          .select("member_id")
+          .eq("policy_document_id", activeMarketingPolicy.id)
+          .in("member_id", memberIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
+  if (
+    preferenceResult.error
+    || subscriptionResult.error
+    || marketingConsentResult.error
+  ) {
+    throw new Error("발송 대상의 수신 설정을 불러오지 못했습니다.");
+  }
+
+  const preferences = preferenceResult.data ?? [];
+  const subscriptions = subscriptionResult.data ?? [];
+  const marketingConsentedMemberIds = new Set(
+    (marketingConsentResult.data ?? []).map((consent) => consent.member_id),
+  );
 
   const preferenceMap = new Map(
-    (preferences ?? []).map((item) => [
+    preferences.map((item) => [
       item.member_id,
       {
         enabled: item.enabled,
@@ -383,7 +390,7 @@ async function buildAudienceContext(
     ]),
   );
   const subscriptionsByMemberId = new Map<string, StoredSubscription[]>();
-  for (const subscription of (subscriptions ?? []) as StoredSubscription[]) {
+  for (const subscription of subscriptions as StoredSubscription[]) {
     const current = subscriptionsByMemberId.get(subscription.member_id) ?? [];
     current.push(subscription);
     subscriptionsByMemberId.set(subscription.member_id, current);
@@ -404,9 +411,8 @@ async function buildAudienceContext(
 
   for (const member of members) {
     const preference = getActiveSubscriptionPushPreferences(preferenceMap.get(member.id));
-    const hasCurrentMarketingConsent =
-      activeMarketingPolicyVersion !== null &&
-      member.marketing_policy_version === activeMarketingPolicyVersion;
+    const hasCurrentMarketingConsent = Boolean(activeMarketingPolicy)
+      && marketingConsentedMemberIds.has(member.id);
     const normalizedPreference = {
       ...preference,
       marketingEnabled: hasCurrentMarketingConsent,
@@ -446,7 +452,7 @@ async function buildAudienceContext(
     if (!channelReasons.mm) {
       if (!preference.mmEnabled) {
         channelReasons.mm = "mm_disabled";
-      } else if (!member.mm_user_id) {
+      } else if (!member.mattermostUserId) {
         channelReasons.mm = "channel_unavailable";
       } else if (!hasMattermostSenderForMember(member)) {
         channelReasons.mm = "channel_unavailable";
@@ -500,9 +506,9 @@ async function buildAudienceContext(
 
       return {
         id: member.id,
-        name: member.display_name?.trim() || member.mm_username,
-        mmUsername: member.mm_username,
-        year: member.year,
+        name: member.displayName?.trim() || member.mattermostUsername || "회원",
+        mmUsername: member.mattermostUsername ?? "",
+        year: member.generation,
         campus: member.campus,
         channels: channelsForMember,
       } satisfies AdminNotificationEligibleMember;
@@ -638,13 +644,18 @@ export async function sendAdminNotificationCampaign(
   }
 
   if (context.selectedChannels.includes("mm")) {
+    const mattermostMembers = context.members.filter(
+      (member): member is AudienceMember & { mattermostUserId: string } =>
+        context.eligibleMemberIds.mm.includes(member.id)
+        && Boolean(member.mattermostUserId),
+    );
     const mmResult = await sendMattermostCampaignDeliveries({
       notificationId: created.notification.id,
       notificationType: input.notificationType,
       title: input.title,
       body: input.body,
       url: input.url?.trim() ? normalizeNotificationTargetUrl(input.url) : null,
-      members: context.members.filter((member) => context.eligibleMemberIds.mm.includes(member.id)),
+      members: mattermostMembers,
     });
     channelResults.mm = {
       targeted: mmResult.targeted,

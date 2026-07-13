@@ -7,8 +7,11 @@ import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyCertificationQrToken } from "@/lib/certification-qr";
+import {
+  getMemberCanonicalProfile,
+  type MemberCanonicalProfile,
+} from "@/lib/member-profile-view";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { SITE_NAME } from "@/lib/site";
 import {
@@ -46,58 +49,36 @@ export default async function CertificationVerifyPage({
     : "";
   const verification = verifyCertificationQrToken(rawToken);
 
-  let member:
-    | {
-        id?: string | null;
-        display_name?: string | null;
-        generation?: number | null;
-        year?: number | null;
-        campus?: string | null;
-        avatar_content_type?: string | null;
-        avatar_url?: string | null;
-        graduate_verified_at?: string | null;
-        active_profile_image_id?: string | null;
-        profile_photo_review_status?: string | null;
-        must_change_password?: boolean | null;
-      }
-    | null = null;
+  let member: MemberCanonicalProfile | null = null;
 
   if (verification.ok) {
-    const supabase = getSupabaseAdminClient();
-    const { data } = await supabase
-      .from("members")
-      .select(
-        "id,display_name,generation,year,campus,avatar_content_type,avatar_url,must_change_password,graduate_verified_at,active_profile_image_id,profile_photo_review_status",
-      )
-      .eq("id", verification.payload.userId)
-      .is("deleted_at", null)
-      .maybeSingle();
+    const profile = await getMemberCanonicalProfile(verification.payload.userId);
 
     if (
-      data?.id &&
-      !data.must_change_password &&
-      data.profile_photo_review_status === "approved"
+      profile?.id
+      && !profile.mustChangePassword
+      && profile.profilePhotoReviewStatus === "approved"
     ) {
-      member = data;
+      member = profile;
     }
   }
 
   const isValid = verification.ok && Boolean(member);
   const cohortCardThemes = member ? await listCohortCardThemes() : [];
-  const profile = member ? parseSsafyProfile(member.display_name ?? "") : null;
-  const generation = member?.generation ?? member?.year ?? null;
+  const profile = member ? parseSsafyProfile(member.displayName ?? "") : null;
+  const generation = member?.generation ?? null;
   const roleLabel = member
-    ? getCertificationRoleLabel(generation, { graduateVerifiedAt: member.graduate_verified_at })
+    ? getCertificationRoleLabel(generation, { graduateVerifiedAt: member.graduateVerifiedAt })
     : null;
   const scheme = member
-    ? getCertificationScheme(generation, cohortCardThemes, { graduateVerifiedAt: member.graduate_verified_at })
+    ? getCertificationScheme(generation, cohortCardThemes, { graduateVerifiedAt: member.graduateVerifiedAt })
     : null;
   const campusLabel = member?.campus ?? profile?.campus ?? null;
   const yearLabel = generation && generation > 0 ? `${generation}기` : null;
-  const avatarSrc = member?.active_profile_image_id || member?.avatar_content_type
+  const avatarSrc = member?.activeProfileImageId
     ? `/api/certification/avatar/${encodeURIComponent(rawToken)}`
-    : member?.avatar_url ?? "/avatar-default.svg";
-  const name = profile?.displayName ?? member?.display_name ?? "이름 미지정";
+    : "/avatar-default.svg";
+  const name = profile?.displayName ?? member?.displayName ?? "이름 미지정";
 
   return (
     <div className="min-h-screen bg-background">

@@ -166,9 +166,6 @@ export async function POST(request: Request) {
     const payload = buildSsafySignupMemberInsertPayload({
       session: signupSession,
       passwordRecord,
-      activePolicies,
-      marketingPolicy,
-      marketingPolicyChecked: parsed.data.marketingPolicyChecked,
       agreedAt,
     });
 

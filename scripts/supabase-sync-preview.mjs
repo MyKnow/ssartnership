@@ -57,11 +57,28 @@ on conflict (key) do update
        permissions = excluded.permissions,
        updated_at = now();
 
-update public.members
-   set admin_permission_id = 'super_admin',
-       updated_at = now()
- where mm_username = 'myknow'
-   and admin_permission_id is distinct from 'super_admin';
+insert into public.admin_profiles (
+  member_id,
+  permission_template_key,
+  managed_campus_slugs,
+  is_active,
+  updated_at
+)
+select
+  member.id,
+  'super_admin',
+  '{}',
+  true,
+  now()
+from public.members member
+join public.mm_user_directory directory
+  on directory.id = member.mattermost_account_id
+where directory.mm_username = 'myknow'
+  and member.deleted_at is null
+on conflict (member_id) do update
+set permission_template_key = excluded.permission_template_key,
+    is_active = true,
+    updated_at = now();
 `;
 
 function requiredEnv(name) {

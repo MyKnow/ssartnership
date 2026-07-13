@@ -12,7 +12,6 @@ export type AdminProfilePhotoReplacement = {
     id: string;
     display_name: string | null;
     year: number | null;
-    profile_photo_review_status: "approved" | "pending" | "rejected";
   } | null;
 };
 
@@ -20,8 +19,6 @@ export type AdminExistingProfilePhoto = {
   id: string;
   display_name: string | null;
   year: number | null;
-  active_profile_image_id: string | null;
-  profile_photo_review_status: "approved" | "pending" | "rejected";
   updated_at: string;
 };
 

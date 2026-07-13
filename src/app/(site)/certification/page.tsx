@@ -4,8 +4,8 @@ import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import { getHeaderSession } from "@/lib/header-session";
+import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
 import CertificationEmailAction from "@/components/certification/CertificationEmailAction";
@@ -25,21 +25,12 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type CertificationMember = {
-  mm_username?: string | null;
-  display_name?: string | null;
+  mattermostUsername?: string | null;
+  displayName?: string | null;
   generation?: number | null;
-  year?: number | null;
   campus?: string | null;
-  avatar_url?: string | null;
-  avatar_updated_at?: string | null;
-  has_legacy_avatar?: boolean | null;
-  graduate_verified_at?: string | null;
-  has_profile_image?: boolean | null;
-  profile_image_url?: string | null;
-  mattermost_account_id?: string | null;
-  mm_user_id?: string | null;
-  email?: string | null;
-  email_verified_at?: string | null;
+  graduateVerifiedAt?: string | null;
+  profileImageUrl?: string | null;
 };
 
 function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
@@ -77,15 +68,7 @@ export default async function CertificationPage({
     listCohortCardThemes(),
   ]);
 
-  const supabase = getSupabaseAdminClient();
-  const { data: member } = await supabase
-    .from("members")
-    .select(
-      "mm_username,display_name,generation,year,campus,avatar_content_type,avatar_url,updated_at,graduate_verified_at,active_profile_image_id,mattermost_account_id,mm_user_id,email,email_verified_at",
-    )
-    .eq("id", session.userId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  const member = await getMemberCanonicalProfile(session.userId);
 
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
@@ -106,29 +89,26 @@ export default async function CertificationPage({
             />
             <CertificationView
               member={{
-                mm_username: member.mm_username,
-                display_name: member.display_name,
+                mattermostUsername: member.mattermostUsername,
+                displayName: member.displayName,
                 generation: member.generation,
-                year: member.year,
                 campus: member.campus,
-                avatar_url: member.avatar_url,
-                avatar_updated_at: member.updated_at,
-                has_legacy_avatar: Boolean(member.avatar_content_type),
-                graduate_verified_at: member.graduate_verified_at,
-                has_profile_image: Boolean(member.active_profile_image_id),
-                profile_image_url: member.active_profile_image_id
+                graduateVerifiedAt: member.graduateVerifiedAt,
+                profileImageUrl: member.activeProfileImageId
+                  && member.profilePhotoReviewStatus === "approved"
+                  && !member.mustChangePassword
                   ? "/api/certification/profile-image"
                   : null,
               } satisfies CertificationMember}
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
             />
-            {member.mattermost_account_id || member.mm_user_id ? (
+            {member.mattermostAccountId ? (
               <CertificationMattermostSyncAction />
             ) : null}
             <CertificationEmailAction
               initialEmail={member.email}
-              emailVerified={Boolean(member.email_verified_at)}
+              emailVerified={Boolean(member.emailVerifiedAt)}
             />
             <div className="mt-10 w-full border-t border-border/70 pt-8">
               <CertificationFooterActions canChangeProfilePhoto />

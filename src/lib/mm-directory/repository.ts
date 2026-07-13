@@ -13,6 +13,29 @@ import {
 const DIRECTORY_SELECT =
   "id,mm_user_id,mm_username,display_name,campus,display_name_snapshot,campus_snapshot,is_staff,source_years,source_generations,is_active,synced_at,last_seen_at,created_at,updated_at";
 
+export async function findMmUserDirectoryEntryByUserId(userId: string) {
+  const normalized = userId.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("mm_user_directory")
+    .select(DIRECTORY_SELECT)
+    .eq("mm_user_id", normalized)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) {
+    throw wrapMmDirectoryDbError(
+      error,
+      "MM 유저 디렉터리를 불러오지 못했습니다.",
+    );
+  }
+
+  return (data as MmUserDirectoryRow | null) ?? null;
+}
+
 export async function findMmUserDirectoryEntryByUsername(username: string) {
   const supabase = getSupabaseAdminClient();
   const normalized = normalizeMmUsername(username);
