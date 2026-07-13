@@ -24,28 +24,67 @@ if (username !== "myknow") {
   throw new Error("Only the myknow member can be bootstrapped as super_admin.");
 }
 
-const { data: member, error: lookupError } = await supabase
-  .from("members")
-  .select("id,mm_username,admin_permission_id")
+const { data: directory, error: directoryLookupError } = await supabase
+  .from("mm_user_directory")
+  .select("id,mm_username")
   .eq("mm_username", username)
   .maybeSingle();
 
-if (lookupError) {
-  throw new Error(lookupError.message);
+if (directoryLookupError) {
+  throw new Error(directoryLookupError.message);
+}
+if (!directory) {
+  throw new Error("myknow Mattermost directory entry was not found. Sync the member before bootstrapping admin access.");
+}
+
+const { data: member, error: memberLookupError } = await supabase
+  .from("members")
+  .select("id")
+  .eq("mattermost_account_id", directory.id)
+  .is("deleted_at", null)
+  .maybeSingle();
+
+if (memberLookupError) {
+  throw new Error(memberLookupError.message);
 }
 if (!member) {
   throw new Error("myknow member was not found. Create the member before bootstrapping admin access.");
 }
 
-const { data: updatedMember, error: updateError } = await supabase
-  .from("members")
-  .update({ admin_permission_id: "super_admin" })
-  .eq("id", member.id)
-  .select("id,mm_username,admin_permission_id")
-  .single();
+const { data: existingProfile, error: profileLookupError } = await supabase
+  .from("admin_profiles")
+  .select("id")
+  .eq("member_id", member.id)
+  .maybeSingle();
+
+if (profileLookupError) {
+  throw new Error(profileLookupError.message);
+}
+
+let updatedProfile;
+let updateError;
+if (existingProfile) {
+  ({ data: updatedProfile, error: updateError } = await supabase
+    .from("admin_profiles")
+    .update({ permission_template_key: "super_admin", is_active: true })
+    .eq("id", existingProfile.id)
+    .select("member_id,permission_template_key")
+    .single());
+} else {
+  ({ data: updatedProfile, error: updateError } = await supabase
+    .from("admin_profiles")
+    .insert({
+      member_id: member.id,
+      permission_template_key: "super_admin",
+      managed_campus_slugs: [],
+      is_active: true,
+    })
+    .select("member_id,permission_template_key")
+    .single());
+}
 
 if (updateError) {
   throw new Error(updateError.message);
 }
 
-console.log(`Promoted member super admin: ${updatedMember.mm_username}`);
+console.log(`Promoted member super admin: ${directory.mm_username} (${updatedProfile.member_id})`);
