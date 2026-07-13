@@ -15,6 +15,7 @@ import { isMissingSupabasePoolerTenantErrorMessage } from "./supabase-db-health-
 import {
   hashPreviewSeedPassword,
   isValidPreviewSeedPassword,
+  resolvePreviewMemberCredentialSeedTarget,
   resolvePreviewMemberCredentialSeedConfig,
 } from "./preview-credential-seed-lib.mjs";
 import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
@@ -441,21 +442,35 @@ async function seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey) {
   }
 
   const previewClient = createStorageClient(previewUrl, previewServiceRoleKey);
-  const { data: member, error: findError } = await previewClient
-    .from("members")
-    .select("id,mm_username")
-    .eq("mm_username", seedConfig.username)
-    .maybeSingle();
-
-  if (findError) {
-    throw findError;
-  }
-
-  if (!member?.id) {
-    throw new Error(
-      `Preview test member "${seedConfig.username}" was not found after sync.`,
-    );
-  }
+  const member = await resolvePreviewMemberCredentialSeedTarget(
+    {
+      async findDirectoryByUsername(username) {
+        const { data, error } = await previewClient
+          .from("mm_user_directory")
+          .select("id")
+          .eq("mm_username", username)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (error) {
+          throw error;
+        }
+        return data;
+      },
+      async findActiveMemberByMattermostAccountId(directoryId) {
+        const { data, error } = await previewClient
+          .from("members")
+          .select("id")
+          .eq("mattermost_account_id", directoryId)
+          .is("deleted_at", null)
+          .maybeSingle();
+        if (error) {
+          throw error;
+        }
+        return data;
+      },
+    },
+    seedConfig.username,
+  );
 
   const passwordRecord = hashPreviewSeedPassword(seedConfig.password);
   const updatedAt = new Date().toISOString();
@@ -804,7 +819,24 @@ async function main() {
   }
 }
 
+function formatSyncFailure(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (!error || typeof error !== "object") {
+    return String(error);
+  }
+
+  const message = typeof error.message === "string" ? error.message.trim() : "";
+  const code = typeof error.code === "string" ? error.code.trim() : "";
+  const hint = typeof error.hint === "string" ? error.hint.trim() : "";
+  const labels = [message || "Preview sync failed", code && `[${code}]`, hint && `hint: ${hint}`]
+    .filter(Boolean)
+    .join(" ");
+  return labels;
+}
+
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(formatSyncFailure(error));
   process.exit(1);
 });
