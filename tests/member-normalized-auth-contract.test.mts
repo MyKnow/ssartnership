@@ -276,6 +276,23 @@ test("운영 알림 수신자는 활성 admin profile로만 결정한다", () =>
   );
 });
 
+test("이벤트 보상 후보는 세대·MM 디렉터리·정책 consent ledger로 구성한다", () => {
+  const eventRewards = readRepoFile("src/lib/promotions/event-rewards.ts");
+
+  assert.match(eventRewards, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(eventRewards, /\.from\("member_policy_consents"\)/);
+  assert.match(eventRewards, /\.eq\("policy_document_id", policyDocumentId\)/);
+  assert.match(
+    eventRewards,
+    /\.select\("id,display_name,mattermost_account_id,generation,campus,created_at"\)/,
+  );
+  assert.match(eventRewards, /\.order\("generation", \{ ascending: false \}\)/);
+  assert.doesNotMatch(
+    eventRewards,
+    /\.select\("id,display_name,mm_username,year,campus,marketing_policy_version,created_at"\)|member\.marketing_policy_version|\.order\("year", \{ ascending: false \}\)/,
+  );
+});
+
 test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
   const provision = readRepoFile("src/lib/member-manual-add/provision.ts");
