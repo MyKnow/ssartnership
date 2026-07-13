@@ -70,6 +70,28 @@ test("production Supabase migrations require an explicit guarded dispatch", () =
   assert.doesNotMatch(workflow, /--include-all/);
 });
 
+test("Preview Supabase migrations apply dev schema changes without syncing data", () => {
+  const workflow = readRepoFile(".github/workflows/preview-migrations.yml");
+
+  for (const requiredText of [
+    "name: Apply Preview Supabase Migrations",
+    "push:",
+    "branches: [main]",
+    "workflow_dispatch:",
+    "APPLY_PREVIEW_MIGRATIONS",
+    "[apply-preview-migrations]",
+    "github.ref == 'refs/heads/main'",
+    "ref: dev",
+    "npm run validate:migrations",
+    "SUPABASE_PREVIEW_DB_URL",
+    "supabase db push --db-url \"$SUPABASE_PREVIEW_DB_URL\" --yes",
+  ]) {
+    assert.match(workflow, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  assert.doesNotMatch(workflow, /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all/);
+});
+
 test("playwright config can use the CI-hosted Chrome channel", () => {
   const config = readRepoFile("playwright.config.ts");
 

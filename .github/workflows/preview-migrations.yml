@@ -1,0 +1,86 @@
+name: Apply Preview Supabase Migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/preview-migrations.yml"
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type APPLY_PREVIEW_MIGRATIONS to apply pending dev migrations to Preview.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: >-
+      ${{
+        github.ref == 'refs/heads/main' &&
+        (
+          (
+            github.event_name == 'push' &&
+            contains(github.event.head_commit.message, '[apply-preview-migrations]')
+          ) ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            inputs.confirmation == 'APPLY_PREVIEW_MIGRATIONS'
+          )
+        )
+      }}
+    name: Validate and apply Preview migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout current dev revision
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate migration files
+        run: npm run validate:migrations
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+          github-token: ${{ github.token }}
+
+      - name: List Preview migrations before apply
+        env:
+          SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_PREVIEW_DB_URL"
+          supabase migration list --db-url "$SUPABASE_PREVIEW_DB_URL"
+
+      - name: Apply pending Preview migrations
+        env:
+          SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes
+
+      - name: Verify Preview migrations after apply
+        env:
+          SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase migration list --db-url "$SUPABASE_PREVIEW_DB_URL"
