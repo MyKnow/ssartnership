@@ -24,6 +24,24 @@ test("SSAFY Verify falls back to the PKCE redirect flow while the SDK is unavail
   assert.doesNotMatch(button, /errorCode: "SDK_NOT_READY"/);
 });
 
+test("SSAFY Verify failures render sanitized temporary diagnostics in popup and redirect paths", () => {
+  const button = readRepoFile("src/components/auth/SsafyVerifyButton.tsx");
+  const relay = readRepoFile("src/components/auth/SsafyVerifyCallbackRelay.tsx");
+  const diagnosticDetails = readRepoFile(
+    "src/components/auth/SsafyVerifyDiagnosticDetails.tsx",
+  );
+
+  assert.match(button, /SsafyVerifyDiagnosticDetails/);
+  assert.match(relay, /SsafyVerifyDiagnosticDetails/);
+  assert.match(button, /normalizeSsafyVerifyClientFailure/);
+  assert.match(relay, /normalizeSsafyVerifyClientFailure/);
+  assert.match(diagnosticDetails, /failure\.errorCode/);
+  assert.match(diagnosticDetails, /failure\.phase/);
+  assert.match(diagnosticDetails, /failure\.requestId/);
+  assert.doesNotMatch(diagnosticDetails, /JSON\.stringify/);
+  assert.doesNotMatch(diagnosticDetails, /codeVerifier/);
+});
+
 test("SSAFY callback route is not a user-facing auth start page", () => {
   const ssafyPage = readRepoFile("src/app/auth/ssafy/page.tsx");
   const relay = readRepoFile("src/components/auth/SsafyVerifyCallbackRelay.tsx");
