@@ -1,12 +1,14 @@
-import { getPolicyDocumentByKind, recordMarketingPolicyConsent } from "@/lib/policy-documents";
+import {
+  getMemberPolicyConsentVersions,
+  getPolicyDocumentByKind,
+  recordMarketingPolicyConsent,
+} from "@/lib/policy-documents";
 import {
   countActivePushSubscriptions,
   DEFAULT_PUSH_PREFERENCES,
   getMemberPushPreferences,
   upsertMemberPushPreferences,
 } from "@/lib/push";
-import { wrapPushDbError } from "@/lib/push/config";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
 
 const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
@@ -122,33 +124,25 @@ export async function getMemberNotificationPreferences(memberId: string) {
         preferences.enabled && (mockPushDeviceStore.get(memberId) ?? []).length > 0,
     };
   }
-  const supabase = getSupabaseAdminClient();
   const [
     preferences,
     activeMarketingPolicy,
-    memberResult,
+    consentVersions,
     activePushSubscriptionCount,
   ] = await Promise.all([
     getMemberPushPreferences(memberId),
     getPolicyDocumentByKind("marketing").catch(() => null),
-    supabase
-      .from("members")
-      .select("marketing_policy_version")
-      .eq("id", memberId)
-      .maybeSingle(),
+    getMemberPolicyConsentVersions(memberId),
     countActivePushSubscriptions(memberId),
   ]);
-
-  if (memberResult.error) {
-    throw wrapPushDbError(memberResult.error, "Push 설정을 불러오지 못했습니다.");
-  }
 
   return {
     ...preferences,
     enabled: preferences.enabled && activePushSubscriptionCount > 0,
     marketingEnabled: Boolean(
-      activeMarketingPolicy &&
-        memberResult.data?.marketing_policy_version === activeMarketingPolicy.version,
+      preferences.marketingEnabled
+      && activeMarketingPolicy
+      && consentVersions.marketing === activeMarketingPolicy.version,
     ),
   };
 }

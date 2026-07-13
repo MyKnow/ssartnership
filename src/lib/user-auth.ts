@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
+  getMemberPolicyConsentVersions,
 } from "@/lib/policy-documents";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -179,23 +180,28 @@ export async function getUserSession() {
   const memberPromise = supabase
     .from("members")
     .select(
-      "id,must_change_password,service_policy_version,privacy_policy_version,profile_photo_review_status",
+      "id,must_change_password,profile_photo_review_status",
     )
     .eq("id", session.userId)
     .is("deleted_at", null)
     .maybeSingle();
   const activePoliciesPromise = getActiveRequiredPolicies();
+  const consentVersionsPromise = getMemberPolicyConsentVersions(session.userId);
 
-  const [{ data: member }, activePolicies] = await Promise.all([
+  const [{ data: member }, activePolicies, consentVersions] = await Promise.all([
     memberPromise,
     activePoliciesPromise,
+    consentVersionsPromise,
   ]);
 
   if (!member?.id) {
     return null;
   }
 
-  const policyStatus = evaluateRequiredPolicyStatus(member, activePolicies);
+  const policyStatus = evaluateRequiredPolicyStatus(
+    consentVersions,
+    activePolicies,
+  );
   const consentSnapshotIsFresh =
     session.policyConsentSnapshot?.serviceVersion === activePolicies.service.version &&
     session.policyConsentSnapshot?.privacyVersion === activePolicies.privacy.version;

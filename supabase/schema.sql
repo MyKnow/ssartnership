@@ -4553,6 +4553,33 @@ revoke all on function public.reject_member_active_profile_photo(uuid, uuid, tex
 revoke all on function public.reject_member_active_profile_photo(uuid, uuid, text) from authenticated;
 grant execute on function public.reject_member_active_profile_photo(uuid, uuid, text) to service_role;
 
+-- Schema snapshot sync: canonical member marketing preference backfill (2026-07-13).
+with active_marketing_policy as (
+  select version
+  from public.policy_documents
+  where kind = 'marketing'
+    and is_active = true
+  order by version desc
+  limit 1
+)
+insert into public.push_preferences (
+  member_id,
+  marketing_enabled,
+  updated_at
+)
+select
+  member.id,
+  coalesce(member.marketing_policy_version = active_marketing_policy.version, false),
+  now()
+from public.members as member
+left join active_marketing_policy on true
+where member.deleted_at is null
+on conflict (member_id) do update
+set marketing_enabled = excluded.marketing_enabled,
+    updated_at = excluded.updated_at
+where public.push_preferences.marketing_enabled
+  is distinct from excluded.marketing_enabled;
+
 create or replace function public.ensure_single_member_super_admin()
 returns trigger
 language plpgsql

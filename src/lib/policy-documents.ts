@@ -20,13 +20,12 @@ export type PolicyDocument = {
   updated_at: string | null;
 };
 
-export type MemberPolicyVersionFields = {
-  service_policy_version?: number | null;
-  service_policy_consented_at?: string | null;
-  privacy_policy_version?: number | null;
-  privacy_policy_consented_at?: string | null;
-  marketing_policy_version?: number | null;
-  marketing_policy_consented_at?: string | null;
+export type MemberPolicyConsentVersions = Record<PolicyKind, number | null>;
+
+type MemberPolicyConsentRow = {
+  kind: string;
+  version: number;
+  agreed_at: string | null;
 };
 
 export type RequiredPolicyMap = Record<RequiredPolicyKind, PolicyDocument>;
@@ -101,6 +100,7 @@ export function getPolicyHref(
 
 const POLICY_SELECT =
   "id,kind,version,title,summary,content,is_active,effective_at,created_at,updated_at";
+const MEMBER_POLICY_CONSENT_SELECT = "kind,version,agreed_at";
 
 const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
 const hasSupabaseAdminEnv = Boolean(
@@ -157,6 +157,54 @@ function wrapPolicyDocumentDbError(
   return new PolicyDocumentError(
     "db_error",
     error?.message?.trim() || message,
+  );
+}
+
+function createEmptyMemberPolicyConsentVersions(): MemberPolicyConsentVersions {
+  return {
+    service: null,
+    privacy: null,
+    marketing: null,
+  };
+}
+
+export function getMemberPolicyConsentVersionsFromRows(
+  rows: MemberPolicyConsentRow[] | null | undefined,
+): MemberPolicyConsentVersions {
+  const versions = createEmptyMemberPolicyConsentVersions();
+
+  for (const row of rows ?? []) {
+    const kind = row.kind;
+    if (
+      !row.agreed_at
+      || !isPolicyKind(kind)
+      || !Number.isInteger(row.version)
+    ) {
+      continue;
+    }
+    const previousVersion = versions[kind];
+    if (previousVersion === null || row.version > previousVersion) {
+      versions[kind] = row.version;
+    }
+  }
+
+  return versions;
+}
+
+export async function getMemberPolicyConsentVersions(memberId: string) {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("member_policy_consents")
+    .select(MEMBER_POLICY_CONSENT_SELECT)
+    .eq("member_id", memberId);
+  if (error) {
+    throw wrapPolicyDocumentDbError(
+      error,
+      "회원 정책 동의 내역을 불러오지 못했습니다.",
+    );
+  }
+
+  return getMemberPolicyConsentVersionsFromRows(
+    (data ?? []) as MemberPolicyConsentRow[],
   );
 }
 
@@ -291,16 +339,15 @@ export async function getMemberPolicyReviewBundle(
   memberId: string,
 ): Promise<MemberPolicyReviewBundle> {
   const supabase = getSupabaseAdminClient();
-  const [requiredPolicies, marketingPolicy, memberResult] = await Promise.all([
+  const [requiredPolicies, marketingPolicy, memberResult, consentVersions] = await Promise.all([
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing"),
     supabase
       .from("members")
-      .select(
-        "service_policy_version,privacy_policy_version,marketing_policy_version",
-      )
+      .select("id")
       .eq("id", memberId)
       .maybeSingle(),
+    getMemberPolicyConsentVersions(memberId),
   ]);
 
   if (memberResult.error) {
@@ -320,18 +367,14 @@ export async function getMemberPolicyReviewBundle(
   const reviewPolicies: PolicyReviewItem[] = [];
 
   for (const kind of REQUIRED_POLICY_KINDS) {
-    const acceptedVersion =
-      kind === "service"
-        ? memberResult.data.service_policy_version
-        : memberResult.data.privacy_policy_version;
-    if (acceptedVersion !== requiredPolicies[kind].version) {
+    if (consentVersions[kind] !== requiredPolicies[kind].version) {
       reviewPolicies.push({ policy: requiredPolicies[kind], required: true });
     }
   }
 
   if (
     marketingPolicy &&
-    memberResult.data.marketing_policy_version !== marketingPolicy.version
+    consentVersions.marketing !== marketingPolicy.version
   ) {
     reviewPolicies.push({ policy: marketingPolicy, required: false });
   }
@@ -343,17 +386,17 @@ export async function getMemberPolicyReviewBundle(
 }
 
 export function evaluateRequiredPolicyStatus(
-  member: MemberPolicyVersionFields | null | undefined,
+  consentVersions: Partial<MemberPolicyConsentVersions> | null | undefined,
   activePolicies: RequiredPolicyMap,
 ) {
   const acceptedVersions: Record<RequiredPolicyKind, number | null> = {
     service:
-      typeof member?.service_policy_version === "number"
-        ? member.service_policy_version
+      typeof consentVersions?.service === "number"
+        ? consentVersions.service
         : null,
     privacy:
-      typeof member?.privacy_policy_version === "number"
-        ? member.privacy_policy_version
+      typeof consentVersions?.privacy === "number"
+        ? consentVersions.privacy
         : null,
   };
 
@@ -370,15 +413,14 @@ export function evaluateRequiredPolicyStatus(
 
 export async function getMemberRequiredPolicyStatus(memberId: string) {
   const supabase = getSupabaseAdminClient();
-  const [activePolicies, memberResult] = await Promise.all([
+  const [activePolicies, memberResult, consentVersions] = await Promise.all([
     getActiveRequiredPolicies(),
     supabase
       .from("members")
-      .select(
-        "service_policy_version,service_policy_consented_at,privacy_policy_version,privacy_policy_consented_at",
-      )
+      .select("id")
       .eq("id", memberId)
       .maybeSingle(),
+    getMemberPolicyConsentVersions(memberId),
   ]);
 
   if (memberResult.error) {
@@ -390,7 +432,7 @@ export async function getMemberRequiredPolicyStatus(memberId: string) {
 
   return {
     activePolicies,
-    ...evaluateRequiredPolicyStatus(memberResult.data, activePolicies),
+    ...evaluateRequiredPolicyStatus(consentVersions, activePolicies),
   };
 }
 
@@ -433,24 +475,9 @@ export async function recordMarketingPolicyConsent(input: {
   const { upsertMemberPushPreferences } = await import("@/lib/push/preferences");
 
   if (!input.agreed) {
-    const [{ error }, pushPreferences] = await Promise.all([
-      supabase
-        .from("members")
-        .update({
-          marketing_policy_version: null,
-          marketing_policy_consented_at: null,
-          updated_at: agreedAt,
-        })
-        .eq("id", input.memberId),
-      upsertMemberPushPreferences(input.memberId, { marketingEnabled: false }),
-    ]);
-
-    if (error) {
-      throw wrapPolicyDocumentDbError(
-        error,
-        "회원 마케팅 동의 정보를 갱신하지 못했습니다.",
-      );
-    }
+    const pushPreferences = await upsertMemberPushPreferences(input.memberId, {
+      marketingEnabled: false,
+    });
 
     if (!pushPreferences) {
       throw new PolicyDocumentError(
@@ -481,32 +508,17 @@ export async function recordMarketingPolicyConsent(input: {
     },
   ];
 
-  const [{ error: consentError }, { error: updateError }, pushPreferences] =
-    await Promise.all([
-      supabase.from("member_policy_consents").upsert([row], {
-        onConflict: "member_id,policy_document_id",
-      }),
-      supabase
-        .from("members")
-        .update({
-          marketing_policy_version: input.activePolicy.version,
-          marketing_policy_consented_at: agreedAt,
-          updated_at: agreedAt,
-        })
-        .eq("id", input.memberId),
-      upsertMemberPushPreferences(input.memberId, { marketingEnabled: true }),
-    ]);
+  const [{ error: consentError }, pushPreferences] = await Promise.all([
+    supabase.from("member_policy_consents").upsert([row], {
+      onConflict: "member_id,policy_document_id",
+    }),
+    upsertMemberPushPreferences(input.memberId, { marketingEnabled: true }),
+  ]);
 
   if (consentError) {
     throw wrapPolicyDocumentDbError(
       consentError,
       "회원 마케팅 동의 내역을 저장하지 못했습니다.",
-    );
-  }
-  if (updateError) {
-    throw wrapPolicyDocumentDbError(
-      updateError,
-      "회원 마케팅 동의 정보를 갱신하지 못했습니다.",
     );
   }
   if (!pushPreferences) {
@@ -537,21 +549,11 @@ export async function recordRequiredPolicyConsent(input: {
     user_agent: input.userAgent ?? null,
   }));
 
-  const [{ error: consentError }, { error: updateError }] = await Promise.all([
-    supabase.from("member_policy_consents").upsert(rows, {
+  const { error: consentError } = await supabase
+    .from("member_policy_consents")
+    .upsert(rows, {
       onConflict: "member_id,policy_document_id",
-    }),
-    supabase
-      .from("members")
-      .update({
-        service_policy_version: input.activePolicies.service.version,
-        service_policy_consented_at: agreedAt,
-        privacy_policy_version: input.activePolicies.privacy.version,
-        privacy_policy_consented_at: agreedAt,
-        updated_at: agreedAt,
-      })
-      .eq("id", input.memberId),
-  ]);
+    });
 
   if (consentError) {
     throw wrapPolicyDocumentDbError(
@@ -559,12 +561,5 @@ export async function recordRequiredPolicyConsent(input: {
       "정책 동의 내역을 저장하지 못했습니다.",
     );
   }
-  if (updateError) {
-    throw wrapPolicyDocumentDbError(
-      updateError,
-      "회원 정책 동의 정보를 갱신하지 못했습니다.",
-    );
-  }
-
   return agreedAt;
 }
