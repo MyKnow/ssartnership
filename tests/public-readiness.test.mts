@@ -44,6 +44,32 @@ test("Storybook and visual baselines run on every push and pull request without 
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });
 
+test("production Supabase migrations require an explicit guarded dispatch", () => {
+  const workflow = readRepoFile(".github/workflows/production-migrations.yml");
+
+  assert.match(workflow, /name: Apply Production Supabase Migrations/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
+  assert.match(workflow, /confirmation:/);
+  assert.match(workflow, /APPLY_PRODUCTION_MIGRATIONS/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /permissions:\s*\n\s+contents: read/);
+  assert.match(
+    workflow,
+    /SUPABASE_PRODUCTION_DB_URL:\s*\$\{\{ secrets\.SUPABASE_PRODUCTION_DB_URL \}\}/,
+  );
+  assert.match(workflow, /npm run validate:migrations/);
+  assert.match(
+    workflow,
+    /supabase migration list --db-url "\$SUPABASE_PRODUCTION_DB_URL"/,
+  );
+  assert.match(
+    workflow,
+    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --yes/,
+  );
+  assert.doesNotMatch(workflow, /--include-all/);
+});
+
 test("playwright config can use the CI-hosted Chrome channel", () => {
   const config = readRepoFile("playwright.config.ts");
 

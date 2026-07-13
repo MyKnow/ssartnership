@@ -1,0 +1,73 @@
+name: Apply Production Supabase Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type APPLY_PRODUCTION_MIGRATIONS to apply pending migrations to Production.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: >-
+      ${{
+        inputs.confirmation == 'APPLY_PRODUCTION_MIGRATIONS' &&
+        github.ref == 'refs/heads/main'
+      }}
+    name: Validate and apply Production migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate migration files
+        run: npm run validate:migrations
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+          github-token: ${{ github.token }}
+
+      - name: List Production migrations before apply
+        env:
+          SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_PRODUCTION_DB_URL"
+          supabase migration list --db-url "$SUPABASE_PRODUCTION_DB_URL"
+
+      - name: Apply pending Production migrations
+        env:
+          SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase db push --db-url "$SUPABASE_PRODUCTION_DB_URL" --yes
+
+      - name: Verify Production migrations after apply
+        env:
+          SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase migration list --db-url "$SUPABASE_PRODUCTION_DB_URL"
