@@ -143,7 +143,7 @@ export default function LoginForm({
         <Input
           ref={identifierRef}
           autoComplete="username"
-          placeholder="예시: myknow"
+          placeholder="예시: myknow 또는 name@example.com"
           value={identifier}
           onChange={(event) => {
             setIdentifier(event.target.value);

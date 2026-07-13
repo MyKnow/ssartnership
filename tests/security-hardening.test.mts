@@ -265,6 +265,20 @@ test("admin edge guard covers admin pages and admin APIs", async () => {
   assert.equal(isProtectedAdminPath("/api/push/admin/broadcast"), true);
 });
 
+test("soft-deleted members are hidden from public QR verification and avatar delivery", () => {
+  const qrPage = readFileSync(
+    new URL("../src/app/(site)/verify/[token]/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const avatarRoute = readFileSync(
+    new URL("../src/app/api/certification/avatar/[token]/route.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(qrPage, /\.is\("deleted_at", null\)/);
+  assert.match(avatarRoute, /\.is\("deleted_at", null\)/);
+});
+
 test("admin basic auth validates credentials without direct string equality", async () => {
   const originalUsername = process.env.ADMIN_BASIC_AUTH_USERNAME;
   const originalPassword = process.env.ADMIN_BASIC_AUTH_PASSWORD;
@@ -403,6 +417,8 @@ test("session mutation routes require same-origin guards", () => {
     "../src/app/api/mm/delete/route.ts",
     "../src/app/api/mm/profile-sync/route.ts",
     "../src/app/api/auth/login/route.ts",
+    "../src/app/api/member/email/send/route.ts",
+    "../src/app/api/member/email/verify/route.ts",
     "../src/app/api/mm/_shared/reset-password-complete.ts",
     "../src/app/api/partner/change-password/route.ts",
     "../src/app/api/partner/reset-password/route.ts",

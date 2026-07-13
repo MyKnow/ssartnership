@@ -16,11 +16,10 @@ import {
 import {
   clampGraduateEducationEnd,
   getGraduateCurrentYearMonth,
-  getSsafyCohortFromEducationStart,
+  getSsafyGenerationFromEducationStart,
   GRADUATE_CAMPUS_OPTIONS,
   MAX_GRADUATE_CERTIFICATE_BYTES,
   MAX_GRADUATE_PROFILE_IMAGE_BYTES,
-  type GraduateCompletionStage,
 } from "@/lib/graduate-verification";
 
 type ApplicationStep = "email" | "details" | "files" | "submitted";
@@ -107,7 +106,6 @@ export default function GraduateVerificationApplicationView() {
   const [now, setNow] = useState(() => Date.now());
   const [emailVerified, setEmailVerified] = useState(false);
   const [legalName, setLegalName] = useState("");
-  const [completionStage, setCompletionStage] = useState<GraduateCompletionStage>("semester_1");
   const [startYear, setStartYear] = useState(String(getCurrentYear()));
   const [startMonth, setStartMonth] = useState("1");
   const [endYear, setEndYear] = useState(String(getCurrentYear()));
@@ -140,8 +138,8 @@ export default function GraduateVerificationApplicationView() {
     return () => window.clearInterval(intervalId);
   }, [codeExpiresAt]);
 
-  const inferredCohort = useMemo(
-    () => getSsafyCohortFromEducationStart(Number(startYear), Number(startMonth)),
+  const inferredGeneration = useMemo(
+    () => getSsafyGenerationFromEducationStart(Number(startYear), Number(startMonth)),
     [startMonth, startYear],
   );
   const isResubmission = resubmissionTargets.length > 0;
@@ -237,7 +235,6 @@ export default function GraduateVerificationApplicationView() {
         resubmission_targets?: unknown;
         review_note?: unknown;
         legal_name?: unknown;
-        completion_stage?: unknown;
         education_start_year?: unknown;
         education_start_month?: unknown;
         education_end_year?: unknown;
@@ -270,9 +267,6 @@ export default function GraduateVerificationApplicationView() {
           typeof request.review_note === "string" ? request.review_note : null,
         );
         setLegalName(typeof request.legal_name === "string" ? request.legal_name : "");
-        setCompletionStage(
-          request.completion_stage === "semester_2" ? "semester_2" : "semester_1",
-        );
         setStartYear(
           typeof request.education_start_year === "number"
             ? String(request.education_start_year)
@@ -324,7 +318,7 @@ export default function GraduateVerificationApplicationView() {
   }
 
   function continueToFiles() {
-    if (!legalName.trim() || !inferredCohort || !campus) {
+    if (!legalName.trim() || !inferredGeneration || !campus) {
       setMessage({ tone: "danger", text: "이름, 캠퍼스, 교육 시작 연·월을 확인해 주세요." });
       return;
     }
@@ -404,13 +398,11 @@ export default function GraduateVerificationApplicationView() {
           profileImageUploadId,
           email,
           legalName,
-          completionStage,
           educationStartYear: Number(startYear),
           educationStartMonth: Number(startMonth),
           educationEndYear: Number(endYear),
           educationEndMonth: Number(endMonth),
           campus,
-          claimedCohort: inferredCohort,
           consented,
         }),
       });
@@ -496,14 +488,13 @@ export default function GraduateVerificationApplicationView() {
         <section className="mt-6 space-y-4" aria-labelledby="graduate-details-heading">
           <h2 id="graduate-details-heading" className="text-lg font-semibold">2. 교육 정보</h2>
           <label className="grid gap-2 text-sm font-medium">이름<Input value={legalName} onChange={(event) => setLegalName(event.target.value)} maxLength={100} disabled={isResubmission} /></label>
-          <label className="grid gap-2 text-sm font-medium">이수 학기<Select value={completionStage} onChange={(event) => setCompletionStage(event.target.value as GraduateCompletionStage)} disabled={isResubmission}><option value="semester_1">1학기 교육이수</option><option value="semester_2">2학기 교육이수</option></Select></label>
           <div className="grid gap-4 sm:grid-cols-2">
             <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 시작 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 시작 연도" max={currentYearMonth.year} value={startYear} onChange={(event) => setStartYear(normalizeEducationYear(event.target.value))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 시작 월" value={startMonth} onChange={(event) => setStartMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1} disabled={Number(startYear) === currentYearMonth.year && index + 1 > currentYearMonth.month}>{index + 1}월</option>)}</Select></div></fieldset>
             <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 종료 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 종료 연도" max={currentYearMonth.year} value={endYear} onChange={(event) => setEndYear(normalizeEducationYear(event.target.value))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 종료 월" value={endMonth} onChange={(event) => setEndMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1} disabled={Number(endYear) === currentYearMonth.year && index + 1 > currentYearMonth.month}>{index + 1}월</option>)}</Select></div></fieldset>
           </div>
           <label className="grid gap-2 text-sm font-medium">캠퍼스<Select aria-label="캠퍼스" value={campus} onChange={(event) => setCampus(event.target.value)} disabled={isResubmission}><option value="" disabled>캠퍼스를 선택해 주세요</option>{GRADUATE_CAMPUS_OPTIONS.map((option) => <option key={option} value={option}>{option} 캠퍼스</option>)}</Select></label>
           {isResubmission && !canEditEducationPeriod ? <p className="text-sm text-muted-foreground">기존 교육 정보는 유지됩니다. 교육 기간 보완 요청이 있을 때만 수정할 수 있습니다.</p> : null}
-          <InlineMessage tone={inferredCohort ? "info" : "warning"} title={inferredCohort ? `자동 계산된 ${inferredCohort}기` : "기수 계산 불가"} description={inferredCohort ? "교육 시작 연·월로 계산되며 직접 수정할 수 없습니다." : "2018년 12월 이후의 교육 시작 연·월을 입력해 주세요."} />
+          <InlineMessage tone={inferredGeneration ? "info" : "warning"} title={inferredGeneration ? `자동 계산된 ${inferredGeneration}기` : "기수 계산 불가"} description={inferredGeneration ? "교육 시작 연·월로 계산되며 직접 수정할 수 없습니다." : "2018년 12월 이후의 교육 시작 연·월을 입력해 주세요."} />
           <div className="flex gap-2"><Button variant="ghost" onClick={() => setStep("email")}>이전</Button><Button onClick={continueToFiles}>파일 제출로 계속</Button></div>
         </section>
       ) : null}

@@ -44,7 +44,10 @@ export const ValidationErrors: Story = {
     await expect(canvas.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeInTheDocument();
     await expect(canvas.getByText("비밀번호를 입력해 주세요.")).toBeInTheDocument();
 
-    await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "bad id!");
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      "bad id!",
+    );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "password123");
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),
@@ -62,7 +65,10 @@ export const KeyboardSubmit: Story = {
     };
     const canvas = within(canvasElement);
 
-    await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "ssafy15");
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      "ssafy15",
+    );
     await userEvent.type(
       canvas.getByPlaceholderText("사이트 비밀번호"),
       "wrong-password{Enter}",
@@ -78,7 +84,10 @@ export const BlockedLogin: Story = {
       Response.json({ error: "blocked" }, { status: 429 });
     const canvas = within(canvasElement);
 
-    await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "ssafy15");
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      "ssafy15",
+    );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "password123");
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),
@@ -96,7 +105,10 @@ export const InvalidCredentials: Story = {
       Response.json({ error: "invalid_credentials" }, { status: 401 });
     const canvas = within(canvasElement);
 
-    await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "ssafy15");
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      "ssafy15",
+    );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "wrong-password");
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),
@@ -113,7 +125,10 @@ export const SuccessfulLogin: Story = {
     window.fetch = async () => Response.json({ requiresConsent: false }, { status: 200 });
     const canvas = within(canvasElement);
 
-    await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "ssafy15");
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      "ssafy15",
+    );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "Valid!123");
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),
@@ -128,7 +143,10 @@ export const SuccessfulLoginRequiringConsent: Story = {
     window.fetch = async () => Response.json({ requiresConsent: true }, { status: 200 });
     const canvas = within(canvasElement);
 
-    await userEvent.type(canvas.getByPlaceholderText("예시: myknow"), "ssafy15");
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      "ssafy15",
+    );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "Valid!123");
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),

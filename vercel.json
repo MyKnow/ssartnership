@@ -5,8 +5,8 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/member-sync",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/anonymize-deleted-members",
+      "schedule": "40 0 * * *"
     },
     {
       "path": "/api/cron/rss",

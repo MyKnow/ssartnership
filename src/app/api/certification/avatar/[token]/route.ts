@@ -25,6 +25,7 @@ export async function GET(
     .from("members")
     .select("avatar_content_type,avatar_base64,avatar_url,updated_at,must_change_password,active_profile_image_id,profile_photo_review_status")
     .eq("id", verification.payload.userId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (error) {

@@ -4,6 +4,7 @@ import {
   GRADUATE_COHORT_RULE_VERSION,
   canTransitionGraduateVerification,
   createGraduateVerificationSubmission,
+  getSsafyGenerationFromEducationStart,
   getSsafyCohortFromEducationStart,
   getGraduateResubmissionTargets,
   getGraduateSubmissionFileRequirements,
@@ -26,6 +27,7 @@ test("교육 시작 연·월로 SSAFY 기수를 계산한다", () => {
   assert.equal(getSsafyCohortFromEducationStart(2026, 7), 16);
   assert.equal(getSsafyCohortFromEducationStart(2018, 11), null);
   assert.equal(getSsafyCohortFromEducationStart(2026, 13), null);
+  assert.equal(getSsafyGenerationFromEducationStart(2026, 1), 15);
 });
 
 test("교육 종료 연월은 시작 연월보다 빠를 수 없다", () => {
@@ -85,23 +87,21 @@ test("교육 종료 연월은 시작일보다 이르거나 현재보다 늦을 �
   );
 });
 
-test("서버는 클라이언트가 보낸 기수가 아니라 교육 시작 연월로 기수를 다시 계산한다", () => {
+test("서버는 교육 시작 연월로 수료생 기수를 계산한다", () => {
   const result = createGraduateVerificationSubmission({
     email: " Graduate@Example.com ",
     legalName: "홍길동",
-    completionStage: "semester_1",
     educationStartYear: 2026,
     educationStartMonth: 1,
     educationEndYear: 2026,
     educationEndMonth: 6,
     campus: "서울",
-    claimedCohort: 999,
   });
 
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.value.emailNormalized, "graduate@example.com");
-    assert.equal(result.value.inferredCohort, 15);
+    assert.equal(result.value.inferredGeneration, 15);
     assert.equal(result.value.cohortRuleVersion, "ssafy-half-year-v1");
   }
   assert.equal(normalizeGraduateEmail(" Graduate@Example.com "), "graduate@example.com");
@@ -111,7 +111,6 @@ test("수료생 인증은 지정된 캠퍼스를 반드시 선택해야 한다",
   const baseInput = {
     email: "graduate@example.com",
     legalName: "홍길동",
-    completionStage: "semester_1",
     educationStartYear: 2026,
     educationStartMonth: 1,
     educationEndYear: 2026,

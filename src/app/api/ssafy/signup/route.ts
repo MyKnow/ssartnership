@@ -12,10 +12,12 @@ import { hashPassword } from "@/lib/password";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { setUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
 import { findSsafyVerifiedMember } from "@/lib/ssafy-verify/member";
 import {
   buildSsafySignupMemberInsertPayload,
   parseSsafySignupCompleteInput,
+  persistSsafySignupMemberDomainRecords,
 } from "@/lib/ssafy-verify/signup";
 import {
   clearSsafySignupSession,
@@ -103,6 +105,25 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdminClient();
+    const identifierReserved = await hasReservedMemberIdentifier({
+      mmUserId: signupSession.mattermostUserId,
+      mmUsername: signupSession.mattermostUsername,
+      ssafySub: signupSession.sub,
+    });
+    if (identifierReserved) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "blocked",
+        actorType: "guest",
+        identifier: signupSession.sub,
+        properties: { reason: "identifier_reserved" },
+      });
+      await clearSsafySignupSession();
+      return errorResponse("already_registered", 409, {
+        redirectTo: "/auth/login",
+      });
+    }
     const duplicate = await findSsafyVerifiedMember(supabase, {
       sub: signupSession.sub,
       mattermostUserId: signupSession.mattermostUserId,
@@ -169,6 +190,11 @@ export async function POST(request: Request) {
     }
 
     try {
+      await persistSsafySignupMemberDomainRecords(supabase, {
+        memberId: insertedMember.id,
+        session: signupSession,
+        persistedAt: agreedAt,
+      });
       await recordRequiredPolicyConsent({
         memberId: insertedMember.id,
         activePolicies,
@@ -182,7 +208,7 @@ export async function POST(request: Request) {
         ipAddress: context.ipAddress ?? null,
         userAgent: context.userAgent ?? null,
       });
-    } catch (error) {
+    } catch {
       await supabase.from("members").delete().eq("id", insertedMember.id);
       await logAuthSecurity({
         ...context,
@@ -192,8 +218,7 @@ export async function POST(request: Request) {
         actorId: insertedMember.id,
         identifier: signupSession.sub,
         properties: {
-          reason: "consent_failed",
-          message: error instanceof Error ? error.message : null,
+          reason: "member_domain_or_consent_failed",
         },
       });
       return errorResponse("signup_failed", 503);

@@ -8,9 +8,14 @@ export type MmUserDirectoryRow = {
   mm_username: string;
   display_name: string;
   campus?: string | null;
+  display_name_snapshot?: string | null;
+  campus_snapshot?: string | null;
   is_staff: boolean;
   source_years: number[];
+  source_generations?: number[];
+  is_active?: boolean;
   synced_at?: string | null;
+  last_seen_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

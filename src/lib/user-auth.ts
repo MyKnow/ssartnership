@@ -88,7 +88,7 @@ function verifyToken(token: string) {
   }
 }
 
-export async function getSignedUserSession() {
+async function getRawSignedUserSession() {
   noStore();
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
@@ -97,6 +97,33 @@ export async function getSignedUserSession() {
   }
   return verifyToken(token);
 }
+
+/**
+ * Returns a cryptographically valid session only while the underlying member
+ * remains active. This DB check is deliberate: cookie signatures alone cannot
+ * revoke access after a soft delete.
+ */
+export async function getSignedUserSession() {
+  const session = (await getRawSignedUserSession()) as SignedUserSession | null;
+  if (!session?.userId) {
+    return null;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data } = await supabase
+      .from("members")
+      .select("id")
+      .eq("id", session.userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    return data?.id ? session : null;
+  } catch {
+    return null;
+  }
+}
+
+export const getActiveUserSession = getSignedUserSession;
 
 export async function setUserSession(
   userId: string,
@@ -107,7 +134,7 @@ export async function setUserSession(
   },
 ) {
   const now = Date.now();
-  const currentSession = (await getSignedUserSession()) as SignedUserSession | null;
+  const currentSession = (await getRawSignedUserSession()) as SignedUserSession | null;
   const resolvedPolicyConsentSnapshot =
     options?.policyConsentSnapshot !== undefined
       ? options.policyConsentSnapshot
@@ -155,6 +182,7 @@ export async function getUserSession() {
       "id,must_change_password,service_policy_version,privacy_policy_version,profile_photo_review_status",
     )
     .eq("id", session.userId)
+    .is("deleted_at", null)
     .maybeSingle();
   const activePoliciesPromise = getActiveRequiredPolicies();
 
