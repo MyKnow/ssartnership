@@ -1,6 +1,6 @@
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
+import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import type { PartnerViewContext } from "@/lib/repositories/partner-repository";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export async function getPartnerViewerContext(
   userId?: string | null,
@@ -9,19 +9,15 @@ export async function getPartnerViewerContext(
     return { authenticated: false };
   }
 
-  const { data } = await getSupabaseAdminClient()
-    .from("members")
-    .select("year,graduate_verified_at")
-    .eq("id", userId)
-    .maybeSingle();
+  const member = await getMemberCanonicalProfile(userId);
 
   return {
     authenticated: true,
     viewerAudience: resolvePartnerAudienceFromMemberYear(
-      typeof data?.year === "number" ? data.year : null,
+      member?.generation ?? null,
       new Date(),
       undefined,
-      { graduateVerifiedAt: data?.graduate_verified_at ?? null },
+      { graduateVerifiedAt: member?.graduateVerifiedAt ?? null },
     ),
   };
 }

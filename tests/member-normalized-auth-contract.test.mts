@@ -176,6 +176,38 @@ test("인증 카드와 아바타 API는 private 이미지 ledger만 제공한다
   }
 });
 
+test("홈·쿠폰·제휴 접근 권한은 정규화 회원 프로필만 사용한다", () => {
+  const partnerViewContext = readRepoFile("src/lib/partner-view-context.ts");
+  const couponsPage = readRepoFile("src/app/(site)/coupons/page.tsx");
+  const homePage = readRepoFile("src/app/(site)/page.tsx");
+  const partnerDetailPage = readRepoFile(
+    "src/app/(site)/partners/[id]/page.tsx",
+  );
+  const homeStateRoute = readRepoFile(
+    "src/app/api/partners/home-state/route.ts",
+  );
+
+  assert.match(partnerViewContext, /getMemberCanonicalProfile/);
+  assert.match(couponsPage, /getMemberCanonicalProfile/);
+  assert.match(homePage, /getMemberCanonicalProfile/);
+  for (const source of [partnerDetailPage, homeStateRoute]) {
+    assert.match(source, /getPartnerViewerContext/);
+  }
+
+  for (const source of [
+    partnerViewContext,
+    couponsPage,
+    homePage,
+    partnerDetailPage,
+    homeStateRoute,
+  ]) {
+    assert.doesNotMatch(
+      source,
+      /\.select\("year,graduate_verified_at"|member\?\.year|member\?\.graduate_verified_at/,
+    );
+  }
+});
+
 test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
   const provision = readRepoFile("src/lib/member-manual-add/provision.ts");

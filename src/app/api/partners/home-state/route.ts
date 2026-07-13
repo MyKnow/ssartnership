@@ -3,10 +3,9 @@ import {
   getHomePartnerState,
   normalizeHomePartnerStateIds,
 } from "@/lib/home-partner-state";
-import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
+import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { partnerRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const runtime = "nodejs";
@@ -39,22 +38,10 @@ export async function GET(request: Request) {
   }
 
   const session = await getSignedUserSession().catch(() => null);
-  const member = session?.userId
-    ? await getSupabaseAdminClient()
-        .from("members")
-        .select("year,graduate_verified_at")
-        .eq("id", session.userId)
-        .maybeSingle()
-        .then(({ data }) => data)
-    : null;
+  const viewerContext = await getPartnerViewerContext(session?.userId);
   const allowedPartners = await partnerRepository.getPartners({
-    authenticated: Boolean(session?.userId),
-    viewerAudience: resolvePartnerAudienceFromMemberYear(
-      typeof member?.year === "number" ? member.year : null,
-      new Date(),
-      undefined,
-      { graduateVerifiedAt: member?.graduate_verified_at ?? null },
-    ),
+    authenticated: viewerContext.authenticated,
+    viewerAudience: viewerContext.viewerAudience,
   });
   const allowedIds = new Set(allowedPartners.map((partner) => partner.id));
   const partnerIds = requestedIds.filter((partnerId) =>
