@@ -312,9 +312,9 @@ export async function createOrReuseMemberProfileImage(input: {
       width: normalized.width,
       height: normalized.height,
       source: input.imageSource,
-      // Do not let a failed external sync block authentication. The image only
-      // becomes visible after the activation transaction below succeeds.
-      status: "superseded",
+      // This is promoted immediately after the independent profile fields are
+      // updated. A failed promotion is explicitly discarded by the caller.
+      status: "pending",
     })
     .select("id")
     .single();
@@ -323,6 +323,30 @@ export async function createOrReuseMemberProfileImage(input: {
   }
 
   return { imageId: image.id as string, changed: true };
+}
+
+export async function discardMemberProfileImage(input: {
+  memberId: string;
+  imageId: string;
+  updatedAt?: string;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("member_profile_images")
+    .update({
+      status: "superseded",
+      delete_after: new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      updated_at: input.updatedAt ?? new Date().toISOString(),
+    })
+    .eq("id", input.imageId)
+    .eq("member_id", input.memberId)
+    .eq("status", "pending")
+    .is("deleted_at", null);
+  if (error) {
+    throw new Error("실패한 프로필 사진 동기화를 정리하지 못했습니다.");
+  }
 }
 
 export async function activateMemberProfileImage(input: {

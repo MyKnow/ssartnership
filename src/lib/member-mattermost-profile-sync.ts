@@ -3,6 +3,7 @@ import {
   activateMemberProfileImage,
   createOrReuseMemberProfileImage,
   decodeMemberProfileImageData,
+  discardMemberProfileImage,
 } from "@/lib/member-profile-images";
 import {
   findMmUserDirectoryEntryByUsername,
@@ -207,6 +208,13 @@ export async function syncMemberMattermostProfile(
       imageUpdated = true;
       changedFields.push("avatar");
     } catch {
+      if (nextProfileImageId) {
+        await discardMemberProfileImage({
+          memberId: member.id,
+          imageId: nextProfileImageId,
+          updatedAt,
+        }).catch(() => undefined);
+      }
       imageSkipped = true;
     }
   }
