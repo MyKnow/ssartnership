@@ -39,6 +39,16 @@ test("SSAFY Verify falls back to the PKCE redirect flow while the SDK is unavail
   assert.doesNotMatch(button, /errorCode: "SDK_NOT_READY"/);
 });
 
+test("SSAFY Verify uses the same allowed enrollment scopes for popup and redirect starts", () => {
+  const button = readRepoFile("src/components/auth/SsafyVerifyButton.tsx");
+  const scopeUsages = button.match(
+    /scopes:\s*\[\.\.\.SSAFY_VERIFY_PROFILE_SCOPES\]/g,
+  );
+
+  assert.match(button, /import \{ SSAFY_VERIFY_PROFILE_SCOPES \}/);
+  assert.equal(scopeUsages?.length, 2);
+});
+
 test("SSAFY Verify failures render sanitized temporary diagnostics in popup and redirect paths", () => {
   const button = readRepoFile("src/components/auth/SsafyVerifyButton.tsx");
   const relay = readRepoFile("src/components/auth/SsafyVerifyCallbackRelay.tsx");

@@ -35,7 +35,7 @@ const issuer = "https://verify.myknow.xyz";
 const clientId = "client_example_public";
 const redirectUri = "https://partner.example.com/ssafy";
 
-test("SSAFY Verify scopes are split between profile enrollment and re-auth", async () => {
+test("SSAFY Verify enrollment requests only scopes currently allowed for this client", async () => {
   const {
     SSAFY_VERIFY_PROFILE_SCOPES,
     SSAFY_VERIFY_REAUTH_SCOPES,
@@ -44,12 +44,15 @@ test("SSAFY Verify scopes are split between profile enrollment and re-auth", asy
   assert.deepEqual([...SSAFY_VERIFY_PROFILE_SCOPES], [
     "ssafy.verify",
     "ssafy.affiliation",
-    "ssafy.track",
     "ssafy.name",
     "ssafy.profile_image",
     "ssafy.role",
     "ssafy.mattermost_id",
   ]);
+  assert.equal(
+    (SSAFY_VERIFY_PROFILE_SCOPES as readonly string[]).includes("ssafy.track"),
+    false,
+  );
 
   assert.deepEqual([...SSAFY_VERIFY_REAUTH_SCOPES], [
     "ssafy.verify",
