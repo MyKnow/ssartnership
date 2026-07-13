@@ -97,6 +97,11 @@ type PartnerServiceRow = {
   location: string;
 };
 
+type PartnerReviewMemberRow = {
+  display_name: string | null;
+  generation: number | null;
+};
+
 type PartnerReviewRow = {
   id: string;
   partner_id: string;
@@ -143,18 +148,7 @@ type PartnerReviewRow = {
           | null;
       }[]
     | null;
-  member?:
-    | {
-        display_name: string | null;
-        mm_username: string | null;
-        year: number | null;
-      }
-    | {
-        display_name: string | null;
-        mm_username: string | null;
-        year: number | null;
-      }[]
-    | null;
+  member?: PartnerReviewMemberRow | PartnerReviewMemberRow[] | null;
 };
 
 type PartnerAuditLogRow = {
@@ -332,7 +326,7 @@ async function loadSupabasePartnerNotificationCenter(
       ? await supabase
           .from("partner_reviews")
           .select(
-            "id,partner_id,rating,title,body,created_at,updated_at,deleted_at,hidden_at,partner:partners(id,name,company_id,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(display_name,mm_username,year)",
+            "id,partner_id,rating,title,body,created_at,updated_at,deleted_at,hidden_at,partner:partners(id,name,company_id,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(display_name,generation)",
           )
           .in("partner_id", partnerIds)
           .order("created_at", { ascending: false })
@@ -368,7 +362,7 @@ async function loadSupabasePartnerNotificationCenter(
           title: review.title,
           body: review.body,
           authorMaskedName: maskPartnerReviewAuthorName(member?.display_name),
-          authorRoleLabel: getPartnerReviewAuthorRoleLabel(member?.year),
+          authorRoleLabel: getPartnerReviewAuthorRoleLabel(member?.generation),
           createdAt: review.created_at,
         },
       ] as const;

@@ -13,9 +13,7 @@ import {
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminAccount = {
-  // During expand/contract this remains the members.id so existing sessions and
-  // audit references remain valid. admin_profiles.id becomes the actor ID in
-  // the later contract migration.
+  // Session and audit references use the owning members.id.
   id: string;
   loginId: string;
   displayName: string;
@@ -35,17 +33,20 @@ export type AdminAccount = {
 
 type AdminMemberRow = {
   id: string;
-  mm_username: string | null;
+  mattermost_account_id: string | null;
   display_name: string | null;
   email: string | null;
   must_change_password: boolean | null;
   deleted_at: string | null;
-  // Legacy compatibility fields are read only while migration backfill rolls
-  // out. New writes always target admin_profiles first.
-  admin_permission_id?: string | null;
-  admin_managed_campus_slugs?: string[] | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+type AdminDirectoryRow = {
+  id: string;
+  mm_username: string;
+  display_name: string | null;
+  is_active: boolean;
 };
 
 type AdminProfileRow = {
@@ -60,7 +61,8 @@ type AdminProfileRow = {
 };
 
 const ADMIN_MEMBER_SELECT =
-  "id,mm_username,display_name,email,must_change_password,deleted_at,admin_permission_id,admin_managed_campus_slugs,created_at,updated_at";
+  "id,mattermost_account_id,display_name,email,must_change_password,deleted_at,created_at,updated_at";
+const ADMIN_DIRECTORY_SELECT = "id,mm_username,display_name,is_active";
 const ADMIN_PROFILE_SELECT =
   "id,member_id,permission_template_key,managed_campus_slugs,is_active,permission_version,created_at,updated_at";
 
@@ -82,18 +84,22 @@ function getTemplateOrNull(permissionId: string | null | undefined) {
 function mapAdminProfile(
   profile: AdminProfileRow,
   member: AdminMemberRow,
+  directory: AdminDirectoryRow,
 ): AdminAccount | null {
   const template = getTemplateOrNull(profile.permission_template_key);
-  if (!template || !member.mm_username) {
+  if (!template || !directory.mm_username) {
     return null;
   }
 
   return {
     id: member.id,
-    loginId: member.mm_username,
-    displayName: member.display_name?.trim() || member.mm_username,
+    loginId: directory.mm_username,
+    displayName:
+      member.display_name?.trim()
+      || directory.display_name?.trim()
+      || directory.mm_username,
     email: member.email,
-    isActive: profile.is_active && !member.deleted_at,
+    isActive: profile.is_active && !member.deleted_at && directory.is_active,
     mustChangePassword: member.must_change_password === true,
     initialSetupExpiresAt: null,
     initialSetupCompletedAt: profile.created_at ?? new Date(0).toISOString(),
@@ -105,36 +111,6 @@ function mapAdminProfile(
     ),
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
-    permissions: normalizeAdminPermissionMatrix(template.permissions),
-  };
-}
-
-function mapLegacyAdminMember(member: AdminMemberRow): AdminAccount | null {
-  const permissionId = isSuperAdminLoginId(member.mm_username)
-    ? "super_admin"
-    : member.admin_permission_id;
-  const template = getTemplateOrNull(permissionId);
-  if (!template || !member.mm_username) {
-    return null;
-  }
-
-  return {
-    id: member.id,
-    loginId: member.mm_username,
-    displayName: member.display_name?.trim() || member.mm_username,
-    email: member.email,
-    isActive: !member.deleted_at,
-    mustChangePassword: member.must_change_password === true,
-    initialSetupExpiresAt: null,
-    initialSetupCompletedAt: member.created_at ?? new Date(0).toISOString(),
-    lastLoginAt: null,
-    permissionVersion: 1,
-    permissionId: template.key,
-    managedCampusSlugs: normalizeAdminManagedCampusSlugs(
-      member.admin_managed_campus_slugs ?? [],
-    ),
-    createdAt: member.created_at,
-    updatedAt: member.updated_at,
     permissions: normalizeAdminPermissionMatrix(template.permissions),
   };
 }
@@ -163,6 +139,22 @@ async function getAdminProfileByMemberId(memberId: string) {
   return data as AdminProfileRow;
 }
 
+async function getDirectoryById(directoryId: string | null) {
+  if (!directoryId) {
+    return null;
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("mm_user_directory")
+    .select(ADMIN_DIRECTORY_SELECT)
+    .eq("id", directoryId)
+    .maybeSingle();
+  if (error || !data) {
+    return null;
+  }
+  return data as AdminDirectoryRow;
+}
+
 async function getAdminAccountFromProfile(memberId: string) {
   const [profile, member] = await Promise.all([
     getAdminProfileByMemberId(memberId),
@@ -171,7 +163,8 @@ async function getAdminAccountFromProfile(memberId: string) {
   if (!profile || !member) {
     return null;
   }
-  return mapAdminProfile(profile, member);
+  const directory = await getDirectoryById(member.mattermost_account_id);
+  return directory ? mapAdminProfile(profile, member, directory) : null;
 }
 
 export async function getAdminAccountById(memberId: string) {
@@ -179,15 +172,7 @@ export async function getAdminAccountById(memberId: string) {
     return null;
   }
 
-  const account = await getAdminAccountFromProfile(memberId);
-  if (account) {
-    return account;
-  }
-
-  // The fallback is intentionally temporary: it protects sessions created
-  // before the one-time backfill has reached a Preview environment.
-  const member = await getMemberById(memberId);
-  return member ? mapLegacyAdminMember(member) : null;
+  return getAdminAccountFromProfile(memberId);
 }
 
 export async function getAdminAccountByLoginId(loginId: string) {
@@ -197,16 +182,27 @@ export async function getAdminAccountByLoginId(loginId: string) {
   }
 
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("members")
+  const { data: directory, error: directoryError } = await supabase
+    .from("mm_user_directory")
     .select("id")
     .eq("mm_username", username)
+    .eq("is_active", true)
     .maybeSingle();
-  if (error || !data?.id) {
+  if (directoryError || !directory?.id) {
     return null;
   }
 
-  return getAdminAccountById(data.id as string);
+  const { data: member, error: memberError } = await supabase
+    .from("members")
+    .select("id")
+    .eq("mattermost_account_id", directory.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (memberError || !member?.id) {
+    return null;
+  }
+
+  return getAdminAccountById(member.id as string);
 }
 
 export async function authenticateAdminCredentials(
@@ -230,17 +226,7 @@ export async function listAdminAccounts() {
 
   const normalizedProfiles = (profiles ?? []) as AdminProfileRow[];
   if (normalizedProfiles.length === 0) {
-    const { data: legacyMembers, error: legacyError } = await supabase
-      .from("members")
-      .select(ADMIN_MEMBER_SELECT)
-      .or(`admin_permission_id.not.is.null,mm_username.eq.${SUPER_ADMIN_USERNAME}`)
-      .order("updated_at", { ascending: false });
-    if (legacyError) {
-      throw new Error("관리자 계정을 불러오지 못했습니다.");
-    }
-    return ((legacyMembers ?? []) as AdminMemberRow[])
-      .map(mapLegacyAdminMember)
-      .filter((account): account is AdminAccount => account !== null);
+    return [];
   }
 
   const memberIds = normalizedProfiles.map((profile) => profile.member_id);
@@ -252,13 +238,36 @@ export async function listAdminAccounts() {
     throw new Error("관리자 회원 정보를 불러오지 못했습니다.");
   }
 
+  const normalizedMembers = (members ?? []) as AdminMemberRow[];
+  const directoryIds = normalizedMembers
+    .map((member) => member.mattermost_account_id)
+    .filter((directoryId): directoryId is string => Boolean(directoryId));
+  const { data: directories, error: directoryError } = directoryIds.length
+    ? await supabase
+        .from("mm_user_directory")
+        .select(ADMIN_DIRECTORY_SELECT)
+        .in("id", directoryIds)
+    : { data: [], error: null };
+  if (directoryError) {
+    throw new Error("관리자 Mattermost 계정을 불러오지 못했습니다.");
+  }
+
   const memberById = new Map(
-    ((members ?? []) as AdminMemberRow[]).map((member) => [member.id, member]),
+    normalizedMembers.map((member) => [member.id, member]),
+  );
+  const directoryById = new Map(
+    ((directories ?? []) as AdminDirectoryRow[]).map((directory) => [
+      directory.id,
+      directory,
+    ]),
   );
   return normalizedProfiles
     .map((profile) => {
       const member = memberById.get(profile.member_id);
-      return member ? mapAdminProfile(profile, member) : null;
+      const directory = member?.mattermost_account_id
+        ? directoryById.get(member.mattermost_account_id)
+        : null;
+      return member && directory ? mapAdminProfile(profile, member, directory) : null;
     })
     .filter((account): account is AdminAccount => account !== null);
 }
@@ -298,20 +307,6 @@ async function persistAdminProfile(input: {
   if (error) {
     throw new Error("관리자 권한 프로필을 저장하지 못했습니다.");
   }
-
-  // Dual-write only for old readers that have not yet moved to admin_profiles.
-  const { error: legacyError } = await supabase
-    .from("members")
-    .update({
-      admin_permission_id: input.isActive ? input.permissionTemplateKey : null,
-      admin_managed_campus_slugs: input.isActive
-        ? input.managedCampusSlugs
-        : [],
-    })
-    .eq("id", input.memberId);
-  if (legacyError) {
-    throw new Error("기존 관리자 권한 호환 정보를 저장하지 못했습니다.");
-  }
 }
 
 export async function grantMemberAdminPermission(input: {
@@ -341,10 +336,20 @@ export async function grantMemberAdminPermission(input: {
   }
 
   const supabase = getSupabaseAdminClient();
+  const { data: directory, error: directoryError } = await supabase
+    .from("mm_user_directory")
+    .select("id")
+    .eq("mm_username", memberUsername)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (directoryError || !directory?.id) {
+    throw new Error("회원을 찾을 수 없습니다.");
+  }
+
   const { data: member, error } = await supabase
     .from("members")
     .select("id")
-    .eq("mm_username", memberUsername)
+    .eq("mattermost_account_id", directory.id)
     .is("deleted_at", null)
     .maybeSingle();
   if (error || !member?.id) {

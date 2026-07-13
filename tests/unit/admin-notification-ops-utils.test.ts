@@ -113,20 +113,20 @@ describe("admin-notification-ops-utils", () => {
     expect(utils.isMattermostConfigured()).toBe(true);
 
     expect(utils.normalizeSourceYears([15, "14", "bad", 15, null])).toEqual([15, 14]);
-    expect(utils.getMattermostSenderCandidateYears({ is_staff: false, source_years: [], year: 15 })).toEqual([15]);
+    expect(utils.getMattermostSenderCandidateYears({ isStaff: false, sourceYears: [], generation: 15 })).toEqual([15]);
     expect(
       utils.getMattermostSenderCandidateYears({
-        is_staff: true,
-        source_years: [14, 16, 14, 0, -1],
-        year: 0,
+        isStaff: true,
+        sourceYears: [14, 16, 14, 0, -1],
+        generation: 0,
       }),
     ).toEqual([16, 14]);
 
     expect(
       utils.hasMattermostSenderForMember({
-        is_staff: true,
-        source_years: [14, 16],
-        year: 0,
+        isStaff: true,
+        sourceYears: [14, 16],
+        generation: 0,
       }),
     ).toBe(true);
   });

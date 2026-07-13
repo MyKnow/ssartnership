@@ -3,7 +3,9 @@ import { unstable_noStore as noStore } from "next/cache";
 import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
+  getMemberPolicyConsentVersions,
 } from "@/lib/policy-documents";
+import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
@@ -178,24 +180,29 @@ export async function getUserSession() {
   const supabase = getSupabaseAdminClient();
   const memberPromise = supabase
     .from("members")
-    .select(
-      "id,must_change_password,service_policy_version,privacy_policy_version,profile_photo_review_status",
-    )
+    .select("id,must_change_password")
     .eq("id", session.userId)
     .is("deleted_at", null)
     .maybeSingle();
   const activePoliciesPromise = getActiveRequiredPolicies();
+  const consentVersionsPromise = getMemberPolicyConsentVersions(session.userId);
+  const photoStatePromise = getMemberProfilePhotoState(session.userId);
 
-  const [{ data: member }, activePolicies] = await Promise.all([
+  const [{ data: member }, activePolicies, consentVersions, photoState] = await Promise.all([
     memberPromise,
     activePoliciesPromise,
+    consentVersionsPromise,
+    photoStatePromise,
   ]);
 
   if (!member?.id) {
     return null;
   }
 
-  const policyStatus = evaluateRequiredPolicyStatus(member, activePolicies);
+  const policyStatus = evaluateRequiredPolicyStatus(
+    consentVersions,
+    activePolicies,
+  );
   const consentSnapshotIsFresh =
     session.policyConsentSnapshot?.serviceVersion === activePolicies.service.version &&
     session.policyConsentSnapshot?.privacyVersion === activePolicies.privacy.version;
@@ -205,7 +212,7 @@ export async function getUserSession() {
     mustChangePassword: Boolean(member.must_change_password),
     requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
     requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
-      member.profile_photo_review_status,
+      photoState.reviewStatus,
     ),
   };
 }

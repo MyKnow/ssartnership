@@ -4,6 +4,7 @@ import AdminProfilePhotoReviewQueue, {
 } from "@/components/admin/AdminProfilePhotoReviewQueue";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { getMemberProfilePhotoStates } from "@/lib/member-profile-images";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   approveMemberProfilePhotoAction,
@@ -21,38 +22,68 @@ export default async function AdminProfilePhotosPage() {
   const [replacementsResult, currentPhotosResult] = await Promise.all([
     supabase
       .from("member_profile_images")
-      .select("id,member_id,created_at,member:members!member_profile_images_member_id_fkey(id,display_name,year,profile_photo_review_status)")
+      .select("id,member_id,created_at,member:members!member_profile_images_member_id_fkey(id,display_name,generation)")
       .is("graduate_verification_request_id", null)
       .not("member_id", "is", null)
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(PHOTO_QUEUE_LIMIT),
     supabase
-      .from("members")
-      .select("id,display_name,year,active_profile_image_id,profile_photo_review_status,updated_at")
-      .eq("profile_photo_review_status", "approved")
-      .or("active_profile_image_id.not.is.null,avatar_content_type.not.is.null,avatar_url.not.is.null")
+      .from("member_profile_images")
+      .select("id,member_id,created_at,updated_at,member:members!member_profile_images_member_id_fkey(id,display_name,generation)")
+      .not("member_id", "is", null)
+      .eq("status", "approved")
+      .is("deleted_at", null)
       .order("updated_at", { ascending: false })
-      .limit(PHOTO_QUEUE_LIMIT),
+      .limit(PHOTO_QUEUE_LIMIT * 4),
   ]);
 
   if (replacementsResult.error || currentPhotosResult.error) {
     throw new Error("프로필 사진 검토 큐를 불러오지 못했습니다.");
   }
 
+  const currentPhotoStates = await getMemberProfilePhotoStates(
+    (currentPhotosResult.data ?? []).flatMap((image) =>
+      image.member_id ? [image.member_id] : [],
+    ),
+  );
+
   const replacements = (replacementsResult.data ?? []).flatMap((replacement) => {
     const member = Array.isArray(replacement.member)
       ? replacement.member[0]
       : replacement.member;
     if (!member) return [];
-    return [{ ...replacement, member }] as AdminProfilePhotoReplacement[];
+    return [
+      {
+        ...replacement,
+        member: {
+          ...member,
+          year: member.generation ?? null,
+        },
+      },
+    ] as AdminProfilePhotoReplacement[];
   });
+  const currentPhotos = (currentPhotosResult.data ?? []).flatMap((image) => {
+    const member = Array.isArray(image.member) ? image.member[0] : image.member;
+    const state = member ? currentPhotoStates.get(member.id) : null;
+    if (
+      !member
+      || state?.reviewStatus !== "approved"
+      || state.activeProfileImageId !== image.id
+    ) return [];
+    return [{
+      id: member.id,
+      display_name: member.display_name,
+      year: member.generation ?? null,
+      updated_at: image.updated_at ?? image.created_at ?? "",
+    }] as AdminExistingProfilePhoto[];
+  }).slice(0, PHOTO_QUEUE_LIMIT);
 
   return (
     <AdminShell title="프로필 사진">
       <AdminProfilePhotoReviewQueue
         replacements={replacements}
-        currentPhotos={(currentPhotosResult.data ?? []) as AdminExistingProfilePhoto[]}
+        currentPhotos={currentPhotos}
         actions={{
           approveReplacement: approveMemberProfilePhotoAction,
           rejectReplacement: rejectMemberProfilePhotoAction,

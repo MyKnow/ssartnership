@@ -2,20 +2,18 @@ import { parseSsafyProfile } from "../../../lib/mm-profile.ts";
 
 export type AdminMember = {
   id: string;
-  mm_user_id: string;
-  mm_username: string;
-  display_name?: string | null;
-  year?: number | null;
-  staff_source_year?: number | null;
+  mmUserId: string;
+  mmUsername: string;
+  displayName?: string | null;
+  generation?: number | null;
+  staffSourceGeneration?: number | null;
   campus?: string | null;
-  must_change_password: boolean;
-  service_policy_version?: number | null;
-  service_policy_consented_at?: string | null;
-  privacy_policy_version?: number | null;
-  privacy_policy_consented_at?: string | null;
-  marketing_policy_version?: number | null;
-  marketing_policy_consented_at?: string | null;
-  notification_preferences?: {
+  mustChangePassword: boolean;
+  serviceConsent: boolean;
+  privacyConsent: boolean;
+  marketingConsent: boolean | null;
+  hasProfileImage: boolean;
+  notificationPreferences?: {
     enabled: boolean;
     announcementEnabled: boolean;
     newPartnerEnabled: boolean;
@@ -25,25 +23,8 @@ export type AdminMember = {
     marketingEnabled: boolean;
     activeDeviceCount?: number;
   };
-  consent_history?: Array<{
-    kind: "service" | "privacy" | "marketing";
-    version: number;
-    agreed_at: string;
-    title?: string | null;
-    effective_at?: string | null;
-  }>;
-  consent_activity?: Array<{
-    kind: "service" | "privacy" | "marketing";
-    agreed: boolean;
-    at: string;
-    version?: number | null;
-    title?: string | null;
-    effective_at?: string | null;
-  }>;
-  avatar_content_type?: string | null;
-  avatar_url?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 export type MemberSortOption = "recent" | "updated" | "name";
@@ -56,7 +37,7 @@ export type NormalizedMember = AdminMember & {
   _displayName: string;
   _search: string;
   _campus: string;
-  _year: number | null;
+  _generation: number | null;
   _serviceConsentStatus: ConsentFilterOption;
   _privacyConsentStatus: ConsentFilterOption;
   _marketingConsentStatus: ConsentFilterOption;
@@ -69,75 +50,57 @@ export type NormalizedMember = AdminMember & {
   _marketingEnabledStatus: NotificationPreferenceFilterOption;
 };
 
-export type ActivePolicyVersions = {
-  service: number | null;
-  privacy: number | null;
-  marketing: number | null;
-};
-
-function getConsentStatus(value?: number | null, activeVersion?: number | null) {
-  return value && activeVersion && value === activeVersion ? "agreed" : "pending";
+function getConsentStatus(value?: boolean | null) {
+  return value ? "agreed" : "pending";
 }
 
 function getNotificationPreferenceStatus(value?: boolean | null) {
   return value ? "enabled" : "disabled";
 }
 
-export function normalizeAdminMembers(
-  members: AdminMember[],
-  activePolicyVersions?: ActivePolicyVersions,
-): NormalizedMember[] {
+export function normalizeAdminMembers(members: AdminMember[]): NormalizedMember[] {
   return members.map((member) => {
-    const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
+    const profile = parseSsafyProfile(member.displayName ?? member.mmUsername);
     const displayName =
-      profile.displayName ?? member.display_name ?? member.mm_username;
+      profile.displayName ?? member.displayName ?? member.mmUsername;
     const campus = member.campus ?? profile.campus ?? "";
 
     return {
       ...member,
       _displayName: displayName,
       _search: [
-        member.mm_username,
-        member.mm_user_id,
-        member.display_name ?? "",
+        member.mmUsername,
+        member.mmUserId,
+        member.displayName ?? "",
         displayName,
       ]
         .join(" ")
         .toLowerCase(),
       _campus: campus,
-      _year: member.year ?? null,
-      _serviceConsentStatus: getConsentStatus(
-        member.service_policy_version,
-        activePolicyVersions?.service ?? null,
-      ),
-      _privacyConsentStatus: getConsentStatus(
-        member.privacy_policy_version,
-        activePolicyVersions?.privacy ?? null,
-      ),
-      _marketingConsentStatus: getConsentStatus(
-        member.marketing_policy_version,
-        activePolicyVersions?.marketing ?? null,
-      ),
+      _generation: member.generation ?? null,
+      _serviceConsentStatus: getConsentStatus(member.serviceConsent),
+      _privacyConsentStatus: getConsentStatus(member.privacyConsent),
+      _marketingConsentStatus: getConsentStatus(member.marketingConsent),
       _pushEnabledStatus: getNotificationPreferenceStatus(
-        member.notification_preferences?.enabled,
+        member.notificationPreferences?.enabled,
       ),
       _announcementEnabledStatus: getNotificationPreferenceStatus(
-        member.notification_preferences?.announcementEnabled,
+        member.notificationPreferences?.announcementEnabled,
       ),
       _newPartnerEnabledStatus: getNotificationPreferenceStatus(
-        member.notification_preferences?.newPartnerEnabled,
+        member.notificationPreferences?.newPartnerEnabled,
       ),
       _expiringPartnerEnabledStatus: getNotificationPreferenceStatus(
-        member.notification_preferences?.expiringPartnerEnabled,
+        member.notificationPreferences?.expiringPartnerEnabled,
       ),
       _reviewEnabledStatus: getNotificationPreferenceStatus(
-        member.notification_preferences?.reviewEnabled,
+        member.notificationPreferences?.reviewEnabled,
       ),
       _mmEnabledStatus: getNotificationPreferenceStatus(
-        member.notification_preferences?.mmEnabled,
+        member.notificationPreferences?.mmEnabled,
       ),
       _marketingEnabledStatus: getNotificationPreferenceStatus(
-        member.notification_preferences?.marketingEnabled,
+        member.notificationPreferences?.marketingEnabled,
       ),
     };
   });
@@ -153,8 +116,8 @@ export function getAdminMemberYearOptions(members: NormalizedMember[]) {
   return Array.from(
     new Set(
       members
-        .map((member) => member._year)
-        .filter((year): year is number => year !== null),
+        .map((member) => member._generation)
+        .filter((generation): generation is number => generation !== null),
     ),
   ).sort((a, b) => b - a);
 }
@@ -200,21 +163,23 @@ export function filterAdminMembers({
       ? members
       : members.filter((member) =>
           filterValue === "mustChangePassword"
-            ? member.must_change_password
-            : !member.must_change_password,
+            ? member.mustChangePassword
+            : !member.mustChangePassword,
         );
 
   const searchFiltered = query
     ? statusFiltered.filter((member) => member._search.includes(query))
     : statusFiltered;
-  const yearFiltered =
+  const generationFiltered =
     yearFilter === "all"
       ? searchFiltered
-      : searchFiltered.filter((member) => String(member._year ?? "") === yearFilter);
+      : searchFiltered.filter(
+          (member) => String(member._generation ?? "") === yearFilter,
+        );
   const campusFiltered =
     campusFilter === "all"
-      ? yearFiltered
-      : yearFiltered.filter((member) => member._campus === campusFilter);
+      ? generationFiltered
+      : generationFiltered.filter((member) => member._campus === campusFilter);
   const serviceConsentFiltered =
     serviceConsentFilter === "all"
       ? campusFiltered
@@ -280,11 +245,11 @@ export function filterAdminMembers({
         );
 
   return [...marketingEnabledFiltered].sort((a, b) => {
-    if (a.must_change_password !== b.must_change_password) {
-      return a.must_change_password ? -1 : 1;
+    if (a.mustChangePassword !== b.mustChangePassword) {
+      return a.mustChangePassword ? -1 : 1;
     }
     if (sortValue === "updated") {
-      return new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime();
+      return new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime();
     }
     if (sortValue === "name") {
       const compare = a._displayName.localeCompare(b._displayName, "ko");
@@ -292,6 +257,6 @@ export function filterAdminMembers({
         return compare;
       }
     }
-    return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+    return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
   });
 }

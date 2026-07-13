@@ -23,8 +23,8 @@ export type AdminMemberDetailViewProps = {
     displayName: string;
     mmUsername: string;
     mmUserId: string | null;
-    year: number;
-    yearLabel: string;
+    generation: number;
+    generationLabel: string;
     campus: string;
     mustChangePassword: boolean;
     createdAt: string | null;
@@ -88,7 +88,7 @@ export default function AdminMemberDetailView({
           },
           {
             label: "기수/캠퍼스",
-            value: `${member.yearLabel} · ${member.campus}`,
+            value: `${member.generationLabel} · ${member.campus}`,
             hint: "가입 프로필 기준",
           },
           {
@@ -133,7 +133,7 @@ export default function AdminMemberDetailView({
                     ? "비밀번호 변경 필요"
                     : "비밀번호 정상"}
                 </Badge>
-                <Badge variant="neutral">{member.yearLabel}</Badge>
+                <Badge variant="neutral">{member.generationLabel}</Badge>
               </div>
               <h2 className="break-words text-2xl font-semibold tracking-[-0.03em] text-foreground">
                 {member.displayName}
@@ -193,7 +193,7 @@ export default function AdminMemberDetailView({
               id: member.id,
               displayName: member.displayName,
               campus: member.campus,
-              year: member.year,
+              generation: member.generation,
               mmUsername: member.mmUsername,
               mustChangePassword: member.mustChangePassword,
             }}

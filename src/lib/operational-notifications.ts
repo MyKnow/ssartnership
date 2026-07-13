@@ -42,8 +42,6 @@ type OperationalSubscriptionInput = {
   };
 };
 
-const SUPER_ADMIN_USERNAME = "myknow";
-
 let webPushPromise: Promise<WebPushModule> | null = null;
 
 async function getWebPush() {
@@ -470,35 +468,49 @@ export async function createAdminOperationalNotification(input: {
     throw new Error(notificationError?.message ?? "관리자 알림을 저장하지 못했습니다.");
   }
 
-  const { data: adminRows, error: adminError } = await supabase
-    .from("members")
-    .select(
-      "id,mm_username,admin_permission_id,preferences:admin_notification_preferences(enabled,portal_enabled,push_enabled,security_enabled,partner_request_enabled,expiring_partner_enabled)",
-    )
-    .or(`admin_permission_id.not.is.null,mm_username.eq.${SUPER_ADMIN_USERNAME}`);
-  if (adminError) {
-    throw new Error(adminError.message);
+  const { data: profileRows, error: profileError } = await supabase
+    .from("admin_profiles")
+    .select("member_id")
+    .eq("is_active", true);
+  if (profileError) {
+    throw new Error(profileError.message);
   }
 
-  const admins = (adminRows ?? [])
-    .filter(
-      (row) =>
-        Boolean(row.admin_permission_id) ||
-        row.mm_username === SUPER_ADMIN_USERNAME,
-    )
-    .map((row) => {
-    const preferenceRow = Array.isArray(row.preferences)
-      ? row.preferences[0] ?? null
-      : row.preferences;
-    return {
-      id: String(row.id),
-      channels: resolveAdminNotificationChannels({
-        type: input.type,
-        requestedChannels: input.requestedChannels ?? [...ADMIN_NOTIFICATION_CHANNELS],
-        preferences: toAdminPreferences(preferenceRow as Record<string, unknown> | null),
-      }),
-    };
-  });
+  const adminIds = Array.from(
+    new Set(
+      (profileRows ?? [])
+        .map((profile) => profile.member_id)
+        .filter((memberId): memberId is string => Boolean(memberId)),
+    ),
+  );
+  const { data: preferenceRows, error: preferenceError } = adminIds.length
+    ? await supabase
+        .from("admin_notification_preferences")
+        .select(
+          "admin_id,enabled,portal_enabled,push_enabled,security_enabled,partner_request_enabled,expiring_partner_enabled",
+        )
+        .in("admin_id", adminIds)
+    : { data: [], error: null };
+  if (preferenceError) {
+    throw new Error(preferenceError.message);
+  }
+
+  const preferenceByAdminId = new Map(
+    (preferenceRows ?? []).map((preference) => [
+      preference.admin_id,
+      preference,
+    ]),
+  );
+  const admins = adminIds.map((adminId) => ({
+    id: adminId,
+    channels: resolveAdminNotificationChannels({
+      type: input.type,
+      requestedChannels: input.requestedChannels ?? [...ADMIN_NOTIFICATION_CHANNELS],
+      preferences: toAdminPreferences(
+        (preferenceByAdminId.get(adminId) ?? null) as Record<string, unknown> | null,
+      ),
+    }),
+  }));
 
   const recipientRows = admins
     .filter((admin) => admin.channels.includes("portal"))

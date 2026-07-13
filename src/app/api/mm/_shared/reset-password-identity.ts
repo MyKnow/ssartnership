@@ -6,16 +6,24 @@ import {
   resolveSelectableMemberByUsername,
 } from "@/lib/ssafy-verify/directory";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import type { MemberRow } from "@/lib/mm-member-sync";
 
 type DirectoryEntry = Awaited<ReturnType<typeof findMmUserDirectoryEntryByUsername>>;
+type ResetPasswordMember = {
+  id: string;
+  mattermost_account_id: string | null;
+  display_name: string | null;
+  generation: number;
+  staff_source_generation: number | null;
+  campus: string | null;
+  updated_at: string | null;
+};
 
 export type ResetPasswordMemberResolution =
   | {
       kind: "resolved";
-      directoryEntry: DirectoryEntry;
+      directoryEntry: NonNullable<DirectoryEntry>;
       resolvedStudentYear: number | null;
-      member: MemberRow;
+      member: ResetPasswordMember;
     }
   | {
       kind: "inaccessible";
@@ -30,33 +38,35 @@ export async function resolveResetPasswordMember(
 ): Promise<ResetPasswordMemberResolution> {
   const supabase = getSupabaseAdminClient();
   const memberSelect =
-    "id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,avatar_url,updated_at";
-  const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
+    "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,updated_at";
+  let directoryEntry = await findMmUserDirectoryEntryByUsername(username);
   let resolvedStudentYear: number | null = null;
-  let member: MemberRow | null = null;
+  let member: ResetPasswordMember | null = null;
 
-  if (directoryEntry?.mm_user_id) {
-    const { data: memberById } = await supabase
-      .from("members")
-      .select(memberSelect)
-      .eq("mm_user_id", directoryEntry.mm_user_id)
-      .maybeSingle();
-    member = (memberById as MemberRow | null) ?? null;
-  } else {
+  if (!directoryEntry?.id) {
     const resolved = await resolveSelectableMemberByUsername(username);
     if (resolved) {
       resolvedStudentYear = resolved.year;
       if (resolved.directorySnapshot) {
         await upsertMmUserDirectorySnapshot(resolved.directorySnapshot);
       }
-      const { data: memberById } = await supabase
-        .from("members")
-        .select(memberSelect)
-        .eq("mm_user_id", resolved.user.id)
-        .maybeSingle();
-      member = (memberById as MemberRow | null) ?? null;
+      directoryEntry = await findMmUserDirectoryEntryByUsername(username);
     }
   }
+
+  if (!directoryEntry?.id) {
+    return {
+      kind: "not_registered",
+    };
+  }
+
+  const { data: memberById } = await supabase
+    .from("members")
+    .select(memberSelect)
+    .eq("mattermost_account_id", directoryEntry.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  member = (memberById as ResetPasswordMember | null) ?? null;
 
   if (!member?.id) {
     return {

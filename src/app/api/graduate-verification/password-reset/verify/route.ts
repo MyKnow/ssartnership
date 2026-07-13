@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     if (member) {
       await sendGraduatePasswordResetEmail({
         to: email,
-        displayName: member.display_name ?? "회원",
+        displayName: member.displayName ?? "회원",
         token: resetToken,
       });
     }

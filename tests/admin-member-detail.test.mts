@@ -36,16 +36,20 @@ describe("admin member detail selectors", () => {
 
   it("uses the latest consent activity so a marketing withdrawal is not shown as agreed", () => {
     const overview = buildAdminMemberPolicyOverview({
-      member: {
-        servicePolicyVersion: 1,
-        servicePolicyConsentedAt: "2026-07-01T09:00:00.000Z",
-        privacyPolicyVersion: 2,
-        privacyPolicyConsentedAt: "2026-07-01T09:00:00.000Z",
-        marketingPolicyVersion: 1,
-        marketingPolicyConsentedAt: "2026-07-02T09:00:00.000Z",
-      },
       activeVersions: { service: 2, privacy: 2, marketing: 1 },
       consentHistory: [
+        {
+          kind: "service",
+          version: 1,
+          agreed_at: "2026-07-01T09:00:00.000Z",
+          policy_documents: null,
+        },
+        {
+          kind: "privacy",
+          version: 2,
+          agreed_at: "2026-07-01T09:00:00.000Z",
+          policy_documents: null,
+        },
         {
           kind: "marketing",
           version: 1,

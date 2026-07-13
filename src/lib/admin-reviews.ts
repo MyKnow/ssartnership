@@ -86,6 +86,24 @@ type AdminReviewScopeOptions = {
   managedCampusSlugs?: string[] | null;
 };
 
+type MemberDirectoryRelation =
+  | {
+      mm_username: string | null;
+    }
+  | {
+      mm_username: string | null;
+    }[]
+  | null;
+
+type AdminReviewMemberRow = {
+  id: string;
+  display_name: string | null;
+  generation: number | null;
+  campus: string | null;
+  mattermost_account_id: string | null;
+  directory?: MemberDirectoryRelation;
+};
+
 type AdminReviewRow = {
   id: string;
   partner_id: string;
@@ -118,19 +136,7 @@ type AdminReviewRow = {
       slug: string;
     } | null;
   }[] | null;
-  member?: {
-    id: string;
-    display_name: string | null;
-    mm_username: string | null;
-    year: number | null;
-    campus: string | null;
-  } | {
-    id: string;
-    display_name: string | null;
-    mm_username: string | null;
-    year: number | null;
-    campus: string | null;
-  }[] | null;
+  member?: AdminReviewMemberRow | AdminReviewMemberRow[] | null;
 };
 
 type AdminReviewReactionRow = PartnerReviewReactionRow;
@@ -167,7 +173,7 @@ function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 const REVIEW_SELECT =
-  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,deleted_by_member_id,hidden_at,partner:partners(id,name,company_id,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(id,display_name,mm_username,year,campus)";
+  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,deleted_by_member_id,hidden_at,partner:partners(id,name,company_id,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(id,display_name,generation,campus,mattermost_account_id,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username))";
 
 function parseBooleanParam(value: string | string[] | undefined) {
   const input = Array.isArray(value) ? value[0] : value;
@@ -247,9 +253,10 @@ function mapAdminReviewRow(
   const partner = getSingleRelation(row.partner);
   const company = getSingleRelation(partner?.company);
   const member = getSingleRelation(row.member);
+  const directory = getSingleRelation(member?.directory);
   const memberName = member?.display_name ?? "익명";
-  const memberUsername = member?.mm_username ?? null;
-  const memberYear = member?.year ?? null;
+  const memberUsername = directory?.mm_username ?? null;
+  const memberYear = member?.generation ?? null;
   const memberCampus = member?.campus ?? null;
   return {
     id: row.id,

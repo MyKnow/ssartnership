@@ -31,12 +31,13 @@ type RawPolicyRow = Omit<PolicyRow, "kind"> & {
 
 type MemberRow = {
   id?: string;
-  service_policy_version?: number | null;
-  service_policy_consented_at?: string | null;
-  privacy_policy_version?: number | null;
-  privacy_policy_consented_at?: string | null;
-  marketing_policy_version?: number | null;
-  marketing_policy_consented_at?: string | null;
+};
+
+type PolicyConsentRow = {
+  member_id: string;
+  kind: string;
+  version: number;
+  agreed_at: string | null;
 };
 
 const ENV_KEYS = [
@@ -68,17 +69,17 @@ function createPolicyRow(overrides: Partial<PolicyRow>): PolicyRow {
 function createSupabaseMock({
   policyDocuments = [],
   member = null,
+  policyConsents = [],
   policyDocumentsError = null,
   memberError = null,
   policyConsentError = null,
-  memberUpdateError = null,
 }: {
   policyDocuments?: RawPolicyRow[];
   member?: MemberRow | null;
+  policyConsents?: PolicyConsentRow[];
   policyDocumentsError?: { message: string } | null;
   memberError?: { message: string } | null;
   policyConsentError?: { message: string } | null;
-  memberUpdateError?: { message: string } | null;
 }) {
   return {
     from(table: string) {
@@ -137,16 +138,11 @@ function createSupabaseMock({
       }
 
       if (table === "members") {
-        let pendingUpdate: Record<string, unknown> | null = null;
-
         const builder = {
           select() {
             return builder;
           },
           eq() {
-            if (pendingUpdate) {
-              return Promise.resolve({ error: memberUpdateError });
-            }
             return builder;
           },
           maybeSingle() {
@@ -155,21 +151,34 @@ function createSupabaseMock({
               error: memberError,
             });
           },
-          update(payload: Record<string, unknown>) {
-            pendingUpdate = payload;
-            return builder;
-          },
         };
 
         return builder;
       }
 
       if (table === "member_policy_consents") {
-        return {
+        let rows = [...policyConsents];
+        const builder = {
+          select() {
+            return builder;
+          },
+          eq(field: string, value: unknown) {
+            if (field === "member_id") {
+              rows = rows.filter((row) => row.member_id === value);
+            }
+            return builder;
+          },
           upsert() {
             return Promise.resolve({ error: policyConsentError });
           },
+          then(resolve: (value: { data: PolicyConsentRow[]; error: { message: string } | null }) => unknown) {
+            return Promise.resolve({
+              data: rows,
+              error: policyConsentError,
+            }).then(resolve);
+          },
         };
+        return builder;
       }
 
       throw new Error(`Unsupported table: ${table}`);
@@ -356,11 +365,12 @@ describe("policy documents", () => {
             is_active: true,
           }),
         ],
-        member: {
-          service_policy_version: 1,
-          privacy_policy_version: 3,
-          marketing_policy_version: 4,
-        },
+        member: { id: "member-1" },
+        policyConsents: [
+          { member_id: "member-1", kind: "service", version: 1, agreed_at: "2026-01-01T00:00:00.000Z" },
+          { member_id: "member-1", kind: "privacy", version: 3, agreed_at: "2026-01-01T00:00:00.000Z" },
+          { member_id: "member-1", kind: "marketing", version: 4, agreed_at: "2026-01-01T00:00:00.000Z" },
+        ],
       }),
     );
 
@@ -368,8 +378,8 @@ describe("policy documents", () => {
     const bundle = await policies.getMemberPolicyReviewBundle("member-1");
     const status = policies.evaluateRequiredPolicyStatus(
       {
-        service_policy_version: 1,
-        privacy_policy_version: 3,
+        service: 1,
+        privacy: 3,
       },
       bundle.requiredPolicies,
     );
@@ -468,10 +478,11 @@ describe("policy documents", () => {
             is_active: true,
           }),
         ],
-        member: {
-          service_policy_version: 2,
-          privacy_policy_version: 3,
-        },
+        member: { id: "member-1" },
+        policyConsents: [
+          { member_id: "member-1", kind: "service", version: 2, agreed_at: "2026-01-01T00:00:00.000Z" },
+          { member_id: "member-1", kind: "privacy", version: 3, agreed_at: "2026-01-01T00:00:00.000Z" },
+        ],
       }),
     );
     policies = await loadPolicyDocumentsModule({ useMockData: false });
@@ -632,26 +643,6 @@ describe("policy documents", () => {
       message: "동의 저장 실패",
     });
 
-    getSupabaseAdminClient.mockReturnValue(
-      createSupabaseMock({
-        memberUpdateError: { message: "회원 갱신 실패" },
-      }),
-    );
-    policies = await loadPolicyDocumentsModule({ useMockData: false });
-    await expect(
-      policies.recordMarketingPolicyConsent({
-        memberId: "member-1",
-        activePolicy: createPolicyRow({
-          id: "marketing-v2",
-          kind: "marketing",
-          version: 2,
-        }),
-        agreed: true,
-      }),
-    ).rejects.toMatchObject({
-      code: "db_error",
-      message: "회원 갱신 실패",
-    });
   });
 
   test("records required policy consent and surfaces failures", async () => {
@@ -693,20 +684,5 @@ describe("policy documents", () => {
       message: "필수 동의 저장 실패",
     });
 
-    getSupabaseAdminClient.mockReturnValue(
-      createSupabaseMock({
-        memberUpdateError: { message: "필수 동의 갱신 실패" },
-      }),
-    );
-    policies = await loadPolicyDocumentsModule({ useMockData: false });
-    await expect(
-      policies.recordRequiredPolicyConsent({
-        memberId: "member-1",
-        activePolicies,
-      }),
-    ).rejects.toMatchObject({
-      code: "db_error",
-      message: "필수 동의 갱신 실패",
-    });
   });
 });

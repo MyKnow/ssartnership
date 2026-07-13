@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin-notification-ops";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { isPushConfigured } from "@/lib/push";
+import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +35,8 @@ export default async function AdminPushPage({
   ] = await Promise.all([
     supabase
       .from("members")
-      .select("id,display_name,mm_username,year,campus")
-      .order("year", { ascending: true })
+      .select("id,display_name,mattermost_account_id,generation,campus")
+      .order("generation", { ascending: true })
       .order("campus", { ascending: true })
       .order("display_name", { ascending: true }),
     supabase.from("partners").select("id,name").order("name", { ascending: true }),
@@ -44,6 +45,20 @@ export default async function AdminPushPage({
 
   const partners = partnerResult.error ? [] : partnerResult.data ?? [];
   const safeMembers = memberResult.error ? [] : memberResult.data ?? [];
+  const directoryByAccountId = await getMmUserDirectoryEntriesByAccountIds(
+    safeMembers
+      .map((member) => member.mattermost_account_id)
+      .filter((accountId): accountId is string => Boolean(accountId)),
+  );
+  const members = safeMembers.map((member) => ({
+    id: member.id,
+    display_name: member.display_name,
+    mm_username: member.mattermost_account_id
+      ? directoryByAccountId.get(member.mattermost_account_id)?.mm_username ?? ""
+      : "",
+    year: member.generation,
+    campus: member.campus,
+  }));
   const recentLogCount = notificationOverview.recentLogs.length;
   const automaticSummaryCount = notificationOverview.automaticSummaries.length;
 
@@ -57,7 +72,7 @@ export default async function AdminPushPage({
         />
         <StatsRow
           items={[
-            { label: "회원 대상", value: `${safeMembers.length.toLocaleString()}명`, hint: "개인·기수·캠퍼스 기준" },
+            { label: "회원 대상", value: `${members.length.toLocaleString()}명`, hint: "개인·기수·캠퍼스 기준" },
             { label: "제휴처 대상", value: `${partners.length.toLocaleString()}개`, hint: "신규 제휴/종료 임박 연결" },
             { label: "최근 로그", value: `${recentLogCount.toLocaleString()}건`, hint: "최근 30일 운영 로그" },
             { label: "자동 규칙", value: `${automaticSummaryCount.toLocaleString()}개`, hint: "예약/자동 발송 요약" },
@@ -74,7 +89,7 @@ export default async function AdminPushPage({
               pushConfigured={isPushConfigured()}
               mattermostConfigured={isMattermostNotificationConfigured()}
               partners={partners}
-              members={safeMembers}
+              members={members}
               recentLogs={notificationOverview.recentLogs}
               initialTab={initialTab}
               automaticSummaries={notificationOverview.automaticSummaries}

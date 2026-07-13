@@ -65,7 +65,7 @@ export async function sendPushToAudience(
     const memberQuery = supabase.from("members").select("id");
     const { data: memberRows, error: memberError } =
       resolvedAudience.scope === "year"
-        ? await memberQuery.eq("year", resolvedAudience.year)
+        ? await memberQuery.eq("generation", resolvedAudience.year)
         : resolvedAudience.scope === "campus"
           ? await memberQuery.eq("campus", resolvedAudience.campus)
           : await memberQuery;

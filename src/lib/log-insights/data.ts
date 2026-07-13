@@ -72,6 +72,27 @@ function chunkValues<T>(values: T[], size: number) {
   return chunks;
 }
 
+type MemberDirectoryRelation =
+  | {
+      mm_username: string | null;
+    }
+  | {
+      mm_username: string | null;
+    }[]
+  | null;
+
+type MemberLookupRow = {
+  id: string;
+  display_name: string | null;
+  mattermost_account_id: string | null;
+  directory: MemberDirectoryRelation;
+};
+
+function resolveDirectoryUsername(directory: MemberDirectoryRelation) {
+  const entry = Array.isArray(directory) ? directory[0] : directory;
+  return entry?.mm_username ?? null;
+}
+
 async function fetchMemberLookup(
   supabase: AdminSupabaseClient,
   memberIds: string[],
@@ -84,7 +105,12 @@ async function fetchMemberLookup(
   const uniqueIds = Array.from(new Set(memberIds));
   const results = await Promise.all(
     chunkValues(uniqueIds, MEMBER_LOOKUP_CHUNK_SIZE).map((chunk) =>
-      supabase.from('members').select('id,display_name,mm_username').in('id', chunk),
+      supabase
+        .from('members')
+        .select(
+          'id,display_name,mattermost_account_id,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username)',
+        )
+        .in('id', chunk),
     ),
   );
 
@@ -95,11 +121,13 @@ async function fetchMemberLookup(
     }
 
     (result.data ?? []).forEach((row) => {
-      lookup.set(row.id, {
-        ...(row as MemberLookupRecord),
-        actor_name:
-          parseSsafyProfile((row as MemberLookupRecord).display_name ?? undefined).displayName ??
-          (row as MemberLookupRecord).display_name,
+      const member = row as MemberLookupRow;
+      lookup.set(member.id, {
+        id: member.id,
+        displayName: member.display_name,
+        mattermostUsername: resolveDirectoryUsername(member.directory),
+        actorName:
+          parseSsafyProfile(member.display_name ?? undefined).displayName ?? member.display_name,
       });
     });
   }
@@ -185,9 +213,8 @@ export function resolveActorMeta(
   }
 
   return {
-    actor_name:
-      member.actor_name,
-    actor_mm_username: member.mm_username,
+    actor_name: member.actorName,
+    actor_mm_username: member.mattermostUsername,
   };
 }
 
@@ -552,9 +579,9 @@ export async function loadAdminLogNormalizedPage(
     }
     memberLookup.set(row.actor_id, {
       id: row.actor_id,
-      display_name: row.actor_name,
-      mm_username: row.actor_mm_username,
-      actor_name: row.actor_name,
+      displayName: row.actor_name,
+      mattermostUsername: row.actor_mm_username,
+      actorName: row.actor_name,
     });
   }
   const productRows = rows

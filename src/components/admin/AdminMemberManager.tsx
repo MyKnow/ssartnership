@@ -18,7 +18,6 @@ import {
 } from "@/lib/admin-ia";
 import {
   type AdminMember,
-  type ActivePolicyVersions,
   type ConsentFilterOption,
   type MemberFilterOption,
   type MemberSortOption,
@@ -29,7 +28,6 @@ import {
 
 export default function AdminMemberManager({
   members,
-  activePolicyVersions,
   pagination,
   filters,
   options,
@@ -37,7 +35,6 @@ export default function AdminMemberManager({
   errorMessage,
 }: {
   members: AdminMember[];
-  activePolicyVersions: ActivePolicyVersions;
   pagination: {
     totalCount: number;
     page: number;
@@ -81,8 +78,8 @@ export default function AdminMemberManager({
   });
 
   const normalizedMembers = useMemo(
-    () => normalizeAdminMembers(members, activePolicyVersions),
-    [activePolicyVersions, members],
+    () => normalizeAdminMembers(members),
+    [members],
   );
   const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
   const currentPage = Math.min(pagination.page, totalPages);

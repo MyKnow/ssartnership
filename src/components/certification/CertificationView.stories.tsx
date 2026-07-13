@@ -24,11 +24,10 @@ function CertificationScreenStory({
       />
       <CertificationView
         member={{
-          mm_username: "story-member",
-          display_name: displayName,
+          mattermostUsername: "story-member",
+          displayName,
           generation: 15,
           campus,
-          avatar_url: null,
         }}
         initialTimestamp="2026-07-10T10:00:00.000+09:00"
         disableTracking

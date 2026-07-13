@@ -36,9 +36,9 @@ type ParsedLogMetadata = {
 };
 
 type AudienceMemberForMattermost = {
-  is_staff: boolean;
-  source_years: number[];
-  year: number;
+  isStaff: boolean;
+  sourceYears: number[];
+  generation: number;
 };
 
 export function isAdminNotificationType(
@@ -183,11 +183,11 @@ export function normalizeSourceYears(value: unknown): number[] {
 }
 
 export function getMattermostSenderCandidateYears(member: AudienceMemberForMattermost) {
-  if (!member.is_staff) {
-    return member.year > 0 ? [member.year] : [];
+  if (!member.isStaff) {
+    return member.generation > 0 ? [member.generation] : [];
   }
 
-  const years = member.source_years
+  const years = member.sourceYears
     .filter((year) => Number.isFinite(year) && year > 0)
     .sort((a, b) => b - a);
 

@@ -7,8 +7,8 @@ import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { adPackageRepository, partnerRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getHeaderSession } from "@/lib/header-session";
+import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +19,6 @@ export const metadata: Metadata = {
     index: false,
     follow: true,
   },
-};
-
-type MemberRow = {
-  year?: number | null;
-  graduate_verified_at?: string | null;
 };
 
 function getVisiblePartnerIds(
@@ -43,9 +38,8 @@ export default async function CouponsPage() {
     redirect(`/auth/login?returnTo=${encodeURIComponent("/coupons")}`);
   }
 
-  const supabase = getSupabaseAdminClient();
-  const [{ data: member }, headerSession] = await Promise.all([
-    supabase.from("members").select("year,graduate_verified_at").eq("id", session.userId).maybeSingle(),
+  const [member, headerSession] = await Promise.all([
+    getMemberCanonicalProfile(session.userId),
     getHeaderSession(session.userId),
   ]);
   if (!member) {
@@ -53,10 +47,10 @@ export default async function CouponsPage() {
   }
 
   const viewerAudience = resolvePartnerAudienceFromMemberYear(
-    typeof (member as MemberRow).year === "number" ? (member as MemberRow).year : null,
+    member.generation,
     new Date(),
     undefined,
-    { graduateVerifiedAt: (member as MemberRow).graduate_verified_at ?? null },
+    { graduateVerifiedAt: member.graduateVerifiedAt },
   );
   const partners = await partnerRepository.getPartners({
     authenticated: true,

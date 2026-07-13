@@ -12,13 +12,10 @@ const MEMBER_PROFILE_IMAGES_BUCKET = "member-profile-images";
 const GRADUATE_CERTIFICATES_BUCKET = "graduate-certificates";
 const ANONYMIZATION_BATCH_SIZE = 100;
 
-type MemberIdentityRow = {
+type MemberReservationSource = {
   id: string;
   email_normalized: string | null;
   mattermost_account_id: string | null;
-  mm_user_id: string | null;
-  mm_username: string | null;
-  ssafy_sub: string | null;
 };
 
 function toRpcReservations(reservations: MemberIdentifierReservation[]) {
@@ -32,7 +29,7 @@ export async function buildMemberIdentifierReservationsForMember(memberId: strin
   const supabase = getSupabaseAdminClient();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("id,email_normalized,mattermost_account_id,mm_user_id,mm_username,ssafy_sub")
+    .select("id,email_normalized,mattermost_account_id")
     .eq("id", memberId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -41,13 +38,13 @@ export async function buildMemberIdentifierReservationsForMember(memberId: strin
     return null;
   }
 
-  const identity = member as MemberIdentityRow;
+  const source = member as MemberReservationSource;
   const [mattermostResult, verificationResult] = await Promise.all([
-    identity.mattermost_account_id
+    source.mattermost_account_id
       ? supabase
           .from("mm_user_directory")
           .select("mm_user_id,mm_username")
-          .eq("id", identity.mattermost_account_id)
+          .eq("id", source.mattermost_account_id)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     supabase
@@ -56,14 +53,17 @@ export async function buildMemberIdentifierReservationsForMember(memberId: strin
       .eq("member_id", memberId)
       .maybeSingle(),
   ]);
+  if (mattermostResult.error || verificationResult.error) {
+    return null;
+  }
 
   const secret = getMemberIdentifierReservationSecret();
   return buildMemberIdentifierReservations(
     {
-      emailNormalized: identity.email_normalized,
-      mmUserId: mattermostResult.data?.mm_user_id ?? identity.mm_user_id,
-      mmUsername: mattermostResult.data?.mm_username ?? identity.mm_username,
-      ssafySub: verificationResult.data?.ssafy_sub ?? identity.ssafy_sub,
+      emailNormalized: source.email_normalized,
+      mmUserId: mattermostResult.data?.mm_user_id ?? null,
+      mmUsername: mattermostResult.data?.mm_username ?? null,
+      ssafySub: verificationResult.data?.ssafy_sub ?? null,
     },
     secret,
   );

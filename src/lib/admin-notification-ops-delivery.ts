@@ -25,10 +25,10 @@ import type {
 
 type AudienceMember = {
   id: string;
-  mm_user_id: string;
-  is_staff: boolean;
-  source_years: number[];
-  year: number;
+  mattermostUserId: string;
+  isStaff: boolean;
+  sourceYears: number[];
+  generation: number;
 };
 
 type ChannelDeliveryResult = {
@@ -151,7 +151,7 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
           url: params.url ?? undefined,
         },
         recipients: members.map((member) => ({
-          mattermostUserId: member.mm_user_id,
+          mattermostUserId: member.mattermostUserId,
         })),
         idempotencyKey: batchIdempotencyKey,
       });

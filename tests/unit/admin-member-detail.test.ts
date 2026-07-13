@@ -43,16 +43,20 @@ describe("admin member detail selectors", () => {
 
   it("lets the latest withdrawal override an older consent and enriches its document", () => {
     const overview = buildAdminMemberPolicyOverview({
-      member: {
-        servicePolicyVersion: 1,
-        servicePolicyConsentedAt: "2026-07-01T09:00:00.000Z",
-        privacyPolicyVersion: 2,
-        privacyPolicyConsentedAt: "2026-07-01T09:00:00.000Z",
-        marketingPolicyVersion: 1,
-        marketingPolicyConsentedAt: "2026-07-02T09:00:00.000Z",
-      },
       activeVersions: { service: 2, privacy: 2, marketing: 1 },
       consentHistory: [
+        {
+          kind: "service",
+          version: 1,
+          agreed_at: "2026-07-01T09:00:00.000Z",
+          policy_documents: null,
+        },
+        {
+          kind: "privacy",
+          version: 2,
+          agreed_at: "2026-07-01T09:00:00.000Z",
+          policy_documents: null,
+        },
         {
           kind: "marketing",
           version: 1,
@@ -95,12 +99,6 @@ describe("admin member detail selectors", () => {
   it("maps service and privacy activity, deduplicates matching history, and handles missing policy versions", () => {
     const agreedAt = "2026-07-04T10:00:00.000Z";
     const overview = buildAdminMemberPolicyOverview({
-      member: {
-        servicePolicyVersion: 3,
-        servicePolicyConsentedAt: agreedAt,
-        privacyPolicyVersion: 1,
-        privacyPolicyConsentedAt: "2026-06-01T10:00:00.000Z",
-      },
       activeVersions: { service: 3, privacy: null, marketing: 1 },
       consentHistory: [
         {
@@ -149,7 +147,6 @@ describe("admin member detail selectors", () => {
 
   it("records a marketing opt-in activity even before a matching policy document exists", () => {
     const overview = buildAdminMemberPolicyOverview({
-      member: {},
       activeVersions: { service: null, privacy: null, marketing: null },
       consentHistory: [],
       consentActivity: [

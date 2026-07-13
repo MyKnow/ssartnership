@@ -23,6 +23,7 @@
     "test:e2e:ci": "CI=1 PLAYWRIGHT_CHROMIUM_CHANNEL=chrome playwright test",
     "prepush": "npm run check:lockfile && npm run test:e2e:ci",
     "sync:preview": "node scripts/supabase-sync-preview.mjs",
+    "migrate:legacy-member-avatars": "sh -c 'if [ -f .env ]; then node --env-file=.env scripts/migrate-legacy-member-avatars.mjs \"$@\"; else node scripts/migrate-legacy-member-avatars.mjs \"$@\"; fi' --",
     "rss:refresh": "node scripts/refresh-rss.mjs",
     "perf:lighthouse": "npm run build && node scripts/lighthouse-check.mjs",
     "test:mm-profile": "node --import ./tests/alias-register.mjs --test tests/mm-profile-csv.test.mts",

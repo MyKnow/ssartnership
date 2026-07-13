@@ -309,9 +309,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-1",
               display_name: "김싸피",
-              mm_username: "ssafy15",
-              year: 15,
+              mattermost_account_id: "directory-member-1",
+              generation: 15,
               campus: "서울",
+              directory: { mm_username: "ssafy15" },
             },
           },
           {
@@ -336,9 +337,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-2",
               display_name: "박운영",
-              mm_username: "ops15",
-              year: null,
+              mattermost_account_id: "directory-member-2",
+              generation: null,
               campus: null,
+              directory: { mm_username: "ops15" },
             },
           },
         ],
@@ -473,9 +475,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-1",
               display_name: "김싸피",
-              mm_username: "match15",
-              year: 15,
+              mattermost_account_id: "directory-member-1",
+              generation: 15,
               campus: "서울",
+              directory: { mm_username: "match15" },
             },
           },
           {
@@ -504,9 +507,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-2",
               display_name: "박숨김",
-              mm_username: "hidden15",
-              year: 15,
+              mattermost_account_id: "directory-member-2",
+              generation: 15,
               campus: "서울",
+              directory: { mm_username: "hidden15" },
             },
           },
           {
@@ -535,9 +539,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-3",
               display_name: "이다른",
-              mm_username: "other15",
-              year: 15,
+              mattermost_account_id: "directory-member-3",
+              generation: 15,
               campus: "서울",
+              directory: { mm_username: "other15" },
             },
           },
           {
@@ -566,9 +571,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-4",
               display_name: "최별점",
-              mm_username: "rate15",
-              year: 15,
+              mattermost_account_id: "directory-member-4",
+              generation: 15,
               campus: "서울",
+              directory: { mm_username: "rate15" },
             },
           },
         ],
@@ -638,9 +644,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-1",
               display_name: "김숨김",
-              mm_username: "private15",
-              year: 15,
+              mattermost_account_id: "directory-member-1",
+              generation: 15,
               campus: "서울",
+              directory: { mm_username: "private15" },
             },
           },
           {
@@ -665,9 +672,10 @@ describe("admin review helpers", () => {
             member: {
               id: "member-2",
               display_name: "이공개",
-              mm_username: "public15",
-              year: 15,
+              mattermost_account_id: "directory-member-2",
+              generation: 15,
               campus: "서울",
+              directory: { mm_username: "public15" },
             },
           },
         ],

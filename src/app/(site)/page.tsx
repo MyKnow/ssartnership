@@ -18,8 +18,8 @@ import {
 } from "@/lib/site";
 import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
+import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 
 export const revalidate = 300;
@@ -67,18 +67,13 @@ export default async function Home() {
   const [headerSession, member] = await Promise.all([
     getHeaderSession(session?.userId ?? undefined),
     session?.userId
-      ? getSupabaseAdminClient()
-          .from("members")
-          .select("year,campus,graduate_verified_at")
-          .eq("id", session.userId)
-          .maybeSingle()
-          .then(({ data }) => data)
+      ? getMemberCanonicalProfile(session.userId)
       : Promise.resolve(null),
   ]);
   const resolvedPromotionSlides = await getHomePromotionSlides({
     authenticated: Boolean(session?.userId),
-    year: typeof member?.year === "number" ? member.year : null,
-    campus: typeof member?.campus === "string" ? member.campus : null,
+    year: member?.generation ?? null,
+    campus: member?.campus ?? null,
   });
 
   const jsonLd = {
@@ -129,10 +124,10 @@ export default async function Home() {
               viewerAuthenticated={Boolean(session?.userId)}
               currentUserId={session?.userId ?? null}
               viewerAudience={resolvePartnerAudienceFromMemberYear(
-                typeof member?.year === "number" ? member.year : null,
+                member?.generation ?? null,
                 new Date(),
                 undefined,
-                { graduateVerifiedAt: member?.graduate_verified_at ?? null },
+                { graduateVerifiedAt: member?.graduateVerifiedAt ?? null },
               )}
             />
           </Suspense>

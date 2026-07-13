@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { getMemberNotificationPreferences } from "@/lib/notification-preferences";
 import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
 import { collectPagedRows } from "@/lib/log-insights/paging";
+import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { getPushPreferencesOrDefault } from "@/lib/push";
 import {
@@ -117,10 +118,9 @@ export type EventRewardDrawPlan = {
 type MemberRow = {
   id: string;
   display_name: string | null;
-  mm_username: string | null;
-  year: number | null;
+  mattermost_account_id: string | null;
+  generation: number | null;
   campus: string | null;
-  marketing_policy_version: number | null;
   created_at: string | null;
 };
 
@@ -131,6 +131,10 @@ type PreferenceRow = {
 };
 
 type ReviewRow = {
+  member_id: string | null;
+};
+
+type PolicyConsentRow = {
   member_id: string | null;
 };
 
@@ -810,8 +814,8 @@ async function fetchAllEventMembers(
   const result = await collectPagedRows<MemberRow>(null, async (from, to) => {
     const { data, error } = await supabase
       .from("members")
-      .select("id,display_name,mm_username,year,campus,marketing_policy_version,created_at")
-      .order("year", { ascending: false })
+      .select("id,display_name,mattermost_account_id,generation,campus,created_at")
+      .order("generation", { ascending: false })
       .order("display_name", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to);
@@ -819,6 +823,30 @@ async function fetchAllEventMembers(
     return { rows: (data ?? []) as MemberRow[], error: false };
   });
   return result.rows;
+}
+
+async function fetchAllEventMarketingConsentMemberIds(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  policyDocumentId: string | null | undefined,
+) {
+  if (!policyDocumentId) {
+    return new Set<string>();
+  }
+
+  const result = await collectPagedRows<PolicyConsentRow>(null, async (from, to) => {
+    const { data, error } = await supabase
+      .from("member_policy_consents")
+      .select("member_id")
+      .eq("policy_document_id", policyDocumentId)
+      .order("member_id", { ascending: true })
+      .range(from, to);
+    assertEventRewardQuerySucceeded(error, "member_policy_consents");
+    return { rows: (data ?? []) as PolicyConsentRow[], error: false };
+  });
+
+  return new Set(
+    result.rows.flatMap((row) => (row.member_id ? [row.member_id] : [])),
+  );
 }
 
 async function fetchAllEventPreferences(
@@ -867,34 +895,46 @@ async function fetchAllEventReviewCounts(
 
 export async function getEventRewardAdminOverview(campaign: EventCampaign) {
   const supabase = getSupabaseAdminClient();
-  const [members, preferences, reviewCounts] = await Promise.all([
-    fetchAllEventMembers(supabase),
-    fetchAllEventPreferences(supabase),
-    fetchAllEventReviewCounts(supabase, campaign),
+  const [members, preferences, reviewCounts, activeMarketingPolicy] =
+    await Promise.all([
+      fetchAllEventMembers(supabase),
+      fetchAllEventPreferences(supabase),
+      fetchAllEventReviewCounts(supabase, campaign),
+      getPolicyDocumentByKind("marketing").catch(() => null),
+    ]);
+  const [directoryByAccountId, marketingConsentMemberIds] = await Promise.all([
+    getMmUserDirectoryEntriesByAccountIds(
+      members.flatMap((member) =>
+        member.mattermost_account_id ? [member.mattermost_account_id] : [],
+      ),
+    ),
+    fetchAllEventMarketingConsentMemberIds(
+      supabase,
+      activeMarketingPolicy?.id,
+    ),
   ]);
-  const activeMarketingPolicy = await getPolicyDocumentByKind("marketing").catch(
-    () => null,
-  );
   const preferenceMap = new Map(preferences.map((row) => [row.member_id ?? "", row]));
 
   return buildEventRewardAdminOverview(
     campaign,
-    members.map((member) => ({
-      id: member.id,
-      displayName: member.display_name,
-      mmUsername: member.mm_username ?? "",
-      year: member.year ?? 0,
-      campus: member.campus,
-      createdAt: member.created_at,
-      preferences: normalizePreferences({
-        row: preferenceMap.get(member.id),
-        marketingEnabled: Boolean(
-          activeMarketingPolicy &&
-            member.marketing_policy_version === activeMarketingPolicy.version,
-        ),
-      }),
-      reviewCount: reviewCounts.get(member.id) ?? 0,
-    })),
+    members.map((member) => {
+      const directory = member.mattermost_account_id
+        ? directoryByAccountId.get(member.mattermost_account_id)
+        : null;
+      return {
+        id: member.id,
+        displayName: member.display_name,
+        mmUsername: directory?.mm_username ?? "",
+        year: member.generation ?? 0,
+        campus: member.campus,
+        createdAt: member.created_at,
+        preferences: normalizePreferences({
+          row: preferenceMap.get(member.id),
+          marketingEnabled: marketingConsentMemberIds.has(member.id),
+        }),
+        reviewCount: reviewCounts.get(member.id) ?? 0,
+      };
+    }),
   );
 }
 
