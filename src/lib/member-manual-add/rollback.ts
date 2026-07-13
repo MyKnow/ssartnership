@@ -12,7 +12,10 @@ export async function rollbackManualMemberProvision(input: {
 
   const supabase = getSupabaseAdminClient();
   if (!input.existingMember) {
-    const { error } = await supabase.from("members").delete().eq("id", input.memberId);
+    const { error } = await supabase
+      .from("members")
+      .delete()
+      .eq("id", input.memberId);
     if (error) {
       throw wrapManualMemberAddDbError(
         error,
@@ -25,17 +28,17 @@ export async function rollbackManualMemberProvision(input: {
   const { error } = await supabase
     .from("members")
     .update({
-      mm_user_id: input.existingMember.mm_user_id,
-      mm_username: input.existingMember.mm_username,
+      mattermost_account_id: input.existingMember.mattermost_account_id,
       display_name: input.existingMember.display_name ?? null,
-      year: input.existingMember.year,
+      generation: input.existingMember.generation,
+      staff_source_generation: input.existingMember.staff_source_generation,
       campus: input.existingMember.campus ?? null,
       password_hash: input.existingMember.password_hash ?? null,
       password_salt: input.existingMember.password_salt ?? null,
       must_change_password: Boolean(input.existingMember.must_change_password),
-      avatar_content_type: input.existingMember.avatar_content_type ?? null,
-      avatar_base64: input.existingMember.avatar_base64 ?? null,
-      avatar_url: input.existingMember.avatar_url ?? null,
+      active_profile_image_id: input.existingMember.active_profile_image_id,
+      profile_photo_review_status:
+        input.existingMember.profile_photo_review_status ?? null,
       updated_at: input.existingMember.updated_at ?? new Date().toISOString(),
     })
     .eq("id", input.memberId);

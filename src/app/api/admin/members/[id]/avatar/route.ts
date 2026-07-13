@@ -1,10 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { ensureAdminApiPermission } from "@/lib/admin-access";
-import {
-  getMemberSyncCandidateYears,
-  resolveMemberSnapshotForYears,
-} from "@/lib/mm-member-sync";
+import { downloadPrivateMemberProfileImage } from "@/lib/graduate-verification-storage";
+import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const UUID_PATTERN =
@@ -16,20 +14,32 @@ function isUuid(value: string) {
   return UUID_PATTERN.test(value.trim());
 }
 
-function normalizeAvatarUrl(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) {
+async function getActiveProfileImage(memberId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("members")
+    .select("active_profile_image_id,profile_photo_review_status")
+    .eq("id", memberId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error || !data?.active_profile_image_id) {
     return null;
   }
-  try {
-    const url = new URL(value.trim());
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return null;
-    }
-    url.hash = "";
-    return url.toString();
-  } catch {
+  if (data.profile_photo_review_status !== "approved") {
     return null;
   }
+
+  const { data: image, error: imageError } = await supabase
+    .from("member_profile_images")
+    .select("storage_path")
+    .eq("id", data.active_profile_image_id)
+    .eq("status", "approved")
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (imageError || !image?.storage_path) {
+    return null;
+  }
+  return image.storage_path as string;
 }
 
 export async function GET(
@@ -46,122 +56,37 @@ export async function GET(
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("members")
-    .select("id,mm_user_id,mm_username,display_name,year,staff_source_year,campus,avatar_content_type,avatar_base64,avatar_url,updated_at")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    return NextResponse.json(
-      { message: "아바타를 불러오지 못했습니다." },
-      { status: 500 },
-    );
-  }
-
-  if (!data) {
-    return NextResponse.json(
-      { message: "아바타를 찾을 수 없습니다." },
-      { status: 404 },
-    );
-  }
-
-  let avatarContentType = data.avatar_content_type;
-  let avatarBase64 = data.avatar_base64;
-  let avatarUrl = normalizeAvatarUrl(data.avatar_url);
-
-  if (!avatarBase64 && data.mm_user_id && typeof data.year === "number") {
+  let storagePath = await getActiveProfileImage(id);
+  if (!storagePath) {
     try {
-      const resolved = await resolveMemberSnapshotForYears(
-        {
-          id: data.id,
-          mm_user_id: data.mm_user_id,
-          mm_username: data.mm_username,
-          display_name: data.display_name,
-          year: data.year,
-          staff_source_year: data.staff_source_year,
-          campus: data.campus,
-          avatar_content_type: data.avatar_content_type,
-          avatar_base64: data.avatar_base64,
-          avatar_url: data.avatar_url,
-          updated_at: data.updated_at,
-        },
-        getMemberSyncCandidateYears(data.staff_source_year ?? data.year),
-        new Map(),
-      );
-
-      if (resolved?.snapshot.avatarBase64 && resolved.snapshot.avatarContentType) {
-        avatarContentType = resolved.snapshot.avatarContentType;
-        avatarBase64 = resolved.snapshot.avatarBase64;
-        avatarUrl = resolved.snapshot.avatarUrl ?? avatarUrl;
-        await supabase
-          .from("members")
-          .update({
-            avatar_content_type: avatarContentType,
-            avatar_base64: avatarBase64,
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", id);
-      } else if (resolved?.snapshot.avatarUrl) {
-        avatarUrl = resolved.snapshot.avatarUrl;
-        await supabase
-          .from("members")
-          .update({
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", id);
-      }
+      await syncMemberMattermostProfile(id);
+      storagePath = await getActiveProfileImage(id);
     } catch (error) {
-      console.error("[admin-member-avatar] Mattermost avatar fallback failed", error);
+      console.error("[admin-member-avatar] profile sync failed", error);
     }
   }
-
-  if (!avatarBase64 && avatarUrl) {
-    const response = NextResponse.redirect(avatarUrl, 302);
-    response.headers.set("cache-control", "private, max-age=300");
-    return response;
-  }
-
-  if (!avatarBase64 || !avatarContentType) {
+  if (!storagePath) {
     return NextResponse.json(
       { message: "아바타를 찾을 수 없습니다." },
       { status: 404 },
     );
   }
 
-  if (!avatarContentType.startsWith("image/")) {
+  const body = await downloadPrivateMemberProfileImage(storagePath);
+  if (!body) {
     return NextResponse.json(
-      { message: "지원하지 않는 아바타 형식입니다." },
-      { status: 415 },
-    );
-  }
-
-  let body: ArrayBuffer;
-  try {
-    const binary = Buffer.from(avatarBase64, "base64");
-    body = binary.buffer.slice(
-      binary.byteOffset,
-      binary.byteOffset + binary.byteLength,
-    );
-  } catch {
-    return NextResponse.json(
-      { message: "아바타 데이터 형식이 올바르지 않습니다." },
-      { status: 500 },
+      { message: "아바타를 불러오지 못했습니다." },
+      { status: 404 },
     );
   }
 
   return new NextResponse(body, {
     status: 200,
     headers: {
-      "content-type": avatarContentType,
+      "content-type": "image/webp",
       "content-length": String(body.byteLength),
-      "cache-control": "private, max-age=31536000, immutable",
-      ...(data.updated_at
-        ? { "last-modified": new Date(data.updated_at).toUTCString() }
-        : {}),
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
     },
   });
 }

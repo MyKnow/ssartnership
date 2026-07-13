@@ -1,20 +1,20 @@
-import {
-  normalizeMattermostProfileImage,
-} from "@/lib/graduate-verification-files";
-import { storeMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { buildMattermostProfileSyncPatch } from "@/lib/member-domain";
+import {
+  activateMemberProfileImage,
+  createOrReuseMemberProfileImage,
+  decodeMemberProfileImageData,
+} from "@/lib/member-profile-images";
 import {
   findMmUserDirectoryEntryByUsername,
   upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
-import { fetchMemberSnapshotByUserId } from "@/lib/mm-member-sync";
+import { fetchMemberSnapshotByUserId } from "@/lib/mm-member-sync/snapshot";
+import type {
+  MemberSyncField,
+  MemberSyncSnapshot,
+  NormalizedMemberSyncSubject,
+} from "@/lib/mm-member-sync/shared";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-
-const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 type MemberMattermostSyncRow = {
   id: string;
@@ -32,50 +32,13 @@ type MattermostDirectoryRow = {
 };
 
 export type MattermostProfileSyncResult = {
+  member: NormalizedMemberSyncSubject;
+  snapshot: MemberSyncSnapshot;
   updated: boolean;
-  changedFields: Array<"displayName" | "campus" | "mmUsername" | "avatar">;
+  changedFields: MemberSyncField[];
   imageUpdated: boolean;
   imageSkipped: boolean;
 };
-
-function normalizeContentType(value: string | null) {
-  const normalized = value?.trim().toLowerCase() ?? "";
-  return ALLOWED_IMAGE_CONTENT_TYPES.has(normalized) ? normalized : null;
-}
-
-function isValidBase64(value: string) {
-  const normalized = value.replace(/\s/g, "");
-  if (!normalized || normalized.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
-    return false;
-  }
-  const decoded = Buffer.from(normalized, "base64");
-  return decoded.length > 0
-    && decoded.toString("base64").replace(/=+$/u, "")
-      === normalized.replace(/=+$/u, "");
-}
-
-export function decodeMattermostProfileImageData(
-  value: string | null | undefined,
-  fallbackContentType: string | null | undefined,
-) {
-  if (!value) {
-    return null;
-  }
-
-  const dataUriMatch = value.match(/^data:([^;,]+);base64,([\s\S]+)$/iu);
-  const contentType = normalizeContentType(
-    dataUriMatch?.[1] ?? fallbackContentType ?? null,
-  );
-  const encoded = dataUriMatch?.[2] ?? value;
-  if (!contentType || !isValidBase64(encoded)) {
-    return null;
-  }
-
-  return {
-    contentType,
-    source: Buffer.from(encoded.replace(/\s/g, ""), "base64"),
-  };
-}
 
 async function loadMattermostDirectory(member: MemberMattermostSyncRow) {
   if (!member.mattermost_account_id) {
@@ -83,63 +46,62 @@ async function loadMattermostDirectory(member: MemberMattermostSyncRow) {
   }
 
   const supabase = getSupabaseAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("mm_user_directory")
     .select("id,mm_user_id,mm_username")
     .eq("id", member.mattermost_account_id)
     .maybeSingle();
+  if (error) {
+    throw new Error("Mattermost 계정 디렉터리를 불러오지 못했습니다.");
+  }
   return (data as MattermostDirectoryRow | null) ?? null;
 }
 
-async function createOrReuseMattermostProfileImage(input: {
-  member: MemberMattermostSyncRow;
-  contentType: string;
-  source: Buffer;
+async function syncSsafyVerificationTrack(input: {
+  memberId: string;
+  snapshot: MemberSyncSnapshot;
+  updatedAt: string;
 }) {
-  const normalized = await normalizeMattermostProfileImage({
-    contentType: input.contentType,
-    source: input.source,
-  });
-  const supabase = getSupabaseAdminClient();
-  const { data: existing } = await supabase
-    .from("member_profile_images")
-    .select("id")
-    .eq("member_id", input.member.id)
-    .eq("sha256", normalized.sha256)
-    .eq("status", "approved")
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (existing?.id) {
-    return { imageId: existing.id as string, changed: existing.id !== input.member.active_profile_image_id };
+  if (!input.snapshot.track) {
+    return false;
   }
 
-  const storagePath = await storeMemberProfileImage({
-    memberId: input.member.id,
-    sha256: normalized.sha256,
-    buffer: normalized.buffer,
-  });
-  const { data: image, error } = await supabase
-    .from("member_profile_images")
-    .insert({
-      member_id: input.member.id,
-      storage_path: storagePath,
-      sha256: normalized.sha256,
-      content_type: normalized.contentType,
-      width: normalized.width,
-      height: normalized.height,
-      source: "mattermost",
-      status: "approved",
-      reviewed_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-  if (error || !image?.id) {
-    throw new Error("Mattermost 프로필 사진 상태를 저장하지 못했습니다.");
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("member_ssafy_verifications")
+    .select("track,track_name")
+    .eq("member_id", input.memberId)
+    .maybeSingle();
+  if (error) {
+    throw new Error("SSAFY 인증 정보를 불러오지 못했습니다.");
   }
-  return { imageId: image.id as string, changed: true };
+  if (!data) {
+    return false;
+  }
+  if (
+    data.track === input.snapshot.track
+    && data.track_name === input.snapshot.trackName
+  ) {
+    return false;
+  }
+
+  const { error: updateError } = await supabase
+    .from("member_ssafy_verifications")
+    .update({
+      track: input.snapshot.track,
+      track_name: input.snapshot.trackName,
+      updated_at: input.updatedAt,
+    })
+    .eq("member_id", input.memberId);
+  if (updateError) {
+    throw new Error("SSAFY 트랙 정보를 반영하지 못했습니다.");
+  }
+  return true;
 }
 
-export async function syncMemberMattermostProfile(memberId: string): Promise<MattermostProfileSyncResult | null> {
+export async function syncMemberMattermostProfile(
+  memberId: string,
+): Promise<MattermostProfileSyncResult | null> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
@@ -164,16 +126,18 @@ export async function syncMemberMattermostProfile(memberId: string): Promise<Mat
     return null;
   }
 
-  const generation = member.generation;
   await upsertMmUserDirectorySnapshot({
     mmUserId: snapshot.mmUserId,
     mmUsername: snapshot.mmUsername,
     displayName: snapshot.displayName,
     campus: snapshot.campus,
-    isStaff: generation === 0,
-    sourceYears: generation && generation > 0 ? [generation] : [],
+    isStaff: member.generation === 0,
+    sourceYears:
+      member.generation && member.generation > 0 ? [member.generation] : [],
   });
-  const refreshedDirectory = await findMmUserDirectoryEntryByUsername(snapshot.mmUsername);
+  const refreshedDirectory = await findMmUserDirectoryEntryByUsername(
+    snapshot.mmUsername,
+  );
   if (!refreshedDirectory?.id) {
     throw new Error("Mattermost 계정 연결을 저장하지 못했습니다.");
   }
@@ -190,71 +154,84 @@ export async function syncMemberMattermostProfile(memberId: string): Promise<Mat
       mmUsername: snapshot.mmUsername,
     },
   );
-  const changedFields = [...patch.changedFields] as MattermostProfileSyncResult["changedFields"];
-  let activeProfileImageId = member.active_profile_image_id;
+  const changedFields = [...patch.changedFields] as MemberSyncField[];
+  let nextProfileImageId: string | null = null;
   let imageUpdated = false;
   let imageSkipped = false;
 
-  const decodedImage = decodeMattermostProfileImageData(
+  const decodedImage = decodeMemberProfileImageData(
     snapshot.avatarBase64,
     snapshot.avatarContentType,
   );
   if (decodedImage) {
     try {
-      const image = await createOrReuseMattermostProfileImage({
-        member,
+      const image = await createOrReuseMemberProfileImage({
+        memberId: member.id,
+        activeProfileImageId: member.active_profile_image_id,
         ...decodedImage,
+        imageSource: "mattermost",
       });
-      activeProfileImageId = image.imageId;
-      imageUpdated = image.changed;
-      if (image.changed) {
-        changedFields.push("avatar");
-      }
+      nextProfileImageId = image.changed ? image.imageId : null;
     } catch {
-      // Mattermost avatar data is external input. A malformed or oversized image
-      // must not block the independently valid name/campus profile update.
+      // An external profile image must never block independent profile fields.
       imageSkipped = true;
     }
   }
 
   const updatedAt = new Date().toISOString();
-  if (
-    member.active_profile_image_id
-    && activeProfileImageId
-    && activeProfileImageId !== member.active_profile_image_id
-  ) {
-    await supabase
-      .from("member_profile_images")
-      .update({
-        status: "superseded",
-        delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: updatedAt,
-      })
-      .eq("id", member.active_profile_image_id)
-      .eq("status", "approved");
-  }
-
   const memberUpdate = {
     ...patch.member,
-    mattermost_account_id: refreshedDirectory.id,
-    ...(activeProfileImageId
-      ? {
-          active_profile_image_id: activeProfileImageId,
-          profile_photo_review_status: "approved",
-        }
+    ...(member.mattermost_account_id !== refreshedDirectory.id
+      ? { mattermost_account_id: refreshedDirectory.id }
       : {}),
-    updated_at: updatedAt,
   };
-  const { error: updateError } = await supabase
-    .from("members")
-    .update(memberUpdate)
-    .eq("id", member.id)
-    .is("deleted_at", null);
-  if (updateError) {
-    throw new Error("Mattermost 프로필을 반영하지 못했습니다.");
+  if (Object.keys(memberUpdate).length > 0) {
+    const { error: updateError } = await supabase
+      .from("members")
+      .update({
+        ...memberUpdate,
+        updated_at: updatedAt,
+      })
+      .eq("id", member.id)
+      .is("deleted_at", null);
+    if (updateError) {
+      throw new Error("Mattermost 프로필을 반영하지 못했습니다.");
+    }
+  }
+
+  if (nextProfileImageId) {
+    try {
+      await activateMemberProfileImage({
+        memberId: member.id,
+        previousImageId: member.active_profile_image_id,
+        nextImageId: nextProfileImageId,
+        updatedAt,
+      });
+      imageUpdated = true;
+      changedFields.push("avatar");
+    } catch {
+      imageSkipped = true;
+    }
+  }
+
+  const trackUpdated = await syncSsafyVerificationTrack({
+    memberId: member.id,
+    snapshot,
+    updatedAt,
+  });
+  if (trackUpdated) {
+    changedFields.push("track");
   }
 
   return {
+    member: {
+      id: member.id,
+      generation: member.generation,
+      mattermostAccountId: refreshedDirectory.id,
+      mmUserId: snapshot.mmUserId,
+      mmUsername: snapshot.mmUsername,
+    },
+    snapshot,
     updated: changedFields.length > 0,
     changedFields,
     imageUpdated,

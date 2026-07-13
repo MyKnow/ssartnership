@@ -115,11 +115,52 @@ test("명시적 Mattermost 프로필 동기화는 디렉터리 FK와 이미지 l
   const profileSync = readRepoFile(
     "src/lib/member-mattermost-profile-sync.ts",
   );
+  const profileImages = readRepoFile("src/lib/member-profile-images.ts");
 
   assert.match(profileSync, /mattermost_account_id/);
-  assert.match(profileSync, /\.from\("member_profile_images"\)/);
+  assert.match(profileSync, /createOrReuseMemberProfileImage/);
+  assert.match(profileImages, /\.from\("member_profile_images"\)/);
   assert.doesNotMatch(
     profileSync,
     /member\.year|member\.mm_user_id|member\.mm_username|Compatibility fields/,
+  );
+});
+
+test("일괄 MM 동기화와 관리자 아바타 조회는 정규화된 디렉터리·이미지 ledger만 사용한다", () => {
+  const batchSync = readRepoFile("src/lib/mm-member-sync/sync.ts");
+  const adminAvatar = readRepoFile("src/app/api/admin/members/[id]/avatar/route.ts");
+
+  assert.match(batchSync, /syncMemberMattermostProfile/);
+  assert.doesNotMatch(
+    batchSync,
+    /avatar_base64|avatar_content_type|avatar_url|member\.year|member\.mm_user_id|member\.mm_username/,
+  );
+
+  assert.match(adminAvatar, /active_profile_image_id/);
+  assert.match(adminAvatar, /downloadPrivateMemberProfileImage/);
+  assert.doesNotMatch(
+    adminAvatar,
+    /avatar_base64|avatar_content_type|avatar_url|getMemberSyncCandidateYears|resolveMemberSnapshotForYears/,
+  );
+});
+
+test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
+  const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
+  const provision = readRepoFile("src/lib/member-manual-add/provision.ts");
+  const rollback = readRepoFile("src/lib/member-manual-add/rollback.ts");
+
+  assert.match(lookup, /findMmUserDirectoryEntryByUserId/);
+  assert.match(lookup, /\.eq\("mattermost_account_id", directory\.id\)/);
+  assert.doesNotMatch(lookup, /\.from\("members"\)[\s\S]{0,400}\.eq\("mm_user_id"/);
+
+  assert.match(provision, /mattermost_account_id/);
+  assert.match(provision, /staff_source_generation/);
+  assert.match(provision, /syncMemberMattermostProfile/);
+  assert.doesNotMatch(provision, /avatar_base64|avatar_content_type|avatar_url/);
+
+  assert.match(rollback, /mattermost_account_id/);
+  assert.doesNotMatch(
+    rollback,
+    /mm_user_id|mm_username|avatar_base64|avatar_content_type|avatar_url|\byear:/,
   );
 });

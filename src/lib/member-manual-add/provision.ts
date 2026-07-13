@@ -1,7 +1,16 @@
 import { randomUUID } from "node:crypto";
+import {
+  findMmUserDirectoryEntryByUserId,
+  upsertMmUserDirectorySnapshot,
+} from "@/lib/mm-directory";
+import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
 import { generateTempPassword, hashPassword } from "@/lib/password";
-import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
 import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
+import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
+import {
+  toMmUserDirectorySnapshot,
+  type SsafyVerifyMemberProfile,
+} from "@/lib/ssafy-verify/profile";
 import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { validateMmUsername } from "@/lib/validation";
@@ -18,37 +27,51 @@ import {
   type SenderSession,
   wrapManualMemberAddDbError,
 } from "./shared";
-import type { MemberRow } from "@/lib/mm-member-sync";
-import type { SsafyVerifyMattermostUser } from "@/lib/ssafy-verify/profile";
 
-function buildMemberPayload(input: {
-  member: MemberRow | null;
-  user: SsafyVerifyMattermostUser;
+export function buildManualMemberPayload(input: {
+  mattermostAccountId: string;
   displayName: string;
   campus: string | null;
-  year: ManualMemberAddYear;
-  avatarUrl: string | null;
-  avatarContentType: string | null;
-  avatarBase64: string | null;
+  generation: ManualMemberAddYear;
+  staffSourceGeneration: number | null;
   passwordHash: string;
   passwordSalt: string;
   now: string;
 }) {
   return {
-    mm_user_id: input.user.id,
-    mm_username: input.user.username,
+    mattermost_account_id: input.mattermostAccountId,
     display_name: input.displayName,
-    year: input.year,
+    generation: input.generation,
+    staff_source_generation: input.staffSourceGeneration,
     campus: input.campus,
     password_hash: input.passwordHash,
     password_salt: input.passwordSalt,
     must_change_password: true,
-    avatar_content_type:
-      input.avatarContentType ?? input.member?.avatar_content_type ?? null,
-    avatar_base64: input.avatarBase64 ?? input.member?.avatar_base64 ?? null,
-    avatar_url: input.avatarUrl ?? input.member?.avatar_url ?? null,
     updated_at: input.now,
   };
+}
+
+async function ensureManualMemberDirectory(input: {
+  profile: SsafyVerifyMemberProfile;
+  requestedYear: ManualMemberAddYear;
+  resolvedYear: number;
+}) {
+  const snapshot = toMmUserDirectorySnapshot(input.profile, [
+    input.requestedYear,
+    ...(input.requestedYear === 0 ? [input.resolvedYear] : []),
+  ]);
+  await upsertMmUserDirectorySnapshot({
+    ...snapshot,
+    isStaff: input.requestedYear === 0 || snapshot.isStaff,
+  });
+
+  const directory = await findMmUserDirectoryEntryByUserId(
+    input.profile.mattermostUserId,
+  );
+  if (!directory?.id) {
+    throw new Error("Mattermost 계정 연결을 저장하지 못했습니다.");
+  }
+  return directory;
 }
 
 export async function provisionManualMembers(
@@ -56,15 +79,18 @@ export async function provisionManualMembers(
   inputs: ManualMemberAddInput[],
 ): Promise<ManualMemberAddBatchResult> {
   const supabase = getSupabaseAdminClient();
-  const verifyClient = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
-    trace: createSsafyVerifyApiTraceLogger({
-      actorType: "system",
-      properties: {
-        flow: "manual_member_temp_password_notification",
-        requestedYear,
-      },
-    }),
-  });
+  const verifyClient = createSsafyVerifyServerApiClient(
+    getSsafyVerifyServerApiConfig(),
+    {
+      trace: createSsafyVerifyApiTraceLogger({
+        actorType: "system",
+        properties: {
+          flow: "manual_member_temp_password_notification",
+          requestedYear,
+        },
+      }),
+    },
+  );
   const senderSessionCache = new Map<number, Promise<SenderSession>>();
   const items: ManualMemberAddItem[] = [];
   let success = 0;
@@ -118,23 +144,25 @@ export async function provisionManualMembers(
         continue;
       }
 
-      const displayName = resolution.profile.displayName;
-      const campus = resolution.profile.campus;
-      const avatar = resolution.profile.profileImage;
-      const existingMember = await findExistingMemberByMmUser(resolution.user.id);
+      const directory = await ensureManualMemberDirectory({
+        profile: resolution.profile,
+        requestedYear,
+        resolvedYear: resolution.resolvedYear,
+      });
+      const existingMember = await findExistingMemberByMmUser(
+        resolution.user.id,
+      );
       const tempPassword = generateTempPassword(12);
       const { hash, salt } = hashPassword(tempPassword);
       const now = new Date().toISOString();
-      const nextCampus = campus ?? existingMember?.campus ?? null;
-      const payload = buildMemberPayload({
-        member: existingMember,
-        user: resolution.user,
-        displayName,
+      const nextCampus = resolution.profile.campus ?? existingMember?.campus ?? null;
+      const payload = buildManualMemberPayload({
+        mattermostAccountId: directory.id,
+        displayName: resolution.profile.displayName,
         campus: nextCampus,
-        year: requestedYear,
-        avatarUrl: avatar?.url ?? null,
-        avatarContentType: avatar?.contentType ?? null,
-        avatarBase64: avatar?.base64 ?? null,
+        generation: requestedYear,
+        staffSourceGeneration:
+          requestedYear === 0 ? resolution.resolvedYear : null,
         passwordHash: hash,
         passwordSalt: salt,
         now,
@@ -160,10 +188,10 @@ export async function provisionManualMembers(
           })
           .select("id")
           .single();
-        if (error) {
+        if (error || !insertedMember?.id) {
           throw wrapManualMemberAddDbError(error, "회원 정보를 저장하지 못했습니다.");
         }
-        memberId = insertedMember?.id ?? null;
+        memberId = insertedMember.id as string;
       }
 
       const itemBase = {
@@ -174,7 +202,7 @@ export async function provisionManualMembers(
         memberId,
         mmUserId: resolution.user.id,
         mmUsername: resolution.user.username,
-        displayName,
+        displayName: resolution.profile.displayName,
         campus: nextCampus,
         staffSourceYear: requestedYear === 0 ? resolution.resolvedYear : null,
         action,
@@ -202,13 +230,16 @@ export async function provisionManualMembers(
           idempotencyKey: `manual-member:${resolution.user.id}:${randomUUID()}`,
         });
 
+        if (memberId) {
+          await syncMemberMattermostProfile(memberId).catch(() => undefined);
+        }
         items.push({
           ...itemBase,
           status: "success",
           reason: null,
         });
         success += 1;
-      } catch (error) {
+      } catch {
         let rollbackReason: string | null = null;
         try {
           await rollbackManualMemberProvision({
@@ -217,22 +248,19 @@ export async function provisionManualMembers(
           });
         } catch (rollbackError) {
           rollbackReason =
-            rollbackError instanceof Error
-              ? rollbackError.message
-              : "롤백 실패";
+            rollbackError instanceof Error ? rollbackError.message : "롤백 실패";
         }
 
         items.push({
           ...itemBase,
           status: "failed",
-          reason:
-            error instanceof Error
-              ? `임시 비밀번호 전송 실패: ${error.message}${rollbackReason ? ` / 롤백 실패: ${rollbackReason}` : ""}`
-              : `임시 비밀번호 전송 실패${rollbackReason ? ` / 롤백 실패: ${rollbackReason}` : ""}`,
+          reason: rollbackReason
+            ? `임시 비밀번호 전송 실패 / 롤백 실패: ${rollbackReason}`
+            : "임시 비밀번호 전송 실패",
         });
         failed += 1;
       }
-    } catch (error) {
+    } catch {
       items.push({
         raw: input.raw,
         username: input.username,
@@ -246,7 +274,7 @@ export async function provisionManualMembers(
         staffSourceYear: null,
         action: null,
         status: "failed",
-        reason: error instanceof Error ? error.message : "수동 추가 실패",
+        reason: "수동 추가 실패",
       });
       failed += 1;
     }

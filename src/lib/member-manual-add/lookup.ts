@@ -1,4 +1,4 @@
-import type { MemberRow } from "@/lib/mm-member-sync";
+import { findMmUserDirectoryEntryByUserId } from "@/lib/mm-directory";
 import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
 import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
@@ -17,7 +17,7 @@ import {
 } from "./shared";
 
 const MEMBER_SELECT =
-  "id,mm_user_id,mm_username,display_name,year,campus,password_hash,password_salt,must_change_password,avatar_content_type,avatar_base64,avatar_url,updated_at";
+  "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,password_hash,password_salt,must_change_password,active_profile_image_id,profile_photo_review_status,updated_at";
 
 export type ManualMemberResolution = {
   requestedYear: ManualMemberAddYear;
@@ -26,10 +26,19 @@ export type ManualMemberResolution = {
   profile: SsafyVerifyMemberProfile;
 };
 
-export type ExistingMemberRecord = MemberRow & {
-  password_hash?: string | null;
-  password_salt?: string | null;
-  must_change_password?: boolean;
+export type ExistingMemberRecord = {
+  id: string;
+  mattermost_account_id: string | null;
+  display_name: string | null;
+  generation: number | null;
+  staff_source_generation: number | null;
+  campus: string | null;
+  password_hash: string | null;
+  password_salt: string | null;
+  must_change_password: boolean | null;
+  active_profile_image_id: string | null;
+  profile_photo_review_status: string | null;
+  updated_at: string | null;
 };
 
 export async function getSenderSession(
@@ -41,12 +50,7 @@ export async function getSenderSession(
     return cached;
   }
 
-  const promise = (async () => {
-    return {
-      year,
-    };
-  })();
-
+  const promise = (async () => ({ year }))();
   cache.set(year, promise);
 
   try {
@@ -69,18 +73,21 @@ export async function resolveManualMemberResolution(
   for (const year of yearsToTry) {
     try {
       await getSenderSession(year, cache);
-      const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
-        trace: createSsafyVerifyApiTraceLogger({
-          actorType: "system",
-          identifier: username,
-          properties: {
-            flow: "manual_member_add_lookup",
-            username,
-            requestedYear,
-            lookupYear: year,
-          },
-        }),
-      });
+      const client = createSsafyVerifyServerApiClient(
+        getSsafyVerifyServerApiConfig(),
+        {
+          trace: createSsafyVerifyApiTraceLogger({
+            actorType: "system",
+            identifier: username,
+            properties: {
+              flow: "manual_member_add_lookup",
+              username,
+              requestedYear,
+              lookupYear: year,
+            },
+          }),
+        },
+      );
       const payload = await client.findMattermostUsers({
         username,
         cohort: year,
@@ -114,22 +121,22 @@ export async function resolveManualMemberResolution(
 }
 
 export async function findExistingMemberByMmUser(userId: string) {
-  const supabase = getSupabaseAdminClient();
+  const directory = await findMmUserDirectoryEntryByUserId(userId);
+  if (!directory?.id) {
+    return null;
+  }
 
-  const byUserId = await supabase
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
     .from("members")
     .select(MEMBER_SELECT)
-    .eq("mm_user_id", userId)
+    .eq("mattermost_account_id", directory.id)
     .maybeSingle();
-  if (byUserId.error) {
+  if (error) {
     throw wrapManualMemberAddDbError(
-      byUserId.error,
+      error,
       "기존 회원 정보를 불러오지 못했습니다.",
     );
   }
-  if (byUserId.data?.id) {
-    return byUserId.data as ExistingMemberRecord;
-  }
-
-  return null;
+  return (data as ExistingMemberRecord | null) ?? null;
 }
