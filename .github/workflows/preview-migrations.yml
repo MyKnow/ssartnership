@@ -71,6 +71,22 @@ jobs:
           test -n "$SUPABASE_PREVIEW_DB_URL"
           supabase migration list --db-url "$SUPABASE_PREVIEW_DB_URL"
 
+      - name: Repair stale Preview migration history
+        if: >-
+          ${{
+            github.event_name == 'push' &&
+            contains(github.event.head_commit.message, '[repair-preview-migration-history]')
+          }}
+        env:
+          SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase migration repair \
+            --status reverted \
+            --db-url "$SUPABASE_PREVIEW_DB_URL" \
+            --yes \
+            20260712133729 20260712143858
+
       - name: Apply pending Preview migrations
         env:
           SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}

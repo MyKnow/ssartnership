@@ -26,7 +26,10 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "PLAYWRIGHT_CHROMIUM_CHANNEL: chrome",
     "npm run test:e2e",
   ]) {
-    assert.match(workflow, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(
+      workflow,
+      new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
   }
 });
 
@@ -84,12 +87,27 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
     "ref: dev",
     "npm run validate:migrations",
     "SUPABASE_PREVIEW_DB_URL",
-    "supabase db push --db-url \"$SUPABASE_PREVIEW_DB_URL\" --yes",
+    'supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes',
+    "Repair stale Preview migration history",
+    "[repair-preview-migration-history]",
+    "supabase migration repair",
+    "--status reverted",
+    "20260712133729 20260712143858",
   ]) {
-    assert.match(workflow, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(
+      workflow,
+      new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
   }
 
-  assert.doesNotMatch(workflow, /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all/);
+  assert.match(
+    workflow,
+    /name: Repair stale Preview migration history[\s\S]+?github\.event_name == 'push' &&[\s\S]+?contains\(github\.event\.head_commit\.message, '\[repair-preview-migration-history\]'\)[\s\S]+?supabase migration repair[\s\S]+?--status reverted[\s\S]+?20260712133729 20260712143858/,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all/,
+  );
 });
 
 test("playwright config can use the CI-hosted Chrome channel", () => {
