@@ -293,6 +293,67 @@ test("이벤트 보상 후보는 세대·MM 디렉터리·정책 consent ledger�
   );
 });
 
+test("관리자 회원 화면과 수정 액션은 정규화된 회원 관계만 사용한다", () => {
+  const membersPage = readRepoFile("src/app/admin/(protected)/members/page.tsx");
+  const memberDetailPage = readRepoFile(
+    "src/app/admin/(protected)/members/[memberId]/page.tsx",
+  );
+  const memberActions = readRepoFile(
+    "src/app/admin/(protected)/_actions/member-actions.ts");
+
+  assert.match(membersPage, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(membersPage, /\.from\("member_policy_consents"\)/);
+  assert.match(membersPage, /getEffectiveMarketingConsentMemberIds/);
+  assert.match(membersPage, /marketing_enabled/);
+  assert.match(
+    membersPage,
+    /mattermost_account_id,display_name,generation,staff_source_generation/,
+  );
+  assert.match(membersPage, /\.eq\("generation", Number\(filters\.yearFilter\)\)/);
+  assert.match(memberDetailPage, /getMemberCanonicalProfile/);
+  assert.match(memberActions, /generation,/);
+  assert.match(memberActions, /mattermost_account_id/);
+
+  for (const source of [membersPage, memberDetailPage, memberActions]) {
+    assert.doesNotMatch(
+      source,
+      /avatar_base64|avatar_content_type|avatar_url|service_policy_version|service_policy_consented_at|privacy_policy_version|privacy_policy_consented_at|marketing_policy_version|marketing_policy_consented_at|staff_source_year|\.eq\("year"|\byear,/,
+    );
+  }
+});
+
+test("리뷰 작성자 표시는 정규화된 회원·MM 디렉터리 관계를 사용한다", () => {
+  const adminReviews = readRepoFile("src/lib/admin-reviews.ts");
+  const partnerNotifications = readRepoFile("src/lib/partner-notifications.ts");
+  const reviewRepository = readRepoFile(
+    "src/lib/repositories/supabase/partner-review-repository.supabase.ts",
+  );
+
+  for (const source of [adminReviews, partnerNotifications, reviewRepository]) {
+    assert.match(source, /generation/);
+    assert.doesNotMatch(source, /mm_username,year|display_name,year|member\?\.year/);
+  }
+  assert.match(adminReviews, /mattermost_account_id/);
+  assert.match(
+    adminReviews,
+    /mm_user_directory!members_mattermost_account_id_fkey/,
+  );
+});
+
+test("관리자 로그 작성자 조회는 회원·MM 디렉터리 관계를 조합한다", () => {
+  const logInsights = readRepoFile("src/lib/log-insights/data.ts");
+
+  assert.match(logInsights, /mattermost_account_id/);
+  assert.match(
+    logInsights,
+    /mm_user_directory!members_mattermost_account_id_fkey/,
+  );
+  assert.doesNotMatch(
+    logInsights,
+    /select\('id,display_name,mm_username'\)/,
+  );
+});
+
 test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
   const provision = readRepoFile("src/lib/member-manual-add/provision.ts");

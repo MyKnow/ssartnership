@@ -39,12 +39,12 @@ type PartnerReviewRow = {
   hidden_at?: string | null;
   members?: {
     display_name?: string | null;
-    year?: number | null;
+    generation?: number | null;
   } | null;
 };
 
 const REVIEW_SELECT =
-  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,hidden_at,members!partner_reviews_member_id_fkey(display_name,year)";
+  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,hidden_at,members!partner_reviews_member_id_fkey(display_name,generation)";
 
 function hasImages(row: PartnerReviewRow) {
   return (row.images ?? []).length > 0;
@@ -161,7 +161,7 @@ function mapReview(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     authorMaskedName: maskPartnerReviewAuthorName(row.members?.display_name),
-    authorRoleLabel: getPartnerReviewAuthorRoleLabel(row.members?.year),
+    authorRoleLabel: getPartnerReviewAuthorRoleLabel(row.members?.generation),
     isMine: currentUserId === row.member_id,
     isHidden: row.hidden_at !== null,
     hiddenAt: row.hidden_at ?? null,

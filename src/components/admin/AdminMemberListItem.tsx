@@ -26,30 +26,29 @@ export default function AdminMemberListItem({
 }: {
   member: AdminMember;
 }) {
-  const profile = parseSsafyProfile(member.display_name ?? member.mm_username);
+  const profile = parseSsafyProfile(member.displayName ?? member.mmUsername);
   const displayName =
-    profile.displayName ?? member.display_name ?? member.mm_username;
+    profile.displayName ?? member.displayName ?? member.mmUsername;
   const yearLabel = formatSsafyMemberLifecycleLabel(
-    member.year ?? getCurrentSsafyYear(),
+    member.generation ?? getCurrentSsafyYear(),
   );
   const campus = member.campus ?? profile.campus ?? "캠퍼스 미입력";
-  const avatarLabel = (displayName || member.mm_username || "?")
+  const avatarLabel = (displayName || member.mmUsername || "?")
     .trim()
     .charAt(0)
     .toUpperCase();
-  const hasAvatar = Boolean(member.avatar_content_type || member.avatar_url);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const avatarUrl = useMemo(() => {
-    const query = member.updated_at
-      ? `?v=${encodeURIComponent(member.updated_at)}`
+    const query = member.updatedAt
+      ? `?v=${encodeURIComponent(member.updatedAt)}`
       : "";
     return `/api/admin/members/${member.id}/avatar${query}`;
-  }, [member.id, member.updated_at]);
+  }, [member.id, member.updatedAt]);
 
   return (
     <article className="grid min-w-0 gap-4 rounded-2xl border border-border/80 bg-surface-inset p-4 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:items-center">
       <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg font-semibold text-foreground">
-        {hasAvatar && !avatarFailed ? (
+        {member.hasProfileImage && !avatarFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={avatarUrl}
@@ -69,7 +68,7 @@ export default function AdminMemberListItem({
           <h3 className="max-w-full truncate text-base font-semibold text-foreground">
             {displayName}
           </h3>
-          {member.must_change_password ? (
+          {member.mustChangePassword ? (
             <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-200">
               비밀번호 변경 필요
             </span>
@@ -80,12 +79,12 @@ export default function AdminMemberListItem({
           )}
         </div>
         <p className="text-token mt-1 truncate text-sm text-muted-foreground">
-          @{member.mm_username}
+          @{member.mmUsername}
         </p>
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span>{yearLabel}</span>
           <span className="truncate">{campus}</span>
-          <span>최근 수정 {formatDateTime(member.updated_at)}</span>
+          <span>최근 수정 {formatDateTime(member.updatedAt)}</span>
         </div>
       </div>
 
