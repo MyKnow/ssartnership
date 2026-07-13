@@ -7,6 +7,8 @@ import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
 import {
   formatStorageError,
+  isPreviewRedactedStorageBucket,
+  isPreviewRedactedStoragePath,
   runStorageOperation,
 } from "./supabase-sync-preview-storage.mjs";
 import { isMissingSupabasePoolerTenantErrorMessage } from "./supabase-db-health-lib.mjs";
@@ -291,6 +293,18 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
         `memberRowsSeen=${stats.memberRowsSeen}`,
         `memberPasswordRowsStripped=${stats.memberPasswordRowsStripped}`,
         "production password hashes are intentionally not restored to preview; use preview reset/test credentials.",
+      ].join(" "),
+    );
+  }
+
+  if (stats.memberProfileImageRowsSkipped > 0) {
+    console.log(
+      [
+        "Preview sync member profile image sanitization:",
+        `memberProfileImageCopyBlocksSeen=${stats.memberProfileImageCopyBlocksSeen}`,
+        `memberProfileImageCopyBlocksSkipped=${stats.memberProfileImageCopyBlocksSkipped}`,
+        `memberProfileImageRowsSkipped=${stats.memberProfileImageRowsSkipped}`,
+        "production member profile photos are intentionally not restored to preview.",
       ].join(" "),
     );
   }
@@ -590,6 +604,9 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
     for (const entry of entries) {
       const objectPath = joinStoragePath(prefix, entry.name);
+      if (isPreviewRedactedStoragePath(bucketName, objectPath)) {
+        continue;
+      }
       if (isFolderEntry(entry)) {
         await syncBucketPrefix(prodClient, previewClient, bucketName, objectPath);
         continue;
@@ -639,7 +656,9 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 async function removePreviewOnlyObjects(prodClient, previewClient, bucketName) {
   const sourcePaths = await collectBucketFilePaths(prodClient, bucketName);
   const previewPaths = await collectBucketFilePaths(previewClient, bucketName);
-  const extraPaths = [...previewPaths].filter((path) => !sourcePaths.has(path));
+  const extraPaths = [...previewPaths].filter(
+    (path) => isPreviewRedactedStoragePath(bucketName, path) || !sourcePaths.has(path),
+  );
 
   if (extraPaths.length === 0) {
     return;
@@ -663,10 +682,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       prodClient.storage.listBuckets(),
     );
   } catch (error) {
-    console.warn(
-      `Skipping storage sync because production buckets could not be listed: ${formatStorageError(error)}`,
+    throw new Error(
+      `Production storage buckets could not be listed: ${formatStorageError(error)}`,
     );
-    return;
   }
 
   const buckets = prodBuckets ?? [];
@@ -681,10 +699,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       previewClient.storage.listBuckets(),
     );
   } catch (error) {
-    console.warn(
-      `Skipping storage sync because preview buckets could not be listed: ${formatStorageError(error)}`,
+    throw new Error(
+      `Preview storage buckets could not be listed: ${formatStorageError(error)}`,
     );
-    return;
   }
 
   const previewBucketsByName = new Map(
@@ -709,11 +726,19 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       try {
         await removePreviewOnlyObjects(prodClient, previewClient, bucketName);
       } catch (error) {
+        if (isPreviewRedactedStorageBucket(bucketName)) {
+          throw error;
+        }
         console.warn(
           `Skipping stale-object cleanup for ${bucketName}: ${formatStorageError(error)}`,
         );
       }
     } catch (error) {
+      if (isPreviewRedactedStorageBucket(bucketName)) {
+        throw new Error(
+          `Preview member profile image storage could not be sanitized: ${formatStorageError(error)}`,
+        );
+      }
       console.warn(`Skipping bucket ${bucketName} after storage sync failure: ${formatStorageError(error)}`);
     }
   }
