@@ -19,18 +19,12 @@ import CertificationQrButton from "@/components/certification/CertificationQrBut
 import { formatKoreanDateTime } from "@/lib/datetime";
 
 type Member = {
-  id?: string | null;
-  mm_username?: string | null;
-  display_name?: string | null;
+  mattermostUsername?: string | null;
+  displayName?: string | null;
   generation?: number | null;
-  year?: number | null;
   campus?: string | null;
-  avatar_url?: string | null;
-  avatar_updated_at?: string | null;
-  has_legacy_avatar?: boolean | null;
-  graduate_verified_at?: string | null;
-  has_profile_image?: boolean | null;
-  profile_image_url?: string | null;
+  graduateVerifiedAt?: string | null;
+  profileImageUrl?: string | null;
 };
 
 export default function CertificationView({
@@ -46,30 +40,22 @@ export default function CertificationView({
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
-  const profile = parseSsafyProfile(member.display_name ?? member.mm_username ?? "");
+  const profile = parseSsafyProfile(
+    member.displayName ?? member.mattermostUsername ?? "",
+  );
   const hasTrackedViewRef = useRef(false);
-  const generation = member.generation ?? member.year ?? getCurrentSsafyYear();
+  const generation = member.generation ?? getCurrentSsafyYear();
   const roleLabel = getCertificationRoleLabel(generation, {
-    graduateVerifiedAt: member.graduate_verified_at,
+    graduateVerifiedAt: member.graduateVerifiedAt,
   });
   const scheme = getCertificationScheme(generation, cohortCardThemes, {
-    graduateVerifiedAt: member.graduate_verified_at,
+    graduateVerifiedAt: member.graduateVerifiedAt,
   });
   const campusLabel = member.campus ?? profile.campus ?? null;
   const yearLabel = generation > 0 ? formatSsafyYearLabel(generation) : null;
-  const hasProfileImage = Boolean(member.has_profile_image && member.profile_image_url);
-  const hasAvatarUrl = Boolean(member.avatar_url);
-  const hasLegacyAvatar = Boolean(member.has_legacy_avatar);
-  const avatarVersion = member.avatar_updated_at
-    ? encodeURIComponent(member.avatar_updated_at)
-    : "";
-  const legacyAvatarSrc = avatarVersion
-    ? `/api/mm/avatar?v=${avatarVersion}`
-    : "/api/mm/avatar";
-  const avatarSrc = hasProfileImage
-    ? member.profile_image_url!
-    : member.avatar_url ?? (hasLegacyAvatar ? legacyAvatarSrc : "/avatar-default.svg");
-  const name = profile.displayName ?? member.display_name ?? "이름 미지정";
+  const hasProfileImage = Boolean(member.profileImageUrl);
+  const avatarSrc = member.profileImageUrl ?? "/avatar-default.svg";
+  const name = profile.displayName ?? member.displayName ?? "이름 미지정";
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -174,12 +160,12 @@ export default function CertificationView({
           </div>
         }
         avatarSrc={avatarSrc}
-        avatarAlt={hasProfileImage || hasAvatarUrl || hasLegacyAvatar ? "프로필" : "기본 프로필 이미지"}
-        avatarOnClick={hasProfileImage || hasAvatarUrl || hasLegacyAvatar ? () => setAvatarOpen(true) : undefined}
+        avatarAlt={hasProfileImage ? "프로필" : "기본 프로필 이미지"}
+        avatarOnClick={hasProfileImage ? () => setAvatarOpen(true) : undefined}
         avatarButtonLabel="프로필 이미지 크게 보기"
       />
 
-      {(hasProfileImage || hasAvatarUrl || hasLegacyAvatar) && isAvatarOpen ? (
+      {hasProfileImage && isAvatarOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6">
           <button
             type="button"

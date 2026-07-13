@@ -14,7 +14,25 @@ type ExistingProfileImage = {
   status: "pending" | "approved" | "rejected" | "superseded";
 };
 
+type ActiveProfileImageMemberRow = {
+  active_profile_image_id: string | null;
+  must_change_password: boolean;
+  profile_photo_review_status: "approved" | "pending" | "rejected";
+  updated_at: string | null;
+};
+
+type ActiveProfileImageRow = {
+  id: string;
+  storage_path: string;
+};
+
 export type MemberProfileImageSource = "legacy" | "mattermost";
+
+export type ActiveMemberProfileImage = {
+  imageId: string;
+  storagePath: string;
+  updatedAt: string | null;
+};
 
 function normalizeContentType(value: string | null | undefined) {
   const normalized = value?.trim().toLowerCase() ?? "";
@@ -56,6 +74,55 @@ export function decodeMemberProfileImageData(
   return {
     contentType,
     source: Buffer.from(encoded.replace(/\s/g, ""), "base64"),
+  };
+}
+
+export async function getActiveMemberProfileImage(
+  memberId: string,
+  options: { requirePasswordSetup?: boolean } = {},
+): Promise<ActiveMemberProfileImage | null> {
+  const supabase = getSupabaseAdminClient();
+  const { data: memberData, error: memberError } = await supabase
+    .from("members")
+    .select(
+      "active_profile_image_id,must_change_password,profile_photo_review_status,updated_at",
+    )
+    .eq("id", memberId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (memberError) {
+    throw new Error("현재 프로필 사진을 불러오지 못했습니다.");
+  }
+
+  const member = (memberData as ActiveProfileImageMemberRow | null) ?? null;
+  if (
+    !member?.active_profile_image_id
+    || member.profile_photo_review_status !== "approved"
+    || (options.requirePasswordSetup && member.must_change_password)
+  ) {
+    return null;
+  }
+
+  const { data: imageData, error: imageError } = await supabase
+    .from("member_profile_images")
+    .select("id,storage_path")
+    .eq("id", member.active_profile_image_id)
+    .eq("status", "approved")
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (imageError) {
+    throw new Error("현재 프로필 사진을 불러오지 못했습니다.");
+  }
+
+  const image = (imageData as ActiveProfileImageRow | null) ?? null;
+  if (!image?.id || !image.storage_path) {
+    return null;
+  }
+
+  return {
+    imageId: image.id,
+    storagePath: image.storage_path,
+    updatedAt: member.updated_at,
   };
 }
 

@@ -21,7 +21,7 @@ export default async function AdminProfilePhotosPage() {
   const [replacementsResult, currentPhotosResult] = await Promise.all([
     supabase
       .from("member_profile_images")
-      .select("id,member_id,created_at,member:members!member_profile_images_member_id_fkey(id,display_name,year,profile_photo_review_status)")
+      .select("id,member_id,created_at,member:members!member_profile_images_member_id_fkey(id,display_name,generation,profile_photo_review_status)")
       .is("graduate_verification_request_id", null)
       .not("member_id", "is", null)
       .eq("status", "pending")
@@ -29,9 +29,9 @@ export default async function AdminProfilePhotosPage() {
       .limit(PHOTO_QUEUE_LIMIT),
     supabase
       .from("members")
-      .select("id,display_name,year,active_profile_image_id,profile_photo_review_status,updated_at")
+      .select("id,display_name,generation,active_profile_image_id,profile_photo_review_status,updated_at")
       .eq("profile_photo_review_status", "approved")
-      .or("active_profile_image_id.not.is.null,avatar_content_type.not.is.null,avatar_url.not.is.null")
+      .not("active_profile_image_id", "is", null)
       .order("updated_at", { ascending: false })
       .limit(PHOTO_QUEUE_LIMIT),
   ]);
@@ -45,14 +45,26 @@ export default async function AdminProfilePhotosPage() {
       ? replacement.member[0]
       : replacement.member;
     if (!member) return [];
-    return [{ ...replacement, member }] as AdminProfilePhotoReplacement[];
+    return [
+      {
+        ...replacement,
+        member: {
+          ...member,
+          year: member.generation ?? null,
+        },
+      },
+    ] as AdminProfilePhotoReplacement[];
   });
+  const currentPhotos = (currentPhotosResult.data ?? []).map((member) => ({
+    ...member,
+    year: member.generation ?? null,
+  })) as AdminExistingProfilePhoto[];
 
   return (
     <AdminShell title="프로필 사진">
       <AdminProfilePhotoReviewQueue
         replacements={replacements}
-        currentPhotos={(currentPhotosResult.data ?? []) as AdminExistingProfilePhoto[]}
+        currentPhotos={currentPhotos}
         actions={{
           approveReplacement: approveMemberProfilePhotoAction,
           rejectReplacement: rejectMemberProfilePhotoAction,
