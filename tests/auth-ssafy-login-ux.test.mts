@@ -16,6 +16,14 @@ test("signup page opens SSAFY Verify directly instead of linking to the intermed
   assert.doesNotMatch(signupPage, /href=\{`\/auth\/ssafy/);
 });
 
+test("SSAFY Verify falls back to the PKCE redirect flow while the SDK is unavailable", () => {
+  const button = readRepoFile("src/components/auth/SsafyVerifyButton.tsx");
+
+  assert.match(button, /async function startRedirectFlow\(/);
+  assert.match(button, /if \(!sdk\) \{\s*await startRedirectFlow\(\);/);
+  assert.doesNotMatch(button, /errorCode: "SDK_NOT_READY"/);
+});
+
 test("SSAFY callback route is not a user-facing auth start page", () => {
   const ssafyPage = readRepoFile("src/app/auth/ssafy/page.tsx");
   const relay = readRepoFile("src/components/auth/SsafyVerifyCallbackRelay.tsx");
