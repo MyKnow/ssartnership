@@ -102,7 +102,10 @@ function resolveSignupYear(session: SsafySignupSessionData) {
     return {
       year: SSAFY_STAFF_YEAR,
       staffSourceYear:
-        getPreferredStaffSourceYear(session.sourceYears) ?? session.cohort ?? null,
+        getPreferredStaffSourceYear(session.sourceYears) ??
+        (session.cohort !== null && session.cohort > SSAFY_STAFF_YEAR
+          ? session.cohort
+          : null),
     };
   }
 
