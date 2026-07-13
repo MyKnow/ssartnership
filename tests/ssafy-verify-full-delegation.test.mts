@@ -153,6 +153,20 @@ test("SSAFY Verify staff profiles preserve staff and source year signals", async
   });
 });
 
+test("SSAFY Verify cohort 0 is treated as an operations staff profile", async () => {
+  const { normalizeSsafyVerifyMemberProfile } = await profileModulePromise;
+
+  const profile = normalizeSsafyVerifyMemberProfile({
+    mattermost_user_id: "staff.zero",
+    username: "staff.zero",
+    display_name: "운영진",
+    ssafy_cohort: "0",
+  });
+
+  assert.equal(profile?.isStaff, true);
+  assert.deepEqual(profile?.sourceYears, [0]);
+});
+
 test("SSAFY Verify Server API directory lookup uses directory lookup scope", async () => {
   const { createSsafyVerifyServerApiClient } = await serverApiModulePromise;
   const calls: Array<{ url: string; method: string; body: string | null }> = [];
