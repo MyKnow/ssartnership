@@ -20,6 +20,7 @@ import {
   getPolicyDocumentByKind,
 } from "@/lib/policy-documents";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
+import { getMemberProfilePhotoStates } from "@/lib/member-profile-images";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type {
   ConsentFilterOption,
@@ -518,7 +519,7 @@ export default async function AdminMembersPage({
   let memberQuery = supabase
     .from("members")
     .select(
-      "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,must_change_password,active_profile_image_id,profile_photo_review_status,created_at,updated_at",
+      "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at",
       { count: "exact" },
     )
     .is("deleted_at", null);
@@ -604,7 +605,7 @@ export default async function AdminMembersPage({
     activePolicies.privacy.id,
     activeMarketingPolicy?.id,
   ].filter((id): id is string => Boolean(id));
-  const [directoryByAccountId, currentPolicyConsents, marketingPreferences] = await Promise.all([
+  const [directoryByAccountId, currentPolicyConsents, marketingPreferences, profilePhotoStates] = await Promise.all([
     getMmUserDirectoryEntriesByAccountIds(
       safeMembers.flatMap((member) =>
         member.mattermost_account_id ? [member.mattermost_account_id] : [],
@@ -612,6 +613,7 @@ export default async function AdminMembersPage({
     ),
     getCurrentMemberPolicyConsents(supabase, memberIds, policyDocumentIds),
     getMemberMarketingPreferences(supabase, memberIds),
+    getMemberProfilePhotoStates(memberIds),
   ]);
   const policyDocumentIdsByMember = new Map<string, Set<string>>();
   for (const consent of currentPolicyConsents) {
@@ -639,6 +641,7 @@ export default async function AdminMembersPage({
       : null;
     const consentedPolicyDocumentIds =
       policyDocumentIdsByMember.get(member.id) ?? new Set<string>();
+    const profilePhotoState = profilePhotoStates.get(member.id);
 
     return {
       id: member.id,
@@ -654,10 +657,9 @@ export default async function AdminMembersPage({
       marketingConsent: activeMarketingPolicy
         ? effectiveMarketingConsentMemberIds.has(member.id)
         : null,
-      hasProfileImage: Boolean(
-        member.active_profile_image_id &&
-          member.profile_photo_review_status === "approved",
-      ),
+      hasProfileImage:
+        profilePhotoState?.reviewStatus === "approved"
+        && Boolean(profilePhotoState.activeProfileImageId),
       createdAt: member.created_at,
       updatedAt: member.updated_at,
     };

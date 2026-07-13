@@ -5,6 +5,7 @@ import {
   getMemberProfilePhotoAccessState,
   requiresMemberProfilePhotoUpdate,
 } from "@/lib/member-profile-photo";
+import { resolveMemberProfilePhotoState } from "@/lib/member-profile-images";
 
 const schemaPath = new URL("../supabase/schema.sql", import.meta.url);
 const siteLayoutPath = new URL("../src/app/(site)/layout.tsx", import.meta.url);
@@ -64,13 +65,68 @@ test("사진 검토 대기 또는 반려 상태는 사진 재제출 경로만 �
   assert.match(layout, /redirect\(`\/certification\/photo\?returnTo=/);
 });
 
-test("인증 카드의 private 사진 API도 승인 상태만 읽는다", async () => {
+test("사진 ledger의 최신 검토 상태가 기존 승인 이미지보다 우선한다", () => {
+  assert.deepEqual(
+    resolveMemberProfilePhotoState([
+      {
+        id: "approved-image",
+        status: "approved",
+        storagePath: "members/member-1/approved.webp",
+        updatedAt: "2026-07-10T00:00:00.000Z",
+        createdAt: "2026-07-10T00:00:00.000Z",
+      },
+      {
+        id: "pending-image",
+        status: "pending",
+        storagePath: "members/member-1/pending.webp",
+        updatedAt: "2026-07-11T00:00:00.000Z",
+        createdAt: "2026-07-11T00:00:00.000Z",
+      },
+    ]),
+    {
+      reviewStatus: "pending",
+      activeProfileImageId: null,
+      activeStoragePath: null,
+      updatedAt: "2026-07-11T00:00:00.000Z",
+    },
+  );
+
+  assert.deepEqual(
+    resolveMemberProfilePhotoState([
+      {
+        id: "rejected-image",
+        status: "rejected",
+        storagePath: "members/member-1/rejected.webp",
+        updatedAt: "2026-07-12T00:00:00.000Z",
+        createdAt: "2026-07-12T00:00:00.000Z",
+      },
+      {
+        id: "new-approved-image",
+        status: "approved",
+        storagePath: "members/member-1/new.webp",
+        updatedAt: "2026-07-13T00:00:00.000Z",
+        createdAt: "2026-07-13T00:00:00.000Z",
+      },
+    ]),
+    {
+      reviewStatus: "approved",
+      activeProfileImageId: "new-approved-image",
+      activeStoragePath: "members/member-1/new.webp",
+      updatedAt: "2026-07-13T00:00:00.000Z",
+    },
+  );
+});
+
+test("인증 카드의 private 사진 API는 canonical 이미지 ledger만 읽는다", async () => {
   const [route, profileImages] = await Promise.all([
     readFile(profileImageRoutePath, "utf8"),
     readFile(profileImagesPath, "utf8"),
   ]);
 
   assert.match(route, /getActiveMemberProfileImage/);
-  assert.match(profileImages, /profile_photo_review_status/);
-  assert.match(profileImages, /member\.profile_photo_review_status !== "approved"/);
+  assert.match(profileImages, /resolveMemberProfilePhotoState/);
+  assert.doesNotMatch(
+    profileImages,
+    /active_profile_image_id|profile_photo_review_status/,
+  );
 });

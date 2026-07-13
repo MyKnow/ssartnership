@@ -15,7 +15,6 @@ type ResetPasswordMember = {
   generation: number;
   staff_source_generation: number | null;
   campus: string | null;
-  active_profile_image_id: string | null;
   updated_at: string | null;
 };
 
@@ -39,7 +38,7 @@ export async function resolveResetPasswordMember(
 ): Promise<ResetPasswordMemberResolution> {
   const supabase = getSupabaseAdminClient();
   const memberSelect =
-    "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,active_profile_image_id,updated_at";
+    "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,updated_at";
   let directoryEntry = await findMmUserDirectoryEntryByUsername(username);
   let resolvedStudentYear: number | null = null;
   let member: ResetPasswordMember | null = null;

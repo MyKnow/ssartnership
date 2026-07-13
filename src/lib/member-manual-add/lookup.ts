@@ -17,7 +17,7 @@ import {
 } from "./shared";
 
 const MEMBER_SELECT =
-  "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,password_hash,password_salt,must_change_password,active_profile_image_id,profile_photo_review_status,updated_at";
+  "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,password_hash,password_salt,must_change_password,updated_at";
 
 export type ManualMemberResolution = {
   requestedYear: ManualMemberAddYear;
@@ -36,8 +36,6 @@ export type ExistingMemberRecord = {
   password_hash: string | null;
   password_salt: string | null;
   must_change_password: boolean | null;
-  active_profile_image_id: string | null;
-  profile_photo_review_status: string | null;
   updated_at: string | null;
 };
 

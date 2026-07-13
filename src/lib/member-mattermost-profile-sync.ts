@@ -21,7 +21,6 @@ type MemberMattermostSyncRow = {
   display_name: string | null;
   campus: string | null;
   generation: number | null;
-  active_profile_image_id: string | null;
   mattermost_account_id: string | null;
 };
 
@@ -106,7 +105,7 @@ export async function syncMemberMattermostProfile(
   const { data, error } = await supabase
     .from("members")
     .select(
-      "id,display_name,campus,generation,active_profile_image_id,mattermost_account_id",
+      "id,display_name,campus,generation,mattermost_account_id",
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -167,7 +166,6 @@ export async function syncMemberMattermostProfile(
     try {
       const image = await createOrReuseMemberProfileImage({
         memberId: member.id,
-        activeProfileImageId: member.active_profile_image_id,
         ...decodedImage,
         imageSource: "mattermost",
       });
@@ -203,7 +201,6 @@ export async function syncMemberMattermostProfile(
     try {
       await activateMemberProfileImage({
         memberId: member.id,
-        previousImageId: member.active_profile_image_id,
         nextImageId: nextProfileImageId,
         updatedAt,
       });

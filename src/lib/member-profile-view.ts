@@ -1,3 +1,4 @@
+import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type MemberCanonicalRow = {
@@ -11,8 +12,6 @@ type MemberCanonicalRow = {
   mattermost_account_id: string | null;
   email: string | null;
   email_verified_at: string | null;
-  active_profile_image_id: string | null;
-  profile_photo_review_status: "approved" | "pending" | "rejected";
 };
 
 type MemberDirectoryRow = {
@@ -49,7 +48,7 @@ export async function getMemberCanonicalProfile(
   const { data: memberData, error: memberError } = await supabase
     .from("members")
     .select(
-      "id,display_name,generation,campus,must_change_password,created_at,updated_at,mattermost_account_id,email,email_verified_at,active_profile_image_id,profile_photo_review_status",
+      "id,display_name,generation,campus,must_change_password,created_at,updated_at,mattermost_account_id,email,email_verified_at",
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -63,7 +62,7 @@ export async function getMemberCanonicalProfile(
     return null;
   }
 
-  const [directoryResult, graduateProfileResult] = await Promise.all([
+  const [directoryResult, graduateProfileResult, photoState] = await Promise.all([
     member.mattermost_account_id
       ? supabase
           .from("mm_user_directory")
@@ -77,6 +76,7 @@ export async function getMemberCanonicalProfile(
       .select("verified_at")
       .eq("member_id", member.id)
       .maybeSingle(),
+    getMemberProfilePhotoState(member.id),
   ]);
   if (directoryResult.error || graduateProfileResult.error) {
     throw new Error("회원 인증 정보를 불러오지 못했습니다.");
@@ -99,8 +99,8 @@ export async function getMemberCanonicalProfile(
     mattermostUsername: directory?.mm_username ?? null,
     email: member.email,
     emailVerifiedAt: member.email_verified_at,
-    activeProfileImageId: member.active_profile_image_id,
-    profilePhotoReviewStatus: member.profile_photo_review_status,
+    activeProfileImageId: photoState.activeProfileImageId,
+    profilePhotoReviewStatus: photoState.reviewStatus,
     graduateVerifiedAt: graduateProfile?.verified_at ?? null,
   };
 }

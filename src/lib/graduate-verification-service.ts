@@ -1059,16 +1059,6 @@ export async function submitMemberProfileImageReplacement(input: {
       .single();
     if (error || !data?.id) throw new Error("본인 사진 변경 요청을 저장하지 못했습니다.");
     profileImageId = data.id;
-    const { error: memberUpdateError } = await supabase
-      .from("members")
-      .update({
-        profile_photo_review_status: "pending",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", input.memberId);
-    if (memberUpdateError) {
-      throw new Error("사진 변경 검토 상태를 저장하지 못했습니다.");
-    }
     return { imageId: data.id };
   } catch (error) {
     if (profileImageId) {

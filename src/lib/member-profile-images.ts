@@ -9,29 +9,62 @@ const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
   "image/webp",
 ]);
 
+const REVIEWABLE_IMAGE_STATUSES = ["pending", "approved", "rejected"] as const;
+
+type MemberProfileImageStatus =
+  | (typeof REVIEWABLE_IMAGE_STATUSES)[number]
+  | "superseded";
+
 type ExistingProfileImage = {
   id: string;
-  status: "pending" | "approved" | "rejected" | "superseded";
+  status: MemberProfileImageStatus;
 };
 
 type ActiveProfileImageMemberRow = {
-  active_profile_image_id: string | null;
   must_change_password: boolean;
-  profile_photo_review_status: "approved" | "pending" | "rejected";
-  updated_at: string | null;
 };
 
-type ActiveProfileImageRow = {
+type MemberProfileImageRow = {
   id: string;
-  storage_path: string;
+  member_id: string | null;
+  status: MemberProfileImageStatus;
+  storage_path: string | null;
+  updated_at: string | null;
+  created_at: string | null;
 };
 
 export type MemberProfileImageSource = "legacy" | "mattermost";
+export type MemberProfilePhotoReviewStatus =
+  | "approved"
+  | "pending"
+  | "rejected";
+
+export type MemberProfilePhotoStateImage = {
+  id: string;
+  status: MemberProfileImageStatus;
+  storagePath: string | null;
+  updatedAt: string | null;
+  createdAt: string | null;
+};
+
+export type MemberProfilePhotoState = {
+  reviewStatus: MemberProfilePhotoReviewStatus;
+  activeProfileImageId: string | null;
+  activeStoragePath: string | null;
+  updatedAt: string | null;
+};
 
 export type ActiveMemberProfileImage = {
   imageId: string;
   storagePath: string;
   updatedAt: string | null;
+};
+
+const DEFAULT_MEMBER_PROFILE_PHOTO_STATE: MemberProfilePhotoState = {
+  reviewStatus: "approved",
+  activeProfileImageId: null,
+  activeStoragePath: null,
+  updatedAt: null,
 };
 
 function normalizeContentType(value: string | null | undefined) {
@@ -52,6 +85,42 @@ function isValidBase64(value: string) {
   return decoded.length > 0
     && decoded.toString("base64").replace(/=+$/u, "")
       === normalized.replace(/=+$/u, "");
+}
+
+function getImageTimestamp(image: MemberProfilePhotoStateImage) {
+  return image.updatedAt ?? image.createdAt;
+}
+
+function compareNewestProfileImage(
+  left: MemberProfilePhotoStateImage,
+  right: MemberProfilePhotoStateImage,
+) {
+  const leftTimestamp = getImageTimestamp(left) ?? "";
+  const rightTimestamp = getImageTimestamp(right) ?? "";
+  if (leftTimestamp !== rightTimestamp) {
+    return rightTimestamp.localeCompare(leftTimestamp);
+  }
+  return right.id.localeCompare(left.id);
+}
+
+function isReviewableImageStatus(
+  status: MemberProfileImageStatus,
+): status is MemberProfilePhotoReviewStatus {
+  return REVIEWABLE_IMAGE_STATUSES.includes(
+    status as MemberProfilePhotoReviewStatus,
+  );
+}
+
+function toMemberProfilePhotoStateImage(
+  image: MemberProfileImageRow,
+): MemberProfilePhotoStateImage {
+  return {
+    id: image.id,
+    status: image.status,
+    storagePath: image.storage_path,
+    updatedAt: image.updated_at,
+    createdAt: image.created_at,
+  };
 }
 
 export function decodeMemberProfileImageData(
@@ -77,58 +146,128 @@ export function decodeMemberProfileImageData(
   };
 }
 
+/**
+ * The newest reviewable ledger record controls whether a member can use a
+ * profile image. An older approved image is deliberately hidden while a newer
+ * replacement is pending or rejected.
+ */
+export function resolveMemberProfilePhotoState(
+  images: readonly MemberProfilePhotoStateImage[],
+): MemberProfilePhotoState {
+  const reviewableImages = images
+    .filter(
+      (
+        image,
+      ): image is MemberProfilePhotoStateImage & {
+        status: MemberProfilePhotoReviewStatus;
+      } => isReviewableImageStatus(image.status),
+    )
+    .toSorted(compareNewestProfileImage);
+  const newestReview = reviewableImages[0];
+  if (!newestReview) {
+    return { ...DEFAULT_MEMBER_PROFILE_PHOTO_STATE };
+  }
+
+  if (newestReview.status !== "approved") {
+    return {
+      reviewStatus: newestReview.status,
+      activeProfileImageId: null,
+      activeStoragePath: null,
+      updatedAt: getImageTimestamp(newestReview),
+    };
+  }
+
+  return {
+    reviewStatus: "approved",
+    activeProfileImageId: newestReview.id,
+    activeStoragePath: newestReview.storagePath,
+    updatedAt: getImageTimestamp(newestReview),
+  };
+}
+
+export async function getMemberProfilePhotoStates(memberIds: readonly string[]) {
+  const uniqueMemberIds = [...new Set(memberIds.filter(Boolean))];
+  const states = new Map<string, MemberProfilePhotoState>();
+  for (const memberId of uniqueMemberIds) {
+    states.set(memberId, { ...DEFAULT_MEMBER_PROFILE_PHOTO_STATE });
+  }
+  if (uniqueMemberIds.length === 0) {
+    return states;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("member_profile_images")
+    .select("id,member_id,status,storage_path,updated_at,created_at")
+    .in("member_id", uniqueMemberIds)
+    .in("status", [...REVIEWABLE_IMAGE_STATUSES])
+    .is("deleted_at", null);
+  if (error) {
+    throw new Error("프로필 사진 상태를 불러오지 못했습니다.");
+  }
+
+  const imagesByMemberId = new Map<string, MemberProfilePhotoStateImage[]>();
+  for (const row of (data ?? []) as MemberProfileImageRow[]) {
+    if (!row.member_id) {
+      continue;
+    }
+    const images = imagesByMemberId.get(row.member_id) ?? [];
+    images.push(toMemberProfilePhotoStateImage(row));
+    imagesByMemberId.set(row.member_id, images);
+  }
+  for (const memberId of uniqueMemberIds) {
+    states.set(
+      memberId,
+      resolveMemberProfilePhotoState(imagesByMemberId.get(memberId) ?? []),
+    );
+  }
+  return states;
+}
+
+export async function getMemberProfilePhotoState(memberId: string) {
+  const states = await getMemberProfilePhotoStates([memberId]);
+  return states.get(memberId) ?? { ...DEFAULT_MEMBER_PROFILE_PHOTO_STATE };
+}
+
 export async function getActiveMemberProfileImage(
   memberId: string,
   options: { requirePasswordSetup?: boolean } = {},
 ): Promise<ActiveMemberProfileImage | null> {
   const supabase = getSupabaseAdminClient();
-  const { data: memberData, error: memberError } = await supabase
-    .from("members")
-    .select(
-      "active_profile_image_id,must_change_password,profile_photo_review_status,updated_at",
-    )
-    .eq("id", memberId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (memberError) {
+  const [memberResult, photoState] = await Promise.all([
+    supabase
+      .from("members")
+      .select("must_change_password")
+      .eq("id", memberId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    getMemberProfilePhotoState(memberId),
+  ]);
+  if (memberResult.error) {
     throw new Error("현재 프로필 사진을 불러오지 못했습니다.");
   }
 
-  const member = (memberData as ActiveProfileImageMemberRow | null) ?? null;
+  const member =
+    (memberResult.data as ActiveProfileImageMemberRow | null) ?? null;
   if (
-    !member?.active_profile_image_id
-    || member.profile_photo_review_status !== "approved"
+    !member
+    || photoState.reviewStatus !== "approved"
+    || !photoState.activeProfileImageId
+    || !photoState.activeStoragePath
     || (options.requirePasswordSetup && member.must_change_password)
   ) {
     return null;
   }
 
-  const { data: imageData, error: imageError } = await supabase
-    .from("member_profile_images")
-    .select("id,storage_path")
-    .eq("id", member.active_profile_image_id)
-    .eq("status", "approved")
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (imageError) {
-    throw new Error("현재 프로필 사진을 불러오지 못했습니다.");
-  }
-
-  const image = (imageData as ActiveProfileImageRow | null) ?? null;
-  if (!image?.id || !image.storage_path) {
-    return null;
-  }
-
   return {
-    imageId: image.id,
-    storagePath: image.storage_path,
-    updatedAt: member.updated_at,
+    imageId: photoState.activeProfileImageId,
+    storagePath: photoState.activeStoragePath,
+    updatedAt: photoState.updatedAt,
   };
 }
 
 export async function createOrReuseMemberProfileImage(input: {
   memberId: string;
-  activeProfileImageId: string | null;
   contentType: string;
   source: Buffer;
   imageSource: MemberProfileImageSource;
@@ -154,10 +293,7 @@ export async function createOrReuseMemberProfileImage(input: {
     (image) => image.status === "approved",
   );
   if (reusableImage?.id) {
-    return {
-      imageId: reusableImage.id,
-      changed: reusableImage.id !== input.activeProfileImageId,
-    };
+    return { imageId: reusableImage.id, changed: false };
   }
 
   const storagePath = await storeMemberProfileImage({
@@ -176,8 +312,9 @@ export async function createOrReuseMemberProfileImage(input: {
       width: normalized.width,
       height: normalized.height,
       source: input.imageSource,
-      status: "approved",
-      reviewed_at: new Date().toISOString(),
+      // Do not let a failed external sync block authentication. The image only
+      // becomes visible after the activation transaction below succeeds.
+      status: "superseded",
     })
     .select("id")
     .single();
@@ -190,44 +327,73 @@ export async function createOrReuseMemberProfileImage(input: {
 
 export async function activateMemberProfileImage(input: {
   memberId: string;
-  previousImageId: string | null;
   nextImageId: string;
   updatedAt?: string;
 }) {
-  if (input.previousImageId === input.nextImageId) {
-    return false;
-  }
-
   const supabase = getSupabaseAdminClient();
   const updatedAt = input.updatedAt ?? new Date().toISOString();
-  const { error: memberError } = await supabase
-    .from("members")
-    .update({
-      active_profile_image_id: input.nextImageId,
-      profile_photo_review_status: "approved",
-      updated_at: updatedAt,
-    })
-    .eq("id", input.memberId)
-    .is("deleted_at", null);
-  if (memberError) {
+  const [{ data: member, error: memberLookupError }, { data: target, error: targetLookupError }] =
+    await Promise.all([
+      supabase
+        .from("members")
+        .select("id")
+        .eq("id", input.memberId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      supabase
+        .from("member_profile_images")
+        .select("id")
+        .eq("id", input.nextImageId)
+        .eq("member_id", input.memberId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+    ]);
+  if (memberLookupError || !member?.id || targetLookupError || !target?.id) {
     throw new Error("현재 프로필 사진을 반영하지 못했습니다.");
   }
 
-  if (input.previousImageId) {
-    const { error: previousImageError } = await supabase
-      .from("member_profile_images")
-      .update({
-        status: "superseded",
-        delete_after: new Date(
-          Date.now() + 30 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-        updated_at: updatedAt,
-      })
-      .eq("id", input.previousImageId)
-      .eq("status", "approved");
-    if (previousImageError) {
-      throw new Error("이전 프로필 사진 상태를 정리하지 못했습니다.");
-    }
+  const { error: previousImagesError } = await supabase
+    .from("member_profile_images")
+    .update({
+      status: "superseded",
+      delete_after: new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      updated_at: updatedAt,
+    })
+    .eq("member_id", input.memberId)
+    .neq("id", input.nextImageId)
+    .eq("status", "approved")
+    .is("deleted_at", null);
+  if (previousImagesError) {
+    throw new Error("이전 프로필 사진 상태를 정리하지 못했습니다.");
+  }
+
+  const { data: activatedImage, error: activationError } = await supabase
+    .from("member_profile_images")
+    .update({
+      status: "approved",
+      reviewed_at: updatedAt,
+      review_note: null,
+      delete_after: null,
+      updated_at: updatedAt,
+    })
+    .eq("id", input.nextImageId)
+    .eq("member_id", input.memberId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (activationError || !activatedImage?.id) {
+    throw new Error("현재 프로필 사진을 반영하지 못했습니다.");
+  }
+
+  const { error: memberUpdateError } = await supabase
+    .from("members")
+    .update({ updated_at: updatedAt })
+    .eq("id", input.memberId)
+    .is("deleted_at", null);
+  if (memberUpdateError) {
+    throw new Error("현재 프로필 사진 변경 시각을 저장하지 못했습니다.");
   }
 
   return true;
