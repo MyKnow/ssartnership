@@ -104,11 +104,13 @@ test("마케팅 수신 상태는 contract 전에 push preference로 보존한다
   );
 
   assert.match(migration, /insert into public\.push_preferences/);
+  assert.match(migration, /from public\.member_policy_consents as consent/);
   assert.match(
     migration,
-    /coalesce\(member\.marketing_policy_version = active_marketing_policy\.version, false\)/,
+    /consent\.policy_document_id = active_marketing_policy\.id/,
   );
-  assert.match(migration, /on conflict \(member_id\) do update/);
+  assert.doesNotMatch(migration, /member\.marketing_policy_version/);
+  assert.match(migration, /on conflict \(member_id\) do nothing/);
 });
 
 test("명시적 Mattermost 프로필 동기화는 디렉터리 FK와 이미지 ledger만 갱신한다", () => {
