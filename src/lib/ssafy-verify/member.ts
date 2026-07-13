@@ -4,15 +4,25 @@ import type { SsafyVerificationClaims } from "./claims";
 export type SsafyVerifiedMember = {
   id: string;
   must_change_password: boolean | null;
-  ssafy_sub: string | null;
-  mm_user_id: string | null;
-  mm_username: string | null;
+  mattermost_account_id: string | null;
 };
 
 export type SsafyVerificationForMember = SsafyVerificationClaims & {
   verificationId: string | null;
   scope: string | null;
 };
+
+type StoredSsafyVerification = {
+  member_id: string;
+  ssafy_sub: string;
+};
+
+type MattermostDirectoryEntry = {
+  id: string;
+};
+
+const MEMBER_SELECT = "id,must_change_password,mattermost_account_id";
+const VERIFICATION_SELECT = "member_id,ssafy_sub";
 
 export function buildMemberSsafyVerificationUpsertPayload(
   memberId: string,
@@ -32,19 +42,85 @@ export function buildMemberSsafyVerificationUpsertPayload(
   };
 }
 
-export function buildSsafyMemberUpdatePayload(input: SsafyVerificationForMember) {
-  const authTimeIso = new Date(input.authTime * 1000).toISOString();
+async function findActiveMemberById(
+  supabase: SupabaseClient,
+  memberId: string,
+) {
+  const { data, error } = await supabase
+    .from("members")
+    .select(MEMBER_SELECT)
+    .eq("id", memberId)
+    .is("deleted_at", null)
+    .maybeSingle();
 
   return {
-    ssafy_sub: input.sub,
-    ssafy_verified_at: authTimeIso,
-    ssafy_auth_time: authTimeIso,
-    ssafy_verification_id: input.verificationId,
-    ssafy_mattermost_user_id: input.mattermostUserId,
-    ssafy_track: input.track,
-    ssafy_track_name: input.trackName,
-    ssafy_last_scope: input.scope,
-    updated_at: new Date().toISOString(),
+    data: (data as SsafyVerifiedMember | null) ?? null,
+    error,
+  };
+}
+
+async function findActiveMemberByMattermostAccountId(
+  supabase: SupabaseClient,
+  mattermostAccountId: string,
+) {
+  const { data, error } = await supabase
+    .from("members")
+    .select(MEMBER_SELECT)
+    .eq("mattermost_account_id", mattermostAccountId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  return {
+    data: (data as SsafyVerifiedMember | null) ?? null,
+    error,
+  };
+}
+
+async function findVerificationByMemberId(
+  supabase: SupabaseClient,
+  memberId: string,
+) {
+  const { data, error } = await supabase
+    .from("member_ssafy_verifications")
+    .select(VERIFICATION_SELECT)
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  return {
+    data: (data as StoredSsafyVerification | null) ?? null,
+    error,
+  };
+}
+
+async function findVerificationBySubject(
+  supabase: SupabaseClient,
+  subject: string,
+) {
+  const { data, error } = await supabase
+    .from("member_ssafy_verifications")
+    .select(VERIFICATION_SELECT)
+    .eq("ssafy_sub", subject)
+    .maybeSingle();
+
+  return {
+    data: (data as StoredSsafyVerification | null) ?? null,
+    error,
+  };
+}
+
+async function findMattermostDirectoryByUserId(
+  supabase: SupabaseClient,
+  mattermostUserId: string,
+) {
+  const { data, error } = await supabase
+    .from("mm_user_directory")
+    .select("id")
+    .eq("mm_user_id", mattermostUserId)
+    .maybeSingle();
+
+  return {
+    data: (data as MattermostDirectoryEntry | null) ?? null,
+    error,
   };
 }
 
@@ -56,74 +132,103 @@ export async function findSsafyVerifiedMember(
     mattermostUserId?: string | null;
   },
 ) {
-  const select = "id,must_change_password,ssafy_sub,mm_user_id,mm_username";
-
   if (input.currentMemberId) {
-    const { data, error } = await supabase
-      .from("members")
-      .select(select)
-      .eq("id", input.currentMemberId)
-      .is("deleted_at", null)
-      .maybeSingle();
+    const { data, error } = await findActiveMemberById(
+      supabase,
+      input.currentMemberId,
+    );
     if (error) {
       return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
     }
-    if (data?.ssafy_sub && data.ssafy_sub !== input.sub) {
+    if (!data) {
+      return { ok: false as const, errorCode: "MEMBER_NOT_FOUND" };
+    }
+
+    const currentVerification = await findVerificationByMemberId(
+      supabase,
+      data.id,
+    );
+    if (currentVerification.error) {
+      return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
+    }
+    if (
+      currentVerification.data?.ssafy_sub &&
+      currentVerification.data.ssafy_sub !== input.sub
+    ) {
       return { ok: false as const, errorCode: "SSAFY_MEMBER_CONFLICT" };
     }
-    if (data && !data.ssafy_sub) {
-      const { data: existingSubject, error: subjectError } = await supabase
-        .from("members")
-        .select(select)
-        .eq("ssafy_sub", input.sub)
-        .is("deleted_at", null)
-        .maybeSingle();
-      if (subjectError) {
-        return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
-      }
-      if (existingSubject && existingSubject.id !== data.id) {
-        return { ok: false as const, errorCode: "SSAFY_MEMBER_CONFLICT" };
-      }
+
+    const existingSubject = await findVerificationBySubject(supabase, input.sub);
+    if (existingSubject.error) {
+      return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
     }
-    return data
-      ? { ok: true as const, member: data as SsafyVerifiedMember }
-      : { ok: false as const, errorCode: "MEMBER_NOT_FOUND" };
+    if (
+      existingSubject.data &&
+      existingSubject.data.member_id !== data.id
+    ) {
+      return { ok: false as const, errorCode: "SSAFY_MEMBER_CONFLICT" };
+    }
+    return { ok: true as const, member: data };
   }
 
-  const { data: bySub, error: subError } = await supabase
-    .from("members")
-    .select(select)
-    .eq("ssafy_sub", input.sub)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (subError) {
+  const bySubject = await findVerificationBySubject(supabase, input.sub);
+  if (bySubject.error) {
     return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
   }
-  if (bySub) {
-    return { ok: true as const, member: bySub as SsafyVerifiedMember };
+  if (bySubject.data) {
+    const member = await findActiveMemberById(
+      supabase,
+      bySubject.data.member_id,
+    );
+    if (member.error) {
+      return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
+    }
+    return member.data
+      ? { ok: true as const, member: member.data }
+      : { ok: false as const, errorCode: "MEMBER_NOT_FOUND" };
   }
 
   if (!input.mattermostUserId) {
     return { ok: false as const, errorCode: "MEMBER_NOT_FOUND" };
   }
 
-  const { data: byMattermostId, error: mattermostError } = await supabase
-    .from("members")
-    .select(select)
-    .eq("mm_user_id", input.mattermostUserId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (mattermostError) {
+  const directory = await findMattermostDirectoryByUserId(
+    supabase,
+    input.mattermostUserId,
+  );
+  if (directory.error) {
     return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
   }
-  if (!byMattermostId) {
+  if (!directory.data) {
     return { ok: false as const, errorCode: "MEMBER_NOT_FOUND" };
   }
-  if (byMattermostId.ssafy_sub && byMattermostId.ssafy_sub !== input.sub) {
+
+  const member = await findActiveMemberByMattermostAccountId(
+    supabase,
+    directory.data.id,
+  );
+  if (member.error) {
+    return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
+  }
+  if (!member.data) {
+    return { ok: false as const, errorCode: "MEMBER_NOT_FOUND" };
+  }
+
+  const existingVerification = await findVerificationByMemberId(
+    supabase,
+    member.data.id,
+  );
+  if (existingVerification.error) {
+    return { ok: false as const, errorCode: "MEMBER_LOOKUP_FAILED" };
+  }
+  if (
+    existingVerification.data?.ssafy_sub &&
+    existingVerification.data.ssafy_sub !== input.sub
+  ) {
     return { ok: false as const, errorCode: "SSAFY_MEMBER_CONFLICT" };
   }
 
-  return { ok: true as const, member: byMattermostId as SsafyVerifiedMember };
+  return { ok: true as const, member: member.data };
 }
 
 export async function updateMemberSsafyVerification(
@@ -131,21 +236,13 @@ export async function updateMemberSsafyVerification(
   memberId: string,
   input: SsafyVerificationForMember,
 ) {
-  const payload = buildSsafyMemberUpdatePayload(input);
+  const payload = buildMemberSsafyVerificationUpsertPayload(memberId, input);
   const { error } = await supabase
-    .from("members")
-    .update(payload)
-    .eq("id", memberId);
-  if (error) {
-    return { ok: false as const, errorCode: "MEMBER_UPDATE_FAILED" };
-  }
-
-  const { error: verificationError } = await supabase
     .from("member_ssafy_verifications")
-    .upsert(buildMemberSsafyVerificationUpsertPayload(memberId, input), {
+    .upsert(payload, {
       onConflict: "member_id",
     });
-  if (verificationError) {
+  if (error) {
     return { ok: false as const, errorCode: "MEMBER_UPDATE_FAILED" };
   }
 

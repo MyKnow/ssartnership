@@ -198,11 +198,8 @@ test("SSAFY Verify claim validator enforces issuer, audience, assurance, and aut
   );
 });
 
-test("SSAFY Verify member update payload stores minimal verification fields", async () => {
-  const {
-    buildMemberSsafyVerificationUpsertPayload,
-    buildSsafyMemberUpdatePayload,
-  } = await memberModulePromise;
+test("SSAFY Verify stores verification only in its normalized record", async () => {
+  const { buildMemberSsafyVerificationUpsertPayload } = await memberModulePromise;
   const input = {
     sub: "pairwise-subject",
     verified: true,
@@ -222,21 +219,6 @@ test("SSAFY Verify member update payload stores minimal verification fields", as
     verificationId: "verification-id",
     scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
   } as const;
-  const payload = buildSsafyMemberUpdatePayload(input);
-
-  assert.deepEqual(payload, {
-    ssafy_sub: "pairwise-subject",
-    ssafy_verified_at: new Date(1_781_740_800 * 1000).toISOString(),
-    ssafy_auth_time: new Date(1_781_740_800 * 1000).toISOString(),
-    ssafy_verification_id: "verification-id",
-    ssafy_mattermost_user_id: "mattermost-user-id",
-    ssafy_track: "java-major",
-    ssafy_track_name: "자바 전공",
-    ssafy_last_scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
-    updated_at: payload.updated_at,
-  });
-  assert.match(payload.updated_at, /^\d{4}-\d{2}-\d{2}T/);
-
   const normalizedPayload = buildMemberSsafyVerificationUpsertPayload(
     "member-1",
     input,
@@ -252,6 +234,7 @@ test("SSAFY Verify member update payload stores minimal verification fields", as
     last_scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
     updated_at: normalizedPayload.updated_at,
   });
+  assert.match(normalizedPayload.updated_at, /^\d{4}-\d{2}-\d{2}T/);
 });
 
 test("SSAFY Verify signup payload creates a member from verified profile and policies", async () => {
@@ -274,42 +257,17 @@ test("SSAFY Verify signup payload creates a member from verified profile and pol
       scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
     },
     passwordRecord: { hash: "password-hash", salt: "password-salt" },
-    activePolicies: {
-      service: { id: "service-policy", version: 2 },
-      privacy: { id: "privacy-policy", version: 3 },
-    },
-    marketingPolicy: { id: "marketing-policy", version: 4 },
-    marketingPolicyChecked: true,
     agreedAt: "2026-06-22T02:00:00.000Z",
   });
 
   assert.deepEqual(payload, {
-    mm_user_id: "mm.user-123",
-    mm_username: "student.name",
     display_name: "김싸피",
     generation: 15,
-    year: 15,
     staff_source_generation: null,
-    staff_source_year: null,
     campus: "서울",
     password_hash: "password-hash",
     password_salt: "password-salt",
     must_change_password: false,
-    service_policy_version: 2,
-    service_policy_consented_at: "2026-06-22T02:00:00.000Z",
-    privacy_policy_version: 3,
-    privacy_policy_consented_at: "2026-06-22T02:00:00.000Z",
-    marketing_policy_version: 4,
-    marketing_policy_consented_at: "2026-06-22T02:00:00.000Z",
-    ssafy_sub: "pairwise-subject",
-    ssafy_verified_at: new Date(1_781_740_800 * 1000).toISOString(),
-    ssafy_auth_time: new Date(1_781_740_800 * 1000).toISOString(),
-    ssafy_verification_id: "verification-id",
-    ssafy_mattermost_user_id: "mm.user-123",
-    ssafy_track: "java-major",
-    ssafy_track_name: "자바 전공",
-    ssafy_last_scope: "ssafy.verify ssafy.affiliation ssafy.mattermost_id",
-    avatar_url: null,
     created_at: "2026-06-22T02:00:00.000Z",
     updated_at: "2026-06-22T02:00:00.000Z",
   });
@@ -335,21 +293,11 @@ test("SSAFY Verify signup payload maps staff to the staff year with source year"
       scope: null,
     },
     passwordRecord: { hash: "password-hash", salt: "password-salt" },
-    activePolicies: {
-      service: { id: "service-policy", version: 2 },
-      privacy: { id: "privacy-policy", version: 3 },
-    },
-    marketingPolicy: null,
-    marketingPolicyChecked: false,
     agreedAt: "2026-06-22T02:00:00.000Z",
   });
 
-  assert.equal(payload.year, 0);
   assert.equal(payload.generation, 0);
-  assert.equal(payload.staff_source_year, 15);
   assert.equal(payload.staff_source_generation, 15);
-  assert.equal(payload.marketing_policy_version, null);
-  assert.equal(payload.marketing_policy_consented_at, null);
 });
 
 test("SSAFY Verify signup payload does not store staff cohort 0 as a source year", async () => {
@@ -372,17 +320,11 @@ test("SSAFY Verify signup payload does not store staff cohort 0 as a source year
       scope: "ssafy.verify ssafy.affiliation ssafy.role ssafy.mattermost_id",
     },
     passwordRecord: { hash: "password-hash", salt: "password-salt" },
-    activePolicies: {
-      service: { id: "service-policy", version: 2 },
-      privacy: { id: "privacy-policy", version: 3 },
-    },
-    marketingPolicy: null,
-    marketingPolicyChecked: false,
     agreedAt: "2026-06-22T02:00:00.000Z",
   });
 
-  assert.equal(payload.year, 0);
-  assert.equal(payload.staff_source_year, null);
+  assert.equal(payload.generation, 0);
+  assert.equal(payload.staff_source_generation, null);
 });
 
 test("SSAFY Verify signup profile uses the stable subject lookup for staff cohort 0", async () => {
@@ -756,29 +698,36 @@ test("SSAFY Verify signup profile surfaces local Mattermost lookup errors", asyn
   }
 });
 
-test("SSAFY Verify member lookup rejects duplicate subject linking", async () => {
+test("SSAFY Verify member lookup rejects duplicate normalized subject linking", async () => {
   const { findSsafyVerifiedMember } = await memberModulePromise;
   const calls: Array<{ table: string; column: string; value: string }> = [];
-  const responses = [
-    {
-      data: {
-        id: "current-member",
-        must_change_password: false,
-        ssafy_sub: null,
-        mm_user_id: "mattermost-current",
+  const responses = new Map([
+    [
+      "members:id:current-member",
+      {
+        data: {
+          id: "current-member",
+          must_change_password: false,
+          mattermost_account_id: "directory-current",
+        },
+        error: null,
       },
-      error: null,
-    },
-    {
-      data: {
-        id: "other-member",
-        must_change_password: false,
-        ssafy_sub: "pairwise-subject",
-        mm_user_id: "mattermost-other",
+    ],
+    [
+      "member_ssafy_verifications:member_id:current-member",
+      { data: null, error: null },
+    ],
+    [
+      "member_ssafy_verifications:ssafy_sub:pairwise-subject",
+      {
+        data: {
+          member_id: "other-member",
+          ssafy_sub: "pairwise-subject",
+        },
+        error: null,
       },
-      error: null,
-    },
-  ];
+    ],
+  ]);
   const supabase = {
     from(table: string) {
       return {
@@ -791,7 +740,10 @@ test("SSAFY Verify member lookup rejects duplicate subject linking", async () =>
                   return this;
                 },
                 async maybeSingle() {
-                  return responses.shift() ?? { data: null, error: null };
+                  return responses.get(table + ":" + column + ":" + value) ?? {
+                    data: null,
+                    error: null,
+                  };
                 },
               };
             },
@@ -808,7 +760,16 @@ test("SSAFY Verify member lookup rejects duplicate subject linking", async () =>
 
   assert.deepEqual(calls, [
     { table: "members", column: "id", value: "current-member" },
-    { table: "members", column: "ssafy_sub", value: "pairwise-subject" },
+    {
+      table: "member_ssafy_verifications",
+      column: "member_id",
+      value: "current-member",
+    },
+    {
+      table: "member_ssafy_verifications",
+      column: "ssafy_sub",
+      value: "pairwise-subject",
+    },
   ]);
   assert.deepEqual(result, {
     ok: false,
