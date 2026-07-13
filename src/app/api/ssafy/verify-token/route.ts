@@ -49,10 +49,6 @@ function publicError(
   );
 }
 
-function shouldExposeSsafyVerifyDebug() {
-  return process.env.SSAFY_VERIFY_DEBUG_ERRORS === "1";
-}
-
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   const tokenTrace = createSsafyVerifyApiTraceLogger({
@@ -335,24 +331,6 @@ export async function POST(request: Request) {
       }),
     });
     if (!signupProfile.ok) {
-      const debug = shouldExposeSsafyVerifyDebug()
-        ? {
-            debug: {
-              errorCode: signupProfile.errorCode,
-              providerErrorCode: signupProfile.providerErrorCode ?? null,
-              providerRequestId: signupProfile.requestId,
-              profileLookup: signupProfile.lookup,
-              grantedScope: exchanged.scope,
-              claims: {
-                hasMattermostUserId: Boolean(verified.claims.mattermostUserId),
-                hasCohort: Boolean(verified.claims.cohort),
-                hasCampus: Boolean(verified.claims.campus),
-                hasName: Boolean(verified.claims.name),
-              },
-              diagnostic: signupProfile.diagnostic,
-            },
-          }
-        : {};
       await logAuthSecurity({
         ...context,
         eventName: "member_ssafy_verify",
@@ -379,7 +357,6 @@ export async function POST(request: Request) {
         signupProfile.errorCode,
         signupProfile.requestId,
         signupProfile.status,
-        debug,
       );
     }
 
