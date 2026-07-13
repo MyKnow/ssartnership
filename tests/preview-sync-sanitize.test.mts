@@ -132,6 +132,79 @@ test("sanitizeDumpSqlForPreview strips heavy and sensitive member columns", asyn
   assert.equal(sanitized.sql.includes("salt"), false);
 });
 
+test("sanitizeDumpSqlForPreview omits production member profile image ledgers", async () => {
+  const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
+
+  const sourceSql = [
+    "COPY public.member_profile_images (id, member_id, storage_path, status) FROM stdin;",
+    "image-1\tmember-1\tmembers/member-1/photo.webp\tapproved",
+    "\\.",
+    "COPY public.members (id, display_name) FROM stdin;",
+    "member-1\t김싸피",
+    "\\.",
+  ].join("\n");
+
+  const previewColumnsByTable = new Map([
+    [
+      "member_profile_images",
+      new Set(["id", "member_id", "storage_path", "status"]),
+    ],
+    ["members", new Set(["id", "display_name"])],
+  ]);
+
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.memberProfileImageCopyBlocksSkipped, 1);
+  assert.equal(sanitized.stats.memberProfileImageRowsSkipped, 1);
+  assert.equal(
+    sanitized.sql,
+    [
+      "COPY public.members (id, display_name) FROM stdin;",
+      "member-1\t김싸피",
+      "\\.",
+    ].join("\n"),
+  );
+});
+
+test("sanitizeDumpSqlForPreview preserves graduate verification image ledgers", async () => {
+  const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
+
+  const sourceSql = [
+    "COPY public.member_profile_images (id, graduate_verification_request_id, member_id, storage_path, status) FROM stdin;",
+    "member-image\t\\N\tmember-1\tmembers/member-1/photo.webp\tapproved",
+    "graduate-image\trequest-1\t\\N\tgraduate-requests/request-1/photo.webp\tpending",
+    "\\.",
+  ].join("\n");
+
+  const previewColumnsByTable = new Map([
+    [
+      "member_profile_images",
+      new Set([
+        "id",
+        "graduate_verification_request_id",
+        "member_id",
+        "storage_path",
+        "status",
+      ]),
+    ],
+  ]);
+
+  const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+
+  assert.equal(sanitized.changed, true);
+  assert.equal(sanitized.stats.memberProfileImageRowsSkipped, 1);
+  assert.equal(sanitized.stats.memberProfileImageCopyBlocksSkipped, 0);
+  assert.equal(
+    sanitized.sql,
+    [
+      "COPY public.member_profile_images (id, graduate_verification_request_id, member_id, storage_path, status) FROM stdin;",
+      "graduate-image\trequest-1\t\\N\tgraduate-requests/request-1/photo.webp\tpending",
+      "\\.",
+    ].join("\n"),
+  );
+});
+
 test("sanitizeDumpSqlForPreview backfills empty partner campus slugs", async () => {
   const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
 
