@@ -23,19 +23,47 @@ const adminSecurityModulePromise = import(
 const authSecurityLogSanitizeModulePromise = import(
   new URL("../src/lib/auth-security-log-sanitize.ts", import.meta.url).href
 );
+const clientIpModulePromise = import(
+  new URL("../src/lib/client-ip.ts", import.meta.url).href
+);
 
-test("product event locations mask verification tokens", async () => {
+test("product event locations mask verification tokens and omit query values", async () => {
   const { normalizeProductEventLocation } = await pathModulePromise;
 
   assert.equal(
     normalizeProductEventLocation("/verify/abc123?foo=1"),
-    "/verify/[token]?foo=1",
+    "/verify/[token]",
   );
   assert.equal(
     normalizeProductEventLocation(
       "https://example.com/verify/abc123?foo=1#bar",
     ),
-    "https://example.com/verify/[token]?foo=1#bar",
+    "https://example.com/verify/[token]",
+  );
+});
+
+test("log locations mask setup and QR token path segments", async () => {
+  const { normalizeProductEventLocation } = await pathModulePromise;
+
+  assert.equal(
+    normalizeProductEventLocation("/api/partner/setup/one-time-setup-token"),
+    "/api/partner/setup/[token]",
+  );
+  assert.equal(
+    normalizeProductEventLocation("/partner/setup/one-time-setup-token?redirect=/admin"),
+    "/partner/setup/[token]",
+  );
+  assert.equal(
+    normalizeProductEventLocation("/admin/setup/one-time-setup-token"),
+    "/admin/setup/[token]",
+  );
+  assert.equal(
+    normalizeProductEventLocation("/api/certification/avatar/qr-token"),
+    "/api/certification/avatar/[token]",
+  );
+  assert.equal(
+    normalizeProductEventLocation("partner/setup/one-time-setup-token"),
+    null,
   );
 });
 
@@ -141,6 +169,46 @@ test("product event throttle rejects bursty repeated events", async () => {
   );
 
   resetProductEventThrottleForTests();
+});
+
+test("product event ingress throttle limits requests before their body is parsed", async () => {
+  const { consumeProductEventIngressQuota, resetProductEventThrottleForTests } =
+    await productEventThrottleModulePromise;
+
+  resetProductEventThrottleForTests();
+
+  for (let index = 0; index < 240; index += 1) {
+    assert.equal(
+      consumeProductEventIngressQuota({ ipAddress: "203.0.113.11" }, 1_000),
+      true,
+    );
+  }
+
+  assert.equal(
+    consumeProductEventIngressQuota({ ipAddress: "203.0.113.11" }, 1_000),
+    false,
+  );
+
+  resetProductEventThrottleForTests();
+});
+
+test("client IP uses Vercel's canonical forwarded header before proxy fallbacks", async () => {
+  const { getClientIp } = await clientIpModulePromise;
+
+  assert.equal(
+    getClientIp(
+      new Headers({
+        "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
+        "x-forwarded-for": "198.51.100.20",
+        "x-real-ip": "198.51.100.21",
+      }),
+    ),
+    "203.0.113.12",
+  );
+  assert.equal(
+    getClientIp(new Headers({ "x-forwarded-for": "198.51.100.22" })),
+    "198.51.100.22",
+  );
 });
 
 test("same-origin request guard requires matching origin or trusted referrer", async () => {
@@ -387,7 +455,7 @@ test("admin session ttl defaults to short bounded windows", async () => {
   assert.equal(getAdminSessionTtlSeconds("not-a-number"), 12 * 60 * 60);
 });
 
-test("auth security logs redact raw exception messages", async () => {
+test("auth security logs redact raw messages regardless of reason code", async () => {
   const { redactAuthSecurityExceptionProperties } =
     await authSecurityLogSanitizeModulePromise;
 
@@ -405,12 +473,12 @@ test("auth security logs redact raw exception messages", async () => {
   );
   assert.deepStrictEqual(
     redactAuthSecurityExceptionProperties({
-      reason: "invalid_credentials",
-      message: "사용자에게 보여줄 수 있는 실패 사유",
+      reason: "state_update_failed",
+      message: "database detail that must not be persisted",
     }),
     {
-      reason: "invalid_credentials",
-      message: "사용자에게 보여줄 수 있는 실패 사유",
+      reason: "state_update_failed",
+      message: "redacted_exception",
     },
   );
 });

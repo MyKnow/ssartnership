@@ -290,7 +290,8 @@ export default function HomeView({
         eventName: "search_execute",
         targetType: "partner_search",
         properties: {
-          query,
+          hasQuery: true,
+          queryLength: query.length,
           categoryKey: activeCategory,
           campusFilter,
           appliesToFilter,

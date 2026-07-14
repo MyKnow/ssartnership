@@ -12,6 +12,7 @@ type Bucket = {
 const WINDOW_MS = 60_000;
 const MAX_EVENTS_PER_WINDOW = 120;
 const MAX_SAME_EVENT_PER_WINDOW = 30;
+const MAX_INGRESS_REQUESTS_PER_WINDOW = 240;
 const MAX_BUCKETS = 2_000;
 
 const buckets = new Map<string, Bucket>();
@@ -25,6 +26,10 @@ function buildActorKey(input: ProductEventThrottleInput) {
   const ipKey = normalizeKeyPart(input.ipAddress, 'unknown-ip');
   const sessionKey = normalizeKeyPart(input.sessionId, 'anonymous-session');
   return `${ipKey}:${sessionKey}`;
+}
+
+function buildIngressKey(ipAddress: string | null | undefined) {
+  return normalizeKeyPart(ipAddress, 'unknown-ip');
 }
 
 function pruneBuckets(now: number) {
@@ -88,6 +93,19 @@ export function consumeProductEventQuota(
   );
 
   return allEventsAllowed && sameEventAllowed;
+}
+
+export function consumeProductEventIngressQuota(
+  input: Pick<ProductEventThrottleInput, 'ipAddress'>,
+  now = Date.now(),
+) {
+  pruneBuckets(now);
+
+  return consumeBucket(
+    `ingress:${buildIngressKey(input.ipAddress)}`,
+    MAX_INGRESS_REQUESTS_PER_WINDOW,
+    now,
+  );
 }
 
 export function resetProductEventThrottleForTests() {

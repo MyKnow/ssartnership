@@ -1746,6 +1746,11 @@ create table if not exists push_delivery_logs (
 
 create table if not exists event_logs (
   id uuid primary key default uuid_generate_v4(),
+  event_id uuid,
+  schema_version integer,
+  occurred_at timestamp with time zone,
+  recorded_at timestamp with time zone,
+  request_id text,
   session_id text,
   actor_type text not null,
   actor_id text,
@@ -1757,7 +1762,9 @@ create table if not exists event_logs (
   properties jsonb not null default '{}'::jsonb,
   user_agent text,
   ip_address text,
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  constraint event_logs_schema_version_check
+    check (schema_version is null or schema_version >= 1)
 );
 
 create table if not exists partner_metric_rollups (
@@ -2364,8 +2371,91 @@ create trigger partner_metric_rollups_from_event_logs
   for each row
   execute function sync_partner_metric_rollups_from_event_logs();
 
+create or replace function public.ingest_product_event(
+  input_event_id uuid,
+  input_schema_version integer,
+  input_occurred_at timestamp with time zone,
+  input_request_id text,
+  input_session_id text,
+  input_actor_type text,
+  input_actor_id text,
+  input_event_name text,
+  input_path text,
+  input_referrer text,
+  input_target_type text,
+  input_target_id text,
+  input_properties jsonb,
+  input_user_agent text,
+  input_ip_address text
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  recorded_at_value timestamp with time zone := now();
+begin
+  if input_event_id is null then
+    raise exception 'product_event_id_required';
+  end if;
+
+  if input_schema_version is null or input_schema_version < 1 then
+    raise exception 'product_event_schema_version_invalid';
+  end if;
+
+  insert into public.event_logs (
+    event_id,
+    schema_version,
+    occurred_at,
+    recorded_at,
+    request_id,
+    session_id,
+    actor_type,
+    actor_id,
+    event_name,
+    path,
+    referrer,
+    target_type,
+    target_id,
+    properties,
+    user_agent,
+    ip_address,
+    created_at
+  )
+  values (
+    input_event_id,
+    input_schema_version,
+    coalesce(input_occurred_at, recorded_at_value),
+    recorded_at_value,
+    input_request_id,
+    input_session_id,
+    input_actor_type,
+    input_actor_id,
+    input_event_name,
+    input_path,
+    input_referrer,
+    input_target_type,
+    input_target_id,
+    coalesce(input_properties, '{}'::jsonb),
+    input_user_agent,
+    input_ip_address,
+    recorded_at_value
+  )
+  on conflict (event_id) where event_id is not null do nothing;
+
+  return found;
+end;
+$$;
+
+revoke all on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) from public;
+revoke all on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) from anon;
+revoke all on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) from authenticated;
+grant execute on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) to service_role;
+
 create table if not exists admin_audit_logs (
   id uuid primary key default uuid_generate_v4(),
+  request_id text,
   actor_id text,
   action text not null,
   path text,
@@ -2785,6 +2875,7 @@ alter table members
 
 create table if not exists auth_security_logs (
   id uuid primary key default uuid_generate_v4(),
+  request_id text,
   event_name text not null,
   status text not null,
   actor_type text not null,
@@ -2992,6 +3083,9 @@ create index if not exists event_logs_path_prefix_idx
   on event_logs(path text_pattern_ops)
   where path is not null;
 create index if not exists event_logs_session_id_idx on event_logs(session_id);
+create unique index if not exists event_logs_event_id_key
+  on event_logs(event_id)
+  where event_id is not null;
 create unique index if not exists partner_metric_rollups_total_unique_idx
   on partner_metric_rollups(partner_id, metric_name, metric_kind, bucket_timezone)
   where granularity = 'total';

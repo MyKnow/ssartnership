@@ -77,6 +77,10 @@
 - `partner_password_change`
 
 ## 공통 필드
+- `event_id`: 제품 이벤트의 클라이언트 생성 UUID. 재전송되어도 한 번만 저장한다.
+- `schema_version`: 제품 이벤트 payload 계약 버전
+- `occurred_at`, `recorded_at`: 클라이언트 발생 시각과 서버 기록 시각
+- `request_id`: 같은 요청에서 생성된 감사·보안·제품 이벤트를 연결하는 UUID
 - `actor_type`: `guest`, `member`, `admin`, `partner`, `system`
 - `actor_id`: 회원 UUID, 관리자 ID, 협력사 계정 ID
 - `path`: 이벤트가 발생한 경로
@@ -85,6 +89,23 @@
 - `target_id`: 대상 엔터티 ID
 - `properties`: 추가 메타데이터 JSON
 - `user_agent`, `ip_address`, `created_at`
+
+## 제품 이벤트 수집 계약
+
+- 브라우저는 `event_id`, `schema_version`, `occurred_at`을 포함한 단일 이벤트 envelope만 `/api/events/product`로 보낸다.
+- 이 endpoint는 페이지 조회·클릭 등 **클라이언트 텔레메트리 전용 이벤트**만 받는다. 쿠폰 사용, 푸시 구독 변경, 리뷰 작성처럼 서버가 확인한 업무 이벤트는 해당 서버 route/action에서 기록한다.
+- 이벤트별 허용 `properties`와 `target_type`·`target_id` 조합을 검증한다. 알 수 없는 `properties` key는 저장하지 않는다.
+- 요청 본문은 12 KiB를 넘길 수 없다. `Content-Length` fast-fail 뒤에도 stream을 누적 읽어 한도를 넘는 즉시 취소한다. `properties`는 최종 저장 직전에도 깊이·항목 수·문자열 길이·전체 크기 제한을 거친다.
+- 요청 본문을 읽기 전에 Vercel 원본 전달 IP(`x-vercel-forwarded-for` 우선) 기준 ingress 제한을 적용하고, 계약 검증 뒤에는 IP·세션·이벤트별 제한을 한 번 더 적용한다. 이 제한은 프로세스 로컬 best-effort 보호 장치이며 Vercel WAF/분산 rate limit을 대체하지 않는다.
+- `event_logs.event_id`의 partial unique index와 `ingest_product_event()` RPC가 원자적으로 동작한다. 신규 row가 실제로 insert될 때만 기존 trigger가 rollup을 증가시키므로, 별도 rollup fallback을 두지 않는다.
+- endpoint의 `202` 응답은 비동기 처리 접수 결과다. 제품 텔레메트리는 일부 유실을 허용하며, 정산·쿠폰 사용 같은 정확한 업무 수치는 브라우저 이벤트로 계산하지 않는다.
+
+## 데이터 최소화와 redaction
+
+- 모든 `event_logs`, `admin_audit_logs`, `auth_security_logs` 저장 직전에는 공통 recursive sanitizer를 적용한다.
+- key 이름은 camelCase/snake_case 등을 정규화해 `password`, `secret`, `token`, `authorization`, `cookie`, `session`, `credential`, `api_key`, `private_key`, `client_secret`, raw `code`를 redaction한다. `reasonCode`, `errorCode` 같은 안정적인 코드 값은 유지한다.
+- `path`와 `referrer`는 query string과 hash를 저장하지 않는다. `/verify/:token`, setup link, QR avatar token 경로는 각각 `[token]` route template으로 정규화한다.
+- 인증·보안 예외의 원문 메시지는 저장하지 않고, 안정적인 reason/error code를 사용한다.
 
 ## 이벤트 명명 규칙
 - 소문자 스네이크 케이스 사용

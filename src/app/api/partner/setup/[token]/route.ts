@@ -10,14 +10,6 @@ import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
-function maskPartnerSetupToken(token: string) {
-  if (token.length <= 12) {
-    return token;
-  }
-
-  return `${token.slice(0, 6)}...${token.slice(-6)}`;
-}
-
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ token: string }> },
@@ -93,12 +85,12 @@ export async function POST(
     }
 
     console.error("[partner-setup-route] unexpected setup failure", {
-      token: maskPartnerSetupToken(token),
+      route: "/api/partner/setup/[token]",
       requestId:
         request.headers.get("x-vercel-id") ??
         request.headers.get("x-request-id") ??
         null,
-      error,
+      reasonCode: "unexpected_setup_failure",
     });
 
     await logAuthSecurity({
