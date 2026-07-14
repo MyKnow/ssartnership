@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   useCallback,
   startTransition,
@@ -57,7 +57,6 @@ export default function HomeView({
   loadedPartnerStateIds?: string[];
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const categoryKeys = useMemo(
     () => categories.map((category) => category.key),
@@ -94,17 +93,23 @@ export default function HomeView({
 
   const replaceDirectoryState = useCallback(
     (nextState: Partial<HomeDirectoryState>) => {
+      const currentParams = new URLSearchParams(window.location.search);
+      const currentDirectoryState = parseHomeDirectoryState(
+        currentParams,
+        categoryKeys,
+      );
       const params = serializeHomeDirectoryState(
-        { ...directoryState, ...nextState },
-        searchParams,
+        { ...currentDirectoryState, ...nextState },
+        currentParams,
       );
       const query = params.toString();
-      router.replace(
+      window.history.replaceState(
+        null,
+        "",
         query ? `${pathname}?${query}#benefits` : `${pathname}#benefits`,
-        { scroll: false },
       );
     },
-    [directoryState, pathname, router, searchParams],
+    [categoryKeys, pathname],
   );
 
   const directoryReturnTo = useMemo(() => {
