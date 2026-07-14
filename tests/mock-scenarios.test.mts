@@ -287,6 +287,20 @@ test("coverage matrix exposes route, scenario, storybook, and viewport traceabil
     ],
   );
 
+  const partnerDetail = matrix.find(
+    (row) => row.routePath === "/partners/[id]",
+  );
+  assert.ok(partnerDetail);
+  assert.deepStrictEqual(partnerDetail.missingStorybookScenarioIds, []);
+  assert.ok(
+    partnerDetail.storybookStories.some(
+      (story) =>
+        story.scenarioId === "public.partner.detail.locked" &&
+        story.renderKind === "actual-view" &&
+        story.actualViewComponent === "PartnerDetailAccessGate",
+    ),
+  );
+
   const completePartnerDashboard = matrix.find(
     (row) => row.routePath === "/partner/companies/[companyId]",
   );

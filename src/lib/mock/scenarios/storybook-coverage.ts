@@ -264,6 +264,17 @@ const mockStorybookScenarioCoverageBase = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
+    routePath: "/partners/[id]",
+    scenarioId: "public.partner.detail.locked",
+    storyId: "screens-public-partnerdetailaccessgate--locked",
+    storyFile:
+      "src/app/(site)/partners/[id]/_page/PartnerDetailAccessGate.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "PartnerDetailAccessGate",
+    coveredStateKeys: ["default"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
     routePath: "/partner-registration",
     scenarioId: "public.partner.registration.web-input",
     storyId: "domains-partner-pagestates-core--registration-web-input",
