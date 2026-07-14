@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 const coreStoryIds = [
   "screens-public-homedirectoryview--default",
   "screens-public-partnerdetailview--default",
+  "screens-public-partnerdetailaccessgate--locked",
   "domains-partnerregistration-actualview--web-input",
   "domains-partner-pagestates-dashboard--cafe-ssafy-mixed-plans",
   "domains-admin-pagestates--dashboard-overview",
