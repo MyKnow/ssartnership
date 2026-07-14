@@ -3,6 +3,10 @@ import {
   normalizeMmUsername,
   validateMmUsername,
 } from "@/lib/validation";
+import {
+  MANUAL_MEMBER_IMPORT_CAMPUS_LABELS,
+  normalizeManualMemberImportCampus,
+} from "./options";
 
 export const MANUAL_MEMBER_IMPORT_HEADERS = [
   "기수",
@@ -72,6 +76,7 @@ export type ManualMemberImportErrorCode =
   | "email_invalid"
   | "name_required"
   | "campus_required"
+  | "campus_invalid"
   | "photo_filename_invalid"
   | "photo_filename_duplicate"
   | "photo_missing"
@@ -169,13 +174,27 @@ export function validateManualMemberImportRows(
     rowNumbers.add(raw.rowNumber);
     const generation = normalizeGeneration(raw.generation);
     const name = getText(raw.name) || null;
-    const campus = getText(raw.campus) || null;
+    const rawCampus = getText(raw.campus);
+    const campus = rawCampus
+      ? normalizeManualMemberImportCampus(rawCampus)
+      : null;
     const rawMmId = getText(raw.mmId);
     const rawEmail = getText(raw.email);
     const photoFilename = getText(raw.photoFilename) || null;
 
     if (generation === null || generation > context.currentGeneration) {
       errors.push(getRowError(raw.rowNumber, "generation_invalid", "기수는 운영진부터 현재 기수까지 입력해 주세요."));
+      continue;
+    }
+
+    if (rawCampus && !campus) {
+      errors.push(
+        getRowError(
+          raw.rowNumber,
+          "campus_invalid",
+          `캠퍼스는 ${MANUAL_MEMBER_IMPORT_CAMPUS_LABELS} 중 하나를 선택해 주세요.`,
+        ),
+      );
       continue;
     }
 
@@ -229,6 +248,25 @@ export function validateManualMemberImportRows(
   }
 
   return { acceptedRows, errors };
+}
+
+/**
+ * Mirrors the server-side row validation for the client action state. A batch
+ * still has to finish photo validation and signed uploads before it can be
+ * committed.
+ */
+export function getManualMemberImportRowReadiness(
+  rows: readonly ManualMemberImportRawRow[],
+  context: ManualMemberImportValidationContext,
+) {
+  const validation = validateManualMemberImportRows(rows, context);
+  return {
+    ...validation,
+    isComplete:
+      rows.length > 0
+      && validation.errors.length === 0
+      && validation.acceptedRows.length === rows.length,
+  };
 }
 
 export type ManualMemberImportPhotoManifestEntry = {

@@ -851,6 +851,7 @@ export default async function AdminMembersPage({
             <AdminMemberManualAddPanel
               currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
               mmLookupGenerations={getConfiguredManualMemberMmLookupGenerations(cycleSettings)}
+              canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
             />
           </Card>
         </section>
@@ -871,7 +872,7 @@ export default async function AdminMembersPage({
             description="MM 조회 가능 기수와 사진 검토 상태를 확인합니다."
           />
           <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-            <p>MM 알림이 실패하면 이메일 주소가 있는 회원에게만 설정 링크를 한 번 대체 발송합니다.</p>
+            <p>MM·이메일 알림 전송 결과가 불명확하면 자동 대체 발송하지 않습니다. 수신 여부 확인 뒤에만 새 링크를 발급합니다.</p>
             <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
           </div>
         </Card>

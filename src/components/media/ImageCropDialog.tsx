@@ -147,6 +147,7 @@ export default function ImageCropDialog({
   queueCount = 1,
   accept = "image/*",
   validateFile,
+  prepareFile,
   onCancel,
   onApply,
 }: {
@@ -162,6 +163,7 @@ export default function ImageCropDialog({
   queueCount?: number;
   accept?: string;
   validateFile?: (file: File) => string | null;
+  prepareFile?: (file: File) => Promise<File>;
   onCancel: () => void;
   onApply: (file: File) => void;
 }) {
@@ -169,15 +171,18 @@ export default function ImageCropDialog({
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const replacementInputRef = useRef<HTMLInputElement | null>(null);
   const replacementObjectUrlRef = useRef<string | null>(null);
+  const replacementRequestIdRef = useRef(0);
   const [activeSourceUrl, setActiveSourceUrl] = useState(sourceUrl);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isReplacing, setIsReplacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    replacementRequestIdRef.current += 1;
     if (!open || !portalRoot) {
       return;
     }
@@ -187,6 +192,7 @@ export default function ImageCropDialog({
       URL.revokeObjectURL(replacementObjectUrlRef.current);
       replacementObjectUrlRef.current = null;
     }
+    setIsReplacing(false);
     setActiveSourceUrl(sourceUrl);
     setCrop({ x: 0, y: 0 });
     setZoom(1);
@@ -194,6 +200,7 @@ export default function ImageCropDialog({
     setPreviewUrl(null);
     setError(null);
     return () => {
+      replacementRequestIdRef.current += 1;
       document.body.style.overflow = previousOverflow;
       if (replacementObjectUrlRef.current) {
         URL.revokeObjectURL(replacementObjectUrlRef.current);
@@ -241,7 +248,7 @@ export default function ImageCropDialog({
     setError(null);
   };
 
-  const replaceSource = (event: ChangeEvent<HTMLInputElement>) => {
+  const replaceSource = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     event.target.value = "";
     if (!file) {
@@ -255,13 +262,38 @@ export default function ImageCropDialog({
       return;
     }
 
-    if (replacementObjectUrlRef.current) {
-      URL.revokeObjectURL(replacementObjectUrlRef.current);
+    const requestId = replacementRequestIdRef.current + 1;
+    replacementRequestIdRef.current = requestId;
+    setIsReplacing(true);
+    setError(null);
+    try {
+      const sourceFile = prepareFile ? await prepareFile(file) : file;
+      if (replacementRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      if (replacementObjectUrlRef.current) {
+        URL.revokeObjectURL(replacementObjectUrlRef.current);
+      }
+      const nextSourceUrl = URL.createObjectURL(sourceFile);
+      replacementObjectUrlRef.current = nextSourceUrl;
+      setActiveSourceUrl(nextSourceUrl);
+      resetAdjustments();
+    } catch (nextError) {
+      if (replacementRequestIdRef.current !== requestId) {
+        return;
+      }
+      const message =
+        nextError instanceof Error && nextError.message
+          ? nextError.message
+          : "이미지 변환에 실패했습니다.";
+      setError(message);
+      notify(message);
+    } finally {
+      if (replacementRequestIdRef.current === requestId) {
+        setIsReplacing(false);
+      }
     }
-    const nextSourceUrl = URL.createObjectURL(file);
-    replacementObjectUrlRef.current = nextSourceUrl;
-    setActiveSourceUrl(nextSourceUrl);
-    resetAdjustments();
   };
 
   const exportFile = async () => {
@@ -421,6 +453,8 @@ export default function ImageCropDialog({
                   variant="ghost"
                   size="sm"
                   onClick={() => replacementInputRef.current?.click()}
+                  loading={isReplacing}
+                  loadingText="변환 중"
                   className="min-w-0"
                 >
                   <ArrowUpTrayIcon className="h-4 w-4" />
@@ -457,6 +491,7 @@ export default function ImageCropDialog({
               onClick={exportFile}
               loading={isExporting}
               loadingText="적용 중"
+              disabled={isReplacing}
               className={cn("min-w-0 sm:w-auto", isExporting ? "pointer-events-none" : null)}
             >
               적용

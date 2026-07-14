@@ -1009,6 +1009,7 @@ export async function submitMemberProfileImageReplacement(input: {
     .from("members")
     .select("id")
     .eq("id", input.memberId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (memberError || !member?.id) {
     throw new Error("회원 정보를 확인하지 못했습니다.");
@@ -1034,7 +1035,7 @@ export async function submitMemberProfileImageReplacement(input: {
   });
   let profileImageId: string | null = null;
   try {
-    await supabase
+    const { error: supersedeError } = await supabase
       .from("member_profile_images")
       .update({
         status: "superseded",
@@ -1043,6 +1044,9 @@ export async function submitMemberProfileImageReplacement(input: {
       .eq("member_id", input.memberId)
       .is("graduate_verification_request_id", null)
       .eq("status", "pending");
+    if (supersedeError) {
+      throw new Error("기존 사진 변경 대기를 정리하지 못했습니다.");
+    }
     const { data, error } = await supabase
       .from("member_profile_images")
       .insert({
@@ -1059,6 +1063,96 @@ export async function submitMemberProfileImageReplacement(input: {
       .single();
     if (error || !data?.id) throw new Error("본인 사진 변경 요청을 저장하지 못했습니다.");
     profileImageId = data.id;
+    return { imageId: data.id };
+  } catch (error) {
+    if (profileImageId) {
+      await supabase
+        .from("member_profile_images")
+        .delete()
+        .eq("id", profileImageId)
+        .eq("status", "pending");
+    }
+    await removeGraduateStoredObject("member-profile-images", path).catch(() => undefined);
+    throw error;
+  }
+}
+
+/**
+ * Administrators set a member photo directly. The row is created as pending
+ * only long enough for the existing locked approval RPC to atomically
+ * supersede the old active image and point the member at the new one.
+ */
+export async function replaceMemberProfileImageByAdmin(input: {
+  memberId: string;
+  uploadId: string;
+  adminId: string;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const { data: member, error: memberError } = await supabase
+    .from("members")
+    .select("id")
+    .eq("id", input.memberId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (memberError || !member?.id) {
+    throw new Error("회원 정보를 확인하지 못했습니다.");
+  }
+  const upload = await getGraduateMemberProfileReplacementUpload({
+    uploadId: input.uploadId,
+    memberId: input.memberId,
+  });
+  if (!upload) {
+    throw new Error("사진 업로드가 만료되었거나 확인할 수 없습니다. 다시 선택해 주세요.");
+  }
+  const source = await downloadGraduateVerificationUpload(upload);
+  const image = await normalizeGraduateProfileImage({
+    contentType: upload.content_type,
+    source,
+  });
+  // The signed-upload original is only a short-lived intake object. Keep the
+  // normalized WebP below and discard the original as soon as decoding succeeds.
+  await discardGraduateVerificationUpload(upload);
+  const path = await storeGraduateProfileImage({
+    requestId: `admin-replacement-${input.memberId}`,
+    buffer: image.buffer,
+  });
+  let profileImageId: string | null = null;
+  try {
+    const { error: supersedeError } = await supabase
+      .from("member_profile_images")
+      .update({
+        status: "superseded",
+        delete_after: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .eq("member_id", input.memberId)
+      .is("graduate_verification_request_id", null)
+      .eq("status", "pending");
+    if (supersedeError) {
+      throw new Error("기존 사진 변경 대기를 정리하지 못했습니다.");
+    }
+
+    const { data, error } = await supabase
+      .from("member_profile_images")
+      .insert({
+        member_id: input.memberId,
+        storage_path: path,
+        sha256: image.sha256,
+        content_type: image.contentType,
+        width: image.width,
+        height: image.height,
+        source: "manual_admin",
+        status: "pending",
+      })
+      .select("id")
+      .single();
+    if (error || !data?.id) {
+      throw new Error("관리자 사진 변경을 저장하지 못했습니다.");
+    }
+    profileImageId = data.id;
+    await approveMemberProfileImageReplacement({
+      imageId: data.id,
+      adminId: input.adminId,
+    });
     return { imageId: data.id };
   } catch (error) {
     if (profileImageId) {

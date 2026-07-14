@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getManualMemberImportRowReadiness,
   MANUAL_MEMBER_IMPORT_LIMITS,
   validateManualMemberImportPhotoManifest,
   validateManualMemberImportRows,
@@ -50,6 +51,48 @@ test("MM 또는 이메일 하나는 필수이고, 이메일 전용 회원은 이
 
   assert.equal(result.acceptedRows.length, 0);
   assert.deepEqual(result.errors.map((item) => item.code), ["contact_required", "name_required"]);
+});
+
+test("생성 시작 전 행 완성도는 모든 필수 입력 규칙을 통과한 경우에만 준비 완료가 된다", () => {
+  const empty = getManualMemberImportRowReadiness([], context);
+  const incomplete = getManualMemberImportRowReadiness(
+    [
+      { rowNumber: 2, generation: "16", name: "", campus: "", mmId: "", email: "", photoFilename: "" },
+    ],
+    context,
+  );
+  const complete = getManualMemberImportRowReadiness(
+    [
+      { rowNumber: 2, generation: "16", name: "이메일 회원", campus: "서울", mmId: "", email: "member@example.com", photoFilename: "" },
+    ],
+    context,
+  );
+  const oneIncompleteAmongMultipleRows = getManualMemberImportRowReadiness(
+    [
+      { rowNumber: 2, generation: "15", name: "MM 회원", campus: "서울", mmId: "member-mm", email: "", photoFilename: "" },
+      { rowNumber: 3, generation: "16", name: "", campus: "", mmId: "", email: "", photoFilename: "" },
+    ],
+    context,
+  );
+
+  assert.equal(empty.isComplete, false);
+  assert.equal(incomplete.isComplete, false);
+  assert.equal(oneIncompleteAmongMultipleRows.isComplete, false);
+  assert.equal(complete.isComplete, true);
+});
+
+test("수동 회원 가져오기는 표준 캠퍼스만 허용하고 전체 이름은 저장용 라벨로 정규화한다", () => {
+  const result = validateManualMemberImportRows(
+    [
+      { rowNumber: 2, generation: "16", name: "서울 회원", campus: "서울 캠퍼스", mmId: "", email: "seoul@example.com", photoFilename: "" },
+      { rowNumber: 3, generation: "16", name: "잘못된 캠퍼스", campus: "어딘가", mmId: "", email: "unknown@example.com", photoFilename: "" },
+    ],
+    context,
+  );
+
+  assert.equal(result.acceptedRows.length, 1);
+  assert.equal(result.acceptedRows[0]?.campus, "서울");
+  assert.deepEqual(result.errors.map((item) => [item.rowNumber, item.code]), [[3, "campus_invalid"]]);
 });
 
 test("행 기반 입력은 유효하고 서로 다른 행 번호만 서버 준비 단계에 전달한다", () => {
