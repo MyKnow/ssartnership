@@ -30,6 +30,11 @@ import type {
 } from "@/components/admin/member-manager/selectors";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { parseAdminMemberPageSize } from "@/lib/admin-ia";
+import {
+  getConfiguredCurrentSsafyYear,
+  getConfiguredManualMemberMmLookupGenerations,
+  getSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -454,6 +459,7 @@ export default async function AdminMembersPage({
     optionsResult,
     preferenceFilter,
     searchMemberIds,
+    cycleSettings,
   ] = await Promise.all([
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing").catch(() => null),
@@ -489,6 +495,7 @@ export default async function AdminMembersPage({
       },
     ]),
     getMemberSearchIds(supabase, filters.searchValue),
+    getSsafyCycleSettings(),
   ]);
   const policyConsentFilter = await getPolicyConsentFilteredMemberIds(supabase, [
     {
@@ -775,10 +782,13 @@ export default async function AdminMembersPage({
         <section className="grid min-w-0 gap-4">
           <AdminSectionHeading
             title="수동 추가"
-            description="XLSX와 사진 ZIP을 검증한 뒤 계정을 행별로 생성하고 설정 링크를 전송합니다."
+            description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
           />
           <Card tone="elevated">
-            <AdminMemberManualAddPanel />
+            <AdminMemberManualAddPanel
+              currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
+              mmLookupGenerations={getConfiguredManualMemberMmLookupGenerations(cycleSettings)}
+            />
           </Card>
         </section>
 

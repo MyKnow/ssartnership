@@ -27,13 +27,13 @@ import {
 } from "@/lib/ssafy-verify/profile";
 import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
-import { parseManualMemberImportWorkbook } from "./xlsx.server";
 import {
   MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
   MANUAL_MEMBER_IMPORT_LIMITS,
   validateManualMemberImportPhotoManifest,
   validateManualMemberImportRows,
   type ManualMemberImportPhotoManifestEntry,
+  type ManualMemberImportRawRow,
 } from "./shared";
 
 export const MANUAL_MEMBER_IMPORT_STAGING_BUCKET = "manual-member-import-staging";
@@ -330,15 +330,12 @@ async function deleteCreatedMember(memberId: string | null, profileImagePath: st
 
 export async function prepareManualMemberImport(input: {
   adminId: string;
-  xlsxBuffer: Buffer;
+  rows: ManualMemberImportRawRow[];
   photos: ManualMemberImportPhotoManifestEntry[];
 }): Promise<ManualMemberImportPreflightResult> {
   try {
-    const [rawRows, settings] = await Promise.all([
-      parseManualMemberImportWorkbook(input.xlsxBuffer),
-      getSsafyCycleSettings(),
-    ]);
-    const rowsResult = validateManualMemberImportRows(rawRows, {
+    const settings = await getSsafyCycleSettings();
+    const rowsResult = validateManualMemberImportRows(input.rows, {
       currentGeneration: getConfiguredCurrentSsafyYear(settings),
       mmLookupGenerations: getConfiguredManualMemberMmLookupGenerations(settings),
     });

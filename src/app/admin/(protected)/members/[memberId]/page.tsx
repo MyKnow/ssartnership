@@ -25,6 +25,11 @@ import {
   deleteMember,
   updateMember,
 } from "@/app/admin/(protected)/actions";
+import {
+  approveMemberProfilePhotoAction,
+  rejectMemberCurrentProfilePhotoAction,
+  rejectMemberProfilePhotoAction,
+} from "@/app/admin/(protected)/profile-photos/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +82,7 @@ export default async function AdminMemberDetailPage({
     securityLogsResult,
     activePolicies,
     activeMarketingPolicy,
+    pendingProfilePhotoResult,
   ] = await Promise.all([
     getMemberCanonicalProfile(memberId),
     supabase
@@ -118,6 +124,15 @@ export default async function AdminMemberDetailPage({
       .range(securityLogFrom, securityLogTo),
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing").catch(() => null),
+    supabase
+      .from("member_profile_images")
+      .select("id")
+      .eq("member_id", memberId)
+      .eq("status", "pending")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (!member) {
@@ -178,6 +193,16 @@ export default async function AdminMemberDetailPage({
     consentHistory: (consentHistoryResult.data ?? []) as AdminMemberConsentHistoryRow[],
     consentActivity,
   });
+  const canReadProfilePhotos = canAdmin(
+    adminSession.account.permissions,
+    "profile_images",
+    "read",
+  );
+  const canUpdateProfilePhotos = canAdmin(
+    adminSession.account.permissions,
+    "profile_images",
+    "update",
+  );
 
   return (
     <AdminShell title="회원 상세" backHref="/admin/members" backLabel="회원 관리">
@@ -219,6 +244,14 @@ export default async function AdminMemberDetailPage({
           "members",
           "delete",
         )}
+        profilePhoto={canReadProfilePhotos ? {
+          reviewStatus: member.profilePhotoReviewStatus,
+          pendingImageId: pendingProfilePhotoResult.data?.id ?? null,
+          canUpdate: canUpdateProfilePhotos,
+          approveAction: approveMemberProfilePhotoAction,
+          rejectReplacementAction: rejectMemberProfilePhotoAction,
+          rejectCurrentAction: rejectMemberCurrentProfilePhotoAction,
+        } : null}
       />
     </AdminShell>
   );
