@@ -147,6 +147,8 @@ function AdminLogsExplorerDemo({
         })),
       ]}
       actorOptions={Array.from(new Set(logs.map((log) => log.actorType).filter(Boolean))) as string[]}
+      readGroups={["product", "audit", "security"]}
+      includePii={true}
       onSearchChange={(value) => {
         setSearchValue(value);
         setCurrentPage(1);
