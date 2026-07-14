@@ -117,6 +117,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'graduate_certificate_view',
   'graduate_profile_photo_view',
   'member_profile_photo_view',
+  'admin_log_export_requested',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

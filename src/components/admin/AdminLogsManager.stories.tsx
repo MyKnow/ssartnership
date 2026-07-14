@@ -2,9 +2,15 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { AdminLogsPageData } from "@/lib/log-insights";
+import { applyAdminLogsPrivacy } from "@/lib/log-insights/privacy";
 import AdminLogsManager from "./AdminLogsManager";
 
 const logsData: AdminLogsPageData = {
+  access: {
+    readGroups: ["product", "audit", "security"],
+    exportGroups: ["product", "audit", "security"],
+    includePii: true,
+  },
   range: {
     preset: "24h",
     start: "2026-04-24T00:00:00.000Z",
@@ -129,6 +135,7 @@ const logsData: AdminLogsPageData = {
     auditLogs: [
       {
         id: "audit-1",
+        actor_type: "admin",
         actor_id: "admin-1",
         action: "partner.updated",
         path: "/admin/partners/partner-1",
@@ -141,6 +148,7 @@ const logsData: AdminLogsPageData = {
       },
       {
         id: "audit-2",
+        actor_type: "admin",
         actor_id: "admin-2",
         action: "notification.broadcast",
         path: "/admin/push",
@@ -250,6 +258,41 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const PiiMasked: Story = {
+  args: {
+    initialData: applyAdminLogsPrivacy({
+      ...logsData,
+      counts: {
+        ...logsData.counts,
+        security: 0,
+      },
+      chartBuckets: logsData.chartBuckets.map((bucket) => ({
+        ...bucket,
+        security: 0,
+        total: bucket.product + bucket.audit,
+      })),
+      summary: {
+        ...logsData.summary,
+        securityStatusCounts: {
+          success: 0,
+          failure: 0,
+          blocked: 0,
+        },
+      },
+      list: {
+        ...logsData.list,
+        securityLogs: [],
+        total: logsData.list.productLogs.length + logsData.list.auditLogs.length,
+      },
+      access: {
+        readGroups: ["product", "audit"],
+        exportGroups: [],
+        includePii: false,
+      },
+    }),
+  },
+};
 
 export const InteractiveFiltersAndExport: Story = {
   play: async ({ canvasElement }) => {

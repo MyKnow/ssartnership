@@ -89,7 +89,7 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
   const normalizedAudit = data.auditLogs.map((log) => {
     const actorLoginId = getStringProperty(log.properties ?? null, "actorLoginId");
     const actorDisplayName = getStringProperty(log.properties ?? null, "actorDisplayName");
-    const isPartnerAudit = isPartnerPortalAuditAction(String(log.action));
+    const isPartnerAudit = log.actor_type === "partner" || isPartnerPortalAuditAction(String(log.action));
     const actorSearchLabel = isPartnerAudit
       ? actorLoginId ?? actorDisplayName ?? log.actor_id ?? "파트너사 계정"
       : log.actor_id ?? "admin";
@@ -99,7 +99,7 @@ export function buildUnifiedLogs(data: AdminLogsRecordCollections): NormalizedLo
       name: String(log.action),
       label: getLogLabel("audit", String(log.action)),
       status: null,
-      actorType: isPartnerAudit ? "partner" : "admin",
+      actorType: log.actor_type ?? (isPartnerAudit ? "partner" : "admin"),
       actorId: log.actor_id ?? null,
       actorName: isPartnerAudit ? actorDisplayName : null,
       actorMmUsername: null,

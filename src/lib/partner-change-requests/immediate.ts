@@ -1,4 +1,6 @@
 import { PartnerChangeRequestError } from "../partner-change-request-errors.ts";
+import { buildAtomicAuditRpcContext } from "../audit-rpc-context.ts";
+import { buildAdminMutationAuditProperties } from "../admin-mutation-audit.ts";
 import { normalizePartnerBenefitActionType } from "../partner-benefit-action.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { getSupabaseRequestContext } from "./context.ts";
@@ -16,6 +18,12 @@ import { wrapPartnerChangeRequestDbError } from "./shared.ts";
 export async function updateSupabasePartnerImmediateFields(
   input: PartnerImmediateUpdateInput,
 ): Promise<PartnerImmediateUpdateResult> {
+  if (!input.auditContext) {
+    throw new PartnerChangeRequestError(
+      "invalid_request",
+      "감사 요청 문맥이 없어 제휴처 정보를 저장할 수 없습니다.",
+    );
+  }
   const context = await getSupabaseRequestContext(input.companyIds, input.partnerId);
   if (!context) {
     throw new PartnerChangeRequestError(
@@ -24,10 +32,6 @@ export async function updateSupabasePartnerImmediateFields(
     );
   }
 
-  const previousMediaUrls = collectPartnerMediaUrls({
-    thumbnail: context.thumbnail,
-    images: context.images,
-  });
   const currentMediaUrls = collectPartnerMediaUrlsFromInput({
     thumbnail: input.thumbnail,
     images: input.images,
@@ -56,31 +60,60 @@ export async function updateSupabasePartnerImmediateFields(
     );
   }
 
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("partners")
-    .update({
-      thumbnail: input.thumbnail,
-      images: input.images,
-      tags: input.tags,
-      benefit_action_type: benefitActionType,
-      benefit_action_link: benefitActionLink,
-      reservation_link: input.reservationLink,
-      inquiry_link: input.inquiryLink,
-    })
-    .eq("id", input.partnerId);
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "update_partner_immediate_fields_with_audit",
+    {
+      p_partner_id: input.partnerId,
+      p_company_ids: input.companyIds,
+      p_thumbnail: input.thumbnail,
+      p_images: input.images,
+      p_tags: input.tags,
+      p_benefit_action_type: benefitActionType,
+      p_benefit_action_link: benefitActionLink,
+      p_reservation_link: input.reservationLink,
+      p_inquiry_link: input.inquiryLink,
+      ...buildAtomicAuditRpcContext(
+        input.auditContext,
+        buildAdminMutationAuditProperties({
+          outcome: "success",
+          properties: {
+            partnerId: input.partnerId,
+            companyId: context.companyId,
+            tagCount: input.tags.length,
+            imageCount: input.images.length,
+            thumbnailChanged: context.thumbnail !== input.thumbnail,
+            benefitActionTypeChanged: context.benefitActionType !== benefitActionType,
+            benefitActionLinkChanged: context.benefitActionLink !== benefitActionLink,
+            reservationLinkChanged: context.reservationLink !== input.reservationLink,
+            inquiryLinkChanged: context.inquiryLink !== input.inquiryLink,
+          },
+        }),
+      ),
+    },
+  );
 
   if (error) {
     throw wrapPartnerChangeRequestDbError(
       error,
-      "변경 요청 정보를 불러오지 못했습니다.",
+      "제휴처 정보를 저장하지 못했습니다.",
+    );
+  }
+
+  const mutationResult = Array.isArray(data) ? data[0] : data;
+  if (!mutationResult) {
+    throw new PartnerChangeRequestError(
+      "invalid_request",
+      "제휴처 정보를 저장하지 못했습니다.",
     );
   }
 
   return {
     partnerId: input.partnerId,
-    companyId: context.companyId,
-    previousMediaUrls,
+    companyId: String(mutationResult.company_id ?? context.companyId),
+    previousMediaUrls: collectPartnerMediaUrls({
+      thumbnail: mutationResult.previous_thumbnail ?? null,
+      images: mutationResult.previous_images ?? [],
+    }),
     currentMediaUrls,
   };
 }

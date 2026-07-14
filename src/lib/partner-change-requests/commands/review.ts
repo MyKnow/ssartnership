@@ -1,6 +1,9 @@
 import { deletePartnerMediaUrls } from "../../partner-media-storage.ts";
+import { buildAtomicAuditRpcContext } from "../../audit-rpc-context.ts";
+import { buildAdminMutationAuditProperties } from "../../admin-mutation-audit.ts";
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
 import { getSupabaseAdminClient } from "../../supabase/server.ts";
+import { collectRemovedPartnerMediaUrls } from "../media-cleanup.ts";
 import { fetchRequestSummary, toSummary } from "../summary.ts";
 import {
   collectPartnerChangeRequestRequestedMediaUrls,
@@ -14,6 +17,12 @@ import {
 } from "../shared.ts";
 
 export async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
+  if (!input.auditContext) {
+    throw new PartnerChangeRequestError(
+      "invalid_request",
+      "감사 요청 문맥이 없어 변경 요청을 승인할 수 없습니다.",
+    );
+  }
   const supabase = getSupabaseAdminClient();
   const { data: request, error: requestError } = await supabase
     .from("partner_change_requests")
@@ -58,49 +67,20 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
     );
   }
 
-  const { error: updatePartnerError } = await supabase
-    .from("partners")
-    .update({
-      name: summary.requestedPartnerName,
-      location: summary.requestedPartnerLocation,
-      detail_description: summary.requestedDetailDescription,
-      campus_slugs: summary.requestedCampusSlugs,
-      map_url: summary.requestedMapUrl,
-      conditions: summary.requestedConditions,
-      benefits: summary.requestedBenefits,
-      applies_to: summary.requestedAppliesTo,
-      tags: summary.requestedTags,
-      thumbnail: summary.requestedThumbnail,
-      images: summary.requestedImages,
-      reservation_link: summary.requestedReservationLink,
-      inquiry_link: summary.requestedInquiryLink,
-      period_start: summary.requestedPeriodStart,
-      period_end: summary.requestedPeriodEnd,
-    })
-    .eq("id", summary.partnerId);
-
-  if (updatePartnerError) {
-    throw wrapPartnerChangeRequestDbError(
-      updatePartnerError,
-      "제휴처 정보를 반영하지 못했습니다.",
-    );
-  }
-
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("partner_change_requests")
-    .update({
-      status: "approved",
-      reviewed_by_admin_id: input.adminId,
-      reviewed_at: now,
-      updated_at: now,
-    })
-    .eq("id", input.requestId);
+  const { error } = await supabase.rpc(
+    "resolve_partner_change_request_with_audit",
+    {
+      p_change_request_id: input.requestId,
+      p_admin_id: input.adminId,
+      p_decision: "approved",
+      ...buildAtomicAuditRpcContext(input.auditContext, buildApprovalAuditProperties(summary)),
+    },
+  );
 
   if (error) {
     throw wrapPartnerChangeRequestDbError(
       error,
-      "변경 요청 상태를 저장하지 못했습니다.",
+      "변경 요청을 승인하지 못했습니다.",
     );
   }
 
@@ -108,9 +88,10 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
     thumbnail?: string | null;
     images?: string[] | null;
   } | null);
-  const removedMediaUrls = collectPartnerChangeRequestRequestedMediaUrls(
-    summary,
-  ).filter((url) => !currentMediaUrls.includes(url));
+  const removedMediaUrls = collectRemovedPartnerMediaUrls(
+    currentMediaUrls,
+    collectPartnerChangeRequestRequestedMediaUrls(summary),
+  );
   await deletePartnerMediaUrls(removedMediaUrls).catch(() => undefined);
 
   const approved = await fetchRequestSummary(supabase, input.requestId);
@@ -125,6 +106,12 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
 }
 
 export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInput) {
+  if (!input.auditContext) {
+    throw new PartnerChangeRequestError(
+      "invalid_request",
+      "감사 요청 문맥이 없어 변경 요청을 거절할 수 없습니다.",
+    );
+  }
   const supabase = getSupabaseAdminClient();
   const { data: request, error: requestError } = await supabase
     .from("partner_change_requests")
@@ -163,21 +150,20 @@ export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInp
     );
   }
 
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("partner_change_requests")
-    .update({
-      status: "rejected",
-      reviewed_by_admin_id: input.adminId,
-      reviewed_at: now,
-      updated_at: now,
-    })
-    .eq("id", input.requestId);
+  const { error } = await supabase.rpc(
+    "resolve_partner_change_request_with_audit",
+    {
+      p_change_request_id: input.requestId,
+      p_admin_id: input.adminId,
+      p_decision: "rejected",
+      ...buildAtomicAuditRpcContext(input.auditContext, buildRejectionAuditProperties(summary)),
+    },
+  );
 
   if (error) {
     throw wrapPartnerChangeRequestDbError(
       error,
-      "변경 요청 상태를 저장하지 못했습니다.",
+      "변경 요청을 거절하지 못했습니다.",
     );
   }
 
@@ -200,4 +186,58 @@ export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInp
   ).catch(() => undefined);
 
   return rejected;
+}
+
+function buildApprovalAuditProperties(summary: ReturnType<typeof toSummary>) {
+  const changedFields = [
+    ["name", summary.currentPartnerName, summary.requestedPartnerName],
+    ["location", summary.currentPartnerLocation, summary.requestedPartnerLocation],
+    ["detailDescription", summary.currentDetailDescription, summary.requestedDetailDescription],
+    ["mapUrl", summary.currentMapUrl, summary.requestedMapUrl],
+    ["campusSlugs", summary.currentCampusSlugs, summary.requestedCampusSlugs],
+    ["conditions", summary.currentConditions, summary.requestedConditions],
+    ["benefits", summary.currentBenefits, summary.requestedBenefits],
+    ["appliesTo", summary.currentAppliesTo, summary.requestedAppliesTo],
+    ["tags", summary.currentTags, summary.requestedTags],
+    ["thumbnail", summary.currentThumbnail, summary.requestedThumbnail],
+    ["images", summary.currentImages, summary.requestedImages],
+    ["reservationLink", summary.currentReservationLink, summary.requestedReservationLink],
+    ["inquiryLink", summary.currentInquiryLink, summary.requestedInquiryLink],
+    ["periodStart", summary.currentPeriodStart, summary.requestedPeriodStart],
+    ["periodEnd", summary.currentPeriodEnd, summary.requestedPeriodEnd],
+  ]
+    .filter(([, before, after]) => JSON.stringify(before) !== JSON.stringify(after))
+    .map(([field]) => field);
+
+  return buildAdminMutationAuditProperties({
+    outcome: "success",
+    properties: {
+      requestId: summary.id,
+      partnerId: summary.partnerId,
+      partnerName: summary.partnerName,
+      companyId: summary.companyId,
+      companyName: summary.companyName,
+      changedFields,
+    },
+  });
+}
+
+function buildRejectionAuditProperties(summary: ReturnType<typeof toSummary>) {
+  return buildAdminMutationAuditProperties({
+    outcome: "success",
+    properties: {
+      requestId: summary.id,
+      partnerId: summary.partnerId,
+      partnerName: summary.partnerName,
+      companyId: summary.companyId,
+      companyName: summary.companyName,
+      requestedTagsCount: summary.requestedTags.length,
+      requestedThumbnail: Boolean(summary.requestedThumbnail),
+      requestedImagesCount: summary.requestedImages.length,
+      requestedReservationLink: Boolean(summary.requestedReservationLink),
+      requestedInquiryLink: Boolean(summary.requestedInquiryLink),
+      requestedPeriodStart: summary.requestedPeriodStart,
+      requestedPeriodEnd: summary.requestedPeriodEnd,
+    },
+  });
 }

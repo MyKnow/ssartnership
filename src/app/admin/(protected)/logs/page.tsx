@@ -2,13 +2,17 @@ import AdminLogsManager from '@/components/admin/AdminLogsManager';
 import AdminShell from '@/components/admin/AdminShell';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import { requireAdminPermission } from '@/lib/admin-access';
+import { getAdminLogAccessPolicy } from '@/lib/admin-log-access';
 import { getAdminLogsPageData } from '@/lib/log-insights';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminLogsPage() {
-  await requireAdminPermission('logs', 'read', { path: '/admin/logs' });
-  const data = await getAdminLogsPageData({ preset: '24h' });
+  const session = await requireAdminPermission('logs', 'read', { path: '/admin/logs' });
+  const data = await getAdminLogsPageData(
+    { preset: '24h' },
+    getAdminLogAccessPolicy(session.account),
+  );
 
   return (
     <AdminShell title="로그 조회" backHref="/admin" backLabel="관리 홈">

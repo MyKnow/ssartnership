@@ -138,10 +138,12 @@ export function RangePresetButton({
 
 export function ActivityChart({
   buckets,
+  allowedGroups,
   loading,
   onSelectBucket,
 }: {
   buckets: LogChartBucket[];
+  allowedGroups: LogGroup[];
   loading: boolean;
   onSelectBucket: (bucket: LogChartBucket) => void;
 }) {
@@ -153,15 +155,21 @@ export function ActivityChart({
       />
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-300">
-          사용자 이벤트
-        </Badge>
-        <Badge className="bg-violet-500/15 text-violet-700 dark:text-violet-300">
-          관리자 감사
-        </Badge>
-        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300">
-          인증·보안
-        </Badge>
+        {allowedGroups.includes('product') ? (
+          <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-300">
+            사용자 이벤트
+          </Badge>
+        ) : null}
+        {allowedGroups.includes('audit') ? (
+          <Badge className="bg-violet-500/15 text-violet-700 dark:text-violet-300">
+            관리자 감사
+          </Badge>
+        ) : null}
+        {allowedGroups.includes('security') ? (
+          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            인증·보안
+          </Badge>
+        ) : null}
       </div>
 
       <AdminTimeseriesChart
@@ -184,24 +192,24 @@ export function ActivityChart({
             dotClassName: 'fill-foreground/25',
             strokeWidth: 3,
           },
-          {
+          ...(allowedGroups.includes('product') ? [{
             key: 'product',
             label: '사용자 이벤트',
             lineClassName: 'text-sky-500',
             dotClassName: 'fill-sky-500',
-          },
-          {
+          }] : []),
+          ...(allowedGroups.includes('audit') ? [{
             key: 'audit',
             label: '관리자 감사',
             lineClassName: 'text-violet-500',
             dotClassName: 'fill-violet-500',
-          },
-          {
+          }] : []),
+          ...(allowedGroups.includes('security') ? [{
             key: 'security',
             label: '인증·보안',
             lineClassName: 'text-amber-500',
             dotClassName: 'fill-amber-500',
-          },
+          }] : []),
         ]}
         ariaLabel="조회 범위 활동량 선형 차트"
         renderSummary={(point) => ({
@@ -211,21 +219,21 @@ export function ActivityChart({
               label: '전체',
               value: `${(point.values.total ?? 0).toLocaleString()}건`,
             },
-            {
+            ...(allowedGroups.includes('product') ? [{
               label: '사용자 이벤트',
               value: `${(point.values.product ?? 0).toLocaleString()}건`,
               valueClassName: 'text-sky-700 dark:text-sky-300',
-            },
-            {
+            }] : []),
+            ...(allowedGroups.includes('audit') ? [{
               label: '관리자 감사',
               value: `${(point.values.audit ?? 0).toLocaleString()}건`,
               valueClassName: 'text-violet-700 dark:text-violet-300',
-            },
-            {
+            }] : []),
+            ...(allowedGroups.includes('security') ? [{
               label: '인증·보안',
               value: `${(point.values.security ?? 0).toLocaleString()}건`,
               valueClassName: 'text-amber-700 dark:text-amber-300',
-            },
+            }] : []),
           ],
         })}
       />
@@ -258,6 +266,7 @@ export function ExportDialog({
   open,
   exportScope,
   exportGroups,
+  availableGroups,
   exportCustomStart,
   exportCustomEnd,
   loading,
@@ -271,6 +280,7 @@ export function ExportDialog({
   open: boolean;
   exportScope: 'current' | 'custom';
   exportGroups: Record<LogGroup, boolean>;
+  availableGroups: LogGroup[];
   exportCustomStart: string;
   exportCustomEnd: string;
   loading: boolean;
@@ -348,7 +358,7 @@ export function ExportDialog({
                 ['product', '사용자 이벤트'],
                 ['audit', '관리자 감사'],
                 ['security', '인증·보안'],
-              ] as Array<[LogGroup, string]>).map(([group, label]) => (
+              ] as Array<[LogGroup, string]>).filter(([group]) => availableGroups.includes(group)).map(([group, label]) => (
                 <label
                   key={group}
                   className="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-foreground"
@@ -358,7 +368,7 @@ export function ExportDialog({
                     checked={exportGroups[group]}
                     onChange={() => onToggleGroup(group)}
                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                    disabled={loading}
+                    disabled={loading || !availableGroups.includes(group)}
                   />
                   <span>{label}</span>
                 </label>

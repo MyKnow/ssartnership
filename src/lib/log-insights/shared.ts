@@ -34,6 +34,7 @@ export type ProductLogRow = {
 
 export type AdminAuditLogRow = {
   id: string;
+  actor_type: EventActorType;
   actor_id: string | null;
   action: AdminAuditAction | string;
   path: string | null;
@@ -165,6 +166,7 @@ export type AdminLogsRecordCollections = {
 };
 
 export type AdminLogsPageData = {
+  access: AdminLogsAccessCapabilities;
   range: ResolvedLogRange;
   counts: {
     product: number;
@@ -197,6 +199,12 @@ export type AdminLogsPageData = {
   };
 };
 
+export type AdminLogsAccessCapabilities = {
+  readGroups: LogGroup[];
+  exportGroups: LogGroup[];
+  includePii: boolean;
+};
+
 export type GetAdminLogsPageDataOptions = {
   preset?: string | null;
   start?: string | null;
@@ -216,6 +224,7 @@ export type CsvExportOptions = {
   start?: string | null;
   end?: string | null;
   groups?: LogGroup[];
+  includePii?: boolean;
 };
 
 export type AdminSupabaseClient = ReturnType<

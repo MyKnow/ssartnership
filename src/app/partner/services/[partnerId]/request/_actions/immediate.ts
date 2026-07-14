@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
+import { createServerActionAuditContext } from "@/lib/audit-context";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import { getPartnerSession } from "@/lib/partner-session";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
@@ -98,6 +98,10 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     const result = await updatePartnerImmediateFields({
       companyIds,
       partnerId,
+      auditContext: await createServerActionAuditContext(
+        { actorType: "partner", actorId: session.accountId },
+        getReturnUrl(partnerId, companyId),
+      ),
       thumbnail: media.thumbnail,
       images: media.images,
       tags,
@@ -113,27 +117,6 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
       ),
     ).catch(() => undefined);
 
-    await logAdminAudit({
-      ...(await getServerActionLogContext(getReturnUrl(partnerId, companyId))),
-      actorId: session.accountId,
-      action: "partner_portal_immediate_update",
-      targetType: "partner",
-      targetId: partnerId,
-      properties: {
-        partnerId,
-        companyId: result.companyId,
-        companyIds: session.companyIds,
-        actorLoginId: session.loginId,
-        actorDisplayName: session.displayName,
-        tagCount: tags.length,
-        imageCount: media.images.length,
-        thumbnailChanged: context.thumbnail !== media.thumbnail,
-        benefitActionTypeChanged: context.benefitActionType !== benefitActionType,
-        benefitActionLinkChanged: context.benefitActionLink !== benefitActionLink,
-        reservationLinkChanged: context.reservationLink !== reservationLink,
-        inquiryLinkChanged: context.inquiryLink !== inquiryLink,
-      },
-    });
     await createAdminOperationalNotification({
       type: "partner_immediate_update",
       title: "파트너 즉시 수정 반영",
