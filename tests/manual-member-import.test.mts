@@ -52,6 +52,23 @@ test("MM 또는 이메일 하나는 필수이고, 이메일 전용 회원은 이
   assert.deepEqual(result.errors.map((item) => item.code), ["contact_required", "name_required"]);
 });
 
+test("행 기반 입력은 유효하고 서로 다른 행 번호만 서버 준비 단계에 전달한다", () => {
+  const result = validateManualMemberImportRows(
+    [
+      { rowNumber: 0, generation: "16", name: "첫 회원", campus: "서울", mmId: "", email: "first@example.com", photoFilename: "" },
+      { rowNumber: 3, generation: "16", name: "둘째 회원", campus: "서울", mmId: "", email: "second@example.com", photoFilename: "" },
+      { rowNumber: 3, generation: "16", name: "중복 회원", campus: "서울", mmId: "", email: "duplicate@example.com", photoFilename: "" },
+    ],
+    context,
+  );
+
+  assert.equal(result.acceptedRows.length, 1);
+  assert.deepEqual(
+    result.errors.map((item) => item.code),
+    ["row_number_invalid", "row_number_duplicate"],
+  );
+});
+
 test("사진 매니페스트는 파일명 정확 일치·안전 경로·형식·크기·미참조 파일을 검증한다", () => {
   const result = validateManualMemberImportPhotoManifest(
     [

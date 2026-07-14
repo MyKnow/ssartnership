@@ -63,6 +63,8 @@ export type ManualMemberImportValidationContext = {
 
 export type ManualMemberImportErrorCode =
   | "batch_limit_exceeded"
+  | "row_number_invalid"
+  | "row_number_duplicate"
   | "generation_invalid"
   | "contact_required"
   | "mm_invalid"
@@ -142,6 +144,7 @@ export function validateManualMemberImportRows(
   const errors: ManualMemberImportValidationError[] = [];
   const acceptedRows: ManualMemberImportRow[] = [];
   const photoOwners = new Map<string, number>();
+  const rowNumbers = new Set<number>();
 
   if (rows.length > MANUAL_MEMBER_IMPORT_LIMITS.maxRows) {
     errors.push(
@@ -155,6 +158,15 @@ export function validateManualMemberImportRows(
   }
 
   for (const raw of rows) {
+    if (!Number.isSafeInteger(raw.rowNumber) || raw.rowNumber < 2) {
+      errors.push(getRowError(null, "row_number_invalid", "행 번호를 확인해 주세요."));
+      continue;
+    }
+    if (rowNumbers.has(raw.rowNumber)) {
+      errors.push(getRowError(raw.rowNumber, "row_number_duplicate", "행 번호가 중복되었습니다."));
+      continue;
+    }
+    rowNumbers.add(raw.rowNumber);
     const generation = normalizeGeneration(raw.generation);
     const name = getText(raw.name) || null;
     const campus = getText(raw.campus) || null;

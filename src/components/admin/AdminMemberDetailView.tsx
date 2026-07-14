@@ -3,6 +3,7 @@ import AdminMemberCommunicationPanel from "@/components/admin/member-detail/Admi
 import AdminMemberSecurityLogExplorer, {
   type AdminMemberSecurityLog,
 } from "@/components/admin/member-detail/AdminMemberSecurityLogExplorer";
+import AdminMemberProfilePhotoPanel from "@/components/admin/member-detail/AdminMemberProfilePhotoPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Badge from "@/components/ui/Badge";
@@ -14,6 +15,7 @@ import type {
   AdminMemberPolicyState,
 } from "@/lib/admin-member-detail";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
@@ -47,6 +49,14 @@ export type AdminMemberDetailViewProps = {
   deleteAction: FormAction;
   canUpdate: boolean;
   canDelete: boolean;
+  profilePhoto?: {
+    reviewStatus: MemberProfilePhotoReviewStatus;
+    pendingImageId: string | null;
+    canUpdate: boolean;
+    approveAction: FormAction;
+    rejectReplacementAction: FormAction;
+    rejectCurrentAction: FormAction;
+  } | null;
 };
 
 function formatDate(value: string | null) {
@@ -65,6 +75,7 @@ export default function AdminMemberDetailView({
   deleteAction,
   canUpdate,
   canDelete,
+  profilePhoto = null,
 }: AdminMemberDetailViewProps) {
   const avatarLabel = (member.displayName || member.mmUsername || "?")
     .trim()
@@ -166,6 +177,17 @@ export default function AdminMemberDetailView({
               </div>
             </div>
           </Card>
+          {profilePhoto ? (
+            <AdminMemberProfilePhotoPanel
+              memberId={member.id}
+              reviewStatus={profilePhoto.reviewStatus}
+              pendingImageId={profilePhoto.pendingImageId}
+              canUpdate={profilePhoto.canUpdate}
+              approveAction={profilePhoto.approveAction}
+              rejectReplacementAction={profilePhoto.rejectReplacementAction}
+              rejectCurrentAction={profilePhoto.rejectCurrentAction}
+            />
+          ) : null}
 
           <Card tone="default" className="grid gap-4">
             <AdminSectionHeading

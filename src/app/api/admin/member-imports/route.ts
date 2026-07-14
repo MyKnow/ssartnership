@@ -8,12 +8,16 @@ import {
 import {
   MANUAL_MEMBER_IMPORT_LIMITS,
   type ManualMemberImportPhotoManifestEntry,
+  type ManualMemberImportRawRow,
 } from "@/lib/member-manual-import/shared";
 
 export const runtime = "nodejs";
 
 async function requireImportAdmin(request: NextRequest) {
-  if (!isTrustedSameOriginRequest(request, { expectedOrigin: request.nextUrl.origin })) {
+  if (!isTrustedSameOriginRequest(request, {
+    expectedOrigin: request.nextUrl.origin,
+    allowedContentTypes: ["application/json"],
+  })) {
     return { response: NextResponse.json({ message: "요청을 확인해 주세요." }, { status: 403 }) };
   }
   const session = await getAdminSession();
@@ -24,38 +28,58 @@ async function requireImportAdmin(request: NextRequest) {
   return { adminId: session.adminId };
 }
 
-function parsePhotoManifest(value: FormDataEntryValue | null) {
-  if (typeof value !== "string") return null;
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed)) return null;
-    return parsed.every((item) =>
-      item && typeof item === "object"
-      && typeof (item as { filename?: unknown }).filename === "string"
-      && typeof (item as { contentType?: unknown }).contentType === "string"
-      && typeof (item as { size?: unknown }).size === "number",
-    ) ? parsed as ManualMemberImportPhotoManifestEntry[] : null;
-  } catch {
+function parsePhotoManifest(value: unknown) {
+  if (!Array.isArray(value) || value.length > MANUAL_MEMBER_IMPORT_LIMITS.maxRows) {
     return null;
   }
+  return value.every((item) =>
+    item && typeof item === "object"
+    && typeof (item as { filename?: unknown }).filename === "string"
+    && typeof (item as { contentType?: unknown }).contentType === "string"
+    && typeof (item as { size?: unknown }).size === "number",
+  ) ? value as ManualMemberImportPhotoManifestEntry[] : null;
+}
+
+function parseRows(value: unknown) {
+  if (!Array.isArray(value) || value.length > MANUAL_MEMBER_IMPORT_LIMITS.maxRows) {
+    return null;
+  }
+  const rows = value.map((item) => {
+    if (!item || typeof item !== "object") return null;
+    const row = item as Record<string, unknown>;
+    const rowNumber = row.rowNumber;
+    if (typeof rowNumber !== "number" || !Number.isSafeInteger(rowNumber)) return null;
+    return {
+      rowNumber,
+      generation: row.generation,
+      name: row.name,
+      campus: row.campus,
+      mmId: row.mmId,
+      email: row.email,
+      photoFilename: row.photoFilename,
+    } satisfies ManualMemberImportRawRow;
+  });
+  return rows.every((row): row is ManualMemberImportRawRow => row !== null)
+    ? rows
+    : null;
 }
 
 export async function POST(request: NextRequest) {
   const auth = await requireImportAdmin(request);
   if ("response" in auth) return auth.response;
   try {
-    const formData = await request.formData();
-    const file = formData.get("xlsx");
-    const photos = parsePhotoManifest(formData.get("photos"));
-    if (!(file instanceof File) || !photos) {
-      return NextResponse.json({ ok: false, errors: ["XLSX와 사진 목록을 확인해 주세요."] }, { status: 400 });
-    }
-    if (file.size <= 0 || file.size > MANUAL_MEMBER_IMPORT_LIMITS.xlsxBytes) {
-      return NextResponse.json({ ok: false, errors: ["XLSX 파일은 1MB 이하만 업로드할 수 있습니다."] }, { status: 400 });
+    const contentType = request.headers.get("content-type") ?? "";
+    const payload = contentType.includes("application/json")
+      ? await request.json().catch(() => null)
+      : null;
+    const rows = parseRows(payload && typeof payload === "object" ? payload.rows : null);
+    const photos = parsePhotoManifest(payload && typeof payload === "object" ? payload.photos : null);
+    if (!rows || !photos) {
+      return NextResponse.json({ ok: false, errors: ["회원 행과 사진 목록을 확인해 주세요."] }, { status: 400 });
     }
     const result = await prepareManualMemberImport({
       adminId: auth.adminId,
-      xlsxBuffer: Buffer.from(await file.arrayBuffer()),
+      rows,
       photos,
     });
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
