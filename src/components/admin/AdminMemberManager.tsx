@@ -240,7 +240,7 @@ export default function AdminMemberManager({
                       applySearchFilter();
                     }
                   }}
-                  placeholder="이름, MM 아이디로 검색"
+                  placeholder="이름, 직접 로그인 ID, MM 아이디로 검색"
                 />
                 <button
                   type="button"

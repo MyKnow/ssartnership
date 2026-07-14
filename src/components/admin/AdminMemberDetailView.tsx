@@ -23,6 +23,7 @@ export type AdminMemberDetailViewProps = {
     displayName: string;
     mmUsername: string;
     mmUserId: string | null;
+    manualLoginId: string | null;
     generation: number;
     generationLabel: string;
     campus: string;
@@ -66,7 +67,8 @@ export default function AdminMemberDetailView({
   canUpdate,
   canDelete,
 }: AdminMemberDetailViewProps) {
-  const avatarLabel = (member.displayName || member.mmUsername || "?")
+  const loginIdentifier = member.manualLoginId ?? member.mmUsername;
+  const avatarLabel = (member.displayName || loginIdentifier || "?")
     .trim()
     .charAt(0)
     .toUpperCase();
@@ -82,9 +84,9 @@ export default function AdminMemberDetailView({
       <StatsRow
         items={[
           {
-            label: "MM 아이디",
-            value: member.mmUsername ? `@${member.mmUsername}` : "-",
-            hint: member.mmUserId ?? "외부 식별자 없음",
+            label: "로그인 ID",
+            value: member.manualLoginId ?? (member.mmUsername ? `@${member.mmUsername}` : "-"),
+            hint: member.manualLoginId ? "관리자 직접 생성 계정" : member.mmUserId ?? "외부 식별자 없음",
           },
           {
             label: "기수/캠퍼스",
@@ -139,7 +141,9 @@ export default function AdminMemberDetailView({
                 {member.displayName}
               </h2>
               <p className="break-all text-sm text-muted-foreground">
-                @{member.mmUsername || "mm_username 없음"}
+                {member.manualLoginId
+                  ? `직접 ID · ${member.manualLoginId}`
+                  : `@${member.mmUsername || "mm_username 없음"}`}
               </p>
             </div>
 
@@ -149,9 +153,9 @@ export default function AdminMemberDetailView({
                 <span className="font-medium text-foreground">{member.campus}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>MM User ID</span>
+                <span>{member.manualLoginId ? "직접 로그인 ID" : "MM User ID"}</span>
                 <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
-                  {member.mmUserId ?? "-"}
+                  {member.manualLoginId ?? member.mmUserId ?? "-"}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -195,6 +199,7 @@ export default function AdminMemberDetailView({
               campus: member.campus,
               generation: member.generation,
               mmUsername: member.mmUsername,
+              manualLoginId: member.manualLoginId,
               mustChangePassword: member.mustChangePassword,
             }}
             updateAction={updateAction}

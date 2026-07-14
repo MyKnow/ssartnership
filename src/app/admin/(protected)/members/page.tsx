@@ -1,6 +1,6 @@
 import AdminShell from "@/components/admin/AdminShell";
-import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
+import AdminMemberProvisionPanel from "@/components/admin/AdminMemberProvisionPanel";
 import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
 import Card from "@/components/ui/Card";
 import InlineMessage from "@/components/ui/InlineMessage";
@@ -11,6 +11,7 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import {
   backfillMemberProfiles,
+  createDirectMember,
   manualAddMembers,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
@@ -351,12 +352,18 @@ async function getMemberSearchIds(
   }
 
   const pattern = `%${escapeLikePattern(searchValue)}%`;
-  const [memberResult, usernameResult, userIdResult] = await Promise.all([
+  const [memberResult, directLoginIdResult, usernameResult, userIdResult] = await Promise.all([
     supabase
       .from("members")
       .select("id")
       .is("deleted_at", null)
       .ilike("display_name", pattern)
+      .limit(MEMBER_OPTION_SAMPLE_LIMIT),
+    supabase
+      .from("members")
+      .select("id")
+      .is("deleted_at", null)
+      .ilike("manual_login_id", pattern)
       .limit(MEMBER_OPTION_SAMPLE_LIMIT),
     supabase
       .from("mm_user_directory")
@@ -369,7 +376,12 @@ async function getMemberSearchIds(
       .ilike("mm_user_id", pattern)
       .limit(MEMBER_OPTION_SAMPLE_LIMIT),
   ]);
-  if (memberResult.error || usernameResult.error || userIdResult.error) {
+  if (
+    memberResult.error
+    || directLoginIdResult.error
+    || usernameResult.error
+    || userIdResult.error
+  ) {
     throw new Error("회원 검색 조건을 불러오지 못했습니다.");
   }
 
@@ -394,7 +406,11 @@ async function getMemberSearchIds(
 
   return Array.from(
     new Set(
-      [...(memberResult.data ?? []), ...(accountMemberResult?.data ?? [])]
+      [
+        ...(memberResult.data ?? []),
+        ...(directLoginIdResult.data ?? []),
+        ...(accountMemberResult?.data ?? []),
+      ]
         .map((row) => row.id)
         .filter((id): id is string => Boolean(id)),
     ),
@@ -519,7 +535,7 @@ export default async function AdminMembersPage({
   let memberQuery = supabase
     .from("members")
     .select(
-      "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at",
+      "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at",
       { count: "exact" },
     )
     .is("deleted_at", null);
@@ -647,6 +663,7 @@ export default async function AdminMembersPage({
       id: member.id,
       mmUserId: directory?.mm_user_id ?? "",
       mmUsername: directory?.mm_username ?? "",
+      manualLoginId: member.manual_login_id,
       displayName: member.display_name,
       generation: member.generation,
       staffSourceGeneration: member.staff_source_generation,
@@ -817,11 +834,14 @@ export default async function AdminMembersPage({
           <div className="grid gap-6 2xl:sticky 2xl:top-24">
             <Card tone="elevated">
               <AdminSectionHeading
-                title="수동 추가"
-                description="MM 아이디를 입력해 계정을 생성하고 비밀번호 변경 필요 상태로 저장합니다."
+                title="회원 추가"
+                description="SSAFY Verify 연동 또는 외부 인증 없이 직접 계정을 생성합니다."
               />
               <div className="mt-6">
-                <AdminMemberManualAddPanel action={manualAddMembers} />
+                <AdminMemberProvisionPanel
+                  manualAddAction={manualAddMembers}
+                  directCreateAction={createDirectMember}
+                />
               </div>
             </Card>
 

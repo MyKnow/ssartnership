@@ -139,11 +139,12 @@ export default async function AdminMemberDetailPage({
   }));
   const securityLogTotalCount = securityLogsResult.count ?? securityLogs.length;
   const profile = parseSsafyProfile(
-    member.displayName ?? member.mattermostUsername ?? undefined,
+    member.displayName ?? member.manualLoginId ?? member.mattermostUsername ?? undefined,
   );
   const displayName =
     profile.displayName ??
     member.displayName ??
+    member.manualLoginId ??
     member.mattermostUsername ??
     "회원 상세";
   const generation = member.generation ?? getCurrentSsafyYear();
@@ -187,6 +188,7 @@ export default async function AdminMemberDetailPage({
           displayName,
           mmUsername: member.mattermostUsername ?? "",
           mmUserId: member.mattermostUserId,
+          manualLoginId: member.manualLoginId,
           generation,
           generationLabel,
           campus,

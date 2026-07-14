@@ -326,7 +326,7 @@ test("관리자 회원 화면과 수정 액션은 정규화된 회원 관계만 
   assert.match(membersPage, /marketing_enabled/);
   assert.match(
     membersPage,
-    /mattermost_account_id,display_name,generation,staff_source_generation/,
+    /mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation/,
   );
   assert.match(membersPage, /\.eq\("generation", Number\(filters\.yearFilter\)\)/);
   assert.match(memberDetailPage, /getMemberCanonicalProfile/);

@@ -4,9 +4,14 @@ import {
   validateMmUsername,
 } from "@/lib/validation";
 import { createHmacDigest } from "@/lib/hmac.js";
+import {
+  DIRECT_MEMBER_LOGIN_ID_PREFIX,
+  normalizeDirectMemberLoginId,
+} from "@/lib/member-direct-create";
 
 export type MemberLoginIdentifier =
   | { kind: "email"; value: string }
+  | { kind: "manual_login_id"; value: string }
   | { kind: "mattermost_username"; value: string };
 
 export type MattermostProfileSnapshot = {
@@ -50,6 +55,13 @@ export function classifyMemberLoginIdentifier(value: unknown): MemberLoginIdenti
   const email = normalizeMemberEmail(rawValue);
   if (email) {
     return { kind: "email", value: email };
+  }
+
+  if (rawValue.toLowerCase().startsWith(DIRECT_MEMBER_LOGIN_ID_PREFIX)) {
+    const manualLoginId = normalizeDirectMemberLoginId(rawValue);
+    return manualLoginId.value
+      ? { kind: "manual_login_id", value: manualLoginId.value }
+      : null;
   }
 
   const username = normalizeMmUsername(rawValue.replace(/^@/, ""));

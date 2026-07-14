@@ -10,6 +10,7 @@ type MemberCanonicalRow = {
   created_at: string | null;
   updated_at: string | null;
   mattermost_account_id: string | null;
+  manual_login_id: string | null;
   email: string | null;
   email_verified_at: string | null;
 };
@@ -34,6 +35,7 @@ export type MemberCanonicalProfile = {
   mattermostAccountId: string | null;
   mattermostUserId: string | null;
   mattermostUsername: string | null;
+  manualLoginId: string | null;
   email: string | null;
   emailVerifiedAt: string | null;
   activeProfileImageId: string | null;
@@ -48,7 +50,7 @@ export async function getMemberCanonicalProfile(
   const { data: memberData, error: memberError } = await supabase
     .from("members")
     .select(
-      "id,display_name,generation,campus,must_change_password,created_at,updated_at,mattermost_account_id,email,email_verified_at",
+      "id,display_name,generation,campus,must_change_password,created_at,updated_at,mattermost_account_id,manual_login_id,email,email_verified_at",
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -97,6 +99,7 @@ export async function getMemberCanonicalProfile(
     mattermostAccountId: member.mattermost_account_id,
     mattermostUserId: directory?.mm_user_id ?? null,
     mattermostUsername: directory?.mm_username ?? null,
+    manualLoginId: member.manual_login_id,
     email: member.email,
     emailVerifiedAt: member.email_verified_at,
     activeProfileImageId: photoState.activeProfileImageId,
