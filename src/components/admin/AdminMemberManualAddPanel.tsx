@@ -6,7 +6,20 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
+import {
+  MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS,
+  getManualMemberImportGenerationOptions,
+} from "@/lib/member-manual-import/options";
+import {
+  MANUAL_MEMBER_IMPORT_PHOTO_ACCEPT,
+  prepareManualMemberImportRowPhoto,
+} from "@/lib/member-manual-import/photo.client";
+import {
+  getManualMemberImportErrorFocusField,
+  type ManualMemberImportFocusField,
+} from "@/lib/member-manual-import/focus";
 import {
   addManualMemberImportEditableRow,
   appendManualMemberImportWorkbookRows,
@@ -16,15 +29,16 @@ import {
 import {
   MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
   MANUAL_MEMBER_IMPORT_LIMITS,
+  getManualMemberImportRowReadiness,
   isManualMemberImportSafeFilename,
   validateManualMemberImportPhotoManifest,
-  validateManualMemberImportRows,
 } from "@/lib/member-manual-import/shared";
 
 type PhotoEntry = {
   filename: string;
   contentType: "image/jpeg" | "image/png" | "image/webp";
   file: File;
+  sourceName: string;
 };
 
 type PreflightSuccess = {
@@ -35,9 +49,11 @@ type PreflightSuccess = {
 };
 
 type ImportResult = {
+  batchId: string;
   total: number;
   success: number;
   failed: number;
+  retryableFailures: number;
   items: Array<{
     rowNumber: number;
     status: "success" | "failed";
@@ -46,14 +62,20 @@ type ImportResult = {
     email: string | null;
     deliveryChannel: "mattermost" | "email" | null;
     reason: string | null;
+    retryable: boolean;
   }>;
 };
+
+type ImportResultItem = ImportResult["items"][number];
 
 type AdminMemberManualAddPanelProps = {
   currentGeneration?: number;
   mmLookupGenerations?: readonly number[];
   initialRows?: readonly ManualMemberImportEditableRow[];
+  canReissueManualSetup?: boolean;
 };
+
+const DEFAULT_MM_LOOKUP_GENERATIONS = [14, 15] as const;
 
 function getContentType(filename: string): PhotoEntry["contentType"] | null {
   const extension = filename.toLowerCase().split(".").pop();
@@ -103,6 +125,7 @@ async function readPhotoZip(file: File) {
       filename: entry.name,
       contentType,
       file: new File([fileBytes], entry.name, { type: contentType }),
+      sourceName: entry.name,
     });
   }
   return photos;
@@ -120,10 +143,29 @@ function formatValidationErrors(errors: Array<{ rowNumber: number | null; messag
     .join("\n");
 }
 
+function replaceImportResultItem(
+  result: ImportResult,
+  replacement: ImportResultItem,
+): ImportResult {
+  const items = result.items.map((item) =>
+    item.rowNumber === replacement.rowNumber ? replacement : item,
+  );
+  const success = items.filter((item) => item.status === "success").length;
+  const failed = items.length - success;
+  return {
+    ...result,
+    success,
+    failed,
+    retryableFailures: items.filter((item) => item.status === "failed" && item.retryable).length,
+    items,
+  };
+}
+
 export default function AdminMemberManualAddPanel({
   currentGeneration = 16,
-  mmLookupGenerations = [14, 15],
+  mmLookupGenerations = DEFAULT_MM_LOOKUP_GENERATIONS,
   initialRows = [],
+  canReissueManualSetup = false,
 }: AdminMemberManualAddPanelProps) {
   const xlsxRef = useRef<HTMLInputElement>(null);
   const zipRef = useRef<HTMLInputElement>(null);
@@ -133,16 +175,45 @@ export default function AdminMemberManualAddPanel({
   );
   const [zip, setZip] = useState<File | null>(null);
   const [batch, setBatch] = useState<PreflightSuccess | null>(null);
-  const [photos, setPhotos] = useState<PhotoEntry[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<Map<number, PhotoEntry>>(
+    () => new Map(),
+  );
+  const [ignoredZipPhotoFilenames, setIgnoredZipPhotoFilenames] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [reissuingRowNumber, setReissuingRowNumber] = useState<number | null>(null);
+  const [confirmationRowNumber, setConfirmationRowNumber] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<"rows" | "validate" | "create" | null>(null);
+  const [pending, setPending] = useState<
+    "rows" | "photo" | "validate" | "create" | null
+  >(null);
   const { notify } = useToast();
 
-  const photosLabel = useMemo(
-    () => (zip ? `${zip.name} · ${photos.length}개 사진` : "사진 ZIP 없음 (사진 없이 초대)"),
-    [photos.length, zip],
+  const generationOptions = useMemo(
+    () => getManualMemberImportGenerationOptions(currentGeneration),
+    [currentGeneration],
   );
+  const rawRows = useMemo(() => toManualMemberImportRawRows(rows), [rows]);
+  const rowReadiness = useMemo(
+    () => getManualMemberImportRowReadiness(rawRows, {
+      currentGeneration,
+      mmLookupGenerations,
+    }),
+    [currentGeneration, mmLookupGenerations, rawRows],
+  );
+  const canRetryFailedMembers = (result?.retryableFailures ?? 0) > 0;
+  const canCreateMembers = Boolean(batch)
+    && rowReadiness.isComplete
+    && pending === null
+    && (!result || canRetryFailedMembers);
+  const photosLabel = useMemo(() => {
+    const sources = [
+      selectedPhotos.size > 0 ? `행별 사진 ${selectedPhotos.size}개 선택됨` : null,
+      zip ? "사진 ZIP 선택됨" : null,
+    ].filter((value): value is string => Boolean(value));
+    return sources.length > 0 ? sources.join(" · ") : "사진을 선택하지 않았습니다.";
+  }, [selectedPhotos, zip]);
   const mmLookupLabel = mmLookupGenerations.length > 0
     ? mmLookupGenerations.toSorted((left, right) => left - right).map((generation) => `${generation}기`).join("·")
     : "없음";
@@ -150,13 +221,22 @@ export default function AdminMemberManualAddPanel({
   function resetPreparedBatch() {
     setBatch(null);
     setResult(null);
+    setReissuingRowNumber(null);
+    setConfirmationRowNumber(null);
     setError(null);
   }
 
-  function focusRow(rowNumber: number | null) {
+  function focusRow(
+    rowNumber: number | null,
+    field: ManualMemberImportFocusField | null = null,
+  ) {
     if (rowNumber === null) return;
     requestAnimationFrame(() => {
-      rowRefs.current.get(rowNumber)?.querySelector<HTMLElement>("input")?.focus();
+      const row = rowRefs.current.get(rowNumber);
+      const target = field
+        ? row?.querySelector<HTMLElement>(`[data-member-import-field="${field}"]`)
+        : row?.querySelector<HTMLElement>("input, select");
+      target?.focus();
     });
   }
 
@@ -182,9 +262,63 @@ export default function AdminMemberManualAddPanel({
     resetPreparedBatch();
   }
 
+  function ignoreZipPhotoFilename(filename: string | null | undefined) {
+    if (!filename) return;
+    setIgnoredZipPhotoFilenames((current) => {
+      const next = new Set(current);
+      next.add(filename.toLowerCase());
+      return next;
+    });
+  }
+
   function removeRow(rowNumber: number) {
+    ignoreZipPhotoFilename(rows.find((row) => row.rowNumber === rowNumber)?.photoFilename);
     setRows((current) => current.filter((row) => row.rowNumber !== rowNumber));
+    setSelectedPhotos((current) => {
+      const next = new Map(current);
+      next.delete(rowNumber);
+      return next;
+    });
     resetPreparedBatch();
+  }
+
+  async function selectRowPhoto(rowNumber: number, file: File | null) {
+    if (!file) return;
+    const previousPhotoFilename = rows.find(
+      (row) => row.rowNumber === rowNumber,
+    )?.photoFilename;
+    setPending("photo");
+    setError(null);
+    try {
+      const photo = await prepareManualMemberImportRowPhoto(file, rowNumber);
+      ignoreZipPhotoFilename(previousPhotoFilename);
+      setSelectedPhotos((current) => {
+        const next = new Map(current);
+        next.set(rowNumber, photo);
+        return next;
+      });
+      setRows((current) => current.map((row) =>
+        row.rowNumber === rowNumber
+          ? { ...row, photoFilename: photo.filename }
+          : row,
+      ));
+      resetPreparedBatch();
+      notify(`${rowNumber}행 사진을 선택했습니다.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "사진을 준비하지 못했습니다.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  function clearRowPhoto(rowNumber: number) {
+    ignoreZipPhotoFilename(rows.find((row) => row.rowNumber === rowNumber)?.photoFilename);
+    setSelectedPhotos((current) => {
+      const next = new Map(current);
+      next.delete(rowNumber);
+      return next;
+    });
+    updateRow(rowNumber, "photoFilename", "");
   }
 
   async function appendWorkbookRows(file: File | null) {
@@ -230,14 +364,14 @@ export default function AdminMemberManualAddPanel({
       xlsxRef.current?.focus();
       return;
     }
-    const rawRows = toManualMemberImportRawRows(rows);
-    const rowsResult = validateManualMemberImportRows(rawRows, {
-      currentGeneration,
-      mmLookupGenerations,
-    });
-    if (rowsResult.errors.length > 0 || rowsResult.acceptedRows.length !== rawRows.length) {
+    const rowsResult = rowReadiness;
+    if (!rowsResult.isComplete) {
       setError(formatValidationErrors(rowsResult.errors));
-      focusRow(rowsResult.errors[0]?.rowNumber ?? null);
+      const firstError = rowsResult.errors[0];
+      focusRow(
+        firstError?.rowNumber ?? null,
+        firstError ? getManualMemberImportErrorFocusField(firstError.code) : null,
+      );
       return;
     }
 
@@ -245,7 +379,12 @@ export default function AdminMemberManualAddPanel({
     setError(null);
     setResult(null);
     try {
-      const parsedPhotos = zip ? await readPhotoZip(zip) : [];
+      const zipPhotos = zip
+        ? (await readPhotoZip(zip)).filter(
+          (photo) => !ignoredZipPhotoFilenames.has(photo.filename.toLowerCase()),
+        )
+        : [];
+      const parsedPhotos = [...zipPhotos, ...selectedPhotos.values()];
       const photoResult = validateManualMemberImportPhotoManifest(
         rowsResult.acceptedRows,
         parsedPhotos.map((photo) => ({
@@ -256,7 +395,11 @@ export default function AdminMemberManualAddPanel({
       );
       if (photoResult.errors.length > 0) {
         setError(formatValidationErrors(photoResult.errors));
-        focusRow(photoResult.errors[0]?.rowNumber ?? null);
+        const firstError = photoResult.errors[0];
+        focusRow(
+          firstError?.rowNumber ?? null,
+          firstError ? getManualMemberImportErrorFocusField(firstError.code) : null,
+        );
         return;
       }
       const response = await fetch("/api/admin/member-imports", {
@@ -287,7 +430,6 @@ export default function AdminMemberManualAddPanel({
         });
         if (!uploadResponse.ok) throw new Error(`${upload.rowNumber}행 사진 업로드에 실패했습니다.`);
       }
-      setPhotos(parsedPhotos);
       setBatch(prepared);
       notify("행 검증과 사진 업로드가 완료되었습니다. 생성 시작을 눌러 주세요.");
     } catch (caught) {
@@ -299,7 +441,7 @@ export default function AdminMemberManualAddPanel({
   }
 
   async function createMembers() {
-    if (!batch || pending) return;
+    if (!batch || !rowReadiness.isComplete || pending || (result && result.retryableFailures === 0)) return;
     setPending("create");
     setError(null);
     try {
@@ -321,12 +463,49 @@ export default function AdminMemberManualAddPanel({
     }
   }
 
+  async function reissueManualSetup(item: ImportResultItem) {
+    if (!result || item.status !== "failed" || item.retryable || reissuingRowNumber !== null) {
+      return;
+    }
+    setReissuingRowNumber(item.rowNumber);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/admin/member-imports/${encodeURIComponent(result.batchId)}/rows/${item.rowNumber}/reissue-setup`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ confirmed: true }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (
+        !response.ok
+        || !data.ok
+        || !data.item
+        || data.item.rowNumber !== item.rowNumber
+        || data.item.status !== "success"
+      ) {
+        throw new Error(data.message ?? "새 초기 설정 링크를 발급하지 못했습니다.");
+      }
+      setResult((current) => current
+        ? replaceImportResultItem(current, data.item as ImportResultItem)
+        : current);
+      setConfirmationRowNumber(null);
+      notify(`${item.rowNumber}행에 새 초기 설정 링크를 발급했습니다.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "새 초기 설정 링크를 발급하지 못했습니다.");
+    } finally {
+      setReissuingRowNumber(null);
+    }
+  }
+
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 rounded-3xl border border-border bg-surface p-4 shadow-flat">
         <div className="grid gap-1">
           <h3 className="text-lg font-semibold text-foreground">행 기반 회원 초대</h3>
-          <p className="text-sm text-muted-foreground">행을 직접 추가하거나 회원 XLSX를 올리면 입력 행으로 자동 추가됩니다. 내용을 검토한 뒤 사진 ZIP과 함께 검증해 주세요.</p>
+          <p className="text-sm text-muted-foreground">행을 직접 추가하거나 회원 XLSX를 올리면 입력 행으로 자동 추가됩니다. 각 행에서 사진을 고르거나 XLSX와 사진 ZIP을 연결한 뒤 검증해 주세요.</p>
         </div>
         <div className="rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-muted-foreground">
           <p>기수: 운영진(0기)~현재 {currentGeneration}기 · MM 조회 지원: {mmLookupLabel}</p>
@@ -346,7 +525,7 @@ export default function AdminMemberManualAddPanel({
             />
           </label>
           <label className="grid gap-2 text-sm font-semibold text-foreground">
-            사진 ZIP (선택)
+            사진 ZIP (XLSX 사진 연결용, 선택)
             <Input
               ref={zipRef}
               type="file"
@@ -355,7 +534,7 @@ export default function AdminMemberManualAddPanel({
               disabled={pending !== null}
               onChange={(event) => {
                 setZip(event.target.files?.[0] ?? null);
-                setPhotos([]);
+                setIgnoredZipPhotoFilenames(new Set());
                 resetPreparedBatch();
               }}
             />
@@ -363,7 +542,7 @@ export default function AdminMemberManualAddPanel({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">{photosLabel}</p>
+          <p className="min-w-0 text-xs text-muted-foreground">{photosLabel}</p>
           <div className="flex flex-wrap gap-2">
             <a href="/api/admin/member-imports/template" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline">XLSX 템플릿 다운로드</a>
             <Button type="button" variant="secondary" onClick={addRow} disabled={pending !== null || rows.length >= MANUAL_MEMBER_IMPORT_LIMITS.maxRows}>행 추가</Button>
@@ -378,8 +557,10 @@ export default function AdminMemberManualAddPanel({
           {rows.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-6 text-sm text-muted-foreground">행 추가를 누르거나 회원 XLSX를 업로드해 초대할 회원을 입력해 주세요.</div>
           ) : (
-            rows.map((row) => (
-              <div
+            rows.map((row) => {
+              const selectedPhoto = selectedPhotos.get(row.rowNumber);
+              return (
+                <div
                 key={row.rowNumber}
                 ref={(element) => {
                   if (element) rowRefs.current.set(row.rowNumber, element);
@@ -392,21 +573,144 @@ export default function AdminMemberManualAddPanel({
                   <Button type="button" variant="secondary" onClick={() => removeRow(row.rowNumber)} disabled={pending !== null}>행 삭제</Button>
                 </div>
                 <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">기수<Input aria-label={`${row.rowNumber}행 기수`} type="number" min="0" max={currentGeneration} value={row.generation} disabled={pending !== null} onChange={(event) => updateRow(row.rowNumber, "generation", event.target.value)} /></label>
-                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">이름<Input aria-label={`${row.rowNumber}행 이름`} value={row.name} disabled={pending !== null} onChange={(event) => updateRow(row.rowNumber, "name", event.target.value)} /></label>
-                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">캠퍼스<Input aria-label={`${row.rowNumber}행 캠퍼스`} value={row.campus} disabled={pending !== null} onChange={(event) => updateRow(row.rowNumber, "campus", event.target.value)} /></label>
-                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">MM ID<Input aria-label={`${row.rowNumber}행 MM ID`} value={row.mmId} disabled={pending !== null} onChange={(event) => updateRow(row.rowNumber, "mmId", event.target.value)} /></label>
-                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">이메일<Input aria-label={`${row.rowNumber}행 이메일`} type="email" value={row.email} disabled={pending !== null} onChange={(event) => updateRow(row.rowNumber, "email", event.target.value)} /></label>
-                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">사진 파일명<Input aria-label={`${row.rowNumber}행 사진 파일명`} value={row.photoFilename} disabled={pending !== null} onChange={(event) => updateRow(row.rowNumber, "photoFilename", event.target.value)} /></label>
+                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">
+                    기수
+                    <Select
+                      aria-label={`${row.rowNumber}행 기수`}
+                      data-member-import-field="generation"
+                      value={row.generation}
+                      disabled={pending !== null}
+                      onChange={(event) => updateRow(row.rowNumber, "generation", event.target.value)}
+                    >
+                      <option value="" disabled>기수를 선택해 주세요</option>
+                      {generationOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">
+                    이름
+                    <Input
+                      aria-label={`${row.rowNumber}행 이름`}
+                      data-member-import-field="name"
+                      value={row.name}
+                      disabled={pending !== null}
+                      onChange={(event) => updateRow(row.rowNumber, "name", event.target.value)}
+                    />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">
+                    캠퍼스
+                    <Select
+                      aria-label={`${row.rowNumber}행 캠퍼스`}
+                      data-member-import-field="campus"
+                      value={row.campus}
+                      disabled={pending !== null}
+                      onChange={(event) => updateRow(row.rowNumber, "campus", event.target.value)}
+                    >
+                      <option value="">캠퍼스를 선택해 주세요</option>
+                      {MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">
+                    MM ID
+                    <Input
+                      aria-label={`${row.rowNumber}행 MM ID`}
+                      aria-describedby={`member-import-contact-rule-${row.rowNumber}`}
+                      data-member-import-field="mmId"
+                      value={row.mmId}
+                      disabled={pending !== null}
+                      onChange={(event) => updateRow(row.rowNumber, "mmId", event.target.value)}
+                    />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-sm font-medium text-foreground">
+                    이메일
+                    <Input
+                      aria-label={`${row.rowNumber}행 이메일`}
+                      aria-describedby={`member-import-contact-rule-${row.rowNumber}`}
+                      data-member-import-field="email"
+                      type="email"
+                      value={row.email}
+                      disabled={pending !== null}
+                      onChange={(event) => updateRow(row.rowNumber, "email", event.target.value)}
+                    />
+                  </label>
+  <p
+    id={`member-import-contact-rule-${row.rowNumber}`}
+    className="md:col-span-2 xl:col-span-3 text-xs font-normal text-muted-foreground"
+  >
+    <span className="block">MM ID 또는 이메일 중 하나는 필수입니다.</span>
+    <span className="block">MM 조회 미지원 기수에서는</span>
+    <span className="block">MM ID 대신 이메일만 입력해 주세요.</span>
+    <span className="block">단, 이메일만 입력하면 이름과 캠퍼스도 필요합니다.</span>
+  </p>
+                  <div className="grid min-w-0 gap-1 text-sm font-medium text-foreground">
+                    <label htmlFor={`member-import-photo-${row.rowNumber}`}>사진 (선택 사항)</label>
+                    <Input
+                      id={`member-import-photo-${row.rowNumber}`}
+                      aria-label={`${row.rowNumber}행 사진 선택`}
+                      data-member-import-field="photo"
+                      type="file"
+                      accept={MANUAL_MEMBER_IMPORT_PHOTO_ACCEPT}
+                      className="h-auto min-w-0 py-2 text-sm"
+                      disabled={pending !== null}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        event.target.value = "";
+                        void selectRowPhoto(row.rowNumber, file);
+                      }}
+                    />
+                    {selectedPhoto ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2">
+                        <p
+                          className="min-w-0 truncate text-xs font-normal text-muted-foreground"
+                          title={selectedPhoto.sourceName}
+                        >
+                          선택됨 · {selectedPhoto.sourceName}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => clearRowPhoto(row.rowNumber)}
+                          disabled={pending !== null}
+                        >
+                          사진 해제
+                        </Button>
+                      </div>
+                    ) : row.photoFilename ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2">
+                        <p className="min-w-0 truncate text-xs font-normal text-muted-foreground">
+                          사진 ZIP 연결됨
+                        </p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => clearRowPhoto(row.rowNumber)}
+                          disabled={pending !== null}
+                        >
+                          사진 연결 해제
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-normal text-muted-foreground">JPEG·PNG·WebP·HEIC·HEIF, 5MB 이하</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={prepare} disabled={pending !== null || rows.length === 0} loading={pending === "validate"} loadingText="검증·업로드 중">검증 및 업로드</Button>
-          <Button type="button" onClick={createMembers} disabled={!batch || pending !== null || Boolean(result)} loading={pending === "create"} loadingText="생성 중">생성 시작</Button>
+        <div className="grid gap-2">
+          <p className="text-right text-xs text-muted-foreground">
+            모든 행의 필수 항목을 입력하고 검증·업로드를 완료하면 생성 시작이 활성화됩니다.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={prepare} disabled={pending !== null || rows.length === 0} loading={pending === "validate"} loadingText="검증·업로드 중">검증 및 업로드</Button>
+            <Button type="button" onClick={createMembers} disabled={!canCreateMembers} loading={pending === "create"} loadingText="생성 중">{canRetryFailedMembers ? "실패 행 재시도" : result ? "자동 재시도 불가" : "생성 시작"}</Button>
+          </div>
         </div>
         {error ? <FormMessage variant="error" className="whitespace-pre-line">{error}</FormMessage> : null}
         {batch ? <FormMessage variant="muted">준비 완료 · {new Date(batch.expiresAt).toLocaleString("ko-KR")} 전까지 생성할 수 있습니다.</FormMessage> : null}
@@ -415,14 +719,32 @@ export default function AdminMemberManualAddPanel({
       {result ? (
         <div className="grid gap-4 rounded-3xl border border-border bg-surface-elevated p-4 shadow-flat">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="text-lg font-semibold text-foreground">가져오기 결과</h3><p className="text-sm text-muted-foreground">성공 행은 유지되며, 실패 행은 원인을 수정해 새 배치로 재시도할 수 있습니다.</p></div>
+            <div><h3 className="text-lg font-semibold text-foreground">가져오기 결과</h3><p className="text-sm text-muted-foreground">{result.failed === 0 ? "성공 행은 유지됩니다." : result.retryableFailures === 0 ? "전송 결과 확인이 필요한 행이 있어 자동 재시도는 중지되었습니다." : result.retryableFailures < result.failed ? "재시도 가능한 실패 행만 같은 준비 배치에서 다시 시도합니다. 전송 결과 확인이 필요한 행은 자동 재시도하지 않습니다." : "성공 행은 유지됩니다. 실패 행이 있으면 같은 준비 배치에서 실패 행만 다시 시도할 수 있습니다."}</p></div>
             <div className="flex gap-2"><Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">성공 {result.success}</Badge><Badge className="bg-danger/15 text-danger">실패 {result.failed}</Badge></div>
           </div>
           <div className="grid gap-2">
             {result.items.map((item) => (
               <div key={item.rowNumber} className="rounded-2xl border border-border bg-surface-inset px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2"><Badge className={resultBadge(item.status)}>{item.status === "success" ? "성공" : "실패"}</Badge><span className="font-medium text-foreground">{item.rowNumber}행 · {item.name ?? item.mmId ?? item.email ?? "회원"}</span>{item.deliveryChannel ? <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-300">{item.deliveryChannel === "mattermost" ? "MM 전송" : "이메일 전송"}</Badge> : null}</div>
-                <p className="mt-2 text-sm text-muted-foreground">{item.status === "success" ? "계정 설정 링크를 전송했습니다. 첨부 사진은 검토 큐에서 승인 또는 반려할 수 있습니다." : item.reason ?? "처리 실패"}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{item.status === "success" ? "계정 설정 링크를 전송했습니다. 첨부 사진은 검토 큐에서 승인 또는 반려할 수 있습니다." : item.retryable ? item.reason ?? "처리 실패" : `자동 재시도 중지 · ${item.reason ?? "전송 결과 확인 필요"}`}</p>
+                {canReissueManualSetup && item.status === "failed" && !item.retryable ? (
+                  <div className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3">
+                    {confirmationRowNumber === item.rowNumber ? (
+                      <div className="grid gap-3">
+                        <p className="text-sm text-foreground">수신자에게 기존 링크가 전달되지 않았음을 확인한 뒤 발급해 주세요. 기존 미사용 링크는 무효화됩니다.</p>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button type="button" variant="secondary" onClick={() => setConfirmationRowNumber(null)} disabled={reissuingRowNumber !== null}>취소</Button>
+                          <Button type="button" onClick={() => void reissueManualSetup(item)} disabled={reissuingRowNumber !== null} loading={reissuingRowNumber === item.rowNumber} loadingText="발급 중">새 링크 발급 확인</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-muted-foreground">관리자 확인 후 기존 전송 채널로 새 초기 설정 링크를 발급할 수 있습니다.</p>
+                        <Button type="button" variant="secondary" onClick={() => setConfirmationRowNumber(item.rowNumber)} disabled={reissuingRowNumber !== null}>확인 후 새 링크 발급</Button>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

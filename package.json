@@ -36,6 +36,7 @@
     "release": "bash scripts/release.sh"
   },
   "dependencies": {
+    "@discourse/heic": "1.0.0",
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.99.0",
     "@types/qrcode": "^1.5.6",

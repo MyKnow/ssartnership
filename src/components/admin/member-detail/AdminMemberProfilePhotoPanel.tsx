@@ -8,12 +8,19 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
-import { MAX_GRADUATE_PROFILE_IMAGE_BYTES } from "@/lib/graduate-verification";
+import {
+  ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT,
+  getAdminMemberProfilePhotoSourceError,
+  getAdminMemberProfilePhotoUploadError,
+  isAdminMemberProfilePhotoHeifSource,
+  prepareAdminMemberProfilePhotoSource,
+} from "@/lib/admin-member-profile-photo.client";
 import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
 type SignedUpload = { uploadId: string; signedUrl: string };
+type Message = { variant: "error" | "info"; text: string };
 
 const REVIEW_STATUS_LABEL: Record<MemberProfilePhotoReviewStatus, string> = {
   missing: "사진 없음",
@@ -27,16 +34,6 @@ function getStatusVariant(status: MemberProfilePhotoReviewStatus) {
   if (status === "pending") return "warning" as const;
   if (status === "rejected") return "danger" as const;
   return "neutral" as const;
-}
-
-function validatePhoto(file: File) {
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    return "사진은 JPEG, PNG, WebP 파일만 선택할 수 있습니다.";
-  }
-  if (file.size <= 0 || file.size > MAX_GRADUATE_PROFILE_IMAGE_BYTES) {
-    return "사진은 5MB 이하만 선택할 수 있습니다.";
-  }
-  return null;
 }
 
 export default function AdminMemberProfilePhotoPanel({
@@ -60,45 +57,87 @@ export default function AdminMemberProfilePhotoPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const sourceUrlRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const selectionRequestIdRef = useRef(0);
   const [sourceUrl, setSourceUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
   const [pending, setPending] = useState(false);
+  const [selecting, setSelecting] = useState(false);
 
   useEffect(() => () => {
+    selectionRequestIdRef.current += 1;
     if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
   }, []);
 
-  function selectFile(nextFile: File | null) {
+  async function selectFile(nextFile: File | null) {
     if (!nextFile) return;
-    const error = validatePhoto(nextFile);
+    const error = getAdminMemberProfilePhotoSourceError(nextFile);
     if (error) {
-      setMessage(error);
+      setMessage({ variant: "error", text: error });
       return;
     }
-    if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
-    const nextSourceUrl = URL.createObjectURL(nextFile);
-    sourceUrlRef.current = nextSourceUrl;
-    setSourceUrl(nextSourceUrl);
-    setCropOpen(true);
-    setMessage(null);
+    const requestId = selectionRequestIdRef.current + 1;
+    selectionRequestIdRef.current = requestId;
+    setSelecting(true);
+    setMessage(
+      isAdminMemberProfilePhotoHeifSource(nextFile)
+        ? {
+            variant: "info",
+            text: "HEIC/HEIF 사진을 기기에서 안전하게 WebP로 변환하고 있습니다.",
+          }
+        : null,
+    );
+    try {
+      const sourceFile = await prepareAdminMemberProfilePhotoSource(nextFile);
+      if (selectionRequestIdRef.current !== requestId) return;
+      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
+      const nextSourceUrl = URL.createObjectURL(sourceFile);
+      sourceUrlRef.current = nextSourceUrl;
+      setSourceUrl(nextSourceUrl);
+      setCropOpen(true);
+      setMessage(null);
+    } catch (nextError) {
+      if (selectionRequestIdRef.current !== requestId) return;
+      setMessage({
+        variant: "error",
+        text:
+          nextError instanceof Error && nextError.message
+            ? nextError.message
+            : "사진을 안전하게 준비하지 못했습니다.",
+      });
+    } finally {
+      if (selectionRequestIdRef.current === requestId) {
+        setSelecting(false);
+      }
+    }
   }
 
   function applyCroppedPhoto(nextFile: File) {
+    const error = getAdminMemberProfilePhotoUploadError(nextFile);
+    if (error) {
+      setMessage({ variant: "error", text: error });
+      return;
+    }
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     const nextPreviewUrl = URL.createObjectURL(nextFile);
     previewUrlRef.current = nextPreviewUrl;
     setPreviewUrl(nextPreviewUrl);
     setFile(nextFile);
     setCropOpen(false);
+    setMessage(null);
   }
 
   async function submitReplacement() {
     if (!file) {
-      setMessage("사진을 선택하고 1:1 비율로 잘라 주세요.");
+      setMessage({ variant: "error", text: "사진을 선택하고 1:1 비율로 잘라 주세요." });
+      return;
+    }
+    const uploadError = getAdminMemberProfilePhotoUploadError(file);
+    if (uploadError) {
+      setMessage({ variant: "error", text: uploadError });
       return;
     }
     setPending(true);
@@ -128,12 +167,18 @@ export default function AdminMemberProfilePhotoPanel({
       });
       const submitData = await submitResponse.json().catch(() => ({}));
       if (!submitResponse.ok || !submitData.ok) {
-        throw new Error(submitData.message ?? "사진 변경 요청을 저장하지 못했습니다.");
+        throw new Error(submitData.message ?? "사진을 변경하지 못했습니다.");
       }
-      setMessage("새 사진을 검토 대기 상태로 등록했습니다. 승인 전까지 인증 카드와 QR은 제한됩니다.");
+      setMessage({
+        variant: "info",
+        text: "사진을 변경했습니다. 인증 카드와 QR에 바로 반영됩니다.",
+      });
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "사진 변경 요청을 저장하지 못했습니다.");
+      setMessage({
+        variant: "error",
+        text: error instanceof Error ? error.message : "사진을 변경하지 못했습니다.",
+      });
     } finally {
       setPending(false);
     }
@@ -149,9 +194,14 @@ export default function AdminMemberProfilePhotoPanel({
         <Badge variant={getStatusVariant(reviewStatus)}>{REVIEW_STATUS_LABEL[reviewStatus]}</Badge>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        관리자가 올린 사진도 검토 대기로 등록됩니다. 사진을 반려하면 새 사진이 승인될 때까지 인증 카드와 QR을 사용할 수 없습니다.
-      </p>
+      <div className="space-y-1 text-sm text-muted-foreground">
+        <p className="text-ko-pretty">
+          관리자가 직접 변경한 사진은 인증 카드와 QR에 바로 반영됩니다.
+        </p>
+        <p className="text-ko-pretty">
+          선택한 원본은 기기에서 WebP로 압축·정규화하고 서버에서 다시 검증합니다.
+        </p>
+      </div>
 
       {canUpdate ? (
         <>
@@ -160,27 +210,68 @@ export default function AdminMemberProfilePhotoPanel({
             className="sr-only"
             type="file"
             aria-label="새 프로필 사진 파일 선택"
-            accept="image/jpeg,image/png,image/webp"
+            accept={ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT}
+            disabled={pending || selecting}
             onChange={(event) => {
-              selectFile(event.target.files?.[0] ?? null);
+              void selectFile(event.target.files?.[0] ?? null);
               event.target.value = "";
             }}
           />
-          <div className="flex flex-wrap items-center gap-3">
-            {previewUrl ? <Image src={previewUrl} alt="새 프로필 사진 미리보기" width={64} height={64} unoptimized className="h-16 w-16 rounded-2xl border border-border object-cover" /> : null}
-            <Button variant="secondary" type="button" disabled={pending} onClick={() => inputRef.current?.click()}>
-              {file ? "사진 다시 선택" : "새 사진 선택"}
-            </Button>
-            <Button type="button" disabled={!file || pending} loading={pending} loadingText="등록 중" onClick={() => void submitReplacement()}>
-              사진 변경 요청
-            </Button>
+          <div
+            className={
+              previewUrl
+                ? "grid min-w-0 gap-4 rounded-[1.25rem] border border-border/70 bg-surface-inset p-4 min-[560px]:grid-cols-[minmax(0,1fr)_auto] min-[560px]:items-center"
+                : "flex min-w-0 justify-end"
+            }
+          >
+            {previewUrl ? (
+              <figure className="flex min-w-0 flex-col items-center gap-3 text-center min-[560px]:flex-row min-[560px]:gap-4 min-[560px]:text-left">
+                <Image
+                  src={previewUrl}
+                  alt="변경할 프로필 사진 미리보기"
+                  width={144}
+                  height={144}
+                  unoptimized
+                  className="h-32 w-32 shrink-0 rounded-[1.125rem] border border-border bg-surface object-cover shadow-flat min-[560px]:h-36 min-[560px]:w-36"
+                />
+                <figcaption className="min-w-0 min-[560px]:min-w-20">
+                  <p className="text-ko whitespace-nowrap text-sm font-semibold text-foreground">변경할 사진</p>
+                  <p className="text-ko-pretty mt-1 text-xs leading-5 text-muted-foreground">
+                    1:1 비율 WebP 사진으로 바로 반영됩니다.
+                  </p>
+                </figcaption>
+              </figure>
+            ) : null}
+            <div className="grid w-full min-w-0 gap-2 min-[400px]:grid-cols-2 min-[560px]:w-auto min-[560px]:flex min-[560px]:flex-wrap min-[560px]:justify-end">
+              <Button
+                className="min-w-0"
+                variant="secondary"
+                type="button"
+                disabled={pending}
+                loading={selecting}
+                loadingText="사진 준비 중"
+                onClick={() => inputRef.current?.click()}
+              >
+                {file ? "다시 선택" : "사진 선택"}
+              </Button>
+              <Button
+                className="min-w-0"
+                type="button"
+                disabled={!file || pending || selecting}
+                loading={pending}
+                loadingText="변경 중"
+                onClick={() => void submitReplacement()}
+              >
+                사진 변경
+              </Button>
+            </div>
           </div>
 
           {pendingImageId ? (
             <div className="grid gap-3 rounded-2xl border border-border bg-surface-inset p-3">
               <div className="flex items-center gap-3">
                 <Image src={`/api/admin/profile-photos/images/${encodeURIComponent(pendingImageId)}`} alt="검토 대기 중인 새 프로필 사진" width={64} height={64} unoptimized className="h-16 w-16 rounded-2xl border border-border object-cover" />
-                <p className="text-sm text-muted-foreground">새 사진이 검토 대기 중입니다. 검토 결과는 감사 로그에 남습니다.</p>
+                <p className="text-ko-pretty min-w-0 text-sm text-muted-foreground">회원이 제출한 사진이 검토 대기 중입니다. 검토 결과는 감사 로그에 남습니다.</p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <form action={approveAction}>
@@ -210,18 +301,19 @@ export default function AdminMemberProfilePhotoPanel({
         </>
       ) : <p className="text-sm text-muted-foreground">사진 조회 권한만 있어 변경·승인·반려는 할 수 없습니다.</p>}
 
-      {message ? <FormMessage variant={message.includes("등록했습니다") ? "info" : "error"}>{message}</FormMessage> : null}
+      {message ? <FormMessage variant={message.variant}>{message.text}</FormMessage> : null}
       <ImageCropDialog
         open={cropOpen}
         title="프로필 사진 자르기"
         subtitle="얼굴이 선명하게 보이도록 1:1 비율로 맞춰 주세요."
         aspectRatio={1}
         sourceUrl={sourceUrl}
-        outputName="member-profile.webp"
+        outputName="admin-member-profile.webp"
         outputWidth={640}
         outputHeight={640}
-        accept="image/jpeg,image/png,image/webp"
-        validateFile={validatePhoto}
+        accept={ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT}
+        validateFile={getAdminMemberProfilePhotoSourceError}
+        prepareFile={prepareAdminMemberProfilePhotoSource}
         onCancel={() => setCropOpen(false)}
         onApply={applyCroppedPhoto}
       />

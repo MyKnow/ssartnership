@@ -55,6 +55,7 @@ const auditLabels: Record<string, string> = {
   member_directory_sync: '회원 디렉토리 동기화',
   member_sync: '회원 정보 동기화',
   member_manual_add: '회원 수동 추가',
+  member_manual_setup_link_reissue: '수동 회원 초기 설정 링크 재발급',
   member_delete: '회원 삭제',
   cycle_settings_update: '기수 기준 수정',
   cycle_settings_early_start: '기수 조기 시작',

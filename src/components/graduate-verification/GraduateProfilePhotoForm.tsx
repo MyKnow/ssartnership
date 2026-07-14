@@ -6,23 +6,19 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import ImageCropDialog from "@/components/media/ImageCropDialog";
-import { MAX_GRADUATE_PROFILE_IMAGE_BYTES } from "@/lib/graduate-verification";
+import { useToast } from "@/components/ui/Toast";
+import {
+  GRADUATE_PROFILE_PHOTO_ACCEPT,
+  getGraduateProfilePhotoSourceError,
+  getGraduateProfilePhotoSourceFormat,
+  normalizeGraduateProfilePhotoSource,
+} from "@/lib/graduate-profile-photo.client";
 import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
 
 type SignedUpload = {
   uploadId: string;
   signedUrl: string;
 };
-
-function validatePhoto(file: File) {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    return "본인 사진은 JPEG, PNG, WebP 파일만 선택할 수 있습니다.";
-  }
-  if (file.size <= 0 || file.size > MAX_GRADUATE_PROFILE_IMAGE_BYTES) {
-    return "본인 사진은 5MB 이하만 선택할 수 있습니다.";
-  }
-  return null;
-}
 
 async function uploadReplacementPhoto(file: File) {
   const signResponse = await fetch("/api/certification/photo/sign", {
@@ -57,32 +53,68 @@ export default function GraduateProfilePhotoForm({
   const inputRef = useRef<HTMLInputElement>(null);
   const sourceUrlRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const selectionRequestIdRef = useRef(0);
   const [sourceUrl, setSourceUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{
+    variant: "error" | "info";
+    text: string;
+  } | null>(null);
   const [pending, setPending] = useState(false);
+  const [selecting, setSelecting] = useState(false);
   const router = useRouter();
+  const { notify } = useToast();
 
   useEffect(() => () => {
+    selectionRequestIdRef.current += 1;
     if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
   }, []);
 
-  function selectFile(nextFile: File | null) {
+  async function selectFile(nextFile: File | null) {
     if (!nextFile) return;
-    const error = validatePhoto(nextFile);
+    const error = getGraduateProfilePhotoSourceError(nextFile);
     if (error) {
-      setMessage(error);
+      setMessage({ variant: "error", text: error });
       return;
     }
-    if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
-    const url = URL.createObjectURL(nextFile);
-    sourceUrlRef.current = url;
-    setSourceUrl(url);
-    setCropOpen(true);
-    setMessage(null);
+    const requestId = selectionRequestIdRef.current + 1;
+    selectionRequestIdRef.current = requestId;
+    const isHeif = getGraduateProfilePhotoSourceFormat(nextFile) === "heif";
+    setSelecting(true);
+    setMessage(
+      isHeif
+        ? {
+            variant: "info",
+            text: "HEIC/HEIF 사진을 기기에서 안전하게 변환하고 있습니다.",
+          }
+        : null,
+    );
+    try {
+      const sourceFile = await normalizeGraduateProfilePhotoSource(nextFile);
+      if (selectionRequestIdRef.current !== requestId) return;
+      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
+      const url = URL.createObjectURL(sourceFile);
+      sourceUrlRef.current = url;
+      setSourceUrl(url);
+      setCropOpen(true);
+      setMessage(null);
+    } catch (nextError) {
+      if (selectionRequestIdRef.current !== requestId) return;
+      setMessage({
+        variant: "error",
+        text:
+          nextError instanceof Error && nextError.message
+            ? nextError.message
+            : "사진 변환에 실패했습니다.",
+      });
+    } finally {
+      if (selectionRequestIdRef.current === requestId) {
+        setSelecting(false);
+      }
+    }
   }
 
   function applyCroppedPhoto(nextFile: File) {
@@ -92,11 +124,15 @@ export default function GraduateProfilePhotoForm({
     setPreviewUrl(url);
     setFile(nextFile);
     setCropOpen(false);
+    setMessage(null);
   }
 
   async function submit() {
     if (!file) {
-      setMessage("먼저 본인 사진을 선택하고 1:1 비율로 잘라 주세요.");
+      setMessage({
+        variant: "error",
+        text: "먼저 본인 사진을 선택하고 1:1 비율로 잘라 주세요.",
+      });
       return;
     }
     setPending(true);
@@ -112,11 +148,20 @@ export default function GraduateProfilePhotoForm({
       if (!response.ok) {
         throw new Error(data.message ?? "본인 사진 변경 요청을 저장하지 못했습니다.");
       }
+      notify(
+        "사진 변경 요청을 제출했습니다. 기존 승인 사진은 새 사진이 승인될 때까지 계속 표시됩니다.",
+      );
       router.replace(
         getMemberGateCompletionReturnTo(returnTo, "profile-photo"),
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "본인 사진 변경 요청을 저장하지 못했습니다.");
+      setMessage({
+        variant: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "본인 사진 변경 요청을 저장하지 못했습니다.",
+      });
     } finally {
       setPending(false);
     }
@@ -124,41 +169,75 @@ export default function GraduateProfilePhotoForm({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        새 사진은 관리자 적합성 검토 후 인증 카드에 반영됩니다. 단체사진·로고·캐릭터·얼굴이 과도하게 가려진 사진은 사용할 수 없습니다.
-      </p>
+      <div className="space-y-1 text-sm text-muted-foreground">
+        <p className="text-ko-pretty">
+          새 사진은 관리자 적합성 검토 후 인증 카드에 반영됩니다.
+        </p>
+        <p className="text-ko-pretty">
+          단체사진·로고·캐릭터·얼굴이 과도하게 가려진 사진은 사용할 수 없습니다.
+        </p>
+      </div>
       <input
         ref={inputRef}
         className="sr-only"
         type="file"
         aria-label="본인 사진 파일 선택"
-        accept="image/jpeg,image/png,image/webp"
+        accept={GRADUATE_PROFILE_PHOTO_ACCEPT}
         onChange={(event) => {
-          selectFile(event.target.files?.[0] ?? null);
+          void selectFile(event.target.files?.[0] ?? null);
           event.target.value = "";
         }}
       />
-      <div className="flex flex-wrap items-center gap-3">
+      <div
+        className={
+          previewUrl
+            ? "grid min-w-0 gap-4 rounded-[1.25rem] border border-border/70 bg-surface-inset p-4 min-[620px]:grid-cols-[minmax(0,1fr)_auto] min-[620px]:items-center"
+            : "flex justify-end"
+        }
+      >
         {previewUrl ? (
-          <Image
-            src={previewUrl}
-            alt="선택한 본인 사진"
-            width={96}
-            height={96}
-            unoptimized
-            className="h-24 w-24 rounded-card border border-border object-cover"
-          />
+          <figure className="flex min-w-0 flex-col items-center gap-3 text-center min-[620px]:flex-row min-[620px]:gap-4 min-[620px]:text-left">
+            <Image
+              src={previewUrl}
+              alt="선택한 본인 사진 미리보기"
+              width={144}
+              height={144}
+              unoptimized
+              className="h-32 w-32 shrink-0 rounded-[1.125rem] border border-border bg-surface object-cover shadow-flat min-[620px]:h-36 min-[620px]:w-36"
+            />
+            <figcaption className="min-w-0 min-[620px]:min-w-20">
+              <p className="text-ko whitespace-nowrap text-sm font-semibold text-foreground">선택한 사진</p>
+              <p className="text-ko-pretty mt-1 text-xs leading-5 text-muted-foreground">
+                1:1 비율로 잘린 사진이 제출됩니다.
+              </p>
+            </figcaption>
+          </figure>
         ) : null}
-        <Button variant="secondary" onClick={() => inputRef.current?.click()}>
-          {file ? "사진 다시 선택" : "본인 사진 선택"}
-        </Button>
-        <Button onClick={submit} loading={pending} loadingText="제출 중">
-          사진 변경 요청
-        </Button>
+        <div className="grid w-full gap-2 min-[400px]:grid-cols-2 min-[620px]:w-auto min-[620px]:flex min-[620px]:flex-wrap min-[620px]:justify-end">
+          <Button
+            className="min-w-0"
+            variant="secondary"
+            onClick={() => inputRef.current?.click()}
+            loading={selecting}
+            loadingText="사진 변환 중"
+            disabled={pending}
+          >
+            {file ? "사진 다시 선택" : "본인 사진 선택"}
+          </Button>
+          <Button
+            className="min-w-0"
+            onClick={submit}
+            loading={pending}
+            loadingText="제출 중"
+            disabled={selecting}
+          >
+            사진 변경 요청
+          </Button>
+        </div>
       </div>
       {message ? (
-        <FormMessage variant={message.includes("제출했습니다") ? "info" : "error"}>
-          {message}
+        <FormMessage variant={message.variant}>
+          {message.text}
         </FormMessage>
       ) : null}
       <ImageCropDialog
@@ -170,8 +249,9 @@ export default function GraduateProfilePhotoForm({
         outputName="graduate-profile.webp"
         outputWidth={640}
         outputHeight={640}
-        accept="image/jpeg,image/png,image/webp"
-        validateFile={validatePhoto}
+        accept={GRADUATE_PROFILE_PHOTO_ACCEPT}
+        validateFile={getGraduateProfilePhotoSourceError}
+        prepareFile={normalizeGraduateProfilePhotoSource}
         onCancel={() => setCropOpen(false)}
         onApply={applyCroppedPhoto}
       />
