@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminPermission } from "@/lib/admin-access";
@@ -6,6 +7,16 @@ import {
   buildMemberSyncLogProperties,
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
+import {
+  buildDirectMemberCreateAuditProperties,
+  DIRECT_MEMBER_CREATE_INITIAL_STATE,
+  validateDirectMemberCreateInput,
+  type DirectMemberCreateFormState,
+} from "@/lib/member-direct-create";
+import {
+  DirectMemberProvisionError,
+  provisionDirectMember,
+} from "@/lib/member-direct-create-provision";
 import {
   parseMemberYearValue,
   validateMemberYear,
@@ -138,6 +149,83 @@ export async function updateMemberAction(formData: FormData) {
   redirect("/admin/members");
 }
 
+export async function createDirectMemberAction(
+  _prevState: DirectMemberCreateFormState,
+  formData: FormData,
+): Promise<DirectMemberCreateFormState> {
+  const adminSession = await requireAdminPermission("members", "create", {
+    path: "/admin/members",
+  });
+  const validation = validateDirectMemberCreateInput({
+    loginId: formData.get("loginId"),
+    displayName: formData.get("displayName"),
+    generation: formData.get("generation"),
+    campus: formData.get("campus"),
+    temporaryPassword: formData.get("temporaryPassword"),
+    temporaryPasswordConfirmation: formData.get("temporaryPasswordConfirmation"),
+  });
+  if (!validation.ok) {
+    return {
+      ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+      status: "error",
+      message: "입력값을 확인해 주세요.",
+      fieldErrors: validation.fieldErrors,
+    };
+  }
+
+  try {
+    const member = await provisionDirectMember(validation.value);
+    const context = await getServerActionLogContext("/admin/members");
+    await logAdminAudit({
+      ...context,
+      action: "member_direct_create",
+      actorId: adminSession.adminId,
+      targetType: "member",
+      targetId: member.id,
+      properties: buildDirectMemberCreateAuditProperties(validation.value),
+    });
+    revalidateMemberPaths();
+    revalidatePath("/admin/logs");
+    return {
+      ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+      status: "success",
+      message: "직접 회원 계정을 생성했습니다. 임시 비밀번호를 안전한 경로로 전달해 주세요.",
+      member,
+    };
+  } catch (error) {
+    if (error instanceof DirectMemberProvisionError) {
+      if (error.code === "duplicate_login_id") {
+        return {
+          ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+          status: "error",
+          message: "입력값을 확인해 주세요.",
+          fieldErrors: {
+            loginId: "이미 사용 중인 직접 로그인 ID입니다.",
+          },
+        };
+      }
+      if (error.code === "mattermost_username_conflict") {
+        return {
+          ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+          status: "error",
+          message: "입력값을 확인해 주세요.",
+          fieldErrors: {
+            loginId: "기존 Mattermost ID와 겹치는 직접 로그인 ID입니다.",
+          },
+        };
+      }
+      console.error("direct member create failed", { code: error.code });
+    } else {
+      console.error("direct member create failed");
+    }
+    return {
+      ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+      status: "error",
+      message: "계정을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+}
+
 export async function deleteMemberAction(formData: FormData) {
   await requireAdminPermission("members", "delete", { path: "/admin/members" });
   const id = String(formData.get("id") || "").trim();
@@ -153,7 +241,7 @@ export async function deleteMemberAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("mattermost_account_id")
+    .select("mattermost_account_id,manual_login_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -204,6 +292,7 @@ export async function deleteMemberAction(formData: FormData) {
 
   const memberAuthCleanupKeys = getMemberAuthCleanupKeys([
     ...cleanupIdentifiers,
+    member.manual_login_id,
     id,
   ]);
   if (memberAuthCleanupKeys.length > 0) {

@@ -55,6 +55,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'member_directory_sync',
   'member_sync',
   'member_manual_add',
+  'member_direct_create',
   'member_delete',
   'cycle_settings_update',
   'cycle_settings_early_start',

@@ -28,12 +28,13 @@ export default function AdminMemberListItem({
 }) {
   const profile = parseSsafyProfile(member.displayName ?? member.mmUsername);
   const displayName =
-    profile.displayName ?? member.displayName ?? member.mmUsername;
+    profile.displayName ?? member.displayName ?? member.manualLoginId ?? member.mmUsername;
+  const loginIdentifier = member.manualLoginId ?? member.mmUsername;
   const yearLabel = formatSsafyMemberLifecycleLabel(
     member.generation ?? getCurrentSsafyYear(),
   );
   const campus = member.campus ?? profile.campus ?? "캠퍼스 미입력";
-  const avatarLabel = (displayName || member.mmUsername || "?")
+  const avatarLabel = (displayName || loginIdentifier || "?")
     .trim()
     .charAt(0)
     .toUpperCase();
@@ -79,7 +80,7 @@ export default function AdminMemberListItem({
           )}
         </div>
         <p className="text-token mt-1 truncate text-sm text-muted-foreground">
-          @{member.mmUsername}
+          {member.manualLoginId ? `직접 ID · ${member.manualLoginId}` : `@${member.mmUsername}`}
         </p>
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span>{yearLabel}</span>

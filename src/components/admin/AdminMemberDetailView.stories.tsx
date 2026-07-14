@@ -10,6 +10,7 @@ const meta = {
       displayName: "김하늘",
       mmUsername: "seoul15_haneul",
       mmUserId: "mm-user-seoul-15-001",
+      manualLoginId: null,
       generation: 15,
       generationLabel: "15기 · 2학기",
       campus: "서울",

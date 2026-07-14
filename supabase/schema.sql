@@ -804,6 +804,7 @@ create table if not exists members (
   id uuid primary key default uuid_generate_v4(),
   mm_user_id text not null unique,
   mm_username text not null,
+  manual_login_id text,
   password_hash text,
   password_salt text,
   must_change_password boolean not null default false,
@@ -831,8 +832,20 @@ create table if not exists members (
   ssafy_track_name text,
   ssafy_last_scope text,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
+  constraint members_manual_login_id_check
+    check (
+      manual_login_id is null
+      or (
+        manual_login_id = lower(btrim(manual_login_id))
+        and manual_login_id ~ '^manual-[a-z0-9._-]{1,57}$'
+      )
+    )
 );
+
+create unique index if not exists members_manual_login_id_key
+  on members(manual_login_id)
+  where manual_login_id is not null;
 
 create table if not exists partner_reviews (
   id uuid primary key default uuid_generate_v4(),
@@ -5814,6 +5827,7 @@ begin
   set email = null,
       email_normalized = null,
       email_verified_at = null,
+      manual_login_id = null,
       password_hash = null,
       password_salt = null,
       must_change_password = false,
