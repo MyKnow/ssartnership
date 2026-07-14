@@ -62,9 +62,24 @@ async function resolveMemberByVerifiedEmail(email: string) {
   return (data ?? null) as LoginMember | null;
 }
 
+async function resolveMemberByManualLoginId(manualLoginId: string) {
+  const supabase = getSupabaseAdminClient();
+  const { data } = await supabase
+    .from("members")
+    .select(MEMBER_LOGIN_SELECT)
+    .eq("manual_login_id", manualLoginId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  return (data ?? null) as LoginMember | null;
+}
+
 export async function resolveActiveMemberForLogin(identifier: MemberLoginIdentifier) {
   if (identifier.kind === "email") {
     return resolveMemberByVerifiedEmail(identifier.value);
+  }
+  if (identifier.kind === "manual_login_id") {
+    const manualMember = await resolveMemberByManualLoginId(identifier.value);
+    return manualMember ?? resolveMemberByMattermostUsername(identifier.value);
   }
   return resolveMemberByMattermostUsername(identifier.value);
 }

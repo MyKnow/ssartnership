@@ -21,6 +21,7 @@ export default function AdminMemberAccountManager({
     campus: string;
     generation: number;
     mmUsername: string;
+    manualLoginId: string | null;
     mustChangePassword: boolean;
   };
   updateAction: FormAction;
@@ -84,7 +85,7 @@ export default function AdminMemberAccountManager({
           onSubmit={(event) => {
             if (
               !window.confirm(
-                `정말 ${member.displayName}(@${member.mmUsername}) 회원을 삭제하시겠습니까?`,
+                `정말 ${member.displayName}(${member.manualLoginId ?? `@${member.mmUsername}`}) 회원을 삭제하시겠습니까?`,
               )
             ) {
               event.preventDefault();

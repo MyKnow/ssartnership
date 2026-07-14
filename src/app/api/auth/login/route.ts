@@ -33,7 +33,11 @@ export async function POST(request: Request) {
     const password = String(payload.password ?? "").trim();
     const autoLogin = payload.autoLogin === true;
     const loginIdentifier = classifyMemberLoginIdentifier(rawIdentifier);
-    const provider = loginIdentifier?.kind === "email" ? "email" : "mattermost";
+    const provider = loginIdentifier?.kind === "email"
+      ? "email"
+      : loginIdentifier?.kind === "manual_login_id"
+        ? "manual"
+        : "mattermost";
     const identifier = loginIdentifier?.value ?? rawIdentifier.toLowerCase();
     const rateLimitIdentifier = loginIdentifier?.kind === "email"
       ? hashMemberEmailIdentifier(loginIdentifier.value)
