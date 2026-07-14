@@ -7,6 +7,10 @@ const screens = [
     storyId: "screens-public-partnerdetailview--default",
   },
   {
+    key: "partner-detail-locked",
+    storyId: "screens-public-partnerdetailaccessgate--locked",
+  },
+  {
     key: "partner-registration",
     storyId: "domains-partnerregistration-actualview--web-input",
   },
