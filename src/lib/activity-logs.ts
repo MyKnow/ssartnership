@@ -17,6 +17,7 @@ import { getSignedUserSession } from '@/lib/user-auth';
 import { getPartnerSession } from '@/lib/partner-session';
 import { sanitizeProductEventTargetId } from '@/lib/activity-log-targets';
 import { getClientIp } from '@/lib/client-ip';
+import type { AuditActorType } from '@/lib/audit-rpc-context';
 
 type BaseLogContext = {
   path?: string | null;
@@ -42,6 +43,7 @@ type ProductLogInput = BaseLogContext & {
 
 type AdminAuditInput = BaseLogContext & {
   action: AdminAuditAction;
+  actorType?: AuditActorType;
   actorId?: string | null;
   targetType?: string | null;
   targetId?: string | null;
@@ -221,8 +223,10 @@ export function scheduleProductEventLog(input: ProductLogInput) {
 
 export async function logAdminAudit(input: AdminAuditInput) {
   const adminSession = await getAdminSession();
+  const actorId = input.actorId ?? adminSession?.adminId ?? 'system';
   await insertLog('admin_audit_logs', {
-    actor_id: input.actorId ?? adminSession?.adminId ?? 'system',
+    actor_type: input.actorType ?? (actorId === 'system' ? 'system' : 'admin'),
+    actor_id: actorId,
     action: input.action,
     path: normalizeProductEventLocation(input.path ?? null),
     target_type: input.targetType ?? null,

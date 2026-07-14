@@ -7,6 +7,7 @@ import type {
 import type { PartnerCompanyPlanTier } from "../partner-company-plans.ts";
 import { PartnerChangeRequestError } from "../partner-change-request-errors.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
+import type { AtomicAuditContext } from "../audit-rpc-context.ts";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -153,11 +154,13 @@ export type PartnerChangeRequestCancelInput = {
 export type PartnerChangeRequestReviewInput = {
   requestId: string;
   adminId: string;
+  auditContext?: AtomicAuditContext;
 };
 
 export type PartnerImmediateUpdateInput = {
   companyIds: string[];
   partnerId: string;
+  auditContext?: AtomicAuditContext;
   thumbnail: string | null;
   images: string[];
   tags: string[];
