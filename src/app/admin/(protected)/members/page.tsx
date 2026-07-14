@@ -11,7 +11,6 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import {
   backfillMemberProfiles,
-  manualAddMembers,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
@@ -773,70 +772,64 @@ export default async function AdminMembersPage({
           />
         ) : null}
 
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.72fr)] 2xl:items-start">
-          <div className="grid gap-6">
-            <section className="grid min-w-0 gap-4">
-              <AdminSectionHeading
-                title="회원 목록"
-                description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
-              />
-              <div>
-                <AdminMemberManager
-                  key={[
-                    page,
-                    pageSize,
-                    filters.searchValue,
-                    filters.sortValue,
-                    filters.filterValue,
-                    filters.yearFilter,
-                    filters.campusFilter,
-                    filters.serviceConsentFilter,
-                    filters.privacyConsentFilter,
-                    filters.marketingConsentFilter,
-                    filters.pushEnabledFilter,
-                    filters.announcementEnabledFilter,
-                    filters.newPartnerEnabledFilter,
-                    filters.expiringPartnerEnabledFilter,
-                    filters.reviewEnabledFilter,
-                    filters.mmEnabledFilter,
-                    filters.marketingEnabledFilter,
-                  ].join(":")}
-                  members={enrichedMembers}
-                  pagination={{
-                    totalCount,
-                    page,
-                    pageSize,
-                  }}
-                  filters={filters}
-                  options={options}
-                />
-              </div>
-            </section>
-          </div>
+        <section className="grid min-w-0 gap-4">
+          <AdminSectionHeading
+            title="수동 추가"
+            description="XLSX와 사진 ZIP을 검증한 뒤 계정을 행별로 생성하고 설정 링크를 전송합니다."
+          />
+          <Card tone="elevated">
+            <AdminMemberManualAddPanel />
+          </Card>
+        </section>
 
-          <div className="grid gap-6 2xl:sticky 2xl:top-24">
-            <Card tone="elevated">
-              <AdminSectionHeading
-                title="수동 추가"
-                description="MM 아이디를 입력해 계정을 생성하고 비밀번호 변경 필요 상태로 저장합니다."
-              />
-              <div className="mt-6">
-                <AdminMemberManualAddPanel action={manualAddMembers} />
-              </div>
-            </Card>
-
-            <Card tone="elevated">
-              <AdminSectionHeading
-                title="운영 메모"
-                description="15기 우선 조회 후 없으면 14기에서 다시 찾습니다."
-              />
-              <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-                <p>정책 동의 상태와 알림 설정은 현재 페이지 결과에서 즉시 확인할 수 있습니다.</p>
-                <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
-              </div>
-            </Card>
+        <Card tone="elevated">
+          <AdminSectionHeading
+            title="운영 메모"
+            description="MM 조회 가능 기수와 사진 검토 상태를 확인합니다."
+          />
+          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
+            <p>MM 알림이 실패하면 이메일 주소가 있는 회원에게만 설정 링크를 한 번 대체 발송합니다.</p>
+            <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
           </div>
-        </div>
+        </Card>
+
+        <section className="grid min-w-0 gap-4">
+          <AdminSectionHeading
+            title="회원 목록"
+            description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
+          />
+          <div>
+            <AdminMemberManager
+              key={[
+                page,
+                pageSize,
+                filters.searchValue,
+                filters.sortValue,
+                filters.filterValue,
+                filters.yearFilter,
+                filters.campusFilter,
+                filters.serviceConsentFilter,
+                filters.privacyConsentFilter,
+                filters.marketingConsentFilter,
+                filters.pushEnabledFilter,
+                filters.announcementEnabledFilter,
+                filters.newPartnerEnabledFilter,
+                filters.expiringPartnerEnabledFilter,
+                filters.reviewEnabledFilter,
+                filters.mmEnabledFilter,
+                filters.marketingEnabledFilter,
+              ].join(":")}
+              members={enrichedMembers}
+              pagination={{
+                totalCount,
+                page,
+                pageSize,
+              }}
+              filters={filters}
+              options={options}
+            />
+          </div>
+        </section>
       </div>
     </AdminShell>
   );

@@ -37,7 +37,7 @@ export type MemberCanonicalProfile = {
   email: string | null;
   emailVerifiedAt: string | null;
   activeProfileImageId: string | null;
-  profilePhotoReviewStatus: "approved" | "pending" | "rejected";
+  profilePhotoReviewStatus: "missing" | "approved" | "pending" | "rejected";
   graduateVerifiedAt: string | null;
 };
 

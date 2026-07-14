@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { clearAdminSession } from "@/lib/auth";
-import type { ManualMemberAddFormState } from "@/lib/member-manual-add";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import {
   applyAdminPermissionTemplateAction,
@@ -37,7 +36,6 @@ import {
 import {
   backfillMemberProfilesAction,
   deleteMemberAction,
-  manualAddMembersAction,
   updateMemberAction,
 } from "./_actions/member-actions";
 import {
@@ -190,13 +188,6 @@ export async function backfillMemberProfiles() {
 
 export async function updateMember(formData: FormData) {
   return updateMemberAction(formData);
-}
-
-export async function manualAddMembers(
-  prevState: ManualMemberAddFormState,
-  formData: FormData,
-): Promise<ManualMemberAddFormState> {
-  return manualAddMembersAction(prevState, formData);
 }
 
 export async function updateSsafyCycleSettings(formData: FormData) {

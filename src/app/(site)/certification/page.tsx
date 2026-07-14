@@ -13,6 +13,9 @@ import CertificationMattermostSyncAction from "@/components/certification/Certif
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
+import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
+import Button from "@/components/ui/Button";
 
 export const metadata: Metadata = {
   title: `내 인증 | ${SITE_NAME}`,
@@ -63,10 +66,12 @@ export default async function CertificationPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
-  const [headerSession, cohortCardThemes] = await Promise.all([
+  const [headerSession, cohortCardThemes, photoState] = await Promise.all([
     getHeaderSession(session.userId),
     listCohortCardThemes(),
+    getMemberProfilePhotoState(session.userId),
   ]);
+  const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
 
   const member = await getMemberCanonicalProfile(session.userId);
 
@@ -87,7 +92,13 @@ export default async function CertificationPage({
               backHref={benefitReturnTo}
               backLabel="혜택 화면으로 돌아가기"
             />
-            <CertificationView
+            {photoAccess.restrictCertification ? (
+              <div className="rounded-3xl border border-border bg-surface p-6 shadow-flat">
+                <h2 className="text-lg font-semibold text-foreground">인증 카드 준비 중</h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{photoAccess.message}</p>
+                <Button className="mt-5" href="/certification/photo">본인 사진 {photoAccess.requiresSubmission ? "제출하기" : "확인하기"}</Button>
+              </div>
+            ) : <CertificationView
               member={{
                 mattermostUsername: member.mattermostUsername,
                 displayName: member.displayName,
@@ -102,7 +113,7 @@ export default async function CertificationPage({
               } satisfies CertificationMember}
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
-            />
+            />}
             {member.mattermostAccountId ? (
               <CertificationMattermostSyncAction />
             ) : null}

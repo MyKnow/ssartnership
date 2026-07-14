@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("auth and partner portal operation flows", () => {
+  test("manual member setup rejects a missing one-time token without exposing it", async ({ page }) => {
+    await page.goto("/auth/member/setup");
+
+    await expect(
+      page.getByText("비밀번호 설정 링크가 없거나 이미 사용되었습니다. 관리자에게 새 링크를 요청해 주세요."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "비밀번호 설정 완료" })).toBeDisabled();
+  });
+
   test("preserves the partner detail return path through member certification login", async ({ page }) => {
     await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
 

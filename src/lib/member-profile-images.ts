@@ -43,9 +43,14 @@ type MemberProfileImageRow = {
 
 export type MemberProfileImageSource = "legacy" | "mattermost";
 export type MemberProfilePhotoReviewStatus =
+  | "missing"
   | "approved"
   | "pending"
   | "rejected";
+type StoredMemberProfilePhotoReviewStatus = Exclude<
+  MemberProfilePhotoReviewStatus,
+  "missing"
+>;
 
 export type MemberProfilePhotoStateImage = {
   id: string;
@@ -82,7 +87,7 @@ export type MemberProfileImageSyncResult = {
 };
 
 const DEFAULT_MEMBER_PROFILE_PHOTO_STATE: MemberProfilePhotoState = {
-  reviewStatus: "approved",
+  reviewStatus: "missing",
   activeProfileImageId: null,
   activeStoragePath: null,
   updatedAt: null,
@@ -126,9 +131,9 @@ function compareNewestProfileImage(
 
 function isReviewableImageStatus(
   status: MemberProfileImageStatus,
-): status is MemberProfilePhotoReviewStatus {
+): status is StoredMemberProfilePhotoReviewStatus {
   return REVIEWABLE_IMAGE_STATUSES.includes(
-    status as MemberProfilePhotoReviewStatus,
+    status as StoredMemberProfilePhotoReviewStatus,
   );
 }
 
@@ -235,7 +240,7 @@ export function resolveMemberProfilePhotoState(
       (
         image,
       ): image is MemberProfilePhotoStateImage & {
-        status: MemberProfilePhotoReviewStatus;
+        status: StoredMemberProfilePhotoReviewStatus;
       } => isReviewableImageStatus(image.status),
     )
     .toSorted(compareNewestProfileImage);

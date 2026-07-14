@@ -192,6 +192,15 @@ export const mockScenarios = [
     requiredStates: ["토큰 유효", "비밀번호 오류", "만료", "완료"],
   },
   {
+    id: "auth.manual-member-password-setup",
+    label: "관리자 초대 회원 비밀번호 설정",
+    surface: "auth",
+    description: "MM 또는 이메일 초대 링크로 비밀번호를 설정하고 사진 제출로 이어지는 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["api-route", "storybook"],
+    requiredStates: ["토큰 유효", "비밀번호 오류", "만료", "사진 제출 안내"],
+  },
+  {
     id: "auth.reset.default",
     label: "비밀번호 재설정",
     surface: "auth",
