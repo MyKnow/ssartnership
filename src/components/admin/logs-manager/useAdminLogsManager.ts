@@ -20,6 +20,14 @@ import type {
 const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
 const LOG_SEARCH_DEBOUNCE_MS = 350;
 
+function createExportGroupSelection(groups: LogGroup[]): Record<LogGroup, boolean> {
+  return {
+    product: groups.includes('product'),
+    audit: groups.includes('audit'),
+    security: groups.includes('security'),
+  };
+}
+
 export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const { notify } = useToast();
   const [data, setData] = useState(initialData);
@@ -47,11 +55,9 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const [exportCustomEnd, setExportCustomEnd] = useState(
     toDateTimeLocalValue(initialData.range.end),
   );
-  const [exportGroups, setExportGroups] = useState<Record<LogGroup, boolean>>({
-    product: true,
-    audit: true,
-    security: true,
-  });
+  const [exportGroups, setExportGroups] = useState<Record<LogGroup, boolean>>(
+    () => createExportGroupSelection(initialData.access.exportGroups),
+  );
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pageSize, setPageSizeState] =
@@ -66,7 +72,22 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
         productLogs: data.list.productLogs,
         auditLogs: data.list.auditLogs,
         securityLogs: data.list.securityLogs,
-      }),
+      }).filter((log) => data.access.readGroups.includes(log.group)),
+    [data],
+  );
+  const chartBuckets = useMemo(
+    () => data.chartBuckets.map((bucket) => {
+      const product = data.access.readGroups.includes('product') ? bucket.product : 0;
+      const audit = data.access.readGroups.includes('audit') ? bucket.audit : 0;
+      const security = data.access.readGroups.includes('security') ? bucket.security : 0;
+      return {
+        ...bucket,
+        product,
+        audit,
+        security,
+        total: product + audit + security,
+      };
+    }),
     [data],
   );
   const availableNames = data.filters.availableNames;
@@ -75,13 +96,22 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const totalPages = Math.max(1, Math.ceil(data.list.total / pageSize));
   const currentPage = Math.min(data.list.page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
-  const totalLogs = data.counts.product + data.counts.audit + data.counts.security;
-  const topProductEvents = data.summary.topProductEvents;
-  const topAuditActions = data.summary.topAuditActions;
+  const totalLogs = data.access.readGroups.reduce(
+    (total, group) => total + data.counts[group],
+    0,
+  );
+  const topProductEvents = data.access.readGroups.includes('product')
+    ? data.summary.topProductEvents
+    : [];
+  const topAuditActions = data.access.readGroups.includes('audit')
+    ? data.summary.topAuditActions
+    : [];
   const topActors = data.summary.topActors;
   const topIps = data.summary.topIps;
   const topPaths = data.summary.topPaths;
-  const securityStatusCounts = data.summary.securityStatusCounts;
+  const securityStatusCounts = data.access.readGroups.includes('security')
+    ? data.summary.securityStatusCounts
+    : { success: 0, failure: 0, blocked: 0 };
 
   useEffect(() => {
     return () => {
@@ -243,6 +273,9 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   }
 
   function handleOpenExport() {
+    if (!data.access.exportGroups.length) {
+      return;
+    }
     setExportScope('current');
     setExportCustomStart(toDateTimeLocalValue(data.range.start));
     setExportCustomEnd(toDateTimeLocalValue(data.range.end));
@@ -280,14 +313,17 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     setErrorMessage(null);
 
     try {
-      const searchParams = new URLSearchParams({
-        preset: 'custom',
-        start,
-        end,
-        groups: selectedGroups.join(','),
-      });
-
-      const response = await fetch(`/api/admin/logs/export?${searchParams.toString()}`, {
+      const response = await fetch('/api/admin/logs/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preset: 'custom',
+          start,
+          end,
+          groups: selectedGroups,
+        }),
         cache: 'no-store',
       });
 
@@ -333,6 +369,10 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     exportCustomStart,
     exportCustomEnd,
     exportGroups,
+    availableExportGroups: data.access.exportGroups,
+    canExport: data.access.exportGroups.length > 0,
+    readGroups: data.access.readGroups,
+    includePii: data.access.includePii,
     isExporting,
     errorMessage,
     availableNames,
@@ -347,6 +387,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     pageSizeOptions: LOG_PAGE_SIZE_OPTIONS,
     pageStart,
     totalLogs,
+    chartBuckets,
     topProductEvents,
     topAuditActions,
     topActors,

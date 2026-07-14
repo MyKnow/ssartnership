@@ -4,6 +4,7 @@ import type {
   AdminLogsAggregateBucket,
   AdminLogsAggregateCountItem,
   AdminLogsAggregateData,
+  AdminLogsAccessCapabilities,
   AdminLogsAggregateName,
   AdminLogsLoadedData,
   AdminSupabaseClient,
@@ -252,8 +253,8 @@ export async function loadAdminLogRows(
           supabase,
           'admin_audit_logs',
           shape === 'summary'
-            ? 'id,actor_id,action,path,ip_address,created_at'
-            : 'id,actor_id,action,path,target_type,target_id,properties,ip_address,created_at',
+            ? 'id,actor_type,actor_id,action,path,ip_address,created_at'
+            : 'id,actor_type,actor_id,action,path,target_type,target_id,properties,ip_address,created_at',
           range.start,
           range.end,
           config.maxRowsPerGroup,
@@ -289,6 +290,7 @@ export async function loadAdminLogRows(
   }));
   const auditRows = auditResult.rows.map((row) => ({
     ...row,
+    actor_type: row.actor_type ?? 'admin',
     target_type: row.target_type ?? null,
     target_id: row.target_id ?? null,
     properties: row.properties ?? null,
@@ -397,6 +399,7 @@ function normalizeAggregateItems(
 
 export async function loadAdminLogSummaryAggregates(
   options: GetAdminLogsPageDataOptions = {},
+  access: AdminLogsAccessCapabilities,
 ): Promise<{
   range: ReturnType<typeof resolveLogRange>;
   aggregate: AdminLogsAggregateData;
@@ -405,16 +408,18 @@ export async function loadAdminLogSummaryAggregates(
   const supabase = getSupabaseAdminClient();
   const range = resolveLogRange(options);
   const { sizeMs } = getBucketSizeMs(range.durationMs);
-  const { data, error } = await supabase.rpc('get_admin_logs_summary', {
+  const { data, error } = await supabase.rpc('get_admin_logs_summary_scoped', {
     input_start: range.start,
     input_end: range.end,
     input_bucket_ms: sizeMs,
+    input_allowed_groups: access.readGroups,
+    input_include_pii: access.includePii,
   });
 
   if (error) {
     const missingFunction =
       error.message.includes('Could not find the function') ||
-      error.message.includes('get_admin_logs_summary');
+      error.message.includes('get_admin_logs_summary_scoped');
     if (!missingFunction) {
       console.error('[log-insights] admin logs summary rpc failed', error.message);
     }
@@ -541,11 +546,12 @@ export async function loadAdminLogNormalizedPage(
   config: {
     page: number;
     pageSize: number;
+    access: AdminLogsAccessCapabilities;
   },
 ) {
   const supabase = getSupabaseAdminClient();
   const range = resolveLogRange(options);
-  const { data, error } = await supabase.rpc('get_admin_logs_page', {
+  const { data, error } = await supabase.rpc('get_admin_logs_page_scoped', {
     input_start: range.start,
     input_end: range.end,
     input_page: config.page,
@@ -555,10 +561,12 @@ export async function loadAdminLogNormalizedPage(
     input_name: options.name ?? 'all',
     input_actor: options.actor ?? 'all',
     input_status: options.status ?? 'all',
+    input_allowed_groups: config.access.readGroups,
+    input_include_pii: config.access.includePii,
   });
 
   if (error) {
-    console.error('[log-insights] admin logs page rpc failed', error.message);
+    console.error('[log-insights] scoped admin logs page rpc failed', error.message);
     return {
       range,
       productRows: [] as ProductLogRow[],
@@ -605,6 +613,7 @@ export async function loadAdminLogNormalizedPage(
     .filter((row) => row.group_name === 'audit')
     .map((row) => ({
       id: row.id,
+      actor_type: (row.actor_type ?? 'admin') as AdminAuditLogRow['actor_type'],
       actor_id: row.actor_id,
       action: row.name,
       path: row.path,
@@ -722,7 +731,7 @@ export async function loadAdminLogListPage(
     const { data, error, count } = await supabase
       .from('admin_audit_logs')
       .select(
-        'id,actor_id,action,path,target_type,target_id,properties,ip_address,created_at',
+        'id,actor_type,actor_id,action,path,target_type,target_id,properties,ip_address,created_at',
         { count: 'exact' },
       )
       .gte('created_at', range.start)
@@ -746,6 +755,7 @@ export async function loadAdminLogListPage(
 
     const auditRows = ((data ?? []) as AdminAuditLogRow[]).map((row) => ({
       ...row,
+      actor_type: row.actor_type ?? 'admin',
       target_type: row.target_type ?? null,
       target_id: row.target_id ?? null,
       properties: row.properties ?? null,

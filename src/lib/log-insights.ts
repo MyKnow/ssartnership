@@ -1,6 +1,6 @@
 import { createAdminLogsCsvStream } from './log-insights/csv';
+import { applyAdminLogsPrivacy } from './log-insights/privacy';
 import {
-  loadAdminLogListPage,
   loadAdminLogNormalizedPage,
   loadAdminLogRows,
   loadAdminLogSummaryAggregates,
@@ -24,6 +24,7 @@ import { getLogLabel } from '@/components/admin/logs/utils';
 import type { GroupFilter } from '@/components/admin/logs/types';
 import type {
   AdminLogsAggregateData,
+  AdminLogsAccessCapabilities,
   AdminAuditLogRecord,
   AdminLogsLoadedData,
   AdminLogsFilterMeta,
@@ -42,6 +43,7 @@ import {
 } from './log-insights/shared';
 
 export type {
+  AdminLogsAccessCapabilities,
   AdminAuditLogRecord,
   AdminLogsLoadedData,
   AdminLogsPageData,
@@ -57,6 +59,7 @@ export type {
   ProductLogRecord,
   ProductLogRow,
   ResolvedLogRange,
+  UnifiedCsvRow,
 } from './log-insights/shared';
 export { iterateAdminLogsCsvRows } from './log-insights/csv';
 export { resolveLogRange } from './log-insights/range';
@@ -182,17 +185,6 @@ function buildAggregateFilters(
   };
 }
 
-function canUseMergedNewestList(options: GetAdminLogsPageDataOptions) {
-  return (
-    !options.search?.trim() &&
-    (!options.group || options.group === 'all') &&
-    (!options.name || options.name === 'all') &&
-    (!options.actor || options.actor === 'all') &&
-    (!options.status || options.status === 'all') &&
-    (!options.sort || options.sort === 'newest')
-  );
-}
-
 function mergePartialFailureStates(
   primary: AdminLogsLoadedData['partialFailure'],
   secondary?: AdminLogsLoadedData['partialFailure'],
@@ -217,6 +209,7 @@ function mergePartialFailureStates(
 
 function buildAdminLogsPageDataFromRows({
   options,
+  access,
   page,
   pageSize,
   summaryData,
@@ -225,6 +218,7 @@ function buildAdminLogsPageDataFromRows({
   useSplitLoading,
 }: {
   options: GetAdminLogsPageDataOptions;
+  access: AdminLogsAccessCapabilities;
   page: number;
   pageSize: number;
   summaryData: AdminLogsLoadedData;
@@ -340,6 +334,7 @@ function buildAdminLogsPageDataFromRows({
   const securityIds = new Set(pageItems.filter((log) => log.group === 'security').map((log) => log.id));
 
   return {
+    access,
     range: summaryData.range,
     counts: {
       product: productLogs.length,
@@ -389,6 +384,7 @@ export function shouldUseDbPagedAdminLogList(
 
 export async function getAdminLogsPageData(
   options: GetAdminLogsPageDataOptions = {},
+  access: AdminLogsAccessCapabilities,
 ): Promise<AdminLogsPageData> {
   const page = parsePage(options.page);
   const pageSize = parsePageSize(options.pageSize);
@@ -396,38 +392,28 @@ export async function getAdminLogsPageData(
   const useDbPagedList = shouldUseDbPagedAdminLogList(options, page, pageSize);
 
   if (useDbPagedList) {
-    const useMergedNewestList = canUseMergedNewestList(options);
     const [summaryAggregateData, listSourceData] = await Promise.all([
-      loadAdminLogSummaryAggregates(options),
-      useMergedNewestList
-        ? loadAdminLogRows(options, ['product', 'audit', 'security'], {
-            maxRowsPerGroup: page * pageSize,
-          })
-        : options.group === 'product' || options.group === 'audit' || options.group === 'security'
-        ? loadAdminLogListPage(options, {
-            group: options.group as LogGroup,
-            page,
-            pageSize,
-            status: options.status,
-          })
-        : loadAdminLogNormalizedPage(options, {
-            page,
-            pageSize,
-        }),
+      loadAdminLogSummaryAggregates(options, access),
+      loadAdminLogNormalizedPage(options, {
+        page,
+        pageSize,
+        access,
+      }),
     ]);
     if (summaryAggregateData.unavailable) {
-      const fallbackData = await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+      const fallbackData = await loadAdminLogRows(options, access.readGroups, {
         maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
       });
-      return buildAdminLogsPageDataFromRows({
+      return applyAdminLogsPrivacy(buildAdminLogsPageDataFromRows({
         options,
+        access,
         page,
         pageSize,
         summaryData: fallbackData,
         listSourceData: fallbackData,
         useDbPagedList: false,
         useSplitLoading: false,
-      });
+      }));
     }
     const { range, aggregate } = summaryAggregateData;
     const listProductLogs: ProductLogRecord[] = listSourceData.productRows.map((row) => ({
@@ -470,19 +456,16 @@ export async function getAdminLogsPageData(
           : 'all',
       sortFilter: 'newest',
     });
-    const pageItems = useMergedNewestList
-      ? filteredList.slice((page - 1) * pageSize, page * pageSize)
-      : filteredList;
+    const pageItems = filteredList;
     const productIds = new Set(pageItems.filter((log) => log.group === 'product').map((log) => log.id));
     const auditIds = new Set(pageItems.filter((log) => log.group === 'audit').map((log) => log.id));
     const securityIds = new Set(pageItems.filter((log) => log.group === 'security').map((log) => log.id));
-    const listTotal = useMergedNewestList
-      ? aggregate.counts.product + aggregate.counts.audit + aggregate.counts.security
-      : 'total' in listSourceData
-        ? listSourceData.total
-        : filteredList.length;
+    const listTotal = 'total' in listSourceData
+      ? listSourceData.total
+      : filteredList.length;
 
-    return {
+    return applyAdminLogsPrivacy({
+      access,
       range,
       counts: aggregate.counts,
       truncated: {
@@ -519,46 +502,33 @@ export async function getAdminLogsPageData(
         page,
         pageSize,
       },
-    };
+    });
   }
 
   const partnerPortalOnly = options.group === 'partner';
   const summaryData = useSplitLoading
-    ? await loadAdminLogSummaryRows(options, ['product', 'audit', 'security'])
-    : await loadAdminLogRows(options, ['product', 'audit', 'security'], {
+    ? await loadAdminLogSummaryRows(options, access.readGroups)
+    : await loadAdminLogRows(options, access.readGroups, {
         maxRowsPerGroup: PAGE_MAX_LOG_ROWS_PER_GROUP,
         partnerPortalOnly,
       });
-  const listSourceData = useDbPagedList
-    ? (
-      options.group === 'product' || options.group === 'audit' || options.group === 'security'
-        ? await loadAdminLogListPage(options, {
-            group: options.group as LogGroup,
-            page,
-            pageSize,
-            status: options.status,
-          })
-        : await loadAdminLogNormalizedPage(options, {
-            page,
-            pageSize,
-          })
-    )
-    : useSplitLoading
-      ? await loadAdminLogRows(options, ['product', 'audit', 'security'], {
-          maxRowsPerGroup: page * pageSize,
-          partnerPortalOnly,
-        })
-      : summaryData;
+  const listSourceData = useSplitLoading
+    ? await loadAdminLogRows(options, access.readGroups, {
+        maxRowsPerGroup: page * pageSize,
+        partnerPortalOnly,
+      })
+    : summaryData;
 
-  return buildAdminLogsPageDataFromRows({
+  return applyAdminLogsPrivacy(buildAdminLogsPageDataFromRows({
     options,
+    access,
     page,
     pageSize,
     summaryData,
     listSourceData,
     useDbPagedList,
     useSplitLoading,
-  });
+  }));
 }
 
 export async function exportAdminLogsCsv(options: CsvExportOptions = {}) {
@@ -574,6 +544,9 @@ export async function exportAdminLogsCsv(options: CsvExportOptions = {}) {
       'admin-logs-' +
       new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-') +
       '.csv',
-    stream: createAdminLogsCsvStream(data, groups),
+    stream: createAdminLogsCsvStream(data, groups, {
+      includePii: options.includePii ?? false,
+    }),
+    data,
   };
 }

@@ -224,7 +224,7 @@ export function scheduleProductEventLog(input: ProductLogInput) {
 export async function logAdminAudit(input: AdminAuditInput) {
   const adminSession = await getAdminSession();
   const actorId = input.actorId ?? adminSession?.adminId ?? 'system';
-  await insertLog('admin_audit_logs', {
+  return insertLog('admin_audit_logs', {
     actor_type: input.actorType ?? (actorId === 'system' ? 'system' : 'admin'),
     actor_id: actorId,
     action: input.action,

@@ -9,9 +9,15 @@ import type {
 } from './shared';
 import { ADMIN_LOGS_CSV_HEADER, uniqueLogGroups } from './shared';
 import { resolveActorMeta } from './data';
+import { maskUnifiedCsvRow } from './privacy';
+
+function normalizeCsvText(value: string) {
+  const normalized = value.replace(/\u0000/g, '').replace(/[\r\n]+/g, ' ');
+  return /^[\s\t]*[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
+}
 
 function escapeCsvValue(value: string) {
-  return `"${value.replace(/"/g, '""')}"`;
+  return `"${normalizeCsvText(value).replace(/"/g, '""')}"`;
 }
 
 function toCsvCell(value: unknown) {
@@ -27,7 +33,7 @@ function toCsvCell(value: unknown) {
   return escapeCsvValue(JSON.stringify(value));
 }
 
-function toCsvLine(row: UnifiedCsvRow) {
+export function serializeAdminLogsCsvRow(row: UnifiedCsvRow) {
   return [
     row.group,
     row.action,
@@ -78,7 +84,7 @@ function buildAuditCsvRow(log: AdminAuditLogRow): UnifiedCsvRow {
     group: 'audit',
     action: String(log.action),
     status: null,
-    actorType: 'admin',
+    actorType: log.actor_type ?? 'admin',
     actorName: null,
     actorMmUsername: null,
     actorId: log.actor_id,
@@ -161,6 +167,7 @@ function createCsvRowSources(
 export function* iterateAdminLogsCsvRows(
   data: AdminLogsLoadedData,
   groups: LogGroup[],
+  options: { includePii?: boolean } = {},
 ): Generator<UnifiedCsvRow> {
   const sources = createCsvRowSources(data, groups);
 
@@ -199,7 +206,7 @@ export function* iterateAdminLogsCsvRows(
       return;
     }
 
-    yield source.toCsvRow(row);
+    yield maskUnifiedCsvRow(source.toCsvRow(row), options.includePii ?? true);
     source.index += 1;
   }
 }
@@ -207,9 +214,10 @@ export function* iterateAdminLogsCsvRows(
 export function createAdminLogsCsvStream(
   data: AdminLogsLoadedData,
   groups: LogGroup[],
+  options: { includePii?: boolean } = {},
 ) {
   const encoder = new TextEncoder();
-  const csvRows = iterateAdminLogsCsvRows(data, groups);
+  const csvRows = iterateAdminLogsCsvRows(data, groups, options);
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -218,7 +226,7 @@ export function createAdminLogsCsvStream(
 
         const buffer: string[] = [];
         for (const row of csvRows) {
-          buffer.push(toCsvLine(row));
+          buffer.push(serializeAdminLogsCsvRow(row));
           if (buffer.length >= 100) {
             controller.enqueue(encoder.encode(`${buffer.join('\n')}\n`));
             buffer.length = 0;

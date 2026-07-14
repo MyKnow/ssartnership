@@ -31,6 +31,8 @@ export function AdminLogsExplorer({
   sortFilter,
   availableNames,
   actorOptions,
+  readGroups,
+  includePii,
   onSearchChange,
   onGroupFilterChange,
   onNameFilterChange,
@@ -58,6 +60,8 @@ export function AdminLogsExplorer({
   sortFilter: SortFilter;
   availableNames: Array<{ value: string; label: string }>;
   actorOptions: string[];
+  readGroups: Array<'product' | 'audit' | 'security'>;
+  includePii: boolean;
   onSearchChange: (value: string) => void;
   onGroupFilterChange: (value: GroupFilter) => void;
   onNameFilterChange: (value: string) => void;
@@ -145,7 +149,7 @@ export function AdminLogsExplorer({
               <Input
                 value={searchValue}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="회원명, @MM 아이디, IP, 경로, 대상, 속성으로 검색"
+                placeholder={includePii ? '회원명, @MM 아이디, IP, 경로, 대상, 속성으로 검색' : '행위, 상태, 대상 유형으로 검색'}
               />
             </label>
             <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -155,10 +159,10 @@ export function AdminLogsExplorer({
                 onChange={(event) => onGroupFilterChange(event.target.value as GroupFilter)}
               >
                 <option value="all">전체</option>
-                <option value="product">사용자</option>
-                <option value="audit">관리자</option>
-                <option value="security">보안</option>
-                <option value="partner">파트너 포털</option>
+                {readGroups.includes('product') ? <option value="product">사용자</option> : null}
+                {readGroups.includes('audit') ? <option value="audit">관리자</option> : null}
+                {readGroups.includes('security') ? <option value="security">보안</option> : null}
+                {readGroups.length > 0 ? <option value="partner">파트너 포털</option> : null}
               </Select>
             </label>
             <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -206,8 +210,8 @@ export function AdminLogsExplorer({
               >
                 <option value="newest">최신순</option>
                 <option value="oldest">오래된순</option>
-                <option value="actor">회원명/MM 아이디순</option>
-                <option value="ip">IP순</option>
+                {includePii ? <option value="actor">회원명/MM 아이디순</option> : null}
+                {includePii ? <option value="ip">IP순</option> : null}
               </Select>
             </label>
           </div>
@@ -293,7 +297,9 @@ export function AdminLogsExplorer({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeading
               title="로그 탐색기"
-              description="회원명, MM 아이디, IP, 경로, 속성까지 포함해 검색하고 정렬·필터링할 수 있습니다."
+              description={includePii
+                ? '회원명, MM 아이디, IP, 경로, 속성까지 포함해 검색하고 정렬·필터링할 수 있습니다.'
+                : '식별 정보와 경로는 마스킹된 상태로 행위, 상태, 대상 유형을 검색·필터링할 수 있습니다.'}
             />
             <Badge className="w-fit bg-surface text-muted-foreground">
               필터 결과 {filteredTotal.toLocaleString()}건 / 전체{' '}
@@ -311,7 +317,9 @@ export function AdminLogsExplorer({
           </Card>
         ) : (
           filteredLogs.map((log) => {
-            const propertyEntries = getPropertyEntries(log.properties).slice(0, 8);
+            const propertyEntries = includePii
+              ? getPropertyEntries(log.properties).slice(0, 8)
+              : [];
             return (
               <Card
                 key={`${log.group}-${log.id}`}
@@ -345,23 +353,23 @@ export function AdminLogsExplorer({
                       {log.actorType ? (
                         <span className="max-w-full text-token">주체: {log.actorType}</span>
                       ) : null}
-                      {renderActorLink(log)}
-                      {log.identifier && !log.actorMmUsername ? (
+                      {includePii ? renderActorLink(log) : null}
+                      {includePii && log.identifier && !log.actorMmUsername ? (
                         <span className="max-w-full text-token">입력 ID: {log.identifier}</span>
                       ) : null}
-                      {log.actorId ? (
+                      {includePii && log.actorId ? (
                         <span className="max-w-full text-token">내부 ID: {log.actorId}</span>
                       ) : null}
-                      {log.ipAddress ? (
+                      {includePii && log.ipAddress ? (
                         <span className="max-w-full text-token">IP: {log.ipAddress}</span>
                       ) : null}
-                      {log.path ? (
+                      {includePii && log.path ? (
                         <span className="max-w-full text-token">경로: {log.path}</span>
                       ) : null}
                       {log.targetType ? (
                         <span className="max-w-full text-token">대상: {log.targetType}</span>
                       ) : null}
-                      {log.targetId ? (
+                      {includePii && log.targetId ? (
                         <span className="max-w-full text-token">대상 ID: {log.targetId}</span>
                       ) : null}
                       {renderPartnerLink(log)}
@@ -407,36 +415,40 @@ export function AdminLogsExplorer({
                           {log.name}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>주체</span>
-                        <span className="max-w-full text-token text-right font-medium text-foreground">
-                          {log.actorType === 'member' && log.actorId ? (
-                            <Link
-                              href={`/admin/members/${log.actorId}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              prefetch={false}
-                              className="text-primary hover:underline"
-                            >
-                              {log.actorSearchLabel}
-                            </Link>
-                          ) : (
-                            log.actorSearchLabel
-                          )}
-                        </span>
-                      </div>
+                      {includePii ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <span>주체</span>
+                          <span className="max-w-full text-token text-right font-medium text-foreground">
+                            {log.actorType === 'member' && log.actorId ? (
+                              <Link
+                                href={`/admin/members/${log.actorId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                prefetch={false}
+                                className="text-primary hover:underline"
+                              >
+                                {log.actorSearchLabel}
+                              </Link>
+                            ) : (
+                              log.actorSearchLabel
+                            )}
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center justify-between gap-3">
                         <span>상태</span>
                         <span className="font-medium text-foreground">
                           {log.status ?? '-'}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>경로</span>
-                        <span className="max-w-full text-token font-medium text-foreground">
-                          {log.path ?? '-'}
-                        </span>
-                      </div>
+                      {includePii ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <span>경로</span>
+                          <span className="max-w-full text-token font-medium text-foreground">
+                            {log.path ?? '-'}
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center justify-between gap-3">
                         <span>대상</span>
                         <span className="max-w-full text-token font-medium text-foreground">
@@ -446,7 +458,7 @@ export function AdminLogsExplorer({
                       <div className="flex items-center justify-between gap-3">
                         <span>대상 ID</span>
                         <span className="max-w-full text-token font-medium text-foreground">
-                          {log.targetId ?? '-'}
+                          {includePii ? log.targetId ?? '-' : '-'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
@@ -474,14 +486,14 @@ export function AdminLogsExplorer({
                         </span>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-border bg-surface-muted p-3">
+                    {includePii ? <div className="rounded-2xl border border-border bg-surface-muted p-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         properties
                       </p>
                       <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground">
                         {JSON.stringify(log.properties ?? {}, null, 2)}
                       </pre>
-                    </div>
+                    </div> : null}
                   </div>
                 </details>
               </Card>
