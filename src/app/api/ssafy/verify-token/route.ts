@@ -206,6 +206,22 @@ export async function POST(request: Request) {
       mattermostUserId: verified.claims.mattermostUserId,
     });
 
+    if (memberResult.ok && memberResult.member.mattermost_login_disabled_at) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_ssafy_verify",
+        status: "blocked",
+        actorType: "member",
+        actorId: memberResult.member.id,
+        identifier: verified.claims.sub,
+        properties: { reason: "mattermost_login_disabled" },
+      });
+      await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, false);
+      await delayMemberAuthAttempt("ssafy-verify");
+      await clearSsafySignupSession();
+      return publicError("MM_EMAIL_LOGIN_REQUIRED", null, 409);
+    }
+
     if (memberResult.ok) {
       const updateResult = await updateMemberSsafyVerification(
         supabase,
@@ -241,6 +257,10 @@ export async function POST(request: Request) {
       await setUserSession(
         memberResult.member.id,
         Boolean(memberResult.member.must_change_password),
+        {
+          authenticationMethod: "ssafy",
+          freshAuthentication: true,
+        },
       );
       await clearSsafySignupSession();
       await recordMemberAuthAttempt("ssafy-verify", verifiedThrottleContext, true);

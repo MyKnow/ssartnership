@@ -21,12 +21,49 @@ type PolicyConsentSnapshot = {
 
 type SignedUserSession = {
   userId: string;
+  authSessionVersion: number;
+  authenticationMethod: UserSessionAuthenticationMethod;
   issuedAt: number;
   expiresAt: number;
   mustChangePassword?: boolean;
   persistent?: boolean;
   policyConsentSnapshot?: PolicyConsentSnapshot | null;
 };
+
+export type UserSessionAuthenticationMethod =
+  | "email"
+  | "manual"
+  | "mattermost"
+  | "ssafy";
+
+function isUserSessionAuthenticationMethod(
+  value: unknown,
+): value is UserSessionAuthenticationMethod {
+  return value === "email"
+    || value === "manual"
+    || value === "mattermost"
+    || value === "ssafy";
+}
+
+export class UserSessionIssueError extends Error {
+  readonly code:
+    | "member_not_active"
+    | "mattermost_login_disabled"
+    | "stale_session"
+    | "authentication_method_required";
+
+  constructor(
+    code:
+      | "member_not_active"
+      | "mattermost_login_disabled"
+      | "stale_session"
+      | "authentication_method_required",
+  ) {
+    super(code);
+    this.name = "UserSessionIssueError";
+    this.code = code;
+  }
+}
 
 function getSecret() {
   const secret = process.env.USER_SESSION_SECRET;
@@ -61,6 +98,10 @@ function verifyToken(token: string) {
     const parsed = JSON.parse(payload) as SignedUserSession;
     if (
       typeof parsed.userId !== "string" ||
+      typeof parsed.authSessionVersion !== "number" ||
+      !Number.isInteger(parsed.authSessionVersion) ||
+      parsed.authSessionVersion < 1 ||
+      !isUserSessionAuthenticationMethod(parsed.authenticationMethod) ||
       typeof parsed.issuedAt !== "number" ||
       typeof parsed.expiresAt !== "number"
     ) {
@@ -115,11 +156,13 @@ export async function getSignedUserSession() {
     const supabase = getSupabaseAdminClient();
     const { data } = await supabase
       .from("members")
-      .select("id")
+      .select("id,auth_session_version")
       .eq("id", session.userId)
       .is("deleted_at", null)
       .maybeSingle();
-    return data?.id ? session : null;
+    return data?.id && data.auth_session_version === session.authSessionVersion
+      ? session
+      : null;
   } catch {
     return null;
   }
@@ -133,10 +176,43 @@ export async function setUserSession(
   options?: {
     policyConsentSnapshot?: PolicyConsentSnapshot | null;
     persistent?: boolean;
+    authenticationMethod?: UserSessionAuthenticationMethod;
+    freshAuthentication?: boolean;
   },
 ) {
-  const now = Date.now();
+  const supabase = getSupabaseAdminClient();
   const currentSession = (await getRawSignedUserSession()) as SignedUserSession | null;
+  const { data: member } = await supabase
+    .from("members")
+    .select("id,auth_session_version,mattermost_login_disabled_at")
+    .eq("id", userId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!member?.id || !Number.isInteger(member.auth_session_version)) {
+    throw new UserSessionIssueError("member_not_active");
+  }
+  const authenticationMethod = options?.authenticationMethod
+    ?? (currentSession?.userId === userId
+      ? currentSession.authenticationMethod
+      : null);
+  if (!authenticationMethod) {
+    throw new UserSessionIssueError("authentication_method_required");
+  }
+  if (
+    (authenticationMethod === "mattermost" || authenticationMethod === "ssafy")
+    && member.mattermost_login_disabled_at
+  ) {
+    throw new UserSessionIssueError("mattermost_login_disabled");
+  }
+  if (
+    currentSession?.userId === userId
+    && currentSession.authSessionVersion !== member.auth_session_version
+    && !options?.freshAuthentication
+  ) {
+    throw new UserSessionIssueError("stale_session");
+  }
+
+  const now = Date.now();
   const resolvedPolicyConsentSnapshot =
     options?.policyConsentSnapshot !== undefined
       ? options.policyConsentSnapshot
@@ -146,6 +222,8 @@ export async function setUserSession(
   const persistent = options?.persistent ?? currentSession?.persistent ?? true;
   const payload = JSON.stringify({
     userId,
+    authSessionVersion: member.auth_session_version,
+    authenticationMethod,
     mustChangePassword,
     persistent,
     issuedAt: now,

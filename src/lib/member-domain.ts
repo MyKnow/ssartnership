@@ -34,7 +34,6 @@ export type MemberIdentifierReservationInput = {
 
 type MemberProfileState = {
   displayName: string | null;
-  campus: string | null;
   mmUsername: string | null;
 };
 
@@ -89,15 +88,11 @@ export function buildMattermostProfileSyncPatch(
 ) {
   const memberPatch: Record<string, string | null> = {};
   const mattermostPatch: Record<string, string> = {};
-  const changedFields: Array<"displayName" | "campus" | "mmUsername"> = [];
+  const changedFields: Array<"displayName" | "mmUsername"> = [];
 
   if (member.displayName !== snapshot.displayName) {
     memberPatch.display_name = snapshot.displayName;
     changedFields.push("displayName");
-  }
-  if (member.campus !== snapshot.campus) {
-    memberPatch.campus = snapshot.campus;
-    changedFields.push("campus");
   }
   if (member.mmUsername !== snapshot.mmUsername) {
     mattermostPatch.mm_username = snapshot.mmUsername;

@@ -38,19 +38,23 @@ export async function POST(request: Request) {
   }
   try {
     const record = hashPassword(password);
-    const memberId = await completeManualMemberPasswordAction({
+    const completion = await completeManualMemberPasswordAction({
       token,
       passwordHash: record.hash,
       passwordSalt: record.salt,
     });
-    if (!memberId) {
+    if (!completion) {
       await recordMemberAuthAttempt("manual-password-action", throttle, false);
       await delayMemberAuthAttempt("manual-password-action");
       return NextResponse.json({ ok: false, message: "비밀번호 설정 링크가 만료되었거나 이미 사용되었습니다." }, { status: 400 });
     }
-    await setUserSession(memberId, false, { persistent: true });
+    await setUserSession(completion.memberId, false, {
+      persistent: true,
+      authenticationMethod: completion.deliveryChannel === "mattermost" ? "mattermost" : "email",
+      freshAuthentication: true,
+    });
     await recordMemberAuthAttempt("manual-password-action", throttle, true);
-    await logAuthSecurity({ ...context, eventName: "member_password_reset_complete", status: "success", actorType: "member", actorId: memberId, properties: { purpose: "manual_initial_or_reset" } });
+    await logAuthSecurity({ ...context, eventName: "member_password_reset_complete", status: "success", actorType: "member", actorId: completion.memberId, properties: { purpose: "member_password_action", deliveryChannel: completion.deliveryChannel } });
     return NextResponse.json({ ok: true });
   } catch {
     await recordMemberAuthAttempt("manual-password-action", throttle, false);

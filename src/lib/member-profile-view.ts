@@ -13,6 +13,8 @@ type MemberCanonicalRow = {
   manual_login_id: string | null;
   email: string | null;
   email_verified_at: string | null;
+  mattermost_login_disabled_at: string | null;
+  mattermost_login_disabled_reason: string | null;
 };
 
 type MemberDirectoryRow = {
@@ -38,6 +40,8 @@ export type MemberCanonicalProfile = {
   manualLoginId: string | null;
   email: string | null;
   emailVerifiedAt: string | null;
+  mattermostLoginDisabledAt: string | null;
+  mattermostLoginDisabledReason: string | null;
   activeProfileImageId: string | null;
   profilePhotoReviewStatus: "missing" | "approved" | "pending" | "rejected";
   graduateVerifiedAt: string | null;
@@ -50,7 +54,7 @@ export async function getMemberCanonicalProfile(
   const { data: memberData, error: memberError } = await supabase
     .from("members")
     .select(
-      "id,display_name,generation,campus,must_change_password,created_at,updated_at,mattermost_account_id,manual_login_id,email,email_verified_at",
+      "id,display_name,generation,campus,must_change_password,created_at,updated_at,mattermost_account_id,manual_login_id,email,email_verified_at,mattermost_login_disabled_at,mattermost_login_disabled_reason",
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -102,6 +106,8 @@ export async function getMemberCanonicalProfile(
     manualLoginId: member.manual_login_id,
     email: member.email,
     emailVerifiedAt: member.email_verified_at,
+    mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
+    mattermostLoginDisabledReason: member.mattermost_login_disabled_reason,
     activeProfileImageId: photoState.activeProfileImageId,
     profilePhotoReviewStatus: photoState.reviewStatus,
     graduateVerifiedAt: graduateProfile?.verified_at ?? null,

@@ -109,6 +109,9 @@ export function normalizeSsafyVerifyCallbackFailure(
 }
 
 export function getSsafyVerifyClientErrorMessage(errorCode: string) {
+  if (errorCode === "MM_EMAIL_LOGIN_REQUIRED") {
+    return "MM 로그인이 중단된 계정입니다. 이메일과 비밀번호로 로그인해 주세요. 이메일 설정이 필요하면 관리자에게 문의해 주세요.";
+  }
   if (errorCode === "MEMBER_NOT_FOUND") {
     return "SSAFY 인증과 연결된 회원 계정을 찾지 못했습니다.";
   }
