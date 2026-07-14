@@ -1,5 +1,4 @@
 import AdminShell from "@/components/admin/AdminShell";
-import AdminMemberDirectCreatePanel from "@/components/admin/AdminMemberDirectCreatePanel";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
 import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
@@ -12,7 +11,6 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import {
   backfillMemberProfiles,
-  createDirectMember,
   disableGenerationMattermostLogin,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
@@ -853,16 +851,6 @@ export default async function AdminMembersPage({
               mmLookupGenerations={getConfiguredManualMemberMmLookupGenerations(cycleSettings)}
               canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
             />
-          </Card>
-        </section>
-
-        <section className="grid min-w-0 gap-4">
-          <AdminSectionHeading
-            title="직접 계정 생성"
-            description="외부 인증 없이 로그인 가능한 회원 계정을 만들고 첫 로그인에 비밀번호 변경을 요구합니다."
-          />
-          <Card tone="elevated">
-            <AdminMemberDirectCreatePanel action={createDirectMember} />
           </Card>
         </section>
 
