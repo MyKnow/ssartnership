@@ -64,6 +64,7 @@ export type SsafyCycleSettings = SsafyYearRule & {
   manualCurrentYear: number | null;
   manualReason: string | null;
   manualAppliedAt: string | null;
+  manualMemberMmLookupGenerations: number[];
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -95,6 +96,7 @@ const DEFAULT_SSAFY_CYCLE_SETTINGS: SsafyCycleSettings = {
   manualCurrentYear: null,
   manualReason: null,
   manualAppliedAt: null,
+  manualMemberMmLookupGenerations: [14, 15],
   createdAt: null,
   updatedAt: null,
 };
@@ -126,6 +128,14 @@ function normalizeNullableNumber(
     return null;
   }
   return value;
+}
+
+function normalizeGenerationList(value: unknown, fallback: number[]) {
+  if (!Array.isArray(value)) return [...fallback];
+  const generations = value
+    .filter((item): item is number => typeof item === "number" && Number.isInteger(item))
+    .filter((item) => item >= 1 && item <= 99);
+  return [...new Set(generations)].toSorted((left, right) => left - right);
 }
 
 function wrapSsafyCycleSettingsError(
@@ -167,6 +177,10 @@ export function normalizeSsafyCycleSettings(
       typeof raw.manual_applied_at === "string" && raw.manual_applied_at.trim()
         ? raw.manual_applied_at.trim()
         : null,
+    manualMemberMmLookupGenerations: normalizeGenerationList(
+      raw.manual_member_mm_lookup_generations,
+      DEFAULT_SSAFY_CYCLE_SETTINGS.manualMemberMmLookupGenerations,
+    ),
     createdAt:
       typeof raw.created_at === "string" && raw.created_at.trim()
         ? raw.created_at.trim()
@@ -183,7 +197,7 @@ export async function getSsafyCycleSettings() {
   const { data, error } = await supabase
     .from("ssafy_cycle_settings")
     .select(
-      "anchor_year,anchor_calendar_year,anchor_month,manual_current_year,manual_reason,manual_applied_at,created_at,updated_at",
+      "anchor_year,anchor_calendar_year,anchor_month,manual_current_year,manual_reason,manual_applied_at,manual_member_mm_lookup_generations,created_at,updated_at",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -233,6 +247,14 @@ export function getConfiguredBackfillableSsafyYears(
   return [0, ...getConfiguredSelectableSsafyYears(settings, now)];
 }
 
+export function getConfiguredManualMemberMmLookupGenerations(
+  settings: SsafyCycleSettings,
+) {
+  return [...settings.manualMemberMmLookupGenerations].toSorted(
+    (left, right) => right - left,
+  );
+}
+
 export function getSsafyCycleOverview(
   settings: SsafyCycleSettings,
   now: Date = new Date(),
@@ -264,6 +286,7 @@ export async function upsertSsafyCycleSettings(input: {
   anchorYear: number;
   anchorCalendarYear: number;
   anchorMonth: number;
+  manualMemberMmLookupGenerations?: number[];
 }) {
   const supabase = await loadSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -273,6 +296,14 @@ export async function upsertSsafyCycleSettings(input: {
       anchor_year: input.anchorYear,
       anchor_calendar_year: input.anchorCalendarYear,
       anchor_month: input.anchorMonth,
+      ...(input.manualMemberMmLookupGenerations
+        ? {
+            manual_member_mm_lookup_generations: normalizeGenerationList(
+              input.manualMemberMmLookupGenerations,
+              DEFAULT_SSAFY_CYCLE_SETTINGS.manualMemberMmLookupGenerations,
+            ),
+          }
+        : {}),
       updated_at: now,
     },
     {

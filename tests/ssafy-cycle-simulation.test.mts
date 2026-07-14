@@ -53,6 +53,7 @@ test("configured cycle settings follow early-start overrides", async () => {
     getConfiguredSelectableSsafyYears,
     getConfiguredSignupSsafyYears,
     getConfiguredBackfillableSsafyYears,
+    getConfiguredManualMemberMmLookupGenerations,
     getSsafyCycleOverview,
     normalizeSsafyCycleSettings,
   } = await cycleModulePromise;
@@ -89,4 +90,5 @@ test("configured cycle settings follow early-start overrides", async () => {
   assert.equal(overview.graduateThresholdYear, 17);
   assert.equal(overview.nextSemesterStartLabel, "2028년 1월 1일");
   assert.equal(overview.nextCohortStartLabel, "2028년 7월 1일");
+  assert.deepStrictEqual(getConfiguredManualMemberMmLookupGenerations(settings), [15, 14]);
 });

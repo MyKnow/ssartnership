@@ -984,6 +984,36 @@ const mockStorybookScenarioCoverageBase = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
+    routePath: "/auth/member/setup",
+    scenarioId: "auth.manual-member-password-setup",
+    storyId: "screens-auth-manualmemberpasswordsetup--default",
+    storyFile:
+      "src/components/member-manual-import/ManualMemberPasswordSetupView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "ManualMemberPasswordSetupView",
+    coveredStateKeys: [
+      "default",
+      "validation-error",
+      "success",
+      "long-korean",
+      "mobile-overflow",
+      "async-pending",
+      "setup-token",
+    ],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/auth/member/setup",
+    scenarioId: "auth.manual-member-password-setup",
+    storyId: "screens-auth-manualmemberpasswordsetup--missing-token",
+    storyFile:
+      "src/components/member-manual-import/ManualMemberPasswordSetupView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "ManualMemberPasswordSetupView",
+    coveredStateKeys: ["expired"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
     routePath: "/certification/photo",
     scenarioId: "public.certification.graduate-photo",
     storyId: "screens-member-graduateprofilephotoform--default",

@@ -59,6 +59,7 @@ test("member and partner auth key helpers delegate to the common scoped rate-lim
       "reset-password:account:adminuser",
       "ssafy-reset-password:account:adminuser",
       "change-password:account:adminuser",
+      "manual-password-action:account:adminuser",
       "ssafy-verify:account:adminuser",
     ],
   );

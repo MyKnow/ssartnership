@@ -210,6 +210,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["auth.graduate-password-setup"],
   },
   {
+    routePath: "/auth/member/setup",
+    surface: "auth",
+    authScope: "setup-token",
+    viewComponent: "ManualMemberPasswordSetupView",
+    dataSources: ["api-route", "storybook"],
+    requiredScenarioIds: ["auth.manual-member-password-setup"],
+  },
+  {
     routePath: "/auth/signup/complete",
     surface: "auth",
     authScope: "public",
@@ -705,6 +713,11 @@ const routeContracts = {
     routeKind: "conditional",
     screenContractId: "auth.graduate-password-setup",
     primaryTask: "승인 또는 이메일 재설정 토큰으로 수료생 계정 비밀번호를 설정한다.",
+  },
+  "/auth/member/setup": {
+    routeKind: "conditional",
+    screenContractId: "auth.manual-member-password-setup",
+    primaryTask: "관리자 초대 링크로 비밀번호를 설정하고 본인 사진 제출을 시작한다.",
   },
   "/auth/signup/complete": {
     routeKind: "conditional",

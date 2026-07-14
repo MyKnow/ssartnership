@@ -7,12 +7,6 @@ import {
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
 import {
-  parseManualMemberAddInputList,
-  type ManualMemberAddFormState,
-  type ManualMemberAddYear,
-} from "@/lib/member-manual-add";
-import { provisionManualMembers } from "@/lib/member-manual-add/provision";
-import {
   parseMemberYearValue,
   validateMemberYear,
 } from "@/lib/validation";
@@ -26,7 +20,6 @@ import {
   redirectAdminActionError,
   revalidateMemberPaths,
 } from "./shared-helpers";
-import { revalidatePath } from "next/cache";
 
 export async function backfillMemberProfilesAction() {
   const adminSession = await requireAdminPermission("members", "update", {
@@ -143,95 +136,6 @@ export async function updateMemberAction(formData: FormData) {
   });
   revalidateMemberPaths();
   redirect("/admin/members");
-}
-
-export async function manualAddMembersAction(
-  _prevState: ManualMemberAddFormState,
-  formData: FormData,
-): Promise<ManualMemberAddFormState> {
-  const adminSession = await requireAdminPermission("members", "create", {
-    path: "/admin/members",
-  });
-
-  const requestedYearRaw = String(formData.get("requestedYear") || "").trim();
-  const requestedYear = Number.parseInt(requestedYearRaw, 10) as ManualMemberAddYear;
-  const mmIdsRaw = String(formData.get("mmIds") || "").trim();
-
-  if (![0, 14, 15].includes(requestedYear)) {
-    return {
-      status: "error",
-      message: "기수는 운영진, 14기, 15기 중 하나여야 합니다.",
-      requestedYear: 15,
-      total: 0,
-      success: 0,
-      failed: 0,
-      items: [],
-    };
-  }
-
-  const inputs = parseManualMemberAddInputList(mmIdsRaw);
-  if (inputs.length === 0) {
-    return {
-      status: "error",
-      message: "추가할 MM 아이디를 콤마로 구분해 입력해 주세요.",
-      requestedYear,
-      total: 0,
-      success: 0,
-      failed: 0,
-      items: [],
-    };
-  }
-
-  const context = await getServerActionLogContext("/admin/members");
-  const actorId = adminSession.adminId;
-  const result = await provisionManualMembers(requestedYear, inputs);
-
-  const auditResults = await Promise.allSettled(
-    result.items.map((item) =>
-      logAdminAudit({
-        ...context,
-        action: "member_manual_add",
-        actorId,
-        targetType: "member",
-        targetId: item.memberId ?? item.mmUserId ?? item.username,
-        properties: {
-          requestedYear: result.requestedYear,
-          batchTotal: result.total,
-          batchSuccess: result.success,
-          batchFailed: result.failed,
-          input: item.raw,
-          normalizedUsername: item.username,
-          status: item.status,
-          action: item.action,
-          reason: item.reason,
-          resolvedYear: item.resolvedYear,
-          staffSourceYear: item.staffSourceYear,
-          memberId: item.memberId,
-          mmUserId: item.mmUserId,
-          mmUsername: item.mmUsername,
-          displayName: item.displayName,
-          campus: item.campus,
-        },
-      }),
-    ),
-  );
-  for (const auditResult of auditResults) {
-    if (auditResult.status === "rejected") {
-      console.error("manual member add log failed", auditResult.reason);
-    }
-  }
-
-  revalidateMemberPaths();
-  revalidatePath("/admin/logs");
-
-  return {
-    status: result.failed > 0 ? (result.success > 0 ? "partial" : "error") : "success",
-    message:
-      result.success > 0
-        ? `${result.success}명의 회원을 추가했습니다.`
-        : "추가할 수 있는 회원이 없습니다.",
-    ...result,
-  };
 }
 
 export async function deleteMemberAction(formData: FormData) {
