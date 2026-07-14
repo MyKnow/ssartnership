@@ -165,6 +165,93 @@ test.describe("public partner discovery", () => {
     await expect(page).not.toHaveURL(/campus=seoul/);
   });
 
+  test("updates URL-backed filters without a server component navigation", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto("/?campaign=summer#benefits");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("partner-grid")).toBeVisible();
+
+    const filterRscRequests: string[] = [];
+    const captureFilterRscRequest = (request: import("@playwright/test").Request) => {
+      const url = new URL(request.url());
+      if (
+        request.headers().rsc === "1" &&
+        url.pathname === "/" &&
+        ["category", "campus", "audience"].some((key) =>
+          url.searchParams.has(key),
+        )
+      ) {
+        filterRscRequests.push(request.url());
+      }
+    };
+
+    page.on("request", captureFilterRscRequest);
+    try {
+      const categoryGroup = page.getByRole("group", {
+        name: "제휴처 카테고리",
+      });
+      await page.evaluate(() => {
+        const categoryButton = Array.from(
+          document.querySelectorAll<HTMLButtonElement>(
+            '[role="group"][aria-label="제휴처 카테고리"] button',
+          ),
+        ).find((button) => button.textContent?.trim() === "헬스");
+        const campusFilter = document.querySelector<HTMLSelectElement>(
+          '[data-testid="partner-campus-filter-desktop"]',
+        );
+        const audienceFilter = document.querySelector<HTMLSelectElement>(
+          '[data-testid="partner-audience-filter-desktop"]',
+        );
+
+        if (!categoryButton || !campusFilter || !audienceFilter) {
+          throw new Error("홈 필터 제어를 찾을 수 없습니다.");
+        }
+
+        categoryButton.click();
+        campusFilter.value = "seoul";
+        campusFilter.dispatchEvent(new Event("change", { bubbles: true }));
+        audienceFilter.value = "student";
+        audienceFilter.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+
+      await expect(
+        categoryGroup.getByRole("button", { name: "헬스", exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        page.getByRole("button", { name: "서울 캠퍼스 필터 해제" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "교육생 적용 대상 필터 해제" }),
+      ).toBeVisible();
+
+      await expect.poll(() =>
+        page.evaluate(() => {
+          const url = new URL(window.location.href);
+          return {
+            audience: url.searchParams.get("audience"),
+            campaign: url.searchParams.get("campaign"),
+            campus: url.searchParams.get("campus"),
+            category: url.searchParams.get("category"),
+            hash: url.hash,
+          };
+        }),
+      ).toEqual({
+        audience: "student",
+        campaign: "summer",
+        campus: "seoul",
+        category: "health",
+        hash: "#benefits",
+      });
+
+      await page.waitForTimeout(250);
+      expect(filterRscRequests).toEqual([]);
+    } finally {
+      page.off("request", captureFilterRscRequest);
+    }
+  });
+
   test("lists partners and opens a public partner detail page", async ({ page }) => {
     await page.goto("/");
 

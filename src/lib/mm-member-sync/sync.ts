@@ -6,6 +6,7 @@ import {
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   type MemberSyncBatchResult,
+  type MemberMattermostUnavailableResult,
   type MemberSyncResult,
   wrapMmMemberSyncDbError,
 } from "./shared";
@@ -14,7 +15,6 @@ function buildMemberSyncSummary(result: MemberSyncResult) {
   const labels: Record<MemberSyncResult["changedFields"][number], string> = {
     mmUsername: "MM 아이디",
     displayName: "이름",
-    campus: "캠퍼스",
     track: "트랙",
     avatar: "프로필 사진",
   };
@@ -40,10 +40,13 @@ export function buildMemberSyncLogProperties(
 
 export async function syncMemberById(
   memberId: string,
-): Promise<MemberSyncResult | null> {
+): Promise<MemberSyncResult | MemberMattermostUnavailableResult | null> {
   const result = await syncMemberMattermostProfile(memberId);
   if (!result) {
     return null;
+  }
+  if (!("snapshot" in result)) {
+    return { member: result.member };
   }
 
   return {
@@ -63,6 +66,7 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
     .select("id")
     .in("generation", generations)
     .is("deleted_at", null)
+    .is("mattermost_login_disabled_at", null)
     .order("generation", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) {
@@ -73,6 +77,7 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
     .map((member) => member.id as string | null)
     .filter((memberId): memberId is string => Boolean(memberId));
   const results: MemberSyncResult[] = [];
+  const mattermostUnavailable: MemberMattermostUnavailableResult[] = [];
   const failures: MemberSyncBatchResult["failures"] = [];
 
   for (const memberId of memberIds) {
@@ -84,6 +89,10 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
           mmUserId: null,
           reason: "SSAFY Verify 프로필을 찾을 수 없습니다.",
         });
+        continue;
+      }
+      if (!("snapshot" in result)) {
+        mattermostUnavailable.push(result);
         continue;
       }
       if (result.updated) {
@@ -101,8 +110,9 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
   return {
     checked: memberIds.length,
     updated: results.length,
-    skipped: memberIds.length - results.length - failures.length,
+    skipped: memberIds.length - results.length - failures.length - mattermostUnavailable.length,
     results,
+    mattermostUnavailable,
     failures,
   };
 }

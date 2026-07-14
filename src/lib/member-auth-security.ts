@@ -14,6 +14,7 @@ export type MemberAuthRoute =
   | "reset-password"
   | "ssafy-reset-password"
   | "change-password"
+  | "manual-password-action"
   | "ssafy-verify";
 
 type MemberAuthAttemptContext = {
@@ -26,6 +27,7 @@ const MEMBER_AUTH_ROUTES: MemberAuthRoute[] = [
   "reset-password",
   "ssafy-reset-password",
   "change-password",
+  "manual-password-action",
   "ssafy-verify",
 ];
 
@@ -56,6 +58,10 @@ const MEMBER_AUTH_FAILURE_DELAY_MS: Record<
     max: 700,
   },
   "change-password": {
+    min: 350,
+    max: 700,
+  },
+  "manual-password-action": {
     min: 350,
     max: 700,
   },

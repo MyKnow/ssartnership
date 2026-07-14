@@ -134,6 +134,19 @@ test("member login prioritizes password login and keeps SSAFY Verify as the seco
   assert.ok(signupIndex < verifyIndex);
 });
 
+test("password login completes with a single client router transition", () => {
+  const loginForm = readRepoFile("src/components/auth/LoginForm.tsx");
+  const successTransitionStart = loginForm.indexOf('notify("로그인되었습니다.");');
+  const successTransitionEnd = loginForm.indexOf("    } finally {", successTransitionStart);
+  const successTransition = loginForm.slice(
+    successTransitionStart,
+    successTransitionEnd,
+  );
+
+  assert.match(successTransition, /router\.replace\(nextHref\);/);
+  assert.doesNotMatch(successTransition, /router\.refresh\(\);/);
+});
+
 test("password login resolves Mattermost 아이디 또는 인증된 이메일을 처리하고 자동 로그인 선택을 세션 생성에 전달한다", () => {
   const loginRoute = readRepoFile("src/app/api/auth/login/route.ts");
   const userAuth = readRepoFile("src/lib/user-auth.ts");

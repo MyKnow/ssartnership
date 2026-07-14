@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
+import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { isValidEmail, normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
@@ -119,11 +120,14 @@ export default function LoginForm({
       setFormError(null);
       notify("로그인되었습니다.");
       const safeReturnTo = sanitizeReturnTo(returnTo, "/");
-      const nextHref = data.requiresConsent
-        ? `/auth/consent?returnTo=${encodeURIComponent(safeReturnTo)}`
-        : safeReturnTo;
+      const nextHref =
+        getMemberRequiredGateRedirect({
+          currentPath: "/auth/login",
+          returnTo: safeReturnTo,
+          mustChangePassword: Boolean(data.mustChangePassword),
+          requiresConsent: Boolean(data.requiresConsent),
+        }) ?? safeReturnTo;
       router.replace(nextHref);
-      router.refresh();
     } finally {
       setPending(false);
     }

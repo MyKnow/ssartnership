@@ -159,6 +159,7 @@ export async function handleResetPasswordCompletePost(request: Request) {
       .select("id,generation,campus,updated_at")
       .eq("id", tokenPayload.memberId)
       .eq("mattermost_account_id", directoryEntry.id)
+      .is("mattermost_login_disabled_at", null)
       .is("deleted_at", null)
       .maybeSingle();
     if (memberFetchError || !memberRow) {
@@ -190,16 +191,17 @@ export async function handleResetPasswordCompletePost(request: Request) {
     }
 
     const passwordRecord = hashPassword(nextPassword);
-    const { error } = await supabase
-      .from("members")
-      .update({
-        password_hash: passwordRecord.hash,
-        password_salt: passwordRecord.salt,
-        must_change_password: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", memberRow.id);
-    if (error) {
+    const { data: updatedMemberId, error } = await supabase.rpc(
+      "update_member_mattermost_password_credentials",
+      {
+        p_member_id: memberRow.id,
+        p_expected_mattermost_account_id: directoryEntry.id,
+        p_expected_updated_at: tokenPayload.memberUpdatedAt,
+        p_password_hash: passwordRecord.hash,
+        p_password_salt: passwordRecord.salt,
+      },
+    );
+    if (error || updatedMemberId !== memberRow.id) {
       return failResetPasswordComplete({
         context,
         throttleContext,

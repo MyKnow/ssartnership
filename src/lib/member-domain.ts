@@ -4,9 +4,14 @@ import {
   validateMmUsername,
 } from "@/lib/validation";
 import { createHmacDigest } from "@/lib/hmac.js";
+import {
+  DIRECT_MEMBER_LOGIN_ID_PREFIX,
+  normalizeDirectMemberLoginId,
+} from "@/lib/member-direct-create";
 
 export type MemberLoginIdentifier =
   | { kind: "email"; value: string }
+  | { kind: "manual_login_id"; value: string }
   | { kind: "mattermost_username"; value: string };
 
 export type MattermostProfileSnapshot = {
@@ -29,7 +34,6 @@ export type MemberIdentifierReservationInput = {
 
 type MemberProfileState = {
   displayName: string | null;
-  campus: string | null;
   mmUsername: string | null;
 };
 
@@ -50,6 +54,13 @@ export function classifyMemberLoginIdentifier(value: unknown): MemberLoginIdenti
   const email = normalizeMemberEmail(rawValue);
   if (email) {
     return { kind: "email", value: email };
+  }
+
+  if (rawValue.toLowerCase().startsWith(DIRECT_MEMBER_LOGIN_ID_PREFIX)) {
+    const manualLoginId = normalizeDirectMemberLoginId(rawValue);
+    return manualLoginId.value
+      ? { kind: "manual_login_id", value: manualLoginId.value }
+      : null;
   }
 
   const username = normalizeMmUsername(rawValue.replace(/^@/, ""));
@@ -77,15 +88,11 @@ export function buildMattermostProfileSyncPatch(
 ) {
   const memberPatch: Record<string, string | null> = {};
   const mattermostPatch: Record<string, string> = {};
-  const changedFields: Array<"displayName" | "campus" | "mmUsername"> = [];
+  const changedFields: Array<"displayName" | "mmUsername"> = [];
 
   if (member.displayName !== snapshot.displayName) {
     memberPatch.display_name = snapshot.displayName;
     changedFields.push("displayName");
-  }
-  if (member.campus !== snapshot.campus) {
-    memberPatch.campus = snapshot.campus;
-    changedFields.push("campus");
   }
   if (member.mmUsername !== snapshot.mmUsername) {
     mattermostPatch.mm_username = snapshot.mmUsername;

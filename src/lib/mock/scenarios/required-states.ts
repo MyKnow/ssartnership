@@ -237,6 +237,16 @@ const routeOwnedStateOverrides: Partial<
     "mobile-overflow",
     "async-pending",
   ],
+  "/auth/member/setup": [
+    "default",
+    "validation-error",
+    "expired",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+    "setup-token",
+  ],
   "/certification/photo": [
     "default",
     "validation-error",

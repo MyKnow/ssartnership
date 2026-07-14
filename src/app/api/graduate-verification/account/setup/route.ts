@@ -56,7 +56,11 @@ export async function POST(request: Request) {
       await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
       return NextResponse.json({ ok: false, message: "비밀번호 설정 링크가 만료되었거나 이미 사용되었습니다." }, { status: 400 });
     }
-    await setUserSession(memberId, false, { persistent: true });
+    await setUserSession(memberId, false, {
+      persistent: true,
+      authenticationMethod: "email",
+      freshAuthentication: true,
+    });
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: true });
     await logAuthSecurity({
       ...context,

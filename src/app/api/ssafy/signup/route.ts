@@ -9,21 +9,29 @@ import {
   recordRequiredPolicyConsent,
 } from "@/lib/policy-documents";
 import { hashPassword } from "@/lib/password";
+import type { MemberProfileImageSyncResult } from "@/lib/member-profile-images";
 import { sanitizeReturnTo } from "@/lib/return-to";
-import { setUserSession } from "@/lib/user-auth";
+import { setUserSession, UserSessionIssueError } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
+import { isMattermostLoginDisabledForGeneration } from "@/lib/member-email-login-transition";
 import { findSsafyVerifiedMember } from "@/lib/ssafy-verify/member";
 import {
   buildSsafySignupMemberInsertPayload,
   parseSsafySignupCompleteInput,
-  persistSsafySignupMemberDomainRecords,
+  resolveSignupGeneration,
 } from "@/lib/ssafy-verify/signup";
+import { persistSsafySignupMemberDomainRecords } from "@/lib/ssafy-verify/signup-persist.server";
 import {
   clearSsafySignupSession,
   getSsafySignupSession,
 } from "@/lib/ssafy-verify/signup-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+
+const NO_PROFILE_IMAGE_SYNC: MemberProfileImageSyncResult = {
+  updated: false,
+  skipped: false,
+} as const;
 
 export const runtime = "nodejs";
 
@@ -161,6 +169,33 @@ export async function POST(request: Request) {
       return errorResponse("signup_lookup_failed", 503);
     }
 
+    const rejectCompletedGenerationSignup = async (
+      generation: number,
+      actorId: string | null = null,
+    ) => {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_complete",
+        status: "blocked",
+        actorType: actorId ? "member" : "guest",
+        actorId,
+        identifier: signupSession.sub,
+        properties: {
+          reason: "generation_completed",
+          generation,
+        },
+      });
+      await clearSsafySignupSession();
+      return errorResponse("generation_completed", 409, {
+        message: "해당 기수는 수료 처리되어 신규 가입을 진행할 수 없습니다. 기존 회원의 이메일 로그인 전환은 관리자에게 문의해 주세요.",
+      });
+    };
+
+    const signupGeneration = resolveSignupGeneration(signupSession).generation;
+    if (await isMattermostLoginDisabledForGeneration(signupGeneration)) {
+      return rejectCompletedGenerationSignup(signupGeneration);
+    }
+
     const agreedAt = new Date().toISOString();
     const passwordRecord = hashPassword(parsed.data.password);
     const payload = buildSsafySignupMemberInsertPayload({
@@ -186,8 +221,9 @@ export async function POST(request: Request) {
       return errorResponse("signup_failed", 503);
     }
 
+    let profileImageSync = NO_PROFILE_IMAGE_SYNC;
     try {
-      await persistSsafySignupMemberDomainRecords(supabase, {
+      profileImageSync = await persistSsafySignupMemberDomainRecords(supabase, {
         memberId: insertedMember.id,
         session: signupSession,
         persistedAt: agreedAt,
@@ -221,12 +257,30 @@ export async function POST(request: Request) {
       return errorResponse("signup_failed", 503);
     }
 
-    await setUserSession(insertedMember.id, false, {
-      policyConsentSnapshot: {
-        serviceVersion: activePolicies.service.version,
-        privacyVersion: activePolicies.privacy.version,
-      },
-    });
+    try {
+      await setUserSession(insertedMember.id, false, {
+        policyConsentSnapshot: {
+          serviceVersion: activePolicies.service.version,
+          privacyVersion: activePolicies.privacy.version,
+        },
+        authenticationMethod: "ssafy",
+        freshAuthentication: true,
+      });
+    } catch (error) {
+      if (
+        error instanceof UserSessionIssueError && error.code === "mattermost_login_disabled"
+      ) {
+        const { error: cleanupError } = await supabase
+          .from("members")
+          .delete()
+          .eq("id", insertedMember.id);
+        if (cleanupError) {
+          throw cleanupError;
+        }
+        return rejectCompletedGenerationSignup(signupGeneration, insertedMember.id);
+      }
+      throw error;
+    }
     await clearSsafySignupSession();
     revalidatePath("/");
     revalidatePath("/auth/signup");
@@ -245,6 +299,8 @@ export async function POST(request: Request) {
         cohort: signupSession.cohort,
         campus: signupSession.campus,
         marketingPolicyChecked: parsed.data.marketingPolicyChecked,
+        profileImageUpdated: profileImageSync.updated,
+        profileImageSkipped: profileImageSync.skipped,
       },
     });
 

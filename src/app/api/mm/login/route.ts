@@ -135,6 +135,8 @@ export async function POST(request: Request) {
     const policyStatus = await getMemberRequiredPolicyStatus(member.id);
     await setUserSession(member.id, Boolean(member.must_change_password), {
       persistent: autoLogin,
+      authenticationMethod: "mattermost",
+      freshAuthentication: true,
     });
     revalidatePath("/");
     revalidatePath("/auth/consent");
@@ -157,6 +159,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({
       ok: true,
+      mustChangePassword: Boolean(member.must_change_password),
       requiresConsent: policyStatus.requiresConsent,
     });
   } catch (error) {

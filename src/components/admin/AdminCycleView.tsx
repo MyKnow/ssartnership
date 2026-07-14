@@ -112,6 +112,7 @@ export default function AdminCycleView({
               <label className="grid gap-2 text-sm font-medium text-foreground">기준 연도<Input type="number" name="anchorCalendarYear" min={2000} max={3000} defaultValue={settings.anchorCalendarYear} /></label>
               <label className="grid gap-2 text-sm font-medium text-foreground">기준 월<Input type="number" name="anchorMonth" min={1} max={12} defaultValue={settings.anchorMonth} /></label>
             </div>
+            <label className="grid gap-2 text-sm font-medium text-foreground">수동 추가 MM 조회 가능 기수<Input name="manualMemberMmLookupGenerations" defaultValue={settings.manualMemberMmLookupGenerations.join(", ")} placeholder="예: 14, 15" /><span className="text-xs font-normal text-muted-foreground">운영진은 이 목록을 최신 기수부터 탐색합니다. 지원 준비가 끝난 16기는 여기에서 추가해 활성화합니다.</span></label>
             <SubmitButton pendingText="저장 중">기준값 저장</SubmitButton>
           </form>
           <div className="grid gap-3 sm:grid-cols-2">

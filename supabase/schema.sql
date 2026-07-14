@@ -804,6 +804,7 @@ create table if not exists members (
   id uuid primary key default uuid_generate_v4(),
   mm_user_id text not null unique,
   mm_username text not null,
+  manual_login_id text,
   password_hash text,
   password_salt text,
   must_change_password boolean not null default false,
@@ -831,8 +832,20 @@ create table if not exists members (
   ssafy_track_name text,
   ssafy_last_scope text,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
+  constraint members_manual_login_id_check
+    check (
+      manual_login_id is null
+      or (
+        manual_login_id = lower(btrim(manual_login_id))
+        and manual_login_id ~ '^manual-[a-z0-9._-]{1,57}$'
+      )
+    )
 );
+
+create unique index if not exists members_manual_login_id_key
+  on members(manual_login_id)
+  where manual_login_id is not null;
 
 create table if not exists partner_reviews (
   id uuid primary key default uuid_generate_v4(),
@@ -1746,6 +1759,11 @@ create table if not exists push_delivery_logs (
 
 create table if not exists event_logs (
   id uuid primary key default uuid_generate_v4(),
+  event_id uuid,
+  schema_version integer,
+  occurred_at timestamp with time zone,
+  recorded_at timestamp with time zone,
+  request_id text,
   session_id text,
   actor_type text not null,
   actor_id text,
@@ -1757,7 +1775,9 @@ create table if not exists event_logs (
   properties jsonb not null default '{}'::jsonb,
   user_agent text,
   ip_address text,
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  constraint event_logs_schema_version_check
+    check (schema_version is null or schema_version >= 1)
 );
 
 create table if not exists partner_metric_rollups (
@@ -2364,8 +2384,91 @@ create trigger partner_metric_rollups_from_event_logs
   for each row
   execute function sync_partner_metric_rollups_from_event_logs();
 
+create or replace function public.ingest_product_event(
+  input_event_id uuid,
+  input_schema_version integer,
+  input_occurred_at timestamp with time zone,
+  input_request_id text,
+  input_session_id text,
+  input_actor_type text,
+  input_actor_id text,
+  input_event_name text,
+  input_path text,
+  input_referrer text,
+  input_target_type text,
+  input_target_id text,
+  input_properties jsonb,
+  input_user_agent text,
+  input_ip_address text
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  recorded_at_value timestamp with time zone := now();
+begin
+  if input_event_id is null then
+    raise exception 'product_event_id_required';
+  end if;
+
+  if input_schema_version is null or input_schema_version < 1 then
+    raise exception 'product_event_schema_version_invalid';
+  end if;
+
+  insert into public.event_logs (
+    event_id,
+    schema_version,
+    occurred_at,
+    recorded_at,
+    request_id,
+    session_id,
+    actor_type,
+    actor_id,
+    event_name,
+    path,
+    referrer,
+    target_type,
+    target_id,
+    properties,
+    user_agent,
+    ip_address,
+    created_at
+  )
+  values (
+    input_event_id,
+    input_schema_version,
+    coalesce(input_occurred_at, recorded_at_value),
+    recorded_at_value,
+    input_request_id,
+    input_session_id,
+    input_actor_type,
+    input_actor_id,
+    input_event_name,
+    input_path,
+    input_referrer,
+    input_target_type,
+    input_target_id,
+    coalesce(input_properties, '{}'::jsonb),
+    input_user_agent,
+    input_ip_address,
+    recorded_at_value
+  )
+  on conflict (event_id) where event_id is not null do nothing;
+
+  return found;
+end;
+$$;
+
+revoke all on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) from public;
+revoke all on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) from anon;
+revoke all on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) from authenticated;
+grant execute on function public.ingest_product_event(uuid, integer, timestamp with time zone, text, text, text, text, text, text, text, text, text, jsonb, text, text) to service_role;
+
 create table if not exists admin_audit_logs (
   id uuid primary key default uuid_generate_v4(),
+  request_id text,
   actor_id text,
   action text not null,
   path text,
@@ -2785,6 +2888,7 @@ alter table members
 
 create table if not exists auth_security_logs (
   id uuid primary key default uuid_generate_v4(),
+  request_id text,
   event_name text not null,
   status text not null,
   actor_type text not null,
@@ -2992,6 +3096,9 @@ create index if not exists event_logs_path_prefix_idx
   on event_logs(path text_pattern_ops)
   where path is not null;
 create index if not exists event_logs_session_id_idx on event_logs(session_id);
+create unique index if not exists event_logs_event_id_key
+  on event_logs(event_id)
+  where event_id is not null;
 create unique index if not exists partner_metric_rollups_total_unique_idx
   on partner_metric_rollups(partner_id, metric_name, metric_kind, bucket_timezone)
   where granularity = 'total';
@@ -4553,6 +4660,1262 @@ revoke all on function public.reject_member_active_profile_photo(uuid, uuid, tex
 revoke all on function public.reject_member_active_profile_photo(uuid, uuid, text) from authenticated;
 grant execute on function public.reject_member_active_profile_photo(uuid, uuid, text) to service_role;
 
+-- 20260715004318_add_manual_member_reissue_setup_guard.sql
+create or replace function public.reissue_manual_member_initial_setup(
+  p_member_id uuid,
+  p_delivery_channel text,
+  p_token_hash text,
+  p_expires_at timestamp with time zone
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+begin
+  if p_delivery_channel not in ('mattermost', 'email') then
+    raise exception 'manual_member_reissue_delivery_channel_invalid';
+  end if;
+  if p_token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'manual_member_reissue_token_hash_invalid';
+  end if;
+  if p_expires_at <= now() then
+    raise exception 'manual_member_reissue_expiry_invalid';
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is null
+    and must_change_password = true
+  for update;
+  if not found then
+    raise exception 'manual_member_reissue_not_required';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where member_id = member_row.id
+    and purpose = 'manual_initial_setup'
+    and consumed_at is null;
+
+  insert into public.member_password_action_tokens (
+    member_id,
+    purpose,
+    delivery_channel,
+    token_hash,
+    expires_at
+  ) values (
+    member_row.id,
+    'manual_initial_setup',
+    p_delivery_channel,
+    p_token_hash,
+    p_expires_at
+  );
+
+  return member_row.id;
+end;
+$$;
+
+revoke all on function public.reissue_manual_member_initial_setup(uuid, text, text, timestamp with time zone) from public;
+revoke all on function public.reissue_manual_member_initial_setup(uuid, text, text, timestamp with time zone) from anon;
+revoke all on function public.reissue_manual_member_initial_setup(uuid, text, text, timestamp with time zone) from authenticated;
+grant execute on function public.reissue_manual_member_initial_setup(uuid, text, text, timestamp with time zone) to service_role;
+
+-- 20260714234606_add_member_email_login_transition.sql
+-- Preserve the canonical Mattermost relation for history, but allow an
+-- operator-approved transition to an email credential when MM access ends.
+alter table public.members
+  add column if not exists auth_session_version integer not null default 1,
+  add column if not exists mattermost_login_disabled_at timestamp with time zone,
+  add column if not exists mattermost_login_disabled_reason text;
+
+alter table public.members
+  drop constraint if exists members_auth_session_version_check;
+alter table public.members
+  add constraint members_auth_session_version_check
+  check (auth_session_version >= 1);
+
+alter table public.members
+  drop constraint if exists members_mattermost_login_disabled_reason_check;
+alter table public.members
+  add constraint members_mattermost_login_disabled_reason_check
+  check (
+    mattermost_login_disabled_reason is null
+    or mattermost_login_disabled_reason in (
+      'generation_completed',
+      'member_departed',
+      'provider_not_found'
+    )
+  );
+
+alter table public.members
+  drop constraint if exists members_mattermost_login_disabled_state_check;
+alter table public.members
+  add constraint members_mattermost_login_disabled_state_check
+  check (
+    (mattermost_login_disabled_at is null and mattermost_login_disabled_reason is null)
+    or (mattermost_login_disabled_at is not null and mattermost_login_disabled_reason is not null)
+  );
+
+alter table public.member_password_action_tokens
+  drop constraint if exists member_password_action_tokens_purpose_check;
+alter table public.member_password_action_tokens
+  add constraint member_password_action_tokens_purpose_check
+  check (
+    purpose in (
+      'graduate_initial_setup',
+      'graduate_password_reset',
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition'
+    )
+  );
+
+create table if not exists public.member_email_login_transitions (
+  id uuid primary key default uuid_generate_v4(),
+  member_id uuid not null unique references public.members(id) on delete cascade,
+  candidate_email text not null,
+  candidate_email_normalized text not null,
+  candidate_email_reservation_hash text not null,
+  reason text not null,
+  status text not null default 'pending_delivery',
+  initiated_by_admin_id uuid not null references public.members(id) on delete restrict,
+  password_action_token_id uuid unique references public.member_password_action_tokens(id) on delete set null,
+  email_sent_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint member_email_login_transitions_email_check
+    check (candidate_email_normalized = lower(btrim(candidate_email))),
+  constraint member_email_login_transitions_email_reservation_hash_check
+    check (candidate_email_reservation_hash ~ '^[0-9a-f]{64}$'),
+  constraint member_email_login_transitions_reason_check
+    check (reason in ('generation_completed', 'member_departed', 'provider_not_found')),
+  constraint member_email_login_transitions_status_check
+    check (status in ('pending_delivery', 'email_sent', 'completed', 'cancelled')),
+  constraint member_email_login_transitions_completion_check
+    check (
+      (status = 'completed' and completed_at is not null)
+      or (status <> 'completed' and completed_at is null)
+    )
+);
+
+create index if not exists member_email_login_transitions_pending_idx
+  on public.member_email_login_transitions(status, updated_at desc)
+  where status in ('pending_delivery', 'email_sent');
+
+-- Keep an email claimed through completion as well.  If this only covered
+-- pending rows, a concurrent new transition could wait for a completion,
+-- then send a setup link for an email the completed transition now owns.
+create unique index if not exists member_email_login_transitions_email_unique
+  on public.member_email_login_transitions(candidate_email_normalized)
+  where status <> 'cancelled';
+
+alter table public.member_email_login_transitions enable row level security;
+revoke all on table public.member_email_login_transitions from anon;
+revoke all on table public.member_email_login_transitions from authenticated;
+
+drop trigger if exists member_email_login_transitions_set_partnership_updated_at on public.member_email_login_transitions;
+create trigger member_email_login_transitions_set_partnership_updated_at
+  before update on public.member_email_login_transitions
+  for each row execute function public.set_partnership_updated_at();
+
+create or replace function public.disable_member_mattermost_login(
+  p_member_id uuid,
+  p_reason text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+begin
+  if p_reason not in ('generation_completed', 'member_departed', 'provider_not_found') then
+    raise exception 'mattermost_login_disable_reason_invalid';
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'mattermost_login_disable_member_missing';
+  end if;
+  if member_row.mattermost_account_id is null then
+    raise exception 'mattermost_login_disable_member_not_linked';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where member_id = p_member_id
+    and delivery_channel = 'mattermost'
+    and consumed_at is null;
+
+  if member_row.mattermost_login_disabled_at is null then
+    update public.members
+    set mattermost_login_disabled_at = now(),
+        mattermost_login_disabled_reason = p_reason,
+        auth_session_version = auth_session_version + 1,
+        updated_at = now()
+    where id = p_member_id;
+  end if;
+
+  return p_member_id;
+end;
+$$;
+
+revoke all on function public.disable_member_mattermost_login(uuid, text) from public;
+revoke all on function public.disable_member_mattermost_login(uuid, text) from anon;
+revoke all on function public.disable_member_mattermost_login(uuid, text) from authenticated;
+grant execute on function public.disable_member_mattermost_login(uuid, text) to service_role;
+
+create table if not exists public.member_mattermost_disabled_generations (
+  generation integer primary key,
+  disabled_at timestamp with time zone not null default now(),
+  constraint member_mattermost_disabled_generations_generation_check
+    check (generation between 1 and 99)
+);
+
+alter table public.member_mattermost_disabled_generations enable row level security;
+revoke all on table public.member_mattermost_disabled_generations from anon;
+revoke all on table public.member_mattermost_disabled_generations from authenticated;
+
+create or replace function public.enforce_completed_generation_mattermost_login_block()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  generation_is_disabled boolean;
+begin
+  if new.generation is null
+    or new.mattermost_account_id is null
+    or new.mattermost_login_disabled_at is not null then
+    return new;
+  end if;
+
+  -- Serialize with disable_generation_mattermost_logins so an in-flight
+  -- member insert cannot slip through a completed generation.
+  perform pg_advisory_xact_lock(741515, new.generation);
+
+  select exists (
+    select 1
+    from public.member_mattermost_disabled_generations
+    where generation = new.generation
+  ) into generation_is_disabled;
+  if not generation_is_disabled then
+    return new;
+  end if;
+
+  new.mattermost_login_disabled_at := now();
+  new.mattermost_login_disabled_reason := 'generation_completed';
+  if tg_op = 'UPDATE' then
+    new.auth_session_version := greatest(
+      coalesce(new.auth_session_version, 1),
+      coalesce(old.auth_session_version, 1) + 1
+    );
+  else
+    new.auth_session_version := greatest(coalesce(new.auth_session_version, 1), 1);
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_completed_generation_mattermost_login_block() from public;
+revoke all on function public.enforce_completed_generation_mattermost_login_block() from anon;
+revoke all on function public.enforce_completed_generation_mattermost_login_block() from authenticated;
+
+drop trigger if exists members_enforce_completed_generation_mattermost_login_block on public.members;
+create trigger members_enforce_completed_generation_mattermost_login_block
+  before insert or update of generation, mattermost_account_id, mattermost_login_disabled_at
+  on public.members
+  for each row execute function public.enforce_completed_generation_mattermost_login_block();
+
+create or replace function public.disable_generation_mattermost_logins(
+  p_generation integer
+)
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  updated_count integer;
+begin
+  if p_generation < 1 or p_generation > 99 then
+    raise exception 'mattermost_login_disable_generation_invalid';
+  end if;
+
+  -- Triggers on normal member writes acquire the generation advisory lock
+  -- after a row lock. EXCLUSIVE also conflicts with SELECT FOR UPDATE's
+  -- ROW SHARE lock, so this batch cannot hold the advisory lock while
+  -- waiting for a member row that later needs to update.
+  lock table public.members in exclusive mode;
+  perform pg_advisory_xact_lock(741515, p_generation);
+
+  insert into public.member_mattermost_disabled_generations (generation)
+  values (p_generation)
+  on conflict (generation) do nothing;
+
+  with updated_members as (
+    update public.members
+    set mattermost_login_disabled_at = now(),
+        mattermost_login_disabled_reason = 'generation_completed',
+        auth_session_version = auth_session_version + 1,
+        updated_at = now()
+    where generation = p_generation
+      and deleted_at is null
+      and mattermost_account_id is not null
+      and mattermost_login_disabled_at is null
+    returning id
+  )
+  select count(*)::integer into updated_count from updated_members;
+
+  update public.member_password_action_tokens token
+  set consumed_at = now()
+  where token.delivery_channel = 'mattermost'
+    and token.consumed_at is null
+    and exists (
+      select 1
+      from public.members member
+      where member.id = token.member_id
+        and member.generation = p_generation
+        and member.deleted_at is null
+        and member.mattermost_account_id is not null
+    );
+
+  return updated_count;
+end;
+$$;
+
+revoke all on function public.disable_generation_mattermost_logins(integer) from public;
+revoke all on function public.disable_generation_mattermost_logins(integer) from anon;
+revoke all on function public.disable_generation_mattermost_logins(integer) from authenticated;
+grant execute on function public.disable_generation_mattermost_logins(integer) to service_role;
+
+create or replace function public.begin_member_email_login_transition(
+  p_member_id uuid,
+  p_candidate_email text,
+  p_email_reservation_hash text,
+  p_reason text,
+  p_initiated_by_admin_id uuid,
+  p_token_hash text,
+  p_expires_at timestamp with time zone
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  transition_row public.member_email_login_transitions%rowtype;
+  token_id uuid;
+  normalized_email text;
+begin
+  normalized_email := lower(btrim(p_candidate_email));
+  if normalized_email is null or normalized_email = '' or normalized_email <> p_candidate_email then
+    raise exception 'member_email_login_transition_email_invalid';
+  end if;
+  if p_email_reservation_hash is null
+    or p_email_reservation_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'member_email_login_transition_email_reservation_invalid';
+  end if;
+  if p_reason not in ('generation_completed', 'member_departed', 'provider_not_found') then
+    raise exception 'member_email_login_transition_reason_invalid';
+  end if;
+  if p_token_hash is null or btrim(p_token_hash) = '' or p_expires_at <= now() then
+    raise exception 'member_email_login_transition_token_invalid';
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'member_email_login_transition_member_missing';
+  end if;
+  if member_row.mattermost_account_id is null then
+    raise exception 'member_email_login_transition_member_not_linked';
+  end if;
+  if member_row.email_normalized is not null
+    and member_row.email_normalized <> normalized_email then
+    raise exception 'member_email_login_transition_email_mismatch';
+  end if;
+  if exists (
+    select 1
+    from public.members member
+    where member.email_normalized = normalized_email
+      and member.id <> p_member_id
+  ) then
+    raise exception 'member_email_login_transition_email_exists';
+  end if;
+  if exists (
+    select 1
+    from public.member_identifier_reservations reservation
+    where reservation.identifier_kind = 'email'
+      and reservation.identifier_hash = p_email_reservation_hash
+  ) then
+    raise exception 'member_email_login_transition_email_reserved';
+  end if;
+
+  select * into transition_row
+  from public.member_email_login_transitions
+  where member_id = p_member_id
+  for update;
+  if found and transition_row.status = 'completed' then
+    raise exception 'member_email_login_transition_already_completed';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where member_id = p_member_id
+    and consumed_at is null;
+
+  begin
+    insert into public.member_email_login_transitions (
+      member_id,
+      candidate_email,
+      candidate_email_normalized,
+      candidate_email_reservation_hash,
+      reason,
+      status,
+      initiated_by_admin_id,
+      password_action_token_id,
+      email_sent_at,
+      completed_at,
+      updated_at
+    ) values (
+      p_member_id,
+      normalized_email,
+      normalized_email,
+      p_email_reservation_hash,
+      p_reason,
+      'pending_delivery',
+      p_initiated_by_admin_id,
+      null,
+      null,
+      null,
+      now()
+    )
+    on conflict (member_id) do update
+    set candidate_email = excluded.candidate_email,
+        candidate_email_normalized = excluded.candidate_email_normalized,
+        candidate_email_reservation_hash = excluded.candidate_email_reservation_hash,
+        reason = excluded.reason,
+        status = 'pending_delivery',
+        initiated_by_admin_id = excluded.initiated_by_admin_id,
+        password_action_token_id = null,
+        email_sent_at = null,
+        completed_at = null,
+        updated_at = now();
+  exception
+    when unique_violation then
+      raise exception 'member_email_login_transition_email_exists';
+  end;
+  insert into public.member_password_action_tokens (
+    member_id,
+    purpose,
+    delivery_channel,
+    token_hash,
+    expires_at
+  ) values (
+    p_member_id,
+    'member_email_login_transition',
+    'email',
+    p_token_hash,
+    p_expires_at
+  ) returning id into token_id;
+
+  update public.member_email_login_transitions
+  set password_action_token_id = token_id,
+      updated_at = now()
+  where member_id = p_member_id;
+
+  update public.members
+  set mattermost_login_disabled_at = coalesce(mattermost_login_disabled_at, now()),
+      mattermost_login_disabled_reason = coalesce(mattermost_login_disabled_reason, p_reason),
+      must_change_password = true,
+      auth_session_version = auth_session_version + 1,
+      updated_at = now()
+  where id = p_member_id;
+
+  return token_id;
+end;
+$$;
+
+revoke all on function public.begin_member_email_login_transition(uuid, text, text, text, uuid, text, timestamp with time zone) from public;
+revoke all on function public.begin_member_email_login_transition(uuid, text, text, text, uuid, text, timestamp with time zone) from anon;
+revoke all on function public.begin_member_email_login_transition(uuid, text, text, text, uuid, text, timestamp with time zone) from authenticated;
+grant execute on function public.begin_member_email_login_transition(uuid, text, text, text, uuid, text, timestamp with time zone) to service_role;
+
+create or replace function public.mark_member_email_login_transition_sent(
+  p_token_id uuid
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  update public.member_email_login_transitions
+  set status = 'email_sent',
+      email_sent_at = now(),
+      updated_at = now()
+  where password_action_token_id = p_token_id
+    and status = 'pending_delivery';
+end;
+$$;
+
+revoke all on function public.mark_member_email_login_transition_sent(uuid) from public;
+revoke all on function public.mark_member_email_login_transition_sent(uuid) from anon;
+revoke all on function public.mark_member_email_login_transition_sent(uuid) from authenticated;
+grant execute on function public.mark_member_email_login_transition_sent(uuid) to service_role;
+
+create or replace function public.complete_member_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  token_row public.member_password_action_tokens%rowtype;
+  transition_row public.member_email_login_transitions%rowtype;
+  member_row public.members%rowtype;
+  token_id uuid;
+  member_id uuid;
+begin
+  -- Lock the member first, matching begin_member_email_login_transition.
+  -- The token is re-read after that lock so a concurrent resend safely wins.
+  select * into token_row
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in (
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition'
+    )
+    and consumed_at is null
+    and expires_at > now();
+  if not found then
+    raise exception 'member_password_action_invalid_or_expired';
+  end if;
+  token_id := token_row.id;
+  member_id := token_row.member_id;
+
+  select * into member_row
+  from public.members
+  where id = member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'member_password_action_member_missing';
+  end if;
+
+  select * into token_row
+  from public.member_password_action_tokens
+  where id = token_id
+    and token_hash = p_token_hash
+    and purpose in (
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition'
+    )
+    and consumed_at is null
+    and expires_at > now()
+  for update;
+  if not found then
+    raise exception 'member_password_action_invalid_or_expired';
+  end if;
+
+  if member_row.mattermost_login_disabled_at is not null
+    and token_row.delivery_channel = 'mattermost' then
+    raise exception 'member_password_action_mattermost_login_disabled';
+  end if;
+
+  if token_row.purpose = 'member_email_login_transition' then
+    select * into transition_row
+    from public.member_email_login_transitions
+    where member_id = token_row.member_id
+      and password_action_token_id = token_row.id
+      and status in ('pending_delivery', 'email_sent')
+    for update;
+    if not found then
+      raise exception 'member_email_login_transition_invalid';
+    end if;
+    if exists (
+      select 1
+      from public.members member
+      where member.email_normalized = transition_row.candidate_email_normalized
+        and member.id <> token_row.member_id
+    ) then
+      raise exception 'member_email_login_transition_email_exists';
+    end if;
+    if exists (
+      select 1
+      from public.member_identifier_reservations reservation
+      where reservation.identifier_kind = 'email'
+        and reservation.identifier_hash = transition_row.candidate_email_reservation_hash
+    ) then
+      raise exception 'member_email_login_transition_email_reserved';
+    end if;
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where id = token_row.id;
+
+  if token_row.purpose = 'member_email_login_transition' then
+    update public.members
+    set password_hash = p_password_hash,
+        password_salt = p_password_salt,
+        email = transition_row.candidate_email,
+        email_normalized = transition_row.candidate_email_normalized,
+        email_verified_at = now(),
+        must_change_password = false,
+        auth_session_version = auth_session_version + 1,
+        updated_at = now()
+    where id = token_row.member_id
+      and deleted_at is null;
+    if not found then
+      raise exception 'member_password_action_member_missing';
+    end if;
+
+    update public.member_email_login_transitions
+    set status = 'completed',
+        completed_at = now(),
+        updated_at = now()
+    where id = transition_row.id;
+  else
+    update public.members
+    set password_hash = p_password_hash,
+        password_salt = p_password_salt,
+        must_change_password = false,
+        email_verified_at = case
+          when token_row.delivery_channel = 'email' then coalesce(email_verified_at, now())
+          else email_verified_at
+        end,
+        auth_session_version = auth_session_version + 1,
+        updated_at = now()
+    where id = token_row.member_id
+      and deleted_at is null;
+    if not found then
+      raise exception 'member_password_action_member_missing';
+    end if;
+  end if;
+
+  return token_row.member_id;
+end;
+$$;
+
+revoke all on function public.complete_member_password_action(text, text, text) from public;
+revoke all on function public.complete_member_password_action(text, text, text) from anon;
+revoke all on function public.complete_member_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_member_password_action(text, text, text) to service_role;
+
+create or replace function public.complete_manual_member_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  return public.complete_member_password_action(
+    p_token_hash,
+    p_password_hash,
+    p_password_salt
+  );
+end;
+$$;
+
+revoke all on function public.complete_manual_member_password_action(text, text, text) from public;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from anon;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_manual_member_password_action(text, text, text) to service_role;
+
+-- 20260714234606_add_member_email_login_transition.sql (credential revisions)
+create or replace function public.update_member_password_credentials(
+  p_member_id uuid,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+begin
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'member_password_action_member_missing';
+  end if;
+
+  update public.members
+  set password_hash = p_password_hash,
+      password_salt = p_password_salt,
+      must_change_password = false,
+      auth_session_version = auth_session_version + 1,
+      updated_at = now()
+  where id = p_member_id;
+
+  return p_member_id;
+end;
+$$;
+
+revoke all on function public.update_member_password_credentials(uuid, text, text) from public;
+revoke all on function public.update_member_password_credentials(uuid, text, text) from anon;
+revoke all on function public.update_member_password_credentials(uuid, text, text) from authenticated;
+grant execute on function public.update_member_password_credentials(uuid, text, text) to service_role;
+
+create or replace function public.complete_member_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  token_row public.member_password_action_tokens%rowtype;
+  transition_row public.member_email_login_transitions%rowtype;
+  member_row public.members%rowtype;
+  token_id uuid;
+  member_id uuid;
+begin
+  -- Lock the member first, matching begin_member_email_login_transition.
+  -- The token is re-read after that lock so a concurrent resend safely wins.
+  select * into token_row
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in (
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition'
+    )
+    and consumed_at is null
+    and expires_at > now();
+  if not found then
+    raise exception 'member_password_action_invalid_or_expired';
+  end if;
+  token_id := token_row.id;
+  member_id := token_row.member_id;
+
+  select * into member_row
+  from public.members
+  where id = member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'member_password_action_member_missing';
+  end if;
+
+  select * into token_row
+  from public.member_password_action_tokens
+  where id = token_id
+    and token_hash = p_token_hash
+    and purpose in (
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition'
+    )
+    and consumed_at is null
+    and expires_at > now()
+  for update;
+  if not found then
+    raise exception 'member_password_action_invalid_or_expired';
+  end if;
+
+  if member_row.mattermost_login_disabled_at is not null
+    and token_row.delivery_channel = 'mattermost' then
+    raise exception 'member_password_action_mattermost_login_disabled';
+  end if;
+
+  if token_row.purpose = 'member_email_login_transition' then
+    select * into transition_row
+    from public.member_email_login_transitions
+    where member_id = token_row.member_id
+      and password_action_token_id = token_row.id
+      and status in ('pending_delivery', 'email_sent')
+    for update;
+    if not found then
+      raise exception 'member_email_login_transition_invalid';
+    end if;
+    if exists (
+      select 1
+      from public.members member
+      where member.email_normalized = transition_row.candidate_email_normalized
+        and member.id <> token_row.member_id
+    ) then
+      raise exception 'member_email_login_transition_email_exists';
+    end if;
+    if exists (
+      select 1
+      from public.member_identifier_reservations reservation
+      where reservation.identifier_kind = 'email'
+        and reservation.identifier_hash = transition_row.candidate_email_reservation_hash
+    ) then
+      raise exception 'member_email_login_transition_email_reserved';
+    end if;
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where id = token_row.id;
+
+  if token_row.purpose = 'member_email_login_transition' then
+    update public.members
+    set password_hash = p_password_hash,
+        password_salt = p_password_salt,
+        email = transition_row.candidate_email,
+        email_normalized = transition_row.candidate_email_normalized,
+        email_verified_at = now(),
+        must_change_password = false,
+        auth_session_version = auth_session_version + 1,
+        updated_at = now()
+    where id = token_row.member_id
+      and deleted_at is null;
+    if not found then
+      raise exception 'member_password_action_member_missing';
+    end if;
+
+    update public.member_email_login_transitions
+    set status = 'completed',
+        completed_at = now(),
+        updated_at = now()
+    where id = transition_row.id;
+  else
+    update public.members
+    set password_hash = p_password_hash,
+        password_salt = p_password_salt,
+        must_change_password = false,
+        email_verified_at = case
+          when token_row.delivery_channel = 'email' then coalesce(email_verified_at, now())
+          else email_verified_at
+        end,
+        auth_session_version = auth_session_version + 1,
+        updated_at = now()
+    where id = token_row.member_id
+      and deleted_at is null;
+    if not found then
+      raise exception 'member_password_action_member_missing';
+    end if;
+  end if;
+
+  return token_row.member_id;
+end;
+$$;
+
+revoke all on function public.complete_member_password_action(text, text, text) from public;
+revoke all on function public.complete_member_password_action(text, text, text) from anon;
+revoke all on function public.complete_member_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_member_password_action(text, text, text) to service_role;
+
+create or replace function public.complete_manual_member_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  return public.complete_member_password_action(
+    p_token_hash,
+    p_password_hash,
+    p_password_salt
+  );
+end;
+$$;
+
+revoke all on function public.complete_manual_member_password_action(text, text, text) from public;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from anon;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_manual_member_password_action(text, text, text) to service_role;
+
+create or replace function public.complete_graduate_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  token_row public.member_password_action_tokens%rowtype;
+  member_row public.members%rowtype;
+  token_id uuid;
+  member_id uuid;
+begin
+  -- Keep the same member-first lock order as every transition action.
+  select * into token_row
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in ('graduate_initial_setup', 'graduate_password_reset')
+    and consumed_at is null
+    and expires_at > now();
+  if not found then
+    raise exception 'graduate_password_action_invalid';
+  end if;
+  token_id := token_row.id;
+  member_id := token_row.member_id;
+
+  select * into member_row
+  from public.members
+  where id = member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'graduate_password_action_member_missing';
+  end if;
+
+  select * into token_row
+  from public.member_password_action_tokens
+  where id = token_id
+    and token_hash = p_token_hash
+    and purpose in ('graduate_initial_setup', 'graduate_password_reset')
+    and consumed_at is null
+    and expires_at > now()
+  for update;
+  if not found then
+    raise exception 'graduate_password_action_invalid';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where id = token_row.id;
+
+  update public.members
+  set password_hash = p_password_hash,
+      password_salt = p_password_salt,
+      must_change_password = false,
+      auth_session_version = auth_session_version + 1,
+      updated_at = now()
+  where id = token_row.member_id
+    and deleted_at is null;
+  if not found then
+    raise exception 'graduate_password_action_member_missing';
+  end if;
+
+  return token_row.member_id;
+end;
+$$;
+
+revoke all on function public.complete_graduate_password_action(text, text, text) from public;
+revoke all on function public.complete_graduate_password_action(text, text, text) from anon;
+revoke all on function public.complete_graduate_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_graduate_password_action(text, text, text) to service_role;
+
+-- 20260714111459_add_manual_member_bulk_import.sql
+alter table public.ssafy_cycle_settings
+  add column if not exists manual_member_mm_lookup_generations integer[] not null default array[14, 15]::integer[];
+alter table public.ssafy_cycle_settings
+  drop constraint if exists ssafy_cycle_settings_manual_member_mm_lookup_generations_check;
+alter table public.ssafy_cycle_settings
+  add constraint ssafy_cycle_settings_manual_member_mm_lookup_generations_check
+  check (
+    cardinality(manual_member_mm_lookup_generations) between 0 and 99
+    and manual_member_mm_lookup_generations <@ array[
+      1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+      21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+      41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,
+      61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,
+      81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99
+    ]::integer[]
+  );
+
+alter table public.member_profile_images
+  drop constraint if exists member_profile_images_source_check;
+alter table public.member_profile_images
+  add constraint member_profile_images_source_check
+  check (source in ('legacy', 'mattermost', 'graduate_verification', 'member_upload', 'manual_admin'));
+
+alter table public.member_password_action_tokens
+  add column if not exists delivery_channel text not null default 'email';
+alter table public.member_password_action_tokens
+  drop constraint if exists member_password_action_tokens_purpose_check;
+alter table public.member_password_action_tokens
+  add constraint member_password_action_tokens_purpose_check
+  check (purpose in ('graduate_initial_setup', 'graduate_password_reset', 'manual_initial_setup', 'manual_password_reset'));
+alter table public.member_password_action_tokens
+  drop constraint if exists member_password_action_tokens_delivery_channel_check;
+alter table public.member_password_action_tokens
+  add constraint member_password_action_tokens_delivery_channel_check
+  check (delivery_channel in ('mattermost', 'email'));
+
+create table if not exists public.manual_member_import_batches (
+  id uuid primary key default uuid_generate_v4(),
+  created_by_admin_id uuid not null references public.members(id) on delete restrict,
+  status text not null default 'staging',
+  expires_at timestamp with time zone not null,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint manual_member_import_batches_status_check check (status in ('staging', 'ready', 'processing', 'completed', 'expired'))
+);
+create table if not exists public.manual_member_import_rows (
+  id uuid primary key default uuid_generate_v4(),
+  batch_id uuid not null references public.manual_member_import_batches(id) on delete cascade,
+  row_number integer not null,
+  generation integer not null,
+  display_name text,
+  campus text,
+  mm_username text,
+  email text,
+  email_normalized text,
+  photo_filename text,
+  staging_bucket text,
+  staging_path text,
+  staging_deleted_at timestamp with time zone,
+  photo_content_type text,
+  photo_size_bytes integer,
+  member_id uuid references public.members(id) on delete set null,
+  status text not null default 'staged',
+  error_code text,
+  error_message text,
+  delivery_channel text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint manual_member_import_rows_generation_check check (generation between 0 and 99),
+  constraint manual_member_import_rows_status_check check (status in ('staged', 'processing', 'created', 'failed')),
+  constraint manual_member_import_rows_delivery_channel_check check (delivery_channel is null or delivery_channel in ('mattermost', 'email')),
+  constraint manual_member_import_rows_photo_check check ((photo_filename is null and staging_bucket is null and staging_path is null and photo_content_type is null and photo_size_bytes is null) or (photo_filename is not null and staging_bucket = 'manual-member-import-staging' and staging_path is not null and photo_content_type in ('image/jpeg', 'image/png', 'image/webp') and photo_size_bytes between 1 and 5242880)),
+  unique (batch_id, row_number),
+  unique (batch_id, staging_path)
+);
+create index if not exists manual_member_import_batches_expiry_idx on public.manual_member_import_batches(expires_at) where status in ('staging', 'ready', 'processing');
+create index if not exists manual_member_import_rows_batch_status_idx on public.manual_member_import_rows(batch_id, status, row_number);
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('manual-member-import-staging', 'manual-member-import-staging', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+alter table public.manual_member_import_batches enable row level security;
+alter table public.manual_member_import_rows enable row level security;
+revoke all on table public.manual_member_import_batches from anon;
+revoke all on table public.manual_member_import_batches from authenticated;
+revoke all on table public.manual_member_import_rows from anon;
+revoke all on table public.manual_member_import_rows from authenticated;
+drop trigger if exists manual_member_import_batches_set_partnership_updated_at on public.manual_member_import_batches;
+create trigger manual_member_import_batches_set_partnership_updated_at before update on public.manual_member_import_batches for each row execute function public.set_partnership_updated_at();
+drop trigger if exists manual_member_import_rows_set_partnership_updated_at on public.manual_member_import_rows;
+create trigger manual_member_import_rows_set_partnership_updated_at before update on public.manual_member_import_rows for each row execute function public.set_partnership_updated_at();
+
+create or replace function public.complete_manual_member_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  candidate_member_id uuid;
+  member_row public.members%rowtype;
+  token_row public.member_password_action_tokens%rowtype;
+begin
+  -- Identify the member without locking the token. All mutations below lock
+  -- the member first, then the token, matching the reissue RPC.
+  select member_id into candidate_member_id
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in ('manual_initial_setup', 'manual_password_reset')
+    and consumed_at is null
+    and expires_at > now();
+  if not found then
+    raise exception 'manual_password_action_invalid_or_expired';
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = candidate_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'manual_password_action_member_missing';
+  end if;
+
+  select * into token_row
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in ('manual_initial_setup', 'manual_password_reset')
+    and consumed_at is null
+    and expires_at > now()
+  for update;
+  if not found or token_row.member_id <> member_row.id then
+    raise exception 'manual_password_action_invalid_or_expired';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where id = token_row.id;
+
+  update public.members
+  set password_hash = p_password_hash,
+      password_salt = p_password_salt,
+      must_change_password = false,
+      email_verified_at = case
+        when token_row.delivery_channel = 'email' then coalesce(email_verified_at, now())
+        else email_verified_at
+      end,
+      updated_at = now()
+  where id = member_row.id;
+
+  return member_row.id;
+end;
+$$;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from public;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from anon;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_manual_member_password_action(text, text, text) to service_role;
+
+create or replace function public.checkpoint_manual_member_import_member(
+  p_row_id uuid,
+  p_batch_id uuid,
+  p_expected_row_updated_at timestamp with time zone,
+  p_display_name text,
+  p_generation integer,
+  p_staff_source_generation integer,
+  p_campus text,
+  p_mattermost_account_id uuid,
+  p_email text,
+  p_email_normalized text
+)
+returns table (
+  member_id uuid,
+  row_updated_at timestamp with time zone
+)
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  import_row public.manual_member_import_rows%rowtype;
+  existing_member public.members%rowtype;
+  created_member_id uuid;
+begin
+  select * into import_row
+  from public.manual_member_import_rows
+  where id = p_row_id
+    and batch_id = p_batch_id
+    and status = 'processing'
+    and updated_at = p_expected_row_updated_at
+  for update;
+  if not found then raise exception 'manual_member_import_row_lease_lost'; end if;
+
+  if import_row.member_id is not null then
+    select * into existing_member
+    from public.members
+    where id = import_row.member_id
+      and deleted_at is null
+    for update;
+    if not found then raise exception 'manual_member_import_checkpoint_member_missing'; end if;
+    member_id := existing_member.id;
+    row_updated_at := import_row.updated_at;
+    return next;
+    return;
+  end if;
+
+  if p_email_normalized is not null and exists (
+    select 1 from public.members
+    where email_normalized = p_email_normalized and deleted_at is null
+  ) then raise exception 'existing_email'; end if;
+  if p_mattermost_account_id is not null and exists (
+    select 1 from public.members
+    where mattermost_account_id = p_mattermost_account_id and deleted_at is null
+  ) then raise exception 'existing_mattermost'; end if;
+
+  insert into public.members (
+    display_name, generation, staff_source_generation, campus,
+    mattermost_account_id, email, email_normalized, must_change_password
+  ) values (
+    p_display_name, p_generation, p_staff_source_generation, p_campus,
+    p_mattermost_account_id, p_email, p_email_normalized, true
+  ) returning id into created_member_id;
+
+  update public.manual_member_import_rows
+  set member_id = created_member_id
+  where id = import_row.id
+    and batch_id = p_batch_id
+    and status = 'processing'
+    and updated_at = p_expected_row_updated_at
+  returning updated_at into row_updated_at;
+  if not found then raise exception 'manual_member_import_row_lease_lost'; end if;
+  member_id := created_member_id;
+  return next;
+end;
+$$;
+revoke all on function public.checkpoint_manual_member_import_member(uuid, uuid, timestamp with time zone, text, integer, integer, text, uuid, text, text) from public;
+revoke all on function public.checkpoint_manual_member_import_member(uuid, uuid, timestamp with time zone, text, integer, integer, text, uuid, text, text) from anon;
+revoke all on function public.checkpoint_manual_member_import_member(uuid, uuid, timestamp with time zone, text, integer, integer, text, uuid, text, text) from authenticated;
+grant execute on function public.checkpoint_manual_member_import_member(uuid, uuid, timestamp with time zone, text, integer, integer, text, uuid, text, text) to service_role;
+
+alter table public.manual_member_import_rows
+  add column if not exists photo_attached_at timestamp with time zone,
+  add column if not exists delivery_attempted_at timestamp with time zone,
+  add column if not exists delivery_sent_at timestamp with time zone,
+  add column if not exists delivery_idempotency_key text;
+alter table public.manual_member_import_rows
+  drop constraint if exists manual_member_import_rows_delivery_checkpoint_check;
+alter table public.manual_member_import_rows
+  add constraint manual_member_import_rows_delivery_checkpoint_check
+  check (
+    (
+      delivery_attempted_at is null
+      or (
+        delivery_idempotency_key is not null
+        and delivery_channel is not null
+      )
+    )
+    and (
+      delivery_sent_at is null
+      or (
+        delivery_attempted_at is not null
+        and delivery_idempotency_key is not null
+        and delivery_channel is not null
+      )
+    )
+  );
+create unique index if not exists manual_member_import_rows_delivery_key_unique
+  on public.manual_member_import_rows(delivery_idempotency_key)
+  where delivery_idempotency_key is not null;
+
+alter table public.member_profile_images
+  add column if not exists manual_member_import_row_id uuid
+  references public.manual_member_import_rows(id) on delete set null;
+create unique index if not exists member_profile_images_manual_import_row_unique
+  on public.member_profile_images(manual_member_import_row_id)
+  where manual_member_import_row_id is not null;
+
 -- 20260713204059_contract_member_domain_legacy_columns.sql
 -- Contract phase: remove member-table mirrors after canonical relations are live.
 
@@ -5153,6 +6516,144 @@ revoke all on function public.reject_member_active_profile_photo(uuid, uuid, tex
 revoke all on function public.reject_member_active_profile_photo(uuid, uuid, text) from authenticated;
 grant execute on function public.reject_member_active_profile_photo(uuid, uuid, text) to service_role;
 
+-- 20260714234606_add_member_email_login_transition.sql
+-- The historical schema snapshot retains an older manual-import block above.
+-- Reassert the current migration state after that block so this file matches
+-- the effective database contract.
+alter table public.member_password_action_tokens
+  drop constraint if exists member_password_action_tokens_purpose_check;
+alter table public.member_password_action_tokens
+  add constraint member_password_action_tokens_purpose_check
+  check (
+    purpose in (
+      'graduate_initial_setup',
+      'graduate_password_reset',
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition'
+    )
+  );
+
+create or replace function public.update_member_mattermost_password_credentials(
+  p_member_id uuid,
+  p_expected_mattermost_account_id uuid,
+  p_expected_updated_at timestamp with time zone,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+begin
+  if p_expected_mattermost_account_id is null
+    or p_expected_updated_at is null then
+    raise exception 'member_mattermost_password_update_invalid';
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'member_mattermost_password_update_member_missing';
+  end if;
+  if member_row.mattermost_account_id is distinct from p_expected_mattermost_account_id
+    or member_row.mattermost_login_disabled_at is not null
+    or member_row.updated_at is distinct from p_expected_updated_at then
+    raise exception 'member_mattermost_password_update_not_allowed';
+  end if;
+
+  update public.members
+  set password_hash = p_password_hash,
+      password_salt = p_password_salt,
+      must_change_password = false,
+      auth_session_version = auth_session_version + 1,
+      updated_at = now()
+  where id = p_member_id;
+
+  return p_member_id;
+end;
+$$;
+
+revoke all on function public.update_member_mattermost_password_credentials(uuid, uuid, timestamp with time zone, text, text) from public;
+revoke all on function public.update_member_mattermost_password_credentials(uuid, uuid, timestamp with time zone, text, text) from anon;
+revoke all on function public.update_member_mattermost_password_credentials(uuid, uuid, timestamp with time zone, text, text) from authenticated;
+grant execute on function public.update_member_mattermost_password_credentials(uuid, uuid, timestamp with time zone, text, text) to service_role;
+
+create or replace function public.complete_member_password_action_with_delivery(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  token_row public.member_password_action_tokens%rowtype;
+  completed_member_id uuid;
+begin
+  select * into token_row
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in (
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition'
+    )
+    and consumed_at is null
+    and expires_at > now();
+  if not found then
+    raise exception 'member_password_action_invalid_or_expired';
+  end if;
+
+  completed_member_id := public.complete_member_password_action(
+    p_token_hash,
+    p_password_hash,
+    p_password_salt
+  );
+  return jsonb_build_object(
+    'memberId', completed_member_id,
+    'deliveryChannel', token_row.delivery_channel
+  );
+end;
+$$;
+
+revoke all on function public.complete_member_password_action_with_delivery(text, text, text) from public;
+revoke all on function public.complete_member_password_action_with_delivery(text, text, text) from anon;
+revoke all on function public.complete_member_password_action_with_delivery(text, text, text) from authenticated;
+grant execute on function public.complete_member_password_action_with_delivery(text, text, text) to service_role;
+
+create or replace function public.complete_manual_member_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  return public.complete_member_password_action(
+    p_token_hash,
+    p_password_hash,
+    p_password_salt
+  );
+end;
+$$;
+
+revoke all on function public.complete_manual_member_password_action(text, text, text) from public;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from anon;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_manual_member_password_action(text, text, text) to service_role;
+
 drop trigger if exists members_keep_single_super_admin on public.members;
 drop function if exists public.ensure_single_member_super_admin();
 
@@ -5600,6 +7101,7 @@ begin
   set email = null,
       email_normalized = null,
       email_verified_at = null,
+      manual_login_id = null,
       password_hash = null,
       password_salt = null,
       must_change_password = false,
@@ -6203,6 +7705,79 @@ grant execute on function public.issue_graduate_password_reset(uuid, text, times
 
 -- Photo-review actions retain the legacy reviewer member ID for compatibility
 -- and record the normalized administrator profile ID at the same time.
+-- Reassert the manual setup completion function after the legacy snapshot
+-- sections so the snapshot matches 20260715004800's final lock order.
+create or replace function public.complete_manual_member_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  candidate_member_id uuid;
+  member_row public.members%rowtype;
+  token_row public.member_password_action_tokens%rowtype;
+begin
+  -- Identify the member without locking the token. All mutations below lock
+  -- the member first, then the token, matching the reissue RPC.
+  select member_id into candidate_member_id
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in ('manual_initial_setup', 'manual_password_reset')
+    and consumed_at is null
+    and expires_at > now();
+  if not found then
+    raise exception 'manual_password_action_invalid_or_expired';
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = candidate_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'manual_password_action_member_missing';
+  end if;
+
+  select * into token_row
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in ('manual_initial_setup', 'manual_password_reset')
+    and consumed_at is null
+    and expires_at > now()
+  for update;
+  if not found or token_row.member_id <> member_row.id then
+    raise exception 'manual_password_action_invalid_or_expired';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where id = token_row.id;
+
+  update public.members
+  set password_hash = p_password_hash,
+      password_salt = p_password_salt,
+      must_change_password = false,
+      email_verified_at = case
+        when token_row.delivery_channel = 'email' then coalesce(email_verified_at, now())
+        else email_verified_at
+      end,
+      updated_at = now()
+  where id = member_row.id;
+
+  return member_row.id;
+end;
+$$;
+
+revoke all on function public.complete_manual_member_password_action(text, text, text) from public;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from anon;
+revoke all on function public.complete_manual_member_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_manual_member_password_action(text, text, text) to service_role;
+
 create or replace function public.approve_member_profile_image_replacement(
   p_image_id uuid,
   p_admin_id uuid

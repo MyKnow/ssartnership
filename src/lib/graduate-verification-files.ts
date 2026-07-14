@@ -5,6 +5,7 @@ import {
   GRADUATE_PROFILE_IMAGE_SIZE,
   MAX_GRADUATE_CERTIFICATE_BYTES,
   MAX_GRADUATE_PROFILE_IMAGE_BYTES,
+  MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
   validateGraduatePhotoUpload,
 } from "@/lib/graduate-verification";
 
@@ -20,7 +21,6 @@ const PROFILE_CONTENT_TYPES = new Set([
   "image/png",
   "image/webp",
 ]);
-const MAX_PROFILE_IMAGE_PIXELS = 25_000_000;
 const MIN_MATTERMOST_PROFILE_IMAGE_DIMENSION = 32;
 
 type GraduateCertificateInspection = {
@@ -116,7 +116,7 @@ export async function normalizeGraduateProfileImage(input: {
     metadata = await sharp(input.source, {
       animated: true,
       failOn: "error",
-      limitInputPixels: MAX_PROFILE_IMAGE_PIXELS,
+      limitInputPixels: MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
     }).metadata();
   } catch {
     throw new Error("올바른 사진 파일인지 확인해 주세요.");
@@ -143,7 +143,7 @@ export async function normalizeGraduateProfileImage(input: {
     const buffer = await sharp(input.source, {
       animated: false,
       failOn: "error",
-      limitInputPixels: MAX_PROFILE_IMAGE_PIXELS,
+      limitInputPixels: MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
     })
       .rotate()
       .resize(GRADUATE_PROFILE_IMAGE_SIZE, GRADUATE_PROFILE_IMAGE_SIZE, {
@@ -184,7 +184,7 @@ export async function normalizeMattermostProfileImage(input: {
     metadata = await sharp(input.source, {
       animated: false,
       failOn: "error",
-      limitInputPixels: MAX_PROFILE_IMAGE_PIXELS,
+      limitInputPixels: MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
     }).metadata();
   } catch {
     throw new Error("Mattermost 프로필 사진을 읽지 못했습니다.");
@@ -205,7 +205,7 @@ export async function normalizeMattermostProfileImage(input: {
     const buffer = await sharp(input.source, {
       animated: false,
       failOn: "error",
-      limitInputPixels: MAX_PROFILE_IMAGE_PIXELS,
+      limitInputPixels: MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
     })
       .rotate()
       .resize(GRADUATE_PROFILE_IMAGE_SIZE, GRADUATE_PROFILE_IMAGE_SIZE, {

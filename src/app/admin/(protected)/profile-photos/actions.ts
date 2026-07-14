@@ -28,16 +28,23 @@ function getRequiredReason(formData: FormData) {
   return reason;
 }
 
-function revalidateProfilePhotoPaths() {
+function getOptionalMemberId(formData: FormData) {
+  const value = String(formData.get("memberId") ?? "").trim();
+  return UUID_PATTERN.test(value) ? value : null;
+}
+
+function revalidateProfilePhotoPaths(memberId?: string | null) {
   revalidatePath("/admin");
   revalidatePath(PROFILE_PHOTOS_PATH);
   revalidatePath("/admin/members");
+  if (memberId) revalidatePath(`/admin/members/${memberId}`);
   revalidatePath("/certification");
   revalidatePath("/certification/photo");
 }
 
 export async function approveMemberProfilePhotoAction(formData: FormData) {
   const imageId = getRequiredId(formData, "imageId");
+  const memberId = getOptionalMemberId(formData);
   const session = await requireAdminPermission("profile_images", "update", {
     path: PROFILE_PHOTOS_PATH,
   });
@@ -48,7 +55,7 @@ export async function approveMemberProfilePhotoAction(formData: FormData) {
       targetType: "member_profile_image",
       targetId: imageId,
     });
-    revalidateProfilePhotoPaths();
+    revalidateProfilePhotoPaths(memberId);
   } catch {
     scheduleAdminActionFailureLog("member_profile_photo_approve", {
       targetType: "member_profile_image",
@@ -62,6 +69,7 @@ export async function approveMemberProfilePhotoAction(formData: FormData) {
 export async function rejectMemberProfilePhotoAction(formData: FormData) {
   const imageId = getRequiredId(formData, "imageId");
   const reason = getRequiredReason(formData);
+  const memberId = getOptionalMemberId(formData);
   const session = await requireAdminPermission("profile_images", "update", {
     path: PROFILE_PHOTOS_PATH,
   });
@@ -73,7 +81,7 @@ export async function rejectMemberProfilePhotoAction(formData: FormData) {
       targetId: imageId,
       properties: { reasonLength: reason.length },
     });
-    revalidateProfilePhotoPaths();
+    revalidateProfilePhotoPaths(memberId);
   } catch {
     scheduleAdminActionFailureLog("member_profile_photo_reject", {
       targetType: "member_profile_image",
@@ -98,7 +106,7 @@ export async function rejectMemberCurrentProfilePhotoAction(formData: FormData) 
       targetId: memberId,
       properties: { reasonLength: reason.length },
     });
-    revalidateProfilePhotoPaths();
+    revalidateProfilePhotoPaths(memberId);
   } catch {
     scheduleAdminActionFailureLog("member_profile_photo_active_reject", {
       targetType: "member",

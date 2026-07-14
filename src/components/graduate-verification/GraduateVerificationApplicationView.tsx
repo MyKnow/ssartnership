@@ -19,8 +19,13 @@ import {
   getSsafyGenerationFromEducationStart,
   GRADUATE_CAMPUS_OPTIONS,
   MAX_GRADUATE_CERTIFICATE_BYTES,
-  MAX_GRADUATE_PROFILE_IMAGE_BYTES,
 } from "@/lib/graduate-verification";
+import {
+  GRADUATE_PROFILE_PHOTO_ACCEPT,
+  getGraduateProfilePhotoSourceError,
+  getGraduateProfilePhotoSourceFormat,
+  normalizeGraduateProfilePhotoSource,
+} from "@/lib/graduate-profile-photo.client";
 
 type ApplicationStep = "email" | "details" | "files" | "submitted";
 
@@ -39,16 +44,6 @@ const RESUBMISSION_TARGET_LABELS: Record<ResubmissionTarget, string> = {
 
 function getCurrentYear() {
   return new Date().getFullYear();
-}
-
-function getImageFileError(file: File) {
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    return "본인 사진은 JPEG, PNG, WebP 파일만 선택할 수 있습니다.";
-  }
-  if (file.size <= 0 || file.size > MAX_GRADUATE_PROFILE_IMAGE_BYTES) {
-    return "본인 사진은 5MB 이하만 선택할 수 있습니다.";
-  }
-  return null;
 }
 
 function getCertificateFileError(file: File) {
@@ -98,6 +93,7 @@ export default function GraduateVerificationApplicationView() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoSourceUrlRef = useRef<string | null>(null);
   const photoPreviewUrlRef = useRef<string | null>(null);
+  const photoSelectionRequestIdRef = useRef(0);
   const [step, setStep] = useState<ApplicationStep>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -115,6 +111,7 @@ export default function GraduateVerificationApplicationView() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
+  const [photoSelecting, setPhotoSelecting] = useState(false);
   const [sourcePhotoUrl, setSourcePhotoUrl] = useState("");
   const [resubmissionTargets, setResubmissionTargets] = useState<ResubmissionTarget[]>([]);
   const [resubmissionNote, setResubmissionNote] = useState<string | null>(null);
@@ -127,6 +124,7 @@ export default function GraduateVerificationApplicationView() {
   const currentYearMonth = useMemo(() => getGraduateCurrentYearMonth(), []);
 
   useEffect(() => () => {
+    photoSelectionRequestIdRef.current += 1;
     if (photoSourceUrlRef.current) URL.revokeObjectURL(photoSourceUrlRef.current);
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
   }, []);
@@ -343,18 +341,48 @@ export default function GraduateVerificationApplicationView() {
     setMessage(null);
   }
 
-  function handlePhotoChange(file: File | null) {
+  async function handlePhotoChange(file: File | null) {
     if (!file) return;
-    const error = getImageFileError(file);
+    const error = getGraduateProfilePhotoSourceError(file);
     if (error) {
       setMessage({ tone: "danger", text: error });
       return;
     }
-    if (photoSourceUrlRef.current) URL.revokeObjectURL(photoSourceUrlRef.current);
-    const sourceUrl = URL.createObjectURL(file);
-    photoSourceUrlRef.current = sourceUrl;
-    setSourcePhotoUrl(sourceUrl);
-    setCropOpen(true);
+    const requestId = photoSelectionRequestIdRef.current + 1;
+    photoSelectionRequestIdRef.current = requestId;
+    const isHeif = getGraduateProfilePhotoSourceFormat(file) === "heif";
+    setPhotoSelecting(true);
+    setMessage(
+      isHeif
+        ? {
+            tone: "info",
+            text: "HEIC/HEIF 사진을 기기에서 안전하게 변환하고 있습니다.",
+          }
+        : null,
+    );
+    try {
+      const sourceFile = await normalizeGraduateProfilePhotoSource(file);
+      if (photoSelectionRequestIdRef.current !== requestId) return;
+      if (photoSourceUrlRef.current) URL.revokeObjectURL(photoSourceUrlRef.current);
+      const sourceUrl = URL.createObjectURL(sourceFile);
+      photoSourceUrlRef.current = sourceUrl;
+      setSourcePhotoUrl(sourceUrl);
+      setCropOpen(true);
+      setMessage(null);
+    } catch (nextError) {
+      if (photoSelectionRequestIdRef.current !== requestId) return;
+      setMessage({
+        tone: "danger",
+        text:
+          nextError instanceof Error && nextError.message
+            ? nextError.message
+            : "사진 변환에 실패했습니다.",
+      });
+    } finally {
+      if (photoSelectionRequestIdRef.current === requestId) {
+        setPhotoSelecting(false);
+      }
+    }
   }
 
   function applyCroppedPhoto(file: File) {
@@ -515,11 +543,11 @@ export default function GraduateVerificationApplicationView() {
             />
           ) : null}
           <input ref={certificateInputRef} type="file" accept="application/pdf,.pdf" aria-label="교육이수증 PDF 파일 선택" className="sr-only" onChange={(event) => { handleCertificateChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
-          <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label="본인 사진 파일 선택" className="sr-only" onChange={(event) => { handlePhotoChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
+          <input ref={photoInputRef} type="file" accept={GRADUATE_PROFILE_PHOTO_ACCEPT} aria-label="본인 사진 파일 선택" className="sr-only" onChange={(event) => { void handlePhotoChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
           {requiresCertificate ? <div className="grid gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[1fr_auto] sm:items-center"><div><p className="font-semibold">교육이수증 PDF</p><p className="mt-1 text-sm text-muted-foreground">PDF, 최대 10MB, 5페이지 이하</p>{certificateFile ? <p className="mt-2 text-sm font-medium text-success">선택됨: {certificateFile.name}</p> : null}</div><Button variant="secondary" onClick={chooseCertificate}>{certificateFile ? "파일 바꾸기" : "PDF 선택"}</Button></div> : null}
-          {requiresProfileImage ? <div className="grid gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[1fr_auto] sm:items-center"><div><p className="font-semibold">1:1 본인 사진</p><p className="mt-1 text-sm text-muted-foreground">JPEG, PNG, WebP · 최대 5MB · 얼굴이 분명하게 보이는 사진</p>{photoFile ? <p className="mt-2 text-sm font-medium text-success">사진 크롭 완료</p> : null}</div><div className="flex items-center gap-3">{photoPreviewUrl ? <Image src={photoPreviewUrl} alt="선택한 본인 사진 미리보기" width={56} height={56} unoptimized className="h-14 w-14 rounded-[1rem] border border-border object-cover" /> : null}<Button variant="secondary" onClick={choosePhoto}>{photoFile ? "사진 바꾸기" : "사진 선택"}</Button></div></div> : null}
+          {requiresProfileImage ? <div className="grid min-w-0 gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-semibold">1:1 본인 사진</p><p className="mt-1 text-ko-pretty text-sm text-muted-foreground">JPEG, PNG, WebP, HEIC, HEIF · 최대 5MB · 얼굴이 분명하게 보이는 사진</p>{photoFile ? <p className="mt-2 text-sm font-medium text-success">사진 크롭 완료</p> : null}</div><div className="flex shrink-0 items-center gap-3">{photoPreviewUrl ? <Image src={photoPreviewUrl} alt="선택한 본인 사진 미리보기" width={56} height={56} unoptimized className="h-14 w-14 rounded-[1rem] border border-border object-cover" /> : null}<Button variant="secondary" onClick={choosePhoto} loading={photoSelecting} loadingText="사진 변환 중" disabled={pending}>{photoFile ? "사진 바꾸기" : "사진 선택"}</Button></div></div> : null}
           <label className="flex items-start gap-3 rounded-card border border-border bg-surface-control p-4 text-sm"><input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-primary" /><span>교육이수증과 본인 사진을 수료생 인증 검토 및 인증 카드·유효 QR 검증 화면 표시 목적으로 처리하는 데 동의합니다. 사진은 공개 URL로 제공하지 않습니다.</span></label>
-          <div className="flex flex-wrap gap-2"><Button variant="ghost" onClick={() => setStep("details")}>이전</Button><Button onClick={submit} loading={pending} loadingText="제출 중">{isResubmission ? "보완 제출" : "수료생 인증 제출"}</Button></div>
+          <div className="flex flex-wrap gap-2"><Button variant="ghost" onClick={() => setStep("details")}>이전</Button><Button onClick={submit} loading={pending} loadingText="제출 중" disabled={photoSelecting}>{isResubmission ? "보완 제출" : "수료생 인증 제출"}</Button></div>
         </section>
       ) : null}
 
@@ -547,8 +575,9 @@ export default function GraduateVerificationApplicationView() {
         outputName="graduate-profile.webp"
         outputWidth={640}
         outputHeight={640}
-        accept="image/jpeg,image/png,image/webp"
-        validateFile={getImageFileError}
+        accept={GRADUATE_PROFILE_PHOTO_ACCEPT}
+        validateFile={getGraduateProfilePhotoSourceError}
+        prepareFile={normalizeGraduateProfilePhotoSource}
         onCancel={() => setCropOpen(false)}
         onApply={applyCroppedPhoto}
       />

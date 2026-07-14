@@ -1,4 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
+import AdminMemberDirectCreatePanel from "@/components/admin/AdminMemberDirectCreatePanel";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
 import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
@@ -11,10 +12,12 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import {
   backfillMemberProfiles,
-  manualAddMembers,
+  createDirectMember,
+  disableGenerationMattermostLogin,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
@@ -31,6 +34,11 @@ import type {
 } from "@/components/admin/member-manager/selectors";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { parseAdminMemberPageSize } from "@/lib/admin-ia";
+import {
+  getConfiguredCurrentSsafyYear,
+  getConfiguredManualMemberMmLookupGenerations,
+  getSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +71,10 @@ type AdminMemberSearchParams = {
   updated?: string;
   skipped?: string;
   failures?: string;
+  mattermostUnavailable?: string;
+  mmLoginTransition?: string;
+  generation?: string;
+  disabled?: string;
   error?: string;
   q?: string;
   sort?: string;
@@ -351,12 +363,18 @@ async function getMemberSearchIds(
   }
 
   const pattern = `%${escapeLikePattern(searchValue)}%`;
-  const [memberResult, usernameResult, userIdResult] = await Promise.all([
+  const [memberResult, directLoginIdResult, usernameResult, userIdResult] = await Promise.all([
     supabase
       .from("members")
       .select("id")
       .is("deleted_at", null)
       .ilike("display_name", pattern)
+      .limit(MEMBER_OPTION_SAMPLE_LIMIT),
+    supabase
+      .from("members")
+      .select("id")
+      .is("deleted_at", null)
+      .ilike("manual_login_id", pattern)
       .limit(MEMBER_OPTION_SAMPLE_LIMIT),
     supabase
       .from("mm_user_directory")
@@ -369,7 +387,12 @@ async function getMemberSearchIds(
       .ilike("mm_user_id", pattern)
       .limit(MEMBER_OPTION_SAMPLE_LIMIT),
   ]);
-  if (memberResult.error || usernameResult.error || userIdResult.error) {
+  if (
+    memberResult.error
+    || directLoginIdResult.error
+    || usernameResult.error
+    || userIdResult.error
+  ) {
     throw new Error("회원 검색 조건을 불러오지 못했습니다.");
   }
 
@@ -394,7 +417,11 @@ async function getMemberSearchIds(
 
   return Array.from(
     new Set(
-      [...(memberResult.data ?? []), ...(accountMemberResult?.data ?? [])]
+      [
+        ...(memberResult.data ?? []),
+        ...(directLoginIdResult.data ?? []),
+        ...(accountMemberResult?.data ?? []),
+      ]
         .map((row) => row.id)
         .filter((id): id is string => Boolean(id)),
     ),
@@ -426,7 +453,9 @@ export default async function AdminMembersPage({
 }: {
   searchParams?: Promise<AdminMemberSearchParams>;
 }) {
-  await requireAdminPermission("members", "read", { path: "/admin/members" });
+  const adminSession = await requireAdminPermission("members", "read", {
+    path: "/admin/members",
+  });
   const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const page = parsePage(getOne(params, "page"));
@@ -448,6 +477,14 @@ export default async function AdminMembersPage({
     mmEnabledFilter: parseNotificationFilter(getOne(params, "mmEnabled")),
     marketingEnabledFilter: parseNotificationFilter(getOne(params, "marketingEnabled")),
   };
+  const selectedGeneration = filters.yearFilter === "all"
+    ? null
+    : Number(filters.yearFilter);
+  const canUpdateMembers = canAdmin(
+    adminSession.account.permissions,
+    "members",
+    "update",
+  );
   const supabase = getSupabaseAdminClient();
   const [
     activePolicies,
@@ -455,6 +492,7 @@ export default async function AdminMembersPage({
     optionsResult,
     preferenceFilter,
     searchMemberIds,
+    cycleSettings,
   ] = await Promise.all([
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing").catch(() => null),
@@ -490,6 +528,7 @@ export default async function AdminMembersPage({
       },
     ]),
     getMemberSearchIds(supabase, filters.searchValue),
+    getSsafyCycleSettings(),
   ]);
   const policyConsentFilter = await getPolicyConsentFilteredMemberIds(supabase, [
     {
@@ -519,7 +558,7 @@ export default async function AdminMembersPage({
   let memberQuery = supabase
     .from("members")
     .select(
-      "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at",
+      "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at",
       { count: "exact" },
     )
     .is("deleted_at", null);
@@ -647,6 +686,7 @@ export default async function AdminMembersPage({
       id: member.id,
       mmUserId: directory?.mm_user_id ?? "",
       mmUsername: directory?.mm_username ?? "",
+      manualLoginId: member.manual_login_id,
       displayName: member.display_name,
       generation: member.generation,
       staffSourceGeneration: member.staff_source_generation,
@@ -720,11 +760,33 @@ export default async function AdminMembersPage({
           description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <form action={backfillMemberProfiles}>
-                <SubmitButton pendingText="백필 중">
-                  지금 백필 실행
-                </SubmitButton>
-              </form>
+              {canUpdateMembers ? (
+                <>
+                  <form action={backfillMemberProfiles}>
+                    <SubmitButton pendingText="백필 중">
+                      지금 백필 실행
+                    </SubmitButton>
+                  </form>
+                  {selectedGeneration !== null ? (
+                    <form action={disableGenerationMattermostLogin} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="generation" value={selectedGeneration} />
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          name="confirmedGeneration"
+                          value={selectedGeneration}
+                          required
+                          className="size-4"
+                        />
+                        전체 중단 확인
+                      </label>
+                      <SubmitButton variant="danger" pendingText="전환 중">
+                        {selectedGeneration}기 MM 로그인 중단
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </>
+              ) : null}
             </div>
           }
         />
@@ -769,74 +831,89 @@ export default async function AdminMembersPage({
                   ? "백필 중 오류가 발생했습니다."
                   : "백필이 완료되었습니다."
             }
-            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
+            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.mattermostUnavailable ? `MM 이용 중단 ${params.mattermostUnavailable}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
+          />
+        ) : null}
+        {params.mmLoginTransition === "generation" ? (
+          <InlineMessage
+            tone="success"
+            title="기수 전체의 MM 로그인을 중단했습니다."
+            description={`${params.generation ?? "선택한"}기 ${params.disabled ?? "0"}명의 기존 MM 연결 이력은 유지됩니다. 이메일이 이미 인증된 회원은 이메일로 로그인할 수 있고, 나머지는 회원 상세에서 설정 링크를 발송해 주세요.`}
           />
         ) : null}
 
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.72fr)] 2xl:items-start">
-          <div className="grid gap-6">
-            <section className="grid min-w-0 gap-4">
-              <AdminSectionHeading
-                title="회원 목록"
-                description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
-              />
-              <div>
-                <AdminMemberManager
-                  key={[
-                    page,
-                    pageSize,
-                    filters.searchValue,
-                    filters.sortValue,
-                    filters.filterValue,
-                    filters.yearFilter,
-                    filters.campusFilter,
-                    filters.serviceConsentFilter,
-                    filters.privacyConsentFilter,
-                    filters.marketingConsentFilter,
-                    filters.pushEnabledFilter,
-                    filters.announcementEnabledFilter,
-                    filters.newPartnerEnabledFilter,
-                    filters.expiringPartnerEnabledFilter,
-                    filters.reviewEnabledFilter,
-                    filters.mmEnabledFilter,
-                    filters.marketingEnabledFilter,
-                  ].join(":")}
-                  members={enrichedMembers}
-                  pagination={{
-                    totalCount,
-                    page,
-                    pageSize,
-                  }}
-                  filters={filters}
-                  options={options}
-                />
-              </div>
-            </section>
-          </div>
+        <section className="grid min-w-0 gap-4">
+          <AdminSectionHeading
+            title="수동 추가"
+            description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
+          />
+          <Card tone="elevated">
+            <AdminMemberManualAddPanel
+              currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
+              mmLookupGenerations={getConfiguredManualMemberMmLookupGenerations(cycleSettings)}
+              canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
+            />
+          </Card>
+        </section>
 
-          <div className="grid gap-6 2xl:sticky 2xl:top-24">
-            <Card tone="elevated">
-              <AdminSectionHeading
-                title="수동 추가"
-                description="MM 아이디를 입력해 계정을 생성하고 비밀번호 변경 필요 상태로 저장합니다."
-              />
-              <div className="mt-6">
-                <AdminMemberManualAddPanel action={manualAddMembers} />
-              </div>
-            </Card>
+        <section className="grid min-w-0 gap-4">
+          <AdminSectionHeading
+            title="직접 계정 생성"
+            description="외부 인증 없이 로그인 가능한 회원 계정을 만들고 첫 로그인에 비밀번호 변경을 요구합니다."
+          />
+          <Card tone="elevated">
+            <AdminMemberDirectCreatePanel action={createDirectMember} />
+          </Card>
+        </section>
 
-            <Card tone="elevated">
-              <AdminSectionHeading
-                title="운영 메모"
-                description="15기 우선 조회 후 없으면 14기에서 다시 찾습니다."
-              />
-              <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-                <p>정책 동의 상태와 알림 설정은 현재 페이지 결과에서 즉시 확인할 수 있습니다.</p>
-                <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
-              </div>
-            </Card>
+        <Card tone="elevated">
+          <AdminSectionHeading
+            title="운영 메모"
+            description="MM 조회 가능 기수와 사진 검토 상태를 확인합니다."
+          />
+          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
+            <p>MM·이메일 알림 전송 결과가 불명확하면 자동 대체 발송하지 않습니다. 수신 여부 확인 뒤에만 새 링크를 발급합니다.</p>
+            <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
           </div>
-        </div>
+        </Card>
+
+        <section className="grid min-w-0 gap-4">
+          <AdminSectionHeading
+            title="회원 목록"
+            description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
+          />
+          <div>
+            <AdminMemberManager
+              key={[
+                page,
+                pageSize,
+                filters.searchValue,
+                filters.sortValue,
+                filters.filterValue,
+                filters.yearFilter,
+                filters.campusFilter,
+                filters.serviceConsentFilter,
+                filters.privacyConsentFilter,
+                filters.marketingConsentFilter,
+                filters.pushEnabledFilter,
+                filters.announcementEnabledFilter,
+                filters.newPartnerEnabledFilter,
+                filters.expiringPartnerEnabledFilter,
+                filters.reviewEnabledFilter,
+                filters.mmEnabledFilter,
+                filters.marketingEnabledFilter,
+              ].join(":")}
+              members={enrichedMembers}
+              pagination={{
+                totalCount,
+                page,
+                pageSize,
+              }}
+              filters={filters}
+              options={options}
+            />
+          </div>
+        </section>
       </div>
     </AdminShell>
   );

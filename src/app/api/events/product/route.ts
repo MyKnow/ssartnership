@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isProductEventName } from '@/lib/event-catalog';
 import {
   getRequestLogContext,
   resolveCurrentActor,
   scheduleProductEventLog,
 } from '@/lib/activity-logs';
-import { consumeProductEventQuota } from '@/lib/product-event-throttle';
-import { normalizeProductEventLocation } from '@/lib/product-event-path';
+import {
+  consumeProductEventIngressQuota,
+  consumeProductEventQuota,
+} from '@/lib/product-event-throttle';
+import {
+  MAX_PRODUCT_EVENT_BODY_BYTES,
+  parseProductEventRequest,
+} from '@/lib/product-event-contract';
+import {
+  RequestBodyTooLargeError,
+  readRequestBodyWithinLimit,
+} from '@/lib/request-body-limit';
 import { isTrustedSameOriginRequest } from '@/lib/request-guards';
 
 export const runtime = 'nodejs';
@@ -21,22 +30,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 403 });
   }
 
+  const declaredContentLength = request.headers.get('content-length');
+  if (
+    declaredContentLength &&
+    Number.isFinite(Number(declaredContentLength)) &&
+    Number(declaredContentLength) > MAX_PRODUCT_EVENT_BODY_BYTES
+  ) {
+    return NextResponse.json({ message: '이벤트 요청이 너무 큽니다.' }, { status: 413 });
+  }
+
+  const context = getRequestLogContext(request);
+  if (!consumeProductEventIngressQuota({ ipAddress: context.ipAddress })) {
+    return NextResponse.json({ ok: true, throttled: true }, { status: 202 });
+  }
+
   try {
-    const body = (await request.json()) as {
-      eventName?: string;
-      sessionId?: string | null;
-      path?: string | null;
-      referrer?: string | null;
-      targetType?: string | null;
-      targetId?: string | null;
-      properties?: Record<string, unknown> | null;
-    };
+    const rawBody = await readRequestBodyWithinLimit(
+      request.body,
+      MAX_PRODUCT_EVENT_BODY_BYTES,
+    );
+    const body = parseProductEventRequest(JSON.parse(rawBody) as unknown);
 
-    if (!body?.eventName || !isProductEventName(body.eventName)) {
-      return NextResponse.json({ message: '허용되지 않은 이벤트입니다.' }, { status: 400 });
-    }
-
-    const context = getRequestLogContext(request);
     if (
       !consumeProductEventQuota({
         eventName: body.eventName,
@@ -51,20 +65,28 @@ export async function POST(request: NextRequest) {
 
     scheduleProductEventLog({
       eventName: body.eventName,
+      eventId: body.eventId,
+      schemaVersion: body.schemaVersion,
+      occurredAt: body.occurredAt,
       actorType: actor.actorType,
       actorId: actor.actorId,
       sessionId: body.sessionId ?? null,
-      path: normalizeProductEventLocation(body.path ?? context.path),
-      referrer: normalizeProductEventLocation(body.referrer ?? context.referrer),
+      path: body.path ?? context.path,
+      referrer: body.referrer ?? context.referrer,
       targetType: body.targetType ?? null,
       targetId: body.targetId ?? null,
       properties: body.properties ?? {},
       userAgent: context.userAgent,
       ipAddress: context.ipAddress,
+      requestId: context.requestId,
     });
 
-    return NextResponse.json({ ok: true }, { status: 202 });
-  } catch {
+    return NextResponse.json({ accepted: true, eventId: body.eventId }, { status: 202 });
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json({ message: '이벤트 요청이 너무 큽니다.' }, { status: 413 });
+    }
+
     return NextResponse.json({ message: '이벤트를 기록하지 못했습니다.' }, { status: 400 });
   }
 }

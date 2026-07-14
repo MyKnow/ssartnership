@@ -5,6 +5,7 @@ export type SsafyVerifiedMember = {
   id: string;
   must_change_password: boolean | null;
   mattermost_account_id: string | null;
+  mattermost_login_disabled_at: string | null;
   updated_at: string;
 };
 
@@ -22,7 +23,7 @@ type MattermostDirectoryEntry = {
   id: string;
 };
 
-const MEMBER_SELECT = "id,must_change_password,mattermost_account_id,updated_at";
+const MEMBER_SELECT = "id,must_change_password,mattermost_account_id,mattermost_login_disabled_at,updated_at";
 const VERIFICATION_SELECT = "member_id,ssafy_sub";
 
 export function buildMemberSsafyVerificationUpsertPayload(

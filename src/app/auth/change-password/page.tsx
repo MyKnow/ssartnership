@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import { getUserSession } from "@/lib/user-auth";
 import { getHeaderSession } from "@/lib/header-session";
 import ChangePasswordForm from "@/components/auth/ChangePasswordForm";
+import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
@@ -33,11 +34,15 @@ export default async function ChangePasswordPage({ searchParams }: PageProps) {
   if (!session?.userId) {
     redirect("/auth/login");
   }
-  if (session.requiresConsent) {
-    const consentReturnTo = returnTo
-      ? `/auth/consent?returnTo=${encodeURIComponent(returnTo)}`
-      : "/auth/consent";
-    redirect(consentReturnTo);
+  const requiredGateRedirect = getMemberRequiredGateRedirect({
+    currentPath: "/auth/change-password",
+    returnTo,
+    mustChangePassword: session.mustChangePassword,
+    requiresConsent: session.requiresConsent,
+    requiresProfilePhotoUpdate: session.requiresProfilePhotoUpdate,
+  });
+  if (requiredGateRedirect) {
+    redirect(requiredGateRedirect);
   }
 
   const headerSession = await getHeaderSession(session.userId);

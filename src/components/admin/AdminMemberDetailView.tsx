@@ -3,6 +3,7 @@ import AdminMemberCommunicationPanel from "@/components/admin/member-detail/Admi
 import AdminMemberSecurityLogExplorer, {
   type AdminMemberSecurityLog,
 } from "@/components/admin/member-detail/AdminMemberSecurityLogExplorer";
+import AdminMemberProfilePhotoPanel from "@/components/admin/member-detail/AdminMemberProfilePhotoPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Badge from "@/components/ui/Badge";
@@ -14,6 +15,8 @@ import type {
   AdminMemberPolicyState,
 } from "@/lib/admin-member-detail";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
@@ -23,10 +26,17 @@ export type AdminMemberDetailViewProps = {
     displayName: string;
     mmUsername: string;
     mmUserId: string | null;
+    manualLoginId: string | null;
     generation: number;
     generationLabel: string;
     campus: string;
     mustChangePassword: boolean;
+    email?: string | null;
+    emailVerifiedAt?: string | null;
+    hasMattermostAccount: boolean;
+    mattermostLoginDisabledAt: string | null;
+    mattermostLoginDisabledReason: string | null;
+    emailLoginTransition?: MemberEmailLoginTransition | null;
     createdAt: string | null;
     updatedAt: string | null;
     hasAvatar: boolean;
@@ -45,8 +55,17 @@ export type AdminMemberDetailViewProps = {
   consentTimeline: readonly AdminMemberPolicyEvent[];
   updateAction: FormAction;
   deleteAction: FormAction;
+  emailLoginTransitionAction: FormAction;
   canUpdate: boolean;
   canDelete: boolean;
+  profilePhoto?: {
+    reviewStatus: MemberProfilePhotoReviewStatus;
+    pendingImageId: string | null;
+    canUpdate: boolean;
+    approveAction: FormAction;
+    rejectReplacementAction: FormAction;
+    rejectCurrentAction: FormAction;
+  } | null;
 };
 
 function formatDate(value: string | null) {
@@ -63,13 +82,35 @@ export default function AdminMemberDetailView({
   consentTimeline,
   updateAction,
   deleteAction,
+  emailLoginTransitionAction,
   canUpdate,
   canDelete,
+  profilePhoto = null,
 }: AdminMemberDetailViewProps) {
-  const avatarLabel = (member.displayName || member.mmUsername || "?")
+  const loginIdentifier = member.manualLoginId ?? member.mmUsername;
+  const avatarLabel = (member.displayName || loginIdentifier || "?")
     .trim()
     .charAt(0)
     .toUpperCase();
+  const accountManagerMember = {
+    id: member.id,
+    displayName: member.displayName,
+    campus: member.campus,
+    generation: member.generation,
+    mmUsername: member.mmUsername,
+    manualLoginId: member.manualLoginId,
+    mustChangePassword: member.mustChangePassword,
+    hasMattermostAccount: member.hasMattermostAccount,
+    mattermostLoginDisabledAt: member.mattermostLoginDisabledAt,
+    mattermostLoginDisabledReason: member.mattermostLoginDisabledReason,
+    ...(canUpdate
+      ? {
+          email: member.email,
+          emailVerifiedAt: member.emailVerifiedAt,
+          emailLoginTransition: member.emailLoginTransition,
+        }
+      : {}),
+  };
 
   return (
     <div className="grid gap-6">
@@ -82,9 +123,9 @@ export default function AdminMemberDetailView({
       <StatsRow
         items={[
           {
-            label: "MM 아이디",
-            value: member.mmUsername ? `@${member.mmUsername}` : "-",
-            hint: member.mmUserId ?? "외부 식별자 없음",
+            label: "로그인 ID",
+            value: member.manualLoginId ?? (member.mmUsername ? `@${member.mmUsername}` : "-"),
+            hint: member.manualLoginId ? "관리자 직접 생성 계정" : member.mmUserId ?? "외부 식별자 없음",
           },
           {
             label: "기수/캠퍼스",
@@ -139,7 +180,9 @@ export default function AdminMemberDetailView({
                 {member.displayName}
               </h2>
               <p className="break-all text-sm text-muted-foreground">
-                @{member.mmUsername || "mm_username 없음"}
+                {member.manualLoginId
+                  ? `직접 ID · ${member.manualLoginId}`
+                  : `@${member.mmUsername || "mm_username 없음"}`}
               </p>
             </div>
 
@@ -149,9 +192,9 @@ export default function AdminMemberDetailView({
                 <span className="font-medium text-foreground">{member.campus}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>MM User ID</span>
+                <span>{member.manualLoginId ? "직접 로그인 ID" : "MM User ID"}</span>
                 <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
-                  {member.mmUserId ?? "-"}
+                  {member.manualLoginId ?? member.mmUserId ?? "-"}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -166,6 +209,17 @@ export default function AdminMemberDetailView({
               </div>
             </div>
           </Card>
+          {profilePhoto ? (
+            <AdminMemberProfilePhotoPanel
+              memberId={member.id}
+              reviewStatus={profilePhoto.reviewStatus}
+              pendingImageId={profilePhoto.pendingImageId}
+              canUpdate={profilePhoto.canUpdate}
+              approveAction={profilePhoto.approveAction}
+              rejectReplacementAction={profilePhoto.rejectReplacementAction}
+              rejectCurrentAction={profilePhoto.rejectCurrentAction}
+            />
+          ) : null}
 
           <Card tone="default" className="grid gap-4">
             <AdminSectionHeading
@@ -189,16 +243,10 @@ export default function AdminMemberDetailView({
           </Card>
 
           <AdminMemberAccountManager
-            member={{
-              id: member.id,
-              displayName: member.displayName,
-              campus: member.campus,
-              generation: member.generation,
-              mmUsername: member.mmUsername,
-              mustChangePassword: member.mustChangePassword,
-            }}
+            member={accountManagerMember}
             updateAction={updateAction}
             deleteAction={deleteAction}
+            emailLoginTransitionAction={emailLoginTransitionAction}
             canUpdate={canUpdate}
             canDelete={canDelete}
           />

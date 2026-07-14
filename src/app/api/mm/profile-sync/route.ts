@@ -29,7 +29,30 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    if (syncResult?.updated) {
+    if ("unavailable" in syncResult) {
+      await logAdminAudit({
+        ...context,
+        action: "member_email_login_transition",
+        actorId: session.userId,
+        targetType: "member",
+        targetId: session.userId,
+        properties: {
+          source: "member_profile_action",
+          reason: "provider_not_found",
+          mmUserId: syncResult.member.mmUserId,
+          generation: syncResult.member.generation,
+        },
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          updated: false,
+          message: "MM 계정을 찾을 수 없어 MM 로그인을 중단했습니다. 이메일 로그인 설정을 위해 관리자에게 문의해 주세요.",
+        },
+        { status: 409 },
+      );
+    }
+    if (syncResult.updated) {
       await logAdminAudit({
         ...context,
         action: "member_sync",

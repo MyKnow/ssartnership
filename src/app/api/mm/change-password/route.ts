@@ -103,8 +103,9 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdminClient();
     const { data: member } = await supabase
       .from("members")
-      .select("id,password_hash,password_salt")
+      .select("id,password_hash,password_salt,mattermost_account_id,updated_at")
       .eq("id", session.userId)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (!member?.password_hash || !member.password_salt) {
@@ -141,18 +142,29 @@ export async function POST(request: Request) {
     }
 
     const record = hashPassword(nextPassword);
-    const { data: updatedMember, error: updateError } = await supabase
-      .from("members")
-      .update({
-        password_hash: record.hash,
-        password_salt: record.salt,
-        must_change_password: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", session.userId)
-      .select("id,must_change_password")
-      .maybeSingle();
-    if (updateError || !updatedMember?.id || updatedMember.must_change_password) {
+    const usesMattermostAuthentication =
+      session.authenticationMethod === "mattermost"
+      || session.authenticationMethod === "ssafy";
+    const { data: updatedMemberId, error: updateError } = usesMattermostAuthentication
+      ? await supabase.rpc(
+        "update_member_mattermost_password_credentials",
+        {
+          p_member_id: session.userId,
+          p_expected_mattermost_account_id: member.mattermost_account_id,
+          p_expected_updated_at: member.updated_at,
+          p_password_hash: record.hash,
+          p_password_salt: record.salt,
+        },
+      )
+      : await supabase.rpc(
+        "update_member_password_credentials",
+        {
+          p_member_id: session.userId,
+          p_password_hash: record.hash,
+          p_password_salt: record.salt,
+        },
+      );
+    if (updateError || updatedMemberId !== session.userId) {
       await logAuthSecurity({
         ...context,
         eventName: "member_password_change",
@@ -175,7 +187,9 @@ export async function POST(request: Request) {
       );
     }
 
-    await setUserSession(session.userId, false);
+    await setUserSession(session.userId, false, {
+      freshAuthentication: true,
+    });
     revalidatePath("/auth/change-password");
     revalidatePath("/auth/consent");
     revalidatePath("/certification");

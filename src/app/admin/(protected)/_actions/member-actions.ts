@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminPermission } from "@/lib/admin-access";
@@ -7,15 +8,26 @@ import {
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
 import {
-  parseManualMemberAddInputList,
-  type ManualMemberAddFormState,
-  type ManualMemberAddYear,
-} from "@/lib/member-manual-add";
-import { provisionManualMembers } from "@/lib/member-manual-add/provision";
+  buildDirectMemberCreateAuditProperties,
+  DIRECT_MEMBER_CREATE_INITIAL_STATE,
+  validateDirectMemberCreateInput,
+  type DirectMemberCreateFormState,
+} from "@/lib/member-direct-create";
+import {
+  DirectMemberProvisionError,
+  provisionDirectMember,
+} from "@/lib/member-direct-create-provision";
 import {
   parseMemberYearValue,
   validateMemberYear,
 } from "@/lib/validation";
+import { isUuid } from "@/lib/uuid";
+import {
+  disableMattermostLoginsForGeneration,
+  issueMemberEmailLoginTransition,
+  isMattermostLoginDisabledReason,
+  MemberEmailLoginTransitionError,
+} from "@/lib/member-email-login-transition";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 import {
   getMmUserDirectoryEntriesByAccountIds,
@@ -26,7 +38,6 @@ import {
   redirectAdminActionError,
   revalidateMemberPaths,
 } from "./shared-helpers";
-import { revalidatePath } from "next/cache";
 
 export async function backfillMemberProfilesAction() {
   const adminSession = await requireAdminPermission("members", "update", {
@@ -40,6 +51,7 @@ export async function backfillMemberProfilesAction() {
     updated: 0,
     skipped: 0,
     failures: 0,
+    mattermostUnavailable: 0,
   };
 
   try {
@@ -50,10 +62,12 @@ export async function backfillMemberProfilesAction() {
       updated: result.updated,
       skipped: result.skipped,
       failures: result.failures.length,
+      mattermostUnavailable: result.mattermostUnavailable.length,
     };
 
     await Promise.allSettled(
-      result.results.map((syncResult) =>
+      [
+        ...result.results.map((syncResult) =>
         logAdminAudit({
           ...context,
           action: "member_sync",
@@ -64,7 +78,23 @@ export async function backfillMemberProfilesAction() {
             source: "manual_backfill",
           }),
         }),
-      ),
+        ),
+        ...result.mattermostUnavailable.map((unavailableResult) =>
+          logAdminAudit({
+            ...context,
+            action: "member_email_login_transition",
+            actorId,
+            targetType: "member",
+            targetId: unavailableResult.member.id,
+            properties: {
+              source: "manual_backfill",
+              reason: "provider_not_found",
+              mmUserId: unavailableResult.member.mmUserId,
+              generation: unavailableResult.member.generation,
+            },
+          }),
+        ),
+      ],
     );
     status = result.failures.length > 0 ? "partial" : "success";
   } catch (error) {
@@ -78,8 +108,128 @@ export async function backfillMemberProfilesAction() {
   }
 
   redirect(
-    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}`,
+    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
   );
+}
+
+function memberEmailLoginTransitionErrorCode(error: unknown) {
+  if (!(error instanceof MemberEmailLoginTransitionError)) {
+    return "member_email_transition_failed";
+  }
+  return `member_email_transition_${error.code}`;
+}
+
+export async function disableGenerationMattermostLoginAction(formData: FormData) {
+  await requireAdminPermission("members", "update", { path: "/admin/members" });
+  const generationRaw = String(formData.get("generation") ?? "").trim();
+  const confirmedGeneration = String(formData.get("confirmedGeneration") ?? "").trim();
+  const generation = parseMemberYearValue(generationRaw);
+  if (generation === null || generation < 1 || validateMemberYear(generationRaw)) {
+    redirectAdminActionError("/admin/members", "member_invalid_year", {
+      action: "member_mattermost_login_disable_generation",
+      targetType: "generation",
+      targetId: generationRaw || null,
+      properties: { reason: "invalid_generation" },
+    });
+  }
+  if (confirmedGeneration !== String(generation)) {
+    redirectAdminActionError("/admin/members", "member_email_transition_generation_unconfirmed", {
+      action: "member_mattermost_login_disable_generation",
+      targetType: "generation",
+      targetId: String(generation),
+      properties: { reason: "generation_unconfirmed" },
+    });
+  }
+
+  let disabledCount: number;
+  try {
+    disabledCount = await disableMattermostLoginsForGeneration(generation);
+    await logAdminAction("member_mattermost_login_disable_generation", {
+      targetType: "generation",
+      targetId: String(generation),
+      properties: { generation, disabledCount },
+    });
+  } catch {
+    redirectAdminActionError("/admin/members", "member_email_transition_failed", {
+      action: "member_mattermost_login_disable_generation",
+      targetType: "generation",
+      targetId: String(generation),
+      properties: { generation },
+    });
+  }
+  revalidateMemberPaths();
+  redirect(
+    `/admin/members?mmLoginTransition=generation&generation=${generation}&disabled=${disabledCount}`,
+  );
+}
+
+export async function issueMemberEmailLoginTransitionAction(formData: FormData) {
+  const adminSession = await requireAdminPermission("members", "update", {
+    path: "/admin/members",
+  });
+  const memberId = String(formData.get("id") ?? "").trim();
+  const email = formData.get("email");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const identityVerified = formData.get("identityVerified") === "true";
+  const detailPath = isUuid(memberId)
+    ? `/admin/members/${memberId}`
+    : "/admin/members";
+  if (!isUuid(memberId)) {
+    redirectAdminActionError(detailPath, "member_missing_id", {
+      action: "member_email_login_transition",
+      targetType: "member",
+      properties: { reason: "invalid_member_id" },
+    });
+  }
+  if (!isMattermostLoginDisabledReason(reason)) {
+    redirectAdminActionError(detailPath, "member_email_transition_invalid_reason", {
+      action: "member_email_login_transition",
+      targetType: "member",
+      targetId: memberId,
+      properties: { reason: "invalid_transition_reason" },
+    });
+  }
+  if (!identityVerified) {
+    redirectAdminActionError(detailPath, "member_email_transition_identity_unconfirmed", {
+      action: "member_email_login_transition",
+      targetType: "member",
+      targetId: memberId,
+      properties: { reason: "identity_unconfirmed" },
+    });
+  }
+
+  let result: { expiresAt: string };
+  try {
+    result = await issueMemberEmailLoginTransition({
+      memberId,
+      email,
+      reason,
+      initiatedByAdminId: adminSession.adminId,
+    });
+    await logAdminAction("member_email_login_transition", {
+      targetType: "member",
+      targetId: memberId,
+      properties: {
+        reason,
+        expiresAt: result.expiresAt,
+        identityVerified: true,
+      },
+    });
+  } catch (error) {
+    redirectAdminActionError(
+      detailPath,
+      memberEmailLoginTransitionErrorCode(error),
+      {
+        action: "member_email_login_transition",
+        targetType: "member",
+        targetId: memberId,
+        properties: { reason },
+      },
+    );
+  }
+  revalidateMemberPaths();
+  revalidatePath(detailPath);
+  redirect(`${detailPath}?emailTransition=sent`);
 }
 
 export async function updateMemberAction(formData: FormData) {
@@ -145,93 +295,81 @@ export async function updateMemberAction(formData: FormData) {
   redirect("/admin/members");
 }
 
-export async function manualAddMembersAction(
-  _prevState: ManualMemberAddFormState,
+export async function createDirectMemberAction(
+  _prevState: DirectMemberCreateFormState,
   formData: FormData,
-): Promise<ManualMemberAddFormState> {
+): Promise<DirectMemberCreateFormState> {
   const adminSession = await requireAdminPermission("members", "create", {
     path: "/admin/members",
   });
-
-  const requestedYearRaw = String(formData.get("requestedYear") || "").trim();
-  const requestedYear = Number.parseInt(requestedYearRaw, 10) as ManualMemberAddYear;
-  const mmIdsRaw = String(formData.get("mmIds") || "").trim();
-
-  if (![0, 14, 15].includes(requestedYear)) {
+  const validation = validateDirectMemberCreateInput({
+    loginId: formData.get("loginId"),
+    displayName: formData.get("displayName"),
+    generation: formData.get("generation"),
+    campus: formData.get("campus"),
+    temporaryPassword: formData.get("temporaryPassword"),
+    temporaryPasswordConfirmation: formData.get("temporaryPasswordConfirmation"),
+  });
+  if (!validation.ok) {
     return {
+      ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
       status: "error",
-      message: "기수는 운영진, 14기, 15기 중 하나여야 합니다.",
-      requestedYear: 15,
-      total: 0,
-      success: 0,
-      failed: 0,
-      items: [],
+      message: "입력값을 확인해 주세요.",
+      fieldErrors: validation.fieldErrors,
     };
   }
 
-  const inputs = parseManualMemberAddInputList(mmIdsRaw);
-  if (inputs.length === 0) {
+  try {
+    const member = await provisionDirectMember(validation.value);
+    const context = await getServerActionLogContext("/admin/members");
+    await logAdminAudit({
+      ...context,
+      action: "member_direct_create",
+      actorId: adminSession.adminId,
+      targetType: "member",
+      targetId: member.id,
+      properties: buildDirectMemberCreateAuditProperties(validation.value),
+    });
+    revalidateMemberPaths();
+    revalidatePath("/admin/logs");
     return {
-      status: "error",
-      message: "추가할 MM 아이디를 콤마로 구분해 입력해 주세요.",
-      requestedYear,
-      total: 0,
-      success: 0,
-      failed: 0,
-      items: [],
+      ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+      status: "success",
+      message: "직접 회원 계정을 생성했습니다. 임시 비밀번호를 안전한 경로로 전달해 주세요.",
+      member,
     };
-  }
-
-  const context = await getServerActionLogContext("/admin/members");
-  const actorId = adminSession.adminId;
-  const result = await provisionManualMembers(requestedYear, inputs);
-
-  const auditResults = await Promise.allSettled(
-    result.items.map((item) =>
-      logAdminAudit({
-        ...context,
-        action: "member_manual_add",
-        actorId,
-        targetType: "member",
-        targetId: item.memberId ?? item.mmUserId ?? item.username,
-        properties: {
-          requestedYear: result.requestedYear,
-          batchTotal: result.total,
-          batchSuccess: result.success,
-          batchFailed: result.failed,
-          input: item.raw,
-          normalizedUsername: item.username,
-          status: item.status,
-          action: item.action,
-          reason: item.reason,
-          resolvedYear: item.resolvedYear,
-          staffSourceYear: item.staffSourceYear,
-          memberId: item.memberId,
-          mmUserId: item.mmUserId,
-          mmUsername: item.mmUsername,
-          displayName: item.displayName,
-          campus: item.campus,
-        },
-      }),
-    ),
-  );
-  for (const auditResult of auditResults) {
-    if (auditResult.status === "rejected") {
-      console.error("manual member add log failed", auditResult.reason);
+  } catch (error) {
+    if (error instanceof DirectMemberProvisionError) {
+      if (error.code === "duplicate_login_id") {
+        return {
+          ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+          status: "error",
+          message: "입력값을 확인해 주세요.",
+          fieldErrors: {
+            loginId: "이미 사용 중인 직접 로그인 ID입니다.",
+          },
+        };
+      }
+      if (error.code === "mattermost_username_conflict") {
+        return {
+          ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+          status: "error",
+          message: "입력값을 확인해 주세요.",
+          fieldErrors: {
+            loginId: "기존 Mattermost ID와 겹치는 직접 로그인 ID입니다.",
+          },
+        };
+      }
+      console.error("direct member create failed", { code: error.code });
+    } else {
+      console.error("direct member create failed");
     }
+    return {
+      ...DIRECT_MEMBER_CREATE_INITIAL_STATE,
+      status: "error",
+      message: "계정을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    };
   }
-
-  revalidateMemberPaths();
-  revalidatePath("/admin/logs");
-
-  return {
-    status: result.failed > 0 ? (result.success > 0 ? "partial" : "error") : "success",
-    message:
-      result.success > 0
-        ? `${result.success}명의 회원을 추가했습니다.`
-        : "추가할 수 있는 회원이 없습니다.",
-    ...result,
-  };
 }
 
 export async function deleteMemberAction(formData: FormData) {
@@ -249,7 +387,7 @@ export async function deleteMemberAction(formData: FormData) {
   const supabase = getSupabaseAdminClient();
   const { data: member, error: memberError } = await supabase
     .from("members")
-    .select("mattermost_account_id")
+    .select("mattermost_account_id,manual_login_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -300,6 +438,7 @@ export async function deleteMemberAction(formData: FormData) {
 
   const memberAuthCleanupKeys = getMemberAuthCleanupKeys([
     ...cleanupIdentifiers,
+    member.manual_login_id,
     id,
   ]);
   if (memberAuthCleanupKeys.length > 0) {

@@ -54,6 +54,8 @@ const sensitiveTables = [
   "graduate_email_challenges",
   "graduate_verification_uploads",
   "member_password_action_tokens",
+  "manual_member_import_batches",
+  "manual_member_import_rows",
 ] as const;
 
 function escapeRegex(value: string) {
@@ -84,14 +86,23 @@ test("sensitive public tables revoke broad anon and authenticated access", () =>
   }
 });
 
-test("수료증과 본인 사진 bucket은 공개 Storage로 만들지 않는다", () => {
-  for (const bucket of ["graduate-certificates", "member-profile-images"]) {
+test("수료증·본인 사진·수동 가져오기 staging bucket은 공개 Storage로 만들지 않는다", () => {
+  for (const bucket of ["graduate-certificates", "member-profile-images", "manual-member-import-staging"]) {
     const pattern = new RegExp(
       `\\(\\s*'${escapeRegex(bucket)}',\\s*'${escapeRegex(bucket)}',\\s*false(?:,|\\))`,
       "i",
     );
     assert.match(schemaSql, pattern, `${bucket} must remain private`);
   }
+});
+
+test("수동 가져오기 staging과 설정 토큰은 서버 전용 제약을 둔다", () => {
+  assert.match(schemaSql, /'manual-member-import-staging',\s*'manual-member-import-staging',\s*false,\s*5242880/i);
+  assert.match(schemaSql, /manual_member_mm_lookup_generations/i);
+  assert.match(schemaSql, /'manual_admin'/i);
+  assert.match(schemaSql, /'manual_initial_setup',\s*'manual_password_reset'/i);
+  assert.match(schemaSql, /create\s+or\s+replace\s+function\s+public\.complete_manual_member_password_action/i);
+  assert.match(schemaSql, /grant\s+execute\s+on\s+function\s+public\.complete_manual_member_password_action\([^;]+to\s+service_role/i);
 });
 
 test("수료증과 본인 사진 bucket은 Storage 단계에서도 형식과 크기를 제한한다", () => {

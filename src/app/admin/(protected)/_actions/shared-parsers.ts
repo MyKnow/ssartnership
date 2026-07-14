@@ -212,10 +212,15 @@ export function parseSsafyCycleSettingsPayload(formData: FormData) {
   const anchorYearRaw = String(formData.get("anchorYear") || "").trim();
   const anchorCalendarYearRaw = String(formData.get("anchorCalendarYear") || "").trim();
   const anchorMonthRaw = String(formData.get("anchorMonth") || "").trim();
+  const mmLookupRaw = String(formData.get("manualMemberMmLookupGenerations") || "").trim();
 
   if (!anchorYearRaw || !anchorCalendarYearRaw || !anchorMonthRaw) {
     throw new Error("cycle_missing_fields");
   }
+
+  const manualMemberMmLookupGenerations = mmLookupRaw
+    ? [...new Set(mmLookupRaw.split(/[\s,]+/).filter(Boolean).map((value) => parseSsafyCycleNumber(value, "MM 조회 가능 기수", 1, 99)))].toSorted((left, right) => left - right)
+    : [];
 
   return {
     anchorYear: parseSsafyCycleNumber(anchorYearRaw, "기준 기수", 1, 99),
@@ -226,6 +231,7 @@ export function parseSsafyCycleSettingsPayload(formData: FormData) {
       3000,
     ),
     anchorMonth: parseSsafyCycleNumber(anchorMonthRaw, "기준 월", 1, 12),
+    manualMemberMmLookupGenerations,
   };
 }
 

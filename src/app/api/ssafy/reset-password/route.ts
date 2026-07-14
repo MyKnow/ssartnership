@@ -219,7 +219,10 @@ export async function POST(request: Request) {
       return publicError(memberResult.errorCode, null, status);
     }
 
-    if (!memberResult.member.mattermost_account_id) {
+    if (
+      memberResult.member.mattermost_login_disabled_at
+      || !memberResult.member.mattermost_account_id
+    ) {
       await logAuthSecurity({
         ...context,
         eventName: "member_password_reset_ssafy",
@@ -227,7 +230,11 @@ export async function POST(request: Request) {
         actorType: "member",
         actorId: memberResult.member.id,
         identifier: verified.claims.sub,
-        properties: { reason: "missing_mm_identity" },
+        properties: {
+          reason: memberResult.member.mattermost_login_disabled_at
+            ? "mattermost_login_disabled"
+            : "missing_mm_identity",
+        },
       });
       await recordMemberAuthAttempt(
         "ssafy-reset-password",

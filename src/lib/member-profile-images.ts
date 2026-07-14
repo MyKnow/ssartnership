@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
+import net from "node:net";
+import { fetchPublicImage, isPublicIpAddress } from "@/lib/image-proxy";
+import { MAX_GRADUATE_PROFILE_IMAGE_BYTES } from "@/lib/graduate-verification";
 import { normalizeMattermostProfileImage } from "@/lib/graduate-verification-files";
 import { storeMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { sanitizeHttpUrl } from "@/lib/validation";
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
   "image/jpeg",
@@ -10,6 +14,10 @@ const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
 ]);
 
 const REVIEWABLE_IMAGE_STATUSES = ["pending", "approved", "rejected"] as const;
+const MAX_MEMBER_PROFILE_IMAGE_URL_LENGTH = 2_000;
+
+export const MAX_MEMBER_PROFILE_IMAGE_SOURCE_BYTES =
+  MAX_GRADUATE_PROFILE_IMAGE_BYTES;
 
 type MemberProfileImageStatus =
   | (typeof REVIEWABLE_IMAGE_STATUSES)[number]
@@ -35,9 +43,14 @@ type MemberProfileImageRow = {
 
 export type MemberProfileImageSource = "legacy" | "mattermost";
 export type MemberProfilePhotoReviewStatus =
+  | "missing"
   | "approved"
   | "pending"
   | "rejected";
+type StoredMemberProfilePhotoReviewStatus = Exclude<
+  MemberProfilePhotoReviewStatus,
+  "missing"
+>;
 
 export type MemberProfilePhotoStateImage = {
   id: string;
@@ -60,15 +73,28 @@ export type ActiveMemberProfileImage = {
   updatedAt: string | null;
 };
 
+type MemberProfileImageFetch = typeof fetchPublicImage;
+
+export type MemberProfileImageSourceInput = {
+  avatarBase64: string | null | undefined;
+  avatarContentType: string | null | undefined;
+  avatarUrl: string | null | undefined;
+};
+
+export type MemberProfileImageSyncResult = {
+  updated: boolean;
+  skipped: boolean;
+};
+
 const DEFAULT_MEMBER_PROFILE_PHOTO_STATE: MemberProfilePhotoState = {
-  reviewStatus: "approved",
+  reviewStatus: "missing",
   activeProfileImageId: null,
   activeStoragePath: null,
   updatedAt: null,
 };
 
 function normalizeContentType(value: string | null | undefined) {
-  const normalized = value?.trim().toLowerCase() ?? "";
+  const normalized = value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
   return ALLOWED_IMAGE_CONTENT_TYPES.has(normalized) ? normalized : null;
 }
 
@@ -105,9 +131,9 @@ function compareNewestProfileImage(
 
 function isReviewableImageStatus(
   status: MemberProfileImageStatus,
-): status is MemberProfilePhotoReviewStatus {
+): status is StoredMemberProfilePhotoReviewStatus {
   return REVIEWABLE_IMAGE_STATUSES.includes(
-    status as MemberProfilePhotoReviewStatus,
+    status as StoredMemberProfilePhotoReviewStatus,
   );
 }
 
@@ -146,6 +172,61 @@ export function decodeMemberProfileImageData(
   };
 }
 
+export function parseMemberProfileImageUrl(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed || trimmed.length > MAX_MEMBER_PROFILE_IMAGE_URL_LENGTH) {
+    return null;
+  }
+  const safeUrl = sanitizeHttpUrl(trimmed);
+  if (!safeUrl) {
+    return null;
+  }
+  const target = new URL(safeUrl);
+  if (net.isIP(target.hostname) && !isPublicIpAddress(target.hostname)) {
+    return null;
+  }
+  target.hash = "";
+  return target;
+}
+
+export async function resolveMemberProfileImageData(
+  input: MemberProfileImageSourceInput,
+  dependencies: { fetchPublicImage?: MemberProfileImageFetch } = {},
+) {
+  const decoded = decodeMemberProfileImageData(
+    input.avatarBase64,
+    input.avatarContentType,
+  );
+  if (decoded) {
+    return decoded;
+  }
+
+  const target = parseMemberProfileImageUrl(input.avatarUrl);
+  if (!target) {
+    return null;
+  }
+  const fetched = await (dependencies.fetchPublicImage ?? fetchPublicImage)(target, {
+    maxBytes: MAX_MEMBER_PROFILE_IMAGE_SOURCE_BYTES,
+  });
+  const contentType = normalizeContentType(fetched.contentType);
+  if (
+    !contentType
+    || fetched.body.length === 0
+    || fetched.body.length > MAX_MEMBER_PROFILE_IMAGE_SOURCE_BYTES
+  ) {
+    return null;
+  }
+
+  return {
+    contentType,
+    source: fetched.body,
+  };
+}
+
+function hasMemberProfileImageSource(input: MemberProfileImageSourceInput) {
+  return Boolean(input.avatarBase64?.trim() || input.avatarUrl?.trim());
+}
+
 /**
  * The newest reviewable ledger record controls whether a member can use a
  * profile image. An older approved image is deliberately hidden while a newer
@@ -159,7 +240,7 @@ export function resolveMemberProfilePhotoState(
       (
         image,
       ): image is MemberProfilePhotoStateImage & {
-        status: MemberProfilePhotoReviewStatus;
+        status: StoredMemberProfilePhotoReviewStatus;
       } => isReviewableImageStatus(image.status),
     )
     .toSorted(compareNewestProfileImage);
@@ -421,4 +502,56 @@ export async function activateMemberProfileImage(input: {
   }
 
   return true;
+}
+
+/**
+ * Persist an externally supplied Mattermost profile image in the same private
+ * ledger used by user uploads. URL sources pass through the public-image
+ * fetcher, which blocks private network targets before downloading bytes.
+ */
+export async function syncMemberProfileImage(
+  input: {
+    memberId: string;
+    imageSource: MemberProfileImageSource;
+  } & MemberProfileImageSourceInput,
+): Promise<MemberProfileImageSyncResult> {
+  if (!hasMemberProfileImageSource(input)) {
+    return { updated: false, skipped: false };
+  }
+
+  let pendingImageId: string | null = null;
+  const updatedAt = new Date().toISOString();
+
+  try {
+    const imageData = await resolveMemberProfileImageData(input);
+    if (!imageData) {
+      return { updated: false, skipped: true };
+    }
+
+    const image = await createOrReuseMemberProfileImage({
+      memberId: input.memberId,
+      ...imageData,
+      imageSource: input.imageSource,
+    });
+    if (!image.changed) {
+      return { updated: false, skipped: false };
+    }
+
+    pendingImageId = image.imageId;
+    await activateMemberProfileImage({
+      memberId: input.memberId,
+      nextImageId: pendingImageId,
+      updatedAt,
+    });
+    return { updated: true, skipped: false };
+  } catch {
+    if (pendingImageId) {
+      await discardMemberProfileImage({
+        memberId: input.memberId,
+        imageId: pendingImageId,
+        updatedAt,
+      }).catch(() => undefined);
+    }
+    return { updated: false, skipped: true };
+  }
 }

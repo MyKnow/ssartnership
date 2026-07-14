@@ -64,6 +64,7 @@ export async function resolveResetPasswordMember(
     .from("members")
     .select(memberSelect)
     .eq("mattermost_account_id", directoryEntry.id)
+    .is("mattermost_login_disabled_at", null)
     .is("deleted_at", null)
     .maybeSingle();
   member = (memberById as ResetPasswordMember | null) ?? null;

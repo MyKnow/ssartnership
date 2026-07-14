@@ -205,15 +205,6 @@ type PartnerMetricRollupDraftRow = {
   metric_count: number;
 };
 
-export type PartnerMetricEventInput = {
-  partnerId: string;
-  eventName: PartnerMetricEventName;
-  actorType: string;
-  actorId?: string | null;
-  sessionId?: string | null;
-  createdAt?: string | Date | null;
-};
-
 function createDraftKey(row: PartnerMetricRollupDraftRow) {
   return [
     row.partner_id,
@@ -393,7 +384,7 @@ export async function fetchPartnerMetricEventLogRows(
 }
 
 async function runPartnerMetricRpc(
-  fn: "apply_partner_metric_event" | "reconcile_partner_metric_rollups",
+  fn: "reconcile_partner_metric_rollups",
   args: Record<string, unknown>,
 ) {
   const supabase = getSupabaseAdminClient();
@@ -408,22 +399,6 @@ export async function reconcilePartnerMetricRollupsFromEventLogs(
 ) {
   await runPartnerMetricRpc("reconcile_partner_metric_rollups", {
     input_partner_id: partnerId,
-  });
-}
-
-export async function upsertPartnerMetricRollupsFromEventInput(
-  input: PartnerMetricEventInput,
-) {
-  await runPartnerMetricRpc("apply_partner_metric_event", {
-    input_partner_id: input.partnerId,
-    input_event_name: input.eventName,
-    input_actor_type: input.actorType,
-    input_actor_id: input.actorId ?? null,
-    input_session_id: input.sessionId ?? null,
-    input_created_at:
-      input.createdAt instanceof Date
-        ? input.createdAt.toISOString()
-        : input.createdAt ?? new Date().toISOString(),
   });
 }
 

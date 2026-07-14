@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { headers } from 'next/headers';
 import { after } from 'next/server';
 import { getAdminSession } from '@/lib/auth';
@@ -8,27 +9,14 @@ import {
   type EventActorType,
   type ProductEventName,
 } from '@/lib/event-catalog';
-import { SITE_URL } from '@/lib/site';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
 import { redactAuthSecurityExceptionProperties } from '@/lib/auth-security-log-sanitize';
-import {
-  type PartnerMetricEventName,
-  upsertPartnerMetricRollupsFromEventInput,
-} from '@/lib/partner-metric-rollups';
+import { sanitizeLogProperties, type LogJsonValue } from '@/lib/log-sanitization';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { getSignedUserSession } from '@/lib/user-auth';
 import { getPartnerSession } from '@/lib/partner-session';
-import {
-  sanitizeProductEventTargetId,
-  shouldRunPartnerMetricFallback,
-} from '@/lib/activity-log-targets';
-
-type HeaderSource = {
-  get(name: string): string | null;
-};
-
-type JsonPrimitive = string | number | boolean | null;
-type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+import { sanitizeProductEventTargetId } from '@/lib/activity-log-targets';
+import { getClientIp } from '@/lib/client-ip';
 
 type BaseLogContext = {
   path?: string | null;
@@ -36,10 +24,14 @@ type BaseLogContext = {
   userAgent?: string | null;
   ipAddress?: string | null;
   host?: string | null;
+  requestId?: string | null;
 };
 
 type ProductLogInput = BaseLogContext & {
   eventName: ProductEventName;
+  eventId?: string | null;
+  schemaVersion?: number | null;
+  occurredAt?: string | null;
   actorType: EventActorType;
   actorId?: string | null;
   sessionId?: string | null;
@@ -65,66 +57,14 @@ type AuthSecurityInput = BaseLogContext & {
   properties?: Record<string, unknown> | null;
 };
 
-function getClientIp(headerStore: HeaderSource) {
-  const forwarded = headerStore.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0]?.trim() || null;
-  }
-  return headerStore.get('x-real-ip');
-}
-
 function getPathFromValue(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const base = new URL(SITE_URL);
-    const parsed = new URL(value, base);
-    return `${parsed.pathname}${parsed.search}`;
-  } catch {
-    return value;
-  }
-}
-
-function sanitizeJsonValue(value: unknown): JsonValue | undefined {
-  if (value === null) {
-    return null;
-  }
-  if (value === undefined) {
-    return undefined;
-  }
-  if (
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  ) {
-    return value;
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => sanitizeJsonValue(item))
-      .filter((item): item is JsonValue => item !== undefined);
-  }
-  if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .map(([key, entryValue]) => [key, sanitizeJsonValue(entryValue)] as const)
-      .filter(([, entryValue]) => entryValue !== undefined);
-    return Object.fromEntries(entries) as { [key: string]: JsonValue };
-  }
-  return String(value);
+  return normalizeProductEventLocation(value);
 }
 
 function sanitizeProperties(
   properties?: Record<string, unknown> | null,
-): Record<string, JsonValue> {
-  const sanitized = sanitizeJsonValue(properties ?? {}) ?? {};
-  return sanitized && !Array.isArray(sanitized) && typeof sanitized === 'object'
-    ? sanitized
-    : {};
+): Record<string, LogJsonValue> {
+  return sanitizeLogProperties(properties);
 }
 
 function sanitizeAuthSecurityProperties(
@@ -139,14 +79,32 @@ async function insertLog(table: string, payload: Record<string, unknown>) {
     const supabase = getSupabaseAdminClient();
     const { error } = await supabase.from(table).insert(payload);
     if (error) {
-      console.error(`[activity-log] ${table} insert failed`, error.message);
+      console.error('[activity-log] log_insert_failed', {
+        table,
+        requestId: payload.request_id ?? null,
+        reasonCode: 'insert_failed',
+      });
       return false;
     }
     return true;
-  } catch (error) {
-    console.error(`[activity-log] ${table} insert failed`, error);
+  } catch {
+    console.error('[activity-log] log_insert_failed', {
+      table,
+      requestId: payload.request_id ?? null,
+      reasonCode: 'insert_exception',
+    });
     return false;
   }
+}
+
+function getOccurredAt(value?: string | null) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+  const occurredAt = new Date(value);
+  return Number.isNaN(occurredAt.getTime())
+    ? new Date().toISOString()
+    : occurredAt.toISOString();
 }
 
 export async function getServerActionLogContext(
@@ -162,6 +120,7 @@ export async function getServerActionLogContext(
     userAgent: headerStore.get('user-agent'),
     ipAddress: getClientIp(headerStore),
     host: headerStore.get('host'),
+    requestId: randomUUID(),
   };
 }
 
@@ -173,6 +132,7 @@ export function getRequestLogContext(request: Request): BaseLogContext {
     userAgent: request.headers.get('user-agent'),
     ipAddress: getClientIp(request.headers),
     host: request.headers.get('host'),
+    requestId: randomUUID(),
   };
 }
 
@@ -212,34 +172,44 @@ export async function resolveCurrentActor(): Promise<{
 
 export async function logProductEvent(input: ProductLogInput) {
   const targetId = sanitizeProductEventTargetId(input.targetType, input.targetId);
-  const inserted = await insertLog('event_logs', {
-    session_id: input.sessionId ?? null,
-    actor_type: input.actorType,
-    actor_id: input.actorId ?? null,
-    event_name: input.eventName,
-    path: normalizeProductEventLocation(input.path ?? null),
-    referrer: normalizeProductEventLocation(input.referrer ?? null),
-    target_type: input.targetType ?? null,
-    target_id: targetId,
-    properties: sanitizeProperties(input.properties),
-    user_agent: input.userAgent ?? null,
-    ip_address: input.ipAddress ?? null,
-  });
+  const eventId = input.eventId ?? randomUUID();
 
-  if (!inserted) {
-    if (shouldRunPartnerMetricFallback(input.targetType, targetId)) {
-      try {
-        await upsertPartnerMetricRollupsFromEventInput({
-          partnerId: targetId as string,
-          eventName: input.eventName as PartnerMetricEventName,
-          actorType: input.actorType,
-          actorId: input.actorId ?? null,
-          sessionId: input.sessionId ?? null,
-        });
-      } catch (error) {
-        console.error("[activity-log] partner metric fallback rpc failed", error);
-      }
+  try {
+    const { data, error } = await getSupabaseAdminClient().rpc('ingest_product_event', {
+      input_event_id: eventId,
+      input_schema_version: input.schemaVersion ?? 1,
+      input_occurred_at: getOccurredAt(input.occurredAt),
+      input_request_id: input.requestId ?? null,
+      input_session_id: input.sessionId ?? null,
+      input_actor_type: input.actorType,
+      input_actor_id: input.actorId ?? null,
+      input_event_name: input.eventName,
+      input_path: normalizeProductEventLocation(input.path ?? null),
+      input_referrer: normalizeProductEventLocation(input.referrer ?? null),
+      input_target_type: input.targetType ?? null,
+      input_target_id: targetId,
+      input_properties: sanitizeProperties(input.properties),
+      input_user_agent: input.userAgent ?? null,
+      input_ip_address: input.ipAddress ?? null,
+    });
+
+    if (error) {
+      console.error('[activity-log] product_event_ingest_failed', {
+        eventId,
+        requestId: input.requestId ?? null,
+        reasonCode: 'ingest_failed',
+      });
+      return false;
     }
+
+    return data === true;
+  } catch {
+    console.error('[activity-log] product_event_ingest_failed', {
+      eventId,
+      requestId: input.requestId ?? null,
+      reasonCode: 'ingest_exception',
+    });
+    return false;
   }
 }
 
@@ -254,12 +224,13 @@ export async function logAdminAudit(input: AdminAuditInput) {
   await insertLog('admin_audit_logs', {
     actor_id: input.actorId ?? adminSession?.adminId ?? 'system',
     action: input.action,
-    path: input.path ?? null,
+    path: normalizeProductEventLocation(input.path ?? null),
     target_type: input.targetType ?? null,
     target_id: input.targetId ?? null,
     properties: sanitizeProperties(input.properties),
     user_agent: input.userAgent ?? null,
     ip_address: input.ipAddress ?? null,
+    request_id: input.requestId ?? null,
   });
 }
 
@@ -270,9 +241,10 @@ export async function logAuthSecurity(input: AuthSecurityInput) {
     actor_type: input.actorType,
     actor_id: input.actorId ?? null,
     identifier: input.identifier ?? null,
-    path: input.path ?? null,
+    path: normalizeProductEventLocation(input.path ?? null),
     properties: sanitizeAuthSecurityProperties(input.properties),
     user_agent: input.userAgent ?? null,
     ip_address: input.ipAddress ?? null,
+    request_id: input.requestId ?? null,
   });
 }

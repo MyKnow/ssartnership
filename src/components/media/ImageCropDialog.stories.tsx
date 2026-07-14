@@ -104,6 +104,63 @@ export const ReplacementValidationError: Story = {
   },
 };
 
+export const ReplacementHeicPreparation: Story = {
+  args: {
+    accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif",
+    validateFile: () => null,
+    prepareFile: fn(async () => {
+      const response = await fetch(
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8igAAAABJRU5ErkJggg==",
+      );
+      return new File([await response.blob()], "converted.webp", { type: "image/webp" });
+    }),
+  },
+  play: async ({ args }) => {
+    const body = within(document.body);
+    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
+    const input = document.body.querySelector<HTMLInputElement>('input[type="file"]');
+    await expect(input).not.toBeNull();
+
+    await userEvent.upload(
+      input!,
+      new File(["heif-source"], "iphone.heic", { type: "image/heic" }),
+    );
+    await expect(args.prepareFile).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const ReplacementConversionPending: Story = {
+  args: {
+    accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif",
+    validateFile: () => null,
+    prepareFile: async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+      const response = await fetch(
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8igAAAABJRU5ErkJggg==",
+      );
+      return new File([await response.blob()], "converted.webp", { type: "image/webp" });
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const body = within(document.body);
+    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
+    const input = document.body.querySelector<HTMLInputElement>('input[type="file"]');
+    await expect(input).not.toBeNull();
+
+    await userEvent.upload(
+      input!,
+      new File(["heif-source"], "iphone.heic", { type: "image/heic" }),
+    );
+
+    const applyButton = body.getByRole("button", { name: "적용" });
+    await expect(applyButton).toBeDisabled();
+    await waitFor(() => expect(applyButton).toBeEnabled());
+
+    // Keep the story canvas referenced so the test is scoped to this story's mount.
+    await expect(canvasElement).toBeInTheDocument();
+  },
+};
+
 export const ApplySuccess: Story = {
   play: async ({ args }) => {
     const originalToBlob = HTMLCanvasElement.prototype.toBlob;

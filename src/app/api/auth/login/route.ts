@@ -6,7 +6,7 @@ import { verifyPassword } from "@/lib/password";
 import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents";
 import { classifyMemberLoginIdentifier } from "@/lib/member-domain";
 import { hashMemberEmailIdentifier } from "@/lib/member-email-verification";
-import { resolveActiveMemberForLogin } from "@/lib/member-authentication";
+import { resolveActiveMemberForLoginWithSource } from "@/lib/member-authentication";
 import {
   delayMemberAuthAttempt,
   getMemberAuthAttemptScope,
@@ -33,7 +33,11 @@ export async function POST(request: Request) {
     const password = String(payload.password ?? "").trim();
     const autoLogin = payload.autoLogin === true;
     const loginIdentifier = classifyMemberLoginIdentifier(rawIdentifier);
-    const provider = loginIdentifier?.kind === "email" ? "email" : "mattermost";
+    const requestedProvider = loginIdentifier?.kind === "email"
+      ? "email"
+      : loginIdentifier?.kind === "manual_login_id"
+        ? "manual"
+        : "mattermost";
     const identifier = loginIdentifier?.value ?? rawIdentifier.toLowerCase();
     const rateLimitIdentifier = loginIdentifier?.kind === "email"
       ? hashMemberEmailIdentifier(loginIdentifier.value)
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
         properties: {
           reason: "rate_limit",
           scope: getMemberAuthAttemptScope(blockedState.identifier),
-          provider,
+          provider: requestedProvider,
         },
       });
       await delayMemberAuthAttempt("login", true);
@@ -64,13 +68,21 @@ export async function POST(request: Request) {
       await delayMemberAuthAttempt("login");
       return NextResponse.json({ error: "login_failed" }, { status: 400 });
     }
-    const member = await resolveActiveMemberForLogin(loginIdentifier);
-    if (!member?.password_hash || !member.password_salt) {
+    const resolvedLogin = await resolveActiveMemberForLoginWithSource(loginIdentifier);
+    if (!resolvedLogin) {
       await recordMemberAuthAttempt("login", throttleContext, false);
       await delayMemberAuthAttempt("login");
       return NextResponse.json({ error: "login_failed" }, { status: 401 });
     }
-    if (!verifyPassword(password, member.password_salt, member.password_hash)) {
+    const { member, authenticationMethod: provider } = resolvedLogin;
+    const passwordHash = member.password_hash;
+    const passwordSalt = member.password_salt;
+    if (!passwordHash || !passwordSalt) {
+      await recordMemberAuthAttempt("login", throttleContext, false);
+      await delayMemberAuthAttempt("login");
+      return NextResponse.json({ error: "login_failed" }, { status: 401 });
+    }
+    if (!verifyPassword(password, passwordSalt, passwordHash)) {
       await logAuthSecurity({
         ...context,
         eventName: "member_login",
@@ -86,7 +98,11 @@ export async function POST(request: Request) {
     }
 
     const policyStatus = await getMemberRequiredPolicyStatus(member.id);
-    await setUserSession(member.id, Boolean(member.must_change_password), { persistent: autoLogin });
+    await setUserSession(member.id, Boolean(member.must_change_password), {
+      persistent: autoLogin,
+      authenticationMethod: resolvedLogin.authenticationMethod,
+      freshAuthentication: true,
+    });
     revalidatePath("/");
     revalidatePath("/auth/consent");
     revalidatePath("/auth/change-password");
@@ -106,7 +122,11 @@ export async function POST(request: Request) {
         provider,
       },
     });
-    return NextResponse.json({ ok: true, requiresConsent: policyStatus.requiresConsent });
+    return NextResponse.json({
+      ok: true,
+      mustChangePassword: Boolean(member.must_change_password),
+      requiresConsent: policyStatus.requiresConsent,
+    });
   } catch {
     await logAuthSecurity({
       ...context,

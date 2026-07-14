@@ -135,10 +135,17 @@ test("명시적 Mattermost 프로필 동기화는 디렉터리 FK와 이미지 l
     "src/lib/member-mattermost-profile-sync.ts",
   );
   const profileImages = readRepoFile("src/lib/member-profile-images.ts");
+  const signupPersistence = readRepoFile(
+    "src/lib/ssafy-verify/signup-persist.server.ts",
+  );
 
   assert.match(profileSync, /mattermost_account_id/);
-  assert.match(profileSync, /createOrReuseMemberProfileImage/);
+  assert.match(profileSync, /syncMemberProfileImage/);
+  assert.match(profileSync, /avatarUrl: snapshot\.avatarUrl/);
   assert.match(profileImages, /\.from\("member_profile_images"\)/);
+  assert.match(profileImages, /fetchPublicImage/);
+  assert.match(profileImages, /MAX_MEMBER_PROFILE_IMAGE_SOURCE_BYTES/);
+  assert.match(signupPersistence, /syncMemberProfileImage/);
   assert.doesNotMatch(
     profileSync,
     /member\.year|member\.mm_user_id|member\.mm_username|Compatibility fields/,
@@ -326,7 +333,7 @@ test("관리자 회원 화면과 수정 액션은 정규화된 회원 관계만 
   assert.match(membersPage, /marketing_enabled/);
   assert.match(
     membersPage,
-    /mattermost_account_id,display_name,generation,staff_source_generation/,
+    /mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation/,
   );
   assert.match(membersPage, /\.eq\("generation", Number\(filters\.yearFilter\)\)/);
   assert.match(memberDetailPage, /getMemberCanonicalProfile/);

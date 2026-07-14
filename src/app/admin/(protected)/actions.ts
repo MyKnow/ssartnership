@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { clearAdminSession } from "@/lib/auth";
-import type { ManualMemberAddFormState } from "@/lib/member-manual-add";
+import type { DirectMemberCreateFormState } from "@/lib/member-direct-create";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import {
   applyAdminPermissionTemplateAction,
@@ -36,8 +36,10 @@ import {
 } from "./_actions/cycle-actions";
 import {
   backfillMemberProfilesAction,
+  createDirectMemberAction,
   deleteMemberAction,
-  manualAddMembersAction,
+  disableGenerationMattermostLoginAction,
+  issueMemberEmailLoginTransitionAction,
   updateMemberAction,
 } from "./_actions/member-actions";
 import {
@@ -192,11 +194,19 @@ export async function updateMember(formData: FormData) {
   return updateMemberAction(formData);
 }
 
-export async function manualAddMembers(
-  prevState: ManualMemberAddFormState,
+export async function disableGenerationMattermostLogin(formData: FormData) {
+  return disableGenerationMattermostLoginAction(formData);
+}
+
+export async function issueMemberEmailLoginTransition(formData: FormData) {
+  return issueMemberEmailLoginTransitionAction(formData);
+}
+
+export async function createDirectMember(
+  prevState: DirectMemberCreateFormState,
   formData: FormData,
-): Promise<ManualMemberAddFormState> {
-  return manualAddMembersAction(prevState, formData);
+): Promise<DirectMemberCreateFormState> {
+  return createDirectMemberAction(prevState, formData);
 }
 
 export async function updateSsafyCycleSettings(formData: FormData) {

@@ -1,15 +1,16 @@
 import { buildMattermostProfileSyncPatch } from "@/lib/member-domain";
 import {
-  activateMemberProfileImage,
-  createOrReuseMemberProfileImage,
-  decodeMemberProfileImageData,
-  discardMemberProfileImage,
+  syncMemberProfileImage,
 } from "@/lib/member-profile-images";
 import {
-  findMmUserDirectoryEntryByUsername,
+  findMmUserDirectoryEntryByUserId,
   upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
-import { fetchMemberSnapshotByUserId } from "@/lib/mm-member-sync/snapshot";
+import {
+  fetchMemberSnapshotByUserId,
+  fetchMemberSnapshotByUsername,
+} from "@/lib/mm-member-sync/snapshot";
+import { markMemberMattermostLoginUnavailable } from "@/lib/member-email-login-transition";
 import type {
   MemberSyncField,
   MemberSyncSnapshot,
@@ -20,7 +21,6 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 type MemberMattermostSyncRow = {
   id: string;
   display_name: string | null;
-  campus: string | null;
   generation: number | null;
   mattermost_account_id: string | null;
 };
@@ -38,6 +38,11 @@ export type MattermostProfileSyncResult = {
   changedFields: MemberSyncField[];
   imageUpdated: boolean;
   imageSkipped: boolean;
+};
+
+export type MattermostProfileUnavailableResult = {
+  unavailable: true;
+  member: NormalizedMemberSyncSubject;
 };
 
 async function loadMattermostDirectory(member: MemberMattermostSyncRow) {
@@ -101,12 +106,12 @@ async function syncSsafyVerificationTrack(input: {
 
 export async function syncMemberMattermostProfile(
   memberId: string,
-): Promise<MattermostProfileSyncResult | null> {
+): Promise<MattermostProfileSyncResult | MattermostProfileUnavailableResult | null> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
     .select(
-      "id,display_name,campus,generation,mattermost_account_id",
+      "id,display_name,generation,mattermost_account_id",
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -121,9 +126,35 @@ export async function syncMemberMattermostProfile(
     return null;
   }
 
-  const snapshot = await fetchMemberSnapshotByUserId(linkedDirectory.mm_user_id);
+  let snapshot = await fetchMemberSnapshotByUserId(linkedDirectory.mm_user_id);
+  if (snapshot && snapshot.mmUserId !== linkedDirectory.mm_user_id) {
+    throw new Error("Mattermost 계정 식별자가 변경되어 자동 연결할 수 없습니다.");
+  }
   if (!snapshot) {
-    return null;
+    const usernameSnapshot = await fetchMemberSnapshotByUsername({
+      username: linkedDirectory.mm_username,
+      generation: member.generation,
+    });
+    if (!usernameSnapshot) {
+      await markMemberMattermostLoginUnavailable({
+        memberId: member.id,
+        reason: "provider_not_found",
+      });
+      return {
+        unavailable: true,
+        member: {
+          id: member.id,
+          generation: member.generation,
+          mattermostAccountId: linkedDirectory.id,
+          mmUserId: linkedDirectory.mm_user_id,
+          mmUsername: linkedDirectory.mm_username,
+        },
+      };
+    }
+    if (usernameSnapshot.mmUserId !== linkedDirectory.mm_user_id) {
+      throw new Error("Mattermost 계정 식별자가 변경되어 자동 연결할 수 없습니다.");
+    }
+    snapshot = usernameSnapshot;
   }
 
   await upsertMmUserDirectorySnapshot({
@@ -135,8 +166,8 @@ export async function syncMemberMattermostProfile(
     sourceYears:
       member.generation && member.generation > 0 ? [member.generation] : [],
   });
-  const refreshedDirectory = await findMmUserDirectoryEntryByUsername(
-    snapshot.mmUsername,
+  const refreshedDirectory = await findMmUserDirectoryEntryByUserId(
+    snapshot.mmUserId,
   );
   if (!refreshedDirectory?.id) {
     throw new Error("Mattermost 계정 연결을 저장하지 못했습니다.");
@@ -145,7 +176,6 @@ export async function syncMemberMattermostProfile(
   const patch = buildMattermostProfileSyncPatch(
     {
       displayName: member.display_name,
-      campus: member.campus,
       mmUsername: linkedDirectory.mm_username,
     },
     {
@@ -155,35 +185,18 @@ export async function syncMemberMattermostProfile(
     },
   );
   const changedFields = [...patch.changedFields] as MemberSyncField[];
-  let nextProfileImageId: string | null = null;
-  let imageUpdated = false;
-  let imageSkipped = false;
-
-  const decodedImage = decodeMemberProfileImageData(
-    snapshot.avatarBase64,
-    snapshot.avatarContentType,
-  );
-  if (decodedImage) {
-    try {
-      const image = await createOrReuseMemberProfileImage({
-        memberId: member.id,
-        ...decodedImage,
-        imageSource: "mattermost",
-      });
-      nextProfileImageId = image.changed ? image.imageId : null;
-    } catch {
-      // An external profile image must never block independent profile fields.
-      imageSkipped = true;
-    }
-  }
+  const profileImage = await syncMemberProfileImage({
+    memberId: member.id,
+    imageSource: "mattermost",
+    avatarBase64: snapshot.avatarBase64,
+    avatarContentType: snapshot.avatarContentType,
+    avatarUrl: snapshot.avatarUrl,
+  });
+  const imageUpdated = profileImage.updated;
+  const imageSkipped = profileImage.skipped;
 
   const updatedAt = new Date().toISOString();
-  const memberUpdate = {
-    ...patch.member,
-    ...(member.mattermost_account_id !== refreshedDirectory.id
-      ? { mattermost_account_id: refreshedDirectory.id }
-      : {}),
-  };
+  const memberUpdate = patch.member;
   if (Object.keys(memberUpdate).length > 0) {
     const { error: updateError } = await supabase
       .from("members")
@@ -198,25 +211,8 @@ export async function syncMemberMattermostProfile(
     }
   }
 
-  if (nextProfileImageId) {
-    try {
-      await activateMemberProfileImage({
-        memberId: member.id,
-        nextImageId: nextProfileImageId,
-        updatedAt,
-      });
-      imageUpdated = true;
-      changedFields.push("avatar");
-    } catch {
-      if (nextProfileImageId) {
-        await discardMemberProfileImage({
-          memberId: member.id,
-          imageId: nextProfileImageId,
-          updatedAt,
-        }).catch(() => undefined);
-      }
-      imageSkipped = true;
-    }
+  if (imageUpdated) {
+    changedFields.push("avatar");
   }
 
   const trackUpdated = await syncSsafyVerificationTrack({
