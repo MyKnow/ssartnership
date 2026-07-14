@@ -1,9 +1,6 @@
 import { buildMattermostProfileSyncPatch } from "@/lib/member-domain";
 import {
-  activateMemberProfileImage,
-  createOrReuseMemberProfileImage,
-  decodeMemberProfileImageData,
-  discardMemberProfileImage,
+  syncMemberProfileImage,
 } from "@/lib/member-profile-images";
 import {
   findMmUserDirectoryEntryByUsername,
@@ -155,27 +152,15 @@ export async function syncMemberMattermostProfile(
     },
   );
   const changedFields = [...patch.changedFields] as MemberSyncField[];
-  let nextProfileImageId: string | null = null;
-  let imageUpdated = false;
-  let imageSkipped = false;
-
-  const decodedImage = decodeMemberProfileImageData(
-    snapshot.avatarBase64,
-    snapshot.avatarContentType,
-  );
-  if (decodedImage) {
-    try {
-      const image = await createOrReuseMemberProfileImage({
-        memberId: member.id,
-        ...decodedImage,
-        imageSource: "mattermost",
-      });
-      nextProfileImageId = image.changed ? image.imageId : null;
-    } catch {
-      // An external profile image must never block independent profile fields.
-      imageSkipped = true;
-    }
-  }
+  const profileImage = await syncMemberProfileImage({
+    memberId: member.id,
+    imageSource: "mattermost",
+    avatarBase64: snapshot.avatarBase64,
+    avatarContentType: snapshot.avatarContentType,
+    avatarUrl: snapshot.avatarUrl,
+  });
+  const imageUpdated = profileImage.updated;
+  const imageSkipped = profileImage.skipped;
 
   const updatedAt = new Date().toISOString();
   const memberUpdate = {
@@ -198,25 +183,8 @@ export async function syncMemberMattermostProfile(
     }
   }
 
-  if (nextProfileImageId) {
-    try {
-      await activateMemberProfileImage({
-        memberId: member.id,
-        nextImageId: nextProfileImageId,
-        updatedAt,
-      });
-      imageUpdated = true;
-      changedFields.push("avatar");
-    } catch {
-      if (nextProfileImageId) {
-        await discardMemberProfileImage({
-          memberId: member.id,
-          imageId: nextProfileImageId,
-          updatedAt,
-        }).catch(() => undefined);
-      }
-      imageSkipped = true;
-    }
+  if (imageUpdated) {
+    changedFields.push("avatar");
   }
 
   const trackUpdated = await syncSsafyVerificationTrack({

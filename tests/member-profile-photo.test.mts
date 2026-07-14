@@ -139,5 +139,6 @@ test("인증 카드의 private 사진 API는 canonical 이미지 ledger만 읽�
     /active_profile_image_id|profile_photo_review_status/,
   );
   assert.match(profileImages, /status: "pending"/);
-  assert.match(profileSync, /discardMemberProfileImage/);
+  assert.match(profileSync, /syncMemberProfileImage/);
+  assert.match(profileImages, /discardMemberProfileImage/);
 });

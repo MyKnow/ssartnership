@@ -6,6 +6,20 @@ import type { IncomingHttpHeaders, RequestOptions } from "node:http";
 import { isPublicIpAddress } from "./ip";
 import { IMAGE_FETCH_TIMEOUT_MS, ImageProxyError, MAX_IMAGE_BYTES } from "./shared";
 
+export type FetchPublicImageOptions = {
+  maxBytes?: number;
+};
+
+function resolveMaxBytes(value: number | undefined) {
+  if (value === undefined) {
+    return MAX_IMAGE_BYTES;
+  }
+  if (!Number.isSafeInteger(value) || value <= 0 || value > MAX_IMAGE_BYTES) {
+    throw new ImageProxyError("Invalid image size limit", 500);
+  }
+  return value;
+}
+
 async function resolvePublicImageAddress(hostname: string) {
   const resolvedIpVersion = net.isIP(hostname);
   if (resolvedIpVersion === 4 || resolvedIpVersion === 6) {
@@ -65,7 +79,11 @@ function getContentLength(headers: IncomingHttpHeaders) {
   return Number.parseInt(value ?? "", 10);
 }
 
-export async function fetchPublicImage(target: URL) {
+export async function fetchPublicImage(
+  target: URL,
+  options: FetchPublicImageOptions = {},
+) {
+  const maxBytes = resolveMaxBytes(options.maxBytes);
   const resolvedAddress = await resolvePublicImageAddress(target.hostname);
   const isHttps = target.protocol === "https:";
   const client = isHttps ? https : http;
@@ -116,7 +134,7 @@ export async function fetchPublicImage(target: URL) {
   }
 
   const contentLength = getContentLength(response.headers);
-  if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_BYTES) {
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     response.resume();
     throw new ImageProxyError("Image too large", 413);
   }
@@ -128,7 +146,7 @@ export async function fetchPublicImage(target: URL) {
     response.on("data", (chunk: Buffer | string) => {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       totalBytes += buffer.length;
-      if (totalBytes > MAX_IMAGE_BYTES) {
+      if (totalBytes > maxBytes) {
         reject(new ImageProxyError("Image too large", 413));
         response.destroy();
         return;

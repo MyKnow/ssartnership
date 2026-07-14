@@ -9,6 +9,7 @@ import {
   recordRequiredPolicyConsent,
 } from "@/lib/policy-documents";
 import { hashPassword } from "@/lib/password";
+import type { MemberProfileImageSyncResult } from "@/lib/member-profile-images";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { setUserSession } from "@/lib/user-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -17,13 +18,18 @@ import { findSsafyVerifiedMember } from "@/lib/ssafy-verify/member";
 import {
   buildSsafySignupMemberInsertPayload,
   parseSsafySignupCompleteInput,
-  persistSsafySignupMemberDomainRecords,
 } from "@/lib/ssafy-verify/signup";
+import { persistSsafySignupMemberDomainRecords } from "@/lib/ssafy-verify/signup-persist.server";
 import {
   clearSsafySignupSession,
   getSsafySignupSession,
 } from "@/lib/ssafy-verify/signup-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+
+const NO_PROFILE_IMAGE_SYNC: MemberProfileImageSyncResult = {
+  updated: false,
+  skipped: false,
+} as const;
 
 export const runtime = "nodejs";
 
@@ -186,8 +192,9 @@ export async function POST(request: Request) {
       return errorResponse("signup_failed", 503);
     }
 
+    let profileImageSync = NO_PROFILE_IMAGE_SYNC;
     try {
-      await persistSsafySignupMemberDomainRecords(supabase, {
+      profileImageSync = await persistSsafySignupMemberDomainRecords(supabase, {
         memberId: insertedMember.id,
         session: signupSession,
         persistedAt: agreedAt,
@@ -245,6 +252,8 @@ export async function POST(request: Request) {
         cohort: signupSession.cohort,
         campus: signupSession.campus,
         marketingPolicyChecked: parsed.data.marketingPolicyChecked,
+        profileImageUpdated: profileImageSync.updated,
+        profileImageSkipped: profileImageSync.skipped,
       },
     });
 
