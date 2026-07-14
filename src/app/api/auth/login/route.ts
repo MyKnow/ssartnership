@@ -110,7 +110,11 @@ export async function POST(request: Request) {
         provider,
       },
     });
-    return NextResponse.json({ ok: true, requiresConsent: policyStatus.requiresConsent });
+    return NextResponse.json({
+      ok: true,
+      mustChangePassword: Boolean(member.must_change_password),
+      requiresConsent: policyStatus.requiresConsent,
+    });
   } catch {
     await logAuthSecurity({
       ...context,

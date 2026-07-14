@@ -157,6 +157,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({
       ok: true,
+      mustChangePassword: Boolean(member.must_change_password),
       requiresConsent: policyStatus.requiresConsent,
     });
   } catch (error) {
