@@ -562,15 +562,27 @@ export async function completeManualMemberPasswordAction(input: {
   passwordSalt: string;
 }) {
   const { data, error } = await getSupabaseAdminClient().rpc(
-    "complete_manual_member_password_action",
+    "complete_member_password_action_with_delivery",
     {
       p_token_hash: hashOpaqueToken(input.token),
       p_password_hash: input.passwordHash,
       p_password_salt: input.passwordSalt,
     },
   );
-  if (error || typeof data !== "string") return null;
-  return data;
+  if (
+    error
+    || !data
+    || typeof data !== "object"
+    || typeof (data as Record<string, unknown>).memberId !== "string"
+    || ((data as Record<string, unknown>).deliveryChannel !== "email"
+      && (data as Record<string, unknown>).deliveryChannel !== "mattermost")
+  ) {
+    return null;
+  }
+  return {
+    memberId: (data as Record<string, unknown>).memberId as string,
+    deliveryChannel: (data as Record<string, unknown>).deliveryChannel as "email" | "mattermost",
+  };
 }
 
 export async function issueManualMemberPasswordReset(email: string) {

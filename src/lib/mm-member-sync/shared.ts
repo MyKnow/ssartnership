@@ -1,7 +1,6 @@
 export type MemberSyncField =
   | "mmUsername"
   | "displayName"
-  | "campus"
   | "track"
   | "avatar";
 
@@ -33,11 +32,16 @@ export type MemberSyncResult = {
   changedFields: MemberSyncField[];
 };
 
+export type MemberMattermostUnavailableResult = {
+  member: NormalizedMemberSyncSubject;
+};
+
 export type MemberSyncBatchResult = {
   checked: number;
   updated: number;
   skipped: number;
   results: MemberSyncResult[];
+  mattermostUnavailable: MemberMattermostUnavailableResult[];
   failures: Array<{ memberId: string; mmUserId: string | null; reason: string }>;
 };
 

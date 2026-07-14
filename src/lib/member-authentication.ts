@@ -16,6 +16,13 @@ export type LoginMember = {
   must_change_password: boolean | null;
 };
 
+export type LoginMemberAuthenticationMethod = "email" | "manual" | "mattermost";
+
+export type LoginMemberResolution = {
+  member: LoginMember;
+  authenticationMethod: LoginMemberAuthenticationMethod;
+};
+
 const MEMBER_LOGIN_SELECT = "id,password_hash,password_salt,must_change_password";
 
 async function findActiveMemberByMattermostDirectoryId(directoryId: string) {
@@ -24,6 +31,7 @@ async function findActiveMemberByMattermostDirectoryId(directoryId: string) {
     .from("members")
     .select(MEMBER_LOGIN_SELECT)
     .eq("mattermost_account_id", directoryId)
+    .is("mattermost_login_disabled_at", null)
     .is("deleted_at", null)
     .maybeSingle();
   return (data ?? null) as LoginMember | null;
@@ -74,14 +82,34 @@ async function resolveMemberByManualLoginId(manualLoginId: string) {
 }
 
 export async function resolveActiveMemberForLogin(identifier: MemberLoginIdentifier) {
+  const resolved = await resolveActiveMemberForLoginWithSource(identifier);
+  return resolved?.member ?? null;
+}
+
+/**
+ * Resolves the account and the credential source independently. A value with
+ * the direct-member prefix can fall back to a legacy MM username, so callers
+ * must issue the session for the source that actually matched.
+ */
+export async function resolveActiveMemberForLoginWithSource(
+  identifier: MemberLoginIdentifier,
+): Promise<LoginMemberResolution | null> {
   if (identifier.kind === "email") {
-    return resolveMemberByVerifiedEmail(identifier.value);
+    const member = await resolveMemberByVerifiedEmail(identifier.value);
+    return member ? { member, authenticationMethod: "email" } : null;
   }
   if (identifier.kind === "manual_login_id") {
     const manualMember = await resolveMemberByManualLoginId(identifier.value);
-    return manualMember ?? resolveMemberByMattermostUsername(identifier.value);
+    if (manualMember) {
+      return { member: manualMember, authenticationMethod: "manual" };
+    }
+    const mattermostMember = await resolveMemberByMattermostUsername(identifier.value);
+    return mattermostMember
+      ? { member: mattermostMember, authenticationMethod: "mattermost" }
+      : null;
   }
-  return resolveMemberByMattermostUsername(identifier.value);
+  const member = await resolveMemberByMattermostUsername(identifier.value);
+  return member ? { member, authenticationMethod: "mattermost" } : null;
 }
 
 export async function resolveActiveMemberForLoginInput(value: unknown) {

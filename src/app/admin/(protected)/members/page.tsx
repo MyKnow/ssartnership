@@ -13,9 +13,11 @@ import StatsRow from "@/components/ui/StatsRow";
 import {
   backfillMemberProfiles,
   createDirectMember,
+  disableGenerationMattermostLogin,
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
@@ -69,6 +71,10 @@ type AdminMemberSearchParams = {
   updated?: string;
   skipped?: string;
   failures?: string;
+  mattermostUnavailable?: string;
+  mmLoginTransition?: string;
+  generation?: string;
+  disabled?: string;
   error?: string;
   q?: string;
   sort?: string;
@@ -447,7 +453,9 @@ export default async function AdminMembersPage({
 }: {
   searchParams?: Promise<AdminMemberSearchParams>;
 }) {
-  await requireAdminPermission("members", "read", { path: "/admin/members" });
+  const adminSession = await requireAdminPermission("members", "read", {
+    path: "/admin/members",
+  });
   const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const page = parsePage(getOne(params, "page"));
@@ -469,6 +477,14 @@ export default async function AdminMembersPage({
     mmEnabledFilter: parseNotificationFilter(getOne(params, "mmEnabled")),
     marketingEnabledFilter: parseNotificationFilter(getOne(params, "marketingEnabled")),
   };
+  const selectedGeneration = filters.yearFilter === "all"
+    ? null
+    : Number(filters.yearFilter);
+  const canUpdateMembers = canAdmin(
+    adminSession.account.permissions,
+    "members",
+    "update",
+  );
   const supabase = getSupabaseAdminClient();
   const [
     activePolicies,
@@ -744,11 +760,33 @@ export default async function AdminMembersPage({
           description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <form action={backfillMemberProfiles}>
-                <SubmitButton pendingText="백필 중">
-                  지금 백필 실행
-                </SubmitButton>
-              </form>
+              {canUpdateMembers ? (
+                <>
+                  <form action={backfillMemberProfiles}>
+                    <SubmitButton pendingText="백필 중">
+                      지금 백필 실행
+                    </SubmitButton>
+                  </form>
+                  {selectedGeneration !== null ? (
+                    <form action={disableGenerationMattermostLogin} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="generation" value={selectedGeneration} />
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          name="confirmedGeneration"
+                          value={selectedGeneration}
+                          required
+                          className="size-4"
+                        />
+                        전체 중단 확인
+                      </label>
+                      <SubmitButton variant="danger" pendingText="전환 중">
+                        {selectedGeneration}기 MM 로그인 중단
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </>
+              ) : null}
             </div>
           }
         />
@@ -793,7 +831,14 @@ export default async function AdminMembersPage({
                   ? "백필 중 오류가 발생했습니다."
                   : "백필이 완료되었습니다."
             }
-            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
+            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.mattermostUnavailable ? `MM 이용 중단 ${params.mattermostUnavailable}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
+          />
+        ) : null}
+        {params.mmLoginTransition === "generation" ? (
+          <InlineMessage
+            tone="success"
+            title="기수 전체의 MM 로그인을 중단했습니다."
+            description={`${params.generation ?? "선택한"}기 ${params.disabled ?? "0"}명의 기존 MM 연결 이력은 유지됩니다. 이메일이 이미 인증된 회원은 이메일로 로그인할 수 있고, 나머지는 회원 상세에서 설정 링크를 발송해 주세요.`}
           />
         ) : null}
 

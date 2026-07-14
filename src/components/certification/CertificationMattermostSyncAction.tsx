@@ -43,7 +43,7 @@ export default function CertificationMattermostSyncAction() {
       }
 
       if (payload.imageSkipped) {
-        notify("이름과 캠퍼스는 반영됐지만 MM 프로필 사진을 처리하지 못했습니다.");
+        notify("이름과 MM 아이디는 반영됐지만 MM 프로필 사진을 처리하지 못했습니다.");
       } else if (payload.updated) {
         notify("MM 프로필의 최신 정보를 반영했습니다.");
       } else {
@@ -66,7 +66,7 @@ export default function CertificationMattermostSyncAction() {
       <div className="min-w-0">
         <p className="text-sm font-semibold text-foreground">Mattermost 프로필</p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          MM에서 변경한 이름, 캠퍼스, 프로필 사진을 지금 바로 반영합니다.
+          MM에서 변경한 이름, MM 아이디, 트랙, 프로필 사진을 지금 바로 반영합니다.
         </p>
       </div>
       <Button

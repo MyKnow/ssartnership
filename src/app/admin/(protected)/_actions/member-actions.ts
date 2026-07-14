@@ -21,6 +21,13 @@ import {
   parseMemberYearValue,
   validateMemberYear,
 } from "@/lib/validation";
+import { isUuid } from "@/lib/uuid";
+import {
+  disableMattermostLoginsForGeneration,
+  issueMemberEmailLoginTransition,
+  isMattermostLoginDisabledReason,
+  MemberEmailLoginTransitionError,
+} from "@/lib/member-email-login-transition";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 import {
   getMmUserDirectoryEntriesByAccountIds,
@@ -44,6 +51,7 @@ export async function backfillMemberProfilesAction() {
     updated: 0,
     skipped: 0,
     failures: 0,
+    mattermostUnavailable: 0,
   };
 
   try {
@@ -54,10 +62,12 @@ export async function backfillMemberProfilesAction() {
       updated: result.updated,
       skipped: result.skipped,
       failures: result.failures.length,
+      mattermostUnavailable: result.mattermostUnavailable.length,
     };
 
     await Promise.allSettled(
-      result.results.map((syncResult) =>
+      [
+        ...result.results.map((syncResult) =>
         logAdminAudit({
           ...context,
           action: "member_sync",
@@ -68,7 +78,23 @@ export async function backfillMemberProfilesAction() {
             source: "manual_backfill",
           }),
         }),
-      ),
+        ),
+        ...result.mattermostUnavailable.map((unavailableResult) =>
+          logAdminAudit({
+            ...context,
+            action: "member_email_login_transition",
+            actorId,
+            targetType: "member",
+            targetId: unavailableResult.member.id,
+            properties: {
+              source: "manual_backfill",
+              reason: "provider_not_found",
+              mmUserId: unavailableResult.member.mmUserId,
+              generation: unavailableResult.member.generation,
+            },
+          }),
+        ),
+      ],
     );
     status = result.failures.length > 0 ? "partial" : "success";
   } catch (error) {
@@ -82,8 +108,128 @@ export async function backfillMemberProfilesAction() {
   }
 
   redirect(
-    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}`,
+    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
   );
+}
+
+function memberEmailLoginTransitionErrorCode(error: unknown) {
+  if (!(error instanceof MemberEmailLoginTransitionError)) {
+    return "member_email_transition_failed";
+  }
+  return `member_email_transition_${error.code}`;
+}
+
+export async function disableGenerationMattermostLoginAction(formData: FormData) {
+  await requireAdminPermission("members", "update", { path: "/admin/members" });
+  const generationRaw = String(formData.get("generation") ?? "").trim();
+  const confirmedGeneration = String(formData.get("confirmedGeneration") ?? "").trim();
+  const generation = parseMemberYearValue(generationRaw);
+  if (generation === null || generation < 1 || validateMemberYear(generationRaw)) {
+    redirectAdminActionError("/admin/members", "member_invalid_year", {
+      action: "member_mattermost_login_disable_generation",
+      targetType: "generation",
+      targetId: generationRaw || null,
+      properties: { reason: "invalid_generation" },
+    });
+  }
+  if (confirmedGeneration !== String(generation)) {
+    redirectAdminActionError("/admin/members", "member_email_transition_generation_unconfirmed", {
+      action: "member_mattermost_login_disable_generation",
+      targetType: "generation",
+      targetId: String(generation),
+      properties: { reason: "generation_unconfirmed" },
+    });
+  }
+
+  let disabledCount: number;
+  try {
+    disabledCount = await disableMattermostLoginsForGeneration(generation);
+    await logAdminAction("member_mattermost_login_disable_generation", {
+      targetType: "generation",
+      targetId: String(generation),
+      properties: { generation, disabledCount },
+    });
+  } catch {
+    redirectAdminActionError("/admin/members", "member_email_transition_failed", {
+      action: "member_mattermost_login_disable_generation",
+      targetType: "generation",
+      targetId: String(generation),
+      properties: { generation },
+    });
+  }
+  revalidateMemberPaths();
+  redirect(
+    `/admin/members?mmLoginTransition=generation&generation=${generation}&disabled=${disabledCount}`,
+  );
+}
+
+export async function issueMemberEmailLoginTransitionAction(formData: FormData) {
+  const adminSession = await requireAdminPermission("members", "update", {
+    path: "/admin/members",
+  });
+  const memberId = String(formData.get("id") ?? "").trim();
+  const email = formData.get("email");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const identityVerified = formData.get("identityVerified") === "true";
+  const detailPath = isUuid(memberId)
+    ? `/admin/members/${memberId}`
+    : "/admin/members";
+  if (!isUuid(memberId)) {
+    redirectAdminActionError(detailPath, "member_missing_id", {
+      action: "member_email_login_transition",
+      targetType: "member",
+      properties: { reason: "invalid_member_id" },
+    });
+  }
+  if (!isMattermostLoginDisabledReason(reason)) {
+    redirectAdminActionError(detailPath, "member_email_transition_invalid_reason", {
+      action: "member_email_login_transition",
+      targetType: "member",
+      targetId: memberId,
+      properties: { reason: "invalid_transition_reason" },
+    });
+  }
+  if (!identityVerified) {
+    redirectAdminActionError(detailPath, "member_email_transition_identity_unconfirmed", {
+      action: "member_email_login_transition",
+      targetType: "member",
+      targetId: memberId,
+      properties: { reason: "identity_unconfirmed" },
+    });
+  }
+
+  let result: { expiresAt: string };
+  try {
+    result = await issueMemberEmailLoginTransition({
+      memberId,
+      email,
+      reason,
+      initiatedByAdminId: adminSession.adminId,
+    });
+    await logAdminAction("member_email_login_transition", {
+      targetType: "member",
+      targetId: memberId,
+      properties: {
+        reason,
+        expiresAt: result.expiresAt,
+        identityVerified: true,
+      },
+    });
+  } catch (error) {
+    redirectAdminActionError(
+      detailPath,
+      memberEmailLoginTransitionErrorCode(error),
+      {
+        action: "member_email_login_transition",
+        targetType: "member",
+        targetId: memberId,
+        properties: { reason },
+      },
+    );
+  }
+  revalidateMemberPaths();
+  revalidatePath(detailPath);
+  redirect(`${detailPath}?emailTransition=sent`);
 }
 
 export async function updateMemberAction(formData: FormData) {

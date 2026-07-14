@@ -16,6 +16,7 @@ import type {
 } from "@/lib/admin-member-detail";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
@@ -30,6 +31,12 @@ export type AdminMemberDetailViewProps = {
     generationLabel: string;
     campus: string;
     mustChangePassword: boolean;
+    email?: string | null;
+    emailVerifiedAt?: string | null;
+    hasMattermostAccount: boolean;
+    mattermostLoginDisabledAt: string | null;
+    mattermostLoginDisabledReason: string | null;
+    emailLoginTransition?: MemberEmailLoginTransition | null;
     createdAt: string | null;
     updatedAt: string | null;
     hasAvatar: boolean;
@@ -48,6 +55,7 @@ export type AdminMemberDetailViewProps = {
   consentTimeline: readonly AdminMemberPolicyEvent[];
   updateAction: FormAction;
   deleteAction: FormAction;
+  emailLoginTransitionAction: FormAction;
   canUpdate: boolean;
   canDelete: boolean;
   profilePhoto?: {
@@ -74,6 +82,7 @@ export default function AdminMemberDetailView({
   consentTimeline,
   updateAction,
   deleteAction,
+  emailLoginTransitionAction,
   canUpdate,
   canDelete,
   profilePhoto = null,
@@ -83,6 +92,25 @@ export default function AdminMemberDetailView({
     .trim()
     .charAt(0)
     .toUpperCase();
+  const accountManagerMember = {
+    id: member.id,
+    displayName: member.displayName,
+    campus: member.campus,
+    generation: member.generation,
+    mmUsername: member.mmUsername,
+    manualLoginId: member.manualLoginId,
+    mustChangePassword: member.mustChangePassword,
+    hasMattermostAccount: member.hasMattermostAccount,
+    mattermostLoginDisabledAt: member.mattermostLoginDisabledAt,
+    mattermostLoginDisabledReason: member.mattermostLoginDisabledReason,
+    ...(canUpdate
+      ? {
+          email: member.email,
+          emailVerifiedAt: member.emailVerifiedAt,
+          emailLoginTransition: member.emailLoginTransition,
+        }
+      : {}),
+  };
 
   return (
     <div className="grid gap-6">
@@ -215,17 +243,10 @@ export default function AdminMemberDetailView({
           </Card>
 
           <AdminMemberAccountManager
-            member={{
-              id: member.id,
-              displayName: member.displayName,
-              campus: member.campus,
-              generation: member.generation,
-              mmUsername: member.mmUsername,
-              manualLoginId: member.manualLoginId,
-              mustChangePassword: member.mustChangePassword,
-            }}
+            member={accountManagerMember}
             updateAction={updateAction}
             deleteAction={deleteAction}
+            emailLoginTransitionAction={emailLoginTransitionAction}
             canUpdate={canUpdate}
             canDelete={canDelete}
           />

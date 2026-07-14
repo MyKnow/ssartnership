@@ -38,6 +38,8 @@ import {
   backfillMemberProfilesAction,
   createDirectMemberAction,
   deleteMemberAction,
+  disableGenerationMattermostLoginAction,
+  issueMemberEmailLoginTransitionAction,
   updateMemberAction,
 } from "./_actions/member-actions";
 import {
@@ -190,6 +192,14 @@ export async function backfillMemberProfiles() {
 
 export async function updateMember(formData: FormData) {
   return updateMemberAction(formData);
+}
+
+export async function disableGenerationMattermostLogin(formData: FormData) {
+  return disableGenerationMattermostLoginAction(formData);
+}
+
+export async function issueMemberEmailLoginTransition(formData: FormData) {
+  return issueMemberEmailLoginTransitionAction(formData);
 }
 
 export async function createDirectMember(
