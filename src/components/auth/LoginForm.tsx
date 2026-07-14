@@ -123,7 +123,6 @@ export default function LoginForm({
         ? `/auth/consent?returnTo=${encodeURIComponent(safeReturnTo)}`
         : safeReturnTo;
       router.replace(nextHref);
-      router.refresh();
     } finally {
       setPending(false);
     }
