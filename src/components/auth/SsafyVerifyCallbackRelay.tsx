@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   clearSsafyVerifyRedirectSession,
@@ -28,6 +29,7 @@ type MemberVerifyResult =
       campus: string | null;
       authTime: number;
       requiresConsent: boolean;
+      mustChangePassword?: boolean;
       nextPath?: string;
     }
   | (SsafyVerifyClientFailure & {
@@ -281,9 +283,13 @@ export default function SsafyVerifyCallbackRelay() {
       return;
     }
 
-    const nextHref = result.requiresConsent
-      ? `/auth/consent?returnTo=${encodeURIComponent(safeReturnTo)}`
-      : safeReturnTo;
+    const nextHref =
+      getMemberRequiredGateRedirect({
+        currentPath: "/auth/login",
+        returnTo: safeReturnTo,
+        mustChangePassword: Boolean(result.mustChangePassword),
+        requiresConsent: result.requiresConsent,
+      }) ?? safeReturnTo;
     setStatus("sent");
     window.location.replace(nextHref);
   }, [fail]);

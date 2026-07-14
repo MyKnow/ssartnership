@@ -7,7 +7,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { validateAuthPasswordChangeDraft } from "@/lib/auth-form-validation";
-import { sanitizeReturnTo } from "@/lib/return-to";
+import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
 export default function ChangePasswordForm({
@@ -83,7 +83,9 @@ export default function ChangePasswordForm({
       setFieldErrors({});
       setFormError(null);
       notify("비밀번호가 변경되었습니다.");
-      window.location.replace(sanitizeReturnTo(returnTo, "/"));
+      window.location.replace(
+        getMemberGateCompletionReturnTo(returnTo, "change-password"),
+      );
     } finally {
       setPending(false);
     }

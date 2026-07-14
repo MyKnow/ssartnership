@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import Footer from "@/components/Footer";
 import ScrollToTopFab from "@/components/ScrollToTopFab";
 import RoutePageViewTracker from "@/components/analytics/RoutePageViewTracker";
+import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import { getForwardedRequestPath } from "@/lib/request-path";
 import { getUserSession } from "@/lib/user-auth";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
@@ -15,19 +17,17 @@ export default async function SiteLayout({
   children: React.ReactNode;
 }) {
   const headerStore = await headers();
-  const returnTo = sanitizeReturnTo(headerStore.get("next-url"), "/");
+  const returnTo = sanitizeReturnTo(getForwardedRequestPath(headerStore), "/");
   const session = await getUserSession();
-  if (session?.requiresConsent) {
-    redirect(`/auth/consent?returnTo=${encodeURIComponent(returnTo)}`);
-  }
-  if (session?.mustChangePassword) {
-    redirect(`/auth/change-password?returnTo=${encodeURIComponent(returnTo)}`);
-  }
-  if (
-    session?.requiresProfilePhotoUpdate &&
-    !returnTo.startsWith("/certification/photo")
-  ) {
-    redirect(`/certification/photo?returnTo=${encodeURIComponent(returnTo)}`);
+  const requiredGateRedirect = getMemberRequiredGateRedirect({
+    currentPath: returnTo,
+    returnTo,
+    mustChangePassword: session?.mustChangePassword,
+    requiresConsent: session?.requiresConsent,
+    requiresProfilePhotoUpdate: session?.requiresProfilePhotoUpdate,
+  });
+  if (requiredGateRedirect) {
+    redirect(requiredGateRedirect);
   }
   return (
     <div className="flex min-h-screen flex-col">

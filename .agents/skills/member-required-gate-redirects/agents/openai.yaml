@@ -1,0 +1,4 @@
+interface:
+  display_name: "회원 필수 게이트 리디렉션"
+  short_description: "비밀번호·약관·사진 게이트의 안전한 이동 순서를 관리합니다"
+  default_prompt: "Use $member-required-gate-redirects to implement or review member password, consent, photo, and returnTo redirects."

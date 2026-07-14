@@ -6,6 +6,7 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { cn } from "@/lib/cn";
+import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   shouldUseSsafyVerifyRedirectFlow,
@@ -33,6 +34,7 @@ type VerifyResult =
       campus: string | null;
       authTime: number;
       requiresConsent: boolean;
+      mustChangePassword?: boolean;
       nextPath?: string;
     }
   | (SsafyVerifyClientFailure & {
@@ -225,9 +227,13 @@ export default function SsafyVerifyButton({
       router.refresh();
       return;
     }
-    const nextHref = result.requiresConsent
-      ? `/auth/consent?returnTo=${encodeURIComponent(safeReturnTo)}`
-      : safeReturnTo;
+    const nextHref =
+      getMemberRequiredGateRedirect({
+        currentPath: "/auth/login",
+        returnTo: safeReturnTo,
+        mustChangePassword: Boolean(result.mustChangePassword),
+        requiresConsent: result.requiresConsent,
+      }) ?? safeReturnTo;
     router.replace(nextHref);
     router.refresh();
   }

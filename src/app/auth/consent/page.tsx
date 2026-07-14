@@ -7,6 +7,10 @@ import PolicyConsentForm from "@/components/auth/PolicyConsentForm";
 import { getHeaderSession } from "@/lib/header-session";
 import { getUserSession } from "@/lib/user-auth";
 import { getMemberPolicyReviewBundle } from "@/lib/policy-documents";
+import {
+  getMemberGateCompletionReturnTo,
+  getMemberRequiredGateRedirect,
+} from "@/lib/member-required-gates";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
@@ -35,14 +39,19 @@ export default async function ConsentPage({ searchParams }: PageProps) {
     redirect("/auth/login");
   }
 
+  const requiredGateRedirect = getMemberRequiredGateRedirect({
+    currentPath: "/auth/consent",
+    returnTo,
+    mustChangePassword: session.mustChangePassword,
+    requiresConsent: session.requiresConsent,
+    requiresProfilePhotoUpdate: session.requiresProfilePhotoUpdate,
+  });
+  if (requiredGateRedirect) {
+    redirect(requiredGateRedirect);
+  }
+
   if (!session.requiresConsent) {
-    if (session.mustChangePassword) {
-      const changePasswordReturnTo = returnTo
-        ? `/auth/change-password?returnTo=${encodeURIComponent(returnTo)}`
-        : "/auth/change-password";
-      redirect(changePasswordReturnTo);
-    }
-    redirect(returnTo || "/");
+    redirect(getMemberGateCompletionReturnTo(returnTo, "consent"));
   }
 
   const policyReview = await getMemberPolicyReviewBundle(session.userId);
@@ -62,7 +71,6 @@ export default async function ConsentPage({ searchParams }: PageProps) {
             <PolicyConsentForm
               requiredPolicies={policyReview.requiredPolicies}
               reviewPolicies={policyReview.reviewPolicies}
-              mustChangePassword={Boolean(session.mustChangePassword)}
               returnTo={returnTo}
             />
           </Card>

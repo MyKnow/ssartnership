@@ -297,6 +297,7 @@ export async function POST(request: Request) {
             : String(verified.claims.cohort),
         campus: verified.claims.campus,
         authTime: verified.claims.authTime,
+        mustChangePassword: Boolean(memberResult.member.must_change_password),
         requiresConsent: policyStatus.requiresConsent,
       });
     }

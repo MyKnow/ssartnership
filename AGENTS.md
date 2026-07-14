@@ -51,6 +51,7 @@ tests/                    Node test files for domain logic and helpers
 Use the minimal relevant skill for the task:
 
 - `ssartnership-patterns`: repository-specific Next.js, Supabase, Tailwind, Repository pattern, validation conventions
+- `member-required-gate-redirects`: member password, consent, profile-photo, and `returnTo` gate priority/loop prevention
 - `frontend-patterns`, `frontend-design`, `design-system`: React, Next.js UI, TDS-like visual consistency
 - `backend-patterns`, `api-design`: API routes, service/repository layering, response design
 - `postgres-patterns`, `database-migrations`: Supabase/PostgreSQL schema and migration work

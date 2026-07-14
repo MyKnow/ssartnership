@@ -6,9 +6,19 @@ import {
   requiresMemberProfilePhotoUpdate,
 } from "@/lib/member-profile-photo";
 import { resolveMemberProfilePhotoState } from "@/lib/member-profile-images";
+import {
+  buildForwardedRequestPath,
+  getForwardedRequestPath,
+  REQUEST_PATH_HEADER,
+} from "@/lib/request-path";
 
 const schemaPath = new URL("../supabase/schema.sql", import.meta.url);
 const siteLayoutPath = new URL("../src/app/(site)/layout.tsx", import.meta.url);
+const adminProtectedLayoutPath = new URL(
+  "../src/app/admin/(protected)/layout.tsx",
+  import.meta.url,
+);
+const proxyPath = new URL("../src/proxy.ts", import.meta.url);
 const profileImageRoutePath = new URL(
   "../src/app/api/certification/profile-image/route.ts",
   import.meta.url,
@@ -74,12 +84,38 @@ test("회원 사진 상태는 canonical ledger와 단일 승인 이미지 제약
   );
 });
 
-test("사진 검토 대기 또는 반려 상태는 사진 재제출 경로만 예외로 두고 차단한다", async () => {
+test("사진 제출 경로는 공통 게이트 해석기로 자기 재진입을 막는다", async () => {
   const layout = await readFile(siteLayoutPath, "utf8");
 
   assert.match(layout, /session\?\.requiresProfilePhotoUpdate/);
-  assert.match(layout, /!returnTo\.startsWith\("\/certification\/photo"\)/);
-  assert.match(layout, /redirect\(`\/certification\/photo\?returnTo=/);
+  assert.match(layout, /getMemberRequiredGateRedirect/);
+  assert.match(layout, /currentPath: returnTo/);
+});
+
+test("사진 제출 경로는 Next 내부 헤더와 분리된 요청 경로 컨텍스트를 사용한다", async () => {
+  const [layout, adminLayout, proxy] = await Promise.all([
+    readFile(siteLayoutPath, "utf8"),
+    readFile(adminProtectedLayoutPath, "utf8"),
+    readFile(proxyPath, "utf8"),
+  ]);
+  const photoPath = "/certification/photo?returnTo=%2F";
+  const requestHeaders = new Headers([
+    ["next-url", "/"],
+    [REQUEST_PATH_HEADER, photoPath],
+  ]);
+
+  assert.equal(
+    buildForwardedRequestPath({
+      pathname: "/certification/photo",
+      search: "?returnTo=%2F",
+    }),
+    photoPath,
+  );
+  assert.equal(getForwardedRequestPath(requestHeaders), photoPath);
+  assert.match(proxy, /requestHeaders\.set\(\s*REQUEST_PATH_HEADER/);
+  assert.doesNotMatch(proxy, /"next-url"/);
+  assert.match(layout, /getForwardedRequestPath\(headerStore\)/);
+  assert.match(adminLayout, /getForwardedRequestPath\(headerStore\)/);
 });
 
 test("사진 ledger의 최신 검토 상태가 기존 승인 이미지보다 우선한다", () => {

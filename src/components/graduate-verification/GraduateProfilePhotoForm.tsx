@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import ImageCropDialog from "@/components/media/ImageCropDialog";
 import { MAX_GRADUATE_PROFILE_IMAGE_BYTES } from "@/lib/graduate-verification";
+import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
 
 type SignedUpload = {
   uploadId: string;
@@ -47,7 +49,11 @@ async function uploadReplacementPhoto(file: File) {
   return upload.uploadId;
 }
 
-export default function GraduateProfilePhotoForm() {
+export default function GraduateProfilePhotoForm({
+  returnTo,
+}: {
+  returnTo?: string;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const sourceUrlRef = useRef<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -57,6 +63,7 @@ export default function GraduateProfilePhotoForm() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const router = useRouter();
 
   useEffect(() => () => {
     if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
@@ -105,7 +112,9 @@ export default function GraduateProfilePhotoForm() {
       if (!response.ok) {
         throw new Error(data.message ?? "본인 사진 변경 요청을 저장하지 못했습니다.");
       }
-      setMessage("사진 변경 요청을 제출했습니다. 기존 승인 사진은 새 사진이 승인될 때까지 계속 표시됩니다.");
+      router.replace(
+        getMemberGateCompletionReturnTo(returnTo, "profile-photo"),
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "본인 사진 변경 요청을 저장하지 못했습니다.");
     } finally {

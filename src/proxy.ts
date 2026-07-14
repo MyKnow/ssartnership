@@ -8,6 +8,11 @@ import {
   isProtectedAdminPath,
   shouldChallengeAdminBasicAuth,
 } from "@/lib/admin-security";
+import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import {
+  buildForwardedRequestPath,
+  REQUEST_PATH_HEADER,
+} from "@/lib/request-path";
 
 const COOKIE_NAME = "user_session";
 const ADMIN_COOKIE_NAME = "admin_session";
@@ -16,8 +21,8 @@ const PARTNER_COOKIE_NAME = "partner_session";
 function nextWithRequestUrl(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(
-    "next-url",
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    REQUEST_PATH_HEADER,
+    buildForwardedRequestPath(request.nextUrl),
   );
   return NextResponse.next({
     request: {
@@ -308,10 +313,13 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value;
   if (token) {
     const payload = await verifyToken(token);
-    if (payload?.mustChangePassword && pathname !== "/auth/change-password") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/auth/change-password";
-      return NextResponse.redirect(url);
+    const requiredGateRedirect = getMemberRequiredGateRedirect({
+      currentPath,
+      returnTo: currentPath,
+      mustChangePassword: payload?.mustChangePassword,
+    });
+    if (requiredGateRedirect) {
+      return NextResponse.redirect(new URL(requiredGateRedirect, request.url));
     }
   }
 
