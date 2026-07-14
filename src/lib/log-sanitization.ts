@@ -1,4 +1,4 @@
-import { normalizeProductEventLocation } from "@/lib/product-event-path";
+import { normalizeProductEventLocation } from "./product-event-path.ts";
 
 export type LogJsonPrimitive = string | number | boolean | null;
 export type LogJsonValue =
