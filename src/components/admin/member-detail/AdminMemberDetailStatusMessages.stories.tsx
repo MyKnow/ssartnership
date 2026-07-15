@@ -23,3 +23,17 @@ export const ProviderAccessDenied: Story = {
     errorCode: "member_sync_provider_access_denied",
   },
 };
+
+export const ProfilePhotoSkipped: Story = {
+  args: {
+    errorCode: undefined,
+    memberSync: "profilePhotoSkipped",
+  },
+};
+
+export const UpdatedWithProfilePhotoSkipped: Story = {
+  args: {
+    errorCode: undefined,
+    memberSync: "updatedWithProfilePhotoSkipped",
+  },
+};

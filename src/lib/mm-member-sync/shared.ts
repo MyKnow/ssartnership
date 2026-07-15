@@ -30,6 +30,7 @@ export type MemberSyncResult = {
   snapshot: MemberSyncSnapshot;
   updated: boolean;
   changedFields: MemberSyncField[];
+  imageSkipped: boolean;
 };
 
 export type MemberMattermostUnavailableResult = {
@@ -41,6 +42,7 @@ export type MemberSyncBatchResult = {
   updated: number;
   skipped: number;
   results: MemberSyncResult[];
+  photoSkipped: MemberSyncResult[];
   mattermostUnavailable: MemberMattermostUnavailableResult[];
   failures: Array<{ memberId: string; mmUserId: string | null; reason: string }>;
 };

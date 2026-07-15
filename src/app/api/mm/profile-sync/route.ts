@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    if (syncResult.updated) {
+    if (syncResult.updated || syncResult.imageSkipped) {
       await logAdminAudit({
         ...context,
         action: "member_sync",

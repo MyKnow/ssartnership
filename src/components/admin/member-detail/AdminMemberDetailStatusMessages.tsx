@@ -37,6 +37,20 @@ export default function AdminMemberDetailStatusMessages({
           description="표시 이름, MM 아이디, 트랙, 프로필 사진 중 변경된 정보만 반영했습니다. 캠퍼스와 기수는 변경하지 않습니다."
         />
       ) : null}
+      {memberSync === "updatedWithProfilePhotoSkipped" ? (
+        <InlineMessage
+          tone="warning"
+          title="MM 프로필은 반영했지만 사진은 처리하지 못했습니다."
+          description="표시 이름, MM 아이디 또는 트랙은 반영됐습니다. MM 프로필 사진은 동기화되지 않았으므로 필요한 경우 사진 관리에서 직접 제출해 주세요."
+        />
+      ) : null}
+      {memberSync === "profilePhotoSkipped" ? (
+        <InlineMessage
+          tone="warning"
+          title="MM 프로필 사진을 처리하지 못했습니다."
+          description="표시 이름, MM 아이디와 트랙은 이미 최신입니다. 사진 동기화가 건너뛰어졌으므로 변경 없음이 아니며, 필요한 경우 사진 관리에서 직접 제출해 주세요."
+        />
+      ) : null}
       {memberSync === "unchanged" ? (
         <InlineMessage
           tone="info"

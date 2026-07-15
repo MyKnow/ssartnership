@@ -31,6 +31,7 @@ import {
 } from "@/lib/member-email-login-transition";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
 import { getMemberProfileSyncFailureCode } from "@/lib/member-profile-sync-errors";
+import { resolveMemberProfileSyncStatus } from "@/lib/member-profile-sync-status";
 import {
   getMmUserDirectoryEntriesByAccountIds,
   type MmUserDirectoryIdentity,
@@ -52,6 +53,7 @@ export async function backfillMemberProfilesAction() {
     checked: 0,
     updated: 0,
     skipped: 0,
+    photoSkipped: 0,
     failures: 0,
     mattermostUnavailable: 0,
   };
@@ -63,13 +65,13 @@ export async function backfillMemberProfilesAction() {
       checked: result.checked,
       updated: result.updated,
       skipped: result.skipped,
+      photoSkipped: result.photoSkipped.length,
       failures: result.failures.length,
       mattermostUnavailable: result.mattermostUnavailable.length,
     };
 
-    await Promise.allSettled(
-      [
-        ...result.results.map((syncResult) =>
+    await Promise.allSettled([
+      ...result.results.map((syncResult) =>
         logAdminAudit({
           ...context,
           action: "member_sync",
@@ -80,25 +82,41 @@ export async function backfillMemberProfilesAction() {
             source: "manual_backfill",
           }),
         }),
-        ),
-        ...result.mattermostUnavailable.map((unavailableResult) =>
+      ),
+      ...result.photoSkipped
+        .filter((syncResult) => !syncResult.updated)
+        .map((syncResult) =>
           logAdminAudit({
             ...context,
-            action: "member_email_login_transition",
+            action: "member_sync",
             actorId,
             targetType: "member",
-            targetId: unavailableResult.member.id,
-            properties: {
+            targetId: syncResult.member.id,
+            properties: buildMemberSyncLogProperties(syncResult, {
               source: "manual_backfill",
-              reason: "provider_not_found",
-              mmUserId: unavailableResult.member.mmUserId,
-              generation: unavailableResult.member.generation,
-            },
+            }),
           }),
         ),
-      ],
-    );
-    status = result.failures.length > 0 ? "partial" : "success";
+      ...result.mattermostUnavailable.map((unavailableResult) =>
+        logAdminAudit({
+          ...context,
+          action: "member_email_login_transition",
+          actorId,
+          targetType: "member",
+          targetId: unavailableResult.member.id,
+          properties: {
+            source: "manual_backfill",
+            reason: "provider_not_found",
+            mmUserId: unavailableResult.member.mmUserId,
+            generation: unavailableResult.member.generation,
+          },
+        }),
+      ),
+    ]);
+    status =
+      result.failures.length > 0 || result.photoSkipped.length > 0
+        ? "partial"
+        : "success";
   } catch (error) {
     console.error("member backfill failed", error);
     status = "error";
@@ -110,7 +128,7 @@ export async function backfillMemberProfilesAction() {
   }
 
   redirect(
-    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
+    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&photoSkipped=${summary.photoSkipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
   );
 }
 
@@ -177,7 +195,9 @@ export async function syncMemberProfileAction(formData: FormData) {
   });
   revalidateMemberPaths();
   revalidatePath(detailPath);
-  redirect(`${detailPath}?memberSync=${result.updated ? "updated" : "unchanged"}`);
+  redirect(
+    `${detailPath}?memberSync=${resolveMemberProfileSyncStatus(result)}`,
+  );
 }
 
 function memberEmailLoginTransitionErrorCode(error: unknown) {

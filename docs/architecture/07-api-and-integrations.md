@@ -99,7 +99,7 @@
 - PostgreSQL schema와 migration을 관리한다.
 - server side에서는 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`를 사용한다.
 - `NEXT_PUBLIC_SUPABASE_URL`은 image remote pattern 등 public 용도만 선택적으로 사용한다.
-- Preview sync는 production data를 preview로 복사하되 password material과 heavy avatar payload를 제거한다.
+- Preview sync는 production data를 preview로 복사하되 member password material과 legacy `members.avatar_base64`만 제거한다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
 
 ### SSAFY Verify
 

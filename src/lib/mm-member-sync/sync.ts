@@ -34,6 +34,7 @@ export function buildMemberSyncLogProperties(
     generation: result.member.generation,
     summary: buildMemberSyncSummary(result),
     changedFields: result.changedFields,
+    imageSkipped: result.imageSkipped,
     ...extra,
   };
 }
@@ -54,6 +55,7 @@ export async function syncMemberById(
     snapshot: result.snapshot,
     updated: result.updated,
     changedFields: result.changedFields,
+    imageSkipped: result.imageSkipped,
   };
 }
 
@@ -77,8 +79,10 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
     .map((member) => member.id as string | null)
     .filter((memberId): memberId is string => Boolean(memberId));
   const results: MemberSyncResult[] = [];
+  const photoSkipped: MemberSyncResult[] = [];
   const mattermostUnavailable: MemberMattermostUnavailableResult[] = [];
   const failures: MemberSyncBatchResult["failures"] = [];
+  let skipped = 0;
 
   for (const memberId of memberIds) {
     try {
@@ -98,6 +102,12 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
       if (result.updated) {
         results.push(result);
       }
+      if (result.imageSkipped) {
+        photoSkipped.push(result);
+      }
+      if (!result.updated && !result.imageSkipped) {
+        skipped += 1;
+      }
     } catch {
       failures.push({
         memberId,
@@ -110,8 +120,9 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
   return {
     checked: memberIds.length,
     updated: results.length,
-    skipped: memberIds.length - results.length - failures.length - mattermostUnavailable.length,
+    skipped,
     results,
+    photoSkipped,
     mattermostUnavailable,
     failures,
   };

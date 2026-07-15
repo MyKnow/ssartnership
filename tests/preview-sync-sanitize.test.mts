@@ -5,14 +5,14 @@ type PreviewSyncLibModule =
   typeof import("../scripts/supabase-sync-preview-lib.mjs");
 
 const previewSyncLibPromise = import(
-  new URL("../scripts/supabase-sync-preview-lib.mjs", import.meta.url).href,
+  new URL("../scripts/supabase-sync-preview-lib.mjs", import.meta.url).href
 ) as Promise<PreviewSyncLibModule>;
 
 test("sanitizeDumpSqlForPreview removes columns absent from preview copy blocks", async () => {
   const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
 
   const sourceSql = [
-    'COPY public.partner_companies (id, name, slug, description, contact_name, contact_email, contact_phone, is_active) FROM stdin;',
+    "COPY public.partner_companies (id, name, slug, description, contact_name, contact_email, contact_phone, is_active) FROM stdin;",
     "1\tCafe\tcafe\tdesc\tKim\tkim@example.com\t010-1111-2222\tt",
     "\\.",
   ].join("\n");
@@ -41,7 +41,7 @@ test("sanitizeDumpSqlForPreview leaves aligned copy blocks unchanged", async () 
   const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
 
   const sourceSql = [
-    'COPY public.categories (id, key, label) FROM stdin;',
+    "COPY public.categories (id, key, label) FROM stdin;",
     "1\tcafe\t카페",
     "\\.",
   ].join("\n");
@@ -132,7 +132,7 @@ test("sanitizeDumpSqlForPreview strips heavy and sensitive member columns", asyn
   assert.equal(sanitized.sql.includes("salt"), false);
 });
 
-test("sanitizeDumpSqlForPreview omits production member profile image ledgers", async () => {
+test("sanitizeDumpSqlForPreview preserves production member profile image ledgers", async () => {
   const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
 
   const sourceSql = [
@@ -154,20 +154,20 @@ test("sanitizeDumpSqlForPreview omits production member profile image ledgers", 
 
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
 
-  assert.equal(sanitized.changed, true);
-  assert.equal(sanitized.stats.memberProfileImageCopyBlocksSkipped, 1);
-  assert.equal(sanitized.stats.memberProfileImageRowsSkipped, 1);
-  assert.equal(
-    sanitized.sql,
-    [
-      "COPY public.members (id, display_name) FROM stdin;",
-      "member-1\t김싸피",
-      "\\.",
-    ].join("\n"),
-  );
+  assert.equal(sanitized.changed, false);
+  assert.equal(sanitized.stats.memberProfileImageCopyBlocksSeen, 1);
+  assert.equal(sanitized.stats.memberProfileImageCopyBlocksSkipped, 0);
+  assert.equal(sanitized.stats.memberProfileImageRowsSkipped, 0);
+  assert.equal(sanitized.sql, sourceSql);
+  const legacySanitizedSql = [
+    "COPY public.members (id, display_name) FROM stdin;",
+    "member-1\t김싸피",
+    "\\.",
+  ].join("\n");
+  assert.notEqual(sanitized.sql, legacySanitizedSql);
 });
 
-test("sanitizeDumpSqlForPreview preserves graduate verification image ledgers", async () => {
+test("sanitizeDumpSqlForPreview preserves both member and graduate verification image ledgers", async () => {
   const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
 
   const sourceSql = [
@@ -192,17 +192,16 @@ test("sanitizeDumpSqlForPreview preserves graduate verification image ledgers", 
 
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
 
-  assert.equal(sanitized.changed, true);
-  assert.equal(sanitized.stats.memberProfileImageRowsSkipped, 1);
+  assert.equal(sanitized.changed, false);
+  assert.equal(sanitized.stats.memberProfileImageRowsSkipped, 0);
   assert.equal(sanitized.stats.memberProfileImageCopyBlocksSkipped, 0);
-  assert.equal(
-    sanitized.sql,
-    [
-      "COPY public.member_profile_images (id, graduate_verification_request_id, member_id, storage_path, status) FROM stdin;",
-      "graduate-image\trequest-1\t\\N\tgraduate-requests/request-1/photo.webp\tpending",
-      "\\.",
-    ].join("\n"),
-  );
+  assert.equal(sanitized.sql, sourceSql);
+  const legacySanitizedSql = [
+    "COPY public.member_profile_images (id, graduate_verification_request_id, member_id, storage_path, status) FROM stdin;",
+    "graduate-image\trequest-1\t\\N\tgraduate-requests/request-1/photo.webp\tpending",
+    "\\.",
+  ].join("\n");
+  assert.notEqual(sanitized.sql, legacySanitizedSql);
 });
 
 test("sanitizeDumpSqlForPreview backfills empty partner campus slugs", async () => {
@@ -219,7 +218,14 @@ test("sanitizeDumpSqlForPreview backfills empty partner campus slugs", async () 
   const previewColumnsByTable = new Map([
     [
       "partners",
-      new Set(["id", "category_id", "name", "location", "campus_slugs", "created_at"]),
+      new Set([
+        "id",
+        "category_id",
+        "name",
+        "location",
+        "campus_slugs",
+        "created_at",
+      ]),
     ],
   ]);
 
@@ -254,7 +260,14 @@ test("sanitizeDumpSqlForPreview adds partner campus slugs when production dump l
   const previewColumnsByTable = new Map([
     [
       "partners",
-      new Set(["id", "category_id", "name", "location", "campus_slugs", "created_at"]),
+      new Set([
+        "id",
+        "category_id",
+        "name",
+        "location",
+        "campus_slugs",
+        "created_at",
+      ]),
     ],
   ]);
 
