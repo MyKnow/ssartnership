@@ -1,10 +1,16 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
+import {
+  getServerActionLogContext,
+  logAdminAudit,
+  logAdminAuditBatch,
+  type AdminAuditInput,
+} from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
   buildMemberSyncLogProperties,
+  buildMemberSyncAuditLogProperties,
   syncMemberById,
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
@@ -70,49 +76,40 @@ export async function backfillMemberProfilesAction() {
       mattermostUnavailable: result.mattermostUnavailable.length,
     };
 
-    await Promise.allSettled([
-      ...result.results.map((syncResult) =>
-        logAdminAudit({
-          ...context,
-          action: "member_sync",
-          actorId,
-          targetType: "member",
-          targetId: syncResult.member.id,
-          properties: buildMemberSyncLogProperties(syncResult, {
-            source: "manual_backfill",
-          }),
-        }),
-      ),
-      ...result.photoSkipped
-        .filter((syncResult) => !syncResult.updated)
-        .map((syncResult) =>
-          logAdminAudit({
-            ...context,
-            action: "member_sync",
-            actorId,
-            targetType: "member",
-            targetId: syncResult.member.id,
-            properties: buildMemberSyncLogProperties(syncResult, {
-              source: "manual_backfill",
-            }),
-          }),
-        ),
-      ...result.mattermostUnavailable.map((unavailableResult) =>
-        logAdminAudit({
-          ...context,
-          action: "member_email_login_transition",
-          actorId,
-          targetType: "member",
-          targetId: unavailableResult.member.id,
-          properties: {
-            source: "manual_backfill",
-            reason: "provider_not_found",
-            mmUserId: unavailableResult.member.mmUserId,
-            generation: unavailableResult.member.generation,
-          },
-        }),
-      ),
-    ]);
+    const auditedMemberIds = new Set(result.auditResults.map((audit) => audit.member.id));
+    const auditInputs: AdminAuditInput[] = result.auditResults.map((audit) => ({
+      ...context,
+      action: audit.status === "graduated" || audit.status === "departed"
+        ? "member_email_login_transition" as const
+        : "member_sync" as const,
+      actorId,
+      targetType: "member" as const,
+      targetId: audit.member.id,
+      properties: buildMemberSyncAuditLogProperties(audit, {
+        source: "manual_backfill",
+      }),
+    }));
+    const unloggedFailures = result.failures.filter(
+      (failure) => !auditedMemberIds.has(failure.memberId),
+    );
+    auditInputs.push(
+      ...unloggedFailures.map((failure) => ({
+        ...context,
+        action: "member_sync" as const,
+        actorId,
+        targetType: "member" as const,
+        targetId: failure.memberId === "unknown" ? null : failure.memberId,
+        properties: {
+          source: "manual_backfill",
+          status: "failed",
+          mmUserId: failure.mmUserId,
+          reason: failure.reason,
+          detailCode: failure.detailCode ?? null,
+          providerRequestId: failure.providerRequestId ?? null,
+        },
+      })),
+    );
+    await logAdminAuditBatch(auditInputs);
     status =
       result.failures.length > 0 || result.photoSkipped.length > 0
         ? "partial"
@@ -176,9 +173,12 @@ export async function syncMemberProfileAction(formData: FormData) {
       targetId: result.member.id,
       properties: {
         source: "member_detail",
-        reason: "provider_not_found",
+        reason: result.transitionReason,
         mmUserId: result.member.mmUserId,
         generation: result.member.generation,
+        lifecycleStatus: result.lifecycleStatus,
+        detailCode: result.detailCode,
+        providerRequestId: result.providerRequestId,
       },
     });
     revalidateMemberPaths();

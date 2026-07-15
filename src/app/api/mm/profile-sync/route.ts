@@ -40,16 +40,22 @@ export async function POST(request: Request) {
         targetId: session.userId,
         properties: {
           source: "member_profile_action",
-          reason: "provider_not_found",
+          reason: syncResult.transitionReason,
           mmUserId: syncResult.member.mmUserId,
           generation: syncResult.member.generation,
+          lifecycleStatus: syncResult.lifecycleStatus,
+          detailCode: syncResult.detailCode,
+          providerRequestId: syncResult.providerRequestId,
         },
       });
       return NextResponse.json(
         {
           ok: false,
           updated: false,
-          message: "MM 계정을 찾을 수 없어 MM 로그인을 중단했습니다. 이메일 로그인 설정을 위해 관리자에게 문의해 주세요.",
+          message: "MM 이용 상태가 종료되어 MM 로그인을 중단했습니다. 이메일 로그인 설정을 위해 관리자에게 문의해 주세요.",
+          lifecycleStatus: syncResult.lifecycleStatus,
+          detailCode: syncResult.detailCode,
+          providerRequestId: syncResult.providerRequestId,
         },
         { status: 409 },
       );

@@ -29,6 +29,7 @@ export const adminActionErrorMessages: Record<string, string> = {
   member_sync_profile_image_failed: "MM 프로필 사진을 저장하지 못했습니다. 사진 원본과 저장소 상태를 확인한 뒤 다시 동기화해 주세요.",
   member_sync_database_failed: "회원 정보를 읽거나 저장하지 못했습니다. 잠시 후 다시 시도하고, 반복되면 데이터베이스 로그를 확인해 주세요.",
   member_sync_track_failed: "SSAFY 트랙 정보를 읽거나 저장하지 못했습니다. SSAFY 인증 정보 상태를 확인한 뒤 다시 동기화해 주세요.",
+  member_sync_provider_lifecycle_unresolved: "SSAFY Verify에서 회원 lifecycle을 확정하지 못했습니다. provider request ID와 진단 코드를 확인한 뒤 다시 동기화해 주세요.",
   member_sync_transition_failed: "MM에서 회원을 찾았지만 이메일 로그인 전환 상태를 저장하지 못했습니다. 동기화를 중단했으니 회원 상태를 확인한 뒤 다시 시도해 주세요.",
   member_sync_failed: "MM 프로필 동기화 중 예상하지 못한 오류가 발생했습니다. 잠시 후 다시 시도하고, 반복되면 감사 로그를 확인해 주세요.",
   member_email_transition_invalid_email: "이메일 형식을 확인해 주세요.",

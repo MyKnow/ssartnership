@@ -86,6 +86,8 @@ type ClientOptions = {
   fetch?: typeof fetch;
   now?: () => number;
   trace?: SsafyVerifyApiTraceHandler | null;
+  sleep?: (delayMs: number) => Promise<void>;
+  random?: () => number;
 };
 
 type CachedToken = {
@@ -103,24 +105,29 @@ const SAFE_KEY_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/;
 const TOKEN_REFRESH_SKEW_MS = 30_000;
 const DEFAULT_TOKEN_TTL_SECONDS = 600;
 const MAX_BATCH_RECIPIENTS = 25;
+export const MAX_BATCH_MATTERMOST_USER_IDS = 500;
+const MAX_RETRY_ATTEMPTS = 3;
 const UNSAFE_TEXT_CONTROL_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
 export class SsafyVerifyServerApiError extends Error {
   readonly status: number;
   readonly errorCode: string;
   readonly requestId: string | null;
+  readonly retryAfterSeconds: number | null;
 
   constructor(input: {
     status: number;
     errorCode: string;
     message: string;
     requestId?: string | null;
+    retryAfterSeconds?: number | null;
   }) {
     super(input.message);
     this.name = "SsafyVerifyServerApiError";
     this.status = input.status;
     this.errorCode = input.errorCode;
     this.requestId = input.requestId ?? null;
+    this.retryAfterSeconds = input.retryAfterSeconds ?? null;
   }
 
   toJSON() {
@@ -129,6 +136,7 @@ export class SsafyVerifyServerApiError extends Error {
       errorCode: this.errorCode,
       message: this.message,
       requestId: this.requestId,
+      retryAfterSeconds: this.retryAfterSeconds,
     };
   }
 }
@@ -157,7 +165,12 @@ function safePublicMessage(value: unknown, fallback: string) {
 
 function normalizeErrorPayload(
   payload: unknown,
-  fallback: { status: number; errorCode: string; message: string },
+  fallback: {
+    status: number;
+    errorCode: string;
+    message: string;
+    retryAfterSeconds?: number | null;
+  },
 ) {
   const root = isRecord(payload) ? payload : {};
   const nested = isRecord(root.error) ? root.error : {};
@@ -175,7 +188,16 @@ function normalizeErrorPayload(
     errorCode,
     message,
     requestId,
+    retryAfterSeconds: fallback.retryAfterSeconds,
   });
+}
+
+function readRetryAfterSeconds(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const seconds = Number.parseInt(value.trim(), 10);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
 async function readJson(response: Response) {
@@ -428,6 +450,10 @@ export function createSsafyVerifyServerApiClient(
   const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   const now = options.now ?? (() => Date.now());
   const trace = options.trace ?? null;
+  const sleep = options.sleep ?? ((delayMs: number) => new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs);
+  }));
+  const random = options.random ?? Math.random;
   const tokenCache = new Map<string, CachedToken>();
   const inFlightToken = new Map<string, InFlightToken>();
 
@@ -475,6 +501,7 @@ export function createSsafyVerifyServerApiClient(
       const normalizedError = normalizeErrorPayload(json.ok ? json.value : null, {
         ...fallback,
         status: response.status,
+        retryAfterSeconds: readRetryAfterSeconds(response.headers.get("retry-after")),
       });
       await emitSsafyVerifyApiTrace(trace, {
         source: "server-api",
@@ -667,6 +694,42 @@ export function createSsafyVerifyServerApiClient(
     );
   }
 
+  async function requestJsonWithRetry(input: Parameters<typeof requestJson>[0]) {
+    for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        return await requestJson(input);
+      } catch (error) {
+        const retryable = error instanceof SsafyVerifyServerApiError
+          && (error.status === 429 || error.status >= 500);
+        if (!retryable || attempt >= MAX_RETRY_ATTEMPTS - 1) {
+          throw error;
+        }
+
+        const retryAfterMs = error.retryAfterSeconds === null
+          ? null
+          : error.retryAfterSeconds * 1000;
+        const exponentialMs = 2 ** attempt * 1000;
+        const jitterMs = retryAfterMs === null
+          ? Math.floor(Math.max(0, Math.min(1, random())) * 250)
+          : 0;
+        await sleep((retryAfterMs ?? exponentialMs) + jitterMs);
+      }
+    }
+
+    throw new Error("SSAFY Verify Server API 재시도 상태가 올바르지 않습니다.");
+  }
+
+  function normalizeMattermostBatchIds(ids: readonly string[]) {
+    const normalizedIds = Array.from(new Set(ids.map((id) => assertMattermostId(id))));
+    if (normalizedIds.length === 0) {
+      throw new Error("Mattermost batch 조회 대상이 필요합니다.");
+    }
+    if (normalizedIds.length > MAX_BATCH_MATTERMOST_USER_IDS) {
+      throw new Error("Mattermost batch 조회는 최대 500명까지 지원합니다.");
+    }
+    return normalizedIds;
+  }
+
   return {
     async getSsafyMemberProfile(sub: string) {
       const normalizedSub = requiredText(sub, "SSAFY subject", 200);
@@ -686,6 +749,36 @@ export function createSsafyVerifyServerApiClient(
           SSAFY_VERIFY_SERVER_API_SCOPES.profileRead,
           SSAFY_VERIFY_SERVER_API_SCOPES.directoryLookup,
         ],
+      });
+    },
+
+    async getMattermostUserProfilesBatch(mattermostUserIds: readonly string[]) {
+      const normalizedMattermostUserIds = normalizeMattermostBatchIds(mattermostUserIds);
+      return requestJsonWithRetry({
+        method: "POST",
+        path: "/mattermost-users/profiles/batch",
+        scopes: [
+          SSAFY_VERIFY_SERVER_API_SCOPES.profileRead,
+          SSAFY_VERIFY_SERVER_API_SCOPES.directoryLookup,
+        ],
+        body: {
+          mattermost_user_ids: normalizedMattermostUserIds,
+        },
+      });
+    },
+
+    async getMattermostUserLifecyclesBatch(mattermostUserIds: readonly string[]) {
+      const normalizedMattermostUserIds = normalizeMattermostBatchIds(mattermostUserIds);
+      return requestJsonWithRetry({
+        method: "POST",
+        path: "/mattermost-users/lifecycle/batch",
+        scopes: [
+          SSAFY_VERIFY_SERVER_API_SCOPES.profileRead,
+          SSAFY_VERIFY_SERVER_API_SCOPES.directoryLookup,
+        ],
+        body: {
+          mattermost_user_ids: normalizedMattermostUserIds,
+        },
       });
     },
 

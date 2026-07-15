@@ -10,6 +10,8 @@ export type MemberProfileSyncErrorCode =
   | "member_update_failed"
   | "verification_lookup_failed"
   | "verification_update_failed"
+  | "lifecycle_response_invalid"
+  | "lifecycle_unresolved"
   | "mattermost_unavailable_mark_failed";
 
 export class MemberProfileSyncError extends Error {
@@ -33,6 +35,7 @@ export type MemberProfileSyncFailureCode =
   | "member_sync_profile_image_failed"
   | "member_sync_database_failed"
   | "member_sync_track_failed"
+  | "member_sync_provider_lifecycle_unresolved"
   | "member_sync_transition_failed"
   | "member_sync_failed";
 
@@ -78,6 +81,10 @@ export function getMemberProfileSyncFailureCode(
     case "verification_lookup_failed":
     case "verification_update_failed":
       return "member_sync_track_failed";
+    case "lifecycle_response_invalid":
+      return "member_sync_provider_invalid_response";
+    case "lifecycle_unresolved":
+      return "member_sync_provider_lifecycle_unresolved";
     case "mattermost_unavailable_mark_failed":
       return "member_sync_transition_failed";
   }

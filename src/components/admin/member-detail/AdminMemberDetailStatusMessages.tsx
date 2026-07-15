@@ -61,8 +61,8 @@ export default function AdminMemberDetailStatusMessages({
       {memberSync === "mattermostUnavailable" ? (
         <InlineMessage
           tone="warning"
-          title="MM에서 회원을 찾지 못했습니다."
-          description="MM 로그인을 중단했습니다. 회원 신원을 확인한 뒤 아래에서 이메일 로그인 전환을 진행해 주세요."
+          title="MM 이용 상태를 종료 처리했습니다."
+          description="SSAFY Verify lifecycle 판정에 따라 MM 로그인을 중단하고 이메일 로그인 전환 대상으로 설정했습니다. 기존 회원 정보와 MM 연결 이력은 보존됩니다."
         />
       ) : null}
     </>
