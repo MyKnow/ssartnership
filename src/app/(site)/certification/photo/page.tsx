@@ -9,6 +9,7 @@ import {
   buildMemberGateHref,
   getMemberGateCompletionReturnTo,
 } from "@/lib/member-required-gates";
+import { getHeaderSession } from "@/lib/header-session";
 import { getUserSession } from "@/lib/user-auth";
 import { SITE_NAME } from "@/lib/site";
 
@@ -32,5 +33,6 @@ export default async function CertificationPhotoPage({ searchParams }: PageProps
     );
   }
   const blocked = session.requiresProfilePhotoUpdate;
-  return <div className="min-h-screen bg-background"><SiteHeader /><main><Container className="pb-16 pt-10"><div className="mx-auto w-full max-w-2xl space-y-6"><PageHeader eyebrow="Member" title="본인 사진 변경" description={blocked ? "사진 검토가 완료될 때까지 인증 카드와 QR 검증을 사용할 수 없습니다. 새 사진을 제출해 주세요." : "새 사진은 관리자 검토가 끝난 뒤 인증 카드와 유효 QR 검증 화면에 반영됩니다."} {...(blocked ? {} : { backHref: "/certification", backLabel: "내 인증으로 돌아가기" })} /><Card><GraduateProfilePhotoForm returnTo={returnTo} /></Card></div></Container></main></div>;
+  const headerSession = await getHeaderSession(session.userId);
+  return <div className="min-h-screen bg-background"><SiteHeader initialSession={headerSession} /><main><Container className="pb-16 pt-10"><div className="mx-auto w-full max-w-2xl space-y-6"><PageHeader eyebrow="Member" title="본인 사진 변경" description={blocked ? "사진 검토가 완료될 때까지 인증 카드와 QR 검증을 사용할 수 없습니다. 새 사진을 제출해 주세요." : "새 사진은 관리자 검토가 끝난 뒤 인증 카드와 유효 QR 검증 화면에 반영됩니다."} {...(blocked ? {} : { backHref: "/certification", backLabel: "내 인증으로 돌아가기" })} /><Card><GraduateProfilePhotoForm returnTo={returnTo} /></Card></div></Container></main></div>;
 }
