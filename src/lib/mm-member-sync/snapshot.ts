@@ -2,7 +2,6 @@ import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
 import {
   extractSsafyVerifyMemberProfiles,
-  normalizeSsafyVerifyMemberProfile,
   toMemberSyncSnapshot,
 } from "@/lib/ssafy-verify/profile";
 import {
@@ -56,8 +55,14 @@ export async function fetchMemberSnapshotByUserId(
     return null;
   }
 
-  const profile = normalizeSsafyVerifyMemberProfile(payload);
+  const profiles = extractSsafyVerifyMemberProfiles(payload);
+  const profile = profiles.find(
+    (candidate) => candidate.mattermostUserId === userId,
+  );
   if (!profile) {
+    if (profiles.length > 0) {
+      throw new MemberProfileSyncError("identity_mismatch");
+    }
     throw new MemberProfileSyncError("provider_response_invalid");
   }
   return toMemberSyncSnapshot(profile);
