@@ -30,6 +30,7 @@ type MemberVerifyResult =
       authTime: number;
       requiresConsent: boolean;
       mustChangePassword?: boolean;
+      requiresProfilePhotoUpdate?: boolean;
       nextPath?: string;
     }
   | (SsafyVerifyClientFailure & {
@@ -289,6 +290,7 @@ export default function SsafyVerifyCallbackRelay() {
         returnTo: safeReturnTo,
         mustChangePassword: Boolean(result.mustChangePassword),
         requiresConsent: result.requiresConsent,
+        requiresProfilePhotoUpdate: Boolean(result.requiresProfilePhotoUpdate),
       }) ?? safeReturnTo;
     setStatus("sent");
     window.location.replace(nextHref);

@@ -3,6 +3,8 @@ import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
+import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
+import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 
 export const runtime = "nodejs";
 
@@ -67,12 +69,17 @@ export async function POST(request: Request) {
         },
       });
     }
+    const photoState = await getMemberProfilePhotoState(session.userId);
+    const requiresProfilePhotoSubmission = requiresMemberProfilePhotoUpdate(
+      photoState.reviewStatus,
+    );
 
     return NextResponse.json({
       ok: true,
       updated: syncResult.updated,
       changedFields: syncResult.changedFields,
       imageSkipped: syncResult.imageSkipped,
+      requiresProfilePhotoSubmission,
     });
   } catch {
     return NextResponse.json(
