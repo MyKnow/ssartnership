@@ -41,7 +41,7 @@ type ProductLogInput = BaseLogContext & {
   properties?: Record<string, unknown> | null;
 };
 
-type AdminAuditInput = BaseLogContext & {
+export type AdminAuditInput = BaseLogContext & {
   action: AdminAuditAction;
   actorType?: AuditActorType;
   actorId?: string | null;
@@ -94,6 +94,31 @@ async function insertLog(table: string, payload: Record<string, unknown>) {
       table,
       requestId: payload.request_id ?? null,
       reasonCode: 'insert_exception',
+    });
+    return false;
+  }
+}
+
+async function insertLogs(table: string, payloads: readonly Record<string, unknown>[]) {
+  if (payloads.length === 0) {
+    return true;
+  }
+  try {
+    const { error } = await getSupabaseAdminClient().from(table).insert(payloads);
+    if (error) {
+      console.error("[activity-log] bulk_log_insert_failed", {
+        table,
+        count: payloads.length,
+        reasonCode: "insert_failed",
+      });
+      return false;
+    }
+    return true;
+  } catch {
+    console.error("[activity-log] bulk_log_insert_failed", {
+      table,
+      count: payloads.length,
+      reasonCode: "insert_exception",
     });
     return false;
   }
@@ -236,6 +261,29 @@ export async function logAdminAudit(input: AdminAuditInput) {
     ip_address: input.ipAddress ?? null,
     request_id: input.requestId ?? null,
   });
+}
+
+export async function logAdminAuditBatch(inputs: readonly AdminAuditInput[]) {
+  if (inputs.length === 0) {
+    return true;
+  }
+  const adminSession = await getAdminSession();
+  const payloads = inputs.map((input) => {
+    const actorId = input.actorId ?? adminSession?.adminId ?? "system";
+    return {
+      actor_type: input.actorType ?? (actorId === "system" ? "system" : "admin"),
+      actor_id: actorId,
+      action: input.action,
+      path: normalizeProductEventLocation(input.path ?? null),
+      target_type: input.targetType ?? null,
+      target_id: input.targetId ?? null,
+      properties: sanitizeProperties(input.properties),
+      user_agent: input.userAgent ?? null,
+      ip_address: input.ipAddress ?? null,
+      request_id: input.requestId ?? null,
+    };
+  });
+  return insertLogs("admin_audit_logs", payloads);
 }
 
 export async function logAuthSecurity(input: AuthSecurityInput) {
