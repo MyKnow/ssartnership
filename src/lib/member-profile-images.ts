@@ -479,7 +479,7 @@ export async function activateMemberProfileImage(input: {
     .update({
       status: "approved",
       reviewed_at: updatedAt,
-      review_note: null,
+      review_reason: null,
       delete_after: null,
       updated_at: updatedAt,
     })
