@@ -35,6 +35,7 @@ type VerifyResult =
       authTime: number;
       requiresConsent: boolean;
       mustChangePassword?: boolean;
+      requiresProfilePhotoUpdate?: boolean;
       nextPath?: string;
     }
   | (SsafyVerifyClientFailure & {
@@ -233,6 +234,7 @@ export default function SsafyVerifyButton({
         returnTo: safeReturnTo,
         mustChangePassword: Boolean(result.mustChangePassword),
         requiresConsent: result.requiresConsent,
+        requiresProfilePhotoUpdate: Boolean(result.requiresProfilePhotoUpdate),
       }) ?? safeReturnTo;
     router.replace(nextHref);
     router.refresh();

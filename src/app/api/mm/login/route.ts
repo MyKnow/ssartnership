@@ -7,6 +7,8 @@ import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 import {
   getMemberRequiredPolicyStatus,
 } from "@/lib/policy-documents";
+import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
+import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { resolveActiveMemberForLogin } from "@/lib/member-authentication";
 import {
   delayMemberAuthAttempt,
@@ -132,7 +134,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "login_failed" }, { status: 401 });
     }
 
-    const policyStatus = await getMemberRequiredPolicyStatus(member.id);
+    const [policyStatus, photoState] = await Promise.all([
+      getMemberRequiredPolicyStatus(member.id),
+      getMemberProfilePhotoState(member.id),
+    ]);
+    const requiresProfilePhotoUpdate = requiresMemberProfilePhotoUpdate(
+      photoState.reviewStatus,
+    );
     await setUserSession(member.id, Boolean(member.must_change_password), {
       persistent: autoLogin,
       authenticationMethod: "mattermost",
@@ -154,6 +162,7 @@ export async function POST(request: Request) {
       properties: {
         mustChangePassword: Boolean(member.must_change_password),
         requiresConsent: policyStatus.requiresConsent,
+        requiresProfilePhotoUpdate,
         autoLogin,
       },
     });
@@ -161,6 +170,7 @@ export async function POST(request: Request) {
       ok: true,
       mustChangePassword: Boolean(member.must_change_password),
       requiresConsent: policyStatus.requiresConsent,
+      requiresProfilePhotoUpdate,
     });
   } catch (error) {
     await logAuthSecurity({
