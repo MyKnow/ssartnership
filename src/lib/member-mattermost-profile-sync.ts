@@ -11,6 +11,7 @@ import {
   fetchMemberSnapshotByUsername,
 } from "@/lib/mm-member-sync/snapshot";
 import { markMemberMattermostLoginUnavailable } from "@/lib/member-email-login-transition";
+import { MemberProfileSyncError } from "@/lib/member-profile-sync-errors";
 import type {
   MemberSyncField,
   MemberSyncSnapshot,
@@ -57,7 +58,7 @@ async function loadMattermostDirectory(member: MemberMattermostSyncRow) {
     .eq("id", member.mattermost_account_id)
     .maybeSingle();
   if (error) {
-    throw new Error("Mattermost 계정 디렉터리를 불러오지 못했습니다.");
+    throw new MemberProfileSyncError("directory_lookup_failed");
   }
   return (data as MattermostDirectoryRow | null) ?? null;
 }
@@ -78,7 +79,7 @@ async function syncSsafyVerificationTrack(input: {
     .eq("member_id", input.memberId)
     .maybeSingle();
   if (error) {
-    throw new Error("SSAFY 인증 정보를 불러오지 못했습니다.");
+    throw new MemberProfileSyncError("verification_lookup_failed");
   }
   if (!data) {
     return false;
@@ -99,7 +100,7 @@ async function syncSsafyVerificationTrack(input: {
     })
     .eq("member_id", input.memberId);
   if (updateError) {
-    throw new Error("SSAFY 트랙 정보를 반영하지 못했습니다.");
+    throw new MemberProfileSyncError("verification_update_failed");
   }
   return true;
 }
@@ -117,7 +118,10 @@ export async function syncMemberMattermostProfile(
     .is("deleted_at", null)
     .is("mattermost_login_disabled_at", null)
     .maybeSingle();
-  if (error || !data?.id) {
+  if (error) {
+    throw new MemberProfileSyncError("member_lookup_failed");
+  }
+  if (!data?.id) {
     return null;
   }
 
@@ -129,7 +133,7 @@ export async function syncMemberMattermostProfile(
 
   let snapshot = await fetchMemberSnapshotByUserId(linkedDirectory.mm_user_id);
   if (snapshot && snapshot.mmUserId !== linkedDirectory.mm_user_id) {
-    throw new Error("Mattermost 계정 식별자가 변경되어 자동 연결할 수 없습니다.");
+    throw new MemberProfileSyncError("identity_mismatch");
   }
   if (!snapshot) {
     const usernameSnapshot = await fetchMemberSnapshotByUsername({
@@ -137,10 +141,14 @@ export async function syncMemberMattermostProfile(
       generation: member.generation,
     });
     if (!usernameSnapshot) {
-      await markMemberMattermostLoginUnavailable({
-        memberId: member.id,
-        reason: "provider_not_found",
-      });
+      try {
+        await markMemberMattermostLoginUnavailable({
+          memberId: member.id,
+          reason: "provider_not_found",
+        });
+      } catch {
+        throw new MemberProfileSyncError("mattermost_unavailable_mark_failed");
+      }
       return {
         unavailable: true,
         member: {
@@ -153,25 +161,28 @@ export async function syncMemberMattermostProfile(
       };
     }
     if (usernameSnapshot.mmUserId !== linkedDirectory.mm_user_id) {
-      throw new Error("Mattermost 계정 식별자가 변경되어 자동 연결할 수 없습니다.");
+      throw new MemberProfileSyncError("identity_mismatch");
     }
     snapshot = usernameSnapshot;
   }
 
-  await upsertMmUserDirectorySnapshot({
-    mmUserId: snapshot.mmUserId,
-    mmUsername: snapshot.mmUsername,
-    displayName: snapshot.displayName,
-    campus: snapshot.campus,
-    isStaff: member.generation === 0,
-    sourceYears:
-      member.generation && member.generation > 0 ? [member.generation] : [],
-  });
-  const refreshedDirectory = await findMmUserDirectoryEntryByUserId(
-    snapshot.mmUserId,
-  );
+  let refreshedDirectory: Awaited<ReturnType<typeof findMmUserDirectoryEntryByUserId>>;
+  try {
+    await upsertMmUserDirectorySnapshot({
+      mmUserId: snapshot.mmUserId,
+      mmUsername: snapshot.mmUsername,
+      displayName: snapshot.displayName,
+      campus: snapshot.campus,
+      isStaff: member.generation === 0,
+      sourceYears:
+        member.generation && member.generation > 0 ? [member.generation] : [],
+    });
+    refreshedDirectory = await findMmUserDirectoryEntryByUserId(snapshot.mmUserId);
+  } catch {
+    throw new MemberProfileSyncError("directory_sync_failed");
+  }
   if (!refreshedDirectory?.id) {
-    throw new Error("Mattermost 계정 연결을 저장하지 못했습니다.");
+    throw new MemberProfileSyncError("directory_sync_failed");
   }
 
   const patch = buildMattermostProfileSyncPatch(
@@ -186,13 +197,18 @@ export async function syncMemberMattermostProfile(
     },
   );
   const changedFields = [...patch.changedFields] as MemberSyncField[];
-  const profileImage = await syncMemberProfileImage({
-    memberId: member.id,
-    imageSource: "mattermost",
-    avatarBase64: snapshot.avatarBase64,
-    avatarContentType: snapshot.avatarContentType,
-    avatarUrl: snapshot.avatarUrl,
-  });
+  let profileImage: Awaited<ReturnType<typeof syncMemberProfileImage>>;
+  try {
+    profileImage = await syncMemberProfileImage({
+      memberId: member.id,
+      imageSource: "mattermost",
+      avatarBase64: snapshot.avatarBase64,
+      avatarContentType: snapshot.avatarContentType,
+      avatarUrl: snapshot.avatarUrl,
+    });
+  } catch {
+    throw new MemberProfileSyncError("profile_image_failed");
+  }
   const imageUpdated = profileImage.updated;
   const imageSkipped = profileImage.skipped;
 
@@ -204,11 +220,11 @@ export async function syncMemberMattermostProfile(
       .update({
         ...memberUpdate,
         updated_at: updatedAt,
-      })
+    })
       .eq("id", member.id)
       .is("deleted_at", null);
     if (updateError) {
-      throw new Error("Mattermost 프로필을 반영하지 못했습니다.");
+      throw new MemberProfileSyncError("member_update_failed");
     }
   }
 

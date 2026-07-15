@@ -30,6 +30,7 @@ import {
   MemberEmailLoginTransitionError,
 } from "@/lib/member-email-login-transition";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
+import { getMemberProfileSyncFailureCode } from "@/lib/member-profile-sync-errors";
 import {
   getMmUserDirectoryEntriesByAccountIds,
   type MmUserDirectoryIdentity,
@@ -132,12 +133,13 @@ export async function syncMemberProfileAction(formData: FormData) {
   let result: Awaited<ReturnType<typeof syncMemberById>>;
   try {
     result = await syncMemberById(memberId);
-  } catch {
-    redirectAdminActionError(detailPath, "member_sync_failed", {
+  } catch (error) {
+    const failureCode = getMemberProfileSyncFailureCode(error);
+    redirectAdminActionError(detailPath, failureCode, {
       action: "member_sync",
       targetType: "member",
       targetId: memberId,
-      properties: { source: "member_detail" },
+      properties: { source: "member_detail", reason: failureCode },
     });
   }
 

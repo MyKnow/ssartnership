@@ -2,13 +2,13 @@ import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
 import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
 import {
   extractSsafyVerifyMemberProfiles,
-  normalizeSsafyVerifyMemberProfile,
   toMemberSyncSnapshot,
 } from "@/lib/ssafy-verify/profile";
 import {
   SsafyVerifyServerApiError,
   createSsafyVerifyServerApiClient,
 } from "@/lib/ssafy-verify/server-api";
+import { MemberProfileSyncError } from "@/lib/member-profile-sync-errors";
 import type { MemberSyncSnapshot } from "./shared";
 
 const MATTERMOST_PROFILE_NOT_FOUND = Symbol("mattermost_profile_not_found");
@@ -55,9 +55,15 @@ export async function fetchMemberSnapshotByUserId(
     return null;
   }
 
-  const profile = normalizeSsafyVerifyMemberProfile(payload);
+  const profiles = extractSsafyVerifyMemberProfiles(payload);
+  const profile = profiles.find(
+    (candidate) => candidate.mattermostUserId === userId,
+  );
   if (!profile) {
-    throw new Error("SSAFY Verify 프로필 응답 형식이 올바르지 않습니다.");
+    if (profiles.length > 0) {
+      throw new MemberProfileSyncError("identity_mismatch");
+    }
+    throw new MemberProfileSyncError("provider_response_invalid");
   }
   return toMemberSyncSnapshot(profile);
 }
@@ -102,12 +108,12 @@ export async function fetchMemberSnapshotByUsername(input: {
   );
   if (!matchingProfile) {
     if (profiles.length > 0) {
-      throw new Error("SSAFY Verify username 조회 결과가 요청 계정과 일치하지 않습니다.");
+      throw new MemberProfileSyncError("identity_mismatch");
     }
     if (isExplicitlyEmptyDirectoryLookup(payload)) {
       return null;
     }
-    throw new Error("SSAFY Verify username 조회 응답 형식이 올바르지 않습니다.");
+    throw new MemberProfileSyncError("provider_response_invalid");
   }
   return toMemberSyncSnapshot(matchingProfile);
 }
