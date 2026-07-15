@@ -1,32 +1,46 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 type PreviewSyncStorageModule =
   typeof import("../scripts/supabase-sync-preview-storage.mjs");
 
 const previewSyncStoragePromise = import(
-  new URL("../scripts/supabase-sync-preview-storage.mjs", import.meta.url).href,
+  new URL("../scripts/supabase-sync-preview-storage.mjs", import.meta.url).href
 ) as Promise<PreviewSyncStorageModule>;
 
-test("isPreviewRedactedStorageBucket identifies production profile-image storage", async () => {
-  const { isPreviewRedactedStorageBucket, isPreviewRedactedStoragePath } =
-    await previewSyncStoragePromise;
+test("member profile image Storage 동기화 실패는 Preview 성공으로 숨기지 않는다", async () => {
+  const {
+    isPreviewRequiredStorageBucket,
+    shouldAbortPreviewStorageObjectSync,
+  } = await previewSyncStoragePromise;
 
-  assert.equal(isPreviewRedactedStorageBucket("member-profile-images"), true);
-  assert.equal(isPreviewRedactedStorageBucket("graduate-certificates"), false);
+  assert.equal(isPreviewRequiredStorageBucket("member-profile-images"), true);
+  assert.equal(isPreviewRequiredStorageBucket("graduate-certificates"), false);
   assert.equal(
-    isPreviewRedactedStoragePath(
-      "member-profile-images",
-      "members/member-1/photo.webp",
-    ),
+    shouldAbortPreviewStorageObjectSync("member-profile-images"),
     true,
   );
   assert.equal(
-    isPreviewRedactedStoragePath(
-      "member-profile-images",
-      "graduate-requests/request-1/photo.webp",
-    ),
+    shouldAbortPreviewStorageObjectSync("graduate-certificates"),
     false,
+  );
+});
+
+test("required profile image object failure aborts the Preview sync", async () => {
+  const script = await readFile(
+    new URL("../scripts/supabase-sync-preview.mjs", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(script, /shouldAbortPreviewStorageObjectSync\(bucketName\)/);
+  assert.match(
+    script,
+    /Preview required object \$\{bucketName\}\/\$\{objectPath\} could not be synchronized/,
+  );
+  assert.match(
+    script,
+    /Preview required bucket \$\{bucketName\} is missing \$\{missingPaths\.length\} synchronized object\(s\)/,
   );
 });
 
