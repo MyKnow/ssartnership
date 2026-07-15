@@ -115,6 +115,7 @@ export async function syncMemberMattermostProfile(
     )
     .eq("id", memberId)
     .is("deleted_at", null)
+    .is("mattermost_login_disabled_at", null)
     .maybeSingle();
   if (error || !data?.id) {
     return null;

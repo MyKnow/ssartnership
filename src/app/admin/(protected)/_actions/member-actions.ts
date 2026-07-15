@@ -5,6 +5,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
   buildMemberSyncLogProperties,
+  syncMemberById,
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
 import {
@@ -110,6 +111,71 @@ export async function backfillMemberProfilesAction() {
   redirect(
     `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
   );
+}
+
+export async function syncMemberProfileAction(formData: FormData) {
+  await requireAdminPermission("members", "update", {
+    path: "/admin/members",
+  });
+  const memberId = String(formData.get("id") ?? "").trim();
+  const detailPath = isUuid(memberId)
+    ? `/admin/members/${memberId}`
+    : "/admin/members";
+  if (!isUuid(memberId)) {
+    redirectAdminActionError(detailPath, "member_missing_id", {
+      action: "member_sync",
+      targetType: "member",
+      properties: { source: "member_detail", reason: "invalid_member_id" },
+    });
+  }
+
+  let result: Awaited<ReturnType<typeof syncMemberById>>;
+  try {
+    result = await syncMemberById(memberId);
+  } catch {
+    redirectAdminActionError(detailPath, "member_sync_failed", {
+      action: "member_sync",
+      targetType: "member",
+      targetId: memberId,
+      properties: { source: "member_detail" },
+    });
+  }
+
+  if (!result) {
+    redirectAdminActionError(detailPath, "member_sync_unavailable", {
+      action: "member_sync",
+      targetType: "member",
+      targetId: memberId,
+      properties: { source: "member_detail", reason: "member_not_syncable" },
+    });
+  }
+
+  if (!("snapshot" in result)) {
+    await logAdminAction("member_email_login_transition", {
+      targetType: "member",
+      targetId: result.member.id,
+      properties: {
+        source: "member_detail",
+        reason: "provider_not_found",
+        mmUserId: result.member.mmUserId,
+        generation: result.member.generation,
+      },
+    });
+    revalidateMemberPaths();
+    revalidatePath(detailPath);
+    redirect(`${detailPath}?memberSync=mattermostUnavailable`);
+  }
+
+  await logAdminAction("member_sync", {
+    targetType: "member",
+    targetId: result.member.id,
+    properties: buildMemberSyncLogProperties(result, {
+      source: "member_detail",
+    }),
+  });
+  revalidateMemberPaths();
+  revalidatePath(detailPath);
+  redirect(`${detailPath}?memberSync=${result.updated ? "updated" : "unchanged"}`);
 }
 
 function memberEmailLoginTransitionErrorCode(error: unknown) {

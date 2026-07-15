@@ -40,6 +40,7 @@ import {
   deleteMemberAction,
   disableGenerationMattermostLoginAction,
   issueMemberEmailLoginTransitionAction,
+  syncMemberProfileAction,
   updateMemberAction,
 } from "./_actions/member-actions";
 import {
@@ -188,6 +189,10 @@ export async function deletePartner(formData: FormData) {
 
 export async function backfillMemberProfiles() {
   return backfillMemberProfilesAction();
+}
+
+export async function syncMemberProfile(formData: FormData) {
+  return syncMemberProfileAction(formData);
 }
 
 export async function updateMember(formData: FormData) {

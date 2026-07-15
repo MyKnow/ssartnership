@@ -25,6 +25,7 @@ import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import {
   deleteMember,
   issueMemberEmailLoginTransition,
+  syncMemberProfile,
   updateMember,
 } from "@/app/admin/(protected)/actions";
 import { getMemberEmailLoginTransition } from "@/lib/member-email-login-transition";
@@ -45,6 +46,7 @@ type AdminMemberDetailSearchParams = {
   logPageSize?: string;
   error?: string;
   emailTransition?: string;
+  memberSync?: string;
 };
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -227,13 +229,34 @@ export default async function AdminMemberDetailPage({
     <AdminShell title="회원 상세" backHref="/admin/members" backLabel="회원 관리">
       <div className="grid gap-4">
         {actionError ? (
-          <InlineMessage tone="danger" title="이메일 로그인 전환을 처리하지 못했습니다." description={actionError} />
+          <InlineMessage tone="danger" title="회원 작업을 처리하지 못했습니다." description={actionError} />
         ) : null}
         {query.emailTransition === "sent" ? (
           <InlineMessage
             tone="success"
             title="이메일 설정 링크를 발송했습니다."
             description="링크를 완료하기 전까지 기존 MM 연결 이력은 보존되며, MM 아이디 로그인은 사용할 수 없습니다."
+          />
+        ) : null}
+        {query.memberSync === "updated" ? (
+          <InlineMessage
+            tone="success"
+            title="MM 프로필을 동기화했습니다."
+            description="표시 이름, MM 아이디, 트랙, 프로필 사진 중 변경된 정보만 반영했습니다. 캠퍼스와 기수는 변경하지 않습니다."
+          />
+        ) : null}
+        {query.memberSync === "unchanged" ? (
+          <InlineMessage
+            tone="info"
+            title="MM 프로필이 이미 최신 상태입니다."
+            description="동기화 가능한 항목에서 변경된 정보가 없습니다."
+          />
+        ) : null}
+        {query.memberSync === "mattermostUnavailable" ? (
+          <InlineMessage
+            tone="warning"
+            title="MM에서 회원을 찾지 못했습니다."
+            description="MM 로그인을 중단했습니다. 회원 신원을 확인한 뒤 아래에서 이메일 로그인 전환을 진행해 주세요."
           />
         ) : null}
       <AdminMemberDetailView
@@ -276,6 +299,7 @@ export default async function AdminMemberDetailPage({
         updateAction={updateMember}
         deleteAction={deleteMember}
         emailLoginTransitionAction={issueMemberEmailLoginTransition}
+        syncMemberProfileAction={syncMemberProfile}
         canUpdate={canUpdateMembers}
         canDelete={canAdmin(
           adminSession.account.permissions,

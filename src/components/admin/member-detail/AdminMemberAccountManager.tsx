@@ -14,6 +14,7 @@ export default function AdminMemberAccountManager({
   updateAction,
   deleteAction,
   emailLoginTransitionAction,
+  syncMemberProfileAction,
   canUpdate,
   canDelete,
 }: {
@@ -35,6 +36,7 @@ export default function AdminMemberAccountManager({
   updateAction: FormAction;
   deleteAction: FormAction;
   emailLoginTransitionAction: FormAction;
+  syncMemberProfileAction: FormAction;
   canUpdate: boolean;
   canDelete: boolean;
 }) {
@@ -86,6 +88,27 @@ export default function AdminMemberAccountManager({
             회원 정보 저장
           </SubmitButton>
         </form>
+      ) : null}
+
+      {canUpdate && member.hasMattermostAccount ? (
+        <section className="grid gap-3 border-t border-border/70 pt-4">
+          <AdminSectionHeading
+            title="MM 프로필 동기화"
+            description="이 회원 한 명의 표시 이름, MM 아이디, 트랙, 프로필 사진만 다시 가져옵니다. 캠퍼스와 기수는 변경하지 않습니다."
+          />
+          {!member.mattermostLoginDisabledAt ? (
+            <form action={syncMemberProfileAction}>
+              <input type="hidden" name="id" value={member.id} />
+              <SubmitButton pendingText="MM 프로필 동기화 중" className="w-full">
+                MM 프로필 동기화
+              </SubmitButton>
+            </form>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              MM 로그인이 중단된 회원은 동기화할 수 없습니다. 이메일 로그인 전환 상태를 확인해 주세요.
+            </p>
+          )}
+        </section>
       ) : null}
 
       {canUpdate && member.hasMattermostAccount ? (

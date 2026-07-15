@@ -18,6 +18,8 @@ export const adminActionErrorMessages: Record<string, string> = {
   member_missing_id: "대상을 찾을 수 없습니다.",
   member_invalid_year: "기수는 0~99 사이의 숫자로 입력해 주세요.",
   member_invalid_request: "회원 입력값을 확인해 주세요.",
+  member_sync_unavailable: "MM 계정이 연결되어 있고 로그인 사용 중인 회원만 동기화할 수 있습니다.",
+  member_sync_failed: "MM 프로필을 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   member_email_transition_invalid_email: "이메일 형식을 확인해 주세요.",
   member_email_transition_invalid_reason: "MM 이용 중단 사유를 확인해 주세요.",
   member_email_transition_identity_unconfirmed: "대상 회원의 신원과 이메일 소유자를 확인한 뒤 진행해 주세요.",

@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const root = new URL("..", import.meta.url);
+const read = (path: string) => readFile(new URL(path, root), "utf8");
+
+test("회원 상세 단건 동기화는 기존 서비스·권한·감사 로그를 재사용한다", async () => {
+  const [memberActions, publicActions, detailPage, detailView, accountManager, profileSync] =
+    await Promise.all([
+      read("src/app/admin/(protected)/_actions/member-actions.ts"),
+      read("src/app/admin/(protected)/actions.ts"),
+      read("src/app/admin/(protected)/members/[memberId]/page.tsx"),
+      read("src/components/admin/AdminMemberDetailView.tsx"),
+      read("src/components/admin/member-detail/AdminMemberAccountManager.tsx"),
+      read("src/lib/member-mattermost-profile-sync.ts"),
+    ]);
+
+  assert.match(memberActions, /syncMemberById/);
+  assert.match(memberActions, /export async function syncMemberProfileAction\(formData: FormData\)/);
+  assert.match(memberActions, /requireAdminPermission\("members", "update"/);
+  assert.match(memberActions, /isUuid\(memberId\)/);
+  assert.match(memberActions, /buildMemberSyncLogProperties/);
+  assert.match(memberActions, /logAdminAction\("member_sync"/);
+  assert.match(memberActions, /source: "member_detail"/);
+  assert.match(memberActions, /logAdminAction\("member_email_login_transition"/);
+  assert.match(memberActions, /source: "member_detail"/);
+  assert.match(memberActions, /revalidatePath\(detailPath\)/);
+  assert.match(memberActions, /memberSync=\$\{result\.updated \? "updated" : "unchanged"\}/);
+  assert.match(memberActions, /memberSync=mattermostUnavailable/);
+
+  assert.match(publicActions, /syncMemberProfileAction/);
+  assert.match(publicActions, /export async function syncMemberProfile\(formData: FormData\)/);
+  assert.match(detailPage, /syncMemberProfile/);
+  assert.match(detailPage, /memberSync/);
+  assert.match(detailPage, /MM 프로필을 동기화했습니다/);
+  assert.match(detailPage, /MM에서 회원을 찾지 못했습니다/);
+  assert.match(detailView, /syncMemberProfileAction/);
+  assert.match(accountManager, /MM 프로필 동기화/);
+  assert.match(accountManager, /!member\.mattermostLoginDisabledAt/);
+  assert.match(profileSync, /\.is\("mattermost_login_disabled_at", null\)/);
+});
