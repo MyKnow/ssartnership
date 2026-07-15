@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, fn, userEvent, within } from "storybook/test";
 import AdminMemberDetailView from "./AdminMemberDetailView";
 
 const meta = {
@@ -121,6 +122,7 @@ const meta = {
     updateAction: async () => {},
     deleteAction: async () => {},
     emailLoginTransitionAction: async () => {},
+    syncMemberProfileAction: fn(async () => {}),
     canUpdate: true,
     canDelete: false,
   },
@@ -138,3 +140,38 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const ActiveMattermostSync: Story = {
+  args: {
+    member: {
+      id: "member-seoul-15-001",
+      displayName: "김하늘",
+      mmUsername: "seoul15_haneul",
+      mmUserId: "mm-user-seoul-15-001",
+      manualLoginId: null,
+      generation: 15,
+      generationLabel: "15기 · 2학기",
+      campus: "서울",
+      mustChangePassword: false,
+      email: "haneul@example.com",
+      emailVerifiedAt: "2026-07-01T09:00:00+09:00",
+      hasMattermostAccount: true,
+      mattermostLoginDisabledAt: null,
+      mattermostLoginDisabledReason: null,
+      emailLoginTransition: null,
+      createdAt: "2026-01-12T10:00:00+09:00",
+      updatedAt: "2026-07-10T09:30:00+09:00",
+      hasAvatar: false,
+      avatarUrl: "/api/admin/members/member-seoul-15-001/avatar",
+    },
+    syncMemberProfileAction: fn(async () => {}),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: "MM 프로필 동기화" });
+
+    await expect(button).toBeInTheDocument();
+    await userEvent.click(button);
+    await expect(args.syncMemberProfileAction).toHaveBeenCalled();
+  },
+};
