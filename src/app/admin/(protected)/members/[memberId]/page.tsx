@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberDetailView from "@/components/admin/AdminMemberDetailView";
-import InlineMessage from "@/components/ui/InlineMessage";
+import AdminMemberDetailStatusMessages from "@/components/admin/member-detail/AdminMemberDetailStatusMessages";
 import {
   type AdminMemberSecurityLog,
 } from "@/components/admin/member-detail/AdminMemberSecurityLogExplorer";
@@ -25,10 +25,10 @@ import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import {
   deleteMember,
   issueMemberEmailLoginTransition,
+  syncMemberProfile,
   updateMember,
 } from "@/app/admin/(protected)/actions";
 import { getMemberEmailLoginTransition } from "@/lib/member-email-login-transition";
-import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import {
   approveMemberProfilePhotoAction,
   rejectMemberCurrentProfilePhotoAction,
@@ -45,6 +45,7 @@ type AdminMemberDetailSearchParams = {
   logPageSize?: string;
   error?: string;
   emailTransition?: string;
+  memberSync?: string;
 };
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -219,23 +220,14 @@ export default async function AdminMemberDetailPage({
     "profile_images",
     "update",
   );
-  const actionError = query.error
-    ? adminActionErrorMessages[query.error] ?? "요청을 처리하지 못했습니다."
-    : null;
-
   return (
     <AdminShell title="회원 상세" backHref="/admin/members" backLabel="회원 관리">
       <div className="grid gap-4">
-        {actionError ? (
-          <InlineMessage tone="danger" title="이메일 로그인 전환을 처리하지 못했습니다." description={actionError} />
-        ) : null}
-        {query.emailTransition === "sent" ? (
-          <InlineMessage
-            tone="success"
-            title="이메일 설정 링크를 발송했습니다."
-            description="링크를 완료하기 전까지 기존 MM 연결 이력은 보존되며, MM 아이디 로그인은 사용할 수 없습니다."
-          />
-        ) : null}
+        <AdminMemberDetailStatusMessages
+          errorCode={query.error}
+          emailTransition={query.emailTransition}
+          memberSync={query.memberSync}
+        />
       <AdminMemberDetailView
         member={{
           id: member.id,
@@ -276,6 +268,7 @@ export default async function AdminMemberDetailPage({
         updateAction={updateMember}
         deleteAction={deleteMember}
         emailLoginTransitionAction={issueMemberEmailLoginTransition}
+        syncMemberProfileAction={syncMemberProfile}
         canUpdate={canUpdateMembers}
         canDelete={canAdmin(
           adminSession.account.permissions,

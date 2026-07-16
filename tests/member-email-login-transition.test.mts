@@ -312,7 +312,7 @@ test("전환 재발급과 비밀번호 설정은 member 행을 먼저 잠가 tok
   assert.match(migration, /select \* into member_row[\s\S]*for update;/);
 });
 
-test("프로필 백필은 campus·기수를 쓰지 않고, ID와 username이 모두 없을 때만 전환한다", async () => {
+test("프로필 백필은 MM User ID와 lifecycle 판정만 사용하고 username fallback을 수행하지 않는다", async () => {
   const [memberDomain, profileSync, snapshot, sync] = await Promise.all([
     read("src/lib/member-domain.ts"),
     read("src/lib/member-mattermost-profile-sync.ts"),
@@ -321,20 +321,16 @@ test("프로필 백필은 campus·기수를 쓰지 않고, ID와 username이 모
   ]);
 
   assert.doesNotMatch(memberDomain, /memberPatch\.campus/);
-  assert.match(profileSync, /fetchMemberSnapshotByUsername/);
+  assert.doesNotMatch(profileSync, /fetchMemberSnapshotByUsername/);
+  assert.match(profileSync, /fetchMemberLifecycleByUserId/);
+  assert.match(profileSync, /resolveMattermostLifecycle/);
   assert.match(profileSync, /markMemberMattermostLoginUnavailable/);
-  const idSnapshotIndex = profileSync.indexOf(
-    "let snapshot = await fetchMemberSnapshotByUserId(linkedDirectory.mm_user_id);",
-  );
-  const usernameFallbackIndex = profileSync.indexOf("if (!snapshot)");
-  const idIdentityGuardIndex = profileSync.indexOf(
-    "if (snapshot && snapshot.mmUserId !== linkedDirectory.mm_user_id)",
-  );
-  assert.ok(idSnapshotIndex >= 0);
-  assert.ok(idIdentityGuardIndex > idSnapshotIndex);
-  assert.ok(idIdentityGuardIndex < usernameFallbackIndex);
-  assert.match(snapshot, /fetchMemberSnapshotByUsername/);
+  assert.match(profileSync, /fetchMemberSnapshotByUserId/);
+  assert.doesNotMatch(snapshot, /fetchMemberSnapshotByUsername/);
+  assert.doesNotMatch(snapshot, /member_profile_sync_username_fallback/);
   assert.match(snapshot, /MATTERMOST_PROFILE_NOT_FOUND/);
   assert.doesNotMatch(snapshot, /if \(!payload\) \{\s*return null;/);
+  assert.match(sync, /fetchBatchStates/);
+  assert.match(sync, /parseMattermostLifecycleBatch/);
   assert.match(sync, /\.is\("mattermost_login_disabled_at", null\)/);
 });

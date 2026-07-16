@@ -176,6 +176,9 @@ export default function GraduateProfilePhotoForm({
         <p className="text-ko-pretty">
           단체사진·로고·캐릭터·얼굴이 과도하게 가려진 사진은 사용할 수 없습니다.
         </p>
+        <p className="text-ko-pretty">
+          JPEG, PNG, WebP, HEIC, HEIF를 선택할 수 있으며, 크롭 적용 후 640×640 WebP 파일로 제출됩니다.
+        </p>
       </div>
       <input
         ref={inputRef}
@@ -210,6 +213,12 @@ export default function GraduateProfilePhotoForm({
               <p className="text-ko-pretty mt-1 text-xs leading-5 text-muted-foreground">
                 1:1 비율로 잘린 사진이 제출됩니다.
               </p>
+              <div className="mt-2.5 grid gap-1" role="status" aria-live="polite">
+                <p className="text-ko text-xs font-semibold text-success">WebP 변환 완료</p>
+                <p className="text-ko-pretty text-xs leading-5 text-muted-foreground">
+                  640×640 WebP 파일로 제출됩니다. 원본 사진은 업로드되지 않습니다.
+                </p>
+              </div>
             </figcaption>
           </figure>
         ) : null}

@@ -68,6 +68,7 @@ type AdminMemberSearchParams = {
   checked?: string;
   updated?: string;
   skipped?: string;
+  photoSkipped?: string;
   failures?: string;
   mattermostUnavailable?: string;
   mmLoginTransition?: string;
@@ -829,7 +830,7 @@ export default async function AdminMembersPage({
                   ? "백필 중 오류가 발생했습니다."
                   : "백필이 완료되었습니다."
             }
-            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.mattermostUnavailable ? `MM 이용 중단 ${params.mattermostUnavailable}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
+            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.photoSkipped ? `사진 미처리 ${params.photoSkipped}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.mattermostUnavailable ? `MM 이용 중단 ${params.mattermostUnavailable}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
           />
         ) : null}
         {params.mmLoginTransition === "generation" ? (

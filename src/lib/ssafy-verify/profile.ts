@@ -261,24 +261,32 @@ export function extractSsafyVerifyMemberProfiles(
   payload: unknown,
 ): SsafyVerifyMemberProfile[] {
   const candidates: unknown[] = [];
+  const visited = new WeakSet<object>();
 
   function collect(value: unknown) {
-    if (Array.isArray(value)) {
-      candidates.push(...value);
+    if (typeof value !== "object" || value === null) {
       return;
     }
+    if (visited.has(value)) {
+      return;
+    }
+    visited.add(value);
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        collect(item);
+      }
+      return;
+    }
+
     if (!isRecord(value)) {
       return;
     }
+    candidates.push(value);
     for (const key of ["users", "items", "data", "profiles", "events"]) {
       const nested = value[key];
-      if (Array.isArray(nested)) {
-        candidates.push(...nested);
-      } else if (isRecord(nested)) {
-        candidates.push(nested);
-      }
+      collect(nested);
     }
-    candidates.push(value);
   }
 
   collect(payload);

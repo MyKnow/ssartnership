@@ -50,7 +50,7 @@
 ## Privacy and data minimization
 
 - 비밀번호 원문, session token, auth token, client secret, push key 원문 중복 저장은 금지한다.
-- Preview sync는 production member password hash/salt와 heavy avatar payload를 제거한다.
+- Preview sync는 production member password hash/salt와 legacy `members.avatar_base64`를 제거하되, 프로필 사진 ledger와 private Storage 객체는 Preview 검증용으로 유지한다.
 - 제휴 제안 자유서술 본문 전체를 로그에 남기지 않는다.
 - SSAFY Verify trace는 request/response shape와 provider request id 수준으로 요약한다.
 - avatar/image는 필요한 범위에서 tokenized route 또는 storage URL로 제공한다.

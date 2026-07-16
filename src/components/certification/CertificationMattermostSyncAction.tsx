@@ -5,11 +5,13 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { useToast } from "@/components/ui/Toast";
+import { buildMemberGateHref } from "@/lib/member-required-gates";
 
 type MattermostProfileSyncResponse = {
   ok?: boolean;
   updated?: boolean;
   imageSkipped?: boolean;
+  requiresProfilePhotoSubmission?: boolean;
   message?: string;
 };
 
@@ -39,6 +41,21 @@ export default function CertificationMattermostSyncAction() {
 
       if (!response.ok || !payload?.ok) {
         notify(getResponseMessage(payload));
+        return;
+      }
+
+      if (payload.requiresProfilePhotoSubmission) {
+        notify(
+          payload.imageSkipped
+            ? "MM 프로필 사진을 처리하지 못했습니다. 본인 사진을 직접 제출해 주세요."
+            : "MM 프로필에 사용할 사진이 없습니다. 본인 사진을 직접 제출해 주세요.",
+        );
+        window.location.assign(
+          buildMemberGateHref(
+            "profile-photo",
+            `${window.location.pathname}${window.location.search}${window.location.hash}`,
+          ),
+        );
         return;
       }
 

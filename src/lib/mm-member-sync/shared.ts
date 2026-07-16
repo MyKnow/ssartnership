@@ -1,3 +1,9 @@
+import type { MattermostLoginDisabledReason } from "@/lib/member-mattermost-auth";
+import type {
+  MattermostLifecycleResult,
+  MattermostLifecycleStatus,
+} from "./lifecycle";
+
 export type MemberSyncField =
   | "mmUsername"
   | "displayName"
@@ -30,10 +36,36 @@ export type MemberSyncResult = {
   snapshot: MemberSyncSnapshot;
   updated: boolean;
   changedFields: MemberSyncField[];
+  imageSkipped: boolean;
 };
 
 export type MemberMattermostUnavailableResult = {
   member: NormalizedMemberSyncSubject;
+  lifecycleStatus: Extract<MattermostLifecycleStatus, "graduated" | "departed">;
+  detailCode: string;
+  providerRequestId: string | null;
+  transitionReason: Extract<MattermostLoginDisabledReason, "generation_completed" | "member_departed">;
+};
+
+export type MemberSyncFailure = {
+  memberId: string;
+  mmUserId: string | null;
+  reason: string;
+  detailCode?: string | null;
+  providerRequestId?: string | null;
+};
+
+export type MemberSyncAuditResult = {
+  member: NormalizedMemberSyncSubject;
+  status: "updated" | "unchanged" | "photo_skipped" | "graduated" | "departed" | "unresolved" | "failed";
+  changedFields: MemberSyncField[];
+  imageSkipped: boolean;
+  lifecycleStatus: MattermostLifecycleStatus | null;
+  detailCode: string | null;
+  providerRequestId: string | null;
+  transitionReason: MattermostLoginDisabledReason | null;
+  reason: string | null;
+  lifecycle: MattermostLifecycleResult | null;
 };
 
 export type MemberSyncBatchResult = {
@@ -41,8 +73,10 @@ export type MemberSyncBatchResult = {
   updated: number;
   skipped: number;
   results: MemberSyncResult[];
+  photoSkipped: MemberSyncResult[];
   mattermostUnavailable: MemberMattermostUnavailableResult[];
-  failures: Array<{ memberId: string; mmUserId: string | null; reason: string }>;
+  failures: MemberSyncFailure[];
+  auditResults: MemberSyncAuditResult[];
 };
 
 export type MmMemberSyncErrorCode = "db_error" | "lookup_failed" | "invalid_state";

@@ -56,6 +56,7 @@ export type AdminMemberDetailViewProps = {
   updateAction: FormAction;
   deleteAction: FormAction;
   emailLoginTransitionAction: FormAction;
+  syncMemberProfileAction: FormAction;
   canUpdate: boolean;
   canDelete: boolean;
   profilePhoto?: {
@@ -83,6 +84,7 @@ export default function AdminMemberDetailView({
   updateAction,
   deleteAction,
   emailLoginTransitionAction,
+  syncMemberProfileAction,
   canUpdate,
   canDelete,
   profilePhoto = null,
@@ -247,6 +249,7 @@ export default function AdminMemberDetailView({
             updateAction={updateAction}
             deleteAction={deleteAction}
             emailLoginTransitionAction={emailLoginTransitionAction}
+            syncMemberProfileAction={syncMemberProfileAction}
             canUpdate={canUpdate}
             canDelete={canDelete}
           />

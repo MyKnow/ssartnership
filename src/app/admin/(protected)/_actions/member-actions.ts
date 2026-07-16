@@ -1,10 +1,17 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
+import {
+  getServerActionLogContext,
+  logAdminAudit,
+  logAdminAuditBatch,
+  type AdminAuditInput,
+} from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
   buildMemberSyncLogProperties,
+  buildMemberSyncAuditLogProperties,
+  syncMemberById,
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
 import {
@@ -29,6 +36,8 @@ import {
   MemberEmailLoginTransitionError,
 } from "@/lib/member-email-login-transition";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
+import { getMemberProfileSyncFailureCode } from "@/lib/member-profile-sync-errors";
+import { resolveMemberProfileSyncStatus } from "@/lib/member-profile-sync-status";
 import {
   getMmUserDirectoryEntriesByAccountIds,
   type MmUserDirectoryIdentity,
@@ -50,6 +59,7 @@ export async function backfillMemberProfilesAction() {
     checked: 0,
     updated: 0,
     skipped: 0,
+    photoSkipped: 0,
     failures: 0,
     mattermostUnavailable: 0,
   };
@@ -61,42 +71,49 @@ export async function backfillMemberProfilesAction() {
       checked: result.checked,
       updated: result.updated,
       skipped: result.skipped,
+      photoSkipped: result.photoSkipped.length,
       failures: result.failures.length,
       mattermostUnavailable: result.mattermostUnavailable.length,
     };
 
-    await Promise.allSettled(
-      [
-        ...result.results.map((syncResult) =>
-        logAdminAudit({
-          ...context,
-          action: "member_sync",
-          actorId,
-          targetType: "member",
-          targetId: syncResult.member.id,
-          properties: buildMemberSyncLogProperties(syncResult, {
-            source: "manual_backfill",
-          }),
-        }),
-        ),
-        ...result.mattermostUnavailable.map((unavailableResult) =>
-          logAdminAudit({
-            ...context,
-            action: "member_email_login_transition",
-            actorId,
-            targetType: "member",
-            targetId: unavailableResult.member.id,
-            properties: {
-              source: "manual_backfill",
-              reason: "provider_not_found",
-              mmUserId: unavailableResult.member.mmUserId,
-              generation: unavailableResult.member.generation,
-            },
-          }),
-        ),
-      ],
+    const auditedMemberIds = new Set(result.auditResults.map((audit) => audit.member.id));
+    const auditInputs: AdminAuditInput[] = result.auditResults.map((audit) => ({
+      ...context,
+      action: audit.status === "graduated" || audit.status === "departed"
+        ? "member_email_login_transition" as const
+        : "member_sync" as const,
+      actorId,
+      targetType: "member" as const,
+      targetId: audit.member.id,
+      properties: buildMemberSyncAuditLogProperties(audit, {
+        source: "manual_backfill",
+      }),
+    }));
+    const unloggedFailures = result.failures.filter(
+      (failure) => !auditedMemberIds.has(failure.memberId),
     );
-    status = result.failures.length > 0 ? "partial" : "success";
+    auditInputs.push(
+      ...unloggedFailures.map((failure) => ({
+        ...context,
+        action: "member_sync" as const,
+        actorId,
+        targetType: "member" as const,
+        targetId: failure.memberId === "unknown" ? null : failure.memberId,
+        properties: {
+          source: "manual_backfill",
+          status: "failed",
+          mmUserId: failure.mmUserId,
+          reason: failure.reason,
+          detailCode: failure.detailCode ?? null,
+          providerRequestId: failure.providerRequestId ?? null,
+        },
+      })),
+    );
+    await logAdminAuditBatch(auditInputs);
+    status =
+      result.failures.length > 0 || result.photoSkipped.length > 0
+        ? "partial"
+        : "success";
   } catch (error) {
     console.error("member backfill failed", error);
     status = "error";
@@ -108,7 +125,78 @@ export async function backfillMemberProfilesAction() {
   }
 
   redirect(
-    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
+    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&photoSkipped=${summary.photoSkipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
+  );
+}
+
+export async function syncMemberProfileAction(formData: FormData) {
+  await requireAdminPermission("members", "update", {
+    path: "/admin/members",
+  });
+  const memberId = String(formData.get("id") ?? "").trim();
+  const detailPath = isUuid(memberId)
+    ? `/admin/members/${memberId}`
+    : "/admin/members";
+  if (!isUuid(memberId)) {
+    redirectAdminActionError(detailPath, "member_missing_id", {
+      action: "member_sync",
+      targetType: "member",
+      properties: { source: "member_detail", reason: "invalid_member_id" },
+    });
+  }
+
+  let result: Awaited<ReturnType<typeof syncMemberById>>;
+  try {
+    result = await syncMemberById(memberId);
+  } catch (error) {
+    const failureCode = getMemberProfileSyncFailureCode(error);
+    redirectAdminActionError(detailPath, failureCode, {
+      action: "member_sync",
+      targetType: "member",
+      targetId: memberId,
+      properties: { source: "member_detail", reason: failureCode },
+    });
+  }
+
+  if (!result) {
+    redirectAdminActionError(detailPath, "member_sync_unavailable", {
+      action: "member_sync",
+      targetType: "member",
+      targetId: memberId,
+      properties: { source: "member_detail", reason: "member_not_syncable" },
+    });
+  }
+
+  if (!("snapshot" in result)) {
+    await logAdminAction("member_email_login_transition", {
+      targetType: "member",
+      targetId: result.member.id,
+      properties: {
+        source: "member_detail",
+        reason: result.transitionReason,
+        mmUserId: result.member.mmUserId,
+        generation: result.member.generation,
+        lifecycleStatus: result.lifecycleStatus,
+        detailCode: result.detailCode,
+        providerRequestId: result.providerRequestId,
+      },
+    });
+    revalidateMemberPaths();
+    revalidatePath(detailPath);
+    redirect(`${detailPath}?memberSync=mattermostUnavailable`);
+  }
+
+  await logAdminAction("member_sync", {
+    targetType: "member",
+    targetId: result.member.id,
+    properties: buildMemberSyncLogProperties(result, {
+      source: "member_detail",
+    }),
+  });
+  revalidateMemberPaths();
+  revalidatePath(detailPath);
+  redirect(
+    `${detailPath}?memberSync=${resolveMemberProfileSyncStatus(result)}`,
   );
 }
 

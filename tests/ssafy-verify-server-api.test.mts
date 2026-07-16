@@ -693,3 +693,151 @@ test("SSAFY Verify Server API validates Mattermost IDs and batch size", async ()
     /Mattermost batch 알림은 최대 25명까지 발송할 수 있습니다\./,
   );
 });
+
+test("SSAFY Verify Server API는 profile/lifecycle batch에서 같은 토큰을 재사용한다", async () => {
+  const { createSsafyVerifyServerApiClient } = await serverApiModulePromise;
+  const calls: Array<{ url: string; body: string | null; scope: string | null }> = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    const body = typeof init?.body === "string" ? init.body : null;
+    if (url.endsWith("/server/token")) {
+      calls.push({ url, body, scope: new URLSearchParams(body ?? "").get("scope") });
+      return jsonResponse({
+        access_token: "batch-token",
+        token_type: "Bearer",
+        expires_in: 600,
+      });
+    }
+
+    calls.push({ url, body, scope: null });
+    if (url.endsWith("/profiles/batch")) {
+      return jsonResponse({
+        ok: true,
+        data: {
+          requested_count: 2,
+          found_count: 1,
+          missing_count: 1,
+          profiles: [{
+            sub: "sub-1",
+            ssafy_mattermost_user_id: "mm.student-1",
+            username: "student_one",
+          }],
+          missing: [{
+            mattermost_user_id: "mm.staff-1",
+            error_code: "PROFILE_NOT_FOUND",
+            detail_code: "PROFILE_RECORD_NOT_FOUND",
+          }],
+        },
+        request_id: "req_profiles",
+      });
+    }
+
+    return jsonResponse({
+      ok: true,
+      data: {
+        requested_count: 2,
+        results: [{
+          mm_user_id: "mm.staff-1",
+          username: null,
+          member_type: null,
+          lifecycle_status: "unresolved",
+          detail_code: "MATTERMOST_ID_NOT_MAPPED",
+          effective_at: "2026-07-15T00:00:00.000Z",
+        }],
+      },
+      request_id: "req_lifecycle",
+    });
+  };
+
+  const client = createSsafyVerifyServerApiClient(
+    {
+      issuer: "https://verify.example.com",
+      apiBaseUrl: "https://verify.example.com/v1",
+      clientId: "server-api-client",
+      clientSecret: "server-secret",
+    },
+    {
+      fetch: fetchImpl,
+      sleep: async () => undefined,
+      random: () => 0,
+    },
+  );
+
+  const ids = ["mm.student-1", "mm.staff-1"];
+  await client.getMattermostUserProfilesBatch(ids);
+  await client.getMattermostUserLifecyclesBatch(ids);
+
+  assert.equal(calls.filter((call) => call.url.endsWith("/server/token")).length, 1);
+  assert.deepEqual(
+    calls.filter((call) => !call.url.endsWith("/server/token")).map((call) => call.url),
+    [
+      "https://verify.example.com/v1/mattermost-users/profiles/batch",
+      "https://verify.example.com/v1/mattermost-users/lifecycle/batch",
+    ],
+  );
+  assert.deepEqual(JSON.parse(calls[1]?.body ?? "{}"), {
+    mattermost_user_ids: ids,
+  });
+  assert.deepEqual(JSON.parse(calls[2]?.body ?? "{}"), {
+    mattermost_user_ids: ids,
+  });
+});
+
+test("SSAFY Verify batch API는 429 Retry-After를 사용해 최대 3회 재시도한다", async () => {
+  const { createSsafyVerifyServerApiClient } = await serverApiModulePromise;
+  const calls: string[] = [];
+  const delays: number[] = [];
+  let profileAttempts = 0;
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.endsWith("/server/token")) {
+      return jsonResponse({
+        access_token: "retry-token",
+        token_type: "Bearer",
+        expires_in: 600,
+      });
+    }
+    profileAttempts += 1;
+    if (profileAttempts < 3) {
+      return new Response(JSON.stringify({
+        ok: false,
+        error_code: "RATE_LIMITED",
+        request_id: `req-rate-${profileAttempts}`,
+      }), {
+        status: 429,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": "2",
+        },
+      });
+    }
+    return jsonResponse({
+      ok: true,
+      data: { requested_count: 1, found_count: 0, missing_count: 1, profiles: [], missing: [] },
+      request_id: "req-final",
+    });
+  };
+
+  const client = createSsafyVerifyServerApiClient(
+    {
+      issuer: "https://verify.example.com",
+      apiBaseUrl: "https://verify.example.com/v1",
+      clientId: "server-api-client",
+      clientSecret: "server-secret",
+    },
+    {
+      fetch: fetchImpl,
+      sleep: async (delayMs) => {
+        delays.push(delayMs);
+      },
+      random: () => 0,
+    },
+  );
+
+  await client.getMattermostUserProfilesBatch(["mm.student-1"]);
+
+  assert.equal(profileAttempts, 3);
+  assert.deepEqual(delays, [2000, 2000]);
+  assert.equal(calls.filter((url) => url.endsWith("/server/token")).length, 1);
+});

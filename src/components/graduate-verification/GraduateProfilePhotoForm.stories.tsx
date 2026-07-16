@@ -97,5 +97,9 @@ export const SelectedPhoto: Story = {
     await expect(selectedPhotoLabel).toHaveClass("whitespace-nowrap");
     await expect(selectedPhotoLabel.parentElement).not.toBeNull();
     await expect(selectedPhotoLabel.parentElement!).toHaveClass("min-[620px]:min-w-20");
+    await expect(canvas.getByText("WebP 변환 완료")).toBeInTheDocument();
+    await expect(
+      canvas.getByText("640×640 WebP 파일로 제출됩니다. 원본 사진은 업로드되지 않습니다."),
+    ).toBeInTheDocument();
   },
 };

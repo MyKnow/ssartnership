@@ -334,9 +334,6 @@ export function sanitizeDumpSqlForPreview(
     }
 
     const excludedColumns = excludedColumnsByTable.get(copyStatement.table) ?? new Set();
-    const memberProfileImageMemberIdIndex = isMemberProfileImageCopyBlock
-      ? copyStatement.columns.indexOf("member_id")
-      : -1;
     const memberPasswordColumnIndexes = isMemberCopyBlock
       ? ["password_hash", "password_salt"]
           .map((column) => copyStatement.columns.indexOf(column))
@@ -363,7 +360,6 @@ export function sanitizeDumpSqlForPreview(
     if (
       keptIndexes.length === copyStatement.columns.length
       && !mayTransformValues
-      && !isMemberProfileImageCopyBlock
     ) {
       output.push(line);
       continue;
@@ -381,7 +377,6 @@ export function sanitizeDumpSqlForPreview(
         ? line
         : buildCopyStatement(copyStatement.schema, copyStatement.table, outputColumns);
     const blockRows = [];
-    let memberProfileImageRowsSkippedInBlock = 0;
     let blockTerminated = false;
 
     index += 1;
@@ -407,13 +402,6 @@ export function sanitizeDumpSqlForPreview(
       }
 
       if (values.length !== copyStatement.columns.length) {
-        if (isMemberProfileImageCopyBlock) {
-          stats.memberProfileImageRowsSkipped += 1;
-          memberProfileImageRowsSkippedInBlock += 1;
-          changed = true;
-          index += 1;
-          continue;
-        }
         if (isPartnerCopyBlock) {
           stats.partnerRowsSkippedColumnMismatch += 1;
           stats.unresolvedPartnerCampusSlugRows += 1;
@@ -424,18 +412,6 @@ export function sanitizeDumpSqlForPreview(
         }
         blockRows.push(dataLine);
       } else {
-        const memberId = values[memberProfileImageMemberIdIndex]?.trim() ?? "";
-        if (
-          isMemberProfileImageCopyBlock
-          && (memberProfileImageMemberIdIndex < 0 || (memberId && memberId !== "\\N"))
-        ) {
-          stats.memberProfileImageRowsSkipped += 1;
-          memberProfileImageRowsSkippedInBlock += 1;
-          changed = true;
-          index += 1;
-          continue;
-        }
-
         if (
           memberPasswordColumnIndexes.some((columnIndex) => {
             const value = values[columnIndex]?.trim() ?? "";
@@ -473,23 +449,13 @@ export function sanitizeDumpSqlForPreview(
       index += 1;
     }
 
-    const omitProfileImageCopyBlock =
-      isMemberProfileImageCopyBlock
-      && memberProfileImageRowsSkippedInBlock > 0
-      && blockRows.length === 0;
     const copyBlockChanged =
       keptIndexes.length !== copyStatement.columns.length
-      || shouldAppendCampusScopeColumns
-      || omitProfileImageCopyBlock;
+      || shouldAppendCampusScopeColumns;
     if (copyBlockChanged) {
       stats.copyBlocksChanged += 1;
       changed = true;
     }
-    if (omitProfileImageCopyBlock) {
-      stats.memberProfileImageCopyBlocksSkipped += 1;
-      continue;
-    }
-
     output.push(statementLine, ...blockRows);
     if (blockTerminated) {
       output.push("\\.");

@@ -11,19 +11,14 @@ const RETRYABLE_ERROR_PATTERNS = [
   /etimedout/i,
   /upstream connect error/i,
 ];
-const PREVIEW_REDACTED_STORAGE_BUCKETS = new Set(["member-profile-images"]);
+const PREVIEW_REQUIRED_STORAGE_BUCKETS = new Set(["member-profile-images"]);
 
-export function isPreviewRedactedStorageBucket(bucketName) {
-  return PREVIEW_REDACTED_STORAGE_BUCKETS.has(bucketName);
+export function isPreviewRequiredStorageBucket(bucketName) {
+  return PREVIEW_REQUIRED_STORAGE_BUCKETS.has(bucketName);
 }
 
-export function isPreviewRedactedStoragePath(bucketName, objectPath) {
-  if (!isPreviewRedactedStorageBucket(bucketName)) {
-    return false;
-  }
-
-  const normalizedPath = objectPath.replace(/^\/+|\/+$/g, "");
-  return normalizedPath === "members" || normalizedPath.startsWith("members/");
+export function shouldAbortPreviewStorageObjectSync(bucketName) {
+  return isPreviewRequiredStorageBucket(bucketName);
 }
 
 function extractStorageErrorDetails(error) {

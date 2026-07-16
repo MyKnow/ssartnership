@@ -11,6 +11,8 @@ import {
 } from "@/lib/member-auth-security";
 import { getSignedUserSession, setUserSession } from "@/lib/user-auth";
 import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents";
+import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
+import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { getSsafyVerifyServerConfig } from "@/lib/ssafy-verify/config";
 import {
   findSsafyVerifiedMember,
@@ -251,8 +253,12 @@ export async function POST(request: Request) {
         return publicError(updateResult.errorCode, null, 500);
       }
 
-      const policyStatus = await getMemberRequiredPolicyStatus(
-        memberResult.member.id,
+      const [policyStatus, photoState] = await Promise.all([
+        getMemberRequiredPolicyStatus(memberResult.member.id),
+        getMemberProfilePhotoState(memberResult.member.id),
+      ]);
+      const requiresProfilePhotoUpdate = requiresMemberProfilePhotoUpdate(
+        photoState.reviewStatus,
       );
       await setUserSession(
         memberResult.member.id,
@@ -283,6 +289,7 @@ export async function POST(request: Request) {
           hasMattermostUserId: Boolean(verified.claims.mattermostUserId),
           mustChangePassword: Boolean(memberResult.member.must_change_password),
           requiresConsent: policyStatus.requiresConsent,
+          requiresProfilePhotoUpdate,
           next: "login",
         },
       });
@@ -299,6 +306,7 @@ export async function POST(request: Request) {
         authTime: verified.claims.authTime,
         mustChangePassword: Boolean(memberResult.member.must_change_password),
         requiresConsent: policyStatus.requiresConsent,
+        requiresProfilePhotoUpdate,
       });
     }
 

@@ -79,7 +79,7 @@ For UI creation or modification, include visual proof in the final handoff. Capt
 ## Preview Supabase Sync
 
 - `npm run sync:preview` may copy public Production data into Preview, but it must not copy member password material.
-- The preview sync sanitizer intentionally strips `members.password_hash`, `members.password_salt`, and heavy avatar payloads from the Production dump before restore.
+- The preview sync sanitizer strips `members.password_hash`, `members.password_salt`, and legacy `members.avatar_base64` from the Production dump, while preserving the `member_profile_images` ledger and private `member-profile-images` Storage objects for visual Preview parity.
 - Because member password hashes are stripped, Production member passwords are not expected to work in `dev` or Preview after sync. Use the Preview password reset flow or explicit Preview test accounts instead.
 - If `PREVIEW_TEST_MEMBER_USERNAME` and `PREVIEW_TEST_MEMBER_PASSWORD` are configured, `npm run sync:preview` re-seeds that single Preview-only member password after restore.
 - Do not “fix” this by copying Production member password hashes into Preview unless the user explicitly accepts the security risk for a one-off operation.
