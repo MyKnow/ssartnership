@@ -89,6 +89,46 @@ test("SSAFY Verify profiles map to directory and member sync snapshots", async (
   });
 });
 
+test("SSAFY Verify profile batch unwraps profiles nested under data", async () => {
+  const { extractSsafyVerifyMemberProfiles } = await profileModulePromise;
+
+  const profiles = extractSsafyVerifyMemberProfiles({
+    ok: true,
+    data: {
+      requested_count: 1,
+      found_count: 1,
+      missing_count: 0,
+      profiles: [{
+        sub: "pairwise-subject",
+        ssafy_mattermost_user_id: "mm.user-123",
+        username: "student.name",
+        picture: "https://verify.example.com/api/mattermost/avatar/mm.user-123",
+      }],
+      missing: [],
+    },
+    request_id: "req_profile_batch",
+  });
+
+  assert.equal(profiles.length, 1);
+  assert.deepEqual(profiles[0], {
+    sub: "pairwise-subject",
+    mattermostUserId: "mm.user-123",
+    mattermostUsername: "student.name",
+    displayName: "student.name",
+    campus: null,
+    cohort: null,
+    track: null,
+    trackName: null,
+    isStaff: false,
+    sourceYears: [],
+    profileImage: {
+      url: "https://verify.example.com/api/mattermost/avatar/mm.user-123",
+      contentType: null,
+      base64: null,
+    },
+  });
+});
+
 test("SSAFY Verify profiles preserve picture URLs for member avatars", async () => {
   const {
     normalizeSsafyVerifyMemberProfile,
