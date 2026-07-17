@@ -37,6 +37,7 @@ test.describe("auth and partner portal operation flows", () => {
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
     await page.goto("/auth/signup");
     await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.fonts?.ready);
 
     const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
@@ -50,6 +51,7 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(graduateTab).toHaveAttribute("aria-selected", "true");
     const graduateStart = page.getByRole("link", { name: "수료생 신규 인증으로 시작하기" });
     await expect(graduateStart).toHaveAttribute("href", "/auth/signup/graduate?returnTo=%2F");
+    await expect(graduateStart).toHaveClass(/w-full/);
 
     await graduateStart.click();
     await expect(page).toHaveURL(/\/auth\/signup\/graduate/);

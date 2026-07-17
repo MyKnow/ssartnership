@@ -42,7 +42,7 @@ export default function CertificationCardFrame({
   return (
     <div
       className={cn(
-        "@container/cert relative mx-auto aspect-[1.58/1] w-full min-w-0 overflow-hidden rounded-[4%] border p-[4%] shadow-overlay ring-1 transform-gpu",
+        "@container/cert relative isolate mx-auto aspect-[16/9] w-full min-w-0 overflow-hidden rounded-[clamp(1.25rem,3cqw,2.5rem)] border p-[4%] shadow-overlay ring-1",
         scheme.textClassName,
         scheme.cardClassName,
         scheme.frameRingClassName,
@@ -82,7 +82,7 @@ export default function CertificationCardFrame({
         <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
       </div>
 
-      <div className="relative grid h-full grid-cols-[minmax(0,1fr)_36.95cqw] grid-rows-[minmax(0,1fr)_20.65cqw] gap-x-[4cqw] gap-y-[2cqw]">
+      <div className="relative grid h-full grid-cols-[minmax(0,1fr)_24cqw] @sm/cert:grid-cols-[minmax(0,1fr)_28cqw] @md/cert:grid-cols-[minmax(0,1fr)_33cqw] grid-rows-[minmax(0,1fr)_auto] gap-x-[4cqw] gap-y-[2cqw]">
         <div
           data-certification-card-identity
           className="row-start-1 col-start-1 min-w-0 space-y-[1cqw]"
@@ -178,7 +178,7 @@ export default function CertificationCardFrame({
         <div
           data-certification-card-footer
           className={cn(
-            "row-start-2 col-span-2 rounded-[3cqw] border px-[2.4cqw] py-[2cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md",
+            "row-start-2 col-span-2 rounded-[3cqw] border px-[2.4cqw] py-[1.5cqw] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md",
             scheme.panelClassName,
           )}
         >

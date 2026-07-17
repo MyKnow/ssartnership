@@ -132,16 +132,16 @@ export default function CertificationView({
         campusLabel={campusLabel}
         description=""
         footer={
-          <div className="flex h-full flex-nowrap items-center justify-between gap-[2cqw]">
+          <div className="flex h-full flex-nowrap items-center justify-between gap-[2.5cqw]">
             <div className="min-w-0 space-y-[0.4cqw]">
-              <p className={cn("text-[clamp(0.5rem,1.5cqw,0.875rem)] font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
+              <p className={cn("text-[10px] @sm/cert:text-[clamp(0.75rem,1.7cqw,1rem)] font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
                 인증 시간
               </p>
-              <p className="whitespace-nowrap text-[clamp(0.625rem,2.4cqw,1.25rem)] font-semibold">
+              <p className="whitespace-nowrap text-[clamp(0.875rem,2.8cqw,1.5rem)] font-semibold">
                 {dateLabel} {timeLabel}
               </p>
-              <div className={cn("flex items-center gap-[1cqw] text-[clamp(0.5rem,1.5cqw,0.875rem)]", scheme.subduedTextClassName)}>
-                <span className={cn("inline-flex h-[1cqw] w-[1cqw] rounded-full", scheme.accentClassName)} />
+              <div className={cn("flex items-center gap-[1cqw] text-[clamp(0.75rem,1.7cqw,1rem)]", scheme.subduedTextClassName)}>
+                <span className={cn("inline-flex h-[1.2cqw] w-[1.2cqw] rounded-full", scheme.accentClassName)} />
                 {roleLabel === "운영진" ? "운영진 인증" : roleLabel === "수료생" ? "수료생 인증" : "교육생 인증"}
               </div>
             </div>
@@ -153,7 +153,7 @@ export default function CertificationView({
                 roleLabel={roleLabel}
                 className={cn(
                   scheme.qrButtonClassName,
-                  "relative !h-[8cqw] !min-h-0 !w-[15cqw] !min-w-0 !rounded-[2.5cqw] !px-[2cqw] text-[clamp(0.625rem,2cqw,1rem)] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
+                  "relative !h-[9cqw] !min-h-0 !w-[17cqw] !min-w-0 !rounded-[2.5cqw] !px-[2cqw] text-[clamp(0.75rem,2.4cqw,1.125rem)] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
                 )}
               />
             </div>

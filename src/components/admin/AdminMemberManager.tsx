@@ -19,6 +19,7 @@ import {
 import {
   type AdminMember,
   type ConsentFilterOption,
+  type MemberLifecycleFilterOption,
   type MemberFilterOption,
   type MemberSortOption,
   type NotificationPreferenceFilterOption,
@@ -44,6 +45,7 @@ export default function AdminMemberManager({
     searchValue: string;
     sortValue: MemberSortOption;
     filterValue: MemberFilterOption;
+    mattermostLifecycleFilter: MemberLifecycleFilterOption;
     yearFilter: YearFilterOption;
     campusFilter: string;
     serviceConsentFilter: ConsentFilterOption;
@@ -95,6 +97,7 @@ export default function AdminMemberManager({
   const isSearchDirty = searchInputValue !== filters.searchValue;
   const hasAdvancedFilters =
     filters.sortValue !== "recent" ||
+    filters.mattermostLifecycleFilter !== "all" ||
     filters.serviceConsentFilter !== "all" ||
     filters.privacyConsentFilter !== "all" ||
     filters.marketingConsentFilter !== "all" ||
@@ -316,7 +319,7 @@ export default function AdminMemberManager({
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground marker:hidden">
               <span>고급 필터</span>
               <span className="text-xs font-medium text-muted-foreground">
-                정렬·약관·알림 설정 11개
+                정렬·약관·알림·MM 상태 12개
               </span>
             </summary>
             <div className="grid min-w-0 gap-3 border-t border-border/70 p-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -326,6 +329,19 @@ export default function AdminMemberManager({
                   <option value="recent">등록순</option>
                   <option value="updated">최근 수정순</option>
                   <option value="name">이름순</option>
+                </Select>
+              </div>
+              <div className="grid min-w-0 gap-1">
+                <span className="ui-caption">MM 로그인 상태</span>
+                <Select
+                  aria-label="MM 로그인 상태"
+                  value={filters.mattermostLifecycleFilter}
+                  onChange={(event) => updateFilter("mmLifecycle", event.target.value)}
+                >
+                  <option value="all">전체</option>
+                  <option value="disabled">MM 이용 중단</option>
+                  <option value="graduated">수료 처리</option>
+                  <option value="departed">퇴사 처리</option>
                 </Select>
               </div>
               <div className="grid min-w-0 gap-1">

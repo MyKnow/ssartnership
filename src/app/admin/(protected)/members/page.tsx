@@ -25,6 +25,7 @@ import { getMemberProfilePhotoStates } from "@/lib/member-profile-images";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type {
   ConsentFilterOption,
+  MemberLifecycleFilterOption,
   MemberFilterOption,
   MemberSortOption,
   NotificationPreferenceFilterOption,
@@ -88,6 +89,7 @@ type AdminMemberSearchParams = {
   expiringPartnerEnabled?: string;
   reviewEnabled?: string;
   mmEnabled?: string;
+  mmLifecycle?: string;
   marketingEnabled?: string;
   page?: string;
   pageSize?: string;
@@ -109,6 +111,14 @@ function parseSort(value: string | undefined): MemberSortOption {
 
 function parseMemberStatus(value: string | undefined): MemberFilterOption {
   return value === "normal" || value === "mustChangePassword" ? value : "all";
+}
+
+function parseMemberLifecycleFilter(
+  value: string | undefined,
+): MemberLifecycleFilterOption {
+  return value === "disabled" || value === "graduated" || value === "departed"
+    ? value
+    : "all";
 }
 
 function parseConsentFilter(value: string | undefined): ConsentFilterOption {
@@ -462,6 +472,9 @@ export default async function AdminMembersPage({
     searchValue: getOne(params, "q")?.trim() ?? "",
     sortValue: parseSort(getOne(params, "sort")),
     filterValue: parseMemberStatus(getOne(params, "status")),
+    mattermostLifecycleFilter: parseMemberLifecycleFilter(
+      getOne(params, "mmLifecycle"),
+    ),
     yearFilter: parseYearFilter(getOne(params, "year")),
     campusFilter: getOne(params, "campus")?.trim() || "all",
     serviceConsentFilter: parseConsentFilter(getOne(params, "serviceConsent")),
@@ -556,7 +569,7 @@ export default async function AdminMembersPage({
   let memberQuery = supabase
     .from("members")
     .select(
-      "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at",
+      "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason",
       { count: "exact" },
     )
     .is("deleted_at", null);
@@ -571,6 +584,19 @@ export default async function AdminMembersPage({
     memberQuery = memberQuery.eq("must_change_password", true);
   } else if (filters.filterValue === "normal") {
     memberQuery = memberQuery.eq("must_change_password", false);
+  }
+  if (filters.mattermostLifecycleFilter === "disabled") {
+    memberQuery = memberQuery.not("mattermost_login_disabled_at", "is", null);
+  } else if (filters.mattermostLifecycleFilter === "graduated") {
+    memberQuery = memberQuery.eq(
+      "mattermost_login_disabled_reason",
+      "generation_completed",
+    );
+  } else if (filters.mattermostLifecycleFilter === "departed") {
+    memberQuery = memberQuery.eq(
+      "mattermost_login_disabled_reason",
+      "member_departed",
+    );
   }
   if (memberIdFilter.included) {
     memberQuery = memberQuery.in(
@@ -611,6 +637,23 @@ export default async function AdminMembersPage({
     memberTrendQuery = memberTrendQuery.eq("must_change_password", true);
   } else if (filters.filterValue === "normal") {
     memberTrendQuery = memberTrendQuery.eq("must_change_password", false);
+  }
+  if (filters.mattermostLifecycleFilter === "disabled") {
+    memberTrendQuery = memberTrendQuery.not(
+      "mattermost_login_disabled_at",
+      "is",
+      null,
+    );
+  } else if (filters.mattermostLifecycleFilter === "graduated") {
+    memberTrendQuery = memberTrendQuery.eq(
+      "mattermost_login_disabled_reason",
+      "generation_completed",
+    );
+  } else if (filters.mattermostLifecycleFilter === "departed") {
+    memberTrendQuery = memberTrendQuery.eq(
+      "mattermost_login_disabled_reason",
+      "member_departed",
+    );
   }
   if (memberIdFilter.included) {
     memberTrendQuery = memberTrendQuery.in(
@@ -690,6 +733,8 @@ export default async function AdminMembersPage({
       staffSourceGeneration: member.staff_source_generation,
       campus: member.campus,
       mustChangePassword: member.must_change_password,
+      mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
+      mattermostLoginDisabledReason: member.mattermost_login_disabled_reason,
       serviceConsent: consentedPolicyDocumentIds.has(activePolicies.service.id),
       privacyConsent: consentedPolicyDocumentIds.has(activePolicies.privacy.id),
       marketingConsent: activeMarketingPolicy
@@ -877,6 +922,7 @@ export default async function AdminMembersPage({
                 filters.searchValue,
                 filters.sortValue,
                 filters.filterValue,
+                filters.mattermostLifecycleFilter,
                 filters.yearFilter,
                 filters.campusFilter,
                 filters.serviceConsentFilter,

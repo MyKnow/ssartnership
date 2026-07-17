@@ -14,6 +14,8 @@ export type AdminMember = {
   privacyConsent: boolean;
   marketingConsent: boolean | null;
   hasProfileImage: boolean;
+  mattermostLoginDisabledAt?: string | null;
+  mattermostLoginDisabledReason?: string | null;
   notificationPreferences?: {
     enabled: boolean;
     announcementEnabled: boolean;
@@ -30,6 +32,11 @@ export type AdminMember = {
 
 export type MemberSortOption = "recent" | "updated" | "name";
 export type MemberFilterOption = "all" | "normal" | "mustChangePassword";
+export type MemberLifecycleFilterOption =
+  | "all"
+  | "disabled"
+  | "graduated"
+  | "departed";
 export type YearFilterOption = "all" | `${number}`;
 export type ConsentFilterOption = "all" | "agreed" | "pending";
 export type NotificationPreferenceFilterOption = "all" | "enabled" | "disabled";
@@ -49,6 +56,7 @@ export type NormalizedMember = AdminMember & {
   _reviewEnabledStatus: NotificationPreferenceFilterOption;
   _mmEnabledStatus: NotificationPreferenceFilterOption;
   _marketingEnabledStatus: NotificationPreferenceFilterOption;
+  _mattermostLifecycleStatus: "active" | "disabled" | "graduated" | "departed";
 };
 
 function getConsentStatus(value?: boolean | null) {
@@ -57,6 +65,19 @@ function getConsentStatus(value?: boolean | null) {
 
 function getNotificationPreferenceStatus(value?: boolean | null) {
   return value ? "enabled" : "disabled";
+}
+
+function getMattermostLifecycleStatus(member: AdminMember) {
+  if (!member.mattermostLoginDisabledAt) {
+    return "active" as const;
+  }
+  if (member.mattermostLoginDisabledReason === "generation_completed") {
+    return "graduated" as const;
+  }
+  if (member.mattermostLoginDisabledReason === "member_departed") {
+    return "departed" as const;
+  }
+  return "disabled" as const;
 }
 
 export function normalizeAdminMembers(members: AdminMember[]): NormalizedMember[] {
@@ -104,6 +125,7 @@ export function normalizeAdminMembers(members: AdminMember[]): NormalizedMember[
       _marketingEnabledStatus: getNotificationPreferenceStatus(
         member.notificationPreferences?.marketingEnabled,
       ),
+      _mattermostLifecycleStatus: getMattermostLifecycleStatus(member),
     };
   });
 }
@@ -129,6 +151,7 @@ export function filterAdminMembers({
   searchValue,
   sortValue,
   filterValue,
+  mattermostLifecycleFilter = "all",
   yearFilter,
   campusFilter,
   serviceConsentFilter = "all",
@@ -146,6 +169,7 @@ export function filterAdminMembers({
   searchValue: string;
   sortValue: MemberSortOption;
   filterValue: MemberFilterOption;
+  mattermostLifecycleFilter?: MemberLifecycleFilterOption;
   yearFilter: YearFilterOption;
   campusFilter: string;
   serviceConsentFilter?: ConsentFilterOption;
@@ -178,10 +202,20 @@ export function filterAdminMembers({
       : searchFiltered.filter(
           (member) => String(member._generation ?? "") === yearFilter,
         );
+  const mattermostLifecycleFiltered =
+    mattermostLifecycleFilter === "all"
+      ? generationFiltered
+      : generationFiltered.filter((member) =>
+          mattermostLifecycleFilter === "disabled"
+            ? member._mattermostLifecycleStatus !== "active"
+            : member._mattermostLifecycleStatus === mattermostLifecycleFilter,
+        );
   const campusFiltered =
     campusFilter === "all"
-      ? generationFiltered
-      : generationFiltered.filter((member) => member._campus === campusFilter);
+      ? mattermostLifecycleFiltered
+      : mattermostLifecycleFiltered.filter(
+          (member) => member._campus === campusFilter,
+        );
   const serviceConsentFiltered =
     serviceConsentFilter === "all"
       ? campusFiltered

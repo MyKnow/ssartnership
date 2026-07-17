@@ -66,6 +66,8 @@ export const SignupGraduate: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("tab", { name: "수료생" })).toHaveAttribute("aria-selected", "true");
-    await expect(canvas.getByRole("link", { name: "수료생 인증으로 시작하기" })).toBeVisible();
+    await expect(
+      canvas.getByRole("link", { name: "수료생 신규 인증으로 시작하기" }),
+    ).toBeVisible();
   },
 };

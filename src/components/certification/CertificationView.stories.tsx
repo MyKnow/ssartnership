@@ -67,6 +67,8 @@ export const Default: Story = {
     const qrButton = canvas.getByRole("button", { name: "QR 표시" });
     const memberName = canvas.getByRole("heading", { name: "김싸피" });
     const roleBadge = canvas.getByText("교육생", { selector: "span" });
+    const footerLabel = canvas.getByText("인증 시간");
+    const footerRole = canvas.getByText("교육생 인증");
     const timestamp = canvas.getByText("2026. 07. 10. 10:00:00");
     const qrTouchTarget = canvasElement.querySelector<HTMLElement>(
       "[data-certification-qr-touch-target]",
@@ -75,9 +77,11 @@ export const Default: Story = {
 
     await expect(certificationCard).toHaveClass(
       "w-full",
-      "aspect-[1.58/1]",
+      "aspect-[16/9]",
+      "rounded-[clamp(1.25rem,3cqw,2.5rem)]",
       "@container/cert",
     );
+    await expect(certificationCard).not.toHaveClass("transform-gpu");
     await expect(certificationCard).not.toHaveClass("max-w-2xl");
     await expect(screenContent.getBoundingClientRect().width).toBe(
       pageHeader.getBoundingClientRect().width,
@@ -85,10 +89,11 @@ export const Default: Story = {
     await expect(pageHeader.getBoundingClientRect().width).toBe(
       certificationCard.getBoundingClientRect().width,
     );
-    await expect(
-      certificationCard.getBoundingClientRect().width /
-        certificationCard.getBoundingClientRect().height,
-    ).toBeCloseTo(1.58, 1);
+    const cardRect = certificationCard.getBoundingClientRect();
+    const avatarRect = avatar?.getBoundingClientRect();
+    const footerRect = footer?.getBoundingClientRect();
+
+    await expect(cardRect.width / cardRect.height).toBeCloseTo(16 / 9, 2);
     await expect(backLink.compareDocumentPosition(canvas.getByText("Member"))).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -101,18 +106,25 @@ export const Default: Story = {
     await expect(Number.parseFloat(qrPseudoStyle.minWidth)).toBeGreaterThanOrEqual(44);
     await expect(Number.parseFloat(getComputedStyle(memberName).fontSize)).toBeGreaterThanOrEqual(16);
     await expect(Number.parseFloat(getComputedStyle(roleBadge).fontSize)).toBeGreaterThanOrEqual(10);
-    await expect(Number.parseFloat(getComputedStyle(timestamp).fontSize)).toBeGreaterThanOrEqual(10);
-    await expect(Number.parseFloat(getComputedStyle(qrButton).fontSize)).toBeGreaterThanOrEqual(10);
+    await expect(Number.parseFloat(getComputedStyle(footerLabel).fontSize)).toBe(10);
+    await expect(Number.parseFloat(getComputedStyle(timestamp).fontSize)).toBeGreaterThanOrEqual(14);
+    await expect(Number.parseFloat(getComputedStyle(footerRole).fontSize)).toBeGreaterThanOrEqual(12);
+    await expect(Number.parseFloat(getComputedStyle(qrButton).fontSize)).toBeGreaterThanOrEqual(12);
     await expect(avatar).not.toBeNull();
     await expect(footer).not.toBeNull();
     await expect(
       (avatar?.getBoundingClientRect().width ?? 0) /
         certificationCard.getBoundingClientRect().width,
-    ).toBeCloseTo(0.34, 2);
-    await expect(
-      (footer?.getBoundingClientRect().height ?? 0) /
-        certificationCard.getBoundingClientRect().width,
-    ).toBeCloseTo(0.19, 2);
+    ).toBeCloseTo(0.22, 2);
+    await expect(footerRect?.top ?? 0).toBeGreaterThanOrEqual(
+      (avatarRect?.bottom ?? 0) - 1,
+    );
+    await expect(footerRect?.bottom ?? 0).toBeLessThanOrEqual(
+      cardRect.bottom + 1,
+    );
+    await expect(footer?.scrollHeight ?? 0).toBeLessThanOrEqual(
+      footer?.clientHeight ?? 0,
+    );
   },
 };
 

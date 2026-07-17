@@ -107,7 +107,9 @@ export default function SignupMethodTabs({
         className="mt-5"
       >
         <div className="grid gap-2">
-          <Button href={graduateHref}>수료생 신규 인증으로 시작하기</Button>
+          <Button href={graduateHref} size="lg" className="w-full">
+            수료생 신규 인증으로 시작하기
+          </Button>
           <Button variant="secondary" href={recoveryHref}>기존 회원 복구 신청</Button>
         </div>
       </section>
