@@ -68,7 +68,6 @@ export const Default: Story = {
     const memberName = canvas.getByRole("heading", { name: "김싸피" });
     const roleBadge = canvas.getByText("교육생", { selector: "span" });
     const footerLabel = canvas.getByText("인증 시간");
-    const footerRole = canvas.getByText("교육생 인증");
     const timestamp = canvas.getByText("2026. 07. 10. 10:00:00");
     const qrTouchTarget = canvasElement.querySelector<HTMLElement>(
       "[data-certification-qr-touch-target]",
@@ -106,9 +105,10 @@ export const Default: Story = {
     await expect(Number.parseFloat(qrPseudoStyle.minWidth)).toBeGreaterThanOrEqual(44);
     await expect(Number.parseFloat(getComputedStyle(memberName).fontSize)).toBeGreaterThanOrEqual(16);
     await expect(Number.parseFloat(getComputedStyle(roleBadge).fontSize)).toBeGreaterThanOrEqual(10);
-    await expect(Number.parseFloat(getComputedStyle(footerLabel).fontSize)).toBe(10);
+    await expect(Number.parseFloat(getComputedStyle(footerLabel).fontSize)).toBeGreaterThanOrEqual(11);
     await expect(Number.parseFloat(getComputedStyle(timestamp).fontSize)).toBeGreaterThanOrEqual(14);
-    await expect(Number.parseFloat(getComputedStyle(footerRole).fontSize)).toBeGreaterThanOrEqual(12);
+    await expect(canvas.queryByText("교육생 인증")).not.toBeInTheDocument();
+    await expect(canvasElement.querySelector("[data-certification-card-timestamp]")).not.toBeNull();
     await expect(Number.parseFloat(getComputedStyle(qrButton).fontSize)).toBeGreaterThanOrEqual(12);
     await expect(avatar).not.toBeNull();
     await expect(footer).not.toBeNull();

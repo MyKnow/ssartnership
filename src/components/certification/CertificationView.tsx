@@ -132,18 +132,17 @@ export default function CertificationView({
         campusLabel={campusLabel}
         description=""
         footer={
-          <div className="flex h-full flex-nowrap items-center justify-between gap-[2.5cqw]">
-            <div className="min-w-0 space-y-[0.4cqw]">
-              <p className={cn("text-[10px] @sm/cert:text-[clamp(0.75rem,1.7cqw,1rem)] font-medium uppercase tracking-[0.16em]", scheme.mutedTextClassName)}>
+          <div className="flex h-full min-w-0 flex-nowrap items-center justify-between gap-[2cqw]">
+            <div className="flex min-w-0 flex-1 items-baseline gap-[1.5cqw]">
+              <span className={cn("shrink-0 text-[clamp(0.6875rem,1.7cqw,0.875rem)] font-medium uppercase tracking-[0.12em]", scheme.mutedTextClassName)}>
                 인증 시간
-              </p>
-              <p className="whitespace-nowrap text-[clamp(0.875rem,2.8cqw,1.5rem)] font-semibold">
+              </span>
+              <time
+                data-certification-card-timestamp
+                className="min-w-0 truncate whitespace-nowrap text-[clamp(0.875rem,2.6cqw,1.25rem)] font-semibold"
+              >
                 {dateLabel} {timeLabel}
-              </p>
-              <div className={cn("flex items-center gap-[1cqw] text-[clamp(0.75rem,1.7cqw,1rem)]", scheme.subduedTextClassName)}>
-                <span className={cn("inline-flex h-[1.2cqw] w-[1.2cqw] rounded-full", scheme.accentClassName)} />
-                {roleLabel === "운영진" ? "운영진 인증" : roleLabel === "수료생" ? "수료생 인증" : "교육생 인증"}
-              </div>
+              </time>
             </div>
             <div
               data-certification-qr-touch-target

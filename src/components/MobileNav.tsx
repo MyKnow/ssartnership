@@ -85,7 +85,7 @@ export default function MobileNav({
         ? createPortal(
             <div
               className={cn(
-                "fixed inset-0 z-[70] xl:hidden",
+                "fixed inset-0 isolate z-[70] xl:hidden",
                 open ? "pointer-events-auto" : "pointer-events-none",
               )}
               aria-hidden={!open}
@@ -93,18 +93,19 @@ export default function MobileNav({
               <button
                 type="button"
                 className={cn(
-                  "absolute inset-0 bg-black/55 transition-opacity",
+                  "absolute inset-0 z-0 bg-black/55 transition-opacity",
                   open ? "opacity-100" : "opacity-0",
                 )}
                 aria-label="메뉴 닫기"
                 onClick={() => setOpen(false)}
               />
 
-              <aside
+              <div
                 role="dialog"
                 aria-modal="true"
+                aria-label="메뉴"
                 className={cn(
-                  "fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay transition-transform",
+                  "fixed right-0 top-0 z-10 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay transition-transform",
                   open ? "translate-x-0" : "translate-x-full",
                 )}
               >
@@ -172,7 +173,7 @@ export default function MobileNav({
                     </p>
                   </div>
                 </div>
-              </aside>
+              </div>
             </div>,
             document.body,
           )

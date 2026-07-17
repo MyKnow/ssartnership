@@ -129,10 +129,10 @@ export default function AdminMobileNav({
 
       {open && typeof document !== "undefined"
         ? createPortal(
-            <div className="fixed inset-0 z-[70] md:hidden" aria-hidden={!open}>
+            <div className="fixed inset-0 isolate z-[70] md:hidden" aria-hidden={!open}>
               <button
                 type="button"
-                className="absolute inset-0 bg-black/55"
+                className="absolute inset-0 z-0 bg-black/55"
                 aria-label="관리 메뉴 닫기"
                 onClick={() => setOpen(false)}
               />
@@ -141,7 +141,7 @@ export default function AdminMobileNav({
                 role="dialog"
                 aria-modal="true"
                 aria-label="관리자 메뉴"
-                className="fixed right-0 top-0 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay"
+                className="fixed right-0 top-0 z-10 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay"
               >
                 <div className="flex h-full flex-col bg-surface-overlay">
                   <div className="border-b border-border px-5 pb-4 pt-5">
