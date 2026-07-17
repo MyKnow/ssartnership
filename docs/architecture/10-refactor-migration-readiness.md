@@ -24,7 +24,7 @@
 | Priority | 영역 | 이유 |
 | --- | --- | --- |
 | P0 | public partner query/render boundary | 홈/상세가 핵심 traffic surface이고 SEO/캐시/권한이 동시에 걸려 있다. |
-| P0 | auth/session/SSAFY Verify | 보안과 가입 전환에 직접 영향이 있다. |
+| P0 | auth/session/direct Mattermost | 보안과 가입 전환에 직접 영향이 있다. |
 | P0 | admin/partner permission boundary | 운영 실수와 데이터 노출 위험이 크다. |
 | P1 | partner portal repository 정리 | façade와 helper/Supabase query가 섞인 현재 구조를 일관된 repository/service 경계로 맞출 필요가 있다. |
 | P1 | notification API 표준화 | member/admin/partner audience별 API가 분리되어 있어 공통 error/envelope/permission 기준을 정리할 여지가 있다. |
@@ -57,7 +57,7 @@
 
 ### Security
 
-- session secret, service role key, SSAFY Verify secret, SMTP credential, VAPID key, CRON_SECRET을 새 환경으로 안전하게 이전한다.
+- session secret, service role key, Mattermost Sender AES key, SMTP credential, VAPID key, CRON_SECRET을 새 환경으로 안전하게 이전한다.
 - auth security log와 admin audit log에서 민감 데이터가 새로 노출되지 않는지 확인한다.
 - image proxy/upload sign, Push subscription, cron, partner billing API는 별도 보안 리뷰를 수행한다.
 - Preview sync sanitizer가 새 schema에서도 password material을 제거하는지 검증한다.

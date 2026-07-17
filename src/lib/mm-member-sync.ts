@@ -11,14 +11,13 @@ export {
   type MmMemberSyncErrorCode,
 } from "./mm-member-sync/shared";
 export {
-  createMemberSyncApiClient,
-  fetchMemberLifecycleByUserId,
   fetchMemberSnapshotByUserId,
+  fetchMemberSnapshotForUser,
+  getMattermostDisplayName,
 } from "./mm-member-sync/snapshot";
 export {
-  parseMattermostLifecycleBatch,
   resolveMattermostLifecycle,
-  type MattermostLifecycleMemberType,
+  toMattermostLifecycleResult,
   type MattermostLifecycleResult,
   type MattermostLifecycleStatus,
 } from "./mm-member-sync/lifecycle";

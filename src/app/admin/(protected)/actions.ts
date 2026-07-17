@@ -29,8 +29,11 @@ import {
 } from "./_actions/catalog-actions";
 import {
   deleteCohortCardThemeAction,
+  disableMattermostSenderAction,
   earlyStartSsafyCycleAction,
   restoreSsafyCycleSettingsAction,
+  saveMattermostSenderCandidateAction,
+  testMattermostSenderCandidateAction,
   updateSsafyCycleSettingsAction,
   upsertCohortCardThemeAction,
 } from "./_actions/cycle-actions";
@@ -232,6 +235,18 @@ export async function upsertCohortCardTheme(formData: FormData) {
 
 export async function deleteCohortCardTheme(formData: FormData) {
   return deleteCohortCardThemeAction(formData);
+}
+
+export async function saveMattermostSenderCandidate(formData: FormData) {
+  return saveMattermostSenderCandidateAction(formData);
+}
+
+export async function testMattermostSenderCandidate(formData: FormData) {
+  return testMattermostSenderCandidateAction(formData);
+}
+
+export async function disableMattermostSender(formData: FormData) {
+  return disableMattermostSenderAction(formData);
 }
 
 export async function deleteMember(formData: FormData) {

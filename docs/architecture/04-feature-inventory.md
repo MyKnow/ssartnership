@@ -2,7 +2,7 @@
 
 작성 기준일: 2026-07-09
 
-최종 교정일: 2026-07-10. 사용자 용어는 [화면 계약 용어 기준](../product/screen-specs/terminology.md)을 따르며, 유지·통합·제거 판정은 [기능 점수표](../product/screen-specs/feature-scoring.md)를 따른다.
+최종 교정일: 2026-07-17. 사용자 용어는 [화면 계약 용어 기준](../product/screen-specs/terminology.md)을 따르며, 유지·통합·제거 판정은 [기능 점수표](../product/screen-specs/feature-scoring.md)를 따른다.
 
 ## Public discovery
 
@@ -20,12 +20,13 @@
 | 기능 | 현재 구현 | 주요 데이터/규칙 |
 | --- | --- | --- |
 | 회원 로그인 | `/api/mm/login`, `LoginForm`, `user-auth.ts` | HMAC session, auth attempts, user-safe errors |
-| 회원가입 | `/auth/signup`, `/auth/ssafy`, `/api/ssafy/signup` | SSAFY Verify claims/profile, members |
-| SSAFY token 검증 | `/api/ssafy/verify-token` | token schema, redirect/callback helper |
-| 비밀번호 재설정 | `/auth/reset`, `/auth/reset/complete`, `/api/ssafy/reset-password`, `/api/mm/reset-password/complete` | reset session, auth security log |
+| 회원가입 | `/auth/signup`, `/api/mm/code/*`, `/api/mm/signup` | 기수별 Sender, MM ID, 코드 HMAC, members |
+| Sender 운영 | `/admin/cycle`, `MattermostSenderManager` | AES-GCM credential registry, Super Admin 이중 권한, 테스트 DM |
+| 비밀번호 재설정 | `/auth/reset`, `/api/mm/code/*`, `/api/mm/reset-password/complete` | direct DM code, reset session, auth security log |
+| MM 장애 이메일 복구 | `/auth/recover-email`, `/api/member/recovery/*` | 기존 비밀번호, 15분 제한 세션, 이메일 코드 |
 | 비밀번호 변경 | `/auth/change-password`, `/api/mm/change-password` | current/new password validation |
 | 정책 동의 | `/auth/consent`, `/api/mm/consent`, `policy-documents.ts` | active required policy versions |
-| 프로필 동기화 | `/api/mm/profile-sync`, cron member sync | Mattermost/SSAFY profile |
+| 프로필 동기화 | `/api/mm/profile-sync`, cron member sync | 최신 Mattermost ID, 표시명/username/사진만 갱신 |
 | 회원 탈퇴/삭제 | `/api/mm/delete` | session and member cleanup |
 | 인증 카드 | `/certification`, `CertificationView`, `certification-qr.ts` | QR token, avatar route |
 
@@ -48,7 +49,7 @@
 | 내 알림 | `/admin/notifications` | admin notification preferences/deliveries |
 | 이벤트 운영 | `/admin/event`, `/admin/event/[slug]` | promotion events, reward draws/winners |
 | 광고/쿠폰 | `/admin/advertisement`, ad package manager | campaigns, coupons, redemptions |
-| 기수 설정 | `/admin/cycle` | ssafy_cycle_settings |
+| 기수 설정 | `/admin/cycle` | ssafy_cycle_settings, mattermost_sender_credentials |
 | 홈 프로모션 구 URL | `/admin/promotions` -> `/admin/advertisement` | compat redirect |
 
 ## Partner portal

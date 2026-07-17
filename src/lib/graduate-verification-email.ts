@@ -1,6 +1,7 @@
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { formatGraduateEmailCodeExpirationNotice } from "@/lib/graduate-verification-email-code";
 import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
+import type { GraduateVerificationRequestKind } from "@/lib/graduate-verification";
 
 function escapeHtml(value: string) {
   return value
@@ -69,6 +70,7 @@ export async function sendGraduateAccountSetupEmail(input: {
   to: string;
   displayName: string;
   token: string;
+  requestKind?: GraduateVerificationRequestKind;
 }) {
   const smtpConfig = getSmtpConfig();
   const transporter = createSmtpTransport(smtpConfig);
@@ -77,15 +79,19 @@ export async function sendGraduateAccountSetupEmail(input: {
   // this opaque one-time token once, removes the fragment, then submits it only
   // in the same-origin password-setup request body.
   setupUrl.hash = new URLSearchParams({ token: input.token }).toString();
-  const safeName = escapeHtml(input.displayName || "회원");
   const safeSetupUrl = escapeHtml(setupUrl.toString());
+  const isExistingMemberRecovery = input.requestKind === "existing_member_recovery";
+  const heading = isExistingMemberRecovery ? "기존 회원 계정 복구" : "수료생 계정 설정";
+  const description = isExistingMemberRecovery
+    ? `${input.displayName || "회원"}님, 기존 회원 복구가 승인되었습니다. 아래 링크에서 새 비밀번호를 설정해 주세요.`
+    : `${input.displayName || "회원"}님, 수료생 인증이 승인되었습니다. 아래 링크에서 비밀번호를 설정해 주세요.`;
 
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.to,
-    subject: `[${SITE_NAME}] 수료생 계정 비밀번호 설정`,
+    subject: `[${SITE_NAME}] ${isExistingMemberRecovery ? "기존 회원 계정 복구" : "수료생 계정 비밀번호 설정"}`,
     text: [
-      `${input.displayName || "회원"}님, 수료생 인증이 승인되었습니다.`,
+      description,
       "",
       "아래 링크에서 비밀번호를 설정해 주세요.",
       setupUrl.toString(),
@@ -94,8 +100,8 @@ export async function sendGraduateAccountSetupEmail(input: {
     ].join("\n"),
     html: `
       <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
-        <h2 style="margin: 0 0 12px;">수료생 계정 설정</h2>
-        <p style="margin: 0 0 16px; color: #334155;">${safeName}님, 수료생 인증이 승인되었습니다. 아래 링크에서 비밀번호를 설정해 주세요.</p>
+        <h2 style="margin: 0 0 12px;">${heading}</h2>
+        <p style="margin: 0 0 16px; color: #334155;">${escapeHtml(description)}</p>
         <p style="margin: 0;"><a href="${safeSetupUrl}" style="display: inline-block; border-radius: 12px; padding: 12px 16px; background: #1e4078; color: #ffffff; text-decoration: none; font-weight: 700;">비밀번호 설정하기</a></p>
         <p style="margin: 16px 0 0; color: #475569;">링크는 24시간 동안 한 번만 사용할 수 있습니다.</p>
       </div>
@@ -144,14 +150,18 @@ export async function sendGraduateVerificationResubmissionEmail(input: {
   displayName: string;
   targets: string[];
   note: string | null;
+  requestKind?: GraduateVerificationRequestKind;
 }) {
   const smtpConfig = getSmtpConfig();
   const transporter = createSmtpTransport(smtpConfig);
-  const applicationUrl = new URL("/auth/signup/graduate", SITE_URL).toString();
+  const applicationUrl = new URL("/auth/signup/graduate", SITE_URL);
+  if (input.requestKind === "existing_member_recovery") {
+    applicationUrl.searchParams.set("kind", "recovery");
+  }
   const safeName = escapeHtml(input.displayName || "회원");
   const safeTargets = escapeHtml(input.targets.join(", "));
   const safeNote = input.note ? escapeHtml(input.note) : null;
-  const safeApplicationUrl = escapeHtml(applicationUrl);
+  const safeApplicationUrl = escapeHtml(applicationUrl.toString());
 
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
@@ -163,7 +173,7 @@ export async function sendGraduateVerificationResubmissionEmail(input: {
       input.note ? `안내: ${input.note}` : null,
       "",
       "아래 페이지에서 같은 이메일로 다시 인증한 뒤 보완 요청된 항목만 제출해 주세요.",
-      applicationUrl,
+      applicationUrl.toString(),
     ].filter((value): value is string => Boolean(value)).join("\n"),
     html: `
       <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">

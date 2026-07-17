@@ -11,6 +11,7 @@ export const ADMIN_PERMISSION_RESOURCES = [
   "admin_management",
   "graduate_verifications",
   "profile_images",
+  "mattermost_senders",
 ] as const;
 
 export type AdminPermissionResource = (typeof ADMIN_PERMISSION_RESOURCES)[number];
@@ -57,6 +58,7 @@ const RESOURCE_LABELS: Record<AdminPermissionResource, string> = {
   admin_management: "관리자 관리",
   graduate_verifications: "수료생 인증",
   profile_images: "프로필 사진",
+  mattermost_senders: "Mattermost Sender",
 };
 
 const ACTION_LABELS: Record<AdminPermissionAction, string> = {
@@ -228,7 +230,12 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
     key: "readonly",
     name: "조회 전용",
     description: "운영 데이터를 조회만 할 수 있습니다.",
-    permissions: grant([...ADMIN_PERMISSION_RESOURCES], ["read"]),
+    permissions: grant(
+      ADMIN_PERMISSION_RESOURCES.filter(
+        (resource) => resource !== "mattermost_senders",
+      ),
+      ["read"],
+    ),
   },
 ];
 

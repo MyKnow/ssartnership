@@ -22,7 +22,6 @@ export function getManualMemberImportErrorFocusField(
       return "campus";
     case "contact_required":
     case "mm_invalid":
-    case "mm_generation_not_supported":
       return "mmId";
     case "email_invalid":
       return "email";

@@ -1,7 +1,6 @@
 import LoginForm from "@/components/auth/LoginForm";
 import PasswordResetMethodTabs from "@/components/auth/PasswordResetMethodTabs";
 import SignupMethodTabs, { type SignupMethod } from "@/components/auth/SignupMethodTabs";
-import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
@@ -32,11 +31,6 @@ export function LoginPageView({ returnTo }: { returnTo: string }) {
             <Button variant="secondary" href={signupHref}>
               회원가입
             </Button>
-            <SsafyVerifyButton
-              className="mt-0"
-              returnTo={returnTo}
-              label="SSAFY Verify로 시작하기"
-            />
           </div>
         </div>
       </Container>

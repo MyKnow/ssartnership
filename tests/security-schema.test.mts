@@ -54,8 +54,12 @@ const sensitiveTables = [
   "graduate_email_challenges",
   "graduate_verification_uploads",
   "member_password_action_tokens",
+  "member_email_challenges",
   "manual_member_import_batches",
   "manual_member_import_rows",
+  "mattermost_sender_credentials",
+  "mattermost_sender_test_attempts",
+  "mattermost_verification_codes",
 ] as const;
 
 function escapeRegex(value: string) {
@@ -180,4 +184,31 @@ test("수료생 초기 비밀번호 설정 메일 재발송 RPC는 서비스 역
     schemaSql,
     /grant\s+execute\s+on\s+function\s+public\.reissue_graduate_initial_setup\([^;]+to\s+service_role\s*;/i,
   );
+});
+
+test("기존 회원 이메일 복구와 수료증 복구 승인 RPC는 service role과 원자 제약으로 보호한다", () => {
+  assert.match(schemaSql, /purpose\s+in\s+\('email_verify',\s*'email_change',\s*'email_recovery'\)/i);
+  assert.match(schemaSql, /create\s+or\s+replace\s+function\s+public\.complete_member_email_recovery\(/i);
+  assert.match(schemaSql, /challenge_row\.attempt_count\s*>=\s*5/i);
+  assert.match(schemaSql, /check\s+\(request_kind\s+in\s+\('graduate_signup',\s*'existing_member_recovery'\)\)/i);
+  assert.match(schemaSql, /graduate_verification_requests_open_email_kind_idx/i);
+  assert.match(schemaSql, /graduate_verification_requests_recovery_member_once_idx/i);
+  assert.match(schemaSql, /p_existing_member_id\s+uuid/i);
+  assert.match(schemaSql, /graduate_verification_recovery_member_required/i);
+
+  for (const functionName of [
+    "complete_member_email_recovery",
+    "approve_graduate_verification",
+  ]) {
+    for (const role of ["public", "anon", "authenticated"]) {
+      assert.match(
+        schemaSql,
+        new RegExp(
+          `revoke\\s+all\\s+on\\s+function\\s+public\\.${functionName}\\([^;]+from\\s+${role}\\s*;`,
+          "i",
+        ),
+      );
+    }
+  }
+  assert.match(schemaSql, /grant\s+execute\s+on\s+function\s+public\.complete_member_email_recovery\([^;]+to\s+service_role\s*;/i);
 });

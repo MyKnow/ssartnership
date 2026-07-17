@@ -10,13 +10,15 @@ export async function GET() {
   const challenge = session
     ? await getVerifiedGraduateApplicationChallenge(session.challengeId)
     : null;
-  if (!session || !challenge) {
+  const requestKind = session?.requestKind ?? "graduate_signup";
+  if (!session || !challenge || challenge.request_kind !== requestKind) {
     return NextResponse.json({ ok: false, message: "이메일 인증이 필요합니다." }, { status: 401 });
   }
   const { data } = await getSupabaseAdminClient()
     .from("graduate_verification_requests")
     .select("id,status,resubmission_targets,review_note,rejection_reason,legal_name,education_start_year,education_start_month,education_end_year,education_end_month,campus,inferred_generation")
     .eq("email_normalized", challenge.email_normalized)
+    .eq("request_kind", requestKind)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

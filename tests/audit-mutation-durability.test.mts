@@ -20,6 +20,13 @@ const migrationSql = readFileSync(
   ),
   "utf8",
 );
+const mattermostSenderMigrationSql = readFileSync(
+  new URL(
+    "../supabase/migrations/20260717011428_add_mattermost_sender_registry.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const reviewCommandSource = readFileSync(
   new URL("../src/lib/partner-change-requests/commands/review.ts", import.meta.url),
   "utf8",
@@ -137,6 +144,40 @@ test("감사 로그는 actor type과 요청 상관관계를 색인하고, RPC는
     for (const functionName of [
       "resolve_partner_change_request_with_audit",
       "update_partner_immediate_fields_with_audit",
+    ]) {
+      for (const role of ["public", "anon", "authenticated"]) {
+        assert.match(
+          sql,
+          new RegExp(
+            `revoke\\s+all\\s+on\\s+function\\s+public\\.${functionName}\\([^;]+from\\s+${role}\\s*;`,
+            "i",
+          ),
+        );
+      }
+      assert.match(
+        sql,
+        new RegExp(
+          `grant\\s+execute\\s+on\\s+function\\s+public\\.${functionName}\\([^;]+to\\s+service_role\\s*;`,
+          "i",
+        ),
+      );
+    }
+  }
+});
+
+test("Mattermost Sender 후보 저장·활성화·비활성화는 자격 증명 폐기와 감사를 하나의 service-role RPC로 처리한다", () => {
+  for (const sql of [mattermostSenderMigrationSql, schemaSql]) {
+    assert.match(sql, /create\s+or\s+replace\s+function\s+public\.save_mattermost_sender_candidate_with_audit\(/i);
+    assert.match(sql, /create\s+or\s+replace\s+function\s+public\.activate_mattermost_sender_candidate_with_audit\(/i);
+    assert.match(sql, /create\s+or\s+replace\s+function\s+public\.disable_mattermost_sender_with_audit\(/i);
+    assert.match(sql, /pg_advisory_xact_lock/i);
+    assert.match(sql, /encrypted_ciphertext\s*=\s*null/i);
+    assert.match(sql, /insert\s+into\s+public\.admin_audit_logs/i);
+
+    for (const functionName of [
+      "save_mattermost_sender_candidate_with_audit",
+      "activate_mattermost_sender_candidate_with_audit",
+      "disable_mattermost_sender_with_audit",
     ]) {
       for (const role of ["public", "anon", "authenticated"]) {
         assert.match(

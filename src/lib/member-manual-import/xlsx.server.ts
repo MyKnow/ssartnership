@@ -56,7 +56,7 @@ export async function createManualMemberImportTemplate() {
   guide.addRows([
     ["항목", "안내"],
     ["기수", "운영진은 0, 그 외에는 1~현재 기수(현재 16)를 입력합니다."],
-    ["MM ID", "SSAFY Verify 조회가 활성화된 기수만 입력할 수 있습니다. 현재 기본값은 14·15기입니다."],
+    ["MM ID", "입력한 기수의 활성 Mattermost Sender로 town-square 소속을 확인합니다."],
     ["이메일", "MM ID 또는 이메일 중 하나는 필수입니다. 이메일 전용 회원은 이름·캠퍼스도 필수입니다."],
     ["사진 파일명", "선택 입력입니다. 기재하면 사진 ZIP의 같은 파일명과 정확히 일치해야 합니다. JPEG/PNG/WebP, 5MB 이하만 허용합니다."],
     ["비밀번호 설정", "MM 알림을 우선 보내며 실패 또는 미지원 시 이메일로 한 번만 대체 발송합니다."],

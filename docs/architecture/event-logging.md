@@ -63,9 +63,11 @@
 - `member_login`
 - `member_logout`
 - `member_signup_complete`
-- `member_ssafy_verify`
-- `ssafy_verify_api_trace`
-- `member_password_reset_ssafy`
+- `mattermost_code_issue`
+- `mattermost_code_verify`
+- `mattermost_sender_test`
+- `member_email_recovery`
+- `member_password_reset`
 - `member_password_reset`
 - `member_password_change`
 - `member_delete`
@@ -122,16 +124,15 @@
 - 제휴 제안 본문 전체 자유서술 텍스트
 - 필요 이상의 민감식별자
 
-## SSAFY Verify API 추적
+## Mattermost 직접 연동 보안 추적
 
-`ssafy_verify_api_trace`는 SSAFY Verify User Auth와 Server API 호출을 추적하는 인증/보안 로그입니다.
+direct Mattermost 흐름은 `auth_security_logs.properties`에 안정적인 상태 코드만 남긴다.
 
-- 대상: verification code exchange, Server API token, profile lookup, directory lookup, profile sync, profile-events, Mattermost notification, notification status 조회
-- 저장 위치: `auth_security_logs.properties`
-- request 요약: method, path, scope, query key, payload key, idempotency key, campaign id, template id, target 식별자 요약
-- response 요약: top-level key, data/profile/error key, request id, error code, status, notification id, campaign id, token 존재 여부
-- 원문 token, code, client secret, verification token, raw Mattermost response는 저장하지 않는다.
-- 일반 사용자 화면에는 provider request id와 diagnostic을 직접 노출하지 않고, 운영자는 관리자 로그의 `SSAFY Verify API 추적` 필터에서 확인한다.
+- 대상: Sender 후보 테스트/활성화, DM 코드 발급·검증, 사용자·디렉터리 조회, 프로필/사진 동기화, lifecycle 미해결, 기수별 알림 실패, 이메일 복구
+- 저장 위치: `auth_security_logs.properties`와 필요한 최소 관리자 audit row
+- 허용 요약: generation, stage, safe error code, delivery result, request id, masked/hashed 대상 식별자
+- 금지: Sender 로그인 ID/비밀번호, AES ciphertext/nonce/auth tag, Mattermost session token, DM code 원문, raw Mattermost response
+- Verify 전용 trace는 7일 안정화 기간에 과거 데이터로만 보존하며 새 이벤트를 만들지 않는다.
 
 ## 운영 원칙
 - 로깅 실패가 본 기능 실패로 이어지지 않게 처리

@@ -8,6 +8,10 @@ import {
 import {
   getGraduateVerificationSecret,
 } from "@/lib/graduate-verification-crypto";
+import {
+  parseGraduateVerificationRequestKind,
+  type GraduateVerificationRequestKind,
+} from "@/lib/graduate-verification";
 
 export {
   generateGraduateEmailCode,
@@ -23,6 +27,7 @@ const APPLICATION_SESSION_TTL_MS = 30 * 60 * 1000;
 
 type GraduateApplicationSession = {
   challengeId: string;
+  requestKind?: GraduateVerificationRequestKind;
   issuedAt: number;
   expiresAt: number;
 };
@@ -44,6 +49,8 @@ function parseApplicationSessionToken(token: string | undefined) {
     if (
       !value ||
       typeof value.challengeId !== "string" ||
+      (value.requestKind !== undefined &&
+        !parseGraduateVerificationRequestKind(value.requestKind)) ||
       typeof value.issuedAt !== "number" ||
       typeof value.expiresAt !== "number" ||
       value.expiresAt <= Date.now() ||
@@ -57,10 +64,15 @@ function parseApplicationSessionToken(token: string | undefined) {
   }
 }
 
-async function setGraduateChallengeSession(cookieName: string, challengeId: string) {
+async function setGraduateChallengeSession(
+  cookieName: string,
+  challengeId: string,
+  requestKind?: GraduateVerificationRequestKind,
+) {
   const issuedAt = Date.now();
   const payload = toBase64UrlJson({
     challengeId,
+    ...(requestKind ? { requestKind } : {}),
     issuedAt,
     expiresAt: issuedAt + APPLICATION_SESSION_TTL_MS,
   });
@@ -86,8 +98,15 @@ async function clearGraduateChallengeSession(cookieName: string) {
   store.delete(cookieName);
 }
 
-export async function setGraduateApplicationSession(challengeId: string) {
-  return setGraduateChallengeSession(APPLICATION_SESSION_COOKIE, challengeId);
+export async function setGraduateApplicationSession(
+  challengeId: string,
+  requestKind: GraduateVerificationRequestKind,
+) {
+  return setGraduateChallengeSession(
+    APPLICATION_SESSION_COOKIE,
+    challengeId,
+    requestKind,
+  );
 }
 
 export async function getGraduateApplicationSession() {

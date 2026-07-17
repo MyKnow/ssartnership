@@ -1,14 +1,15 @@
 "use client";
 
 import { useId, useState } from "react";
+import Link from "next/link";
 import GraduatePasswordResetForm from "@/components/auth/GraduatePasswordResetForm";
 import ManualMemberEmailResetForm from "@/components/member-manual-import/ManualMemberEmailResetForm";
-import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import MattermostCodeVerificationForm from "@/components/auth/MattermostCodeVerificationForm";
 
-type ResetMethod = "ssafy_verify" | "manual_email" | "graduate_email";
+type ResetMethod = "mattermost" | "manual_email" | "graduate_email";
 
 export default function PasswordResetMethodTabs() {
-  const [method, setMethod] = useState<ResetMethod>("ssafy_verify");
+  const [method, setMethod] = useState<ResetMethod>("mattermost");
   const id = useId();
   const memberTabId = `${id}-member-tab`;
   const graduateTabId = `${id}-graduate-tab`;
@@ -28,10 +29,10 @@ export default function PasswordResetMethodTabs() {
           id={memberTabId}
           type="button"
           role="tab"
-          aria-selected={method === "ssafy_verify"}
+          aria-selected={method === "mattermost"}
           aria-controls={memberPanelId}
-          onClick={() => setMethod("ssafy_verify")}
-          className={method === "ssafy_verify"
+          onClick={() => setMethod("mattermost")}
+          className={method === "mattermost"
             ? "min-h-11 rounded-[0.95rem] bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-raised"
             : "min-h-11 rounded-[0.95rem] px-3 text-sm font-semibold text-foreground hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"}
         >
@@ -52,12 +53,12 @@ export default function PasswordResetMethodTabs() {
           수료생
         </button>
       </div>
-      {method === "ssafy_verify" ? (
+      {method === "mattermost" ? (
         <section id={memberPanelId} role="tabpanel" aria-labelledby={memberTabId}>
           <p className="mt-5 text-sm text-muted-foreground">
-            SSAFY Verify 인증을 완료하면 새 비밀번호 설정 페이지로 이동합니다.
+            가입 때 연결한 Mattermost 계정으로 인증 코드를 받으면 새 비밀번호를 설정할 수 있습니다.
           </p>
-          <ResetPasswordForm />
+          <MattermostCodeVerificationForm purpose="reset_password" />
         </section>
       ) : method === "manual_email" ? (
         <section id={manualPanelId} role="tabpanel" aria-labelledby={manualTabId}><ManualMemberEmailResetForm /></section>
@@ -66,6 +67,14 @@ export default function PasswordResetMethodTabs() {
           <GraduatePasswordResetForm />
         </section>
       )}
+      <div className="mt-5 grid gap-2 border-t border-border pt-4 text-sm text-muted-foreground">
+        <Link href="/auth/recover-email" className="font-medium underline underline-offset-4 hover:text-foreground">
+          Mattermost를 사용할 수 없지만 기존 사이트 비밀번호는 알고 있나요? 이메일 로그인 복구
+        </Link>
+        <Link href="/auth/signup/graduate?kind=recovery" className="font-medium underline underline-offset-4 hover:text-foreground">
+          기존 사이트 비밀번호도 모르면 기존 회원 복구 신청
+        </Link>
+      </div>
     </div>
   );
 }

@@ -1,17 +1,9 @@
-import { randomUUID } from "node:crypto";
 import {
   findMmUserDirectoryEntryByUserId,
   upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
-import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
+import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import { generateTempPassword, hashPassword } from "@/lib/password";
-import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
-import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
-import {
-  toMmUserDirectorySnapshot,
-  type SsafyVerifyMemberProfile,
-} from "@/lib/ssafy-verify/profile";
-import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { validateMmUsername } from "@/lib/validation";
 import {
@@ -24,7 +16,6 @@ import {
   type ManualMemberAddInput,
   type ManualMemberAddItem,
   type ManualMemberAddYear,
-  type SenderSession,
   wrapManualMemberAddDbError,
 } from "./shared";
 
@@ -52,17 +43,21 @@ export function buildManualMemberPayload(input: {
 }
 
 async function ensureManualMemberDirectory(input: {
-  profile: SsafyVerifyMemberProfile;
+  profile: {
+    mattermostUserId: string;
+    username: string;
+    displayName: string;
+  };
   requestedYear: ManualMemberAddYear;
   resolvedYear: number;
 }) {
-  const snapshot = toMmUserDirectorySnapshot(input.profile, [
-    input.requestedYear,
-    ...(input.requestedYear === 0 ? [input.resolvedYear] : []),
-  ]);
   await upsertMmUserDirectorySnapshot({
-    ...snapshot,
-    isStaff: input.requestedYear === 0 || snapshot.isStaff,
+    mmUserId: input.profile.mattermostUserId,
+    mmUsername: input.profile.username,
+    displayName: input.profile.displayName,
+    campus: null,
+    isStaff: input.requestedYear === 0,
+    sourceYears: [input.resolvedYear],
   });
 
   const directory = await findMmUserDirectoryEntryByUserId(
@@ -79,19 +74,6 @@ export async function provisionManualMembers(
   inputs: ManualMemberAddInput[],
 ): Promise<ManualMemberAddBatchResult> {
   const supabase = getSupabaseAdminClient();
-  const verifyClient = createSsafyVerifyServerApiClient(
-    getSsafyVerifyServerApiConfig(),
-    {
-      trace: createSsafyVerifyApiTraceLogger({
-        actorType: "system",
-        properties: {
-          flow: "manual_member_temp_password_notification",
-          requestedYear,
-        },
-      }),
-    },
-  );
-  const senderSessionCache = new Map<number, Promise<SenderSession>>();
   const items: ManualMemberAddItem[] = [];
   let success = 0;
   let failed = 0;
@@ -122,7 +104,6 @@ export async function provisionManualMembers(
       const resolution = await resolveManualMemberResolution(
         input.username,
         requestedYear,
-        senderSessionCache,
       );
       if (!resolution) {
         items.push({
@@ -209,15 +190,11 @@ export async function provisionManualMembers(
       } as const;
 
       try {
-        await verifyClient.sendMattermostNotification({
-          recipient: {
-            mattermostUserId: resolution.user.id,
-          },
-          purpose: "manual_member_temp_password",
-          templateKey: "ssartnership_manual_member_temp_password",
-          message: {
-            title: "SSARTNERSHIP 임시 비밀번호",
-            body: [
+        await withActiveMattermostSenderForGeneration(
+          resolution.resolvedYear,
+          (session) => session.sendDirectMessage(
+            resolution.user.id,
+            [
               "SSARTNERSHIP 임시 비밀번호입니다.",
               "",
               "임시 비밀번호",
@@ -226,13 +203,9 @@ export async function provisionManualMembers(
               "```",
               "보안을 위해 로그인 후 반드시 변경해 주세요.",
             ].join("\n"),
-          },
-          idempotencyKey: `manual-member:${resolution.user.id}:${randomUUID()}`,
-        });
+          ),
+        );
 
-        if (memberId) {
-          await syncMemberMattermostProfile(memberId).catch(() => undefined);
-        }
         items.push({
           ...itemBase,
           status: "success",

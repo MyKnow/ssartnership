@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { sendGraduateVerificationCodeEmail } from "@/lib/graduate-verification-email";
 import { GRADUATE_EMAIL_CODE_TTL_SECONDS } from "@/lib/graduate-verification-email-code";
-import { normalizeGraduateEmail } from "@/lib/graduate-verification";
+import {
+  normalizeGraduateEmail,
+  parseGraduateVerificationRequestKind,
+} from "@/lib/graduate-verification";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import {
   generateGraduateEmailCode,
@@ -25,8 +28,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => null)) as { email?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as {
+    email?: unknown;
+    requestKind?: unknown;
+  } | null;
   const email = normalizeGraduateEmail(String(body?.email ?? ""));
+  const requestKind = body?.requestKind === undefined
+    ? "graduate_signup"
+    : parseGraduateVerificationRequestKind(body.requestKind);
+  if (!requestKind) {
+    return NextResponse.json({ ok: false, message: "인증 유형을 확인해 주세요." }, { status: 400 });
+  }
   if (!isValidEmail(email)) {
     return NextResponse.json({ ok: false, message: "이메일 주소를 확인해 주세요." }, { status: 400 });
   }
@@ -51,6 +63,7 @@ export async function POST(request: Request) {
     .insert({
       email_normalized: email,
       purpose: "application",
+      request_kind: requestKind,
       code_hash: hashGraduateEmailCode(email, code),
       expires_at: new Date(Date.now() + GRADUATE_EMAIL_CODE_TTL_SECONDS * 1_000).toISOString(),
     })

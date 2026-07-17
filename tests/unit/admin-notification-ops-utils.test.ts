@@ -1,29 +1,28 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const VERIFY_ENV_KEYS = [
-  "SSAFY_VERIFY_ISSUER",
-  "SSAFY_VERIFY_SERVER_CLIENT_ID",
-  "SSAFY_VERIFY_SERVER_CLIENT_SECRET",
+const MATTERMOST_ENV_KEYS = [
+  "MM_BASE_URL",
+  "MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION",
+  "MM_SENDER_CREDENTIALS_KEY_V1",
 ] as const;
 
-function clearVerifyEnv() {
-  for (const key of VERIFY_ENV_KEYS) {
+function clearMattermostEnv() {
+  for (const key of MATTERMOST_ENV_KEYS) {
     delete process.env[key];
   }
-  delete process.env.SSAFY_VERIFY_SERVER_API_BASE_URL;
 }
 
-function setVerifyEnv() {
-  process.env.SSAFY_VERIFY_ISSUER = "https://verify.example.com";
-  process.env.SSAFY_VERIFY_SERVER_CLIENT_ID = "server-client";
-  process.env.SSAFY_VERIFY_SERVER_CLIENT_SECRET = "server-secret";
+function setMattermostEnv() {
+  process.env.MM_BASE_URL = "https://mattermost.example.com";
+  process.env.MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION = "1";
+  process.env.MM_SENDER_CREDENTIALS_KEY_V1 = Buffer.alloc(32, 7).toString("base64");
 }
 
 describe("admin-notification-ops-utils", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    clearVerifyEnv();
+    clearMattermostEnv();
   });
 
   test("maps preview reason and notification labels", async () => {
@@ -105,11 +104,11 @@ describe("admin-notification-ops-utils", () => {
     const utils = await import("../../src/lib/admin-notification-ops-utils");
 
     expect(() => utils.assertMattermostConfigured()).toThrow(
-      "SSAFY Verify Server API credential이 설정되지 않았습니다.",
+      "MM_BASE_URL 환경 변수가 필요합니다.",
     );
     expect(utils.isMattermostConfigured()).toBe(false);
 
-    setVerifyEnv();
+    setMattermostEnv();
     expect(utils.isMattermostConfigured()).toBe(true);
 
     expect(utils.normalizeSourceYears([15, "14", "bad", 15, null])).toEqual([15, 14]);

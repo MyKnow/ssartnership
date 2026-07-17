@@ -30,7 +30,7 @@
 
 - `next.config.ts`는 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Content-Security-Policy`, production HSTS를 설정한다.
 - 회원/관리자/협력사 session은 HMAC signed httpOnly cookie를 사용한다.
-- service role key, SSAFY Verify server secret, SMTP password, VAPID private key, cron secret은 서버 전용 env로 유지한다.
+- service role key, Mattermost Sender AES key, SMTP password, VAPID private key, cron secret은 서버 전용 env로 유지한다.
 - route/action boundary에서 request/form validation을 수행한다.
 - admin permission은 resource/action matrix로 검사한다.
 - auth/security event는 raw token/password/client secret 없이 sanitize해 기록한다.
@@ -39,7 +39,7 @@
 
 고위험 영역:
 
-- SSAFY Verify callback/token/profile/directory 연동.
+- Mattermost Sender credential 복호화, DM 코드, profile/directory/lifecycle 연동.
 - password reset/change, initial setup token, session bridge.
 - Supabase service role client 사용 경계.
 - image proxy와 media upload sign/cleanup.
@@ -52,7 +52,7 @@
 - 비밀번호 원문, session token, auth token, client secret, push key 원문 중복 저장은 금지한다.
 - Preview sync는 production member password hash/salt와 legacy `members.avatar_base64`를 제거하되, 프로필 사진 ledger와 private Storage 객체는 Preview 검증용으로 유지한다.
 - 제휴 제안 자유서술 본문 전체를 로그에 남기지 않는다.
-- SSAFY Verify trace는 request/response shape와 provider request id 수준으로 요약한다.
+- Mattermost 오류는 안전한 코드만 요약하고, credential·MM session token·DM code 원문은 기록하지 않는다.
 - avatar/image는 필요한 범위에서 tokenized route 또는 storage URL로 제공한다.
 
 ## SEO/discovery
@@ -104,7 +104,7 @@
 
 주요 테스트 범위:
 
-- auth/form validation, SSAFY Verify, security hardening/schema.
+- auth/form validation, direct Mattermost, sender credential, security hardening/schema.
 - partner portal mock/scope/layout/metrics/service detail.
 - partner reviews/favorites/counts/benefit visibility/action.
 - notification center/routing/UI, push helpers.

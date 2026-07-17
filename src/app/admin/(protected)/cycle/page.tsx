@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import {
   deleteCohortCardTheme,
+  disableMattermostSender,
   earlyStartSsafyCycle,
   restoreSsafyCycleSettings,
+  saveMattermostSenderCandidate,
+  testMattermostSenderCandidate,
   updateSsafyCycleSettings,
   upsertCohortCardTheme,
 } from "@/app/admin/(protected)/actions";
@@ -10,6 +13,8 @@ import AdminCycleView from "@/components/admin/AdminCycleView";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { canManageMattermostSenders } from "@/lib/mattermost-senders/access";
+import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import {
   getSsafyCycleOverview,
@@ -30,11 +35,18 @@ export default async function AdminCyclePage({
 }: {
   searchParams?: Promise<{ status?: string; error?: string }>;
 }) {
-  await requireAdminPermission("cycles", "read", { path: "/admin/cycle" });
+  const session = await requireAdminPermission("cycles", "read", { path: "/admin/cycle" });
   const params = (await searchParams) ?? {};
-  const [settings, themes] = await Promise.all([
+  const canManageSenders = canManageMattermostSenders(session.account, "read");
+  const [settings, themes, senderResult] = await Promise.all([
     getSsafyCycleSettings(),
     listCohortCardThemes(),
+    canManageSenders
+      ? mattermostSenderRepository
+          .listMetadata()
+          .then((senders) => ({ senders, loadError: false }))
+          .catch(() => ({ senders: [], loadError: true }))
+      : Promise.resolve({ senders: [], loadError: false }),
   ]);
 
   return (
@@ -54,6 +66,11 @@ export default async function AdminCyclePage({
         restoreAction={restoreSsafyCycleSettings}
         upsertThemeAction={upsertCohortCardTheme}
         deleteThemeAction={deleteCohortCardTheme}
+        mattermostSenders={canManageSenders ? senderResult.senders : undefined}
+        mattermostSenderLoadError={canManageSenders ? senderResult.loadError : undefined}
+        saveMattermostSenderAction={canManageSenders ? saveMattermostSenderCandidate : undefined}
+        testMattermostSenderAction={canManageSenders ? testMattermostSenderCandidate : undefined}
+        disableMattermostSenderAction={canManageSenders ? disableMattermostSender : undefined}
       />
     </AdminShell>
   );

@@ -18,6 +18,8 @@ const meta = {
         education_end_month: 6,
         inferred_generation: 15,
         campus: "서울",
+        request_kind: "graduate_signup",
+        recovery_member_id: null,
         status: "submitted",
         profile_image_id: "00000000-0000-4000-8000-000000000102",
         created_at: "2026-07-12T00:00:00.000Z",

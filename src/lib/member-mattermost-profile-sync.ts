@@ -1,16 +1,13 @@
 import { buildMattermostProfileSyncPatch } from "@/lib/member-domain";
+import { markMemberMattermostLoginUnavailable } from "@/lib/member-email-login-transition";
 import { syncMemberProfileImage } from "@/lib/member-profile-images";
 import { upsertMmUserDirectorySnapshot } from "@/lib/mm-directory";
-import {
-  createMemberSyncApiClient,
-  fetchMemberLifecycleByUserId,
-  fetchMemberSnapshotByUserId,
-} from "@/lib/mm-member-sync/snapshot";
+import { withActiveMattermostSenderForSubject } from "@/lib/mattermost-senders/service";
 import {
   resolveMattermostLifecycle,
-  type MattermostLifecycleResult,
+  toMattermostLifecycleResult,
 } from "@/lib/mm-member-sync/lifecycle";
-import { markMemberMattermostLoginUnavailable } from "@/lib/member-email-login-transition";
+import { fetchMemberSnapshotForUser } from "@/lib/mm-member-sync/snapshot";
 import { MemberProfileSyncError } from "@/lib/member-profile-sync-errors";
 import type {
   MemberSyncField,
@@ -31,6 +28,7 @@ export type MattermostDirectoryRow = {
   mm_user_id: string;
   mm_username: string;
   is_staff: boolean;
+  source_years: number[];
 };
 
 export type MattermostSyncTarget = {
@@ -52,7 +50,7 @@ export type MattermostProfileUnavailableResult = {
   member: NormalizedMemberSyncSubject;
   lifecycleStatus: "graduated" | "departed";
   detailCode: string;
-  providerRequestId: string | null;
+  providerRequestId: null;
   transitionReason: "generation_completed" | "member_departed";
 };
 
@@ -63,55 +61,13 @@ async function loadMattermostDirectory(member: MemberMattermostSyncRow) {
 
   const { data, error } = await getSupabaseAdminClient()
     .from("mm_user_directory")
-    .select("id,mm_user_id,mm_username,is_staff")
+    .select("id,mm_user_id,mm_username,is_staff,source_years")
     .eq("id", member.mattermost_account_id)
     .maybeSingle();
   if (error) {
     throw new MemberProfileSyncError("directory_lookup_failed");
   }
   return (data as MattermostDirectoryRow | null) ?? null;
-}
-
-async function syncSsafyVerificationTrack(input: {
-  memberId: string;
-  snapshot: MemberSyncSnapshot;
-  updatedAt: string;
-}) {
-  if (!input.snapshot.track) {
-    return false;
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("member_ssafy_verifications")
-    .select("track,track_name")
-    .eq("member_id", input.memberId)
-    .maybeSingle();
-  if (error) {
-    throw new MemberProfileSyncError("verification_lookup_failed");
-  }
-  if (!data) {
-    return false;
-  }
-  if (
-    data.track === input.snapshot.track
-    && data.track_name === input.snapshot.trackName
-  ) {
-    return false;
-  }
-
-  const { error: updateError } = await supabase
-    .from("member_ssafy_verifications")
-    .update({
-      track: input.snapshot.track,
-      track_name: input.snapshot.trackName,
-      updated_at: input.updatedAt,
-    })
-    .eq("member_id", input.memberId);
-  if (updateError) {
-    throw new MemberProfileSyncError("verification_update_failed");
-  }
-  return true;
 }
 
 export function getMemberSyncSubject(
@@ -155,16 +111,19 @@ export async function applyMattermostProfileSnapshot(input: {
     throw new MemberProfileSyncError("lifecycle_unresolved");
   }
 
-  const supabase = getSupabaseAdminClient();
+  const sourceYears = localStaffRole
+    ? directory.source_years
+    : member.generation && member.generation > 0
+      ? [member.generation]
+      : [];
   try {
     await upsertMmUserDirectorySnapshot({
       mmUserId: snapshot.mmUserId,
       mmUsername: snapshot.mmUsername,
       displayName: snapshot.displayName,
-      campus: snapshot.campus,
+      campus: null,
       isStaff: localStaffRole,
-      sourceYears:
-        member.generation && member.generation > 0 ? [member.generation] : [],
+      sourceYears,
     });
   } catch {
     throw new MemberProfileSyncError("directory_sync_failed");
@@ -177,7 +136,7 @@ export async function applyMattermostProfileSnapshot(input: {
     },
     {
       displayName: snapshot.displayName,
-      campus: snapshot.campus,
+      campus: null,
       mmUsername: snapshot.mmUsername,
     },
   );
@@ -189,7 +148,7 @@ export async function applyMattermostProfileSnapshot(input: {
       imageSource: "mattermost",
       avatarBase64: snapshot.avatarBase64,
       avatarContentType: snapshot.avatarContentType,
-      avatarUrl: snapshot.avatarUrl,
+      avatarUrl: null,
     });
   } catch {
     throw new MemberProfileSyncError("profile_image_failed");
@@ -197,7 +156,7 @@ export async function applyMattermostProfileSnapshot(input: {
 
   const updatedAt = new Date().toISOString();
   if (Object.keys(patch.member).length > 0) {
-    const { error: updateError } = await supabase
+    const { error: updateError } = await getSupabaseAdminClient()
       .from("members")
       .update({
         ...patch.member,
@@ -212,15 +171,6 @@ export async function applyMattermostProfileSnapshot(input: {
 
   if (profileImage.updated) {
     changedFields.push("avatar");
-  }
-
-  const trackUpdated = await syncSsafyVerificationTrack({
-    memberId: member.id,
-    snapshot,
-    updatedAt,
-  });
-  if (trackUpdated) {
-    changedFields.push("track");
   }
 
   return {
@@ -252,42 +202,43 @@ export async function syncMemberMattermostProfile(
   }
 
   const member = data as MemberMattermostSyncRow;
-  const linkedDirectory = await loadMattermostDirectory(member);
-  if (!linkedDirectory?.mm_user_id) {
+  const directory = await loadMattermostDirectory(member);
+  if (!directory?.mm_user_id) {
     return null;
   }
 
-  const client = createMemberSyncApiClient({
-    identifier: linkedDirectory.mm_user_id,
-    flow: "member_profile_sync",
-  });
-  let lifecycle: MattermostLifecycleResult | null;
-  try {
-    lifecycle = await fetchMemberLifecycleByUserId(
-      linkedDirectory.mm_user_id,
-      client,
-    );
-  } catch {
-    throw new MemberProfileSyncError("lifecycle_response_invalid");
-  }
-
-  const isStaff = resolveLocalStaffRole(member, linkedDirectory);
+  const isStaff = resolveLocalStaffRole(member, directory);
   if (isStaff === null) {
     throw new MemberProfileSyncError("lifecycle_unresolved");
   }
-  const resolution = resolveMattermostLifecycle({
-    result: lifecycle,
-    isStaff,
-  });
-  if (resolution.transitionReason) {
-    const terminalLifecycleStatus = resolution.lifecycleStatus === "departed"
-      ? "departed"
-      : "graduated";
 
+  const directLookup = await withActiveMattermostSenderForSubject(
+    {
+      generation: member.generation,
+      isStaff,
+      sourceYears: directory.source_years,
+    },
+    async (session) => {
+      const user = await session.getUserById(directory.mm_user_id);
+      if (user.id !== directory.mm_user_id) {
+        throw new MemberProfileSyncError("identity_mismatch");
+      }
+
+      const lifecycle = toMattermostLifecycleResult(user);
+      const resolution = resolveMattermostLifecycle({ result: lifecycle, isStaff });
+      if (resolution.transitionReason) {
+        return { lifecycle, resolution, snapshot: null };
+      }
+      const snapshot = await fetchMemberSnapshotForUser(user, session);
+      return { lifecycle, resolution, snapshot };
+    },
+  );
+
+  if (directLookup.resolution.transitionReason) {
     try {
       await markMemberMattermostLoginUnavailable({
         memberId: member.id,
-        reason: resolution.transitionReason,
+        reason: directLookup.resolution.transitionReason,
       });
     } catch {
       throw new MemberProfileSyncError("mattermost_unavailable_mark_failed");
@@ -295,29 +246,23 @@ export async function syncMemberMattermostProfile(
 
     return {
       unavailable: true,
-      member: getMemberSyncSubject(member, linkedDirectory),
-      lifecycleStatus: terminalLifecycleStatus,
-      detailCode: resolution.detailCode,
-      providerRequestId: lifecycle?.requestId ?? null,
-      transitionReason: resolution.transitionReason,
+      member: getMemberSyncSubject(member, directory),
+      lifecycleStatus: directLookup.resolution.lifecycleStatus === "departed"
+        ? "departed"
+        : "graduated",
+      detailCode: directLookup.resolution.detailCode,
+      providerRequestId: null,
+      transitionReason: directLookup.resolution.transitionReason,
     };
   }
 
-  if (resolution.lifecycleStatus !== "active") {
+  if (!directLookup.snapshot || directLookup.resolution.lifecycleStatus !== "active") {
     throw new MemberProfileSyncError("lifecycle_unresolved");
-  }
-
-  const snapshot = await fetchMemberSnapshotByUserId(
-    linkedDirectory.mm_user_id,
-    client,
-  );
-  if (!snapshot) {
-    throw new MemberProfileSyncError("provider_response_invalid");
   }
 
   return applyMattermostProfileSnapshot({
     member,
-    directory: linkedDirectory,
-    snapshot,
+    directory,
+    snapshot: directLookup.snapshot,
   });
 }

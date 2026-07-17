@@ -70,12 +70,9 @@ type ImportResultItem = ImportResult["items"][number];
 
 type AdminMemberManualAddPanelProps = {
   currentGeneration?: number;
-  mmLookupGenerations?: readonly number[];
   initialRows?: readonly ManualMemberImportEditableRow[];
   canReissueManualSetup?: boolean;
 };
-
-const DEFAULT_MM_LOOKUP_GENERATIONS = [14, 15] as const;
 
 function getContentType(filename: string): PhotoEntry["contentType"] | null {
   const extension = filename.toLowerCase().split(".").pop();
@@ -163,7 +160,6 @@ function replaceImportResultItem(
 
 export default function AdminMemberManualAddPanel({
   currentGeneration = 16,
-  mmLookupGenerations = DEFAULT_MM_LOOKUP_GENERATIONS,
   initialRows = [],
   canReissueManualSetup = false,
 }: AdminMemberManualAddPanelProps) {
@@ -198,9 +194,8 @@ export default function AdminMemberManualAddPanel({
   const rowReadiness = useMemo(
     () => getManualMemberImportRowReadiness(rawRows, {
       currentGeneration,
-      mmLookupGenerations,
     }),
-    [currentGeneration, mmLookupGenerations, rawRows],
+    [currentGeneration, rawRows],
   );
   const canRetryFailedMembers = (result?.retryableFailures ?? 0) > 0;
   const canCreateMembers = Boolean(batch)
@@ -214,9 +209,6 @@ export default function AdminMemberManualAddPanel({
     ].filter((value): value is string => Boolean(value));
     return sources.length > 0 ? sources.join(" · ") : "사진을 선택하지 않았습니다.";
   }, [selectedPhotos, zip]);
-  const mmLookupLabel = mmLookupGenerations.length > 0
-    ? mmLookupGenerations.toSorted((left, right) => left - right).map((generation) => `${generation}기`).join("·")
-    : "없음";
 
   function resetPreparedBatch() {
     setBatch(null);
@@ -508,7 +500,7 @@ export default function AdminMemberManualAddPanel({
           <p className="text-sm text-muted-foreground">행을 직접 추가하거나 회원 XLSX를 올리면 입력 행으로 자동 추가됩니다. 각 행에서 사진을 고르거나 XLSX와 사진 ZIP을 연결한 뒤 검증해 주세요.</p>
         </div>
         <div className="rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-muted-foreground">
-          <p>기수: 운영진(0기)~현재 {currentGeneration}기 · MM 조회 지원: {mmLookupLabel}</p>
+          <p>기수: 운영진(0기)~현재 {currentGeneration}기 · MM 조회는 해당 기수의 활성 Sender로 확인합니다.</p>
           <p className="mt-1">한 배치 {MANUAL_MEMBER_IMPORT_LIMITS.maxRows}명 · XLSX 1MB · 사진 ZIP 100MB · 사진 1장 5MB</p>
         </div>
 

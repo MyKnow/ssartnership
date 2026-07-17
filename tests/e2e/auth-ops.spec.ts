@@ -48,7 +48,7 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page).toHaveURL(/\/auth\/signup$/);
     await expect(graduateTab).toBeFocused();
     await expect(graduateTab).toHaveAttribute("aria-selected", "true");
-    const graduateStart = page.getByRole("link", { name: "수료생 인증으로 시작하기" });
+    const graduateStart = page.getByRole("link", { name: "수료생 신규 인증으로 시작하기" });
     await expect(graduateStart).toHaveAttribute("href", "/auth/signup/graduate?returnTo=%2F");
 
     await graduateStart.click();
@@ -60,49 +60,29 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByRole("button", { name: "인증 코드 보내기" })).toBeVisible();
   });
 
-  test("SSAFY Verify popup failures show a generic message and report only safe diagnostics", async ({ page }) => {
-    await page.addInitScript(() => {
-      window.ssafyVerify = {
-        verify: async () => {
-          throw {
-            error_code: "SCOPE_NOT_ALLOWED",
-            request_id: "req_5wVyW3iRc7JLFWi8",
-            phase: "authorize",
-            codeVerifier: "must-not-be-reported",
-          };
-        },
-      };
-    });
-    await page.route("https://verify.myknow.xyz/sdk/ssafy-verify.js", (route) =>
-      route.fulfill({ contentType: "application/javascript", body: "" }),
-    );
-    await page.route("**/api/ssafy/client-failure", (route) =>
-      route.fulfill({
-        status: 202,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true }),
-      }),
+  test("offers email recovery and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {
+    await page.goto("/auth/reset");
+
+    const emailRecovery = page.getByRole("link", { name: /이메일 로그인 복구/ });
+    await expect(emailRecovery).toHaveAttribute("href", "/auth/recover-email");
+    const existingMemberRecovery = page.getByRole("link", { name: "기존 회원 복구 신청" });
+    await expect(existingMemberRecovery).toHaveAttribute(
+      "href",
+      "/auth/signup/graduate?kind=recovery",
     );
 
-    await page.goto("/auth/signup");
-    await page.waitForLoadState("networkidle");
+    await emailRecovery.click();
+    await expect(page).toHaveURL(/\/auth\/recover-email$/);
+    await expect(page.getByRole("heading", { name: "이메일 로그인 복구" })).toBeVisible();
+    await page.getByRole("button", { name: "기존 비밀번호 확인" }).click();
+    await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
+    await expect(page.getByText("기존 사이트 비밀번호를 입력해 주세요.")).toBeVisible();
 
-    const reportRequest = page.waitForRequest(
-      (request) => request.url().includes("/api/ssafy/client-failure"),
-    );
-    await page.getByRole("button", { name: "SSAFY Verify로 시작하기" }).click();
-    const report = await reportRequest;
-
-    expect(JSON.parse(report.postData() ?? "{}")).toEqual({
-      purpose: "member-login",
-      errorCode: "SCOPE_NOT_ALLOWED",
-      requestId: "req_5wVyW3iRc7JLFWi8",
-      phase: "authorize",
-    });
+    await page.goto("/auth/signup/graduate?kind=recovery");
+    await expect(page.getByRole("heading", { name: "기존 회원 복구" })).toBeVisible();
     await expect(
-      page.getByText("SSAFY 인증을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요."),
+      page.getByText(/관리자가 기존 회원을 명시적으로 선택한 경우에만 이메일 로그인과 초기 비밀번호를 연결합니다/),
     ).toBeVisible();
-    await expect(page.getByText("임시 진단 정보")).toHaveCount(0);
   });
 
   test("partner login maps safe server validation errors to fields", async ({ page }) => {

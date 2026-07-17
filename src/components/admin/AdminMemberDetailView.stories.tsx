@@ -99,7 +99,7 @@ const meta = {
         identifier: "seoul15_haneul",
         path: "/auth/login",
         ipAddress: "203.0.113.15",
-        properties: { provider: "ssafy_verify" },
+        properties: { provider: "mattermost" },
         createdAt: "2026-07-10T09:30:00+09:00",
       },
       {

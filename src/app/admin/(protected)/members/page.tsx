@@ -34,7 +34,6 @@ import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { parseAdminMemberPageSize } from "@/lib/admin-ia";
 import {
   getConfiguredCurrentSsafyYear,
-  getConfiguredManualMemberMmLookupGenerations,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
 
@@ -849,7 +848,6 @@ export default async function AdminMembersPage({
           <Card tone="elevated">
             <AdminMemberManualAddPanel
               currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
-              mmLookupGenerations={getConfiguredManualMemberMmLookupGenerations(cycleSettings)}
               canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
             />
           </Card>
@@ -858,7 +856,7 @@ export default async function AdminMembersPage({
         <Card tone="elevated">
           <AdminSectionHeading
             title="운영 메모"
-            description="MM 조회 가능 기수와 사진 검토 상태를 확인합니다."
+            description="활성 Sender와 사진 검토 상태를 확인합니다."
           />
           <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
             <p>MM·이메일 알림 전송 결과가 불명확하면 자동 대체 발송하지 않습니다. 수신 여부 확인 뒤에만 새 링크를 발급합니다.</p>

@@ -57,7 +57,11 @@
 | --- | --- |
 | `members` | SSAFY 회원, 인증/권한/프로필/정책 상태 |
 | `member_auth_attempts` | 회원 인증 시도 |
-| `mm_user_directory` | SSAFY Verify/Mattermost 위임 디렉터리 snapshot |
+| `mm_user_directory` | 직접 Mattermost 디렉터리 snapshot 및 최신 MM ID 연결 |
+| `mattermost_sender_credentials` | 기수별 AES-GCM 암호화 Sender 후보/활성 credential metadata |
+| `mattermost_sender_test_attempts` | Sender 테스트 rate limit/audit state |
+| `mattermost_verification_codes` | direct DM 가입·재설정 코드 hash와 delivery 상태 |
+| `member_email_challenges` | 이메일 변경·MM 장애 복구 코드 hash |
 | `password_reset_attempts` | 비밀번호 재설정 시도 |
 | `policy_documents` | 약관/개인정보/마케팅 문서 버전 |
 | `member_policy_consents` | 회원별 정책 동의 기록 |

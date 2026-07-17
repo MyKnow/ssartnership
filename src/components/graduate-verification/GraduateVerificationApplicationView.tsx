@@ -19,6 +19,7 @@ import {
   getSsafyGenerationFromEducationStart,
   GRADUATE_CAMPUS_OPTIONS,
   MAX_GRADUATE_CERTIFICATE_BYTES,
+  type GraduateVerificationRequestKind,
 } from "@/lib/graduate-verification";
 import {
   GRADUATE_PROFILE_PHOTO_ACCEPT,
@@ -88,7 +89,11 @@ async function uploadSignedGraduateFile(input: {
   return upload.uploadId;
 }
 
-export default function GraduateVerificationApplicationView() {
+export default function GraduateVerificationApplicationView({
+  requestKind = "graduate_signup",
+}: {
+  requestKind?: GraduateVerificationRequestKind;
+}) {
   const certificateInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoSourceUrlRef = useRef<string | null>(null);
@@ -122,6 +127,7 @@ export default function GraduateVerificationApplicationView() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<{ tone: "danger" | "success" | "info"; text: string } | null>(null);
   const currentYearMonth = useMemo(() => getGraduateCurrentYearMonth(), []);
+  const isExistingMemberRecovery = requestKind === "existing_member_recovery";
 
   useEffect(() => () => {
     photoSelectionRequestIdRef.current += 1;
@@ -195,7 +201,7 @@ export default function GraduateVerificationApplicationView() {
       const response = await fetch("/api/graduate-verification/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, requestKind }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "인증 코드를 보내지 못했습니다.");
@@ -221,7 +227,7 @@ export default function GraduateVerificationApplicationView() {
       const response = await fetch("/api/graduate-verification/email/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code, requestKind }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "이메일 인증을 완료하지 못했습니다.");
@@ -440,7 +446,7 @@ export default function GraduateVerificationApplicationView() {
       setResubmissionTargets([]);
       setResubmissionNote(null);
       setExistingRequestStatus("submitted");
-      setMessage({ tone: "success", text: isResubmission ? "보완 제출을 완료했습니다. 관리자 재검토 후 이메일로 안내해 드립니다." : "수료생 인증 신청을 제출했습니다. 관리자 검토 후 이메일로 비밀번호 설정 안내를 보내드립니다." });
+      setMessage({ tone: "success", text: isResubmission ? "보완 제출을 완료했습니다. 관리자 재검토 후 이메일로 안내해 드립니다." : isExistingMemberRecovery ? "기존 회원 복구 신청을 제출했습니다. 관리자가 기존 회원을 명시적으로 연결한 뒤 이메일로 비밀번호 설정 안내를 보냅니다." : "수료생 인증 신청을 제출했습니다. 관리자 검토 후 이메일로 비밀번호 설정 안내를 보내드립니다." });
     } catch (error) {
       setMessage({ tone: "danger", text: error instanceof Error ? error.message : "수료생 인증 신청을 제출하지 못했습니다." });
     } finally {
@@ -478,8 +484,8 @@ export default function GraduateVerificationApplicationView() {
     <Card className="mx-auto min-w-0 max-w-2xl" data-testid="graduate-verification-application">
       <div className="space-y-2">
         <p className="ui-kicker">Graduate verification</p>
-        <h1 className="text-ko-title text-2xl font-semibold text-foreground">수료생 인증</h1>
-        <p className="ui-body text-muted-foreground">이메일 인증, 교육이수증, 본인 사진을 제출하면 관리자 검토 후 계정을 설정할 수 있습니다.</p>
+        <h1 className="text-ko-title text-2xl font-semibold text-foreground">{isExistingMemberRecovery ? "기존 회원 복구" : "수료생 인증"}</h1>
+        <p className="ui-body text-muted-foreground">{isExistingMemberRecovery ? "기존 사이트 비밀번호를 모르는 회원은 이메일 인증, 교육이수증, 본인 사진을 제출해 주세요. 관리자가 기존 회원을 명시적으로 선택한 경우에만 이메일 로그인과 초기 비밀번호를 연결합니다." : "이메일 인증, 교육이수증, 본인 사진을 제출하면 관리자 검토 후 계정을 설정할 수 있습니다."}</p>
       </div>
 
       <ol className="mt-6 grid grid-cols-3 gap-2 text-center text-xs font-medium" aria-label="수료생 인증 단계">

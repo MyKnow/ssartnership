@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   try {
     const result = await withdrawGraduateVerificationRequest({
       challengeId: session.challengeId,
+      requestKind: session.requestKind ?? "graduate_signup",
     });
     await clearGraduateApplicationSession();
     return NextResponse.json({ ok: true, result });
