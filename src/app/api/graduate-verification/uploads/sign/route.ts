@@ -25,7 +25,11 @@ export async function POST(request: Request) {
   const challenge = session
     ? await getVerifiedGraduateApplicationChallenge(session.challengeId)
     : null;
-  if (!session || !challenge) {
+  if (
+    !session ||
+    !challenge ||
+    challenge.request_kind !== (session.requestKind ?? "graduate_signup")
+  ) {
     return NextResponse.json({ ok: false, message: "이메일 인증을 다시 진행해 주세요." }, { status: 401 });
   }
   const rateLimitContext = {

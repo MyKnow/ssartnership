@@ -1,86 +1,89 @@
-import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
-import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
 import {
-  extractSsafyVerifyMemberProfiles,
-  toMemberSyncSnapshot,
-} from "@/lib/ssafy-verify/profile";
-import {
-  SsafyVerifyServerApiError,
-  createSsafyVerifyServerApiClient,
-} from "@/lib/ssafy-verify/server-api";
+  MattermostApiError,
+  type MattermostAuthenticatedSession,
+  type MattermostUser,
+  type MattermostUserImage,
+} from "@/lib/mattermost/client";
 import { MemberProfileSyncError } from "@/lib/member-profile-sync-errors";
-import {
-  parseMattermostLifecycleBatch,
-  type MattermostLifecycleResult,
-} from "./lifecycle";
 import type { MemberSyncSnapshot } from "./shared";
 
-const MATTERMOST_PROFILE_NOT_FOUND = Symbol("mattermost_profile_not_found");
+type MattermostProfileSession = Pick<
+  MattermostAuthenticatedSession,
+  "getUserById" | "getUserImage"
+>;
 
-export function createMemberSyncApiClient(input: {
-  identifier: string;
-  flow: string;
-  mattermostUserIds?: readonly string[];
-}) {
-  return createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
-    trace: createSsafyVerifyApiTraceLogger({
-      actorType: "system",
-      identifier: input.identifier,
-      properties: {
-        flow: input.flow,
-        ...(input.mattermostUserIds
-          ? { mattermostUserIdCount: input.mattermostUserIds.length }
-          : {}),
-      },
-    }),
-  });
+export function getMattermostDisplayName(
+  user: Pick<MattermostUser, "username" | "nickname" | "firstName" | "lastName">,
+) {
+  const nickname = user.nickname.trim();
+  if (nickname) {
+    return nickname;
+  }
+
+  const fullName = [user.firstName, user.lastName]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(" ");
+  return fullName || user.username;
 }
 
-function isNotFound(error: unknown) {
-  return error instanceof SsafyVerifyServerApiError && error.status === 404;
+export function toMemberSyncSnapshot(input: {
+  user: MattermostUser;
+  image: MattermostUserImage | null;
+}): MemberSyncSnapshot {
+  return {
+    mmUserId: input.user.id,
+    mmUsername: input.user.username,
+    displayName: getMattermostDisplayName(input.user),
+    // Direct Mattermost is only authoritative for these three profile fields.
+    // SSAFY profile claims (campus/track) are intentionally preserved locally.
+    campus: null,
+    track: null,
+    trackName: null,
+    avatarFetched: input.image !== null,
+    avatarUrl: null,
+    avatarContentType: input.image?.contentType ?? null,
+    avatarBase64: input.image?.bytes.toString("base64") ?? null,
+  };
+}
+
+async function getOptionalUserImage(
+  userId: string,
+  session: MattermostProfileSession,
+) {
+  try {
+    return await session.getUserImage(userId);
+  } catch (error) {
+    // Missing avatar is not a profile lookup failure. Other errors leave all
+    // local profile data untouched by propagating to the caller.
+    if (error instanceof MattermostApiError && error.code === "not_found") {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function fetchMemberSnapshotByUserId(
   userId: string,
-  clientOverride?: ReturnType<typeof createSsafyVerifyServerApiClient>,
-): Promise<MemberSyncSnapshot | null> {
-  const client = clientOverride
-    ?? createMemberSyncApiClient({
-      identifier: userId,
-      flow: "member_profile_sync",
-    });
-  const payload = await client.getMattermostUserProfile(userId).catch((error) => {
-    if (isNotFound(error)) {
-      return MATTERMOST_PROFILE_NOT_FOUND;
-    }
-    throw error;
-  });
-  if (payload === MATTERMOST_PROFILE_NOT_FOUND) {
-    return null;
+  session: MattermostProfileSession,
+): Promise<{ user: MattermostUser; snapshot: MemberSyncSnapshot }> {
+  const user = await session.getUserById(userId);
+  if (user.id !== userId) {
+    throw new MemberProfileSyncError("identity_mismatch");
   }
-
-  const profiles = extractSsafyVerifyMemberProfiles(payload);
-  const profile = profiles.find(
-    (candidate) => candidate.mattermostUserId === userId,
-  );
-  if (!profile) {
-    if (profiles.length > 0) {
-      throw new MemberProfileSyncError("identity_mismatch");
-    }
-    throw new MemberProfileSyncError("provider_response_invalid");
-  }
-  return toMemberSyncSnapshot(profile);
+  return {
+    user,
+    snapshot: await fetchMemberSnapshotForUser(user, session),
+  };
 }
 
-export async function fetchMemberLifecycleByUserId(
-  userId: string,
-  clientOverride?: ReturnType<typeof createSsafyVerifyServerApiClient>,
-): Promise<MattermostLifecycleResult | null> {
-  const client = clientOverride
-    ?? createMemberSyncApiClient({
-      identifier: userId,
-      flow: "member_lifecycle_sync",
-    });
-  const payload = await client.getMattermostUserLifecyclesBatch([userId]);
-  return parseMattermostLifecycleBatch(payload, [userId]).results.get(userId) ?? null;
+export async function fetchMemberSnapshotForUser(
+  user: MattermostUser,
+  session: MattermostProfileSession,
+): Promise<MemberSyncSnapshot> {
+  if (!user.id) {
+    throw new MemberProfileSyncError("provider_response_invalid");
+  }
+  const image = await getOptionalUserImage(user.id, session);
+  return toMemberSyncSnapshot({ user, image });
 }

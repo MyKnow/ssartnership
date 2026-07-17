@@ -2,7 +2,7 @@
 
 작성 기준일: 2026-07-09
 
-최종 교정일: 2026-07-10
+최종 교정일: 2026-07-17
 
 ## 제휴 탐색 흐름
 
@@ -25,17 +25,16 @@
 4. 캠퍼스 페이지는 해당 캠퍼스와 일치하는 제휴만 보여준다.
 5. SEO sitemap은 캠퍼스 페이지를 weekly changefreq로 포함한다.
 
-## 회원 가입과 SSAFY Verify 흐름
+## 회원 가입과 직접 Mattermost 흐름
 
 1. 사용자가 `/auth/signup`에서 가입을 시작한다.
-2. SSAFY Verify Hosted/Auth flow로 이동하거나 verify token/API를 통해 자격을 확인한다.
-3. `/auth/ssafy`가 callback을 받아 claims/profile을 검증한다.
-4. 가입 가능 대상은 14기 교육생, 15기 교육생, 운영진 기준을 따른다.
-5. `members`에 SSAFY 식별자, Mattermost 사용자, year/campus/track 등 프로필을 저장한다.
-6. 필수 정책 동의가 필요한 경우 `member_policy_consents`와 회원 row의 policy version을 갱신한다.
-7. `user_session` HMAC httpOnly 쿠키를 발급한다.
-8. 완료 후 `/auth/signup/complete` 또는 returnTo로 이동한다.
-9. SSAFY Verify API 호출 원문 token/code/client secret은 로그에 저장하지 않고, 요약 trace만 auth security log에 남긴다.
+2. 대상 기수의 active Sender가 direct Mattermost DM으로 6자리 코드를 보낸다.
+3. 서버는 team `s{generation}public`과 `town-square` membership 및 최신 MM ID를 확인한다.
+4. 코드 hash만 10분 보관하고 1회 소비·5회 검증·재전송 제한을 적용한다.
+5. 가입 가능 대상은 현재 cycle 및 운영진 기준을 따른다.
+6. `members`와 `mm_user_directory` 연결을 저장하되 campus/track 같은 외부 claim은 새로 채우지 않는다.
+7. 필수 정책 동의가 필요한 경우 `member_policy_consents`를 갱신한다.
+8. `user_session` HMAC httpOnly 쿠키를 발급하고 `/auth/signup/complete` 또는 returnTo로 이동한다.
 
 ## 회원 로그인과 정책/비밀번호 강제 흐름
 
@@ -50,10 +49,11 @@
 
 회원:
 
-1. `/auth/reset`에서 SSAFY Verify 기반 재설정을 시작한다.
-2. `/api/ssafy/reset-password`가 요청을 검증하고 SSAFY Verify 연동으로 신원을 확인한다.
-3. `/auth/reset/complete`와 `/api/mm/reset-password/complete`가 완료 처리를 담당한다.
-4. 완료 후 새 세션 또는 로그인 화면으로 이동한다.
+1. `/auth/reset`에서 대상 기수 Sender의 Mattermost DM 코드를 요청한다.
+2. `/api/mm/code/issue`, `/api/mm/code/verify`가 코드를 검증하고 reset completion cookie를 발급한다.
+3. `/api/mm/reset-password/complete`가 새 비밀번호를 저장한다.
+4. MM이 일시적으로 불가하고 기존 비밀번호를 알면 `/auth/recover-email`의 15분 제한 세션에서 이메일 로그인을 연결한다.
+5. 기존 비밀번호도 모르면 기존 회원 복구 수료증 신청을 통해 관리자 명시 선택 후 초기 설정 메일을 받는다.
 
 파트너:
 
@@ -116,5 +116,5 @@
 2. 일반 회원 route는 `/api/notifications`, 관리자 route는 `/api/admin/notifications`, 파트너 route는 `/api/partner/notifications`를 사용한다.
 3. Push 구독은 audience별로 `/api/push/*`, `/api/admin/push/*`, `/api/partner/push/*`에 나뉜다.
 4. 관리자 수동 발송은 `/api/push/admin/broadcast`와 preview route를 거친다.
-5. cron route는 종료 예정 제휴, 회원 sync, RSS, SSAFY Verify notification status, billing, expired promotion archive를 처리한다.
+5. cron route는 종료 예정 제휴, 회원 sync, RSS, billing, expired promotion archive를 처리한다.
 6. 발송 실패는 본 기능 실패로 확산하지 않는 방향으로 요약 로그와 delivery log에 남긴다.

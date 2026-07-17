@@ -27,9 +27,6 @@ export const Login: Story = {
     const loginCard = canvas.getByTestId("password-login-card");
     const divider = canvas.getByRole("separator");
     const signupButton = canvas.getByRole("link", { name: "회원가입" });
-    const verifyButton = canvas.getByRole("button", {
-      name: "SSAFY Verify로 시작하기",
-    });
     const orderedElements = [
       username,
       password,
@@ -37,7 +34,6 @@ export const Login: Story = {
       loginButton,
       divider,
       signupButton,
-      verifyButton,
     ];
 
     await expect(

@@ -57,10 +57,11 @@ test("member and partner auth key helpers delegate to the common scoped rate-lim
     [
       "login:account:adminuser",
       "reset-password:account:adminuser",
-      "ssafy-reset-password:account:adminuser",
+      "member-email-recovery:account:adminuser",
+      "mattermost-code-issue:account:adminuser",
+      "mattermost-code-verify:account:adminuser",
       "change-password:account:adminuser",
       "manual-password-action:account:adminuser",
-      "ssafy-verify:account:adminuser",
     ],
   );
   assert.deepEqual(

@@ -24,7 +24,6 @@ import {
   EMPTY_CHANNEL_RESULTS,
   absoluteUrl,
   computeOperationStatus,
-  hasMattermostSenderForMember,
   getNotificationTypeLabel,
   getPreviewReasonLabel,
   getTypePreferenceEnabled,
@@ -33,7 +32,9 @@ import {
   mergeExclusionReasons,
   normalizeSelectedChannels,
   parseLogMetadata,
+  resolveMattermostSenderGenerationForMember,
 } from "@/lib/admin-notification-ops-utils";
+import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
 import {
   sendMattermostCampaignDeliveries,
   sendPushCampaignDeliveries,
@@ -173,6 +174,7 @@ type AudienceMember = {
   campus: string | null;
   isStaff: boolean;
   sourceYears: number[];
+  senderGeneration: number | null;
 };
 
 type AudienceContext = {
@@ -303,6 +305,7 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
       campus: member.campus,
       isStaff: directoryEntry?.is_staff ?? member.generation === 0,
       sourceYears: directoryEntry?.source_years ?? [],
+      senderGeneration: null,
     } satisfies AudienceMember;
   });
 }
@@ -330,7 +333,27 @@ async function buildAudienceContext(
   }
 
   const resolvedAudience = await resolvePushAudience(input.audience);
-  const members = await listAudienceMembers(resolvedAudience);
+  const listedMembers = await listAudienceMembers(resolvedAudience);
+  let activeSenderGenerations = new Set<number>();
+  if (selectedChannels.includes("mm")) {
+    try {
+      const metadata = await mattermostSenderRepository.listMetadata();
+      activeSenderGenerations = new Set(
+        metadata
+          .filter((sender) => sender.status === "active")
+          .map((sender) => sender.generation),
+      );
+    } catch {
+      validationMessages.push("Mattermost Sender 목록을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+  const members = listedMembers.map((member) => ({
+    ...member,
+    senderGeneration: resolveMattermostSenderGenerationForMember(
+      member,
+      activeSenderGenerations,
+    ),
+  }));
   const activeMarketingPolicy = await getPolicyDocumentByKind("marketing").catch(
     () => null,
   );
@@ -453,8 +476,6 @@ async function buildAudienceContext(
       if (!preference.mmEnabled) {
         channelReasons.mm = "mm_disabled";
       } else if (!member.mattermostUserId) {
-        channelReasons.mm = "channel_unavailable";
-      } else if (!hasMattermostSenderForMember(member)) {
         channelReasons.mm = "channel_unavailable";
       } else {
         eligibleMemberIds.mm.push(member.id);

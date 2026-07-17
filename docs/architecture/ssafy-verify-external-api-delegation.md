@@ -1,5 +1,7 @@
 # SSAFY Verify External API Delegation Plan
 
+> 역사 문서입니다. 2026-07-17에 Verify runtime을 제거하고 직접 Mattermost 연동으로 전환했습니다. 현재 운영 기준은 [Mattermost 직접 연동 전환](./mattermost-direct-reversion.md)을 따릅니다.
+
 ## 목적
 
 SSArtnership이 직접 보유한 Mattermost 계정 조회, 프로필 동기화, DM 발송 책임을 SSAFY Verify로 위임한다. 우리 서비스는 SSAFY Verify가 승인한 사용자 식별자와 프로필 스냅샷을 소비하고, Mattermost 토큰과 발송 로직은 장기적으로 보유하지 않는 방향을 목표로 한다.

@@ -183,6 +183,15 @@ export const mockScenarios = [
     requiredStates: ["이메일 인증", "교육 정보", "기수 자동 계산", "파일 크롭", "보완 요청", "제출 완료"],
   },
   {
+    id: "auth.member-email-recovery",
+    label: "기존 회원 이메일 로그인 복구",
+    surface: "auth",
+    description: "기존 사이트 비밀번호 확인 후 15분 제한 세션에서 이메일 코드로 로그인을 전환하는 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["api-route", "service"],
+    requiredStates: ["기존 비밀번호 확인", "이메일 등록", "6자리 코드", "세션 만료"],
+  },
+  {
     id: "auth.graduate-password-setup",
     label: "수료생 이메일 비밀번호 설정",
     surface: "auth",

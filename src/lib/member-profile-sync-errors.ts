@@ -1,4 +1,5 @@
-import { SsafyVerifyServerApiError } from "@/lib/ssafy-verify/server-api";
+import { MattermostApiError } from "@/lib/mattermost/client";
+import { MattermostSenderUnavailableError } from "@/lib/mattermost-senders/service";
 
 export type MemberProfileSyncErrorCode =
   | "member_lookup_failed"
@@ -8,9 +9,6 @@ export type MemberProfileSyncErrorCode =
   | "directory_sync_failed"
   | "profile_image_failed"
   | "member_update_failed"
-  | "verification_lookup_failed"
-  | "verification_update_failed"
-  | "lifecycle_response_invalid"
   | "lifecycle_unresolved"
   | "mattermost_unavailable_mark_failed";
 
@@ -25,8 +23,10 @@ export class MemberProfileSyncError extends Error {
 }
 
 export type MemberProfileSyncFailureCode =
+  | "member_sync_sender_not_configured"
   | "member_sync_provider_access_denied"
   | "member_sync_provider_rate_limited"
+  | "member_sync_provider_not_found"
   | "member_sync_provider_invalid_response"
   | "member_sync_provider_request_rejected"
   | "member_sync_provider_unavailable"
@@ -34,28 +34,32 @@ export type MemberProfileSyncFailureCode =
   | "member_sync_directory_failed"
   | "member_sync_profile_image_failed"
   | "member_sync_database_failed"
-  | "member_sync_track_failed"
   | "member_sync_provider_lifecycle_unresolved"
   | "member_sync_transition_failed"
   | "member_sync_failed";
 
+/** Maps direct Mattermost failures to non-sensitive, actionable audit codes. */
 export function getMemberProfileSyncFailureCode(
   error: unknown,
 ): MemberProfileSyncFailureCode {
-  if (error instanceof SsafyVerifyServerApiError) {
-    if (error.status === 401 || error.status === 403) {
+  if (error instanceof MattermostSenderUnavailableError) {
+    return "member_sync_sender_not_configured";
+  }
+
+  if (error instanceof MattermostApiError) {
+    if (error.code === "unauthorized" || error.code === "forbidden") {
       return "member_sync_provider_access_denied";
     }
-    if (error.status === 429) {
+    if (error.code === "rate_limited") {
       return "member_sync_provider_rate_limited";
     }
-    if (
-      error.errorCode === "VERIFY_SERVER_API_INVALID_RESPONSE"
-      || error.errorCode === "VERIFY_SERVER_TOKEN_INVALID"
-    ) {
+    if (error.code === "not_found") {
+      return "member_sync_provider_not_found";
+    }
+    if (error.code === "invalid_response") {
       return "member_sync_provider_invalid_response";
     }
-    if (error.status >= 400 && error.status < 500) {
+    if (error.code === "request_rejected") {
       return "member_sync_provider_request_rejected";
     }
     return "member_sync_provider_unavailable";
@@ -78,11 +82,6 @@ export function getMemberProfileSyncFailureCode(
     case "member_lookup_failed":
     case "member_update_failed":
       return "member_sync_database_failed";
-    case "verification_lookup_failed":
-    case "verification_update_failed":
-      return "member_sync_track_failed";
-    case "lifecycle_response_invalid":
-      return "member_sync_provider_invalid_response";
     case "lifecycle_unresolved":
       return "member_sync_provider_lifecycle_unresolved";
     case "mattermost_unavailable_mark_failed":

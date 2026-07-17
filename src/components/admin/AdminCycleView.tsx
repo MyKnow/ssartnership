@@ -1,5 +1,6 @@
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
+import MattermostSenderManager from "@/components/admin/MattermostSenderManager";
 import {
   AdminCertificationCardPreviewGrid,
   AdminCohortCardThemeManager,
@@ -12,6 +13,7 @@ import StatsRow from "@/components/ui/StatsRow";
 import SubmitButton from "@/components/ui/SubmitButton";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import type { CohortCardTheme } from "@/lib/cohort-card-themes";
+import type { MattermostSenderMetadata } from "@/lib/mattermost-senders/types";
 import type {
   SsafyCycleOverview,
   SsafyCycleSettings,
@@ -24,6 +26,9 @@ function statusMessage(status?: string | null) {
   if (status === "restored") return "자동 계산으로 복구했습니다.";
   if (status === "theme-saved") return "기수별 카드 색상을 저장했습니다.";
   if (status === "theme-deleted") return "기수별 카드 색상을 삭제했습니다.";
+  if (status === "mattermost-sender-saved") return "Mattermost Sender 후보를 암호화해 저장했습니다. 테스트 DM 성공 후 활성화해 주세요.";
+  if (status === "mattermost-sender-activated") return "테스트 DM이 성공해 Mattermost Sender를 활성화했습니다.";
+  if (status === "mattermost-sender-disabled") return "Mattermost Sender를 비활성화하고 자격 증명을 삭제했습니다.";
   return status ? "기수 관리 작업을 완료했습니다." : null;
 }
 
@@ -40,6 +45,11 @@ export default function AdminCycleView({
   restoreAction,
   upsertThemeAction,
   deleteThemeAction,
+  mattermostSenders,
+  mattermostSenderLoadError,
+  saveMattermostSenderAction,
+  testMattermostSenderAction,
+  disableMattermostSenderAction,
 }: {
   settings: SsafyCycleSettings;
   overview: SsafyCycleOverview;
@@ -53,6 +63,11 @@ export default function AdminCycleView({
   restoreAction: AdminFormAction;
   upsertThemeAction: AdminFormAction;
   deleteThemeAction: AdminFormAction;
+  mattermostSenders?: MattermostSenderMetadata[];
+  mattermostSenderLoadError?: boolean;
+  saveMattermostSenderAction?: AdminFormAction;
+  testMattermostSenderAction?: AdminFormAction;
+  disableMattermostSenderAction?: AdminFormAction;
 }) {
   const overrideActive = settings.manualCurrentYear !== null;
   const currentYearLabel = `${overview.currentYear}기`;
@@ -112,7 +127,6 @@ export default function AdminCycleView({
               <label className="grid gap-2 text-sm font-medium text-foreground">기준 연도<Input type="number" name="anchorCalendarYear" min={2000} max={3000} defaultValue={settings.anchorCalendarYear} /></label>
               <label className="grid gap-2 text-sm font-medium text-foreground">기준 월<Input type="number" name="anchorMonth" min={1} max={12} defaultValue={settings.anchorMonth} /></label>
             </div>
-            <label className="grid gap-2 text-sm font-medium text-foreground">수동 추가 MM 조회 가능 기수<Input name="manualMemberMmLookupGenerations" defaultValue={settings.manualMemberMmLookupGenerations.join(", ")} placeholder="예: 14, 15" /><span className="text-xs font-normal text-muted-foreground">운영진은 이 목록을 최신 기수부터 탐색합니다. 지원 준비가 끝난 16기는 여기에서 추가해 활성화합니다.</span></label>
             <SubmitButton pendingText="저장 중">기준값 저장</SubmitButton>
           </form>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -131,6 +145,15 @@ export default function AdminCycleView({
       </div>
 
       <div className="grid gap-6">
+        {mattermostSenders && saveMattermostSenderAction && testMattermostSenderAction && disableMattermostSenderAction ? (
+          <MattermostSenderManager
+            senders={mattermostSenders}
+            loadError={mattermostSenderLoadError}
+            saveAction={saveMattermostSenderAction}
+            testAction={testMattermostSenderAction}
+            disableAction={disableMattermostSenderAction}
+          />
+        ) : null}
         <AdminCohortCardThemeManager themes={themes} suggestedYears={cardThemeYears} upsertAction={upsertThemeAction} deleteAction={deleteThemeAction} />
         <AdminCertificationCardPreviewGrid themes={themes} initialTimestamp={initialTimestamp} />
       </div>

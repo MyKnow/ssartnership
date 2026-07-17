@@ -8423,3 +8423,1167 @@ revoke all on function public.get_admin_logs_summary_scoped(timestamp with time 
 revoke all on function public.get_admin_logs_summary_scoped(timestamp with time zone, timestamp with time zone, bigint, text[], boolean) from anon;
 revoke all on function public.get_admin_logs_summary_scoped(timestamp with time zone, timestamp with time zone, bigint, text[], boolean) from authenticated;
 grant execute on function public.get_admin_logs_summary_scoped(timestamp with time zone, timestamp with time zone, bigint, text[], boolean) to service_role;
+
+-- Mattermost sender registry (20260717011428). Credentials are only stored as
+-- AES-256-GCM ciphertext, nonce, auth tag and root-key version.
+create table if not exists public.mattermost_sender_credentials (
+  id uuid primary key default uuid_generate_v4(),
+  generation integer not null,
+  status text not null default 'pending',
+  login_id_hint text not null,
+  sender_mm_user_id text,
+  sender_username_hint text,
+  encrypted_ciphertext text,
+  encrypted_nonce text,
+  encrypted_auth_tag text,
+  key_version integer,
+  verified_at timestamp with time zone,
+  last_tested_at timestamp with time zone,
+  last_test_target_kind text,
+  last_error_code text,
+  expires_at timestamp with time zone,
+  created_by_admin_id uuid references public.members(id) on delete set null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint mattermost_sender_credentials_generation_check check (generation between 1 and 99),
+  constraint mattermost_sender_credentials_status_check check (status in ('pending', 'active', 'superseded', 'disabled')),
+  constraint mattermost_sender_credentials_login_id_hint_check check (char_length(login_id_hint) between 3 and 64),
+  constraint mattermost_sender_credentials_key_version_check check (key_version is null or key_version between 1 and 99),
+  constraint mattermost_sender_credentials_test_target_check check (
+    last_test_target_kind is null
+    or last_test_target_kind in ('previous_generation_sender', 'super_admin_bootstrap')
+  ),
+  constraint mattermost_sender_credentials_encryption_check check (
+    (status in ('pending', 'active') and encrypted_ciphertext is not null and encrypted_nonce is not null and encrypted_auth_tag is not null and key_version is not null)
+    or (status in ('superseded', 'disabled') and encrypted_ciphertext is null and encrypted_nonce is null and encrypted_auth_tag is null and key_version is null)
+  )
+);
+create unique index if not exists mattermost_sender_credentials_one_active_generation_idx
+  on public.mattermost_sender_credentials(generation) where status = 'active';
+create unique index if not exists mattermost_sender_credentials_one_pending_generation_idx
+  on public.mattermost_sender_credentials(generation) where status = 'pending';
+create index if not exists mattermost_sender_credentials_generation_updated_at_idx
+  on public.mattermost_sender_credentials(generation, updated_at desc);
+drop trigger if exists mattermost_sender_credentials_set_updated_at on public.mattermost_sender_credentials;
+create trigger mattermost_sender_credentials_set_updated_at before update on public.mattermost_sender_credentials
+  for each row execute function public.set_partnership_updated_at();
+
+create table if not exists public.mattermost_sender_test_attempts (
+  id uuid primary key default uuid_generate_v4(),
+  identifier text not null unique,
+  count integer not null default 0,
+  first_attempt_at timestamp with time zone not null default now(),
+  blocked_until timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  constraint mattermost_sender_test_attempts_count_check check (count >= 0)
+);
+
+alter table public.mattermost_sender_credentials enable row level security;
+alter table public.mattermost_sender_test_attempts enable row level security;
+revoke all on table public.mattermost_sender_credentials from public;
+revoke all on table public.mattermost_sender_credentials from anon;
+revoke all on table public.mattermost_sender_credentials from authenticated;
+revoke all on table public.mattermost_sender_test_attempts from public;
+revoke all on table public.mattermost_sender_test_attempts from anon;
+revoke all on table public.mattermost_sender_test_attempts from authenticated;
+grant select, insert, update, delete on table public.mattermost_sender_credentials to service_role;
+grant select, insert, update, delete on table public.mattermost_sender_test_attempts to service_role;
+
+alter table public.admin_permissions drop constraint if exists admin_permissions_resource_check;
+alter table public.admin_permissions add constraint admin_permissions_resource_check
+  check (resource in (
+    'members', 'reviews', 'logs', 'brands', 'companies', 'notifications',
+    'home_ads', 'events', 'cycles', 'admin_management', 'graduate_verifications',
+    'profile_images', 'mattermost_senders'
+  ));
+update public.admin_permission_templates
+set permissions = jsonb_set(permissions, '{mattermost_senders}', '{"create":true,"read":true,"update":true,"delete":true}'::jsonb, true), updated_at = now()
+where key = 'super_admin';
+update public.admin_permission_templates
+set permissions = jsonb_set(permissions, '{mattermost_senders}', '{"create":false,"read":false,"update":false,"delete":false}'::jsonb, true), updated_at = now()
+where key <> 'super_admin';
+
+create or replace function public.expire_pending_mattermost_sender_candidates()
+returns integer
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare expired_count integer;
+begin
+  update public.mattermost_sender_credentials
+  set status = 'disabled', encrypted_ciphertext = null, encrypted_nonce = null,
+      encrypted_auth_tag = null, key_version = null,
+      last_error_code = 'candidate_expired', updated_at = now()
+  where status = 'pending' and expires_at is not null and expires_at <= now();
+  get diagnostics expired_count = row_count;
+  return expired_count;
+end;
+$$;
+
+create or replace function public.save_mattermost_sender_candidate_with_audit(
+  p_generation integer, p_login_id_hint text, p_ciphertext text, p_nonce text,
+  p_auth_tag text, p_key_version integer, p_actor_id uuid, p_request_id text,
+  p_path text, p_user_agent text, p_ip_address text, p_properties jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare candidate_id uuid;
+begin
+  if p_generation not between 1 and 99 then raise exception 'mattermost_sender_generation_invalid'; end if;
+  if char_length(btrim(coalesce(p_login_id_hint, ''))) not between 3 and 64 then raise exception 'mattermost_sender_login_hint_invalid'; end if;
+  if char_length(coalesce(p_ciphertext, '')) = 0 or char_length(coalesce(p_nonce, '')) = 0 or char_length(coalesce(p_auth_tag, '')) = 0 or p_key_version not between 1 and 99 then raise exception 'mattermost_sender_encrypted_payload_invalid'; end if;
+  perform pg_advisory_xact_lock(hashtext('mattermost_sender_generation:' || p_generation::text));
+  update public.mattermost_sender_credentials
+  set status = 'disabled', encrypted_ciphertext = null, encrypted_nonce = null,
+      encrypted_auth_tag = null, key_version = null,
+      last_error_code = 'candidate_replaced', updated_at = now()
+  where generation = p_generation and status = 'pending';
+  insert into public.mattermost_sender_credentials (
+    generation, status, login_id_hint, encrypted_ciphertext, encrypted_nonce,
+    encrypted_auth_tag, key_version, expires_at, created_by_admin_id
+  ) values (
+    p_generation, 'pending', btrim(p_login_id_hint), p_ciphertext, p_nonce,
+    p_auth_tag, p_key_version, now() + interval '24 hours', p_actor_id
+  ) returning id into candidate_id;
+  insert into public.admin_audit_logs (
+    request_id, actor_type, actor_id, action, path, target_type, target_id,
+    properties, user_agent, ip_address
+  ) values (
+    p_request_id, 'admin', p_actor_id::text, 'mattermost_sender_candidate_save',
+    p_path, 'mattermost_sender', candidate_id::text,
+    coalesce(p_properties, '{}'::jsonb), p_user_agent, p_ip_address
+  );
+  return candidate_id;
+end;
+$$;
+
+create or replace function public.record_mattermost_sender_test_failure_with_audit(
+  p_candidate_id uuid, p_error_code text, p_actor_id uuid, p_request_id text,
+  p_path text, p_user_agent text, p_ip_address text, p_properties jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare candidate_row public.mattermost_sender_credentials%rowtype;
+begin
+  if coalesce(p_error_code, '') not in ('test_target_unavailable', 'unauthorized', 'forbidden', 'rate_limited', 'not_found', 'unavailable', 'timeout', 'invalid_response', 'request_rejected', 'configuration_invalid') then raise exception 'mattermost_sender_test_error_invalid'; end if;
+  select * into candidate_row from public.mattermost_sender_credentials where id = p_candidate_id for update;
+  if not found then raise exception 'mattermost_sender_candidate_missing'; end if;
+  update public.mattermost_sender_credentials
+  set last_tested_at = now(), last_error_code = p_error_code, updated_at = now()
+  where id = candidate_row.id;
+  insert into public.admin_audit_logs (
+    request_id, actor_type, actor_id, action, path, target_type, target_id,
+    properties, user_agent, ip_address
+  ) values (
+    p_request_id, 'admin', p_actor_id::text, 'mattermost_sender_test', p_path,
+    'mattermost_sender', candidate_row.id::text, coalesce(p_properties, '{}'::jsonb),
+    p_user_agent, p_ip_address
+  );
+end;
+$$;
+
+create or replace function public.activate_mattermost_sender_candidate_with_audit(
+  p_candidate_id uuid, p_sender_mm_user_id text, p_sender_username_hint text,
+  p_test_target_kind text, p_actor_id uuid, p_request_id text, p_path text,
+  p_user_agent text, p_ip_address text, p_properties jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare candidate_row public.mattermost_sender_credentials%rowtype;
+begin
+  select * into candidate_row from public.mattermost_sender_credentials where id = p_candidate_id for update;
+  if not found then raise exception 'mattermost_sender_candidate_missing'; end if;
+  if candidate_row.status <> 'pending' or candidate_row.expires_at is null or candidate_row.expires_at <= now() then raise exception 'mattermost_sender_candidate_not_activatable'; end if;
+  if char_length(btrim(coalesce(p_sender_mm_user_id, ''))) = 0 then raise exception 'mattermost_sender_user_invalid'; end if;
+  if coalesce(p_test_target_kind, '') not in ('previous_generation_sender', 'super_admin_bootstrap') then raise exception 'mattermost_sender_test_target_invalid'; end if;
+  perform pg_advisory_xact_lock(hashtext('mattermost_sender_generation:' || candidate_row.generation::text));
+  update public.mattermost_sender_credentials
+  set status = 'superseded', encrypted_ciphertext = null, encrypted_nonce = null,
+      encrypted_auth_tag = null, key_version = null, updated_at = now()
+  where generation = candidate_row.generation and status = 'active';
+  update public.mattermost_sender_credentials
+  set status = 'active', sender_mm_user_id = btrim(p_sender_mm_user_id),
+      sender_username_hint = nullif(btrim(coalesce(p_sender_username_hint, '')), ''),
+      verified_at = now(), last_tested_at = now(),
+      last_test_target_kind = p_test_target_kind, last_error_code = null,
+      expires_at = null, updated_at = now()
+  where id = candidate_row.id;
+  insert into public.admin_audit_logs (
+    request_id, actor_type, actor_id, action, path, target_type, target_id,
+    properties, user_agent, ip_address
+  ) values (
+    p_request_id, 'admin', p_actor_id::text, 'mattermost_sender_activate',
+    p_path, 'mattermost_sender', candidate_row.id::text,
+    coalesce(p_properties, '{}'::jsonb), p_user_agent, p_ip_address
+  );
+  return candidate_row.id;
+end;
+$$;
+
+create or replace function public.disable_mattermost_sender_with_audit(
+  p_candidate_id uuid, p_generation_confirmation integer, p_actor_id uuid,
+  p_request_id text, p_path text, p_user_agent text, p_ip_address text,
+  p_properties jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare candidate_row public.mattermost_sender_credentials%rowtype;
+begin
+  select * into candidate_row from public.mattermost_sender_credentials where id = p_candidate_id for update;
+  if not found then raise exception 'mattermost_sender_candidate_missing'; end if;
+  if candidate_row.generation <> p_generation_confirmation then raise exception 'mattermost_sender_confirmation_invalid'; end if;
+  if candidate_row.status not in ('pending', 'active') then raise exception 'mattermost_sender_not_disablable'; end if;
+  perform pg_advisory_xact_lock(hashtext('mattermost_sender_generation:' || candidate_row.generation::text));
+  update public.mattermost_sender_credentials
+  set status = 'disabled', encrypted_ciphertext = null, encrypted_nonce = null,
+      encrypted_auth_tag = null, key_version = null, updated_at = now()
+  where id = candidate_row.id;
+  insert into public.admin_audit_logs (
+    request_id, actor_type, actor_id, action, path, target_type, target_id,
+    properties, user_agent, ip_address
+  ) values (
+    p_request_id, 'admin', p_actor_id::text, 'mattermost_sender_disable',
+    p_path, 'mattermost_sender', candidate_row.id::text,
+    coalesce(p_properties, '{}'::jsonb), p_user_agent, p_ip_address
+  );
+  return candidate_row.id;
+end;
+$$;
+
+create or replace function public.list_mattermost_sender_metadata()
+returns table (
+  id uuid, generation integer, status text, login_id_hint text,
+  sender_username_hint text, verified_at timestamp with time zone,
+  last_tested_at timestamp with time zone, last_test_target_kind text,
+  last_error_code text, expires_at timestamp with time zone,
+  created_at timestamp with time zone, updated_at timestamp with time zone
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select sender.id, sender.generation, sender.status, sender.login_id_hint,
+    sender.sender_username_hint, sender.verified_at, sender.last_tested_at,
+    sender.last_test_target_kind, sender.last_error_code, sender.expires_at,
+    sender.created_at, sender.updated_at
+  from public.mattermost_sender_credentials sender
+  order by sender.generation desc, sender.updated_at desc;
+$$;
+
+create or replace function public.get_mattermost_sender_candidate_for_test(p_candidate_id uuid)
+returns table (
+  id uuid, generation integer, status text, login_id_hint text,
+  encrypted_ciphertext text, encrypted_nonce text, encrypted_auth_tag text,
+  key_version integer
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select sender.id, sender.generation, sender.status, sender.login_id_hint,
+    sender.encrypted_ciphertext, sender.encrypted_nonce,
+    sender.encrypted_auth_tag, sender.key_version
+  from public.mattermost_sender_credentials sender
+  where sender.id = p_candidate_id and sender.status = 'pending'
+    and sender.expires_at > now();
+$$;
+
+create or replace function public.get_active_mattermost_sender_credentials(p_generation integer)
+returns table (
+  id uuid, generation integer, encrypted_ciphertext text, encrypted_nonce text,
+  encrypted_auth_tag text, key_version integer, sender_mm_user_id text,
+  sender_username_hint text
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select sender.id, sender.generation, sender.encrypted_ciphertext,
+    sender.encrypted_nonce, sender.encrypted_auth_tag, sender.key_version,
+    sender.sender_mm_user_id, sender.sender_username_hint
+  from public.mattermost_sender_credentials sender
+  where sender.generation = p_generation and sender.status = 'active';
+$$;
+
+create or replace function public.get_mattermost_sender_test_context(
+  p_generation integer, p_admin_member_id uuid
+)
+returns table (
+  previous_generation_sender_user_id text,
+  super_admin_mattermost_user_id text
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select
+    (select sender.sender_mm_user_id from public.mattermost_sender_credentials sender where sender.generation = p_generation - 1 and sender.status = 'active' limit 1),
+    (select directory.mm_user_id from public.members member join public.mm_user_directory directory on directory.id = member.mattermost_account_id where member.id = p_admin_member_id and member.deleted_at is null and directory.is_active = true limit 1);
+$$;
+
+revoke all on function public.expire_pending_mattermost_sender_candidates() from public;
+revoke all on function public.expire_pending_mattermost_sender_candidates() from anon;
+revoke all on function public.expire_pending_mattermost_sender_candidates() from authenticated;
+grant execute on function public.expire_pending_mattermost_sender_candidates() to service_role;
+revoke all on function public.save_mattermost_sender_candidate_with_audit(integer, text, text, text, text, integer, uuid, text, text, text, text, jsonb) from public;
+revoke all on function public.save_mattermost_sender_candidate_with_audit(integer, text, text, text, text, integer, uuid, text, text, text, text, jsonb) from anon;
+revoke all on function public.save_mattermost_sender_candidate_with_audit(integer, text, text, text, text, integer, uuid, text, text, text, text, jsonb) from authenticated;
+grant execute on function public.save_mattermost_sender_candidate_with_audit(integer, text, text, text, text, integer, uuid, text, text, text, text, jsonb) to service_role;
+revoke all on function public.record_mattermost_sender_test_failure_with_audit(uuid, text, uuid, text, text, text, text, jsonb) from public;
+revoke all on function public.record_mattermost_sender_test_failure_with_audit(uuid, text, uuid, text, text, text, text, jsonb) from anon;
+revoke all on function public.record_mattermost_sender_test_failure_with_audit(uuid, text, uuid, text, text, text, text, jsonb) from authenticated;
+grant execute on function public.record_mattermost_sender_test_failure_with_audit(uuid, text, uuid, text, text, text, text, jsonb) to service_role;
+revoke all on function public.activate_mattermost_sender_candidate_with_audit(uuid, text, text, text, uuid, text, text, text, text, jsonb) from public;
+revoke all on function public.activate_mattermost_sender_candidate_with_audit(uuid, text, text, text, uuid, text, text, text, text, jsonb) from anon;
+revoke all on function public.activate_mattermost_sender_candidate_with_audit(uuid, text, text, text, uuid, text, text, text, text, jsonb) from authenticated;
+grant execute on function public.activate_mattermost_sender_candidate_with_audit(uuid, text, text, text, uuid, text, text, text, text, jsonb) to service_role;
+revoke all on function public.disable_mattermost_sender_with_audit(uuid, integer, uuid, text, text, text, text, jsonb) from public;
+revoke all on function public.disable_mattermost_sender_with_audit(uuid, integer, uuid, text, text, text, text, jsonb) from anon;
+revoke all on function public.disable_mattermost_sender_with_audit(uuid, integer, uuid, text, text, text, text, jsonb) from authenticated;
+grant execute on function public.disable_mattermost_sender_with_audit(uuid, integer, uuid, text, text, text, text, jsonb) to service_role;
+revoke all on function public.list_mattermost_sender_metadata() from public;
+revoke all on function public.list_mattermost_sender_metadata() from anon;
+revoke all on function public.list_mattermost_sender_metadata() from authenticated;
+grant execute on function public.list_mattermost_sender_metadata() to service_role;
+revoke all on function public.get_mattermost_sender_candidate_for_test(uuid) from public;
+revoke all on function public.get_mattermost_sender_candidate_for_test(uuid) from anon;
+revoke all on function public.get_mattermost_sender_candidate_for_test(uuid) from authenticated;
+grant execute on function public.get_mattermost_sender_candidate_for_test(uuid) to service_role;
+revoke all on function public.get_active_mattermost_sender_credentials(integer) from public;
+revoke all on function public.get_active_mattermost_sender_credentials(integer) from anon;
+revoke all on function public.get_active_mattermost_sender_credentials(integer) from authenticated;
+grant execute on function public.get_active_mattermost_sender_credentials(integer) to service_role;
+revoke all on function public.get_mattermost_sender_test_context(integer, uuid) from public;
+revoke all on function public.get_mattermost_sender_test_context(integer, uuid) from anon;
+revoke all on function public.get_mattermost_sender_test_context(integer, uuid) from authenticated;
+grant execute on function public.get_mattermost_sender_test_context(integer, uuid) to service_role;
+
+-- Mattermost DM verification codes (20260717013834). The browser receives
+-- only an opaque challenge; the code is persisted as a keyed HMAC hash.
+create table if not exists public.mattermost_verification_codes (
+  id uuid primary key default uuid_generate_v4(),
+  purpose text not null,
+  challenge_hash text not null unique,
+  request_key_hash text not null,
+  mm_user_id text,
+  subject_generation integer,
+  sender_generation integer,
+  code_hash text not null,
+  expires_at timestamp with time zone not null,
+  consumed_at timestamp with time zone,
+  attempt_count integer not null default 0,
+  resend_available_at timestamp with time zone not null,
+  delivery_status text not null default 'pending',
+  last_error_code text,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint mattermost_verification_codes_purpose_check
+    check (purpose in ('signup', 'reset_password')),
+  constraint mattermost_verification_codes_challenge_hash_check
+    check (challenge_hash ~ '^[0-9a-f]{64}$'),
+  constraint mattermost_verification_codes_request_key_hash_check
+    check (request_key_hash ~ '^[0-9a-f]{64}$'),
+  constraint mattermost_verification_codes_code_hash_check
+    check (code_hash ~ '^[0-9a-f]{64}$'),
+  constraint mattermost_verification_codes_generation_check
+    check (
+      (subject_generation is null or subject_generation between 0 and 99)
+      and (sender_generation is null or sender_generation between 1 and 99)
+    ),
+  constraint mattermost_verification_codes_attempt_count_check
+    check (attempt_count between 0 and 5),
+  constraint mattermost_verification_codes_delivery_status_check
+    check (delivery_status in ('pending', 'sent', 'failed')),
+  constraint mattermost_verification_codes_safe_error_check
+    check (
+      last_error_code is null
+      or last_error_code in (
+        'sender_not_configured', 'configuration_invalid', 'unauthorized',
+        'forbidden', 'rate_limited', 'not_found', 'unavailable', 'timeout',
+        'invalid_response', 'request_rejected'
+      )
+    )
+);
+
+create index if not exists mattermost_verification_codes_active_target_idx
+  on public.mattermost_verification_codes(purpose, mm_user_id, expires_at desc)
+  where consumed_at is null and delivery_status = 'sent';
+create index if not exists mattermost_verification_codes_active_request_idx
+  on public.mattermost_verification_codes(purpose, request_key_hash, expires_at desc)
+  where consumed_at is null;
+
+alter table public.mattermost_verification_codes enable row level security;
+revoke all on table public.mattermost_verification_codes from public;
+revoke all on table public.mattermost_verification_codes from anon;
+revoke all on table public.mattermost_verification_codes from authenticated;
+grant select, insert, update, delete on table public.mattermost_verification_codes to service_role;
+
+create or replace function public.reserve_mattermost_verification_code(
+  p_purpose text,
+  p_challenge_hash text,
+  p_request_key_hash text,
+  p_mm_user_id text,
+  p_subject_generation integer,
+  p_sender_generation integer,
+  p_code_hash text,
+  p_expires_at timestamp with time zone,
+  p_resend_available_at timestamp with time zone
+)
+returns table (code_id uuid, accepted boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  existing_code public.mattermost_verification_codes%rowtype;
+  inserted_id uuid;
+begin
+  if p_purpose not in ('signup', 'reset_password')
+    or p_challenge_hash !~ '^[0-9a-f]{64}$'
+    or p_request_key_hash !~ '^[0-9a-f]{64}$'
+    or p_code_hash !~ '^[0-9a-f]{64}$'
+    or p_expires_at <= now()
+    or p_resend_available_at < now()
+    or (p_subject_generation is not null and p_subject_generation not between 0 and 99)
+    or (p_sender_generation is not null and p_sender_generation not between 1 and 99) then
+    raise exception 'mattermost_verification_code_invalid_input';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext(p_purpose), hashtext(p_request_key_hash));
+  select * into existing_code
+  from public.mattermost_verification_codes
+  where purpose = p_purpose
+    and request_key_hash = p_request_key_hash
+    and consumed_at is null
+    and expires_at > now()
+  order by created_at desc
+  limit 1
+  for update;
+  if found and existing_code.resend_available_at > now() then
+    return query select existing_code.id, false;
+    return;
+  end if;
+
+  update public.mattermost_verification_codes
+  set consumed_at = now(), updated_at = now()
+  where purpose = p_purpose
+    and request_key_hash = p_request_key_hash
+    and consumed_at is null;
+
+  insert into public.mattermost_verification_codes (
+    purpose, challenge_hash, request_key_hash, mm_user_id, subject_generation,
+    sender_generation, code_hash, expires_at, resend_available_at
+  ) values (
+    p_purpose, p_challenge_hash, p_request_key_hash, p_mm_user_id,
+    p_subject_generation, p_sender_generation, p_code_hash, p_expires_at,
+    p_resend_available_at
+  ) returning id into inserted_id;
+  return query select inserted_id, true;
+end;
+$$;
+
+create or replace function public.mark_mattermost_verification_code_delivery(
+  p_code_id uuid,
+  p_sent boolean,
+  p_error_code text default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_error_code is not null and p_error_code not in (
+    'sender_not_configured', 'configuration_invalid', 'unauthorized',
+    'forbidden', 'rate_limited', 'not_found', 'unavailable', 'timeout',
+    'invalid_response', 'request_rejected'
+  ) then
+    raise exception 'mattermost_verification_code_invalid_error';
+  end if;
+  update public.mattermost_verification_codes
+  set delivery_status = case when p_sent then 'sent' else 'failed' end,
+      last_error_code = case when p_sent then null else p_error_code end,
+      updated_at = now()
+  where id = p_code_id and consumed_at is null;
+  return found;
+end;
+$$;
+
+create or replace function public.consume_mattermost_verification_code(
+  p_purpose text,
+  p_challenge_hash text,
+  p_code_hash text
+)
+returns table (
+  verified boolean,
+  mm_user_id text,
+  subject_generation integer,
+  sender_generation integer
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  code_row public.mattermost_verification_codes%rowtype;
+begin
+  if p_purpose not in ('signup', 'reset_password')
+    or p_challenge_hash !~ '^[0-9a-f]{64}$'
+    or p_code_hash !~ '^[0-9a-f]{64}$' then
+    return query select false, null::text, null::integer, null::integer;
+    return;
+  end if;
+  select * into code_row
+  from public.mattermost_verification_codes
+  where purpose = p_purpose and challenge_hash = p_challenge_hash
+  for update;
+  if not found
+    or code_row.consumed_at is not null
+    or code_row.delivery_status <> 'sent'
+    or code_row.expires_at <= now()
+    or code_row.attempt_count >= 5
+    or code_row.mm_user_id is null
+    or code_row.subject_generation is null
+    or code_row.sender_generation is null then
+    if found and code_row.consumed_at is null then
+      update public.mattermost_verification_codes
+      set consumed_at = now(), updated_at = now()
+      where id = code_row.id;
+    end if;
+    return query select false, null::text, null::integer, null::integer;
+    return;
+  end if;
+  if code_row.code_hash = p_code_hash then
+    update public.mattermost_verification_codes
+    set consumed_at = now(), updated_at = now()
+    where id = code_row.id;
+    return query select true, code_row.mm_user_id, code_row.subject_generation, code_row.sender_generation;
+    return;
+  end if;
+  update public.mattermost_verification_codes
+  set attempt_count = attempt_count + 1,
+      consumed_at = case when attempt_count + 1 >= 5 then now() else null end,
+      updated_at = now()
+  where id = code_row.id;
+  return query select false, null::text, null::integer, null::integer;
+end;
+$$;
+
+revoke all on function public.reserve_mattermost_verification_code(text, text, text, text, integer, integer, text, timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.reserve_mattermost_verification_code(text, text, text, text, integer, integer, text, timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.reserve_mattermost_verification_code(text, text, text, text, integer, integer, text, timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.reserve_mattermost_verification_code(text, text, text, text, integer, integer, text, timestamp with time zone, timestamp with time zone) to service_role;
+revoke all on function public.mark_mattermost_verification_code_delivery(uuid, boolean, text) from public;
+revoke all on function public.mark_mattermost_verification_code_delivery(uuid, boolean, text) from anon;
+revoke all on function public.mark_mattermost_verification_code_delivery(uuid, boolean, text) from authenticated;
+grant execute on function public.mark_mattermost_verification_code_delivery(uuid, boolean, text) to service_role;
+revoke all on function public.consume_mattermost_verification_code(text, text, text) from public;
+revoke all on function public.consume_mattermost_verification_code(text, text, text) from anon;
+revoke all on function public.consume_mattermost_verification_code(text, text, text) from authenticated;
+grant execute on function public.consume_mattermost_verification_code(text, text, text) to service_role;
+
+-- Mattermost can be temporarily unavailable even though a member still knows
+-- the local site password. Keep that recovery path constrained to a short
+-- server-signed session and a one-time email proof; no full user session is
+-- issued until the email ownership check has completed.
+alter table public.member_email_challenges
+  drop constraint if exists member_email_challenges_purpose_check;
+alter table public.member_email_challenges
+  add constraint member_email_challenges_purpose_check
+  check (purpose in ('email_verify', 'email_change', 'email_recovery'));
+
+alter table public.member_password_action_tokens
+  drop constraint if exists member_password_action_tokens_purpose_check;
+alter table public.member_password_action_tokens
+  add constraint member_password_action_tokens_purpose_check
+  check (
+    purpose in (
+      'graduate_initial_setup',
+      'graduate_password_reset',
+      'manual_initial_setup',
+      'manual_password_reset',
+      'member_email_login_transition',
+      'member_email_recovery_initial_setup'
+    )
+  );
+
+alter table public.graduate_email_challenges
+  add column if not exists request_kind text not null default 'graduate_signup';
+alter table public.graduate_email_challenges
+  drop constraint if exists graduate_email_challenges_request_kind_check;
+alter table public.graduate_email_challenges
+  add constraint graduate_email_challenges_request_kind_check
+  check (request_kind in ('graduate_signup', 'existing_member_recovery'));
+
+alter table public.graduate_verification_requests
+  add column if not exists request_kind text not null default 'graduate_signup',
+  add column if not exists recovery_member_id uuid references public.members(id) on delete restrict;
+alter table public.graduate_verification_requests
+  drop constraint if exists graduate_verification_requests_request_kind_check;
+alter table public.graduate_verification_requests
+  add constraint graduate_verification_requests_request_kind_check
+  check (request_kind in ('graduate_signup', 'existing_member_recovery'));
+alter table public.graduate_verification_requests
+  drop constraint if exists graduate_verification_requests_recovery_member_approval_check;
+alter table public.graduate_verification_requests
+  add constraint graduate_verification_requests_recovery_member_approval_check
+  check (
+    request_kind <> 'existing_member_recovery'
+    or status <> 'approved'
+    or recovery_member_id is not null
+  );
+
+-- A recovery application and a new graduate application may use the same
+-- email, but an applicant cannot create a second open request of the same
+-- kind. The previous email-only index made the two independent flows block
+-- one another.
+drop index if exists public.graduate_verification_requests_open_email_idx;
+create unique index if not exists graduate_verification_requests_open_email_kind_idx
+  on public.graduate_verification_requests(email_normalized, request_kind)
+  where status in ('draft', 'submitted', 'in_review', 'needs_resubmission');
+create unique index if not exists graduate_verification_requests_recovery_member_once_idx
+  on public.graduate_verification_requests(recovery_member_id)
+  where request_kind = 'existing_member_recovery'
+    and recovery_member_id is not null
+    and status = 'approved';
+
+create or replace function public.complete_member_email_recovery(
+  p_member_id uuid,
+  p_email_normalized text,
+  p_email_reservation_hash text,
+  p_code_hash text
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  challenge_row public.member_email_challenges%rowtype;
+begin
+  if p_email_normalized is null
+    or p_email_normalized = ''
+    or lower(btrim(p_email_normalized)) <> p_email_normalized
+    or p_email_reservation_hash is null
+    or p_email_reservation_hash !~ '^[0-9a-f]{64}$'
+    or p_code_hash is null
+    or p_code_hash !~ '^[0-9a-f]{64}$' then
+    return jsonb_build_object('verified', false, 'reason', 'invalid_request');
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    return jsonb_build_object('verified', false, 'reason', 'member_missing');
+  end if;
+
+  select * into challenge_row
+  from public.member_email_challenges
+  where member_id = p_member_id
+    and email_normalized = p_email_normalized
+    and purpose = 'email_recovery'
+    and consumed_at is null
+  order by created_at desc
+  limit 1
+  for update;
+  if not found then
+    return jsonb_build_object('verified', false, 'reason', 'invalid_code');
+  end if;
+
+  if challenge_row.expires_at <= now()
+    or challenge_row.attempt_count >= 5 then
+    update public.member_email_challenges
+    set consumed_at = now()
+    where id = challenge_row.id
+      and consumed_at is null;
+    return jsonb_build_object('verified', false, 'reason', 'invalid_code');
+  end if;
+
+  if challenge_row.code_hash <> p_code_hash then
+    update public.member_email_challenges
+    set attempt_count = least(5, challenge_row.attempt_count + 1),
+        consumed_at = case
+          when challenge_row.attempt_count + 1 >= 5 then now()
+          else consumed_at
+        end
+    where id = challenge_row.id
+      and consumed_at is null;
+    return jsonb_build_object('verified', false, 'reason', 'invalid_code');
+  end if;
+
+  if exists (
+    select 1
+    from public.members member
+    where member.email_normalized = p_email_normalized
+      and member.id <> p_member_id
+      and member.deleted_at is null
+  ) then
+    return jsonb_build_object('verified', false, 'reason', 'email_conflict');
+  end if;
+
+  if exists (
+    select 1
+    from public.member_identifier_reservations reservation
+    where reservation.identifier_kind = 'email'
+      and reservation.identifier_hash = p_email_reservation_hash
+  ) then
+    return jsonb_build_object('verified', false, 'reason', 'email_reserved');
+  end if;
+
+  update public.members
+  set email = p_email_normalized,
+      email_normalized = p_email_normalized,
+      email_verified_at = now(),
+      auth_session_version = auth_session_version + 1,
+      updated_at = now()
+  where id = p_member_id
+    and deleted_at is null;
+
+  update public.member_email_challenges
+  set verified_at = now(),
+      consumed_at = now(),
+      attempt_count = challenge_row.attempt_count + 1
+  where id = challenge_row.id
+    and consumed_at is null;
+
+  return jsonb_build_object(
+    'verified', true,
+    'mustChangePassword', coalesce(member_row.must_change_password, false)
+  );
+end;
+$$;
+
+alter table public.member_email_challenges enable row level security;
+revoke all on table public.member_email_challenges from public;
+revoke all on table public.member_email_challenges from anon;
+revoke all on table public.member_email_challenges from authenticated;
+revoke all on function public.complete_member_email_recovery(uuid, text, text, text) from public;
+revoke all on function public.complete_member_email_recovery(uuid, text, text, text) from anon;
+revoke all on function public.complete_member_email_recovery(uuid, text, text, text) from authenticated;
+grant execute on function public.complete_member_email_recovery(uuid, text, text, text) to service_role;
+
+create or replace function public.approve_graduate_verification(
+  p_request_id uuid,
+  p_admin_id uuid,
+  p_document_number_hmac text,
+  p_setup_token_hash text,
+  p_setup_expires_at timestamp with time zone,
+  p_existing_member_id uuid
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  request_row public.graduate_verification_requests%rowtype;
+  photo_row public.member_profile_images%rowtype;
+  reviewer_profile_id uuid;
+  target_member public.members%rowtype;
+  resolved_member_id uuid;
+  resolved_generation integer;
+  setup_purpose text;
+begin
+  select * into request_row
+  from public.graduate_verification_requests
+  where id = p_request_id
+  for update;
+  if not found or request_row.status <> 'in_review' then
+    raise exception 'graduate_verification_not_reviewable';
+  end if;
+  if request_row.profile_image_id is null then
+    raise exception 'graduate_verification_profile_image_missing';
+  end if;
+
+  select * into photo_row
+  from public.member_profile_images
+  where id = request_row.profile_image_id
+  for update;
+  if not found or photo_row.status <> 'pending' then
+    raise exception 'graduate_verification_profile_image_not_pending';
+  end if;
+
+  if exists (
+    select 1
+    from public.graduate_verification_requests request
+    where request.document_number_hmac = p_document_number_hmac
+      and request.id <> p_request_id
+      and request.status = 'approved'
+  ) then
+    raise exception 'graduate_verification_document_exists';
+  end if;
+
+  select profile.id into reviewer_profile_id
+  from public.admin_profiles profile
+  where profile.member_id = p_admin_id
+    and profile.is_active = true;
+  if reviewer_profile_id is null then
+    raise exception 'graduate_verification_admin_profile_missing';
+  end if;
+
+  if request_row.request_kind = 'existing_member_recovery' then
+    if p_existing_member_id is null then
+      raise exception 'graduate_verification_recovery_member_required';
+    end if;
+
+    select * into target_member
+    from public.members
+    where id = p_existing_member_id
+      and deleted_at is null
+    for update;
+    if not found then
+      raise exception 'graduate_verification_recovery_member_missing';
+    end if;
+    if exists (
+      select 1
+      from public.members member
+      where member.email_normalized = request_row.email_normalized
+        and member.id <> target_member.id
+        and member.deleted_at is null
+    ) then
+      raise exception 'graduate_verification_email_exists';
+    end if;
+    if exists (
+      select 1
+      from public.graduate_verification_requests request
+      where request.request_kind = 'existing_member_recovery'
+        and request.recovery_member_id = target_member.id
+        and request.id <> p_request_id
+        and request.status = 'approved'
+    ) then
+      raise exception 'graduate_verification_recovery_member_already_linked';
+    end if;
+
+    update public.member_profile_images
+    set status = 'superseded',
+        delete_after = now() + interval '30 days',
+        updated_at = now()
+    where member_id = target_member.id
+      and id <> photo_row.id
+      and status = 'approved'
+      and deleted_at is null;
+
+    update public.members
+    set email = request_row.email,
+        email_normalized = request_row.email_normalized,
+        email_verified_at = now(),
+        must_change_password = true,
+        active_profile_image_id = photo_row.id,
+        profile_photo_review_status = 'approved',
+        auth_session_version = auth_session_version + 1,
+        updated_at = now()
+    where id = target_member.id;
+
+    resolved_member_id := target_member.id;
+    setup_purpose := 'member_email_recovery_initial_setup';
+  elsif request_row.request_kind = 'graduate_signup' then
+    if exists (
+      select 1
+      from public.members member
+      where member.email_normalized = request_row.email_normalized
+        and member.deleted_at is null
+    ) then
+      raise exception 'graduate_verification_email_exists';
+    end if;
+
+    resolved_generation := coalesce(
+      request_row.inferred_generation,
+      request_row.inferred_cohort
+    );
+    if resolved_generation is null then
+      raise exception 'graduate_verification_generation_missing';
+    end if;
+
+    insert into public.members (
+      display_name,
+      generation,
+      campus,
+      email,
+      email_normalized,
+      email_verified_at,
+      must_change_password,
+      graduate_verified_at,
+      verification_source
+    ) values (
+      request_row.legal_name,
+      resolved_generation,
+      request_row.campus,
+      request_row.email,
+      request_row.email_normalized,
+      now(),
+      true,
+      now(),
+      'graduate_certificate'
+    ) returning id into resolved_member_id;
+
+    insert into public.graduate_profiles (
+      member_id,
+      verification_request_id,
+      verified_at,
+      verification_source
+    ) values (
+      resolved_member_id,
+      request_row.id,
+      now(),
+      'graduate_certificate'
+    );
+    setup_purpose := 'graduate_initial_setup';
+  else
+    raise exception 'graduate_verification_request_kind_invalid';
+  end if;
+
+  update public.member_profile_images
+  set member_id = resolved_member_id,
+      source = 'graduate_verification',
+      status = 'approved',
+      reviewer_admin_id = p_admin_id,
+      reviewer_admin_profile_id = reviewer_profile_id,
+      reviewed_at = now(),
+      updated_at = now()
+  where id = photo_row.id;
+
+  update public.graduate_verification_requests
+  set status = 'approved',
+      document_number_hmac = p_document_number_hmac,
+      inferred_generation = coalesce(inferred_generation, inferred_cohort),
+      recovery_member_id = case
+        when request_kind = 'existing_member_recovery' then p_existing_member_id
+        else null
+      end,
+      reviewer_admin_id = p_admin_id,
+      reviewer_admin_profile_id = reviewer_profile_id,
+      reviewed_at = now(),
+      decided_at = now(),
+      certificate_delete_after = now() + interval '30 days',
+      resubmission_targets = '{}',
+      updated_at = now()
+  where id = p_request_id;
+
+  insert into public.member_password_action_tokens (
+    member_id,
+    purpose,
+    delivery_channel,
+    token_hash,
+    expires_at
+  ) values (
+    resolved_member_id,
+    setup_purpose,
+    'email',
+    p_setup_token_hash,
+    p_setup_expires_at
+  );
+  return resolved_member_id;
+end;
+$$;
+
+-- Retain the old RPC signature for callers deployed immediately before this
+-- migration, but make recovery approval impossible without an explicit member.
+create or replace function public.approve_graduate_verification(
+  p_request_id uuid,
+  p_admin_id uuid,
+  p_document_number_hmac text,
+  p_setup_token_hash text,
+  p_setup_expires_at timestamp with time zone
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  return public.approve_graduate_verification(
+    p_request_id,
+    p_admin_id,
+    p_document_number_hmac,
+    p_setup_token_hash,
+    p_setup_expires_at,
+    null
+  );
+end;
+$$;
+
+revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone, uuid) from public;
+revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone, uuid) from anon;
+revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone, uuid) from authenticated;
+grant execute on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone, uuid) to service_role;
+revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) from public;
+revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) from anon;
+revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) from authenticated;
+grant execute on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) to service_role;
+
+create or replace function public.reissue_graduate_initial_setup(
+  p_request_id uuid,
+  p_setup_token_hash text,
+  p_setup_expires_at timestamp with time zone
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  request_row public.graduate_verification_requests%rowtype;
+  member_row public.members%rowtype;
+  setup_purpose text;
+begin
+  select * into request_row
+  from public.graduate_verification_requests
+  where id = p_request_id
+    and status = 'approved'
+  for update;
+  if not found then
+    raise exception 'graduate_initial_setup_request_invalid';
+  end if;
+
+  if request_row.request_kind = 'existing_member_recovery' then
+    select * into member_row
+    from public.members
+    where id = request_row.recovery_member_id
+      and must_change_password = true
+      and deleted_at is null
+    for update;
+    setup_purpose := 'member_email_recovery_initial_setup';
+  else
+    select member.* into member_row
+    from public.members member
+    join public.graduate_profiles profile
+      on profile.member_id = member.id
+    where member.email_normalized = request_row.email_normalized
+      and member.must_change_password = true
+      and member.deleted_at is null
+    for update of member;
+    setup_purpose := 'graduate_initial_setup';
+  end if;
+  if not found then
+    raise exception 'graduate_initial_setup_already_completed';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where member_id = member_row.id
+    and purpose = setup_purpose
+    and consumed_at is null;
+
+  insert into public.member_password_action_tokens (
+    member_id,
+    purpose,
+    delivery_channel,
+    token_hash,
+    expires_at
+  ) values (
+    member_row.id,
+    setup_purpose,
+    'email',
+    p_setup_token_hash,
+    p_setup_expires_at
+  );
+  return member_row.id;
+end;
+$$;
+
+create or replace function public.complete_graduate_password_action(
+  p_token_hash text,
+  p_password_hash text,
+  p_password_salt text
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  token_row public.member_password_action_tokens%rowtype;
+  member_row public.members%rowtype;
+  token_id uuid;
+  member_id uuid;
+begin
+  select * into token_row
+  from public.member_password_action_tokens
+  where token_hash = p_token_hash
+    and purpose in (
+      'graduate_initial_setup',
+      'graduate_password_reset',
+      'member_email_recovery_initial_setup'
+    )
+    and consumed_at is null
+    and expires_at > now();
+  if not found then
+    raise exception 'graduate_password_action_invalid';
+  end if;
+  token_id := token_row.id;
+  member_id := token_row.member_id;
+
+  select * into member_row
+  from public.members
+  where id = member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    raise exception 'graduate_password_action_member_missing';
+  end if;
+
+  select * into token_row
+  from public.member_password_action_tokens
+  where id = token_id
+    and token_hash = p_token_hash
+    and purpose in (
+      'graduate_initial_setup',
+      'graduate_password_reset',
+      'member_email_recovery_initial_setup'
+    )
+    and consumed_at is null
+    and expires_at > now()
+  for update;
+  if not found then
+    raise exception 'graduate_password_action_invalid';
+  end if;
+
+  update public.member_password_action_tokens
+  set consumed_at = now()
+  where id = token_row.id;
+
+  update public.members
+  set password_hash = p_password_hash,
+      password_salt = p_password_salt,
+      must_change_password = false,
+      auth_session_version = auth_session_version + 1,
+      updated_at = now()
+  where id = token_row.member_id
+    and deleted_at is null;
+  if not found then
+    raise exception 'graduate_password_action_member_missing';
+  end if;
+
+  return token_row.member_id;
+end;
+$$;
+
+revoke all on function public.reissue_graduate_initial_setup(uuid, text, timestamp with time zone) from public;
+revoke all on function public.reissue_graduate_initial_setup(uuid, text, timestamp with time zone) from anon;
+revoke all on function public.reissue_graduate_initial_setup(uuid, text, timestamp with time zone) from authenticated;
+grant execute on function public.reissue_graduate_initial_setup(uuid, text, timestamp with time zone) to service_role;
+revoke all on function public.complete_graduate_password_action(text, text, text) from public;
+revoke all on function public.complete_graduate_password_action(text, text, text) from anon;
+revoke all on function public.complete_graduate_password_action(text, text, text) from authenticated;
+grant execute on function public.complete_graduate_password_action(text, text, text) to service_role;

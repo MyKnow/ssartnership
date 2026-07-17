@@ -5,6 +5,7 @@ test("partner registration reaches a review-ready submit through all five steps"
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto("/partner-registration");
+  await page.waitForLoadState("networkidle");
 
   const stepProgress = page.getByRole("navigation", { name: "파트너 등록 단계" });
   const currentStep = stepProgress.locator('button[aria-current="step"]:visible');

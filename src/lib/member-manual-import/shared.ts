@@ -62,7 +62,6 @@ export type ManualMemberImportRow = {
 
 export type ManualMemberImportValidationContext = {
   currentGeneration: number;
-  mmLookupGenerations: readonly number[];
 };
 
 export type ManualMemberImportErrorCode =
@@ -72,7 +71,6 @@ export type ManualMemberImportErrorCode =
   | "generation_invalid"
   | "contact_required"
   | "mm_invalid"
-  | "mm_generation_not_supported"
   | "email_invalid"
   | "name_required"
   | "campus_required"
@@ -132,14 +130,6 @@ function getRowError(
   message: string,
 ): ManualMemberImportValidationError {
   return { rowNumber, code, message };
-}
-
-function supportsMmLookup(
-  generation: number,
-  mmLookupGenerations: readonly number[],
-) {
-  if (generation === 0) return mmLookupGenerations.length > 0;
-  return mmLookupGenerations.includes(generation);
 }
 
 export function validateManualMemberImportRows(
@@ -208,11 +198,6 @@ export function validateManualMemberImportRows(
       errors.push(getRowError(raw.rowNumber, "mm_invalid", "MM ID 형식을 확인해 주세요."));
       continue;
     }
-    if (mmId && !supportsMmLookup(generation, context.mmLookupGenerations)) {
-      errors.push(getRowError(raw.rowNumber, "mm_generation_not_supported", "이 기수는 SSAFY Verify MM 조회를 아직 지원하지 않습니다. 이메일로 등록해 주세요."));
-      continue;
-    }
-
     const email = rawEmail ? normalizeEmail(rawEmail) : null;
     if (rawEmail && !email) {
       errors.push(getRowError(raw.rowNumber, "email_invalid", "이메일 주소를 확인해 주세요."));
@@ -222,8 +207,8 @@ export function validateManualMemberImportRows(
       errors.push(getRowError(raw.rowNumber, "name_required", "MM 미사용 회원은 이름을 입력해 주세요."));
       continue;
     }
-    if (!mmId && !campus) {
-      errors.push(getRowError(raw.rowNumber, "campus_required", "MM 미사용 회원은 캠퍼스를 입력해 주세요."));
+    if (!campus) {
+      errors.push(getRowError(raw.rowNumber, "campus_required", "외부 claim을 사용하지 않으므로 캠퍼스를 입력해 주세요."));
       continue;
     }
     if (photoFilename && !isManualMemberImportSafeFilename(photoFilename)) {

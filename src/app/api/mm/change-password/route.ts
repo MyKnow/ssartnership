@@ -142,9 +142,7 @@ export async function POST(request: Request) {
     }
 
     const record = hashPassword(nextPassword);
-    const usesMattermostAuthentication =
-      session.authenticationMethod === "mattermost"
-      || session.authenticationMethod === "ssafy";
+    const usesMattermostAuthentication = session.authenticationMethod === "mattermost";
     const { data: updatedMemberId, error: updateError } = usesMattermostAuthentication
       ? await supabase.rpc(
         "update_member_mattermost_password_credentials",

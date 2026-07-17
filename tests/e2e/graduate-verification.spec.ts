@@ -49,6 +49,7 @@ test.describe("graduate verification application", () => {
     );
 
     await page.goto("/auth/signup/graduate");
+    await page.waitForLoadState("networkidle");
     await page.getByRole("textbox", { name: "이메일" }).fill("graduate@example.com");
     await page.getByRole("button", { name: "인증 코드 보내기" }).click();
     await expect(page.getByText(/인증 코드 만료까지 [45]:[0-5]\d 남음/)).toBeVisible();

@@ -1,29 +1,31 @@
 import { findMmUserDirectoryEntryByUserId } from "@/lib/mm-directory";
-import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
-import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
-import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
-import {
-  extractSsafyVerifyMemberProfiles,
-  toSsafyVerifyMattermostUser,
-  type SsafyVerifyMattermostUser,
-  type SsafyVerifyMemberProfile,
-} from "@/lib/ssafy-verify/profile";
+import { getMattermostDisplayName } from "@/lib/mm-member-sync/snapshot";
+import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
+import { getMattermostSenderRoutingTemplate } from "@/lib/mattermost-senders/routing";
+import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
+import type { MattermostUser } from "@/lib/mattermost/client";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
-  MANUAL_MEMBER_ADD_YEAR_FALLBACKS,
   type ManualMemberAddYear,
-  type SenderSession,
   wrapManualMemberAddDbError,
 } from "./shared";
 
 const MEMBER_SELECT =
   "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,password_hash,password_salt,must_change_password,updated_at";
 
+export type DirectManualMemberProfile = {
+  mattermostUserId: string;
+  username: string;
+  displayName: string;
+  campus: null;
+  isStaff: boolean;
+};
+
 export type ManualMemberResolution = {
   requestedYear: ManualMemberAddYear;
   resolvedYear: number;
-  user: SsafyVerifyMattermostUser;
-  profile: SsafyVerifyMemberProfile;
+  user: MattermostUser;
+  profile: DirectManualMemberProfile;
 };
 
 export type ExistingMemberRecord = {
@@ -39,81 +41,72 @@ export type ExistingMemberRecord = {
   updated_at: string | null;
 };
 
-export async function getSenderSession(
-  year: number,
-  cache: Map<number, Promise<SenderSession>>,
-) {
-  const cached = cache.get(year);
-  if (cached) {
-    return cached;
-  }
+function toProfile(user: MattermostUser, isStaff: boolean): DirectManualMemberProfile {
+  return {
+    mattermostUserId: user.id,
+    username: user.username,
+    displayName: getMattermostDisplayName(user),
+    campus: null,
+    isStaff,
+  };
+}
 
-  const promise = (async () => ({ year }))();
-  cache.set(year, promise);
+async function getActiveSenderGenerations() {
+  const metadata = await mattermostSenderRepository.listMetadata();
+  return metadata
+    .filter((sender) => sender.status === "active")
+    .map((sender) => sender.generation)
+    .sort((left, right) => right - left);
+}
 
-  try {
-    return await promise;
-  } catch (error) {
-    cache.delete(year);
-    throw error;
-  }
+async function findUserInGeneration(input: {
+  username: string;
+  generation: number;
+  isStaff: boolean;
+}) {
+  return withActiveMattermostSenderForGeneration(input.generation, async (session) => {
+    const user = await session.getUserByUsername(input.username);
+    const template = getMattermostSenderRoutingTemplate(input.generation);
+    const team = await session.getTeamByName(template.teamName);
+    const channel = await session.getChannelByName(team.id, template.channelName);
+    const membership = await session.getChannelMember(channel.id, user.id);
+    if (!membership) {
+      return null;
+    }
+    return {
+      requestedYear: input.isStaff ? 0 : input.generation,
+      resolvedYear: input.generation,
+      user,
+      profile: toProfile(user, input.isStaff),
+    } satisfies ManualMemberResolution;
+  });
 }
 
 export async function resolveManualMemberResolution(
   username: string,
   requestedYear: ManualMemberAddYear,
-  cache: Map<number, Promise<SenderSession>>,
 ): Promise<ManualMemberResolution | null> {
-  const yearsToTry =
-    requestedYear === 0 ? MANUAL_MEMBER_ADD_YEAR_FALLBACKS : [requestedYear];
-  let lastError: Error | null = null;
+  const activeGenerations = requestedYear === 0
+    ? await getActiveSenderGenerations()
+    : [requestedYear];
 
-  for (const year of yearsToTry) {
+  for (const generation of activeGenerations) {
     try {
-      await getSenderSession(year, cache);
-      const client = createSsafyVerifyServerApiClient(
-        getSsafyVerifyServerApiConfig(),
-        {
-          trace: createSsafyVerifyApiTraceLogger({
-            actorType: "system",
-            identifier: username,
-            properties: {
-              flow: "manual_member_add_lookup",
-              username,
-              requestedYear,
-              lookupYear: year,
-            },
-          }),
-        },
-      );
-      const payload = await client.findMattermostUsers({
+      const result = await findUserInGeneration({
         username,
-        cohort: year,
+        generation,
+        isStaff: requestedYear === 0,
       });
-      const profile = extractSsafyVerifyMemberProfiles(payload).find((item) =>
-        requestedYear === 0 ? item.isStaff : !item.isStaff,
-      );
-      if (!profile) {
-        continue;
+      if (result) {
+        return result;
       }
-      return {
-        requestedYear,
-        resolvedYear: year,
-        user: toSsafyVerifyMattermostUser(profile),
-        profile,
-      };
     } catch (error) {
-      const normalized =
-        error instanceof Error ? error : new Error("SSAFY Verify 사용자 조회 실패");
+      // A student has a single authoritative Sender. Staff may be represented
+      // by several cohort channels, so continue only for a safe not-found.
       if (requestedYear !== 0) {
-        throw normalized;
+        throw error;
       }
-      lastError = normalized;
     }
-  }
-
-  if (lastError) {
-    throw lastError;
   }
   return null;
 }

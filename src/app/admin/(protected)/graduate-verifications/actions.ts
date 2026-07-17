@@ -25,6 +25,15 @@ function getRequiredId(formData: FormData, name: string) {
   return value;
 }
 
+function getOptionalId(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? "").trim();
+  if (!value) return null;
+  if (!/^[0-9a-f-]{36}$/i.test(value)) {
+    throw new Error("기존 회원 식별자를 확인해 주세요.");
+  }
+  return value;
+}
+
 function revalidateGraduateVerificationPaths() {
   revalidatePath("/admin");
   revalidatePath(ADMIN_GRADUATE_VERIFICATIONS_PATH);
@@ -88,6 +97,7 @@ export async function requestGraduateVerificationResubmissionAction(formData: Fo
 
 export async function approveGraduateVerificationAction(formData: FormData) {
   const requestId = getRequiredId(formData, "requestId");
+  const existingMemberId = getOptionalId(formData, "existingMemberId");
   const documentNumber = validateGraduateDocumentNumber(
     String(formData.get("documentNumber") ?? ""),
   );
@@ -102,6 +112,7 @@ export async function approveGraduateVerificationAction(formData: FormData) {
       requestId,
       adminId: session.adminId,
       documentNumberHmac: hashGraduateDocumentNumber(documentNumber),
+      existingMemberId,
     });
     await logAdminAction("graduate_verification_approve", {
       targetType: "graduate_verification_request",

@@ -21,7 +21,7 @@ Do not include more personal data than is necessary to demonstrate the issue.
 
 - Do not access, modify, delete, or exfiltrate another user's personal data.
 - Do not run denial-of-service, spam, credential stuffing, or destructive tests.
-- Do not attempt to bypass SSAFY Verify, Supabase, Vercel, or Mattermost controls beyond the minimum proof needed for the report.
+- Do not attempt to bypass Supabase, Vercel, or Mattermost controls beyond the minimum proof needed for the report.
 - Stop testing and report immediately if you encounter secrets, service-role keys, private tokens, production database URLs, or member data.
 
 ## Response

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
-import { normalizeGraduateEmail } from "@/lib/graduate-verification";
+import {
+  normalizeGraduateEmail,
+  parseGraduateVerificationRequestKind,
+} from "@/lib/graduate-verification";
 import {
   hashGraduateEmailCode,
   hashGraduateEmailIdentifier,
@@ -21,10 +24,17 @@ export async function POST(request: Request) {
   if (!isTrustedSameOriginRequest(request, { allowedContentTypes: ["application/json"] })) {
     return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 403 });
   }
-  const body = (await request.json().catch(() => null)) as { email?: unknown; code?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as {
+    email?: unknown;
+    code?: unknown;
+    requestKind?: unknown;
+  } | null;
   const email = normalizeGraduateEmail(String(body?.email ?? ""));
   const code = String(body?.code ?? "").trim();
-  if (!isValidEmail(email) || !/^\d{6}$/.test(code)) {
+  const requestKind = body?.requestKind === undefined
+    ? "graduate_signup"
+    : parseGraduateVerificationRequestKind(body.requestKind);
+  if (!requestKind || !isValidEmail(email) || !/^\d{6}$/.test(code)) {
     return NextResponse.json({ ok: false, message: "이메일과 6자리 인증 코드를 확인해 주세요." }, { status: 400 });
   }
 
@@ -40,6 +50,7 @@ export async function POST(request: Request) {
     .select("id,code_hash,attempt_count,expires_at,verified_at")
     .eq("email_normalized", email)
     .eq("purpose", "application")
+    .eq("request_kind", requestKind)
     .is("consumed_at", null)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -78,7 +89,7 @@ export async function POST(request: Request) {
   if (updateError) {
     return NextResponse.json({ ok: false, message: "이메일 인증을 완료하지 못했습니다." }, { status: 503 });
   }
-  await setGraduateApplicationSession(challenge.id);
+  await setGraduateApplicationSession(challenge.id, requestKind);
   await recordGraduateVerificationAttempt({ ...rateLimitContext, success: true });
   await logAuthSecurity({
     ...context,

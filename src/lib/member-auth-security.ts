@@ -12,10 +12,11 @@ import {
 export type MemberAuthRoute =
   | "login"
   | "reset-password"
-  | "ssafy-reset-password"
+  | "member-email-recovery"
+  | "mattermost-code-issue"
+  | "mattermost-code-verify"
   | "change-password"
-  | "manual-password-action"
-  | "ssafy-verify";
+  | "manual-password-action";
 
 type MemberAuthAttemptContext = {
   ipAddress?: string | null;
@@ -25,10 +26,11 @@ type MemberAuthAttemptContext = {
 const MEMBER_AUTH_ROUTES: MemberAuthRoute[] = [
   "login",
   "reset-password",
-  "ssafy-reset-password",
+  "member-email-recovery",
+  "mattermost-code-issue",
+  "mattermost-code-verify",
   "change-password",
   "manual-password-action",
-  "ssafy-verify",
 ];
 
 export const MEMBER_AUTH_RATE_LIMIT: RateLimitConfig = {
@@ -49,11 +51,19 @@ const MEMBER_AUTH_FAILURE_DELAY_MS: Record<
     min: 500,
     max: 900,
   },
-  "ssafy-reset-password": {
+  "mattermost-code-issue": {
+    min: 350,
+    max: 700,
+  },
+  "mattermost-code-verify": {
     min: 350,
     max: 700,
   },
   "reset-password": {
+    min: 350,
+    max: 700,
+  },
+  "member-email-recovery": {
     min: 350,
     max: 700,
   },
@@ -62,10 +72,6 @@ const MEMBER_AUTH_FAILURE_DELAY_MS: Record<
     max: 700,
   },
   "manual-password-action": {
-    min: 350,
-    max: 700,
-  },
-  "ssafy-verify": {
     min: 350,
     max: 700,
   },

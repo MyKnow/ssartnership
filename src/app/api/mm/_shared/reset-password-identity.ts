@@ -1,10 +1,6 @@
 import {
   findMmUserDirectoryEntryByUsername,
-  upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
-import {
-  resolveSelectableMemberByUsername,
-} from "@/lib/ssafy-verify/directory";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type DirectoryEntry = Awaited<ReturnType<typeof findMmUserDirectoryEntryByUsername>>;
@@ -39,20 +35,8 @@ export async function resolveResetPasswordMember(
   const supabase = getSupabaseAdminClient();
   const memberSelect =
     "id,mattermost_account_id,display_name,generation,staff_source_generation,campus,updated_at";
-  let directoryEntry = await findMmUserDirectoryEntryByUsername(username);
-  let resolvedStudentYear: number | null = null;
+  const directoryEntry = await findMmUserDirectoryEntryByUsername(username);
   let member: ResetPasswordMember | null = null;
-
-  if (!directoryEntry?.id) {
-    const resolved = await resolveSelectableMemberByUsername(username);
-    if (resolved) {
-      resolvedStudentYear = resolved.year;
-      if (resolved.directorySnapshot) {
-        await upsertMmUserDirectorySnapshot(resolved.directorySnapshot);
-      }
-      directoryEntry = await findMmUserDirectoryEntryByUsername(username);
-    }
-  }
 
   if (!directoryEntry?.id) {
     return {
@@ -78,7 +62,7 @@ export async function resolveResetPasswordMember(
   return {
     kind: "resolved",
     directoryEntry,
-    resolvedStudentYear,
+    resolvedStudentYear: null,
     member,
   };
 }

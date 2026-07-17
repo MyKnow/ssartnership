@@ -202,6 +202,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["auth.graduate-verification.application"],
   },
   {
+    routePath: "/auth/recover-email",
+    surface: "auth",
+    authScope: "public",
+    viewComponent: "MemberEmailRecoveryForm",
+    dataSources: ["api-route", "service"],
+    requiredScenarioIds: ["auth.member-email-recovery"],
+  },
+  {
     routePath: "/auth/graduate/setup",
     surface: "auth",
     authScope: "setup-token",
@@ -224,14 +232,6 @@ const mockRouteInventoryBase = [
     viewComponent: "SignupCompletePage",
     dataSources: ["api-route"],
     requiredScenarioIds: ["auth.signup.default"],
-  },
-  {
-    routePath: "/auth/ssafy",
-    surface: "auth",
-    authScope: "public",
-    viewComponent: "SsafyAuthPage",
-    dataSources: ["api-route"],
-    requiredScenarioIds: ["auth.consent.default"],
   },
   {
     routePath: "/admin",
@@ -692,7 +692,7 @@ const routeContracts = {
   "/auth/reset": {
     routeKind: "canonical",
     screenContractId: "auth.reset",
-    primaryTask: "SSAFY 인증을 통해 비밀번호 재설정을 시작한다.",
+    primaryTask: "Mattermost DM 인증을 통해 비밀번호 재설정을 시작한다.",
   },
   "/auth/reset/complete": {
     routeKind: "conditional",
@@ -702,12 +702,17 @@ const routeContracts = {
   "/auth/signup": {
     routeKind: "canonical",
     screenContractId: "auth.signup",
-    primaryTask: "회원 유형을 선택해 SSAFY Verify 또는 수료생 인증 가입을 시작한다.",
+    primaryTask: "회원 유형을 선택해 Mattermost DM 또는 수료생 인증 가입을 시작한다.",
   },
   "/auth/signup/graduate": {
     routeKind: "canonical",
     screenContractId: "auth.graduate-verification",
     primaryTask: "이메일, 교육이수증, 본인 사진으로 수료생 인증을 신청한다.",
+  },
+  "/auth/recover-email": {
+    routeKind: "canonical",
+    screenContractId: "auth.member-email-recovery",
+    primaryTask: "기존 사이트 비밀번호를 확인한 뒤 제한된 세션에서 이메일 로그인을 복구한다.",
   },
   "/auth/graduate/setup": {
     routeKind: "conditional",
@@ -723,11 +728,6 @@ const routeContracts = {
     routeKind: "conditional",
     screenContractId: "auth.signup-complete",
     primaryTask: "인증 결과를 확인하고 회원가입을 완료한다.",
-  },
-  "/auth/ssafy": {
-    routeKind: "conditional",
-    screenContractId: "auth.ssafy-callback",
-    primaryTask: "SSAFY Verify 결과에 따라 가입 또는 로그인 흐름을 잇는다.",
   },
   "/admin": {
     routeKind: "canonical",

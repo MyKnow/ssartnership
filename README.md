@@ -1,12 +1,12 @@
 # SSARTNERSHIP
 
 SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.  
-서울 지역 제휴 업체 정보를 빠르게 확인하고, SSAFY Verify 기반 인증으로 교육생/운영진 신원을 확인할 수 있습니다.
+서울 지역 제휴 업체 정보를 빠르게 확인하고, Mattermost 직접 연동으로 교육생/운영진 신원을 확인할 수 있습니다.
 
 핵심 목표는 다음 두 가지입니다.
 
 - 제휴 정보를 공개 페이지에서 빠르게 탐색할 수 있게 하기
-- SSAFY 구성원만 접근해야 하는 기능은 SSAFY Verify 인증과 관리자 도구로 안전하게 운영하기
+- SSAFY 구성원만 접근해야 하는 기능은 Mattermost DM 인증과 관리자 도구로 안전하게 운영하기
 
 ## 핵심 기능
 
@@ -31,8 +31,8 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 
 ### 회원 기능
 
-- SSAFY Verify 위임 디렉터리 기반 회원 로그인
-- SSAFY Verify 기반 회원가입 / 비밀번호 재설정 인증
+- Mattermost 디렉터리 기반 회원 로그인
+- Mattermost DM 6자리 코드 기반 회원가입 / 비밀번호 재설정 인증
 - 가입 대상
   - 14기 교육생
   - 15기 교육생
@@ -54,6 +54,7 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
   - 조기 시작
   - 자동 계산 복구
   - 현재 학생 / 수료생 / 운영진 범위 확인
+  - Super Admin 전용 Mattermost Sender 암호화 등록·테스트·활성화
 - 회원 조회 / 수정 / 삭제
 - 회원 수동 추가
   - 기수 선택
@@ -73,7 +74,7 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 - TypeScript
 - Tailwind CSS v4
 - Supabase
-- SSAFY Verify Server API
+- Mattermost API (서버 전용 Sender registry)
 - Vercel Analytics / Speed Insights
 - Nodemailer
 - Web Push (VAPID)
@@ -97,8 +98,9 @@ src/
     ui/                    공용 UI 컴포넌트
   lib/
     repositories/          Repository 패턴
-    ssafy-verify/          SSAFY Verify Hosted Auth / Server API 연동
-    mm-directory.ts        Verify 위임 디렉토리 조회 / 동기화
+    mattermost/            직접 Mattermost API client
+    mattermost-senders/    Sender 암호화 registry / 권한 / 회전
+    mm-directory.ts        Mattermost 디렉터리 조회 / 동기화
     member-mattermost-profile-sync.ts  회원의 명시적 MM 프로필 동기화
     member-manual-add.ts   관리자 수동 회원 추가
     policy-documents.ts    약관 버전 / 동의 상태 계산
@@ -147,47 +149,41 @@ npm run ci:local
 
 ## 환경 변수
 
-`.env.example`를 기준으로 `.env`를 구성합니다.
+`.env.example`에는 서비스 런타임에 필요한 운영 변수만 둡니다. Preview 동기화, Mock 전환, 일회성 스크립트와 레거시 호환 변수는 CI 또는 해당 운영 문서에서만 관리합니다.
 
 주요 그룹은 다음과 같습니다.
 
 - 관리자 인증
-  - `ADMIN_ID`
-  - `ADMIN_PASSWORD`
   - `ADMIN_SESSION_SECRET`
-  - `ADMIN_ALLOWED_IPS` (선택)
-  - `ADMIN_BASIC_AUTH_USERNAME` / `ADMIN_BASIC_AUTH_PASSWORD` (선택)
+  - `ADMIN_BASIC_AUTH_USERNAME` / `ADMIN_BASIC_AUTH_PASSWORD` (Production `/admin` edge gate)
+  - 관리자 계정과 비밀번호는 Supabase `admin_accounts`에 저장하며 환경변수로 관리하지 않음
 - Supabase
   - `SUPABASE_URL`
   - `SUPABASE_ANON_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`
-- SSAFY Verify
-  - `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`
-  - `SSAFY_VERIFY_ISSUER`
-  - `SSAFY_VERIFY_CLIENT_ID`
-  - `SSAFY_VERIFY_REDIRECT_URIS`
-  - `SSAFY_VERIFY_SERVER_CLIENT_ID`
-  - `SSAFY_VERIFY_SERVER_CLIENT_SECRET`
-  - `SSAFY_VERIFY_SERVER_API_BASE_URL` (선택)
+- Mattermost Sender registry (서버 전용)
+  - `MM_BASE_URL`
+  - `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`
+  - `MM_SENDER_CREDENTIALS_KEY_V1`
+  - Sender 로그인 ID와 비밀번호는 환경변수가 아니라 `/admin/cycle`의 Super Admin 화면에서 암호화해 등록
 - 사용자 세션 / QR
   - `USER_SESSION_SECRET`
+  - `PARTNER_SESSION_SECRET`
   - `CERTIFICATION_QR_SECRET`
   - `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`
-  - `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET` (권장: 식별자 예약 키와 분리)
+  - `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET`
+  - `GRADUATE_VERIFICATION_HMAC_SECRET`
 - 파트너 계좌이체 결제
   - `PARTNER_BILLING_BANK_NAME`
   - `PARTNER_BILLING_BANK_ACCOUNT`
   - `PARTNER_BILLING_ACCOUNT_HOLDER`
-  - `NTS_BUSINESS_STATUS_SERVICE_KEY` (선택, 사업자등록 상태조회)
-  - `DATA_GO_KR_SERVICE_KEY` (선택, `NTS_BUSINESS_STATUS_SERVICE_KEY` fallback)
+  - `NTS_BUSINESS_STATUS_SERVICE_KEY`
 - 제휴 제안 / 회원 이메일 인증 메일
   - `SMTP_HOST`
   - `SMTP_PORT`
   - `SMTP_SECURE`
   - `SMTP_USER`
   - `SMTP_PASS`
-  - `SMTP_FROM_EMAIL` (선택)
-  - `NAVER_SMTP_USER` / `NAVER_SMTP_PASS` (legacy fallback)
   - `SUGGEST_NOTIFY_EMAIL`
 - Web Push / Cron
   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
@@ -196,8 +192,6 @@ npm run ci:local
   - `CRON_SECRET`
 - 사이트 URL / SEO
   - `NEXT_PUBLIC_SITE_URL`
-- 목업 스위치
-  - `NEXT_PUBLIC_DATA_SOURCE=mock` (선택)
 
 환경 변수 예시는 [.env.example](/Users/myknow/coding/ssartnership/.env.example)에 있습니다.
 
@@ -257,7 +251,7 @@ npm run ci:local
 - `members`는 공통 계정·프로필의 원장이다. 교육생, 수료생, 운영진을 별도 회원 테이블로 나누지 않는다.
 - 교육생과 수료생의 핵심 분류값은 `generation`(기수)이다. 수료생의 이수/졸업 학기는 신규 신청·승인 판단에 사용하지 않는다.
 - 운영진은 `generation = 0`으로 표현하고, 확인 원본 기수는 `staff_source_generation`에 보관한다.
-- Mattermost, SSAFY Verify, 수료생, 관리자 권한, 약관 동의는 모두 1:1 또는 이력 확장 테이블로 분리한다.
+- Mattermost, 수료생, 관리자 권한, 약관 동의는 모두 1:1 또는 이력 확장 테이블로 분리한다.
 - `deleted_at`이 있는 회원은 즉시 로그인·권한·혜택 접근이 차단된다. 30일 후 개인정보와 비공개 파일을 익명화하지만, HMAC 식별자 예약과 필요한 감사 이력은 남긴다.
 
 ### 관계도
@@ -382,66 +376,27 @@ erDiagram
 3. Preview 검증: 로그인, 인증, 수료생 승인, 관리자 권한, 탈퇴 익명화, 이미지 접근을 검증한다.
 4. 계약: 모든 reader가 새 모델만 사용한 뒤 레거시 MM/SSAFY/권한/약관 미러 컬럼을 별도 migration으로 제거한다.
 
-## SSAFY Verify 인증 플로우
+## Mattermost 직접 인증과 Sender 운영
 
-### 환경 설정
+### 서버 환경과 Sender 등록
 
-- 브라우저는 현재 접속 origin에서 `/auth/ssafy` callback URL을 계산합니다.
-  - `http://localhost:3000` -> `http://localhost:3000/auth/ssafy`
-  - `https://ssartnership-git-dev-myknows-projects.vercel.app` -> `https://ssartnership-git-dev-myknows-projects.vercel.app/auth/ssafy`
-  - `https://ssartnership.myknow.xyz` -> `https://ssartnership.myknow.xyz/auth/ssafy`
-- 서버는 `SSAFY_VERIFY_REDIRECT_URIS`에 등록된 exact URL만 허용합니다.
-- local loopback redirect는 현재 request origin에서 자동 허용하지만, SSAFY Verify Client에도 동일한 redirect URI와 allowed origin을 등록해야 합니다.
-- `NEXT_PUBLIC_SSAFY_VERIFY_REDIRECT_URI`는 사용하지 않습니다. 공개값은 `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`만 필요합니다.
+- 서버에는 `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`, `MM_SENDER_CREDENTIALS_KEY_V1`만 설정합니다.
+- 기수별 Sender의 로그인 ID·비밀번호는 Super Admin이 `/admin/cycle`에서 입력하며, AES-256-GCM으로 암호화되어 저장됩니다. 평문, MM 세션 토큰, credential metadata는 브라우저와 로그에 노출하지 않습니다.
+- 새 후보 Sender는 이전 활성 Sender 또는 Super Admin 연결 계정으로 테스트 DM을 보낸 뒤에만 활성화됩니다. 기수별 활성 Sender는 하나이고, 교체 성공 시 이전 ciphertext는 삭제됩니다.
+- 팀과 채널은 코드에서 `s{generation}public`과 `town-square`로만 계산합니다.
 
-Server API 위임에는 Hosted User Auth client와 분리된 confidential credential을 사용합니다.
+### 회원가입·재설정
 
-- `SSAFY_VERIFY_SERVER_CLIENT_ID`: Server API `client_credentials`용 client id
-- `SSAFY_VERIFY_SERVER_CLIENT_SECRET`: Server API `client_credentials`용 secret
-- `SSAFY_VERIFY_SERVER_API_BASE_URL`: 선택값, 기본값은 `${SSAFY_VERIFY_ISSUER}/v1`
+1. 사용자가 Mattermost ID와 기수를 입력하면 해당 기수의 활성 Sender가 DM으로 6자리 코드를 보냅니다.
+2. 코드는 HMAC hash만 저장하며 10분 만료, 1회 소비, 5회 검증 제한, 재전송 제한을 적용합니다.
+3. 회원가입은 검증된 immutable `mm_user_id`를 `mm_user_directory`에 연결하고 최신 약관 동의와 로컬 비밀번호를 저장합니다.
+4. 비밀번호 재설정은 기존 연결 회원에만 짧은 HttpOnly 완료 세션을 발급합니다. 계정 존재 여부는 응답에서 구분하지 않습니다.
+5. 직접 MM 조회·동기화·알림은 대상 기수 Sender만 사용하고, Sender가 없거나 MM API가 실패하면 이메일 자동 fallback을 하지 않습니다.
 
-이 credential은 프로필 조회, 디렉토리 lookup, 프로필 이벤트 소비, 관리자 Mattermost 알림 위임에 사용됩니다. 관리자 Mattermost 알림은 `POST /v1/notifications/mattermost/batch`로 위임되며, 발송 대상은 25명 단위로 나누고 각 target은 notification id 기반 idempotency key를 사용합니다.
+### 프로필과 lifecycle
 
-### 회원가입
-
-1. 사용자가 회원가입 화면에서 SSAFY Verify를 실행합니다.
-2. SSAFY Verify callback을 서버에서 교환·검증합니다.
-3. Verify claim을 `member_ssafy_verifications`에 기록하고, Mattermost 계정을 `mm_user_directory`와 nullable FK로 연결합니다.
-4. 가입 시 최신 이용약관 / 개인정보 동의 버전도 함께 저장합니다.
-5. 기수별 허용 범위는 관리자 `기수 관리` 설정을 따른 뒤, 그 기준으로 signup / backfill / 디렉토리 조회가 동작합니다.
-
-시뮬레이션 검증은 다음 명령으로 실행할 수 있습니다.
-
-```bash
-npm run test:ssafy-cycle
-```
-
-SSAFY Verify Server API 실호출 smoke test는 기본 테스트에서 제외되어 있고, 명시적으로 켰을 때만 실행합니다. 기본 대상은 `@myknow`이며, directory lookup으로 얻은 Mattermost user id를 프로필 조회, sync, 알림 발송 대상에 사용합니다.
-
-```bash
-# 조회 / profile / sync / profile-events 실호출
-SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live
-
-# 실제 Mattermost DM batch 발송까지 포함
-SSAFY_VERIFY_LIVE_SMOKE=1 SSAFY_VERIFY_SMOKE_SEND_MM=1 npm run test:ssafy-verify:live
-```
-
-필요하면 `SSAFY_VERIFY_SMOKE_USERNAME`, `SSAFY_VERIFY_SMOKE_COHORT`, `SSAFY_VERIFY_SMOKE_MATTERMOST_USER_ID`로 대상자를 고정할 수 있습니다. `SSAFY_VERIFY_SMOKE_MATTERMOST_USER_ID`는 선택값이며 설정하면 lookup 결과가 같은 id인지도 검증합니다. 발송 template/purpose는 기본적으로 실제 앱과 같은 `ssartnership_admin_notification` / `announcement`, `ssartnership_manual_member_temp_password` / `manual_member_temp_password`를 사용하며, smoke 전용 승인 template이 있으면 `SSAFY_VERIFY_SMOKE_TEMPLATE_ID`, `SSAFY_VERIFY_SMOKE_PURPOSE`, `SSAFY_VERIFY_SMOKE_SINGLE_TEMPLATE_ID`, `SSAFY_VERIFY_SMOKE_SINGLE_PURPOSE`로 바꿀 수 있습니다.
-
-### 로그인
-
-1. 입력값을 인증된 이메일 또는 Mattermost 아이디로 구분합니다.
-2. 이메일은 `members.email_normalized`와 `email_verified_at`으로, MM 아이디는 `mm_user_directory`와 `mattermost_account_id`로 조회합니다.
-3. MM 디렉토리에 없으면 SSAFY Verify Server API directory lookup으로 보강합니다.
-4. soft-deleted 회원을 제외하고 비밀번호를 검증합니다.
-5. 최신 약관 미동의 시 `/auth/consent`로 리다이렉트합니다.
-
-### 비밀번호 재설정
-
-- 가입된 회원만 가능합니다.
-- 사용자가 SSAFY Verify를 완료하면 서버가 Verify callback을 교환·검증합니다.
-- Verify claim의 Mattermost user_id 또는 SSAFY subject로 기존 회원을 찾은 뒤, 짧은 만료 시간의 비밀번호 재설정 completion token만 발급합니다.
-- 이 흐름은 사용자 세션을 생성하지 않습니다.
+- 프로필 동기화는 `mm_user_id` 일치를 강제하고 username, 표시명, 사진만 갱신합니다. 캠퍼스·트랙·기존 claim은 직접 MM 응답으로 덮어쓰지 않습니다.
+- 성공한 사용자 조회에서만 명시적 `delete_at > 0`이면 교육생은 `generation_completed`, 운영진은 `member_departed`로 전환합니다. 404, timeout, 권한 오류, rate limit, 형식 오류는 회원 상태를 바꾸지 않습니다.
 
 ## 약관 / 개인정보 동의
 
@@ -528,7 +483,7 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 - 관리자 세션과 사용자 세션은 서명 + 만료 시각을 사용합니다.
 - 관리자 로그인은 입력 검증, suspicious parameter 탐지, IP/계정 기준 rate limit을 적용합니다.
 - 관리자 경로는 필요 시 IP allowlist 또는 Basic Auth로 한 번 더 제한할 수 있습니다.
-- 로그인, SSAFY Verify, 비밀번호 재설정 요청은 횟수 제한이 적용됩니다.
+- 로그인, Mattermost DM 코드, 비밀번호 재설정 요청은 횟수 제한이 적용됩니다.
 - 교육생 인증 QR은 짧은 만료시간의 서명 토큰으로 발급됩니다.
 - 이미지 프록시는 내부망 / 사설 IP / 비정상 프로토콜을 차단합니다.
 - 외부 링크는 `noopener noreferrer`를 강제합니다.
@@ -622,7 +577,7 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 권장:
 
 - `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `CRON_SECRET`, `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`, `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET`는 충분히 긴 난수 사용
-- `SUPABASE_SERVICE_ROLE_KEY`, `SSAFY_VERIFY_SERVER_CLIENT_SECRET`, SMTP 계정, VAPID private key는 절대 클라이언트에 노출되지 않도록 관리
+- `SUPABASE_SERVICE_ROLE_KEY`, `MM_SENDER_CREDENTIALS_KEY_V1`, SMTP 계정, VAPID private key는 절대 클라이언트에 노출되지 않도록 관리
 - 운영 환경에서는 `ADMIN_ALLOWED_IPS` 또는 Basic Auth 중 최소 하나를 같이 두는 편이 안전
 
 ## 현재 상태
@@ -630,7 +585,7 @@ Vercel 배포를 기준으로 구성되어 있습니다.
 - `npm run lint` 통과
 - `npm run test:mm-profile` 통과
 - 회원가입 / 로그인 / 재설정 / 약관 동의 / 운영진 권한 흐름은 `members` 공통 원장과 확장 프로필 모델로 전환 중입니다.
-- SSAFY Verify Server API 위임과 request-response trace 로깅은 [프로젝트 완성도 점검 문서](/Users/myknow/coding/ssartnership/docs/operations/project-completeness-audit-2026-06-24.md)에 현재 판단과 잔여 운영 TODO를 정리해 두었습니다.
+- Mattermost Sender registry와 직접 API 전환의 운영 절차는 관리자 기수 관리 화면과 Issue #155에 정리합니다.
 - 공개 제휴 페이지는 SEO, sitemap, RSS, robots를 포함합니다.
 
 ## 라이선스
