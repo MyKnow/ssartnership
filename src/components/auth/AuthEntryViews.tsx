@@ -38,7 +38,11 @@ export function LoginPageView({ returnTo }: { returnTo: string }) {
   );
 }
 
-export function ResetPasswordPageView() {
+export function ResetPasswordPageView({
+  activeSenderGenerations = [],
+}: {
+  activeSenderGenerations?: readonly number[];
+}) {
   return (
     <main>
       <Container className="pb-16 pt-10">
@@ -46,7 +50,7 @@ export function ResetPasswordPageView() {
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             비밀번호 재설정
           </h1>
-          <PasswordResetMethodTabs />
+          <PasswordResetMethodTabs activeSenderGenerations={activeSenderGenerations} />
         </Card>
       </Container>
     </main>
@@ -56,9 +60,11 @@ export function ResetPasswordPageView() {
 export function SignupPageView({
   returnTo,
   initialMethod,
+  activeSenderGenerations = [],
 }: {
   returnTo: string;
   initialMethod?: SignupMethod;
+  activeSenderGenerations?: readonly number[];
 }) {
   return (
     <main>
@@ -67,7 +73,11 @@ export function SignupPageView({
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             회원가입
           </h1>
-          <SignupMethodTabs returnTo={returnTo} initialMethod={initialMethod} />
+          <SignupMethodTabs
+            returnTo={returnTo}
+            initialMethod={initialMethod}
+            activeSenderGenerations={activeSenderGenerations}
+          />
         </Card>
       </Container>
     </main>

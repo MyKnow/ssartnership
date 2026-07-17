@@ -17,9 +17,11 @@ function tabClassName(active: boolean) {
 export default function SignupMethodTabs({
   returnTo,
   initialMethod = "member",
+  activeSenderGenerations = [],
 }: {
   returnTo: string;
   initialMethod?: SignupMethod;
+  activeSenderGenerations?: readonly number[];
 }) {
   const [method, setMethod] = useState<SignupMethod>(initialMethod);
   const id = useId();
@@ -97,7 +99,12 @@ export default function SignupMethodTabs({
         hidden={method !== "member"}
         className="mt-5"
       >
-        <MattermostCodeVerificationForm purpose="signup" returnTo={returnTo} className="mt-0 flex flex-col gap-4" />
+        <MattermostCodeVerificationForm
+          purpose="signup"
+          returnTo={returnTo}
+          activeSenderGenerations={activeSenderGenerations}
+          className="mt-0 flex flex-col gap-4"
+        />
       </section>
       <section
         id={graduatePanelId}

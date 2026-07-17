@@ -41,6 +41,22 @@ test.describe("auth and partner portal operation flows", () => {
 
     const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toHaveAttribute(
+      "placeholder",
+      "예: myknow",
+    );
+    await expect(
+      page.getByText("기수의 Mattermost Sender가 6자리 인증 코드를 DM으로 보냅니다."),
+    ).toHaveCount(0);
+    const generation = page.getByRole("combobox", { name: "기수" });
+    await expect(generation).toHaveValue("");
+    const generationOptions = await generation.locator("option").allTextContents();
+    expect(generationOptions).toEqual([
+      "기수를 선택해 주세요",
+      expect.stringMatching(/^운영진(?:\(예정\))?$/),
+      expect.stringMatching(/^\d+기(?:\(예정\))?$/),
+      expect.stringMatching(/^\d+기(?:\(예정\))?$/),
+    ]);
     const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
     await expect(graduateTab).toHaveAttribute("aria-selected", "false");
     await memberTab.focus();

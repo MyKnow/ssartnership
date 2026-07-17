@@ -120,6 +120,7 @@ export function revalidateCyclePaths() {
   revalidatePath("/admin/members");
   revalidatePath("/admin/push");
   revalidatePath("/auth/signup");
+  revalidatePath("/auth/reset");
   revalidatePath("/certification");
 }
 

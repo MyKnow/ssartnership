@@ -54,15 +54,15 @@ export const Login: Story = {
 };
 
 export const ResetPassword: Story = {
-  render: () => <ResetPasswordPageView />,
+  render: () => <ResetPasswordPageView activeSenderGenerations={[15]} />,
 };
 
 export const Signup: Story = {
-  render: (args) => <SignupPageView returnTo={args.returnTo} />,
+  render: (args) => <SignupPageView returnTo={args.returnTo} activeSenderGenerations={[15]} />,
 };
 
 export const SignupGraduate: Story = {
-  render: (args) => <SignupPageView returnTo={args.returnTo} initialMethod="graduate" />,
+  render: (args) => <SignupPageView returnTo={args.returnTo} initialMethod="graduate" activeSenderGenerations={[15]} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("tab", { name: "수료생" })).toHaveAttribute("aria-selected", "true");

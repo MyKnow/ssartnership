@@ -8,7 +8,11 @@ import MattermostCodeVerificationForm from "@/components/auth/MattermostCodeVeri
 
 type ResetMethod = "mattermost" | "manual_email" | "graduate_email";
 
-export default function PasswordResetMethodTabs() {
+export default function PasswordResetMethodTabs({
+  activeSenderGenerations = [],
+}: {
+  activeSenderGenerations?: readonly number[];
+}) {
   const [method, setMethod] = useState<ResetMethod>("mattermost");
   const id = useId();
   const memberTabId = `${id}-member-tab`;
@@ -58,7 +62,10 @@ export default function PasswordResetMethodTabs() {
           <p className="mt-5 text-sm text-muted-foreground">
             가입 때 연결한 Mattermost 계정으로 인증 코드를 받으면 새 비밀번호를 설정할 수 있습니다.
           </p>
-          <MattermostCodeVerificationForm purpose="reset_password" />
+          <MattermostCodeVerificationForm
+            purpose="reset_password"
+            activeSenderGenerations={activeSenderGenerations}
+          />
         </section>
       ) : method === "manual_email" ? (
         <section id={manualPanelId} role="tabpanel" aria-labelledby={manualTabId}><ManualMemberEmailResetForm /></section>

@@ -5,9 +5,16 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import { getFieldErrorClass } from "@/components/ui/form-field-state";
 import { parseMattermostVerificationRequest } from "@/lib/mattermost-code-input";
+import { isMattermostSenderGenerationAvailable } from "@/lib/mattermost-senders/availability-rules";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import {
+  formatSsafyYearLabel,
+  getSelectableSsafyYears,
+  SSAFY_STAFF_YEAR,
+} from "@/lib/ssafy-year";
 
 type Purpose = "signup" | "reset_password";
 
@@ -30,14 +37,27 @@ function getErrorMessage(code: string | undefined) {
   return "요청을 처리하지 못했습니다. 입력값을 확인해 주세요.";
 }
 
+const mattermostGenerationOptions = [
+  {
+    value: String(SSAFY_STAFF_YEAR),
+    label: formatSsafyYearLabel(SSAFY_STAFF_YEAR),
+  },
+  ...getSelectableSsafyYears().map((year) => ({
+    value: String(year),
+    label: formatSsafyYearLabel(year),
+  })),
+];
+
 export default function MattermostCodeVerificationForm({
   purpose,
   returnTo,
   className,
+  activeSenderGenerations = [],
 }: {
   purpose: Purpose;
   returnTo?: string;
   className?: string;
+  activeSenderGenerations?: readonly number[];
 }) {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -48,7 +68,7 @@ export default function MattermostCodeVerificationForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const usernameRef = useRef<HTMLInputElement>(null);
-  const generationRef = useRef<HTMLInputElement>(null);
+  const generationRef = useRef<HTMLSelectElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const isSignup = purpose === "signup";
 
@@ -163,11 +183,11 @@ export default function MattermostCodeVerificationForm({
 
   return (
     <form className={className ?? "mt-6 flex flex-col gap-4"} onSubmit={requestCode}>
-      <p className="text-sm text-muted-foreground">
-        {isSignup
-          ? "기수의 Mattermost Sender가 6자리 인증 코드를 DM으로 보냅니다."
-          : "가입 때 연결한 Mattermost 계정으로 6자리 인증 코드를 DM으로 보냅니다."}
-      </p>
+      {!isSignup ? (
+        <p className="text-sm text-muted-foreground">
+          가입 때 연결한 Mattermost 계정으로 6자리 인증 코드를 DM으로 보냅니다.
+        </p>
+      ) : null}
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         Mattermost ID
         <Input
@@ -179,27 +199,50 @@ export default function MattermostCodeVerificationForm({
             setUsername(event.target.value);
             setFieldErrors((current) => ({ ...current, username: undefined }));
           }}
-          placeholder="예: ssafy.user"
+          placeholder="예: myknow"
           aria-invalid={Boolean(fieldErrors.username) || undefined}
           className={getFieldErrorClass(Boolean(fieldErrors.username))}
         />
         {fieldErrors.username ? <FormMessage variant="error">{fieldErrors.username}</FormMessage> : null}
       </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        기수 <span className="font-normal text-muted-foreground">(운영진은 0)</span>
-        <Input
+        기수
+        <Select
           ref={generationRef}
           name="generation"
-          inputMode="numeric"
+          aria-label="기수"
           value={generation}
           onChange={(event) => {
             setGeneration(event.target.value);
             setFieldErrors((current) => ({ ...current, generation: undefined }));
           }}
-          placeholder="예: 15"
           aria-invalid={Boolean(fieldErrors.generation) || undefined}
           className={getFieldErrorClass(Boolean(fieldErrors.generation))}
-        />
+        >
+          <option value="" disabled>
+            기수를 선택해 주세요
+          </option>
+          {mattermostGenerationOptions.map((option) => {
+            const generationValue = Number(option.value);
+            const available = isMattermostSenderGenerationAvailable(
+              generationValue,
+              activeSenderGenerations,
+            );
+            const label = !available
+              ? `${option.label}(예정)`
+              : option.label;
+
+            return (
+              <option
+                key={option.value}
+                value={option.value}
+                disabled={!available}
+              >
+                {label}
+              </option>
+            );
+          })}
+        </Select>
         {fieldErrors.generation ? <FormMessage variant="error">{fieldErrors.generation}</FormMessage> : null}
       </label>
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}

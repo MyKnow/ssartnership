@@ -7,14 +7,14 @@ const viewports = [
 ] as const;
 
 for (const viewport of viewports) {
-  test(`promotion carousel ${viewport.key}`, async ({ page }) => {
+  test(`mattermost code form ${viewport.key}`, async ({ page }) => {
     await page.setViewportSize({
       width: viewport.width,
       height: viewport.height,
     });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(
-      "/iframe.html?id=domains-promotions-promotioncarousel--default&viewMode=story",
+      "/iframe.html?id=auth-mattermostcodeverificationform--signup&viewMode=story",
       { waitUntil: "domcontentloaded" },
     );
     await page.locator("#storybook-root").waitFor({ state: "visible" });
@@ -33,36 +33,17 @@ for (const viewport of viewports) {
       `,
     });
 
-    const metrics = await page.evaluate(() => {
-      const media = document.querySelector<HTMLElement>(
-        "[data-promotion-carousel-media]",
-      );
-      if (!media) {
-        throw new Error("광고 캐러셀 미디어 영역을 찾을 수 없습니다.");
-      }
-      const rect = media.getBoundingClientRect();
-      const style = getComputedStyle(media);
-      return {
-        width: rect.width,
-        height: rect.height,
-        maxHeight: style.maxHeight,
-        clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-      };
-    });
+    await expect(page.getByPlaceholder("예: myknow")).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "기수" })).toBeVisible();
 
+    const metrics = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
     expect(metrics.scrollWidth).toBe(metrics.clientWidth);
-    expect(metrics.height / metrics.width).toBeCloseTo(9 / 21, 3);
-    if (viewport.width >= 1024) {
-      expect(metrics.height).toBeLessThanOrEqual(448);
-      expect(metrics.maxHeight).toBe("448px");
-    } else if (viewport.width >= 768) {
-      expect(metrics.height).toBeLessThanOrEqual(320);
-      expect(metrics.maxHeight).toBe("320px");
-    }
 
     await expect(page).toHaveScreenshot(
-      `promotion-carousel-${viewport.key}.png`,
+      `mattermost-code-form-${viewport.key}.png`,
       {
         animations: "disabled",
         caret: "hide",
