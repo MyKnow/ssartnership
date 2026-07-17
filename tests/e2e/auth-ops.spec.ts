@@ -91,7 +91,9 @@ test.describe("auth and partner portal operation flows", () => {
 
     await emailRecovery.click();
     await expect(page).toHaveURL(/\/auth\/recover-email$/);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { name: "이메일 로그인 복구" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "기존 아이디 또는 이메일" })).toBeVisible();
     await page.getByRole("button", { name: "기존 비밀번호 확인" }).click();
     await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
     await expect(page.getByText("기존 사이트 비밀번호를 입력해 주세요.")).toBeVisible();

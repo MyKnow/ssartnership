@@ -11,6 +11,8 @@ import {
   type MattermostVerificationPurpose,
 } from "@/lib/mattermost-code-verification";
 import { setMattermostCodeSession } from "@/lib/mattermost-code-session";
+import { getMattermostDisplayName } from "@/lib/mm-member-sync/snapshot";
+import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import {
   getResetPasswordCompletionCookieOptions,
   issueResetPasswordCompletionToken,
@@ -119,9 +121,27 @@ export async function POST(request: Request) {
     }
 
     if (purpose === "signup") {
+      const verifiedUser = await withActiveMattermostSenderForGeneration(
+        verified.senderGeneration,
+        (session) => session.getUserById(verified.mmUserId),
+      );
+      const mmUsername = verifiedUser.username.trim();
+      const displayName = getMattermostDisplayName(verifiedUser).trim();
+      if (
+        verifiedUser.id !== verified.mmUserId
+        || verifiedUser.deleteAt > 0
+        || !mmUsername
+        || !displayName
+        || mmUsername.length > 128
+        || displayName.length > 128
+      ) {
+        throw new Error("mattermost_signup_profile_invalid");
+      }
       await setMattermostCodeSession({
         purpose,
         mmUserId: verified.mmUserId,
+        mmUsername,
+        displayName,
         subjectGeneration: verified.subjectGeneration,
         senderGeneration: verified.senderGeneration,
       });

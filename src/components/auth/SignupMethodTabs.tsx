@@ -117,7 +117,9 @@ export default function SignupMethodTabs({
           <Button href={graduateHref} size="lg" className="w-full">
             수료생 신규 인증으로 시작하기
           </Button>
-          <Button variant="secondary" href={recoveryHref}>기존 회원 복구 신청</Button>
+          <Button variant="secondary" size="lg" href={recoveryHref} className="w-full">
+            기존 회원 복구 신청
+          </Button>
         </div>
       </section>
     </div>

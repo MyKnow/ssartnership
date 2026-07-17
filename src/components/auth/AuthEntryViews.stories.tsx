@@ -69,5 +69,9 @@ export const SignupGraduate: Story = {
     await expect(
       canvas.getByRole("link", { name: "수료생 신규 인증으로 시작하기" }),
     ).toBeVisible();
+    const graduateStart = canvas.getByRole("link", { name: "수료생 신규 인증으로 시작하기" });
+    const existingMemberRecovery = canvas.getByRole("link", { name: "기존 회원 복구 신청" });
+    await expect(graduateStart).toHaveClass(/text-base/);
+    await expect(existingMemberRecovery).toHaveClass(/text-base/);
   },
 };

@@ -51,9 +51,6 @@ export default async function SignupCompletePage({ searchParams }: PageProps) {
         <Container className="pb-16 pt-10">
           <Card className="mx-auto max-w-2xl p-6 sm:p-8">
             <h1 className="text-2xl font-semibold text-foreground">회원가입 완료</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Mattermost DM 인증을 완료한 계정으로 싸트너십 계정을 생성합니다.
-            </p>
             <MattermostSignupCompleteForm
               session={signupSession}
               requiredPolicies={requiredPolicies}

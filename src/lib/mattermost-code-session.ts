@@ -10,6 +10,8 @@ export type MattermostCodeSessionPurpose = "signup" | "reset_password";
 export type MattermostCodeSession = {
   purpose: MattermostCodeSessionPurpose;
   mmUserId: string;
+  mmUsername: string;
+  displayName: string;
   subjectGeneration: number;
   senderGeneration: number;
 };
@@ -36,6 +38,10 @@ function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null
     (payload.purpose !== "signup" && payload.purpose !== "reset_password")
     || typeof payload.mmUserId !== "string"
     || !payload.mmUserId
+    || typeof payload.mmUsername !== "string"
+    || !payload.mmUsername
+    || typeof payload.displayName !== "string"
+    || !payload.displayName
     || !Number.isSafeInteger(payload.subjectGeneration)
     || (payload.subjectGeneration as number) < 0
     || !Number.isSafeInteger(payload.senderGeneration)

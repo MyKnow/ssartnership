@@ -5,16 +5,24 @@ import { useRef, useState } from "react";
 import PolicyAgreementField from "@/components/auth/PolicyAgreementField";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
+import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
+import {
+  getMemberSignupActionState,
+  parseMemberSignupCompleteInput,
+  type MemberSignupCompleteFieldErrors,
+} from "@/lib/member-signup";
+import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import type { PolicyDocument, RequiredPolicyMap } from "@/lib/policy-documents";
-import { parseMemberSignupCompleteInput, type MemberSignupCompleteFieldErrors } from "@/lib/member-signup";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
 type Props = {
   session: {
     mmUserId: string;
+    mmUsername: string;
+    displayName: string;
     subjectGeneration: number;
     senderGeneration: number;
   };
@@ -22,13 +30,6 @@ type Props = {
   marketingPolicy: PolicyDocument | null;
   returnTo?: string;
 };
-
-function getProfileSummary(session: Props["session"]) {
-  const yearLabel = session.subjectGeneration === 0
-    ? "운영진"
-    : `${session.subjectGeneration}기`;
-  return `Mattermost 계정 인증 완료 · ${yearLabel}`;
-}
 
 export default function MattermostSignupCompleteForm({
   session,
@@ -52,6 +53,14 @@ export default function MattermostSignupCompleteForm({
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
   const serviceRef = useRef<HTMLInputElement>(null);
   const privacyRef = useRef<HTMLInputElement>(null);
+  const actionState = getMemberSignupActionState({
+    password,
+    confirmPassword,
+    serviceChecked: checked.service,
+    privacyChecked: checked.privacy,
+    marketingChecked: checked.marketing,
+    hasMarketingPolicy: Boolean(marketingPolicy),
+  });
 
   function clearError(field?: keyof MemberSignupCompleteFieldErrors) {
     if (field) {
@@ -81,15 +90,23 @@ export default function MattermostSignupCompleteForm({
   }
 
   async function handleSubmit() {
-    if (pending) return;
+    if (pending || actionState.disabled) return;
+
+    if (
+      actionState.submissionChecked.service !== checked.service
+      || actionState.submissionChecked.privacy !== checked.privacy
+      || actionState.submissionChecked.marketing !== checked.marketing
+    ) {
+      setChecked(actionState.submissionChecked);
+    }
 
     const payload = {
       password,
       confirmPassword,
-      servicePolicyId: checked.service ? requiredPolicies.service.id : "",
-      privacyPolicyId: checked.privacy ? requiredPolicies.privacy.id : "",
+      servicePolicyId: actionState.submissionChecked.service ? requiredPolicies.service.id : "",
+      privacyPolicyId: actionState.submissionChecked.privacy ? requiredPolicies.privacy.id : "",
       marketingPolicyId: marketingPolicy?.id ?? null,
-      marketingPolicyChecked: Boolean(marketingPolicy && checked.marketing),
+      marketingPolicyChecked: Boolean(marketingPolicy && actionState.submissionChecked.marketing),
       returnTo: sanitizeReturnTo(returnTo, "/"),
     };
     const parsed = parseMemberSignupCompleteInput(payload);
@@ -150,8 +167,23 @@ export default function MattermostSignupCompleteForm({
 
   return (
     <div className="mt-6 flex flex-col gap-5">
-      <div className="rounded-xl border border-border/60 bg-surface-inset p-4 text-sm font-medium text-foreground">
-        {getProfileSummary(session)}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+          MM 아이디
+          <Input value={session.mmUsername} disabled aria-label="MM 아이디" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+          이름
+          <Input value={session.displayName} disabled aria-label="이름" />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+          기수
+          <Input
+            value={formatSsafyYearLabel(session.subjectGeneration)}
+            disabled
+            aria-label="기수"
+          />
+        </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -165,6 +197,7 @@ export default function MattermostSignupCompleteForm({
               clearError("password");
             }}
             placeholder="비밀번호"
+            aria-label="사이트 비밀번호"
             required
             aria-invalid={Boolean(fieldErrors.password) || undefined}
             className={getFieldErrorClass(Boolean(fieldErrors.password))}
@@ -182,6 +215,7 @@ export default function MattermostSignupCompleteForm({
               clearError("confirmPassword");
             }}
             placeholder="비밀번호 확인"
+            aria-label="비밀번호 확인"
             required
             aria-invalid={Boolean(fieldErrors.confirmPassword) || undefined}
             className={getFieldErrorClass(Boolean(fieldErrors.confirmPassword))}
@@ -189,18 +223,6 @@ export default function MattermostSignupCompleteForm({
           {fieldErrors.confirmPassword ? <FormMessage variant="error">{fieldErrors.confirmPassword}</FormMessage> : null}
         </label>
       </div>
-
-      <Button
-        variant="secondary"
-        onClick={() => {
-          setChecked({ service: true, privacy: true, marketing: Boolean(marketingPolicy) });
-          clearError();
-        }}
-        disabled={pending}
-        className="w-full"
-      >
-        전체 동의하기
-      </Button>
 
       <div className="flex flex-col gap-4">
         <PolicyAgreementField
@@ -246,8 +268,14 @@ export default function MattermostSignupCompleteForm({
       ) : null}
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
-      <Button onClick={handleSubmit} loading={pending} loadingText="가입 처리 중" className="w-full">
-        회원가입 완료
+      <Button
+        onClick={handleSubmit}
+        loading={pending}
+        loadingText="가입 처리 중"
+        disabled={actionState.disabled}
+        className="w-full"
+      >
+        {actionState.label}
       </Button>
     </div>
   );

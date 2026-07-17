@@ -19,6 +19,39 @@ export type MemberSignupCompleteFieldErrors = Partial<
   >
 >;
 
+export type MemberSignupActionStateInput = {
+  password: string;
+  confirmPassword: string;
+  serviceChecked: boolean;
+  privacyChecked: boolean;
+  marketingChecked: boolean;
+  hasMarketingPolicy: boolean;
+};
+
+export function getMemberSignupActionState(input: MemberSignupActionStateInput) {
+  const passwordsReady = Boolean(input.password)
+    && Boolean(input.confirmPassword)
+    && input.password === input.confirmPassword;
+  const requiredPoliciesChecked = input.serviceChecked && input.privacyChecked;
+  const shouldAgreeAll = !requiredPoliciesChecked;
+
+  return {
+    disabled: !passwordsReady,
+    label: requiredPoliciesChecked ? "회원가입하기" : "모두 동의하고 시작하기",
+    submissionChecked: shouldAgreeAll
+      ? {
+          service: true,
+          privacy: true,
+          marketing: input.hasMarketingPolicy,
+        }
+      : {
+          service: input.serviceChecked,
+          privacy: input.privacyChecked,
+          marketing: input.marketingChecked,
+        },
+  };
+}
+
 export function parseMemberSignupCompleteInput(input: unknown):
   | { ok: true; data: MemberSignupCompleteInput }
   | { ok: false; fieldErrors: MemberSignupCompleteFieldErrors } {
