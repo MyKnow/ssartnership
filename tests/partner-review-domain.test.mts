@@ -141,6 +141,12 @@ describe("mock partner review repository", () => {
     });
     assert.equal(created.isMine, true);
     assert.deepEqual(created.images, ["https://example.com/review.webp"]);
+    const retry = await repository.getPartnerReviewById(
+      "created-review-1",
+      "mock-student-15",
+    );
+    assert.equal(retry?.id, "created-review-1");
+    assert.equal(retry?.isMine, true);
 
     const updated = await repository.updatePartnerReview({
       reviewId: "created-review-1",

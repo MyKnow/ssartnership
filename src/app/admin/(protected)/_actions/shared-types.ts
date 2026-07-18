@@ -92,6 +92,7 @@ export type PartnerCompanyProvision = {
 
 export type CreatedPartnerRecord = {
   partnerId: string;
+  created: boolean;
   payload: PartnerCoreInput;
   managedCampusSlugs: string[];
   companyProvision: PartnerCompanyProvision | null;

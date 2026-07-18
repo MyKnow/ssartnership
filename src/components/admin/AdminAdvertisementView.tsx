@@ -3,6 +3,7 @@ import AdminAdPackageManager from "@/components/admin/ad-packages/AdminAdPackage
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import PromotionCarouselEditor from "@/components/admin/promotion-carousel-editor/PromotionCarouselEditor";
+import PromotionCarouselDraftClearOnSuccess from "@/components/admin/promotion-carousel-editor/PromotionCarouselDraftClearOnSuccess";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
 
@@ -12,6 +13,7 @@ type CarouselEditorProps = ComponentProps<typeof PromotionCarouselEditor>;
 export type AdminAdvertisementViewProps = AdManagerProps &
   CarouselEditorProps & {
     message?: string | null;
+    clearPromotionDraft?: boolean;
   };
 
 export default function AdminAdvertisementView({
@@ -25,6 +27,7 @@ export default function AdminAdvertisementView({
   adCampaignOptions,
   saveAction,
   message,
+  clearPromotionDraft = false,
 }: AdminAdvertisementViewProps) {
   const activeSlides = initialSlides.filter((slide) => slide.isActive).length;
   const databaseSlides = initialSlides.filter(
@@ -36,6 +39,7 @@ export default function AdminAdvertisementView({
 
   return (
     <div className="grid gap-6">
+      <PromotionCarouselDraftClearOnSuccess shouldClear={clearPromotionDraft} />
       <AdminPageHeader
         eyebrow="Advertisement"
         title="홈 광고 관리"

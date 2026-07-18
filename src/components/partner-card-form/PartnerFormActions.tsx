@@ -35,6 +35,8 @@ export default function PartnerFormActions({
                 pendingText="삭제 중"
                 className="min-h-12 flex-1 rounded-full px-5 sm:flex-none"
                 formAction={deleteAction}
+                name="partnerFormIntent"
+                value="delete"
               >
                 삭제
               </SubmitButton>

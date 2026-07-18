@@ -36,7 +36,8 @@ function parsePhotoManifest(value: unknown) {
     item && typeof item === "object"
     && typeof (item as { filename?: unknown }).filename === "string"
     && typeof (item as { contentType?: unknown }).contentType === "string"
-    && typeof (item as { size?: unknown }).size === "number",
+    && typeof (item as { size?: unknown }).size === "number"
+    && typeof (item as { uploadId?: unknown }).uploadId === "string",
   ) ? value as ManualMemberImportPhotoManifestEntry[] : null;
 }
 

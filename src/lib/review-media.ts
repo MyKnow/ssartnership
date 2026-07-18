@@ -1,4 +1,5 @@
 import { sanitizeHttpUrl } from "./validation.ts";
+import { assertExistingImageManifestUrls } from "./image-upload/policy.ts";
 
 export const REVIEW_MEDIA_BUCKET = "review-media";
 export const REVIEW_IMAGE_ASPECT_RATIO = 1;
@@ -10,6 +11,8 @@ export type ReviewMediaManifestEntry =
     }
   | {
       kind: "upload";
+      /** Pending client state may omit this; server parsing rejects it. */
+      uploadId?: string;
     };
 
 export type ReviewMediaManifest = {
@@ -44,6 +47,13 @@ export function parseReviewMediaManifest(
   return { images };
 }
 
+export function assertReviewMediaExistingUrls(
+  manifest: ReviewMediaManifest | null,
+  allowedExistingUrls: readonly string[],
+) {
+  assertExistingImageManifestUrls(manifest?.images ?? [], allowedExistingUrls);
+}
+
 function parseReviewMediaEntries(value: unknown) {
   if (!Array.isArray(value)) {
     return null;
@@ -61,9 +71,15 @@ function parseReviewMediaEntry(value: unknown): ReviewMediaManifestEntry | null 
     return null;
   }
 
-  const entry = value as { kind?: unknown; url?: unknown };
+  const entry = value as { kind?: unknown; url?: unknown; uploadId?: unknown };
   if (entry.kind === "upload") {
-    return { kind: "upload" };
+    if (
+      typeof entry.uploadId !== "string"
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entry.uploadId)
+    ) {
+      return null;
+    }
+    return { kind: "upload", uploadId: entry.uploadId };
   }
   if (entry.kind === "existing") {
     const safeUrl = sanitizeHttpUrl(typeof entry.url === "string" ? entry.url : undefined);

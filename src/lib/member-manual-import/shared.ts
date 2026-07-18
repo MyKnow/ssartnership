@@ -4,6 +4,11 @@ import {
   validateMmUsername,
 } from "@/lib/validation";
 import {
+  IMAGE_SOURCE_EXTENSIONS,
+  resolveImageTransformPolicy,
+  validateImageUploadSource,
+} from "@/lib/image-upload/policy";
+import {
   MANUAL_MEMBER_IMPORT_CAMPUS_LABELS,
   normalizeManualMemberImportCampus,
 } from "./options";
@@ -29,16 +34,6 @@ export const MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES = [
   "image/png",
   "image/webp",
 ] as const;
-
-const IMAGE_CONTENT_TYPES = new Set<string>(
-  MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
-);
-const IMAGE_EXTENSION_CONTENT_TYPES: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-};
 
 export type ManualMemberImportRawRow = {
   rowNumber: number;
@@ -82,7 +77,8 @@ export type ManualMemberImportErrorCode =
   | "photo_duplicate"
   | "photo_unreferenced"
   | "photo_type_invalid"
-  | "photo_too_large";
+  | "photo_too_large"
+  | "photo_upload_invalid";
 
 export type ManualMemberImportValidationError = {
   rowNumber: number | null;
@@ -121,7 +117,11 @@ export function isManualMemberImportSafeFilename(value: string) {
     return false;
   }
   if (value === "." || value === ".." || value.includes("..")) return false;
-  return Boolean(getImageExtension(value));
+  const extension = getImageExtension(value);
+  return Boolean(
+    extension
+    && IMAGE_SOURCE_EXTENSIONS.includes(`.${extension}` as (typeof IMAGE_SOURCE_EXTENSIONS)[number]),
+  );
 }
 
 function getRowError(
@@ -212,7 +212,7 @@ export function validateManualMemberImportRows(
       continue;
     }
     if (photoFilename && !isManualMemberImportSafeFilename(photoFilename)) {
-      errors.push(getRowError(raw.rowNumber, "photo_filename_invalid", "사진 파일명은 경로 없는 JPEG, PNG, WebP 파일명이어야 합니다."));
+      errors.push(getRowError(raw.rowNumber, "photo_filename_invalid", "사진 파일명은 경로 없는 지원 이미지 파일명이어야 합니다."));
       continue;
     }
     if (photoFilename && photoOwners.has(photoFilename.toLowerCase())) {
@@ -258,11 +258,19 @@ export type ManualMemberImportPhotoManifestEntry = {
   filename: string;
   contentType: string;
   size: number;
+  uploadId?: string;
 };
+
+const MANUAL_MEMBER_IMAGE_POLICY = resolveImageTransformPolicy(
+  "manual-member-import",
+  "profile",
+);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateManualMemberImportPhotoManifest(
   rows: readonly Pick<ManualMemberImportRow, "rowNumber" | "photoFilename">[],
   files: readonly ManualMemberImportPhotoManifestEntry[],
+  options: { requireUploadIds?: boolean } = {},
 ) {
   const errors: ManualMemberImportValidationError[] = [];
   const referenceByFilename = new Map(
@@ -297,9 +305,26 @@ export function validateManualMemberImportPhotoManifest(
     if (!referenceByFilename.has(normalizedFilename)) {
       errors.push(getRowError(null, "photo_unreferenced", "XLSX에서 참조하지 않는 사진 파일이 있습니다."));
     }
-    const expectedContentType = IMAGE_EXTENSION_CONTENT_TYPES[getImageExtension(file.filename) ?? ""];
-    if (!IMAGE_CONTENT_TYPES.has(file.contentType) || file.contentType !== expectedContentType) {
-      errors.push(getRowError(referenceByFilename.get(normalizedFilename) ?? null, "photo_type_invalid", "사진은 JPEG, PNG, WebP만 사용할 수 있습니다."));
+    if (file.uploadId !== undefined) {
+      if (!UUID_PATTERN.test(file.uploadId)) {
+        errors.push(getRowError(referenceByFilename.get(normalizedFilename) ?? null, "photo_upload_invalid", "사진 업로드 정보를 확인해 주세요."));
+      }
+      continue;
+    }
+    if (options.requireUploadIds) {
+      errors.push(getRowError(referenceByFilename.get(normalizedFilename) ?? null, "photo_upload_invalid", "사진 업로드 정보를 확인해 주세요."));
+      continue;
+    }
+    // Keep type/extension errors separate from the dedicated size error below.
+    // Passing a bounded positive size prevents an oversized but otherwise valid
+    // image from being reported as an invalid file type as well.
+    const sourceError = validateImageUploadSource({
+      name: file.filename,
+      type: file.contentType,
+      size: Math.max(1, Math.min(file.size, MANUAL_MEMBER_IMPORT_LIMITS.imageBytes)),
+    }, MANUAL_MEMBER_IMAGE_POLICY);
+    if (sourceError) {
+      errors.push(getRowError(referenceByFilename.get(normalizedFilename) ?? null, "photo_type_invalid", "사진 형식을 확인해 주세요."));
     }
     if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > MANUAL_MEMBER_IMPORT_LIMITS.imageBytes) {
       errors.push(getRowError(referenceByFilename.get(normalizedFilename) ?? null, "photo_too_large", "사진 한 장은 5MB 이하여야 합니다."));

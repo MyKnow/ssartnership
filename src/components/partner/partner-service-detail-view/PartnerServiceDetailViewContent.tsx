@@ -35,6 +35,7 @@ export default function PartnerServiceDetailViewContent({
   mode,
   errorMessage,
   successMessage,
+  immediateSaveSucceeded,
   saveImmediateAction,
   createAction,
   cancelAction,
@@ -225,6 +226,7 @@ export default function PartnerServiceDetailViewContent({
               canCancelPendingRequest={canCancelPendingRequest}
               errorMessage={errorMessage}
               successMessage={successMessage}
+              clearImmediateDraftOnSuccess={immediateSaveSucceeded}
               saveImmediateAction={saveImmediateAction}
               createAction={createAction}
               cancelAction={cancelAction}

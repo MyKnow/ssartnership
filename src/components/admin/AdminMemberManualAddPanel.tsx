@@ -1,7 +1,12 @@
 "use client";
 
 import JSZip from "jszip";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useManualMemberImportDraft,
+  type ManualMemberImportDraftSnapshotWithFiles,
+} from "@/components/admin/useManualMemberImportDraft";
+import ImageCropDialog from "@/components/media/ImageCropDialog";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -14,7 +19,8 @@ import {
 } from "@/lib/member-manual-import/options";
 import {
   MANUAL_MEMBER_IMPORT_PHOTO_ACCEPT,
-  prepareManualMemberImportRowPhoto,
+  getManualMemberImportPhotoUploadClientId,
+  getManualMemberImportSelectedPhotoFilename,
 } from "@/lib/member-manual-import/photo.client";
 import {
   getManualMemberImportErrorFocusField,
@@ -27,25 +33,47 @@ import {
   type ManualMemberImportEditableRow,
 } from "@/lib/member-manual-import/rows";
 import {
-  MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
   MANUAL_MEMBER_IMPORT_LIMITS,
   getManualMemberImportRowReadiness,
   isManualMemberImportSafeFilename,
   validateManualMemberImportPhotoManifest,
 } from "@/lib/member-manual-import/shared";
+import {
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
+import { uploadImagesToStaging } from "@/lib/image-upload/client";
+import {
+  inferImageSourceContentType,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
 
 type PhotoEntry = {
   filename: string;
-  contentType: "image/jpeg" | "image/png" | "image/webp";
+  contentType: string;
   file: File;
   sourceName: string;
+  uploadId?: string;
+};
+
+type RowPhotoCrop = {
+  rowNumber: number;
+  sourceName: string;
+  sourceFile: File;
+  sourceUrl: string;
+};
+
+type ZipPhotoCrop = {
+  photos: PhotoEntry[];
+  croppedPhotos: PhotoEntry[];
+  index: number;
+  sourceUrl: string;
 };
 
 type PreflightSuccess = {
   ok: true;
   batchId: string;
   expiresAt: string;
-  uploads: Array<{ rowNumber: number; filename: string; signedUrl: string }>;
 };
 
 type ImportResult = {
@@ -74,13 +102,10 @@ type AdminMemberManualAddPanelProps = {
   canReissueManualSetup?: boolean;
 };
 
-function getContentType(filename: string): PhotoEntry["contentType"] | null {
-  const extension = filename.toLowerCase().split(".").pop();
-  if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
-  if (extension === "png") return "image/png";
-  if (extension === "webp") return "image/webp";
-  return null;
-}
+const MANUAL_MEMBER_IMAGE_POLICY = resolveImageTransformPolicy(
+  "manual-member-import",
+  "profile",
+);
 
 async function readPhotoZip(file: File) {
   if (file.size <= 0 || file.size > MANUAL_MEMBER_IMPORT_LIMITS.zipBytes) {
@@ -102,10 +127,6 @@ async function readPhotoZip(file: File) {
       throw new Error("사진 ZIP에 같은 파일명이 중복되어 있습니다.");
     }
     seen.add(normalizedName);
-    const contentType = getContentType(entry.name);
-    if (!contentType || !MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES.includes(contentType)) {
-      throw new Error("사진은 JPEG, PNG, WebP 파일만 사용할 수 있습니다.");
-    }
     const estimatedSize = Number(
       (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0,
     );
@@ -118,10 +139,22 @@ async function readPhotoZip(file: File) {
     }
     const fileBytes = new Uint8Array(bytes.byteLength);
     fileBytes.set(bytes);
+    const sourceFile = new File([fileBytes], entry.name, {
+      type: inferImageSourceContentType({ name: entry.name, type: "" }) ?? "",
+    });
+    const sourceError = getImageUploadSourceError(sourceFile, MANUAL_MEMBER_IMAGE_POLICY);
+    if (sourceError) {
+      throw new Error(sourceError);
+    }
+    const preparedFile = await prepareImageUploadSource(sourceFile, MANUAL_MEMBER_IMAGE_POLICY);
+    const contentType = inferImageSourceContentType(preparedFile);
+    if (!contentType) {
+      throw new Error("사진 형식을 확인할 수 없습니다.");
+    }
     photos.push({
       filename: entry.name,
       contentType,
-      file: new File([fileBytes], entry.name, { type: contentType }),
+      file: preparedFile,
       sourceName: entry.name,
     });
   }
@@ -166,12 +199,20 @@ export default function AdminMemberManualAddPanel({
   const xlsxRef = useRef<HTMLInputElement>(null);
   const zipRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef(new Map<number, HTMLDivElement>());
+  const rowPhotoCropUrlRef = useRef<string | null>(null);
+  const zipPhotoCropUrlRef = useRef<string | null>(null);
   const [rows, setRows] = useState<ManualMemberImportEditableRow[]>(() =>
     initialRows.map((row) => ({ ...row })),
   );
   const [zip, setZip] = useState<File | null>(null);
   const [batch, setBatch] = useState<PreflightSuccess | null>(null);
   const [selectedPhotos, setSelectedPhotos] = useState<Map<number, PhotoEntry>>(
+    () => new Map(),
+  );
+  const [rowPhotoCrop, setRowPhotoCrop] = useState<RowPhotoCrop | null>(null);
+  const [zipPhotoCrop, setZipPhotoCrop] = useState<ZipPhotoCrop | null>(null);
+  const [croppedZipPhotos, setCroppedZipPhotos] = useState<PhotoEntry[] | null>(null);
+  const [uploadedPhotoIds, setUploadedPhotoIds] = useState<Map<string, string>>(
     () => new Map(),
   );
   const [ignoredZipPhotoFilenames, setIgnoredZipPhotoFilenames] = useState<Set<string>>(
@@ -185,6 +226,15 @@ export default function AdminMemberManualAddPanel({
     "rows" | "photo" | "validate" | "create" | null
   >(null);
   const { notify } = useToast();
+
+  useEffect(() => () => {
+    if (rowPhotoCropUrlRef.current) {
+      URL.revokeObjectURL(rowPhotoCropUrlRef.current);
+    }
+    if (zipPhotoCropUrlRef.current) {
+      URL.revokeObjectURL(zipPhotoCropUrlRef.current);
+    }
+  }, []);
 
   const generationOptions = useMemo(
     () => getManualMemberImportGenerationOptions(currentGeneration),
@@ -205,10 +255,84 @@ export default function AdminMemberManualAddPanel({
   const photosLabel = useMemo(() => {
     const sources = [
       selectedPhotos.size > 0 ? `행별 사진 ${selectedPhotos.size}개 선택됨` : null,
-      zip ? "사진 ZIP 선택됨" : null,
+      croppedZipPhotos ? "사진 ZIP 편집 완료" : zip ? "사진 ZIP 선택됨" : null,
     ].filter((value): value is string => Boolean(value));
     return sources.length > 0 ? sources.join(" · ") : "사진을 선택하지 않았습니다.";
-  }, [selectedPhotos, zip]);
+  }, [croppedZipPhotos, selectedPhotos, zip]);
+
+  const manualImportDraftSnapshot = useMemo<ManualMemberImportDraftSnapshotWithFiles>(() => {
+    const toDraftPhoto = (
+      photo: PhotoEntry,
+      input: { clientId: string; source: "row" | "zip"; rowNumber?: number },
+    ) => {
+      const uploadId = uploadedPhotoIds.get(photo.filename.toLowerCase());
+      return {
+        ...input,
+        filename: photo.filename,
+        contentType: photo.contentType,
+        sourceName: photo.sourceName,
+        file: photo.file,
+        ...(uploadId ? { uploadId } : {}),
+      };
+    };
+    return {
+      rows,
+      batch: batch ? { ...batch } : null,
+      ignoredZipPhotoFilenames: Array.from(ignoredZipPhotoFilenames),
+      photos: [
+        ...(croppedZipPhotos ?? []).map((photo, index) => toDraftPhoto(photo, {
+          clientId: `manual-zip-${index}`,
+          source: "zip",
+        })),
+        ...Array.from(selectedPhotos.entries())
+          .sort(([left], [right]) => left - right)
+          .map(([rowNumber, photo]) => toDraftPhoto(photo, {
+            clientId: `manual-row-${rowNumber}`,
+            source: "row",
+            rowNumber,
+          })),
+      ],
+    };
+  }, [batch, croppedZipPhotos, ignoredZipPhotoFilenames, rows, selectedPhotos, uploadedPhotoIds]);
+
+  const restoreManualMemberImportDraft = useCallback((draft: ManualMemberImportDraftSnapshotWithFiles) => {
+    const restoredSelectedPhotos = new Map<number, PhotoEntry>();
+    const restoredZipPhotos: PhotoEntry[] = [];
+    const restoredUploadIds = new Map<string, string>();
+    for (const photo of draft.photos) {
+      const restoredPhoto: PhotoEntry = {
+        filename: photo.filename,
+        contentType: photo.contentType,
+        file: photo.file,
+        sourceName: photo.sourceName,
+        ...(photo.uploadId ? { uploadId: photo.uploadId } : {}),
+      };
+      if (photo.uploadId) {
+        restoredUploadIds.set(photo.filename.toLowerCase(), photo.uploadId);
+      }
+      if (photo.source === "row" && photo.rowNumber) {
+        restoredSelectedPhotos.set(photo.rowNumber, restoredPhoto);
+      } else {
+        restoredZipPhotos.push(restoredPhoto);
+      }
+    }
+    setRows(draft.rows);
+    setSelectedPhotos(restoredSelectedPhotos);
+    setCroppedZipPhotos(restoredZipPhotos.length > 0 ? restoredZipPhotos : null);
+    setUploadedPhotoIds(restoredUploadIds);
+    setIgnoredZipPhotoFilenames(new Set(draft.ignoredZipPhotoFilenames));
+    setBatch(draft.batch ? { ok: true, ...draft.batch } : null);
+    setError(null);
+    if (draft.rows.length > 0 || draft.photos.length > 0 || draft.batch) {
+      notify("작성 중이던 회원 초대와 사진을 복구했습니다.");
+    }
+  }, [notify]);
+
+  const { clear: clearManualMemberImportDraft } = useManualMemberImportDraft({
+    formKey: "admin-manual-member-import",
+    snapshot: manualImportDraftSnapshot,
+    onRestore: restoreManualMemberImportDraft,
+  });
 
   function resetPreparedBatch() {
     setBatch(null);
@@ -264,7 +388,15 @@ export default function AdminMemberManualAddPanel({
   }
 
   function removeRow(rowNumber: number) {
-    ignoreZipPhotoFilename(rows.find((row) => row.rowNumber === rowNumber)?.photoFilename);
+    const photoFilename = rows.find((row) => row.rowNumber === rowNumber)?.photoFilename;
+    ignoreZipPhotoFilename(photoFilename);
+    if (photoFilename) {
+      setUploadedPhotoIds((current) => {
+        const next = new Map(current);
+        next.delete(photoFilename.toLowerCase());
+        return next;
+      });
+    }
     setRows((current) => current.filter((row) => row.rowNumber !== rowNumber));
     setSelectedPhotos((current) => {
       const next = new Map(current);
@@ -274,28 +406,100 @@ export default function AdminMemberManualAddPanel({
     resetPreparedBatch();
   }
 
-  async function selectRowPhoto(rowNumber: number, file: File | null) {
-    if (!file) return;
+  function closeRowPhotoCrop() {
+    if (rowPhotoCropUrlRef.current) {
+      URL.revokeObjectURL(rowPhotoCropUrlRef.current);
+      rowPhotoCropUrlRef.current = null;
+    }
+    setRowPhotoCrop(null);
+  }
+
+  function closeZipPhotoCrop() {
+    if (zipPhotoCropUrlRef.current) {
+      URL.revokeObjectURL(zipPhotoCropUrlRef.current);
+      zipPhotoCropUrlRef.current = null;
+    }
+    setZipPhotoCrop(null);
+  }
+
+  function openZipPhotoCrop(
+    photos: PhotoEntry[],
+    croppedPhotos: PhotoEntry[],
+    index: number,
+  ) {
+    const photo = photos[index];
+    if (!photo) return;
+    if (zipPhotoCropUrlRef.current) {
+      URL.revokeObjectURL(zipPhotoCropUrlRef.current);
+    }
+    const sourceUrl = URL.createObjectURL(photo.file);
+    zipPhotoCropUrlRef.current = sourceUrl;
+    setZipPhotoCrop({ photos, croppedPhotos, index, sourceUrl });
+  }
+
+  function applyRowPhoto(rowNumber: number, file: File, sourceName: string) {
     const previousPhotoFilename = rows.find(
       (row) => row.rowNumber === rowNumber,
     )?.photoFilename;
+    const contentType = inferImageSourceContentType(file);
+    if (!contentType) {
+      setError("사진 형식을 확인할 수 없습니다.");
+      return;
+    }
+    const filename = getManualMemberImportSelectedPhotoFilename(rowNumber, contentType);
+    const photo: PhotoEntry = {
+      filename,
+      contentType,
+      file: new File([file], filename, {
+        type: contentType,
+        lastModified: file.lastModified,
+      }),
+      sourceName,
+    };
+    ignoreZipPhotoFilename(previousPhotoFilename);
+    if (previousPhotoFilename) {
+      setUploadedPhotoIds((current) => {
+        const next = new Map(current);
+        next.delete(previousPhotoFilename.toLowerCase());
+        return next;
+      });
+    }
+    setSelectedPhotos((current) => {
+      const next = new Map(current);
+      next.set(rowNumber, photo);
+      return next;
+    });
+    setRows((current) => current.map((row) =>
+      row.rowNumber === rowNumber
+        ? { ...row, photoFilename: photo.filename }
+        : row,
+    ));
+    resetPreparedBatch();
+    notify(`${rowNumber}행 사진을 선택했습니다.`);
+  }
+
+  async function selectRowPhoto(rowNumber: number, file: File | null) {
+    if (!file) return;
+    const sourceError = getImageUploadSourceError(file, MANUAL_MEMBER_IMAGE_POLICY);
+    if (sourceError) {
+      setError(sourceError);
+      return;
+    }
     setPending("photo");
     setError(null);
     try {
-      const photo = await prepareManualMemberImportRowPhoto(file, rowNumber);
-      ignoreZipPhotoFilename(previousPhotoFilename);
-      setSelectedPhotos((current) => {
-        const next = new Map(current);
-        next.set(rowNumber, photo);
-        return next;
+      const sourceFile = await prepareImageUploadSource(file, MANUAL_MEMBER_IMAGE_POLICY);
+      if (rowPhotoCropUrlRef.current) {
+        URL.revokeObjectURL(rowPhotoCropUrlRef.current);
+      }
+      const sourceUrl = URL.createObjectURL(sourceFile);
+      rowPhotoCropUrlRef.current = sourceUrl;
+      setRowPhotoCrop({
+        rowNumber,
+        sourceName: file.name,
+        sourceFile,
+        sourceUrl,
       });
-      setRows((current) => current.map((row) =>
-        row.rowNumber === rowNumber
-          ? { ...row, photoFilename: photo.filename }
-          : row,
-      ));
-      resetPreparedBatch();
-      notify(`${rowNumber}행 사진을 선택했습니다.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "사진을 준비하지 못했습니다.");
     } finally {
@@ -304,7 +508,15 @@ export default function AdminMemberManualAddPanel({
   }
 
   function clearRowPhoto(rowNumber: number) {
-    ignoreZipPhotoFilename(rows.find((row) => row.rowNumber === rowNumber)?.photoFilename);
+    const photoFilename = rows.find((row) => row.rowNumber === rowNumber)?.photoFilename;
+    ignoreZipPhotoFilename(photoFilename);
+    if (photoFilename) {
+      setUploadedPhotoIds((current) => {
+        const next = new Map(current);
+        next.delete(photoFilename.toLowerCase());
+        return next;
+      });
+    }
     setSelectedPhotos((current) => {
       const next = new Map(current);
       next.delete(rowNumber);
@@ -350,7 +562,7 @@ export default function AdminMemberManualAddPanel({
     }
   }
 
-  async function prepare() {
+  async function finalizePreparation(zipPhotos: PhotoEntry[]) {
     if (rows.length === 0) {
       setError("행 추가 또는 XLSX 업로드로 초대할 회원을 먼저 입력해 주세요.");
       xlsxRef.current?.focus();
@@ -371,18 +583,19 @@ export default function AdminMemberManualAddPanel({
     setError(null);
     setResult(null);
     try {
-      const zipPhotos = zip
-        ? (await readPhotoZip(zip)).filter(
+      const parsedPhotos = [
+        ...zipPhotos.filter(
           (photo) => !ignoredZipPhotoFilenames.has(photo.filename.toLowerCase()),
-        )
-        : [];
-      const parsedPhotos = [...zipPhotos, ...selectedPhotos.values()];
+        ),
+        ...selectedPhotos.values(),
+      ];
       const photoResult = validateManualMemberImportPhotoManifest(
         rowsResult.acceptedRows,
         parsedPhotos.map((photo) => ({
           filename: photo.filename,
           contentType: photo.contentType,
           size: photo.file.size,
+          uploadId: uploadedPhotoIds.get(photo.filename.toLowerCase()),
         })),
       );
       if (photoResult.errors.length > 0) {
@@ -394,16 +607,45 @@ export default function AdminMemberManualAddPanel({
         );
         return;
       }
+      const pendingUploadFilenameByClientId = new Map<string, string>();
+      const pendingUploads = parsedPhotos.flatMap((photo, index) => {
+        if (uploadedPhotoIds.has(photo.filename.toLowerCase())) return [];
+        const clientId = getManualMemberImportPhotoUploadClientId(index);
+        pendingUploadFilenameByClientId.set(clientId, photo.filename.toLowerCase());
+        return [{ clientId, role: "profile" as const, file: photo.file }];
+      });
+      const uploadResults = await uploadImagesToStaging({
+        purpose: "manual-member-import",
+        actorMode: "admin",
+        uploads: pendingUploads,
+      });
+      const nextUploadedPhotoIds = new Map(uploadedPhotoIds);
+      for (const result of uploadResults) {
+        const filename = pendingUploadFilenameByClientId.get(result.clientId);
+        if (!filename) {
+          throw new Error("사진 업로드 정보를 확인해 주세요.");
+        }
+        nextUploadedPhotoIds.set(filename, result.uploadId);
+      }
+      setUploadedPhotoIds(nextUploadedPhotoIds);
+      const photoManifest = parsedPhotos.map((photo) => {
+        const uploadId = nextUploadedPhotoIds.get(photo.filename.toLowerCase());
+        if (!uploadId) {
+          throw new Error("사진 업로드 정보를 확인해 주세요.");
+        }
+        return {
+          filename: photo.filename,
+          contentType: photo.contentType,
+          size: photo.file.size,
+          uploadId,
+        };
+      });
       const response = await fetch("/api/admin/member-imports", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           rows: rawRows,
-          photos: parsedPhotos.map((photo) => ({
-            filename: photo.filename,
-            contentType: photo.contentType,
-            size: photo.file.size,
-          })),
+          photos: photoManifest,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -411,17 +653,6 @@ export default function AdminMemberManualAddPanel({
         throw new Error(Array.isArray(data.errors) ? data.errors.join("\n") : "회원 행 검증에 실패했습니다.");
       }
       const prepared = data as PreflightSuccess;
-      const photoByFilename = new Map(parsedPhotos.map((photo) => [photo.filename, photo]));
-      for (const upload of prepared.uploads) {
-        const photo = photoByFilename.get(upload.filename);
-        if (!photo) throw new Error(`${upload.rowNumber}행 사진 파일을 찾지 못했습니다.`);
-        const uploadResponse = await fetch(upload.signedUrl, {
-          method: "PUT",
-          headers: { "content-type": photo.contentType, "x-upsert": "false" },
-          body: photo.file,
-        });
-        if (!uploadResponse.ok) throw new Error(`${upload.rowNumber}행 사진 업로드에 실패했습니다.`);
-      }
       setBatch(prepared);
       notify("행 검증과 사진 업로드가 완료되었습니다. 생성 시작을 눌러 주세요.");
     } catch (caught) {
@@ -430,6 +661,60 @@ export default function AdminMemberManualAddPanel({
     } finally {
       setPending(null);
     }
+  }
+
+  async function prepare() {
+    if (!zip || croppedZipPhotos) {
+      await finalizePreparation(croppedZipPhotos ?? []);
+      return;
+    }
+    setPending("validate");
+    setError(null);
+    setResult(null);
+    try {
+      const zipPhotos = (await readPhotoZip(zip)).filter(
+        (photo) => !ignoredZipPhotoFilenames.has(photo.filename.toLowerCase()),
+      );
+      if (zipPhotos.length === 0) {
+        await finalizePreparation([]);
+        return;
+      }
+      openZipPhotoCrop(zipPhotos, [], 0);
+      notify(`사진 ZIP ${zipPhotos.length}장을 순서대로 확인해 주세요.`);
+    } catch (caught) {
+      setBatch(null);
+      setError(caught instanceof Error ? caught.message : "사진 ZIP을 준비하지 못했습니다.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  function applyZipPhotoCrop(file: File) {
+    if (!zipPhotoCrop) return;
+    const sourcePhoto = zipPhotoCrop.photos[zipPhotoCrop.index];
+    const contentType = sourcePhoto ? inferImageSourceContentType(file) : null;
+    if (!sourcePhoto || !contentType) {
+      setError("사진 형식을 확인할 수 없습니다.");
+      closeZipPhotoCrop();
+      return;
+    }
+    const croppedPhoto: PhotoEntry = {
+      ...sourcePhoto,
+      contentType,
+      file: new File([file], sourcePhoto.filename, {
+        type: contentType,
+        lastModified: file.lastModified,
+      }),
+    };
+    const nextCroppedPhotos = [...zipPhotoCrop.croppedPhotos, croppedPhoto];
+    const nextIndex = zipPhotoCrop.index + 1;
+    if (nextIndex < zipPhotoCrop.photos.length) {
+      openZipPhotoCrop(zipPhotoCrop.photos, nextCroppedPhotos, nextIndex);
+      return;
+    }
+    closeZipPhotoCrop();
+    setCroppedZipPhotos(nextCroppedPhotos);
+    void finalizePreparation(nextCroppedPhotos);
   }
 
   async function createMembers() {
@@ -446,7 +731,11 @@ export default function AdminMemberManualAddPanel({
       if (!response.ok || !data.ok || !data.result) {
         throw new Error(data.message ?? "회원 생성에 실패했습니다.");
       }
-      setResult(data.result as ImportResult);
+      const nextResult = data.result as ImportResult;
+      setResult(nextResult);
+      if (nextResult.failed === 0) {
+        void clearManualMemberImportDraft();
+      }
       notify("회원 가져오기를 처리했습니다.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "회원 생성에 실패했습니다.");
@@ -526,7 +815,10 @@ export default function AdminMemberManualAddPanel({
               disabled={pending !== null}
               onChange={(event) => {
                 setZip(event.target.files?.[0] ?? null);
+                setCroppedZipPhotos(null);
+                closeZipPhotoCrop();
                 setIgnoredZipPhotoFilenames(new Set());
+                setUploadedPhotoIds(new Map());
                 resetPreparedBatch();
               }}
             />
@@ -685,7 +977,7 @@ export default function AdminMemberManualAddPanel({
                         </Button>
                       </div>
                     ) : (
-                      <p className="text-xs font-normal text-muted-foreground">JPEG·PNG·WebP·HEIC·HEIF, 5MB 이하</p>
+                      <p className="text-xs font-normal text-muted-foreground">JPEG·PNG·WebP·AVIF·HEIC/HEIF·GIF·BMP·TIFF·SVG, 5MB 이하</p>
                     )}
                   </div>
                 </div>
@@ -742,6 +1034,39 @@ export default function AdminMemberManualAddPanel({
           </div>
         </div>
       ) : null}
+
+      <ImageCropDialog
+        open={Boolean(rowPhotoCrop)}
+        aspectRatio={1}
+        sourceUrl={rowPhotoCrop?.sourceUrl ?? ""}
+        sourceFile={rowPhotoCrop?.sourceFile}
+        outputName={`manual-row-${rowPhotoCrop?.rowNumber ?? "photo"}.webp`}
+        outputWidth={640}
+        outputHeight={640}
+        policy={MANUAL_MEMBER_IMAGE_POLICY}
+        onCancel={closeRowPhotoCrop}
+        onApply={(file) => {
+          if (!rowPhotoCrop) return;
+          applyRowPhoto(rowPhotoCrop.rowNumber, file, rowPhotoCrop.sourceName);
+          closeRowPhotoCrop();
+        }}
+      />
+
+      <ImageCropDialog
+        open={Boolean(zipPhotoCrop)}
+        aspectRatio={1}
+        sourceUrl={zipPhotoCrop?.sourceUrl ?? ""}
+        sourceFile={zipPhotoCrop?.photos[zipPhotoCrop.index]?.file}
+        outputName={`manual-zip-${(zipPhotoCrop?.index ?? 0) + 1}.webp`}
+        outputWidth={640}
+        outputHeight={640}
+        policy={MANUAL_MEMBER_IMAGE_POLICY}
+        onCancel={() => {
+          closeZipPhotoCrop();
+          setError("사진 ZIP 편집을 취소했습니다. 검증 및 업로드를 다시 누르면 처음부터 확인할 수 있습니다.");
+        }}
+        onApply={applyZipPhotoCrop}
+      />
     </div>
   );
 }

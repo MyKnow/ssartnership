@@ -63,15 +63,17 @@ export const GalleryFormatGuard: Story = {
     await expect(input).not.toBeNull();
     await expect(input?.accept).toContain("image/heic");
     await expect(input?.accept).toContain("image/heif");
+    await expect(input?.accept).toContain("image/avif");
+    await expect(input?.accept).toContain("image/svg+xml");
     await expect(input?.accept).not.toContain("image/*");
 
     await userEvent.upload(
       input!,
-      new File(["not-an-image"], "profile.avif", { type: "image/avif" }),
+      new File(["not-an-image"], "profile.txt", { type: "text/plain" }),
       { applyAccept: false },
     );
     await expect(
-      canvas.getByText("본인 사진은 JPEG, PNG, WebP, HEIC, HEIF 파일만 선택할 수 있습니다."),
+      canvas.getByText("지원하는 이미지 파일만 업로드할 수 있습니다."),
     ).toBeInTheDocument();
   },
 };
@@ -87,10 +89,15 @@ export const SelectedPhoto: Story = {
     await expect(response.ok).toBe(true);
     await expect(input).not.toBeNull();
     await userEvent.upload(input!, photo);
-    await expect(body.getByText("본인 사진 자르기", { exact: true })).toBeInTheDocument();
+    await expect(body.getByText("이미지 편집", { exact: true })).toBeInTheDocument();
     await waitFor(() => {
-      expect(canvasElement.ownerDocument.querySelector('img[src^="data:image/webp"]')).not.toBeNull();
+      expect(body.getByTestId("image-crop-frame")).toBeVisible();
     });
+    await expect(body.queryByText("결과 미리보기")).not.toBeInTheDocument();
+    await expect(canvasElement.ownerDocument.querySelector('input[type="range"]')).toBeNull();
+    await expect(body.queryByTestId("image-crop-tools")).not.toBeInTheDocument();
+    await expect(body.queryByRole("button", { name: "초기화" })).not.toBeInTheDocument();
+    await expect(body.queryByRole("button", { name: "이미지 변경" })).not.toBeInTheDocument();
     await userEvent.click(body.getByRole("button", { name: /^적용$/ }));
 
     const selectedPhotoLabel = await canvas.findByText("선택한 사진", { selector: "p" });

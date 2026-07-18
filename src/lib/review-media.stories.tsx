@@ -12,7 +12,7 @@ function ReviewMediaHelpersPreview() {
     JSON.stringify({
       images: [
         { kind: "existing", url: "https://example.com/review.webp" },
-        { kind: "upload" },
+        { kind: "upload", uploadId: "03f5459b-dfee-4558-907a-509a396312f5" },
       ],
     }),
   );

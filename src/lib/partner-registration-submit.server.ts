@@ -15,15 +15,24 @@ import {
 import {
   PARTNER_REGISTRATION_GALLERY_MAX_FILES,
   resolvePartnerRegistrationCategory,
-  validatePartnerRegistrationImageFile,
   type PartnerRegistrationResolvedValues,
   type PartnerRegistrationSource,
 } from "@/lib/partner-registration";
-import { parsePartnerMediaManifest } from "@/lib/partner-media";
 import {
+  parsePartnerMediaManifest,
+  type PartnerMediaManifestEntry,
+} from "@/lib/partner-media";
+import {
+  buildPartnerRegistrationMediaStoragePath,
   deletePartnerMediaUrls,
-  uploadPartnerRegistrationMediaFile,
 } from "@/lib/partner-media-storage";
+import { resolveImageUploadActorForServerAction } from "@/lib/image-upload/auth.server";
+import {
+  assertNoDirectImageFileSubmission,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type PartnerRegistrationMediaPayload = {
@@ -38,25 +47,16 @@ export type PartnerRegistrationInsertContext = {
   requestedByPartnerAccountId?: string | null;
 };
 
-function getFormDataFile(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return value instanceof File && value.size > 0 ? value : null;
-}
-
-function getFormDataFiles(formData: FormData, name: string) {
-  return formData
-    .getAll(name)
-    .filter((item): item is File => item instanceof File && item.size > 0);
-}
-
 function getOptionalFormDataFile(formData: FormData, name: string) {
   const value = formData.get(name);
   return value instanceof File && value.size > 0 ? value : null;
 }
 
-function assertUploadOnlyEntry(kind: "existing" | "upload") {
-  if (kind === "existing") {
-    throw new Error("신규 등록 이미지는 파일 업로드만 사용할 수 있습니다.");
+function assertUploadOnlyEntry(
+  entry: PartnerMediaManifestEntry,
+): asserts entry is Extract<PartnerMediaManifestEntry, { kind: "upload" }> & { uploadId: string } {
+  if (entry.kind !== "upload" || !entry.uploadId) {
+    throw new Error("신규 등록 이미지는 완료된 공통 업로드만 사용할 수 있습니다.");
   }
 }
 
@@ -119,66 +119,59 @@ export async function resolvePartnerRegistrationMediaPayload(
   if (galleryManifestRaw.trim() && !galleryManifest) {
     throw new Error("추가 이미지 목록 형식을 확인해 주세요.");
   }
+  assertNoDirectImageFileSubmission(formData, ["thumbnailFile", "galleryFiles"]);
 
-  const thumbnailFile = getFormDataFile(formData, "thumbnailFile");
-  const galleryFiles = getFormDataFiles(formData, "galleryFiles");
   const galleryEntries = galleryManifest?.gallery ?? [];
   if (galleryEntries.length > PARTNER_REGISTRATION_GALLERY_MAX_FILES) {
     throw new Error("추가 이미지는 최대 5장까지 업로드할 수 있습니다.");
   }
-  if (galleryFiles.length > PARTNER_REGISTRATION_GALLERY_MAX_FILES) {
-    throw new Error("추가 이미지는 최대 5장까지 업로드할 수 있습니다.");
-  }
 
   const uploadedUrls: string[] = [];
+  const uploadRepository = getImageUploadRepository();
 
-  try {
-    let thumbnailUrl: string | null = null;
-    if (thumbnailManifest?.thumbnail) {
-      assertUploadOnlyEntry(thumbnailManifest.thumbnail.kind);
-      if (!thumbnailFile) {
-        throw new Error("대표 이미지 파일을 찾을 수 없습니다.");
-      }
-      const thumbnailError = validatePartnerRegistrationImageFile(thumbnailFile);
-      if (thumbnailError) {
-        throw new Error(thumbnailError);
-      }
-      thumbnailUrl = await uploadPartnerRegistrationMediaFile(
-        requestId,
-        "thumbnail",
-        thumbnailFile,
-        0,
-      );
-      uploadedUrls.push(thumbnailUrl);
+  const attachUpload = async (
+    uploadId: string,
+    role: "thumbnail" | "gallery",
+    index: number,
+  ) => {
+    // Public registration without a photo must not require a guest upload
+    // cookie. Resolve the upload owner only when an upload ID is actually
+    // attached.
+    const uploadActor = await resolveImageUploadActorForServerAction("partner-registration");
+    const attached = await uploadRepository.attach({
+      actor: uploadActor,
+      purpose: "partner-registration",
+      uploadId,
+      role,
+      policy: resolveImageTransformPolicy("partner-registration", role),
+      destination: {
+        bucket: PARTNER_MEDIA_BUCKET,
+        // The upload ID is stable across a failed business save, unlike the
+        // request UUID that is allocated by the Server Action on each retry.
+        path: buildPartnerRegistrationMediaStoragePath("pending", role, index, uploadId),
+        isPublic: true,
+      },
+      resource: { type: "partner_registration", id: requestId },
+    });
+    if (!attached.url) {
+      throw new Error("제휴처 이미지 URL을 만들지 못했습니다.");
     }
+    return attached.url;
+  };
 
-    const imageUrls: string[] = [];
-    let galleryFileIndex = 0;
-    for (const [index, entry] of galleryEntries.entries()) {
-      assertUploadOnlyEntry(entry.kind);
-      const nextFile = galleryFiles[galleryFileIndex++];
-      if (!nextFile) {
-        throw new Error("추가 이미지 파일을 찾을 수 없습니다.");
-      }
-      const fileError = validatePartnerRegistrationImageFile(nextFile);
-      if (fileError) {
-        throw new Error(fileError);
-      }
-      const uploadedUrl = await uploadPartnerRegistrationMediaFile(
-        requestId,
-        "gallery",
-        nextFile,
-        index,
-      );
-      imageUrls.push(uploadedUrl);
-      uploadedUrls.push(uploadedUrl);
-    }
-
-    return { thumbnailUrl, imageUrls, uploadedUrls };
-  } catch (error) {
-    await deletePartnerMediaUrls(uploadedUrls).catch(() => undefined);
-    throw error;
+  let thumbnailUrl: string | null = null;
+  if (thumbnailManifest?.thumbnail) {
+    assertUploadOnlyEntry(thumbnailManifest.thumbnail);
+    thumbnailUrl = await attachUpload(thumbnailManifest.thumbnail.uploadId, "thumbnail", 0);
   }
+
+  const imageUrls: string[] = [];
+  for (const [index, entry] of galleryEntries.entries()) {
+    assertUploadOnlyEntry(entry);
+    imageUrls.push(await attachUpload(entry.uploadId, "gallery", index));
+  }
+
+  return { thumbnailUrl, imageUrls, uploadedUrls };
 }
 
 function getCellText(cell: ExcelJS.Cell) {
@@ -323,8 +316,9 @@ export async function insertPartnerRegistrationRequest({
     branches,
     fallback: values.branchScopeType,
   });
+  const supabase = getSupabaseAdminClient();
 
-  const insertResult = await getSupabaseAdminClient()
+  const insertResult = await supabase
     .from("partner_registration_requests")
     .insert({
       id: requestId,
@@ -363,27 +357,62 @@ export async function insertPartnerRegistrationRequest({
     .select("id")
     .single();
 
-  if (insertResult.error) {
+  let created = false;
+  let persistedRequestId: string;
+  if (insertResult.error?.code === "23505") {
+    const { data: existingRequest, error: existingRequestError } = await supabase
+      .from("partner_registration_requests")
+      .select("id,source,company_id,requested_by_partner_account_id")
+      .eq("id", requestId)
+      .maybeSingle();
+    const existing = existingRequest as {
+      id?: string;
+      source?: string | null;
+      company_id?: string | null;
+      requested_by_partner_account_id?: string | null;
+    } | null;
+    const hasSameScope = Boolean(
+      existing?.id
+      && existing.source === context.source
+      && (existing.company_id ?? null) === (context.companyId ?? null)
+      && (existing.requested_by_partner_account_id ?? null)
+        === (context.requestedByPartnerAccountId ?? null),
+    );
+    if (existingRequestError || !hasSameScope) {
+      console.error(
+        "[partner-registration] request idempotency lookup failed",
+        existingRequestError?.message ?? insertResult.error.message,
+      );
+      throw new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+    persistedRequestId = existing?.id ?? "";
+  } else if (insertResult.error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     console.error(
       "[partner-registration] request insert failed",
       insertResult.error.message,
     );
     throw new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  } else {
+    created = true;
+    persistedRequestId = insertResult.data.id as string;
   }
 
-  const benefitGroupResult = await getSupabaseAdminClient()
+  const benefitGroupResult = await supabase
     .from("partner_registration_benefit_groups")
-    .insert(
-      buildRegistrationBenefitGroupRows(insertResult.data.id, values, branches),
+    .upsert(
+      buildRegistrationBenefitGroupRows(persistedRequestId, values, branches),
+      { onConflict: "registration_request_id,group_key" },
     );
 
   if (benefitGroupResult.error) {
-    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    await getSupabaseAdminClient()
-      .from("partner_registration_requests")
-      .delete()
-      .eq("id", insertResult.data.id);
+    if (created) {
+      await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+      await supabase
+        .from("partner_registration_requests")
+        .delete()
+        .eq("id", persistedRequestId);
+    }
     console.error(
       "[partner-registration] benefit group insert failed",
       benefitGroupResult.error.message,
@@ -392,11 +421,11 @@ export async function insertPartnerRegistrationRequest({
   }
 
   if (branches.length > 0) {
-    const branchResult = await getSupabaseAdminClient()
+    const branchResult = await supabase
       .from("partner_registration_branches")
-      .insert(
+      .upsert(
         branches.map((branch) => ({
-          registration_request_id: insertResult.data.id,
+          registration_request_id: persistedRequestId,
           benefit_group_key: branch.benefitGroupKey,
           branch_key: branch.branchKey,
           branch_code: branch.branchCode,
@@ -408,14 +437,17 @@ export async function insertPartnerRegistrationRequest({
           phone: branch.phone,
           memo: branch.memo,
         })),
+        { onConflict: "registration_request_id,benefit_group_key,branch_key" },
       );
 
     if (branchResult.error) {
-      await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-      await getSupabaseAdminClient()
-        .from("partner_registration_requests")
-        .delete()
-        .eq("id", insertResult.data.id);
+      if (created) {
+        await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+        await supabase
+          .from("partner_registration_requests")
+          .delete()
+          .eq("id", persistedRequestId);
+      }
       console.error(
         "[partner-registration] branch insert failed",
         branchResult.error.message,
@@ -425,8 +457,9 @@ export async function insertPartnerRegistrationRequest({
   }
 
   return {
-    requestId: insertResult.data.id as string,
+    requestId: persistedRequestId,
     categoryLabel: matchedCategory?.label ?? values.categoryLabel,
     categoryMatched: Boolean(matchedCategory),
+    created,
   };
 }

@@ -192,6 +192,14 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
     };
   }
 
+  async getPartnerReviewById(
+    reviewId: string,
+    currentUserId?: string | null,
+  ) {
+    const review = getStore().reviews.find((item) => item.id === reviewId);
+    return review ? mapReview(review, currentUserId) : null;
+  }
+
   async createPartnerReview(input: CreatePartnerReviewInput) {
     const now = new Date().toISOString();
     const review: MockReviewRecord = {

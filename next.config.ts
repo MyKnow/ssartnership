@@ -57,6 +57,9 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  outputFileTracingIncludes: {
+    "/*": ["node_modules/@discourse/heic/**/*"],
+  },
   reactCompiler: true,
   experimental: {
     optimizePackageImports: [
@@ -64,9 +67,22 @@ const nextConfig: NextConfig = {
       "lucide-react",
       "react-icons",
     ],
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
   },
   turbopack: {
     root: projectRoot,
+  },
+  webpack(config) {
+    // @discourse/heic's Emscripten loader fetches this file itself. Treating it
+    // as a native WebAssembly module makes Webpack try to resolve its internal
+    // Emscripten import names (for example, "a") as npm packages.
+    config.module.rules.push({
+      test: /@discourse[\\/]heic[\\/]codec[\\/]dec[\\/]heic_dec\.wasm$/,
+      type: "asset/resource",
+    });
+    return config;
   },
   images: {
     formats: ["image/avif", "image/webp"],

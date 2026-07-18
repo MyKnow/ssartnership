@@ -1,15 +1,25 @@
-import { parsePartnerMediaManifest } from "@/lib/partner-media";
-import { uploadPartnerMediaFile } from "@/lib/partner-media-storage";
+import {
+  resolveImageUploadActorForServerAction,
+} from "@/lib/image-upload/auth.server";
+import {
+  assertNoDirectImageFileSubmission,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import {
+  assertPartnerMediaExistingUrls,
+  PARTNER_MEDIA_BUCKET,
+  parsePartnerMediaManifest,
+} from "@/lib/partner-media";
+import {
+  buildPartnerMediaStoragePath,
+} from "@/lib/partner-media-storage";
 import type { PartnerMediaInput } from "../shared-types";
-
-function getFormDataFile(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return value instanceof File && value.size > 0 ? value : null;
-}
 
 export async function resolvePartnerMediaPayload(
   formData: FormData,
   partnerId: string,
+  allowedExistingUrls: readonly string[] = [],
 ): Promise<PartnerMediaInput> {
   const thumbnailManifestRaw = String(formData.get("thumbnailManifest") || "");
   const galleryManifestRaw = String(formData.get("galleryManifest") || "");
@@ -22,56 +32,61 @@ export async function resolvePartnerMediaPayload(
   if (galleryManifestRaw.trim() && !galleryManifest) {
     throw new Error("이미지 목록 형식을 확인해 주세요.");
   }
-
-  const thumbnailFile = getFormDataFile(formData, "thumbnailFile");
-  const galleryFiles = formData
-    .getAll("galleryFiles")
-    .filter((item): item is File => item instanceof File && item.size > 0);
+  assertNoDirectImageFileSubmission(formData, ["thumbnailFile", "galleryFiles"]);
+  assertPartnerMediaExistingUrls(thumbnailManifest, allowedExistingUrls);
+  assertPartnerMediaExistingUrls(galleryManifest, allowedExistingUrls);
 
   let thumbnail: string | null = null;
   const uploadedUrls: string[] = [];
+  const uploadActor = await resolveImageUploadActorForServerAction("partner", "admin");
+  const uploadRepository = getImageUploadRepository();
+
+  const attachUpload = async (
+    uploadId: string,
+    role: "thumbnail" | "gallery",
+    index: number,
+  ) => {
+    const attached = await uploadRepository.attach({
+      actor: uploadActor,
+      purpose: "partner",
+      uploadId,
+      role,
+      policy: resolveImageTransformPolicy("partner", role),
+      destination: {
+        bucket: PARTNER_MEDIA_BUCKET,
+        path: buildPartnerMediaStoragePath(partnerId, role, index, uploadId),
+        isPublic: true,
+      },
+      resource: { type: "partner", id: partnerId },
+    });
+    if (!attached.url) {
+      throw new Error("제휴처 이미지 URL을 만들지 못했습니다.");
+    }
+    return attached.url;
+  };
+
   if (thumbnailManifest?.thumbnail) {
     if (thumbnailManifest.thumbnail.kind === "existing") {
       thumbnail = thumbnailManifest.thumbnail.url;
     } else {
-      if (!thumbnailFile) {
-        throw new Error("썸네일 이미지를 찾을 수 없습니다.");
+      if (!thumbnailManifest.thumbnail.uploadId) {
+        throw new Error("완료된 공통 이미지 업로드를 확인해 주세요.");
       }
-      thumbnail = await uploadPartnerMediaFile(
-        partnerId,
-        "thumbnail",
-        thumbnailFile,
-        0,
-      );
-      uploadedUrls.push(thumbnail);
+      thumbnail = await attachUpload(thumbnailManifest.thumbnail.uploadId, "thumbnail", 0);
     }
   }
 
   const images: string[] = [];
-  let galleryFileIndex = 0;
   const galleryEntries = galleryManifest?.gallery ?? [];
   for (const [index, entry] of galleryEntries.entries()) {
     if (entry.kind === "existing") {
       images.push(entry.url);
       continue;
     }
-
-    const nextFile = galleryFiles[galleryFileIndex++];
-    if (!nextFile) {
-      throw new Error("추가 이미지 파일을 찾을 수 없습니다.");
+    if (!entry.uploadId) {
+      throw new Error("완료된 공통 이미지 업로드를 확인해 주세요.");
     }
-    if (!nextFile.type.startsWith("image/")) {
-      throw new Error("이미지 파일만 저장할 수 있습니다.");
-    }
-
-    const uploadedUrl = await uploadPartnerMediaFile(
-      partnerId,
-      "gallery",
-      nextFile,
-      index,
-    );
-    images.push(uploadedUrl);
-    uploadedUrls.push(uploadedUrl);
+    images.push(await attachUpload(entry.uploadId, "gallery", index));
   }
 
   return {

@@ -6,12 +6,9 @@ import { normalizeMattermostProfileImage } from "@/lib/graduate-verification-fil
 import { storeMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { sanitizeHttpUrl } from "@/lib/validation";
+import { IMAGE_SOURCE_MIME_TYPES } from "@/lib/image-upload/policy";
 
-const ALLOWED_IMAGE_CONTENT_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+const ALLOWED_IMAGE_CONTENT_TYPES = new Set<string>(IMAGE_SOURCE_MIME_TYPES);
 
 const REVIEWABLE_IMAGE_STATUSES = ["pending", "approved", "rejected"] as const;
 const MAX_MEMBER_PROFILE_IMAGE_URL_LENGTH = 2_000;

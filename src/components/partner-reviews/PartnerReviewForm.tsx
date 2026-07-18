@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
@@ -13,13 +13,23 @@ import {
   validateReviewDraftInput,
   type ReviewFieldErrors,
 } from "@/lib/review-validation";
-import { buildReviewFormData, uploadReviewImagesDirectly } from "./helpers";
+import { buildReviewFormData } from "./helpers";
 import ReviewStarsInput from "./ReviewStarsInput";
 import ReviewImageUploader from "@/components/review-media/ReviewImageUploader";
 import {
   createReviewImageItemFromExisting,
+  getPendingReviewMediaUploads,
+  markReviewMediaUploadsReady,
   type ReviewImageItem,
 } from "@/components/review-media/shared";
+import { uploadImagesToStaging } from "@/lib/image-upload/client";
+import {
+  clearImageUploadDraft,
+  loadImageUploadDraft,
+  loadImageUploadDraftFiles,
+  saveImageUploadDraft,
+  saveImageUploadDraftFiles,
+} from "@/lib/image-upload/draft.client";
 
 export default function PartnerReviewForm({
   partnerId,
@@ -44,14 +54,103 @@ export default function PartnerReviewForm({
   const [fieldErrors, setFieldErrors] = useState<ReviewFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [mediaProcessing, setMediaProcessing] = useState(false);
+  const [submissionId, setSubmissionId] = useState(() => review?.id ?? crypto.randomUUID());
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const draftRestoringRef = useRef(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const ratingRef = useRef<HTMLDivElement>(null);
 
   const isEditMode = Boolean(review);
+  const draftKey = `partner-review-${partnerId}-${review?.id ?? "new"}`;
+
+  const persistReviewDraft = useCallback(async (
+    nextItems = items,
+    nextSubmissionId = submissionId,
+  ) => {
+    if (!draftHydrated || draftRestoringRef.current) return;
+    saveImageUploadDraft({
+      formKey: draftKey,
+      values: {
+        rating,
+        title,
+        body,
+        reviewId: nextSubmissionId,
+      },
+      manifests: nextItems.flatMap((item, order) =>
+        item.kind === "file" && item.uploadId
+          ? [{ uploadId: item.uploadId, role: "image", order }]
+          : [],
+      ),
+    });
+    await saveImageUploadDraftFiles(
+      draftKey,
+      nextItems.flatMap((item, order) =>
+        item.kind === "file" && item.file
+          ? [{
+              clientId: item.id,
+              role: "image",
+              order,
+              file: item.file,
+              ...(item.uploadId ? { uploadId: item.uploadId } : {}),
+            }]
+          : [],
+      ),
+    );
+  }, [body, draftHydrated, draftKey, items, rating, submissionId, title]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const draft = loadImageUploadDraft(draftKey);
+      try {
+        if (!draft || cancelled) return;
+        draftRestoringRef.current = true;
+        if (typeof draft.values.rating === "number") setRating(draft.values.rating);
+        if (typeof draft.values.title === "string") setTitle(draft.values.title);
+        if (typeof draft.values.body === "string") setBody(draft.values.body);
+        if (typeof draft.values.reviewId === "string") setSubmissionId(draft.values.reviewId);
+        const restoredItems = (await loadImageUploadDraftFiles(draftKey))
+          .filter((item) => item.role === "image")
+          .sort((left, right) => left.order - right.order)
+          .map((item): ReviewImageItem => ({
+            id: item.clientId,
+            kind: "file",
+            url: URL.createObjectURL(item.file),
+            file: item.file,
+            ...(item.uploadId ? { uploadId: item.uploadId } : {}),
+          }));
+        if (!cancelled && restoredItems.length > 0) {
+          setItems((current) => [
+            ...current.filter((item) => item.kind === "existing"),
+            ...restoredItems,
+          ].slice(0, 5));
+        }
+      } finally {
+        draftRestoringRef.current = false;
+        if (!cancelled) setDraftHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftHydrated || draftRestoringRef.current) return;
+    const timer = window.setTimeout(() => {
+      void persistReviewDraft();
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [draftHydrated, persistReviewDraft]);
 
   async function handleSubmit() {
     if (pending) {
+      return;
+    }
+    if (mediaProcessing) {
+      setFormError("이미지 조정을 완료한 뒤 등록해 주세요.");
       return;
     }
 
@@ -78,12 +177,20 @@ export default function PartnerReviewForm({
     setFormError(null);
 
     try {
-      const reviewId = review?.id ?? crypto.randomUUID();
-      const media = await uploadReviewImagesDirectly({
-        partnerId,
-        reviewId,
-        items,
+      const reviewId = submissionId;
+      const pendingUploads = getPendingReviewMediaUploads(items);
+      const uploadResults = await uploadImagesToStaging({
+        purpose: "review",
+        uploads: pendingUploads,
       });
+      const submittedItems = markReviewMediaUploadsReady(
+        items,
+        new Map(uploadResults.map((result) => [result.clientId, result.uploadId])),
+      );
+      if (uploadResults.length > 0) {
+        setItems(submittedItems);
+      }
+      await persistReviewDraft(submittedItems, reviewId);
       const response = await fetch(
         isEditMode
           ? `/api/partners/${encodeURIComponent(partnerId)}/reviews/${encodeURIComponent(review!.id)}`
@@ -94,9 +201,8 @@ export default function PartnerReviewForm({
             rating: normalized.rating,
             title: normalized.title,
             body: normalized.body,
-            items: media.items,
+            items: submittedItems,
             reviewId,
-            directUploadedImageUrls: media.uploadedUrls,
           }),
         },
       );
@@ -126,6 +232,7 @@ export default function PartnerReviewForm({
         review: data.review as PartnerReview,
         summary: data.summary as PartnerReviewSummary,
       });
+      await clearImageUploadDraft(draftKey);
     } catch (error) {
       const message =
         error instanceof Error && error.message
@@ -200,6 +307,7 @@ export default function PartnerReviewForm({
         }}
         error={fieldErrors.images}
         disabled={pending}
+        onProcessingChange={setMediaProcessing}
       />
 
       {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}

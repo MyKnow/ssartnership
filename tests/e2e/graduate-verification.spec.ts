@@ -4,6 +4,7 @@ const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
   "base64",
 );
+const PROFILE_IMAGE_UPLOAD_ID = "03f5459b-dfee-4558-907a-509a396312f5";
 
 test.describe("graduate verification application", () => {
   test("submits the verified email, inferred cohort, certificate, and cropped profile photo", async ({
@@ -37,6 +38,37 @@ test.describe("graduate verification application", () => {
     });
     await page.route("**/__graduate-test-upload/**", (route) =>
       route.fulfill({ status: 200, body: "" }),
+    );
+    await page.route("**/api/uploads/images/sign", async (route) => {
+      const payload = route.request().postDataJSON() as {
+        uploads: Array<{ clientId: string }>;
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          uploads: payload.uploads.map((upload) => ({
+            id: PROFILE_IMAGE_UPLOAD_ID,
+            clientId: upload.clientId,
+            signedUrl: `${new URL(route.request().url()).origin}/__image-upload-test/${PROFILE_IMAGE_UPLOAD_ID}`,
+          })),
+          uploadHeaders: {},
+        }),
+      });
+    });
+    await page.route("**/__image-upload-test/**", (route) =>
+      route.fulfill({ status: 200, body: "" }),
+    );
+    await page.route("**/api/uploads/images/complete", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          uploads: [{ id: PROFILE_IMAGE_UPLOAD_ID }],
+        }),
+      }),
     );
 
     const submitRequest = page.waitForRequest(
@@ -87,7 +119,7 @@ test.describe("graduate verification application", () => {
       mimeType: "image/png",
       buffer: ONE_PIXEL_PNG,
     });
-    await expect(page.getByText("본인 사진 자르기")).toBeVisible();
+    await expect(page.getByText("이미지 편집")).toBeVisible();
     await page.getByRole("button", { name: "적용" }).click();
     await expect(page.getByText("사진 크롭 완료")).toHaveCount(0);
     await expect(
@@ -121,7 +153,8 @@ test.describe("graduate verification application", () => {
       educationStartYear: 2026,
       educationStartMonth: 1,
       certificateUploadId: "certificate-upload",
-      profileImageUploadId: "profile_image-upload",
+      profileImageUploadId: PROFILE_IMAGE_UPLOAD_ID,
+      profileImageUploadSource: "common",
     });
     await expect(page.getByText("수료생 인증 신청을 제출했습니다.")).toBeVisible();
     await expect(

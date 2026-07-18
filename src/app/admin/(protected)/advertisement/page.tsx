@@ -82,6 +82,7 @@ export default async function AdminAdvertisementPage({
         adCampaignOptions={adCampaignOptions}
         saveAction={savePromotionSlidesAction}
         message={message}
+        clearPromotionDraft={params.status === "updated"}
       />
     </AdminShell>
   );

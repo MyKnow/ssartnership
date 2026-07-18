@@ -2,12 +2,6 @@ import { sanitizeHttpUrl } from "@/lib/validation";
 
 export const PROMOTION_SLIDES_BUCKET = "promotion-slides";
 
-export function buildPromotionSlideStoragePath(index: number, extension = "webp") {
-  const safeIndex = Number.isFinite(index) ? Math.max(0, Math.floor(index)) : 0;
-  const suffix = cryptoRandomId();
-  return `promotions/${safeIndex}-${suffix}.${extension}`;
-}
-
 export function extractPromotionSlideStoragePath(url: string) {
   const safeUrl = sanitizeHttpUrl(url);
   if (!safeUrl) {
@@ -38,10 +32,4 @@ export function extractPromotionSlideStoragePath(url: string) {
   } catch {
     return null;
   }
-}
-
-function cryptoRandomId() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 }

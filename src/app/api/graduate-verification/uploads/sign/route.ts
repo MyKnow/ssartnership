@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext } from "@/lib/activity-logs";
 import { hashGraduateEmailIdentifier } from "@/lib/graduate-verification-security";
-import { createGraduateVerificationSignedUpload, type GraduateUploadKind } from "@/lib/graduate-verification-storage";
+import { createGraduateVerificationSignedUpload } from "@/lib/graduate-verification-storage";
 import { getGraduateApplicationSession } from "@/lib/graduate-verification-security";
 import {
   isGraduateVerificationBlocked,
@@ -12,8 +12,8 @@ import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 
-function isGraduateUploadKind(value: unknown): value is GraduateUploadKind {
-  return value === "certificate" || value === "profile_image";
+function isGraduateUploadKind(value: unknown): value is "certificate" {
+  return value === "certificate";
 }
 
 export async function POST(request: Request) {

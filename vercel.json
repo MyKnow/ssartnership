@@ -25,6 +25,10 @@
       "schedule": "30 0 * * *"
     },
     {
+      "path": "/api/cron/cleanup-image-uploads",
+      "schedule": "32 0 * * *"
+    },
+    {
       "path": "/api/cron/cleanup-manual-member-imports",
       "schedule": "35 0 * * *"
     }

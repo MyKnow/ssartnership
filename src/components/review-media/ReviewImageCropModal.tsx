@@ -2,7 +2,7 @@
 
 import ImageCropDialog from "@/components/media/ImageCropDialog";
 import { REVIEW_IMAGE_ASPECT_RATIO } from "@/lib/review-media";
-import { isImageFile } from "@/components/review-media/shared";
+import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
 
 const REVIEW_IMAGE_OUTPUT_SIZE = 900;
 const REVIEW_IMAGE_OUTPUT_QUALITY = 0.68;
@@ -10,12 +10,14 @@ const REVIEW_IMAGE_OUTPUT_QUALITY = 0.68;
 export default function ReviewImageCropModal({
   open,
   sourceUrl,
+  sourceFile,
   outputName,
   onCancel,
   onApply,
 }: {
   open: boolean;
   sourceUrl: string;
+  sourceFile?: File;
   outputName: string;
   onCancel: () => void;
   onApply: (file: File) => void;
@@ -23,17 +25,14 @@ export default function ReviewImageCropModal({
   return (
     <ImageCropDialog
       open={open}
-      title="사진 조정"
-      subtitle="정방형으로 저장됩니다."
       aspectRatio={REVIEW_IMAGE_ASPECT_RATIO}
       sourceUrl={sourceUrl}
+      sourceFile={sourceFile}
       outputName={outputName}
       outputWidth={REVIEW_IMAGE_OUTPUT_SIZE}
       outputHeight={REVIEW_IMAGE_OUTPUT_SIZE}
       quality={REVIEW_IMAGE_OUTPUT_QUALITY}
-      validateFile={(file) =>
-        isImageFile(file) ? null : "이미지 파일만 업로드할 수 있습니다."
-      }
+      policy={resolveImageTransformPolicy("review", "image")}
       onCancel={onCancel}
       onApply={onApply}
     />

@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useRef, useState } from "react";
 import type { PartnerVisibility } from "@/lib/types";
 import usePartnerCardFormState from "@/components/partner-card-form/usePartnerCardFormState";
 import PartnerFormHero from "@/components/partner-card-form/PartnerFormHero";
@@ -21,6 +21,12 @@ import { isPartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
 import { isPartnerDetailDescriptionValid } from "@/lib/partner-detail-description";
+import { isPartnerFormRequestWithinSafeLimit } from "@/lib/partner-form-request-size";
+import ImageUploadSubmissionProvider, {
+  type ImageUploadSubmissionController,
+} from "@/components/media/ImageUploadSubmissionProvider";
+import { useImageUploadFormDraft } from "@/components/media/useImageUploadFormDraft";
+import { useImageUploadSubmissionId } from "@/components/media/useImageUploadSubmissionId";
 import {
   inferPartnerBranchScopeType,
   type PartnerBranchScopeType,
@@ -53,6 +59,7 @@ export default function PartnerCardForm({
   fieldErrors,
   formError,
   hiddenFields,
+  clearDraftOnSuccess = false,
 }: {
   partner: PartnerCardFormValues;
   mode?: PartnerCardFormMode;
@@ -67,10 +74,15 @@ export default function PartnerCardForm({
   fieldErrors?: Partial<Record<PartnerCardFormField, string>>;
   formError?: string | null;
   hiddenFields?: Array<{ name: string; value: string }>;
+  clearDraftOnSuccess?: boolean;
 }) {
   const [clientFieldErrors, setClientFieldErrors] = useState<
     Partial<Record<PartnerCardFormField, string>>
   >({});
+  const [clientFormError, setClientFormError] = useState<string | null>(null);
+  const imageUploadControllerRef = useRef<ImageUploadSubmissionController | null>(null);
+  const isSubmittingImagesRef = useRef(false);
+  const allowUploadedFormSubmitRef = useRef(false);
   const [branchEntryMode, setBranchEntryMode] =
     useState<BranchEntryMode>("single");
   const [benefitListingMode, setBenefitListingMode] =
@@ -131,6 +143,14 @@ export default function PartnerCardForm({
     setAppliesToValue,
     companyFieldsLocked,
   } = usePartnerCardFormState({ partner, categoryId, focusField });
+  const draftKey = `admin-partner-${mode}-${partner.id ?? "new"}`;
+  const submissionId = useImageUploadSubmissionId(draftKey);
+  const { saveDraft } = useImageUploadFormDraft({
+    formKey: draftKey,
+    formRef,
+    imageUploadControllerRef,
+    clearOnSuccess: clearDraftOnSuccess,
+  });
   const branchListText = useMemo(
     () => (branchEntryMode === "multi" ? serializeBranchRows(branchRows) : ""),
     [branchEntryMode, branchRows],
@@ -166,8 +186,15 @@ export default function PartnerCardForm({
     }
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    if (allowUploadedFormSubmitRef.current) {
+      allowUploadedFormSubmitRef.current = false;
+      return;
+    }
     const formData = new FormData(event.currentTarget);
+    if (formData.get("partnerFormIntent") === "delete") {
+      return;
+    }
     const location = String(formData.get("location") || "").trim();
     const benefitActionType = String(formData.get("benefitActionType") || "").trim();
     const benefitActionLink = String(formData.get("benefitActionLink") || "").trim();
@@ -199,6 +226,41 @@ export default function PartnerCardForm({
       : null;
 
     if (campusSlugSelection.ok && !benefitActionError && !detailDescriptionError) {
+      const imageUploadController = imageUploadControllerRef.current;
+      if (imageUploadController?.hasPendingUploads()) {
+        event.preventDefault();
+        if (isSubmittingImagesRef.current) {
+          return;
+        }
+        isSubmittingImagesRef.current = true;
+        setClientFormError(null);
+        try {
+          await saveDraft();
+          await imageUploadController.uploadPending();
+          await saveDraft();
+          allowUploadedFormSubmitRef.current = true;
+          event.currentTarget.requestSubmit();
+        } catch (error) {
+          setClientFormError(
+            error instanceof Error && error.message
+              ? error.message
+              : "이미지를 업로드하지 못했습니다. 입력 내용은 유지되므로 다시 시도해 주세요.",
+          );
+        } finally {
+          isSubmittingImagesRef.current = false;
+        }
+        return;
+      }
+      void saveDraft();
+      if (!isPartnerFormRequestWithinSafeLimit(formData)) {
+        event.preventDefault();
+        setClientFormError(
+          "제출 데이터가 너무 큽니다. 입력한 내용은 유지되므로 텍스트 또는 지점 목록을 줄인 뒤 다시 시도해 주세요.",
+        );
+        return;
+      }
+
+      setClientFormError(null);
       setClientFieldErrors((current) => {
         if (
           !current.campusSlugs &&
@@ -253,7 +315,13 @@ export default function PartnerCardForm({
   };
 
   return (
-    <article className={cn("grid gap-6", className)}>
+    <ImageUploadSubmissionProvider
+      purpose="partner"
+      actorMode="admin"
+      draftKey={draftKey}
+      controllerRef={imageUploadControllerRef}
+    >
+      <article className={cn("grid gap-6", className)}>
       <PartnerFormHero
         mode={mode}
         visibilityValue={visibilityValue as PartnerVisibility}
@@ -265,10 +333,14 @@ export default function PartnerCardForm({
         ref={formRef}
         action={formAction}
         onSubmit={handleSubmit}
+        onChange={() => setClientFormError(null)}
         className="grid gap-6"
       >
         {mode === "edit" && partner.id ? (
           <input type="hidden" name="id" value={partner.id} />
+        ) : null}
+        {mode === "create" && submissionId ? (
+          <input type="hidden" name="idempotencyKey" value={submissionId} />
         ) : null}
         {hiddenFields?.map((field) => (
           <input key={`${field.name}-${field.value}`} type="hidden" name={field.name} value={field.value} />
@@ -462,10 +534,11 @@ export default function PartnerCardForm({
             partnerId={partner.id}
             deleteAction={deleteAction}
             submitLabel={submitLabel}
-            formError={formError}
+            formError={clientFormError ?? formError}
           />
         </div>
       </form>
-    </article>
+      </article>
+    </ImageUploadSubmissionProvider>
   );
 }

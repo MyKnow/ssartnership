@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCachedImageUrl } from "@/lib/image-cache";
+import {
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
+import type { ImageUploadDraftFile } from "@/lib/image-upload/draft.client";
+import type { ImageTransformPolicy } from "@/lib/image-upload/policy";
 import { sanitizeHttpUrl } from "@/lib/validation";
 import type { PendingCrop, MediaItem, MediaRole } from "@/components/admin/partner-media-editor/types";
 import {
@@ -16,6 +22,8 @@ import {
   reorderMediaItems,
   revokeIfBlobUrl,
   setInputFiles,
+  getPendingMediaUploads,
+  markMediaUploadsReady,
 } from "@/components/admin/partner-media-editor/utils";
 
 export default function useMediaFieldController({
@@ -25,6 +33,8 @@ export default function useMediaFieldController({
   multiple,
   maxItems,
   validateFile,
+  policy,
+  directUpload = false,
 }: {
   role: MediaRole;
   aspectRatio: number;
@@ -32,6 +42,8 @@ export default function useMediaFieldController({
   multiple: boolean;
   maxItems?: number;
   validateFile?: (file: File) => string | null;
+  policy: ImageTransformPolicy;
+  directUpload?: boolean;
 }) {
   const [items, setItems] = useState<MediaItem[]>(() =>
     (initial ?? []).filter(Boolean).map((url) => createPreviewEntryFromExisting(url)),
@@ -39,6 +51,7 @@ export default function useMediaFieldController({
   const [draftUrl, setDraftUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendingCrops, setPendingCrops] = useState<PendingCrop[]>([]);
+  const [preparingCount, setPreparingCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const createdBlobUrlsRef = useRef<Set<string>>(new Set());
 
@@ -67,11 +80,6 @@ export default function useMediaFieldController({
       }
     };
   }, []);
-
-  const fileItems = useMemo(
-    () => items.filter((item) => item.kind === "file" && item.file),
-    [items],
-  );
 
   const enqueueCrop = (pending: PendingCrop | PendingCrop[]) => {
     const queue = Array.isArray(pending) ? pending : [pending];
@@ -109,14 +117,16 @@ export default function useMediaFieldController({
     setPendingCrops((prev) => prev.slice(1));
   };
 
-  const queueFile = (file: File, index: number, insertAt?: number) => {
+  const queueFile = async (file: File, index: number, insertAt?: number) => {
+    const sourceFile = await prepareImageUploadSource(file, policy);
     const pendingId = crypto.randomUUID();
-    const objectUrl = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(sourceFile);
     const sourceUrl = objectUrl;
     createdBlobUrlsRef.current.add(objectUrl);
     enqueueCrop({
       id: pendingId,
       sourceUrl,
+      sourceFile,
       aspectRatio,
       outputName: inferOutputName(role, index),
       onApply: (croppedFile) => {
@@ -133,11 +143,15 @@ export default function useMediaFieldController({
 
     const picked = Array.from(files);
     const invalidFile = picked.find((file) =>
-      validateFile ? validateFile(file) : !isImageFile(file),
+      validateFile?.(file)
+      ?? getImageUploadSourceError(file, policy)
+      ?? (isImageFile(file) ? null : "이미지 파일만 추가할 수 있습니다."),
     );
     if (invalidFile) {
       setError(
-        validateFile?.(invalidFile) ?? "이미지 파일만 추가할 수 있습니다.",
+      validateFile?.(invalidFile)
+        ?? getImageUploadSourceError(invalidFile, policy)
+        ?? "이미지 파일만 추가할 수 있습니다.",
       );
       return false;
     }
@@ -156,9 +170,22 @@ export default function useMediaFieldController({
       setError(null);
     }
 
-    acceptedFiles.forEach((file, index) =>
-      queueFile(file, index, typeof insertAt === "number" ? insertAt + index : undefined),
-    );
+    setPreparingCount((current) => current + acceptedFiles.length);
+    void (async () => {
+      try {
+        for (const [index, file] of acceptedFiles.entries()) {
+          await queueFile(file, index, typeof insertAt === "number" ? insertAt + index : undefined);
+        }
+      } catch (error) {
+        setError(
+          error instanceof Error && error.message
+            ? error.message
+            : "이미지를 준비하지 못했습니다.",
+        );
+      } finally {
+        setPreparingCount((current) => Math.max(0, current - acceptedFiles.length));
+      }
+    })();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -225,6 +252,7 @@ export default function useMediaFieldController({
     enqueueCrop({
       id: item.id,
       sourceUrl,
+      ...(item.kind === "file" && item.file ? { sourceFile: item.file } : {}),
       aspectRatio,
       outputName: inferOutputName(role, index),
       onApply: (croppedFile) => {
@@ -274,7 +302,10 @@ export default function useMediaFieldController({
     });
   }, [items, multiple]);
 
-  const currentFiles = useMemo(() => fileItems.map((item) => item.file as File), [fileItems]);
+  const currentFiles = useMemo(
+    () => directUpload ? [] : getPendingMediaUploads(items, role).map((item) => item.file),
+    [directUpload, items, role],
+  );
 
   useEffect(() => {
     setInputFiles(fileInputRef.current, currentFiles);
@@ -297,6 +328,58 @@ export default function useMediaFieldController({
     cancelCurrentCrop();
   };
 
+  const pendingUploads = useMemo(
+    () => getPendingMediaUploads(items, role),
+    [items, role],
+  );
+
+  const markUploadsReady = (uploadIdsByClientId: ReadonlyMap<string, string>) => {
+    setItems((previous) => markMediaUploadsReady(previous, uploadIdsByClientId));
+  };
+
+  const getDraftFiles = (): ImageUploadDraftFile[] => (
+    items.flatMap((item, order) =>
+      item.kind === "file" && item.file
+        ? [{
+            clientId: item.id,
+            role,
+            order,
+            file: item.file,
+            ...(item.uploadId ? { uploadId: item.uploadId } : {}),
+          }]
+        : [],
+    )
+  );
+
+  const restoreDraftFiles = (draftFiles: ImageUploadDraftFile[]) => {
+    const restored = draftFiles
+      .filter((draftFile) => draftFile.role === role)
+      .sort((left, right) => left.order - right.order)
+      .map((draftFile): MediaItem => {
+        const url = URL.createObjectURL(draftFile.file);
+        createdBlobUrlsRef.current.add(url);
+        return {
+          id: draftFile.clientId,
+          kind: "file",
+          url,
+          file: draftFile.file,
+          ...(draftFile.uploadId ? { uploadId: draftFile.uploadId } : {}),
+        };
+      });
+    if (restored.length === 0) return;
+
+    setItems((previous) => {
+      const preserved = previous.filter(
+        (item) => !restored.some((restoredItem) => restoredItem.id === item.id),
+      );
+      if (!multiple) {
+        return restored.slice(0, 1);
+      }
+      return [...preserved, ...restored].slice(0, maxItems ?? Number.MAX_SAFE_INTEGER);
+    });
+    setError(null);
+  };
+
   return {
     items,
     draftUrl,
@@ -305,7 +388,11 @@ export default function useMediaFieldController({
     fileInputRef,
     currentManifest,
     currentCrop,
-    pendingCropCount: pendingCrops.length,
+    pendingCropCount: pendingCrops.length + preparingCount,
+    pendingUploads,
+    markUploadsReady,
+    getDraftFiles,
+    restoreDraftFiles,
     handleAddUrl,
     handleAddUrls,
     ingestFiles,
