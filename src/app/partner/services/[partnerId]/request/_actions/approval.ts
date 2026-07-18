@@ -152,6 +152,14 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
         companyName: request.companyName,
         actorAccountId: session.accountId,
       },
+      templateContext: {
+        kind: "admin_partner_change_request",
+        companyName: request.companyName,
+        partnerName: request.partnerName,
+        requesterName: session.displayName || session.loginId,
+        changeSummary: "파트너 정보 변경 요청",
+        requestUrl: "/admin/partner-requests",
+      },
     }).catch((notificationError) => {
       console.error(
         "[partner-change-request] admin notification failed",

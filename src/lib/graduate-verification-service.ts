@@ -26,6 +26,7 @@ import {
 } from "@/lib/graduate-verification-storage";
 import {
   sendGraduateAccountSetupEmail,
+  sendGraduateVerificationRejectionEmail,
   sendGraduateVerificationResubmissionEmail,
 } from "@/lib/graduate-verification-email";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
@@ -965,7 +966,7 @@ export async function rejectGraduateVerificationRequest(input: {
     })
     .eq("id", input.requestId)
     .eq("status", "in_review")
-    .select("profile_image_id")
+    .select("profile_image_id,email,legal_name,request_kind")
     .maybeSingle();
   if (requestError || !request) {
     throw new Error("반려 처리할 수 없는 인증 신청입니다.");
@@ -983,6 +984,31 @@ export async function rejectGraduateVerificationRequest(input: {
       })
       .eq("id", request.profile_image_id);
   }
+
+  let emailSent = false;
+  try {
+    await sendGraduateVerificationRejectionEmail({
+      to: request.email,
+      displayName: request.legal_name,
+      reason,
+      requestKind: parseGraduateVerificationRequestKind(request.request_kind) ?? "graduate_signup",
+    });
+    emailSent = true;
+    await supabase
+      .from("graduate_verification_requests")
+      .update({
+        rejection_email_sent_at: new Date().toISOString(),
+        rejection_email_last_error_at: null,
+      })
+      .eq("id", input.requestId);
+  } catch {
+    await supabase
+      .from("graduate_verification_requests")
+      .update({ rejection_email_last_error_at: new Date().toISOString() })
+      .eq("id", input.requestId);
+  }
+
+  return { emailSent };
 }
 
 export async function approveMemberProfileImageReplacement(input: {

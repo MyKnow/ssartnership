@@ -45,6 +45,7 @@ export const Guest: Story = {
     await expect(body.getByRole("dialog")).toBeInTheDocument();
     await expect(body.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/auth/login");
     await expect(body.getByRole("link", { name: "회원가입" })).toHaveAttribute("href", "/auth/signup");
+    await expect(body.getByRole("button", { name: "앱 설치" })).toBeVisible();
 
     await userEvent.click(body.getAllByRole("button", { name: "메뉴 닫기" })[0]!);
     await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
@@ -104,6 +105,7 @@ export const SignedInActions: Story = {
       await expect(confirmCalled).toBe(true);
       await expect(logoutButton).toBeVisible();
 
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
       const installButton = await within(dialog).findByRole("button", { name: "앱 설치" });
       await userEvent.click(installButton);
       await expect(await body.findByText("설치가 시작되었습니다.")).toBeVisible();

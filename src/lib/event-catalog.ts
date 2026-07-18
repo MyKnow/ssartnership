@@ -121,6 +121,11 @@ export const ADMIN_AUDIT_ACTIONS = [
   'graduate_certificate_view',
   'graduate_profile_photo_view',
   'member_profile_photo_view',
+  'member_signup_approval_approve',
+  'member_signup_approval_reject',
+  'notification_template_update',
+  'notification_template_reset',
+  'notification_template_test_send',
   'admin_log_export_requested',
 ] as const;
 
@@ -130,6 +135,7 @@ export const AUTH_SECURITY_EVENT_NAMES = [
   'member_login',
   'member_logout',
   'member_signup_complete',
+  'member_signup_approval_request',
   'member_mattermost_code',
   'member_email_recovery',
   'member_email_verification',

@@ -19,7 +19,10 @@ import {
 } from "@/lib/mm-directory";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { resolveManualMemberResolution } from "@/lib/member-manual-add/lookup";
+import { renderEmailTemplateBody } from "@/lib/email-content";
 import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 import {
   MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
@@ -126,13 +129,20 @@ function buildSetupUrl(token: string) {
   return url.toString();
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+async function buildManualMemberSetupMattermostMessage(input: {
+  displayName: string;
+  setupUrl: string;
+}) {
+  const template = await resolveNotificationTemplate("mattermost.manual_member_setup");
+  const variables = {
+    siteName: SITE_NAME,
+    displayName: input.displayName || "회원",
+    setupUrl: input.setupUrl,
+  };
+  return [
+    renderNotificationTemplate(template.titleTemplate, variables),
+    renderNotificationTemplate(template.bodyTemplate, variables),
+  ].join("\n\n");
 }
 
 async function sendSetupEmail(input: {
@@ -145,26 +155,29 @@ async function sendSetupEmail(input: {
   const smtpConfig = getSmtpConfig();
   const transport = createSmtpTransport(smtpConfig);
   const setupUrl = buildSetupUrl(input.token);
-  const safeName = escapeHtml(input.displayName || "회원");
-  const safeUrl = escapeHtml(setupUrl);
-  const heading = input.reset ? "비밀번호 재설정" : "계정 비밀번호 설정";
+  const template = await resolveNotificationTemplate(
+    input.reset
+      ? "email.manual_member_password_reset"
+      : "email.manual_member_setup",
+  );
+  const variables = {
+    siteName: SITE_NAME,
+    displayName: input.displayName || "회원",
+    setupUrl,
+  };
+  const subject = renderNotificationTemplate(template.titleTemplate, variables);
+  const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, variables);
   await transport.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.email,
-    subject: `[${SITE_NAME}] ${heading}`,
+    subject,
     // Message-ID is correlation metadata only; SMTP delivery safety is handled
     // by the durable attempt checkpoint below, not by this header.
     messageId: input.idempotencyKey
       ? getManualMemberImportEmailMessageId(input.idempotencyKey)
       : undefined,
-    text: [
-      `${input.displayName || "회원"}님, 아래 링크에서 비밀번호를 ${input.reset ? "재설정" : "설정"}해 주세요.`,
-      "",
-      setupUrl,
-      "",
-      "링크는 24시간 동안 한 번만 사용할 수 있습니다.",
-    ].join("\n"),
-    html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.7"><h2>${heading}</h2><p>${safeName}님, 아래 링크에서 비밀번호를 설정해 주세요.</p><p><a href="${safeUrl}">비밀번호 설정하기</a></p><p>링크는 24시간 동안 한 번만 사용할 수 있습니다.</p></div>`,
+    text: renderedBody.text,
+    html: renderedBody.html,
   });
 }
 
@@ -861,18 +874,16 @@ async function deliverManualMemberImportSetup(input: {
     input.onRowLeaseUpdated(currentRowLeaseVersion);
 
     try {
+      const setupUrl = buildSetupUrl(setupToken);
+      const message = await buildManualMemberSetupMattermostMessage({
+        displayName: input.displayName,
+        setupUrl,
+      });
       await withActiveMattermostSenderForGeneration(
         recipient.resolvedGeneration,
         (session) => session.sendDirectMessage(
           recipient.mattermostUserId,
-          [
-            `[${SITE_NAME}] 계정 설정`,
-            "",
-            `아래 링크에서 ${SITE_NAME} 비밀번호를 설정해 주세요.`,
-            buildSetupUrl(setupToken),
-            "",
-            "링크는 24시간 동안 한 번만 사용할 수 있습니다.",
-          ].join("\n"),
+          message,
         ),
       );
     } catch {
@@ -1470,18 +1481,16 @@ export async function reissueManualMemberImportSetup(input: {
         throw new Error("회원의 연결된 MM 계정을 확인하지 못했습니다.");
       }
       try {
+        const setupUrl = buildSetupUrl(setupToken);
+        const message = await buildManualMemberSetupMattermostMessage({
+          displayName,
+          setupUrl,
+        });
         await withActiveMattermostSenderForGeneration(
           mattermostRecipient.senderGeneration,
           (session) => session.sendDirectMessage(
             mattermostRecipient.mattermostUserId,
-            [
-              `[${SITE_NAME}] 계정 설정`,
-              "",
-              `아래 링크에서 ${SITE_NAME} 비밀번호를 설정해 주세요.`,
-              buildSetupUrl(setupToken),
-              "",
-              "링크는 24시간 동안 한 번만 사용할 수 있습니다.",
-            ].join("\n"),
+            message,
           ),
         );
       } catch {

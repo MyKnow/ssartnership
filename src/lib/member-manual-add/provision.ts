@@ -4,6 +4,9 @@ import {
 } from "@/lib/mm-directory";
 import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import { generateTempPassword, hashPassword } from "@/lib/password";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import { SITE_NAME } from "@/lib/site";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { validateMmUsername } from "@/lib/validation";
 import {
@@ -190,19 +193,23 @@ export async function provisionManualMembers(
       } as const;
 
       try {
+        const template = await resolveNotificationTemplate(
+          "mattermost.manual_member_temporary_password",
+        );
+        const variables = {
+          siteName: SITE_NAME,
+          displayName: resolution.profile.displayName || "회원",
+          temporaryPassword: tempPassword,
+        };
+        const message = [
+          renderNotificationTemplate(template.titleTemplate, variables),
+          renderNotificationTemplate(template.bodyTemplate, variables),
+        ].join("\n\n");
         await withActiveMattermostSenderForGeneration(
           resolution.resolvedYear,
           (session) => session.sendDirectMessage(
             resolution.user.id,
-            [
-              "SSARTNERSHIP 임시 비밀번호입니다.",
-              "",
-              "임시 비밀번호",
-              "```plaintext",
-              tempPassword,
-              "```",
-              "보안을 위해 로그인 후 반드시 변경해 주세요.",
-            ].join("\n"),
+            message,
           ),
         );
 

@@ -131,6 +131,14 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         tagCount: tags.length,
         imageCount: media.images.length,
       },
+      templateContext: {
+        kind: "admin_partner_immediate_update",
+        companyName: context.companyName,
+        partnerName: context.partnerName,
+        changeSummary: `기본 정보·혜택·태그·이미지 변경 (${tags.length}개 태그, ${media.images.length}개 이미지)`,
+        updatedByName: session.displayName || session.loginId,
+        partnerUrl: `/admin/partners/${encodeURIComponent(partnerId)}`,
+      },
     }).catch((notificationError) => {
       console.error(
         "[partner-immediate-update] admin notification failed",

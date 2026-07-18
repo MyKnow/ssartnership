@@ -234,6 +234,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["auth.signup.default"],
   },
   {
+    routePath: "/auth/signup/pending",
+    surface: "auth",
+    authScope: "public",
+    viewComponent: "SignupApprovalPendingPage",
+    dataSources: ["api-route"],
+    requiredScenarioIds: ["auth.signup.approval-pending"],
+  },
+  {
     routePath: "/admin",
     surface: "admin",
     authScope: "admin",
@@ -347,6 +355,22 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.profile-photos.queue"],
   },
   {
+    routePath: "/admin/member-signup-requests",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminMemberSignupApprovalQueue",
+    dataSources: ["repository", "service", "storybook"],
+    requiredScenarioIds: ["admin.member-signup-requests.queue"],
+  },
+  {
+    routePath: "/admin/member-signup-requests/[requestId]",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminMemberSignupApprovalDetail",
+    dataSources: ["repository", "service", "storybook"],
+    requiredScenarioIds: ["admin.member-signup-requests.queue"],
+  },
+  {
     routePath: "/admin/members/[memberId]",
     surface: "admin",
     authScope: "admin",
@@ -369,6 +393,14 @@ const mockRouteInventoryBase = [
     viewComponent: "AdminNotificationCenter",
     dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["admin.notifications.inbox"],
+  },
+  {
+    routePath: "/admin/notification-templates",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminNotificationTemplateManager",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.dashboard.default"],
   },
   {
     routePath: "/admin/partner-registrations",
@@ -729,6 +761,11 @@ const routeContracts = {
     screenContractId: "auth.signup-complete",
     primaryTask: "인증 결과를 확인하고 회원가입을 완료한다.",
   },
+  "/auth/signup/pending": {
+    routeKind: "conditional",
+    screenContractId: "auth.signup-pending",
+    primaryTask: "Mattermost 가입 승인 신청이 접수되었음을 확인하고 로그인으로 이동한다.",
+  },
   "/admin": {
     routeKind: "canonical",
     screenContractId: "admin.dashboard",
@@ -799,6 +836,16 @@ const routeContracts = {
     screenContractId: "admin.profile-photos",
     primaryTask: "회원의 사진 변경 요청과 기존 프로필 사진 적합성을 검토한다.",
   },
+  "/admin/member-signup-requests": {
+    routeKind: "canonical",
+    screenContractId: "admin.member-signup-requests",
+    primaryTask: "Mattermost 프로필 파싱 실패 가입 신청을 확인하고 상세 검토로 이동한다.",
+  },
+  "/admin/member-signup-requests/[requestId]": {
+    routeKind: "canonical",
+    screenContractId: "admin.member-signup-request-detail",
+    primaryTask: "부족한 회원 정보를 입력해 Mattermost 가입 신청을 승인하거나 반려한다.",
+  },
   "/admin/members/[memberId]": {
     routeKind: "canonical",
     screenContractId: "admin.member-detail",
@@ -813,6 +860,11 @@ const routeContracts = {
     routeKind: "canonical",
     screenContractId: "admin.notifications",
     primaryTask: "내 운영 알림을 확인하고 읽음·수신 설정을 관리한다.",
+  },
+  "/admin/notification-templates": {
+    routeKind: "canonical",
+    screenContractId: "admin.notification-templates",
+    primaryTask: "모든 자동 알림 채널의 템플릿과 변수를 확인하고 수정한다.",
   },
   "/admin/partner-registrations": {
     routeKind: "canonical",

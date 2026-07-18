@@ -27,6 +27,10 @@ const screens = [
     key: "admin-members",
     storyId: "domains-admin-adminmembermanager--default",
   },
+  {
+    key: "admin-cycle",
+    storyId: "domains-admin-admincycleview--mattermost-sender-management",
+  },
 ] as const;
 
 const viewports = [

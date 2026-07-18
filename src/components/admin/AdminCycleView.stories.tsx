@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import AdminCycleView from "./AdminCycleView";
 
 const meta = {
@@ -43,7 +44,29 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { name: "기수별 운영" })).toBeInTheDocument();
+    await expect(canvas.getByRole("combobox", { name: "표시할 기수" })).toHaveValue("16");
+    await expect(canvas.getByRole("heading", { name: "16기 운영" })).toBeInTheDocument();
+    await expect(canvas.queryByRole("heading", { name: "15기 운영" })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("heading", { name: "14기 운영" })).not.toBeInTheDocument();
+  },
+};
+
+export const SelectedGeneration15: Story = {
+  args: {
+    requestedGeneration: "15",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("combobox", { name: "표시할 기수" })).toHaveValue("15");
+    await expect(canvas.getByRole("heading", { name: "15기 운영" })).toBeInTheDocument();
+    await expect(canvas.queryByRole("heading", { name: "16기 운영" })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("heading", { name: "14기 운영" })).not.toBeInTheDocument();
+  },
+};
 
 export const MattermostSenderManagement: Story = {
   args: {
@@ -95,5 +118,13 @@ export const MattermostSenderManagement: Story = {
     saveMattermostSenderAction: async () => {},
     testMattermostSenderAction: async () => {},
     disableMattermostSenderAction: async () => {},
+  },
+  play: async ({ canvasElement }) => {
+    const themeManagerElement = canvasElement.querySelector("#card-theme-manager");
+    if (!(themeManagerElement instanceof HTMLElement)) {
+      throw new Error("카드 색상 관리 영역을 찾지 못했습니다.");
+    }
+    const themeManager = within(themeManagerElement);
+    await expect(themeManager.getAllByRole("spinbutton")).toHaveLength(1);
   },
 };

@@ -8,6 +8,8 @@ import { getServerActionLogContext } from "@/lib/activity-logs";
 import type { AtomicAuditContext } from "@/lib/audit-rpc-context";
 import { MattermostApiError, MattermostClient } from "@/lib/mattermost/client";
 import { getActiveMattermostSenderKey, getMattermostSenderKeyring } from "@/lib/mattermost-senders/config";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import {
   encryptMattermostSenderCredentials,
 } from "@/lib/mattermost-senders/crypto";
@@ -31,6 +33,7 @@ import {
   deleteCohortCardTheme,
   upsertCohortCardTheme,
 } from "@/lib/cohort-card-themes";
+import { SITE_NAME } from "@/lib/site";
 import {
   logAdminAction,
   redirectAdminActionError,
@@ -329,12 +332,18 @@ export async function testMattermostSenderCandidateAction(formData: FormData) {
   }
 
   try {
+    const template = await resolveNotificationTemplate("mattermost.sender_test");
+    const variables = { siteName: SITE_NAME };
+    const message = [
+      renderNotificationTemplate(template.titleTemplate, variables),
+      renderNotificationTemplate(template.bodyTemplate, variables),
+    ].join("\n\n");
     const sender = await new MattermostClient().withAuthenticatedSender(
       candidate.credentials,
       async (mattermost) => {
         await mattermost.sendDirectMessage(
           recipient.userId,
-          "SSAFY Partnership Mattermost Sender 연결 테스트입니다.",
+          message,
         );
         return mattermost.user;
       },

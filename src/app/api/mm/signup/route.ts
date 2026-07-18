@@ -11,6 +11,8 @@ import {
 import { hashPassword } from "@/lib/password";
 import { getMattermostDisplayName } from "@/lib/mm-member-sync/snapshot";
 import { getMattermostCodeSession, clearMattermostCodeSession } from "@/lib/mattermost-code-session";
+import { classifyMattermostSignupProfile } from "@/lib/mm-signup-approval";
+import { createMattermostSignupApprovalRequest } from "@/lib/mm-signup-approval/repository";
 import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import { findMmUserDirectoryEntryByUserId, upsertMmUserDirectorySnapshot } from "@/lib/mm-directory";
 import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
@@ -64,6 +66,15 @@ export async function POST(request: Request) {
       await clearMattermostCodeSession();
       return errorResponse("verification_expired", 401);
     }
+    const profileClassification = classifyMattermostSignupProfile({
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    });
+    const approvalMode = verification.signupMode === "approval"
+      || profileClassification.mode === "approval";
     if (
       verification.subjectGeneration > 0
       && await isMattermostLoginDisabledForGeneration(verification.subjectGeneration)
@@ -107,8 +118,46 @@ export async function POST(request: Request) {
       return errorResponse("already_registered", 409, { redirectTo: "/auth/login" });
     }
 
-    const now = new Date().toISOString();
     const password = hashPassword(parsed.data.password);
+    if (approvalMode) {
+      const approvalRequest = await createMattermostSignupApprovalRequest({
+        mmUserId: user.id,
+        mattermostAccountId: directory.id,
+        mmUsername: user.username,
+        mattermostDisplayName: getMattermostDisplayName(user),
+        senderGeneration: verification.senderGeneration,
+        requestedGeneration: verification.subjectGeneration,
+        parseExclusionReason:
+          verification.parseExclusionReason ?? profileClassification.parseReason,
+        passwordHash: password.hash,
+        passwordSalt: password.salt,
+        servicePolicy: activePolicies.service,
+        privacyPolicy: activePolicies.privacy,
+        marketingPolicy,
+        marketingPolicyChecked: parsed.data.marketingPolicyChecked,
+        ipAddress: context.ipAddress ?? null,
+        userAgent: context.userAgent ?? null,
+      });
+      await clearMattermostCodeSession();
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_signup_approval_request",
+        status: "success",
+        actorType: "guest",
+        properties: {
+          generation: verification.subjectGeneration,
+          parseReason:
+            verification.parseExclusionReason ?? profileClassification.parseReason,
+          status: approvalRequest.status,
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        redirectTo: "/auth/signup/pending",
+      });
+    }
+
+    const now = new Date().toISOString();
     const { data: inserted, error: insertError } = await supabase
       .from("members")
       .insert({

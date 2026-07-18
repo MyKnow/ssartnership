@@ -101,3 +101,27 @@ export const Signup: Story = {
     await expect(canvas.getByRole("button", { name: "회원가입하기" })).toBeEnabled();
   },
 };
+
+export const ApprovalSignup: Story = {
+  args: {
+    session: {
+      mmUserId: "mattermost-user-unparsed",
+      mmUsername: "myknow",
+      displayName: "myknow",
+      subjectGeneration: 15,
+      senderGeneration: 15,
+      signupMode: "approval",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("textbox", { name: "MM 아이디" })).toBeDisabled();
+    await expect(canvas.queryByRole("textbox", { name: "이름" })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("textbox", { name: "기수" })).not.toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "모두 동의하고 신청하기" })).toBeDisabled();
+
+    await userEvent.type(canvas.getByLabelText("사이트 비밀번호"), "Password!123");
+    await userEvent.type(canvas.getByLabelText("비밀번호 확인"), "Password!123");
+    await expect(canvas.getByRole("button", { name: "모두 동의하고 신청하기" })).toBeEnabled();
+  },
+};

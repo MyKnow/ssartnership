@@ -11,6 +11,7 @@ import {
   type PushAudience,
 } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import type { NotificationTemplateContext } from "@/lib/notification-templates/context";
 
 export type NewPartnerAudienceMember = {
   id: string;
@@ -140,6 +141,12 @@ export async function sendCampusScopedNewPartnerNotification(params: {
   location: string;
   categoryLabel?: string | null;
   campusSlugs: string[];
+  campusNames?: string | null;
+  benefitSummary?: string | null;
+  conditions?: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  mapUrl?: string | null;
 }): Promise<CampusScopedNewPartnerNotificationResult> {
   const audience = await resolveNewPartnerPushAudience(params.campusSlugs);
   if (!audience) {
@@ -169,6 +176,21 @@ export async function sendCampusScopedNewPartnerNotification(params: {
         push: isPushConfigured(),
         mm: false,
       },
+      templateContext: {
+        kind: "new_partner",
+        partnerName: params.name.trim(),
+        partnerCategory: params.categoryLabel?.trim() || "제휴",
+        partnerLocation: params.location.trim(),
+        partnerUrl: notificationPayload.url,
+        campusNames:
+          params.campusNames?.trim() || audience.targetCampusLabels.join(", "),
+        benefitSummary:
+          params.benefitSummary?.trim() || "제휴처 상세 페이지에서 확인해 주세요.",
+        conditions: params.conditions?.trim() || "별도 이용 조건을 확인해 주세요.",
+        periodStart: params.periodStart?.trim() || "",
+        periodEnd: params.periodEnd?.trim() || "",
+        mapUrl: params.mapUrl?.trim() || "",
+      } satisfies NotificationTemplateContext,
     },
     "automatic",
   );

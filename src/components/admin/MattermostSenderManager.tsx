@@ -11,6 +11,7 @@ import type {
   MattermostSenderMetadata,
   MattermostSenderStatus,
 } from "@/lib/mattermost-senders/types";
+import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import {
   parseMattermostSenderCredentialInput,
   type MattermostSenderCredentialFieldErrors,
@@ -50,15 +51,23 @@ export default function MattermostSenderManager({
   saveAction,
   testAction,
   disableAction,
+  generation,
+  anchorId,
 }: {
   senders: MattermostSenderMetadata[];
   loadError?: boolean;
   saveAction: AdminFormAction;
   testAction: AdminFormAction;
   disableAction: AdminFormAction;
+  generation?: number;
+  anchorId?: string;
 }) {
   const [fieldErrors, setFieldErrors] = useState<MattermostSenderCredentialFieldErrors>({});
   const formRef = useRef<HTMLFormElement>(null);
+  const generationLabel = typeof generation === "number" ? formatSsafyYearLabel(generation) : null;
+  const visibleSenders = typeof generation === "number"
+    ? senders.filter((sender) => sender.generation === generation)
+    : senders;
 
   function focusFirstInvalidField(errors: MattermostSenderCredentialFieldErrors) {
     const fieldName = (["generation", "loginId", "password"] as const).find(
@@ -90,12 +99,14 @@ export default function MattermostSenderManager({
   }
 
   return (
-    <Card id="mattermost-sender" tone="elevated" className="grid gap-6">
+    <Card id={anchorId ?? (generationLabel ? `mattermost-sender-${generation}` : "mattermost-sender")} tone="elevated" className="grid gap-6">
       <div className="grid gap-2">
-        <p className="ui-kicker">Super Admin only</p>
+        <p className="ui-kicker">{generationLabel ? `${generationLabel} 운영` : "Super Admin only"}</p>
         <h2 className="text-lg font-semibold text-foreground">Mattermost Sender</h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          기수별 Sender 로그인 정보는 서버에서 암호화됩니다. 저장 후 테스트 DM이 성공해야만 활성화되며, 기존 활성 Sender는 교체가 확정될 때까지 유지됩니다.
+          {generationLabel
+            ? `${generationLabel} 가입·알림에 사용할 Sender를 관리합니다. 로그인 정보는 서버에서 암호화되고 테스트 DM 성공 후에만 활성화됩니다.`
+            : "기수별 Sender 로그인 정보는 서버에서 암호화됩니다. 저장 후 테스트 DM이 성공해야만 활성화되며, 기존 활성 Sender는 교체가 확정될 때까지 유지됩니다."}
         </p>
       </div>
 
@@ -112,9 +123,13 @@ export default function MattermostSenderManager({
         onSubmit={validateCandidateForm}
       >
         <div className="grid gap-2">
-          <h3 className="text-sm font-semibold text-foreground">신규 또는 교체 후보 등록</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            {generationLabel ? `${generationLabel} 신규 또는 교체 후보 등록` : "신규 또는 교체 후보 등록"}
+          </h3>
           <p className="text-xs leading-5 text-muted-foreground">
-            팀과 채널은 기수 기준으로 자동 계산됩니다. 로그인 ID와 비밀번호는 저장 이후 다시 표시되지 않습니다.
+            {generationLabel
+              ? "팀과 채널은 " + generationLabel + " 기준으로 자동 계산됩니다. 로그인 ID와 비밀번호는 저장 이후 다시 표시되지 않습니다."
+              : "팀과 채널은 기수 기준으로 자동 계산됩니다. 로그인 ID와 비밀번호는 저장 이후 다시 표시되지 않습니다."}
           </p>
         </div>
         <div className="grid gap-4 lg:grid-cols-[minmax(7rem,0.45fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
@@ -126,6 +141,8 @@ export default function MattermostSenderManager({
               min={1}
               max={99}
               inputMode="numeric"
+              defaultValue={generation}
+              readOnly={generation !== undefined}
               aria-invalid={Boolean(fieldErrors.generation)}
               aria-describedby={fieldErrors.generation ? "mattermost-sender-generation-error" : undefined}
               required
@@ -163,16 +180,20 @@ export default function MattermostSenderManager({
 
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-foreground">등록된 Sender</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            {generationLabel ? `${generationLabel} 등록된 Sender` : "등록된 Sender"}
+          </h3>
           <p className="text-xs text-muted-foreground">식별자 일부와 검증 상태만 표시합니다.</p>
         </div>
-        {senders.length === 0 ? (
+        {visibleSenders.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-surface-muted px-4 py-5 text-sm text-muted-foreground">
-            등록된 Sender가 없습니다. 기수를 입력해 후보를 먼저 저장해 주세요.
+            {generationLabel
+              ? `${generationLabel}에 등록된 Sender가 없습니다. 위에서 후보를 저장해 주세요.`
+              : "등록된 Sender가 없습니다. 기수를 입력해 후보를 먼저 저장해 주세요."}
           </div>
         ) : (
           <div className="grid gap-3">
-            {senders.map((sender) => {
+            {visibleSenders.map((sender) => {
               const canTest = sender.status === "pending";
               const canDisable = sender.status === "pending" || sender.status === "active";
               const confirmationText = `${sender.generation}기 비활성화`;

@@ -31,7 +31,18 @@ export type ExpiringPartnerTarget = {
   period_end: string;
   visibility?: string | null;
   company_id?: string | null;
+  category_label?: string | null;
+  location?: string | null;
 };
+
+function getDaysUntilEnd(periodEnd: string, today = getKstDateString()) {
+  const end = Date.parse(`${periodEnd}T00:00:00+09:00`);
+  const start = Date.parse(`${today}T00:00:00+09:00`);
+  if (!Number.isFinite(end) || !Number.isFinite(start)) {
+    return "";
+  }
+  return String(Math.max(0, Math.round((end - start) / (24 * 60 * 60 * 1000))));
+}
 
 export type PushBatchSummary = {
   processedPartners: number;
@@ -141,6 +152,15 @@ export async function runExpiringPartnerPushBatch(
             push: true,
             mm: false,
           },
+          templateContext: {
+            kind: "expiring_partner",
+            partnerName: partner.name,
+            partnerCategory: partner.category_label?.trim() || "제휴",
+            partnerLocation: partner.location?.trim() || "",
+            periodEnd: partner.period_end,
+            daysUntilEnd: getDaysUntilEnd(partner.period_end),
+            partnerUrl: payload.url,
+          },
         },
         "automatic",
       );
@@ -230,6 +250,15 @@ export async function runOperationalExpiringPartnerNotifications(
             daysBefore,
             endDate: partner.period_end,
           },
+          templateContext: {
+            kind: "admin_expiring_partner",
+            partnerName: partner.name,
+            partnerCategory: partner.category_label?.trim() || "제휴",
+            partnerLocation: partner.location?.trim() || "",
+            periodEnd: partner.period_end,
+            daysUntilEnd: String(daysBefore),
+            adminUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
+          },
         });
         summary.adminCreated += 1;
       } else {
@@ -272,6 +301,15 @@ export async function runOperationalExpiringPartnerNotifications(
             companyId: partner.company_id,
             daysBefore,
             endDate: partner.period_end,
+          },
+          templateContext: {
+            kind: "partner_expiring_partner",
+            partnerName: partner.name,
+            partnerCategory: partner.category_label?.trim() || "제휴",
+            partnerLocation: partner.location?.trim() || "",
+            periodEnd: partner.period_end,
+            daysUntilEnd: String(daysBefore),
+            partnerUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
           },
         });
         summary.partnerCreated += 1;

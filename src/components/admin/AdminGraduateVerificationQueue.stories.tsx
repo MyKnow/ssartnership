@@ -1,3 +1,4 @@
+import { expect, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import AdminGraduateVerificationQueue from "./AdminGraduateVerificationQueue";
 
@@ -54,4 +55,18 @@ export const Default: Story = {};
 
 export const Empty: Story = {
   args: { requests: [], setupEmailRetries: [] },
+};
+
+export const MediaViewer: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await expect(canvas.getByRole("button", { name: "수료증 보기" })).toBeInTheDocument();
+    await expect(canvas.queryByRole("link", { name: "수료증 보기" })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "사진 보기" }));
+    await expect(body.getByRole("dialog", { name: "본인 사진 미리보기" })).toBeInTheDocument();
+    await userEvent.click(body.getByRole("button", { name: "닫기" }));
+    await expect(body.queryByRole("dialog", { name: "본인 사진 미리보기" })).not.toBeInTheDocument();
+  },
 };

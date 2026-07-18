@@ -160,11 +160,11 @@ export async function rejectGraduateVerificationAction(formData: FormData) {
     path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
   });
   try {
-    await rejectGraduateVerificationRequest({ requestId, adminId: session.adminId, reason });
+    const result = await rejectGraduateVerificationRequest({ requestId, adminId: session.adminId, reason });
     await logAdminAction("graduate_verification_reject", {
       targetType: "graduate_verification_request",
       targetId: requestId,
-      properties: { reasonLength: reason.trim().length },
+      properties: { reasonLength: reason.trim().length, emailSent: result.emailSent },
     });
     revalidateGraduateVerificationPaths();
   } catch {

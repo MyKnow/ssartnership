@@ -15,6 +15,7 @@ import {
   type MemberSignupCompleteFieldErrors,
 } from "@/lib/member-signup";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
+import type { MattermostSignupMode } from "@/lib/mm-signup-approval";
 import type { PolicyDocument, RequiredPolicyMap } from "@/lib/policy-documents";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
@@ -25,6 +26,7 @@ type Props = {
     displayName: string;
     subjectGeneration: number;
     senderGeneration: number;
+    signupMode?: MattermostSignupMode;
   };
   requiredPolicies: RequiredPolicyMap;
   marketingPolicy: PolicyDocument | null;
@@ -39,6 +41,8 @@ export default function MattermostSignupCompleteForm({
 }: Props) {
   const router = useRouter();
   const { notify } = useToast();
+  const signupMode = session.signupMode ?? "direct";
+  const isApprovalMode = signupMode === "approval";
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [checked, setChecked] = useState({
@@ -152,10 +156,20 @@ export default function MattermostSignupCompleteForm({
           setFormError("선택한 기수는 회원가입을 진행할 수 없습니다.");
           return;
         }
+        if (data.error === "approval_pending") {
+          notify("승인 요청이 접수되었습니다.");
+          router.replace(data.redirectTo ?? "/auth/signup/pending");
+          return;
+        }
         setFormError("회원가입을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
 
+      if (isApprovalMode) {
+        notify("승인 요청이 접수되었습니다.");
+        router.replace(data.redirectTo ?? "/auth/signup/pending");
+        return;
+      }
       sessionStorage.setItem("signup:success", "1");
       notify("회원가입이 완료되었습니다.");
       router.replace(data.redirectTo ?? "/");
@@ -167,23 +181,27 @@ export default function MattermostSignupCompleteForm({
 
   return (
     <div className="mt-6 flex flex-col gap-5">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={isApprovalMode ? "grid gap-4" : "grid gap-4 sm:grid-cols-3"}>
         <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
           MM 아이디
           <Input value={session.mmUsername} disabled aria-label="MM 아이디" />
         </label>
-        <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-          이름
-          <Input value={session.displayName} disabled aria-label="이름" />
-        </label>
-        <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-          기수
-          <Input
-            value={formatSsafyYearLabel(session.subjectGeneration)}
-            disabled
-            aria-label="기수"
-          />
-        </label>
+        {!isApprovalMode ? (
+          <>
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              이름
+              <Input value={session.displayName} disabled aria-label="이름" />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              기수
+              <Input
+                value={formatSsafyYearLabel(session.subjectGeneration)}
+                disabled
+                aria-label="기수"
+              />
+            </label>
+          </>
+        ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -271,11 +289,15 @@ export default function MattermostSignupCompleteForm({
       <Button
         onClick={handleSubmit}
         loading={pending}
-        loadingText="가입 처리 중"
+        loadingText={isApprovalMode ? "신청 처리 중" : "가입 처리 중"}
         disabled={actionState.disabled}
         className="w-full"
       >
-        {actionState.label}
+        {isApprovalMode
+          ? actionState.label === "회원가입하기"
+            ? "회원가입 신청"
+            : "모두 동의하고 신청하기"
+          : actionState.label}
       </Button>
     </div>
   );

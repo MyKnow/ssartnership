@@ -480,9 +480,18 @@ test("canonical admin screens expose default actual-view stories at every requir
     ["/admin/logs", "AdminLogsManager"],
     ["/admin/graduate-verifications", "AdminGraduateVerificationQueue"],
     ["/admin/profile-photos", "AdminProfilePhotoReviewQueue"],
+    ["/admin/member-signup-requests", "AdminMemberSignupApprovalQueue"],
+    [
+      "/admin/member-signup-requests/[requestId]",
+      "AdminMemberSignupApprovalDetail",
+    ],
     ["/admin/members", "AdminMemberManager"],
     ["/admin/members/[memberId]", "AdminMemberDetailView"],
     ["/admin/notifications", "AdminNotificationsView"],
+    [
+      "/admin/notification-templates",
+      "AdminNotificationTemplateManager",
+    ],
     ["/admin/partner-registrations", "AdminPartnerRegistrationsView"],
     ["/admin/partner-requests", "PartnerChangeRequestQueue"],
     ["/admin/partners", "AdminPartnerManager"],

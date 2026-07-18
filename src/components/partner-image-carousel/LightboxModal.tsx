@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import type { CarouselOffset } from "./types";
 import { clampCarouselZoom, getTouchDistance } from "./helpers";
@@ -19,6 +19,7 @@ export default function LightboxModal({
   onPanMove,
   onPanEnd,
   fallback,
+  navigationUnit = "사진",
 }: {
   open: boolean;
   canNavigate: boolean;
@@ -35,6 +36,7 @@ export default function LightboxModal({
   onPanMove: (x: number, y: number) => void;
   onPanEnd: () => void;
   fallback: ReactNode;
+  navigationUnit?: "사진" | "페이지";
 }) {
   const pinchRef = useRef({
     distance: 0,
@@ -44,12 +46,36 @@ export default function LightboxModal({
   const mouseDraggingRef = useRef(false);
   const lastTapRef = useRef(0);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      } else if (canNavigate && event.key === "ArrowLeft") {
+        onPrev();
+      } else if (canNavigate && event.key === "ArrowRight") {
+        onNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [canNavigate, onClose, onNext, onPrev, open]);
+
   if (!open) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      role="dialog"
+      aria-modal="true"
+      aria-label={name}
+    >
       <button
         type="button"
         className="absolute right-6 top-6 z-20 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
@@ -64,7 +90,7 @@ export default function LightboxModal({
             type="button"
             className="absolute left-4 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
             onClick={onPrev}
-            aria-label="이전 사진"
+            aria-label={`이전 ${navigationUnit}`}
           >
             <svg
               width={18}
@@ -84,7 +110,7 @@ export default function LightboxModal({
             type="button"
             className="absolute right-4 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
             onClick={onNext}
-            aria-label="다음 사진"
+            aria-label={`다음 ${navigationUnit}`}
           >
             <svg
               width={18}

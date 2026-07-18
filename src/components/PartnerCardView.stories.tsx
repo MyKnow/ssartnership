@@ -73,7 +73,16 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const PublicCard: Story = {};
+export const PublicCard: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("식음료")).toHaveClass("h-9", "py-0.5");
+    await expect(canvas.getByLabelText("즐겨찾기 128개")).toHaveClass(
+      "h-9",
+      "py-1",
+    );
+  },
+};
 
 export const InteractivePublicCard: Story = {
   play: async ({ canvasElement, args }) => {
@@ -127,7 +136,11 @@ export const Favoritable: Story = {
         count: 127,
       });
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "즐겨찾기 해제" }));
+    const favoriteButton = canvas.getByRole("button", { name: "즐겨찾기 해제" });
+    const favoriteChip = favoriteButton.querySelector("span.h-9");
+    await expect(favoriteChip).not.toBeNull();
+    await expect(favoriteChip).toHaveClass("py-1");
+    await userEvent.click(favoriteButton);
     await expect(await canvas.findByRole("button", { name: "즐겨찾기" })).toBeInTheDocument();
   },
 };

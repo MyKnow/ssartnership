@@ -42,7 +42,7 @@ export default function PartnerCardMeta({
       }
     : null;
   const categoryBadgeClass =
-    "h-11 whitespace-nowrap px-2 py-1 text-xs font-medium tracking-[0.02em]";
+    "h-9 whitespace-nowrap px-2 py-0.5 text-xs font-medium tracking-[0.02em]";
   const categoryBadge = handleCategoryClick ? (
     <button
       type="button"

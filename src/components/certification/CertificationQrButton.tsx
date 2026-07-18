@@ -20,17 +20,33 @@ const COUNTDOWN_TICK_MS = 250;
 export default function CertificationQrButton({
   roleLabel = "교육생",
   className,
+  open,
+  onOpenChange,
 }: {
   roleLabel?: string;
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [verifyUrl, setVerifyUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : internalOpen;
+
+  const updateOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (!isControlled) {
+        setInternalOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [isControlled, onOpenChange],
+  );
 
   const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : 0;
   const remainingSeconds = expiresAtMs
@@ -38,13 +54,13 @@ export default function CertificationQrButton({
     : CERTIFICATION_QR_TTL_SECONDS;
 
   useEffect(() => {
-    if (!open) {
+    if (!isOpen) {
       return;
     }
     const originalOverflow = document.body.style.overflow;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        updateOpen(false);
       }
     };
     document.body.style.overflow = "hidden";
@@ -53,15 +69,15 @@ export default function CertificationQrButton({
       document.body.style.overflow = originalOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [isOpen, updateOpen]);
 
   useEffect(() => {
-    if (!open) {
+    if (!isOpen) {
       return;
     }
     const timer = window.setInterval(() => setNow(Date.now()), COUNTDOWN_TICK_MS);
     return () => window.clearInterval(timer);
-  }, [open]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!verifyUrl) {
@@ -118,14 +134,14 @@ export default function CertificationQrButton({
   }, []);
 
   useEffect(() => {
-    if (!open) {
+    if (!isOpen) {
       return;
     }
     void requestQr();
-  }, [open, requestQr]);
+  }, [isOpen, requestQr]);
 
   useEffect(() => {
-    if (!open || !expiresAtMs) {
+    if (!isOpen || !expiresAtMs) {
       return;
     }
     const delay = Math.max(0, expiresAtMs - Date.now());
@@ -133,7 +149,7 @@ export default function CertificationQrButton({
       void requestQr();
     }, delay);
     return () => window.clearTimeout(refreshTimer);
-  }, [open, expiresAtMs, requestQr]);
+  }, [isOpen, expiresAtMs, requestQr]);
 
   const expiryLabel = useMemo(() => {
     if (remainingSeconds <= 1) {
@@ -155,20 +171,20 @@ export default function CertificationQrButton({
             eventName: "certification_qr_open",
             targetType: "certification_qr",
           });
-          setOpen(true);
+          updateOpen(true);
         }}
       >
         QR 표시
       </Button>
 
-      {open && typeof document !== "undefined"
+      {isOpen && typeof document !== "undefined"
         ? createPortal(
             <div className="fixed inset-0 z-50 bg-slate-950/72 backdrop-blur-sm">
               <button
                 type="button"
                 className="absolute inset-0"
                 aria-label="QR 닫기"
-                onClick={() => setOpen(false)}
+                onClick={() => updateOpen(false)}
               />
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4 sm:p-6">
                 <section
@@ -186,7 +202,7 @@ export default function CertificationQrButton({
                     <button
                       type="button"
                       className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
-                      onClick={() => setOpen(false)}
+                      onClick={() => updateOpen(false)}
                       aria-label="닫기"
                     >
                       ✕

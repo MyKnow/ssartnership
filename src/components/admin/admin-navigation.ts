@@ -96,6 +96,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "graduate_verifications" },
       },
       {
+        href: "/admin/member-signup-requests",
+        label: "가입 승인",
+        description: "Mattermost 프로필 파싱 실패 회원 검토",
+        iconKey: "queue",
+        permission: { resource: "member_signup_requests" },
+      },
+      {
         href: "/admin/profile-photos",
         label: "프로필 사진",
         description: "사진 변경과 기존 사진 점검",
@@ -175,6 +182,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         description: "메시지 발송과 로그 확인",
         iconKey: "megaphone",
         permission: { resource: "notifications" },
+      },
+      {
+        href: "/admin/notification-templates",
+        label: "알림 템플릿",
+        description: "채널별 자동 알림 문구 관리",
+        iconKey: "megaphone",
+        permission: { resource: "notification_templates" },
       },
       {
         href: "/admin/advertisement",

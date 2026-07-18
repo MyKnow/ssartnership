@@ -144,11 +144,13 @@ export default function PartnerCardView({
                   : undefined
               }
               compact
+              reducedVerticalPadding={variant !== "list"}
               className={variant === "list" ? "!h-11 !px-3" : undefined}
             />
           ) : (
             <PartnerFavoriteCountLabel
               favoriteCount={metrics?.favoriteCount ?? undefined}
+              reducedVerticalPadding={variant !== "list"}
               className={variant === "list" ? "!px-3" : undefined}
             />
           )

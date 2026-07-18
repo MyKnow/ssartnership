@@ -7,7 +7,9 @@ import {
   MattermostSenderUnavailableError,
   withActiveMattermostSenderForGeneration,
 } from "@/lib/mattermost-senders/service";
-import { buildMattermostMessage } from "@/lib/admin-notification-ops-utils";
+import {
+  absoluteUrl,
+} from "@/lib/admin-notification-ops-utils";
 import {
   createPushMessageLog,
   finalizePushMessageLog,
@@ -21,6 +23,13 @@ import type {
   AdminNotificationSource,
   AdminNotificationType,
 } from "@/lib/admin-notification-ops";
+import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  mergeNotificationTemplateVariables,
+  type NotificationTemplateContext,
+} from "@/lib/notification-templates/context";
 
 type AudienceMember = {
   id: string;
@@ -154,16 +163,29 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
   body: string;
   url?: string | null;
   members: AudienceMember[];
+  source: AdminNotificationSource;
+  templateContext?: NotificationTemplateContext;
 }): Promise<ChannelDeliveryResult> {
   const bookkeepingErrors: string[] = [];
   let sent = 0;
   let failed = 0;
-  const message = buildMattermostMessage({
-    notificationType: params.notificationType,
-    title: params.title,
-    body: params.body,
-    url: params.url,
+  const template = await resolveNotificationTemplate(
+    getCampaignTemplateKey("mattermost", params.notificationType, params.source),
+  );
+  const categoryLabel = params.notificationType === "marketing" ? "광고" : "공지";
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: params.templateContext,
+    common: {
+      categoryLabel,
+      title: params.title,
+      body: params.body,
+      targetLink: params.url ? `\n[바로가기](${absoluteUrl(params.url)})` : "",
+    },
   });
+  const message = [
+    renderNotificationTemplate(template.titleTemplate, templateVariables),
+    renderNotificationTemplate(template.bodyTemplate, templateVariables),
+  ].filter(Boolean).join("\n");
   const grouped = new Map<number, AudienceMember[]>();
   const withoutSender: AudienceMember[] = [];
 
@@ -252,6 +274,7 @@ export async function sendPushCampaignDeliveries(params: {
     tag: string;
   };
   source: AdminNotificationSource;
+  templateContext?: NotificationTemplateContext;
   resolvedAudience: ResolvedPushAudience;
   subscriptions: StoredSubscription[];
   getWebPush: () => Promise<WebPushModule>;
@@ -260,13 +283,29 @@ export async function sendPushCampaignDeliveries(params: {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
+  const template = await resolveNotificationTemplate(
+    getCampaignTemplateKey("push", params.payload.type, params.source),
+  );
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: params.templateContext,
+    common: {
+      title: params.payload.title,
+      body: params.payload.body,
+      targetUrl: params.payload.url,
+    },
+  });
+  const payload = {
+    ...params.payload,
+    title: renderNotificationTemplate(template.titleTemplate, templateVariables),
+    body: renderNotificationTemplate(template.bodyTemplate, templateVariables),
+  };
   const messageLog = await createPushMessageLog({
-    payload: params.payload,
+    payload,
     source: params.source,
     audience: params.resolvedAudience,
   });
   const webpush = await params.getWebPush();
-  const serialized = buildNotificationPayload(params.payload);
+  const serialized = buildNotificationPayload(payload);
 
   let sent = 0;
   let failed = 0;
@@ -292,7 +331,7 @@ export async function sendPushCampaignDeliveries(params: {
           messageLogId: messageLog.id,
           memberId: subscription.member_id,
           subscriptionId: subscription.id,
-          payload: params.payload,
+          payload,
           status: "sent",
         }),
         notificationRepository.recordNotificationDelivery({
@@ -316,7 +355,7 @@ export async function sendPushCampaignDeliveries(params: {
           messageLogId: messageLog.id,
           memberId: subscription.member_id,
           subscriptionId: subscription.id,
-          payload: params.payload,
+          payload,
           status: "failed",
           errorMessage,
         }),
@@ -354,10 +393,15 @@ export async function sendMattermostCampaignDeliveries(params: {
   body: string;
   url?: string | null;
   members: AudienceMember[];
+  source?: AdminNotificationSource;
+  templateContext?: NotificationTemplateContext;
 }): Promise<ChannelDeliveryResult> {
   if (!params.members.length) {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
-  return sendMattermostCampaignDeliveriesDirect(params);
+  return sendMattermostCampaignDeliveriesDirect({
+    ...params,
+    source: params.source ?? "manual",
+  });
 }

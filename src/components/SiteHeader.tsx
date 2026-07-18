@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { BellIcon, TicketIcon } from "@heroicons/react/24/outline";
+import {
+  BellIcon,
+  IdentificationIcon,
+  TicketIcon,
+} from "@heroicons/react/24/outline";
 import { BellAlertIcon } from "@heroicons/react/24/solid";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
@@ -58,7 +62,7 @@ export default function SiteHeader({
             >
               <BrandWordmark className="text-lg sm:text-xl" />
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <div className="hidden items-center gap-2 xl:flex">
                 <Button variant="soft" href={suggestHref}>
                   제휴 제안하기
@@ -92,11 +96,25 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div className="hidden md:flex">
+              {initialSession ? (
+                <div className="xl:hidden">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    href="/certification"
+                    prefetch={false}
+                    ariaLabel="내 인증"
+                    title="내 인증"
+                  >
+                    <IdentificationIcon className="h-5 w-5" />
+                  </Button>
+                </div>
+              ) : null}
+              <div className="flex">
                 <ThemeToggle />
               </div>
               {initialSession ? (
-                <div className="xl:hidden">
+                <div className="max-[359px]:hidden xl:hidden">
                   <Button
                     variant="secondary"
                     size="icon"

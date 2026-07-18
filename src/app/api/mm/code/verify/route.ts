@@ -12,6 +12,7 @@ import {
 } from "@/lib/mattermost-code-verification";
 import { setMattermostCodeSession } from "@/lib/mattermost-code-session";
 import { getMattermostDisplayName } from "@/lib/mm-member-sync/snapshot";
+import { classifyMattermostSignupProfile } from "@/lib/mm-signup-approval";
 import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import {
   getResetPasswordCompletionCookieOptions,
@@ -127,6 +128,13 @@ export async function POST(request: Request) {
       );
       const mmUsername = verifiedUser.username.trim();
       const displayName = getMattermostDisplayName(verifiedUser).trim();
+      const profileClassification = classifyMattermostSignupProfile({
+        id: verifiedUser.id,
+        username: verifiedUser.username,
+        nickname: verifiedUser.nickname,
+        firstName: verifiedUser.firstName,
+        lastName: verifiedUser.lastName,
+      });
       if (
         verifiedUser.id !== verified.mmUserId
         || verifiedUser.deleteAt > 0
@@ -144,6 +152,8 @@ export async function POST(request: Request) {
         displayName,
         subjectGeneration: verified.subjectGeneration,
         senderGeneration: verified.senderGeneration,
+        signupMode: profileClassification.mode,
+        parseExclusionReason: profileClassification.parseReason,
       });
       await recordMemberAuthAttempt("mattermost-code-verify", throttleContext, true);
       await logAuthSecurity({

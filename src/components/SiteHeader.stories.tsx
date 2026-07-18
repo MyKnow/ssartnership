@@ -1,6 +1,7 @@
 "use client";
 
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import { ThemeProvider } from "next-themes";
 import SiteHeader from "./SiteHeader";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -46,5 +47,14 @@ export const Guest: Story = {};
 export const SignedIn: Story = {
   args: {
     initialSession: signedInSession,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    if (window.innerWidth < 1280) {
+      await expect(
+        await canvas.findByRole("link", { name: "내 인증" }),
+      ).toHaveAttribute("href", "/certification");
+    }
+    await expect(canvas.getByRole("button", { name: "테마 변경" })).toBeVisible();
   },
 };

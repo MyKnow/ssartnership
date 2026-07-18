@@ -33,7 +33,7 @@ const THEMED_STUDENT_SCHEME_CLASSNAMES = {
   campusBadgeClassName:
     "border-[color:var(--cert-chip-border)] bg-[var(--cert-chip-bg)] text-[color:var(--cert-chip-text)] ring-1 ring-[color:var(--cert-chip-border)]",
   cardClassName:
-    "border-[color:var(--cert-border)] bg-[linear-gradient(135deg,var(--cert-bg-from)_0%,var(--cert-bg-via)_44%,var(--cert-bg-to)_100%)] shadow-[0_28px_90px_var(--cert-shadow)]",
+    "border-[color:var(--cert-border)] bg-[linear-gradient(135deg,var(--cert-bg-from)_0%,var(--cert-bg-via)_44%,var(--cert-bg-to)_100%)] shadow-[0_3.75cqw_12cqw_var(--cert-shadow)]",
   frameRingClassName: "ring-[color:var(--cert-ring)]",
   glowClassName:
     "bg-[radial-gradient(circle,var(--cert-glow-strong)_0%,var(--cert-glow-soft)_22%,transparent_58%)]",
@@ -57,7 +57,7 @@ const STAFF_SCHEME: CertificationScheme = {
   campusBadgeClassName:
     "bg-white/10 text-white/90 ring-1 ring-white/10",
   cardClassName:
-    "border-white/18 bg-[linear-gradient(135deg,#0b1220_0%,#111827_46%,#1f2937_100%)] shadow-[0_28px_90px_rgba(15,23,42,0.35)]",
+    "border-white/18 bg-[linear-gradient(135deg,#0b1220_0%,#111827_46%,#1f2937_100%)] shadow-[0_3.75cqw_12cqw_rgba(15,23,42,0.35)]",
   frameRingClassName: "ring-white/8",
   glowClassName:
     "bg-[radial-gradient(circle,rgba(255,255,255,0.24)_0%,rgba(255,255,255,0.1)_20%,transparent_56%)]",
@@ -79,7 +79,7 @@ const GRADUATE_SCHEME: CertificationScheme = {
   campusBadgeClassName:
     "bg-white/85 text-slate-800 ring-1 ring-slate-400/40 dark:bg-slate-800/80 dark:text-slate-100 dark:ring-slate-500/50",
   cardClassName:
-    "border-slate-300/55 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_46%,#e2e8f0_100%)] shadow-[0_28px_90px_rgba(100,116,139,0.18)] dark:border-slate-500/45 dark:bg-[linear-gradient(135deg,#0f172a_0%,#111827_46%,#1f2937_100%)] dark:shadow-[0_28px_90px_rgba(15,23,42,0.35)]",
+    "border-slate-300/55 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_46%,#e2e8f0_100%)] shadow-[0_3.75cqw_12cqw_rgba(100,116,139,0.18)] dark:border-slate-500/45 dark:bg-[linear-gradient(135deg,#0f172a_0%,#111827_46%,#1f2937_100%)] dark:shadow-[0_3.75cqw_12cqw_rgba(15,23,42,0.35)]",
   frameRingClassName: "ring-slate-300/30 dark:ring-slate-500/16",
   glowClassName:
     "bg-[radial-gradient(circle,rgba(148,163,184,0.2)_0%,rgba(148,163,184,0.08)_22%,transparent_58%)]",

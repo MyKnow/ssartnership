@@ -94,6 +94,24 @@
 - 반응형·분석: 모바일은 사진·이름·사유 입력·액션을 한 열로 배치하고, 데스크톱은 변경 요청과 기존 사진 점검을 다열로 표시한다. 사진 열람·승인·반려를 개인정보 원문 없이 audit한다.
 - 수용 기준: 모든 회원이 사진 교체를 요청할 수 있고, pending/rejected 상태에서는 인증 카드와 유효 QR 이미지가 노출되지 않는다. 기존 MM 사진 반려도 동일한 재제출 흐름을 사용한다.
 
+<!-- screen-contract: admin.member-signup-requests -->
+## `/admin/member-signup-requests` — Mattermost 가입 승인 큐
+
+- 목표·위계: 승인 대기 건수 → 신청한 Mattermost 식별자·표시명·기수 → 파싱 제외 사유 → 상세 검토 순이다.
+- 액션·흐름: primary는 승인 대기 신청 상세 열기이며, 목록에서는 회원 비밀번호·해시·토큰을 표시하거나 수정하지 않는다.
+- 경계·상태: `member_signup_requests.read` 권한과 Super Admin 이중 게이트를 적용한다. 기본, 빈 큐, 승인 대기, 권한 없음, 일부 조회 실패 상태를 제공한다.
+- 반응형·분석: 모바일은 신청 카드와 상세 이동을 한 열로, 데스크톱은 식별자·신청 기수·사유를 dense list로 표시한다. 목록 조회와 상세 열기를 감사 로그에 남긴다.
+- 수용 기준: 승인 요청의 안전한 메타데이터만 노출되고 저장된 비밀번호 material은 서버 내부에서도 목록·응답·로그로 반환되지 않는다.
+
+<!-- screen-contract: admin.member-signup-request-detail -->
+## `/admin/member-signup-requests/[requestId]` — Mattermost 가입 승인 상세
+
+- 목표·위계: Mattermost 식별자와 파싱 사유 → 운영자가 보완할 이름·기수·캠퍼스 → 승인/반려 액션 순이다.
+- 액션·흐름: Super Admin이 이름·기수·캠퍼스를 입력한 뒤 승인하거나, 명확한 사유를 남겨 반려한다. 이미 처리된 요청은 재처리하지 않는다.
+- 경계·상태: service-role 전용 승인/반려 RPC와 pending 상태 잠금을 사용한다. 기본, 처리 중, 승인 완료, 반려 완료, 충돌, 권한 없음 상태를 제공한다.
+- 반응형·분석: 모바일은 입력과 액션을 세로로 배치하고, 데스크톱은 읽기 전용 Mattermost 정보와 보완 입력을 분리한다. 승인·반려 actor와 결과를 감사 로그에 남긴다.
+- 수용 기준: 승인 시 새 회원 레코드와 필수 약관 동의가 원자적으로 생성되고, 반려·승인 후 비밀번호 hash/salt가 즉시 제거되며 요청은 재사용할 수 없다.
+
 <!-- screen-contract: admin.member-detail -->
 ## `/admin/members/[memberId]` — 회원 상세
 
@@ -111,6 +129,15 @@
 - 경계·상태: 현재 admin audience 알림만 조회한다. 기본, 빈 상태, 다건, filter, pagination, 읽음 처리 중, 일부 실패를 제공한다.
 - 반응형·분석: 모바일 compact row, 데스크톱 목록/설정 분할을 쓴다. open/read/settings를 기록한다.
 - 수용 기준: 제목이 `내 알림`이며 발송 composer를 포함하지 않고 내부 허용 목적지만 연다.
+
+<!-- screen-contract: admin.notification-templates -->
+## `/admin/notification-templates` — 알림 템플릿 관리
+
+- 목표·위계: 채널·기능 그룹 → 기본/수정 상태 → 제목·내용 템플릿 → 허용 변수 → 저장/기본값 복원 순이다.
+- 액션·흐름: Super Admin만 이메일·Mattermost·푸시·인앱 자동 알림의 템플릿을 수정하거나 기본값으로 복원할 수 있다. 변수는 `{변수이름}` 형태로 삽입한다.
+- 경계·상태: `notification_templates` 권한과 Super Admin 이중 게이트를 적용한다. DB에는 수정본만 저장하고, 템플릿이 없거나 잘못되면 코드 기본값으로 안전하게 대체한다.
+- 반응형·분석: 모바일은 템플릿 카드를 한 열로 표시하고 변수 삽입 컨트롤을 줄바꿈한다. 데스크톱은 그룹과 제목·내용 입력을 넓게 보여준다. 템플릿 저장·복원을 감사 로그에 남기며 실제 본문·토큰은 기록하지 않는다.
+- 수용 기준: 알 수 없는 변수와 필수 변수 누락을 서버에서 거부하고, 일반 텍스트만 허용해 HTML 주입을 막는다. 사용자 비밀번호·인증 코드·토큰 같은 실제 값은 저장하거나 미리 채우지 않는다.
 
 <!-- screen-contract: admin.partner-registrations -->
 ## `/admin/partner-registrations` — 신규 제휴 접수

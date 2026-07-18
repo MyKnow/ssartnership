@@ -6,6 +6,8 @@ import type { MattermostVerificationRequest } from "@/lib/mattermost-code-input"
 import { MattermostApiError, type MattermostUser } from "@/lib/mattermost/client";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
 import { getMattermostSenderRoutingTemplate } from "@/lib/mattermost-senders/routing";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import {
   MattermostSenderUnavailableError,
   withActiveMattermostSenderForGeneration,
@@ -172,15 +174,19 @@ async function markCodeDelivery(input: {
   }
 }
 
-function buildVerificationMessage(purpose: MattermostVerificationPurpose, code: string) {
+async function buildVerificationMessage(purpose: MattermostVerificationPurpose, code: string) {
   const title = purpose === "signup" ? "회원가입" : "비밀번호 재설정";
+  const template = await resolveNotificationTemplate(
+    purpose === "signup" ? "mattermost.signup_code" : "mattermost.reset_password_code",
+  );
+  const variables = {
+    title: `${title} 인증 코드`,
+    code,
+  };
   return [
-    `[싸트너십] ${title} 인증 코드`,
-    "",
-    `인증 코드: \`${code}\``,
-    "코드는 10분 동안 한 번만 사용할 수 있습니다.",
-    "본인이 요청하지 않았다면 이 메시지를 무시해 주세요.",
-  ].join("\n");
+    renderNotificationTemplate(template.titleTemplate, variables),
+    renderNotificationTemplate(template.bodyTemplate, variables),
+  ].filter(Boolean).join("\n\n");
 }
 
 /**
@@ -217,11 +223,12 @@ export async function issueMattermostVerificationCode(input: {
   }
 
   try {
+    const message = await buildVerificationMessage(input.purpose, code);
     await withActiveMattermostSenderForGeneration(
       target.senderGeneration,
       (session) => session.sendDirectMessage(
         target.user.id,
-        buildVerificationMessage(input.purpose, code),
+        message,
       ),
     );
     await markCodeDelivery({ codeId: reservation.codeId, sent: true });

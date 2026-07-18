@@ -1,5 +1,8 @@
 import { notificationRepository } from "@/lib/repositories";
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
+import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { getPushEnv, isPushConfigured, wrapPushDbError } from "./config.ts";
 import { getDefaultPushAudience, resolvePushAudience } from "./audience.ts";
@@ -42,12 +45,37 @@ async function getWebPush() {
 }
 
 export async function sendPushToAudience(
-  payload: PushPayload,
+  rawPayload: PushPayload,
   options: PushSendOptions = {},
 ) {
   if (!isPushConfigured()) {
     throw new PushError("config_missing", "Web Push 환경 변수가 설정되지 않았습니다.");
   }
+
+  const template = await resolveNotificationTemplate(
+    getCampaignTemplateKey("push", rawPayload.type),
+  );
+  const inAppTemplate = await resolveNotificationTemplate(
+    getCampaignTemplateKey("in_app", rawPayload.type),
+  );
+  const templateVariables = {
+    title: rawPayload.title,
+    body: rawPayload.body,
+    targetUrl: rawPayload.url ?? "/notifications",
+  };
+  const payload: PushPayload = {
+    ...rawPayload,
+    title: renderNotificationTemplate(template.titleTemplate, templateVariables),
+    body: renderNotificationTemplate(template.bodyTemplate, templateVariables),
+  };
+  const renderedInAppTitle = renderNotificationTemplate(
+    inAppTemplate.titleTemplate,
+    templateVariables,
+  );
+  const renderedInAppBody = renderNotificationTemplate(
+    inAppTemplate.bodyTemplate,
+    templateVariables,
+  );
 
   const resolvedAudience = await resolvePushAudience(
     options.audience ?? getDefaultPushAudience(),
@@ -80,8 +108,8 @@ export async function sendPushToAudience(
   const createdNotification = notificationRecipientIds.length
     ? await notificationRepository.createNotification({
         type: payload.type,
-        title: payload.title,
-        body: payload.body,
+        title: renderedInAppTitle,
+        body: renderedInAppBody,
         targetUrl: normalizeNotificationTargetUrl(payload.url) ?? "/notifications",
         metadata: {
           campaignKind: "admin_notification_operation",
@@ -267,4 +295,97 @@ export async function sendPushToAudience(
     delivered,
     failed,
   } satisfies DeliveryResult;
+}
+
+export async function sendPushTemplateTest(input: {
+  memberId: string;
+  payload: PushPayload;
+}) {
+  if (!isPushConfigured()) {
+    throw new PushError("config_missing", "Web Push 환경 변수가 설정되지 않았습니다.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .select("id,member_id,endpoint,p256dh,auth")
+    .eq("member_id", input.memberId)
+    .eq("is_active", true);
+  if (error) {
+    throw wrapPushDbError(error, "푸시 구독을 불러오지 못했습니다.");
+  }
+
+  const subscriptions = (data ?? []) as StoredSubscription[];
+  if (subscriptions.length === 0) {
+    return { targeted: 0, delivered: 0, failed: 0 } satisfies DeliveryResult;
+  }
+
+  const messageLog = await createPushMessageLog({
+    payload: input.payload,
+    source: "manual",
+    audience: {
+      scope: "member",
+      label: "템플릿 테스트 수신 회원",
+      year: null,
+      campus: null,
+      memberId: input.memberId,
+      memberIds: [input.memberId],
+    },
+  });
+  const webpush = await getWebPush();
+  const serialized = buildNotificationPayload({
+    ...input.payload,
+    url: sanitizeNotificationUrl(input.payload.url) ?? "/",
+  });
+  let delivered = 0;
+  let failed = 0;
+
+  for (const subscription of subscriptions) {
+    try {
+      await webpush.sendNotification(
+        {
+          endpoint: subscription.endpoint,
+          expirationTime: null,
+          keys: {
+            p256dh: subscription.p256dh,
+            auth: subscription.auth,
+          },
+        },
+        serialized,
+      );
+      delivered += 1;
+      await Promise.all([
+        markPushSuccess(subscription.id),
+        logPushDelivery({
+          messageLogId: messageLog.id,
+          memberId: subscription.member_id,
+          subscriptionId: subscription.id,
+          payload: input.payload,
+          status: "sent",
+        }),
+      ]);
+    } catch {
+      failed += 1;
+      await Promise.all([
+        markPushFailure(subscription, "템플릿 테스트 푸시 발송 실패", false),
+        logPushDelivery({
+          messageLogId: messageLog.id,
+          memberId: subscription.member_id,
+          subscriptionId: subscription.id,
+          payload: input.payload,
+          status: "failed",
+          errorMessage: "템플릿 테스트 푸시 발송 실패",
+        }),
+      ]);
+    }
+  }
+
+  await finalizePushMessageLog({
+    id: messageLog.id,
+    targeted: subscriptions.length,
+    delivered,
+    failed,
+  });
+
+  return { targeted: subscriptions.length, delivered, failed } satisfies DeliveryResult;
 }

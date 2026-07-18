@@ -12,6 +12,8 @@ export const ADMIN_PERMISSION_RESOURCES = [
   "graduate_verifications",
   "profile_images",
   "mattermost_senders",
+  "member_signup_requests",
+  "notification_templates",
 ] as const;
 
 export type AdminPermissionResource = (typeof ADMIN_PERMISSION_RESOURCES)[number];
@@ -59,6 +61,8 @@ const RESOURCE_LABELS: Record<AdminPermissionResource, string> = {
   graduate_verifications: "수료생 인증",
   profile_images: "프로필 사진",
   mattermost_senders: "Mattermost Sender",
+  member_signup_requests: "가입 승인 요청",
+  notification_templates: "알림 템플릿",
 };
 
 const ACTION_LABELS: Record<AdminPermissionAction, string> = {
@@ -186,6 +190,7 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
       cycles: { read: true, update: true },
       graduate_verifications: { read: true, update: true },
       profile_images: { read: true, update: true },
+      member_signup_requests: { read: false, update: false },
     }),
   },
   {
@@ -224,6 +229,7 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
       events: { read: true },
       graduate_verifications: { read: true, update: true },
       profile_images: { read: true, update: true },
+      member_signup_requests: { read: false, update: false },
     }),
   },
   {
@@ -232,7 +238,10 @@ export const ADMIN_PERMISSION_TEMPLATES: AdminPermissionTemplate[] = [
     description: "운영 데이터를 조회만 할 수 있습니다.",
     permissions: grant(
       ADMIN_PERMISSION_RESOURCES.filter(
-        (resource) => resource !== "mattermost_senders",
+        (resource) =>
+          resource !== "mattermost_senders"
+          && resource !== "member_signup_requests"
+          && resource !== "notification_templates",
       ),
       ["read"],
     ),

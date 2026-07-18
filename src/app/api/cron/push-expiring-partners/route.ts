@@ -35,14 +35,25 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdminClient();
   const { data: partners, error } = await supabase
     .from("partners")
-    .select("id,company_id,name,period_start,period_end,visibility")
+    .select("id,company_id,name,location,period_start,period_end,visibility,categories(label)")
     .in("period_end", targetDates);
 
   if (error) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 
-  const activePartners = filterExpiringPartnersForPush(partners ?? [], today);
+  const activePartners = filterExpiringPartnersForPush(
+    (partners ?? []).map((partner) => {
+      const category = Array.isArray(partner.categories)
+        ? partner.categories[0]
+        : partner.categories;
+      return {
+        ...partner,
+        category_label: category?.label ?? null,
+      };
+    }),
+    today,
+  );
   const sevenDayPartners = activePartners.filter(
     (partner) => partner.period_end === targetDateByOffset.get(7),
   );

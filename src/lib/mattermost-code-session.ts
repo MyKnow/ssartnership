@@ -1,6 +1,11 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "@/lib/hmac.js";
+import {
+  normalizeMattermostSignupParseReason,
+  type MattermostSignupMode,
+  type MattermostSignupParseReason,
+} from "@/lib/mm-signup-approval";
 
 const COOKIE_NAME = "mattermost_code_session";
 const SESSION_TTL_MS = 20 * 60 * 1000;
@@ -14,6 +19,8 @@ export type MattermostCodeSession = {
   displayName: string;
   subjectGeneration: number;
   senderGeneration: number;
+  signupMode?: MattermostSignupMode;
+  parseExclusionReason?: MattermostSignupParseReason | null;
 };
 
 type SignedMattermostCodeSession = MattermostCodeSession & {
@@ -53,7 +60,19 @@ function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null
   ) {
     return null;
   }
-  return payload as SignedMattermostCodeSession;
+  const signupMode = payload.purpose === "signup"
+    ? payload.signupMode === "approval"
+      ? "approval"
+      : "direct"
+    : undefined;
+  const parseExclusionReason = payload.purpose === "signup"
+    ? normalizeMattermostSignupParseReason(payload.parseExclusionReason)
+    : null;
+  return {
+    ...payload,
+    ...(signupMode ? { signupMode } : {}),
+    ...(parseExclusionReason ? { parseExclusionReason } : {}),
+  } as SignedMattermostCodeSession;
 }
 
 function verifySessionToken(token: string) {

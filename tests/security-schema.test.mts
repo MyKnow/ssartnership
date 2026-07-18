@@ -60,6 +60,7 @@ const sensitiveTables = [
   "mattermost_sender_credentials",
   "mattermost_sender_test_attempts",
   "mattermost_verification_codes",
+  "notification_templates",
 ] as const;
 
 function escapeRegex(value: string) {

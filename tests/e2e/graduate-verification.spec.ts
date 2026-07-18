@@ -57,20 +57,31 @@ test.describe("graduate verification application", () => {
     await page.getByRole("button", { name: "이메일 인증하기" }).click();
 
     await expect(page.getByRole("heading", { name: "2. 교육 정보" })).toBeVisible();
+    await expect(
+      page.getByText("이메일 인증이 완료되었습니다. 교육 정보를 입력해 주세요."),
+    ).toHaveCount(0);
     await page.getByRole("textbox", { name: "이름" }).fill("테스트 수료생");
     await page.getByRole("textbox", { name: "교육 시작 연도" }).fill("2026");
     await page.getByRole("combobox", { name: "교육 시작 월" }).selectOption("1");
     await page.getByRole("textbox", { name: "교육 종료 연도" }).fill("2026");
     await page.getByRole("combobox", { name: "교육 종료 월" }).selectOption("6");
     await page.getByRole("combobox", { name: "캠퍼스" }).selectOption("서울");
-    await expect(page.getByText("자동 계산된 15기")).toBeVisible();
-    await page.getByRole("button", { name: "파일 제출로 계속" }).click();
+    await expect(page.getByText("자동 계산된 15기")).toHaveCount(0);
+    await expect(
+      page.getByText("교육 시작 연·월로 계산되며 직접 수정할 수 없습니다."),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "다음" }).click();
+    const submitButton = page.getByRole("button", { name: "제출", exact: true });
+    await expect(submitButton).toBeDisabled();
 
     await page.getByLabel("교육이수증 PDF 파일 선택").setInputFiles({
       name: "certificate.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4\n%%EOF"),
     });
+    await expect(page.getByText("PDF(최대 10MB)")).toBeVisible();
+    await expect(page.getByText("PDF, 최대 10MB, 5페이지 이하")).toHaveCount(0);
+    await expect(submitButton).toBeDisabled();
     await page.getByLabel("본인 사진 파일 선택").setInputFiles({
       name: "profile.png",
       mimeType: "image/png",
@@ -78,10 +89,32 @@ test.describe("graduate verification application", () => {
     });
     await expect(page.getByText("본인 사진 자르기")).toBeVisible();
     await page.getByRole("button", { name: "적용" }).click();
-    await expect(page.getByText("사진 크롭 완료")).toBeVisible();
+    await expect(page.getByText("사진 크롭 완료")).toHaveCount(0);
+    await expect(
+      page.getByText("얼굴이 분명하게 보이는 사진(최대 5MB)"),
+    ).toBeVisible();
+    await expect(
+      page.getByText("JPEG, PNG, WebP, HEIC, HEIF · 최대 5MB · 얼굴이 분명하게 보이는 사진"),
+    ).toHaveCount(0);
+    await expect(submitButton).toBeDisabled();
+    await page.getByRole("button", { name: "선택한 본인 사진 크게 보기" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "선택한 본인 사진 확대" }),
+    ).toBeVisible();
+    await expect(page.getByRole("img", { name: "선택한 본인 사진 확대" })).toBeVisible();
+    await page.getByRole("button", { name: "닫기", exact: true }).click();
 
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: "수료생 인증 제출" }).click();
+    await page
+      .getByText(
+        "교육이수증과 본인 사진을 수료생 인증 검토 및 인증 카드·유효 QR 검증 화면 표시 목적으로 처리하는 데 동의합니다.",
+        { exact: true },
+      )
+      .click();
+    await expect(
+      page.getByText("사진은 공개 URL로 제공하지 않습니다."),
+    ).toHaveCount(0);
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
     const submitted = await submitRequest;
     expect(submitted.postDataJSON()).toMatchObject({
       email: "graduate@example.com",
@@ -91,5 +124,11 @@ test.describe("graduate verification application", () => {
       profileImageUploadId: "profile_image-upload",
     });
     await expect(page.getByText("수료생 인증 신청을 제출했습니다.")).toBeVisible();
+    await expect(
+      page.getByText("수료증과 본인 사진을 검토합니다. 보완이 필요하면 같은 이메일로 다시 안내합니다."),
+    ).toHaveCount(0);
+    const withdrawButton = page.getByRole("button", { name: "신청 철회" });
+    await expect(withdrawButton).toBeVisible();
+    await expect(withdrawButton).toHaveClass(/text-danger/);
   });
 });

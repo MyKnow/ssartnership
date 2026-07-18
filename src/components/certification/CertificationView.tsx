@@ -40,6 +40,7 @@ export default function CertificationView({
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
+  const [isQrOpen, setQrOpen] = useState(false);
   const profile = parseSsafyProfile(
     member.displayName ?? member.mattermostUsername ?? "",
   );
@@ -131,28 +132,34 @@ export default function CertificationView({
         yearLabel={yearLabel}
         campusLabel={campusLabel}
         description=""
+        onCardClick={() => setQrOpen(true)}
         footer={
           <div className="flex h-full min-w-0 flex-nowrap items-center justify-between gap-[2cqw]">
-            <div className="flex min-w-0 flex-1 items-baseline gap-[1.5cqw]">
-              <span className={cn("shrink-0 text-[clamp(0.6875rem,1.7cqw,0.875rem)] font-medium uppercase tracking-[0.12em]", scheme.mutedTextClassName)}>
+            <div
+              data-certification-card-timestamp-row
+              className="flex min-w-0 flex-1 items-center gap-[1.5cqw]"
+            >
+              <span className={cn("shrink-0 text-[3cqw] font-medium uppercase tracking-[0.12em]", scheme.mutedTextClassName)}>
                 인증 시간
               </span>
               <time
                 data-certification-card-timestamp
-                className="min-w-0 truncate whitespace-nowrap text-[clamp(0.875rem,2.6cqw,1.25rem)] font-semibold"
+                className="min-w-0 truncate whitespace-nowrap text-[3cqw] font-semibold"
               >
                 {dateLabel} {timeLabel}
               </time>
             </div>
             <div
               data-certification-qr-touch-target
-              className="flex min-h-11 min-w-11 items-center justify-center"
+              className="relative flex min-w-0 items-center justify-center"
             >
               <CertificationQrButton
                 roleLabel={roleLabel}
+                open={isQrOpen}
+                onOpenChange={setQrOpen}
                 className={cn(
                   scheme.qrButtonClassName,
-                  "relative !h-[9cqw] !min-h-0 !w-[17cqw] !min-w-0 !rounded-[2.5cqw] !px-[2cqw] text-[clamp(0.75rem,2.4cqw,1.125rem)] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
+                  "relative !h-[5.9cqw] !min-h-0 !w-auto !min-w-0 !rounded-[2.5cqw] !px-[2.1cqw] text-[2.4cqw] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
                 )}
               />
             </div>

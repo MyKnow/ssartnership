@@ -20,6 +20,13 @@ import type {
 } from "@/lib/push/types";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  mergeNotificationTemplateVariables,
+  type NotificationTemplateContext,
+} from "@/lib/notification-templates/context";
 import {
   EMPTY_CHANNEL_RESULTS,
   absoluteUrl,
@@ -61,6 +68,7 @@ export type AdminNotificationComposerInput = {
   audience: PushAudience;
   channels: AdminNotificationChannelSelection;
   confirmationText?: string | null;
+  templateContext?: NotificationTemplateContext;
 };
 
 export type AdminNotificationPreviewReasonCode =
@@ -208,6 +216,7 @@ type NotificationCampaignMetadata = {
   warnings?: string[];
   campaignStatus?: AdminNotificationOperationLog["status"];
   completedAt?: string | null;
+  templateContextKind?: string;
 };
 
 type NotificationRow = {
@@ -622,11 +631,34 @@ export async function sendAdminNotificationCampaign(
       channels: context.preview.channels,
     },
   };
+  if (input.templateContext) {
+    metadata.templateContextKind = input.templateContext.kind;
+  }
+
+  const inAppTemplate = await resolveNotificationTemplate(
+    getCampaignTemplateKey("in_app", input.notificationType, source),
+  );
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: input.templateContext,
+    common: {
+      title: input.title.trim(),
+      body: input.body.trim(),
+      targetUrl: context.destinationUrl,
+    },
+  });
+  const renderedInAppTitle = renderNotificationTemplate(
+    inAppTemplate.titleTemplate,
+    templateVariables,
+  );
+  const renderedInAppBody = renderNotificationTemplate(
+    inAppTemplate.bodyTemplate,
+    templateVariables,
+  );
 
   const created = await notificationRepository.createNotification({
     type: input.notificationType,
-    title: input.title.trim(),
-    body: input.body.trim(),
+    title: renderedInAppTitle,
+    body: renderedInAppBody,
     targetUrl: context.destinationUrl,
     metadata,
     recipientMemberIds: context.selectedChannels.includes("in_app")
@@ -650,6 +682,7 @@ export async function sendAdminNotificationCampaign(
       notificationId: created.notification.id,
       payload: toPushPayload(input),
       source,
+      templateContext: input.templateContext,
       resolvedAudience: context.resolvedAudience,
       subscriptions: context.pushSubscriptions,
       getWebPush,
@@ -677,6 +710,8 @@ export async function sendAdminNotificationCampaign(
       body: input.body,
       url: input.url?.trim() ? normalizeNotificationTargetUrl(input.url) : null,
       members: mattermostMembers,
+      source,
+      templateContext: input.templateContext,
     });
     channelResults.mm = {
       targeted: mmResult.targeted,
