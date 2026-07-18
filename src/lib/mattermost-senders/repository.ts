@@ -7,12 +7,18 @@ import {
 } from "./crypto";
 import {
   MATTERMOST_SENDER_STATUSES,
+  type ActiveMattermostSenderHealthRecord,
   type ActiveMattermostSender,
   type MattermostSenderMetadata,
   type MattermostSenderSafeErrorCode,
   type MattermostSenderTestContext,
   type MattermostSenderStatus,
 } from "./types";
+import {
+  MATTERMOST_SENDER_HEALTH_STATUSES,
+  getMattermostSenderHealthFailurePolicy,
+  type MattermostSenderHealthStatus,
+} from "./health";
 
 type SenderAuditInput = {
   context: AtomicAuditContext;
@@ -47,6 +53,11 @@ function isSafeErrorCode(value: unknown): value is MattermostSenderSafeErrorCode
     "request_rejected",
     "configuration_invalid",
   ].includes(value);
+}
+
+function isHealthStatus(value: unknown): value is MattermostSenderHealthStatus {
+  return typeof value === "string"
+    && (MATTERMOST_SENDER_HEALTH_STATUSES as readonly string[]).includes(value);
 }
 
 function asNullableString(value: unknown) {
@@ -97,6 +108,16 @@ function mapMetadata(row: unknown): MattermostSenderMetadata | null {
     return null;
   }
 
+  const healthFailureCount = value.health_failure_count;
+  if (
+    healthFailureCount !== undefined
+    && (typeof healthFailureCount !== "number"
+      || !Number.isSafeInteger(healthFailureCount)
+      || healthFailureCount < 0)
+  ) {
+    return null;
+  }
+
   return {
     id,
     generation,
@@ -111,6 +132,13 @@ function mapMetadata(row: unknown): MattermostSenderMetadata | null {
       : null,
     lastErrorCode: isSafeErrorCode(value.last_error_code)
       ? value.last_error_code
+      : null,
+    healthStatus: isHealthStatus(value.health_status) ? value.health_status : "unknown",
+    healthCheckedAt: asIsoString(value.health_checked_at),
+    healthFailureCount: healthFailureCount ?? 0,
+    healthBlockedUntil: asIsoString(value.health_blocked_until),
+    healthLastErrorCode: isSafeErrorCode(value.health_last_error_code)
+      ? value.health_last_error_code
       : null,
     expiresAt: asIsoString(value.expires_at),
     createdAt,
@@ -287,6 +315,71 @@ export class MattermostSenderRepository {
       senderMattermostUserId,
       senderMattermostUsername: asNullableString(value.sender_username_hint),
     };
+  }
+
+  async listActiveSendersForHealthCheck(
+    keyring: MattermostSenderKeyring,
+  ): Promise<ActiveMattermostSenderHealthRecord[]> {
+    const { data, error } = await getSupabaseAdminClient().rpc(
+      "list_active_mattermost_sender_credentials_for_health_check",
+    );
+    if (error) {
+      throwRepositoryError();
+    }
+    const rows: unknown[] = Array.isArray(data) ? data : [];
+    return rows.flatMap((row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return [];
+      const value = row as Record<string, unknown>;
+      const encryptedCredentials = getEncryptedCredentials(value);
+      const id = value.id;
+      const generation = value.generation;
+      const senderMattermostUserId = value.sender_mm_user_id;
+      if (
+        typeof id !== "string"
+        || typeof generation !== "number"
+        || !Number.isSafeInteger(generation)
+        || typeof senderMattermostUserId !== "string"
+        || !senderMattermostUserId
+        || !encryptedCredentials
+      ) {
+        return [];
+      }
+      return [{
+        id,
+        generation,
+        credentials: decryptMattermostSenderCredentials(encryptedCredentials, keyring),
+        senderMattermostUserId,
+        senderMattermostUsername: asNullableString(value.sender_username_hint),
+      }];
+    });
+  }
+
+  async recordHealthSuccess(senderId: string) {
+    const { error } = await getSupabaseAdminClient().rpc(
+      "record_mattermost_sender_health_success",
+      { p_sender_id: senderId },
+    );
+    if (error) {
+      throwRepositoryError();
+    }
+  }
+
+  async recordHealthFailure(input: {
+    senderId: string;
+    errorCode: MattermostSenderSafeErrorCode;
+  }) {
+    const policy = getMattermostSenderHealthFailurePolicy(input.errorCode);
+    if (!policy) return;
+    const { error } = await getSupabaseAdminClient().rpc(
+      "record_mattermost_sender_health_failure",
+      {
+        p_sender_id: input.senderId,
+        p_error_code: input.errorCode,
+      },
+    );
+    if (error) {
+      throwRepositoryError();
+    }
   }
 
   async getTestContext(

@@ -3,6 +3,7 @@ import type {
   MattermostSenderCredentials,
 } from "./crypto";
 import type { MattermostSenderTestRecipientKind } from "./routing";
+import type { MattermostSenderHealthStatus } from "./health";
 
 export const MATTERMOST_SENDER_STATUSES = [
   "pending",
@@ -35,6 +36,11 @@ export type MattermostSenderMetadata = {
   lastTestedAt: string | null;
   lastTestTargetKind: MattermostSenderTestRecipientKind | null;
   lastErrorCode: MattermostSenderSafeErrorCode | null;
+  healthStatus: MattermostSenderHealthStatus;
+  healthCheckedAt: string | null;
+  healthFailureCount: number;
+  healthBlockedUntil: string | null;
+  healthLastErrorCode: MattermostSenderSafeErrorCode | null;
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -47,6 +53,14 @@ export type MattermostSenderEncryptedRecord = MattermostSenderMetadata & {
 };
 
 export type ActiveMattermostSender = {
+  id: string;
+  generation: number;
+  credentials: MattermostSenderCredentials;
+  senderMattermostUserId: string;
+  senderMattermostUsername: string | null;
+};
+
+export type ActiveMattermostSenderHealthRecord = {
   id: string;
   generation: number;
   credentials: MattermostSenderCredentials;

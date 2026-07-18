@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import { ResetPasswordPageView } from "@/components/auth/AuthEntryViews";
 import { getHeaderSession } from "@/lib/header-session";
-import { getActiveMattermostSenderGenerations } from "@/lib/mattermost-senders/availability";
+import { getMattermostSenderSignupAvailability } from "@/lib/mattermost-senders/availability";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -14,14 +14,17 @@ export const metadata: Metadata = {
 };
 
 export default async function ResetPasswordPage() {
-  const [headerSession, activeSenderGenerations] = await Promise.all([
+  const [headerSession, senderAvailability] = await Promise.all([
     getHeaderSession(),
-    getActiveMattermostSenderGenerations(),
+    getMattermostSenderSignupAvailability(),
   ]);
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
-      <ResetPasswordPageView activeSenderGenerations={activeSenderGenerations} />
+      <ResetPasswordPageView
+        activeSenderGenerations={senderAvailability.activeSenderGenerations}
+        configuredSenderGenerations={senderAvailability.configuredSenderGenerations}
+      />
     </div>
   );
 }
