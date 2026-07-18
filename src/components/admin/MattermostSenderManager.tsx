@@ -11,6 +11,7 @@ import type {
   MattermostSenderMetadata,
   MattermostSenderStatus,
 } from "@/lib/mattermost-senders/types";
+import type { MattermostSenderHealthStatus } from "@/lib/mattermost-senders/health";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import {
   parseMattermostSenderCredentialInput,
@@ -32,6 +33,23 @@ const STATUS_VARIANTS: Record<
   active: "success",
   superseded: "neutral",
   disabled: "danger",
+};
+
+const HEALTH_LABELS: Record<MattermostSenderHealthStatus, string> = {
+  unknown: "상태 미확인",
+  healthy: "접근 정상",
+  cooldown: "일시 대기",
+  blocked: "접근 차단",
+};
+
+const HEALTH_VARIANTS: Record<
+  MattermostSenderHealthStatus,
+  "success" | "warning" | "neutral" | "danger"
+> = {
+  unknown: "neutral",
+  healthy: "success",
+  cooldown: "warning",
+  blocked: "danger",
 };
 
 function formatTimestamp(value: string | null) {
@@ -206,11 +224,15 @@ export default function MattermostSenderManager({
                     <div className="grid gap-1">
                       <p className="text-base font-semibold text-foreground">{sender.generation}기 · {sender.loginIdHint}</p>
                       <p className="text-xs text-muted-foreground">
-                        최근 검증 {formatTimestamp(sender.verifiedAt)} · {formatLastTest(sender)}
+                        최근 검증 {formatTimestamp(sender.verifiedAt)} · {formatLastTest(sender)} ·
+                        상태 확인 {formatTimestamp(sender.healthCheckedAt)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant={STATUS_VARIANTS[sender.status]}>{STATUS_LABELS[sender.status]}</Badge>
+                      <Badge variant={HEALTH_VARIANTS[sender.healthStatus]}>
+                        {HEALTH_LABELS[sender.healthStatus]}
+                      </Badge>
                       {sender.senderUsernameHint ? <Badge variant="neutral">{sender.senderUsernameHint}</Badge> : null}
                     </div>
                   </div>
@@ -224,6 +246,12 @@ export default function MattermostSenderManager({
                   {sender.lastErrorCode ? (
                     <p className="rounded-2xl bg-danger/10 px-3 py-2 text-xs leading-5 text-danger">
                       마지막 테스트는 완료되지 않았습니다. 안전한 오류 코드: {sender.lastErrorCode}
+                    </p>
+                  ) : null}
+
+                  {sender.healthStatus === "cooldown" || sender.healthStatus === "blocked" ? (
+                    <p className="rounded-2xl bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
+                      런타임 접근 실패 {sender.healthFailureCount}회 · 다음 재시도 {formatTimestamp(sender.healthBlockedUntil)}
                     </p>
                   ) : null}
 

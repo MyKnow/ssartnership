@@ -8,7 +8,10 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { getFieldErrorClass } from "@/components/ui/form-field-state";
 import { parseMattermostVerificationRequest } from "@/lib/mattermost-code-input";
-import { isMattermostSenderGenerationAvailable } from "@/lib/mattermost-senders/availability-rules";
+import {
+  getMattermostSenderGenerationOptions,
+  isMattermostSenderGenerationAvailable,
+} from "@/lib/mattermost-senders/availability-rules";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   formatSsafyYearLabel,
@@ -37,27 +40,18 @@ function getErrorMessage(code: string | undefined) {
   return "요청을 처리하지 못했습니다. 입력값을 확인해 주세요.";
 }
 
-const mattermostGenerationOptions = [
-  {
-    value: String(SSAFY_STAFF_YEAR),
-    label: formatSsafyYearLabel(SSAFY_STAFF_YEAR),
-  },
-  ...getSelectableSsafyYears().map((year) => ({
-    value: String(year),
-    label: formatSsafyYearLabel(year),
-  })),
-];
-
 export default function MattermostCodeVerificationForm({
   purpose,
   returnTo,
   className,
   activeSenderGenerations = [],
+  configuredSenderGenerations = [],
 }: {
   purpose: Purpose;
   returnTo?: string;
   className?: string;
   activeSenderGenerations?: readonly number[];
+  configuredSenderGenerations?: readonly number[];
 }) {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -71,6 +65,16 @@ export default function MattermostCodeVerificationForm({
   const generationRef = useRef<HTMLSelectElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const isSignup = purpose === "signup";
+  const mattermostGenerationOptions = getMattermostSenderGenerationOptions({
+    activeSenderGenerations,
+    configuredSenderGenerations,
+    selectableSenderGenerations: getSelectableSsafyYears(),
+  }).map((generation) => ({
+    value: String(generation),
+    label: generation === SSAFY_STAFF_YEAR
+      ? formatSsafyYearLabel(SSAFY_STAFF_YEAR)
+      : formatSsafyYearLabel(generation),
+  }));
 
   function focusFirstField(nextErrors: Partial<Record<"username" | "generation", string>>) {
     if (nextErrors.username) {
