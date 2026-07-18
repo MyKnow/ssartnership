@@ -8,6 +8,10 @@ import {
   MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
   validateGraduatePhotoUpload,
 } from "@/lib/graduate-verification";
+import {
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import { normalizeImageUpload } from "@/lib/image-upload/transform.server";
 
 const PDF_MAGIC = Buffer.from("%PDF-");
 const PDF_SECURITY_MARKERS = {
@@ -172,14 +176,11 @@ export async function normalizeMattermostProfileImage(input: {
   contentType: string;
   source: Buffer;
 }) {
-  if (!PROFILE_CONTENT_TYPES.has(input.contentType)) {
-    throw new Error("Mattermost 프로필 사진 형식을 확인해 주세요.");
-  }
   if (input.source.length === 0 || input.source.length > MAX_GRADUATE_PROFILE_IMAGE_BYTES) {
     throw new Error("Mattermost 프로필 사진 크기를 확인해 주세요.");
   }
 
-  let metadata: sharp.Metadata;
+  let metadata: sharp.Metadata | null = null;
   try {
     metadata = await sharp(input.source, {
       animated: false,
@@ -187,40 +188,27 @@ export async function normalizeMattermostProfileImage(input: {
       limitInputPixels: MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
     }).metadata();
   } catch {
-    throw new Error("Mattermost 프로필 사진을 읽지 못했습니다.");
+    // HEIC/HEIF can require the common @discourse/heic fallback. The common
+    // normalizer below is the authoritative byte/MIME/pixel validator.
+    metadata = null;
   }
 
-  const detectedContentType = getExpectedContentType(metadata.format);
-  if (!detectedContentType || detectedContentType !== input.contentType) {
-    throw new Error("Mattermost 프로필 사진 형식을 확인해 주세요.");
-  }
   if (
-    (metadata.width ?? 0) < MIN_MATTERMOST_PROFILE_IMAGE_DIMENSION
-    || (metadata.height ?? 0) < MIN_MATTERMOST_PROFILE_IMAGE_DIMENSION
+    metadata
+    && (
+      (metadata.width ?? 0) < MIN_MATTERMOST_PROFILE_IMAGE_DIMENSION
+      || (metadata.height ?? 0) < MIN_MATTERMOST_PROFILE_IMAGE_DIMENSION
+    )
   ) {
     throw new Error("Mattermost 프로필 사진 해상도가 너무 낮습니다.");
   }
 
   try {
-    const buffer = await sharp(input.source, {
-      animated: false,
-      failOn: "error",
-      limitInputPixels: MAX_GRADUATE_PROFILE_IMAGE_PIXELS,
-    })
-      .rotate()
-      .resize(GRADUATE_PROFILE_IMAGE_SIZE, GRADUATE_PROFILE_IMAGE_SIZE, {
-        fit: "cover",
-        position: "centre",
-      })
-      .webp({ quality: 82, effort: 4 })
-      .toBuffer();
-    return {
-      buffer,
-      contentType: "image/webp" as const,
-      sha256: createHash("sha256").update(buffer).digest("hex"),
-      width: GRADUATE_PROFILE_IMAGE_SIZE,
-      height: GRADUATE_PROFILE_IMAGE_SIZE,
-    };
+    return await normalizeImageUpload({
+      source: input.source,
+      declaredContentType: input.contentType,
+      policy: resolveImageTransformPolicy("profile", "profile"),
+    });
   } catch {
     throw new Error("Mattermost 프로필 사진을 안전하게 변환하지 못했습니다.");
   }

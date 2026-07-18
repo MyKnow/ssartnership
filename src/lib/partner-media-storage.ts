@@ -5,50 +5,22 @@ import {
   PARTNER_MEDIA_BUCKET,
 } from "@/lib/partner-media";
 
-export async function uploadPartnerMediaFile(
+export function buildPartnerMediaStoragePath(
   partnerId: string,
   role: "thumbnail" | "gallery",
-  file: File,
   index: number,
+  uploadId: string = randomUUID(),
 ) {
-  const supabase = getSupabaseAdminClient();
-  const storagePath = `partners/${partnerId.trim()}/${role}/${index}-${randomUUID()}.webp`;
-
-  const { error } = await supabase.storage.from(PARTNER_MEDIA_BUCKET).upload(storagePath, file, {
-    contentType: file.type || "image/webp",
-    cacheControl: "31536000",
-    upsert: false,
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const { data } = supabase.storage.from(PARTNER_MEDIA_BUCKET).getPublicUrl(storagePath);
-  return data.publicUrl;
+  return `partners/${partnerId.trim()}/${role}/${index}-${uploadId}.webp`;
 }
 
-export async function uploadPartnerRegistrationMediaFile(
+export function buildPartnerRegistrationMediaStoragePath(
   requestId: string,
   role: "thumbnail" | "gallery",
-  file: File,
   index: number,
+  uploadId: string = randomUUID(),
 ) {
-  const supabase = getSupabaseAdminClient();
-  const storagePath = `registration-requests/${requestId.trim()}/${role}/${index}-${randomUUID()}.webp`;
-
-  const { error } = await supabase.storage.from(PARTNER_MEDIA_BUCKET).upload(storagePath, file, {
-    contentType: file.type || "image/webp",
-    cacheControl: "31536000",
-    upsert: false,
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const { data } = supabase.storage.from(PARTNER_MEDIA_BUCKET).getPublicUrl(storagePath);
-  return data.publicUrl;
+  return `registration-requests/${requestId.trim()}/${role}/${index}-${uploadId}.webp`;
 }
 
 export async function deletePartnerMediaUrls(urls: Array<string | null | undefined>) {

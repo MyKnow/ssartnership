@@ -19,6 +19,7 @@ type PartnerChangeRequestFormProps = {
   canCancelPendingRequest: boolean;
   errorMessage?: string | null;
   successMessage?: string | null;
+  clearImmediateDraftOnSuccess?: boolean;
   saveImmediateAction: (formData: FormData) => void | Promise<void>;
   createAction: (formData: FormData) => void | Promise<void>;
   cancelAction: (formData: FormData) => void | Promise<void>;
@@ -30,6 +31,7 @@ export default function PartnerChangeRequestForm({
   canCancelPendingRequest,
   errorMessage,
   successMessage,
+  clearImmediateDraftOnSuccess = false,
   saveImmediateAction,
   createAction,
   cancelAction,
@@ -71,6 +73,7 @@ export default function PartnerChangeRequestForm({
         <ImmediateChangeForm
           context={context}
           saveImmediateAction={saveImmediateAction}
+          clearDraftOnSuccess={clearImmediateDraftOnSuccess}
         />
       </div>
 

@@ -147,18 +147,18 @@ export const BrokenImage: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "4/5 소개" }));
     const input = canvasElement.querySelector<HTMLInputElement>(
-      'input[name="thumbnailFile"]',
+      'input[type="file"]',
     );
     if (!input) {
       throw new Error("대표 이미지 파일 입력을 찾지 못했습니다.");
     }
     await userEvent.upload(
       input,
-      new File(["<svg />"], "invalid.svg", { type: "image/svg+xml" }),
+      new File(["not-an-image"], "invalid.txt", { type: "text/plain" }),
       { applyAccept: false },
     );
     await expect(
-      canvas.getByText("이미지는 JPG, PNG, WebP, AVIF 파일만 업로드할 수 있습니다."),
+      canvas.getByText("지원하는 이미지 파일만 업로드할 수 있습니다."),
     ).toBeVisible();
   },
 };

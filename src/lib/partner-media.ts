@@ -1,4 +1,5 @@
 import { sanitizeHttpUrl } from "@/lib/validation";
+import { assertExistingImageManifestUrls } from "@/lib/image-upload/policy";
 
 export const PARTNER_MEDIA_BUCKET = "partner-media";
 export const PARTNER_THUMBNAIL_ASPECT_RATIO = 1;
@@ -11,6 +12,8 @@ export type PartnerMediaManifestEntry =
     }
   | {
       kind: "upload";
+      /** Pending client state may omit this; server parsing rejects it. */
+      uploadId?: string;
     };
 
 export type PartnerMediaManifest = {
@@ -57,6 +60,19 @@ export function parsePartnerMediaManifest(
   };
 }
 
+export function assertPartnerMediaExistingUrls(
+  manifest: PartnerMediaManifest | null,
+  allowedExistingUrls: readonly string[],
+) {
+  assertExistingImageManifestUrls(
+    [
+      ...(manifest?.thumbnail ? [manifest.thumbnail] : []),
+      ...(manifest?.gallery ?? []),
+    ],
+    allowedExistingUrls,
+  );
+}
+
 function parsePartnerMediaManifestEntry(
   value: unknown,
 ): PartnerMediaManifestEntry | null {
@@ -70,10 +86,17 @@ function parsePartnerMediaManifestEntry(
   const entry = value as {
     kind?: unknown;
     url?: unknown;
+    uploadId?: unknown;
   };
 
   if (entry.kind === "upload") {
-    return { kind: "upload" };
+    if (
+      typeof entry.uploadId !== "string"
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entry.uploadId)
+    ) {
+      return null;
+    }
+    return { kind: "upload", uploadId: entry.uploadId };
   }
 
   if (entry.kind === "existing") {

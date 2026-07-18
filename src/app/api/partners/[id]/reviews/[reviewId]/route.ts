@@ -4,12 +4,10 @@ import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   deleteReviewMediaUrls,
-  verifyReviewMediaStorageUrls,
 } from "@/lib/review-media-storage";
 import {
   ensureVisibleReviewPartner,
   getReviewMemberSession,
-  parseDirectUploadedReviewUrls,
   parseReviewFormFields,
   resolveReviewMediaPayload,
 } from "../_shared";
@@ -71,13 +69,17 @@ export async function PATCH(
     );
   }
 
-  const directUploadedUrls = parseDirectUploadedReviewUrls(formData, id, reviewId);
   let uploadedUrls: string[] = [];
 
   try {
-    await verifyReviewMediaStorageUrls(directUploadedUrls);
-    const media = await resolveReviewMediaPayload(formData, id, reviewId);
-    uploadedUrls = [...directUploadedUrls, ...media.uploadedUrls];
+    const media = await resolveReviewMediaPayload(
+      formData,
+      id,
+      reviewId,
+      session.userId,
+      ownedReview.images,
+    );
+    uploadedUrls = media.uploadedUrls;
     const review = await partnerReviewRepository.updatePartnerReview({
       reviewId,
       memberId: session.userId,

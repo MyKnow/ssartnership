@@ -20,6 +20,7 @@ export const runtime = "nodejs";
 type GraduateSubmissionBody = {
   certificateUploadId?: unknown;
   profileImageUploadId?: unknown;
+  profileImageUploadSource?: unknown;
   email?: unknown;
   legalName?: unknown;
   educationStartYear?: unknown;
@@ -60,7 +61,15 @@ export async function POST(request: Request) {
   if (
     !body ||
     (body.certificateUploadId !== undefined && typeof body.certificateUploadId !== "string") ||
-    (body.profileImageUploadId !== undefined && typeof body.profileImageUploadId !== "string")
+    (body.profileImageUploadId !== undefined && typeof body.profileImageUploadId !== "string") ||
+    (
+      body.profileImageUploadSource !== undefined
+      && body.profileImageUploadSource !== "common"
+    ) ||
+    (
+      typeof body.profileImageUploadId === "string"
+      && body.profileImageUploadSource !== "common"
+    )
   ) {
     return NextResponse.json({ ok: false, message: "업로드 파일을 확인해 주세요." }, { status: 400 });
   }

@@ -1,23 +1,23 @@
 "use client";
 
 import {
-  getGraduateProfilePhotoSourceFormat,
-  GRADUATE_PROFILE_PHOTO_ACCEPT,
-  normalizeGraduateProfilePhotoSource,
-} from "@/lib/graduate-profile-photo.client";
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
+import {
+  IMAGE_SOURCE_ACCEPT,
+  inferImageSourceContentType,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
 import {
   MANUAL_MEMBER_IMPORT_LIMITS,
-  type MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
 } from "./shared";
 
-type ManualMemberImportImageContentType =
-  (typeof MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES)[number];
-
-export const MANUAL_MEMBER_IMPORT_PHOTO_ACCEPT = GRADUATE_PROFILE_PHOTO_ACCEPT;
+export const MANUAL_MEMBER_IMPORT_PHOTO_ACCEPT = IMAGE_SOURCE_ACCEPT;
 
 export type ManualMemberImportPreparedPhoto = {
   filename: string;
-  contentType: ManualMemberImportImageContentType;
+  contentType: string;
   file: File;
   /**
    * Client-only display value. This must never be included in the staging
@@ -26,20 +26,22 @@ export type ManualMemberImportPreparedPhoto = {
   sourceName: string;
 };
 
-const PHOTO_CONTENT_TYPE_BY_FORMAT = {
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-} as const satisfies Record<string, ManualMemberImportImageContentType>;
-
-const PHOTO_EXTENSION_BY_CONTENT_TYPE: Record<
-  ManualMemberImportImageContentType,
-  "jpg" | "png" | "webp"
-> = {
+const PHOTO_EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "image/avif": "avif",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/gif": "gif",
+  "image/bmp": "bmp",
+  "image/tiff": "tiff",
+  "image/svg+xml": "svg",
 };
+const MANUAL_MEMBER_IMAGE_POLICY = resolveImageTransformPolicy(
+  "manual-member-import",
+  "profile",
+);
 
 /**
  * The original gallery name never reaches the import staging bucket. A stable
@@ -52,35 +54,37 @@ export function getManualMemberImportSelectedPhotoFilename(
   if (!Number.isSafeInteger(rowNumber) || rowNumber < 2) {
     throw new Error("사진 행 번호를 확인해 주세요.");
   }
-  const extension = contentType === "image/jpeg"
-    ? PHOTO_EXTENSION_BY_CONTENT_TYPE["image/jpeg"]
-    : contentType === "image/png"
-      ? PHOTO_EXTENSION_BY_CONTENT_TYPE["image/png"]
-      : contentType === "image/webp"
-        ? PHOTO_EXTENSION_BY_CONTENT_TYPE["image/webp"]
-        : null;
+  const extension = PHOTO_EXTENSION_BY_CONTENT_TYPE[contentType] ?? null;
   if (!extension) {
     throw new Error("사진 형식을 확인해 주세요.");
   }
   return `manual-row-${rowNumber}.${extension}`;
 }
 
+/** Internal-safe ID for a single sign request; original ZIP names may be Korean. */
+export function getManualMemberImportPhotoUploadClientId(index: number) {
+  if (!Number.isSafeInteger(index) || index < 0 || index >= 1000) {
+    throw new Error("사진 업로드 순서를 확인해 주세요.");
+  }
+  return `manual-photo-${index}`;
+}
+
 /**
- * iPhone HEIC/HEIF sources are converted locally before staging. JPEG, PNG,
- * and WebP remain source files here but are decoded and re-encoded to WebP on
- * the server before the private profile image is persisted.
+ * HEIC/HEIF is decoded locally for browser compatibility. Every source is
+ * then verified and normalized by the common private staging pipeline.
  */
 export async function prepareManualMemberImportRowPhoto(
   file: File,
   rowNumber: number,
 ): Promise<ManualMemberImportPreparedPhoto> {
-  const normalized = await normalizeGraduateProfilePhotoSource(file);
-  const format = getGraduateProfilePhotoSourceFormat(normalized);
-  const contentType = format && format !== "heif"
-    ? PHOTO_CONTENT_TYPE_BY_FORMAT[format]
-    : null;
+  const sourceError = getImageUploadSourceError(file, MANUAL_MEMBER_IMAGE_POLICY);
+  if (sourceError) {
+    throw new Error(sourceError);
+  }
+  const normalized = await prepareImageUploadSource(file, MANUAL_MEMBER_IMAGE_POLICY);
+  const contentType = inferImageSourceContentType(normalized);
   if (!contentType) {
-    throw new Error("사진은 JPEG, PNG, WebP, HEIC, HEIF 파일만 선택할 수 있습니다.");
+    throw new Error("지원하는 이미지 파일만 선택할 수 있습니다.");
   }
   if (
     normalized.size <= 0

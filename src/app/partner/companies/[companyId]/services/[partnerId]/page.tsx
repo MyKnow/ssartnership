@@ -154,6 +154,7 @@ export default async function PartnerCompanyServiceDetailPage({
       mode={mode}
       errorMessage={errorMessage}
       successMessage={successMessage}
+      immediateSaveSucceeded={successCode === "saved"}
       saveImmediateAction={savePartnerImmediateChanges}
       createAction={submitPartnerChangeRequest}
       cancelAction={cancelPartnerChangeRequestAction}

@@ -68,7 +68,7 @@ test("유효한 Base64 프로필 사진은 URL 수집보다 우선한다", async
   assert.equal(result?.source.toString("utf8"), "hello");
 });
 
-test("지원하지 않는 외부 이미지 형식과 안전하지 않은 URL은 저장 후보에서 제외한다", async () => {
+test("지원하지 않는 외부 형식과 안전하지 않은 URL은 저장 후보에서 제외하고 SVG는 서버 변환 후보로 넘긴다", async () => {
   let fetchCalled = false;
   const invalidUrlResult = await resolveMemberProfileImageData(
     {
@@ -86,7 +86,7 @@ test("지원하지 않는 외부 이미지 형식과 안전하지 않은 URL은 
   assert.equal(invalidUrlResult, null);
   assert.equal(fetchCalled, false);
 
-  const unsupportedTypeResult = await resolveMemberProfileImageData(
+  const safeSvgCandidate = await resolveMemberProfileImageData(
     {
       avatarBase64: null,
       avatarContentType: null,
@@ -95,7 +95,22 @@ test("지원하지 않는 외부 이미지 형식과 안전하지 않은 URL은 
     {
       fetchPublicImage: async () => ({
         body: Buffer.from("<svg />"),
-        contentType: "image/svg+xml",
+      contentType: "image/svg+xml",
+      }),
+    },
+  );
+  assert.equal(safeSvgCandidate?.contentType, "image/svg+xml");
+
+  const unsupportedTypeResult = await resolveMemberProfileImageData(
+    {
+      avatarBase64: null,
+      avatarContentType: null,
+      avatarUrl: "https://verify.example.com/profile/avatar",
+    },
+    {
+      fetchPublicImage: async () => ({
+        body: Buffer.from("not-an-image"),
+        contentType: "application/pdf",
       }),
     },
   );

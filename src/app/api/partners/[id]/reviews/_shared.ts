@@ -7,11 +7,18 @@ import { getPartnerSession } from "@/lib/partner-session";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { partnerRepository } from "@/lib/repositories";
 import {
-  extractReviewMediaStoragePath,
+  assertReviewMediaExistingUrls,
   parseReviewMediaManifest,
   REVIEW_MEDIA_BUCKET,
 } from "@/lib/review-media";
-import { deleteReviewMediaUrls, uploadReviewMediaFile } from "@/lib/review-media-storage";
+import {
+  buildReviewMediaStoragePath,
+} from "@/lib/review-media-storage";
+import {
+  assertNoDirectImageFileSubmission,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
 import {
   normalizeReviewDraftInput,
   validateReviewDraftInput,
@@ -93,9 +100,10 @@ export function parseReviewFormFields(formData: FormData):
     title: String(formData.get("title") ?? ""),
     body: String(formData.get("body") ?? ""),
   });
+  const manifest = parseReviewMediaManifest(String(formData.get("imagesManifest") ?? ""));
   const fieldErrors = validateReviewDraftInput({
     ...normalized,
-    imageCount: formData.getAll("imageFiles").filter((item) => item instanceof File).length,
+    imageCount: manifest?.images.length ?? 0,
   });
 
   if (Object.keys(fieldErrors).length > 0) {
@@ -118,110 +126,62 @@ export function parseRequestedReviewId(formData: FormData) {
   return REVIEW_ID_PATTERN.test(raw) ? raw : null;
 }
 
-export function parseDirectUploadedReviewUrls(
-  formData: FormData,
-  partnerId: string,
-  reviewId: string,
-) {
-  const raw = String(formData.get("directUploadedImageUrls") ?? "").trim();
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    const expectedPrefix = `reviews/${partnerId.trim()}/${reviewId.trim()}/`;
-    return parsed.filter((item): item is string => {
-      if (typeof item !== "string" || item.length === 0) {
-        return false;
-      }
-      const storagePath = extractReviewMediaStoragePath(item);
-      return (
-        storagePath?.bucket === REVIEW_MEDIA_BUCKET &&
-        storagePath.path.startsWith(expectedPrefix)
-      );
-    });
-  } catch {
-    return [];
-  }
-}
-
 export async function resolveReviewMediaPayload(
   formData: FormData,
   partnerId: string,
   reviewId: string,
+  memberId: string,
+  allowedExistingUrls: readonly string[] = [],
 ) {
   const manifestRaw = String(formData.get("imagesManifest") ?? "");
   const manifest = parseReviewMediaManifest(manifestRaw);
-  const files = formData
-    .getAll("imageFiles")
-    .filter((item): item is File => item instanceof File && item.size > 0);
 
   if (manifestRaw.trim() && !manifest) {
     throw new Error("리뷰 사진 형식을 확인해 주세요.");
   }
+  assertNoDirectImageFileSubmission(formData, ["imageFiles"]);
 
   const entries = manifest?.images ?? [];
+  assertReviewMediaExistingUrls(manifest, allowedExistingUrls);
   if (entries.length > 5) {
     throw new Error("리뷰 사진은 최대 5장까지 업로드할 수 있습니다.");
   }
 
   const images: string[] = [];
-  const uploadTasks: Array<{
-    imageIndex: number;
-    file: File;
-  }> = [];
-  let fileIndex = 0;
+  const uploadRepository = getImageUploadRepository();
+  const attachUpload = async (uploadId: string, imageIndex: number) => {
+    const attached = await uploadRepository.attach({
+      actor: { kind: "member", id: memberId },
+      purpose: "review",
+      uploadId,
+      role: "image",
+      policy: resolveImageTransformPolicy("review", "image"),
+      destination: {
+        bucket: REVIEW_MEDIA_BUCKET,
+        path: buildReviewMediaStoragePath(partnerId, reviewId, imageIndex, uploadId),
+        isPublic: true,
+      },
+      resource: { type: "partner_review", id: reviewId },
+    });
+    if (!attached.url) {
+      throw new Error("리뷰 사진 URL을 만들지 못했습니다.");
+    }
+    return attached.url;
+  };
 
   for (const entry of entries) {
     if (entry.kind === "existing") {
       images.push(entry.url);
       continue;
     }
-
-    const nextFile = files[fileIndex++];
-    if (!nextFile) {
-      throw new Error("리뷰 사진 파일을 찾을 수 없습니다.");
+    if (!entry.uploadId) {
+      throw new Error("완료된 공통 이미지 업로드를 확인해 주세요.");
     }
-    if (!nextFile.type.startsWith("image/")) {
-      throw new Error("이미지 파일만 업로드할 수 있습니다.");
-    }
-
-    images.push("");
-    uploadTasks.push({
-      imageIndex: images.length - 1,
-      file: nextFile,
-    });
-  }
-
-  const uploadResults = await Promise.allSettled(
-    uploadTasks.map((task) =>
-      uploadReviewMediaFile(partnerId, reviewId, task.file, task.imageIndex),
-    ),
-  );
-  const uploadedUrls = uploadResults.flatMap((result) =>
-    result.status === "fulfilled" ? [result.value] : [],
-  );
-  const failedUpload = uploadResults.find(
-    (result): result is PromiseRejectedResult => result.status === "rejected",
-  );
-
-  if (failedUpload) {
-    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
-    throw failedUpload.reason instanceof Error
-      ? failedUpload.reason
-      : new Error("리뷰 사진 업로드에 실패했습니다.");
-  }
-
-  for (const [index, task] of uploadTasks.entries()) {
-    images[task.imageIndex] = uploadedUrls[index] ?? "";
+    images.push(await attachUpload(entry.uploadId, images.length));
   }
 
   return {
     images,
-    uploadedUrls,
+    uploadedUrls: [],
   };
 }

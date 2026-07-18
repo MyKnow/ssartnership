@@ -3,6 +3,7 @@ import test from "node:test";
 import sharp from "sharp";
 import {
   inspectGraduateCertificatePdf,
+  normalizeMattermostProfileImage,
   normalizeGraduateProfileImage,
 } from "@/lib/graduate-verification-files";
 
@@ -69,4 +70,25 @@ test("손상되었거나 GIF·SVG처럼 허용하지 않은 이미지 입력은 
     }),
     /사진 파일/,
   );
+});
+
+test("Mattermost 프로필 사진도 공통 WebP 변환 정책을 사용한다", async () => {
+  const source = await sharp({
+    create: {
+      width: 96,
+      height: 72,
+      channels: 3,
+      background: { r: 40, g: 140, b: 160 },
+    },
+  }).png().toBuffer();
+
+  const result = await normalizeMattermostProfileImage({
+    contentType: "image/png",
+    source,
+  });
+  const metadata = await sharp(result.buffer).metadata();
+
+  assert.equal(result.contentType, "image/webp");
+  assert.equal(metadata.width, 640);
+  assert.equal(metadata.height, 640);
 });

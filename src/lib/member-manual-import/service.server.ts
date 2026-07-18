@@ -13,6 +13,8 @@ import {
   removeGraduateStoredObject,
   storeMemberProfileImage,
 } from "@/lib/graduate-verification-storage";
+import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
 import {
   findMmUserDirectoryEntryByUserId,
   upsertMmUserDirectorySnapshot,
@@ -33,6 +35,8 @@ import {
   type ManualMemberImportRawRow,
 } from "./shared";
 
+// New import batches use the common image-upload staging bucket. This legacy
+// bucket remains readable only while already-created batches are completed.
 export const MANUAL_MEMBER_IMPORT_STAGING_BUCKET = "manual-member-import-staging";
 const IMPORT_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_ACTION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -65,6 +69,10 @@ type ImportRow = {
   staging_path: string | null;
   photo_content_type: string | null;
   photo_size_bytes: number | null;
+  image_upload_id: string | null;
+  photo_sha256: string | null;
+  photo_width: number | null;
+  photo_height: number | null;
   photo_attached_at: string | null;
   delivery_channel: "mattermost" | "email" | null;
   delivery_attempted_at: string | null;
@@ -89,11 +97,6 @@ export type ManualMemberImportPreflightResult =
       ok: true;
       batchId: string;
       expiresAt: string;
-      uploads: Array<{
-        rowNumber: number;
-        filename: string;
-        signedUrl: string;
-      }>;
     };
 
 export type ManualMemberImportCommitItem = {
@@ -482,7 +485,7 @@ async function findManualImportProfileImage(rowId: string) {
 }
 
 async function attachPendingPhoto(memberId: string, row: ImportRow) {
-  if (!row.staging_bucket || !row.staging_path || !isSupportedImageContentType(row.photo_content_type)) {
+  if (!row.staging_bucket || !row.staging_path) {
     return false;
   }
   const existingImage = await findManualImportProfileImage(row.id);
@@ -491,6 +494,38 @@ async function attachPendingPhoto(memberId: string, row: ImportRow) {
       throw new Error("사진 검토 요청의 회원 연결을 확인하지 못했습니다.");
     }
     return true;
+  }
+  if (row.image_upload_id) {
+    if (
+      row.staging_bucket !== MEMBER_PROFILE_IMAGES_BUCKET
+      || !row.photo_sha256
+      || row.photo_width !== 640
+      || row.photo_height !== 640
+    ) {
+      throw new Error("공통 사진 업로드 상태를 확인하지 못했습니다.");
+    }
+    const { data: image, error: insertError } = await getSupabaseAdminClient()
+      .from("member_profile_images")
+      .insert({
+        member_id: memberId,
+        storage_path: row.staging_path,
+        sha256: row.photo_sha256,
+        content_type: "image/webp",
+        width: row.photo_width,
+        height: row.photo_height,
+        source: "manual_admin",
+        status: "pending",
+        manual_member_import_row_id: row.id,
+      })
+      .select("id")
+      .single();
+    if (!insertError && image?.id) return true;
+    const concurrentImage = await findManualImportProfileImage(row.id);
+    if (concurrentImage?.member_id === memberId) return true;
+    throw new Error("사진 검토 요청을 저장하지 못했습니다.");
+  }
+  if (!isSupportedImageContentType(row.photo_content_type)) {
+    return false;
   }
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase.storage
@@ -548,6 +583,7 @@ export async function prepareManualMemberImport(input: {
     const photoResult = validateManualMemberImportPhotoManifest(
       rowsResult.acceptedRows,
       input.photos,
+      { requireUploadIds: true },
     );
     const errors = [...rowsResult.errors, ...photoResult.errors];
     if (errors.length > 0 || rowsResult.acceptedRows.length === 0) {
@@ -566,11 +602,53 @@ export async function prepareManualMemberImport(input: {
     const photoByFilename = new Map(
       input.photos.map((photo) => [photo.filename.toLowerCase(), photo]),
     );
-    const insertRows = rowsResult.acceptedRows.map((row) => {
+    const imageUploadRepository = getImageUploadRepository();
+    const insertRows = await Promise.all(rowsResult.acceptedRows.map(async (row) => {
       const photo = row.photoFilename
         ? photoByFilename.get(row.photoFilename.toLowerCase()) ?? null
         : null;
+      const rowId = randomUUID();
+      if (photo) {
+        if (!photo.uploadId) {
+          throw new Error("사진 업로드 정보를 확인해 주세요.");
+        }
+        const attached = await imageUploadRepository.attach({
+          actor: { kind: "admin", id: input.adminId },
+          purpose: "manual-member-import",
+          uploadId: photo.uploadId,
+          role: "profile",
+          policy: resolveImageTransformPolicy("manual-member-import", "profile"),
+          destination: {
+            bucket: MEMBER_PROFILE_IMAGES_BUCKET,
+            path: `manual-import/uploads/${photo.uploadId}.webp`,
+            isPublic: false,
+            cacheControl: "private, no-store",
+          },
+          resource: { type: "manual_member_import_row", id: rowId },
+        });
+        return {
+          id: rowId,
+          batch_id: batch.id,
+          row_number: row.rowNumber,
+          generation: row.generation,
+          display_name: row.name,
+          campus: row.campus,
+          mm_username: row.mmId,
+          email: row.email,
+          email_normalized: row.email,
+          photo_filename: row.photoFilename,
+          staging_bucket: MEMBER_PROFILE_IMAGES_BUCKET,
+          staging_path: attached.path,
+          photo_content_type: "image/webp",
+          photo_size_bytes: null,
+          image_upload_id: photo.uploadId,
+          photo_sha256: attached.sha256,
+          photo_width: attached.width,
+          photo_height: attached.height,
+        };
+      }
       return {
+        id: rowId,
         batch_id: batch.id,
         row_number: row.rowNumber,
         generation: row.generation,
@@ -580,35 +658,21 @@ export async function prepareManualMemberImport(input: {
         email: row.email,
         email_normalized: row.email,
         photo_filename: row.photoFilename,
-        staging_bucket: photo ? MANUAL_MEMBER_IMPORT_STAGING_BUCKET : null,
-        staging_path: photo ? `batches/${batch.id}/${randomUUID()}-${row.photoFilename}` : null,
-        photo_content_type: photo?.contentType ?? null,
-        photo_size_bytes: photo?.size ?? null,
+        staging_bucket: null,
+        staging_path: null,
+        photo_content_type: null,
+        photo_size_bytes: null,
       };
-    });
-    const { data: storedRows, error: rowsError } = await supabase
+    }));
+    const { error: rowsError } = await supabase
       .from("manual_member_import_rows")
-      .insert(insertRows)
-      .select("id,row_number,photo_filename,staging_path,photo_content_type");
-    if (rowsError || !storedRows) {
+      .insert(insertRows);
+    if (rowsError) {
       await supabase.from("manual_member_import_batches").delete().eq("id", batch.id);
       throw new Error("가져오기 행을 저장하지 못했습니다.");
     }
-
-    const uploads = [] as Array<{ rowNumber: number; filename: string; signedUrl: string }>;
-    for (const row of storedRows as Array<{ row_number: number; photo_filename: string | null; staging_path: string | null; photo_content_type: string | null }>) {
-      if (!row.photo_filename || !row.staging_path || !row.photo_content_type) continue;
-      const { data, error } = await supabase.storage
-        .from(MANUAL_MEMBER_IMPORT_STAGING_BUCKET)
-        .createSignedUploadUrl(row.staging_path);
-      if (error || !data?.signedUrl) {
-        await supabase.from("manual_member_import_batches").delete().eq("id", batch.id);
-        throw new Error("사진 업로드 URL을 발급하지 못했습니다.");
-      }
-      uploads.push({ rowNumber: row.row_number, filename: row.photo_filename, signedUrl: data.signedUrl });
-    }
     await supabase.from("manual_member_import_batches").update({ status: "ready" }).eq("id", batch.id);
-    return { ok: true, batchId: batch.id as string, expiresAt, uploads };
+    return { ok: true, batchId: batch.id as string, expiresAt };
   } catch (error) {
     return { ok: false, errors: [getSafeFailureMessage(error)] };
   }
@@ -1207,7 +1271,7 @@ export async function commitManualMemberImport(input: {
     await assertProcessingLease();
     const { data, error } = await supabase
       .from("manual_member_import_rows")
-      .select("id,batch_id,staging_bucket,staging_path")
+      .select("id,batch_id,staging_bucket,staging_path,image_upload_id")
       .eq("batch_id", input.batchId)
       .eq("status", "created")
       .is("staging_deleted_at", null)
@@ -1216,10 +1280,12 @@ export async function commitManualMemberImport(input: {
 
     for (const row of (data ?? []) as Array<Pick<
       ImportRow,
-      "id" | "batch_id" | "staging_bucket" | "staging_path"
+      "id" | "batch_id" | "staging_bucket" | "staging_path" | "image_upload_id"
     >>) {
       await assertProcessingLease();
-      await removeStagingFile(row);
+      if (!row.image_upload_id) {
+        await removeStagingFile(row);
+      }
       const { data: cleanedRow, error: cleanupError } = await supabase
         .from("manual_member_import_rows")
         .update({ staging_deleted_at: new Date().toISOString() })
@@ -1253,7 +1319,7 @@ export async function commitManualMemberImport(input: {
     }
     const { data: rowsData, error: rowsError } = await supabase
       .from("manual_member_import_rows")
-      .select("id,batch_id,status,member_id,row_number,generation,display_name,campus,mm_username,email,email_normalized,photo_filename,staging_bucket,staging_path,photo_content_type,photo_size_bytes,photo_attached_at,delivery_channel,delivery_attempted_at,delivery_sent_at,delivery_idempotency_key,staging_deleted_at,error_code,error_message,updated_at")
+      .select("id,batch_id,status,member_id,row_number,generation,display_name,campus,mm_username,email,email_normalized,photo_filename,staging_bucket,staging_path,photo_content_type,photo_size_bytes,image_upload_id,photo_sha256,photo_width,photo_height,photo_attached_at,delivery_channel,delivery_attempted_at,delivery_sent_at,delivery_idempotency_key,staging_deleted_at,error_code,error_message,updated_at")
       .eq("batch_id", input.batchId)
       .in("status", ["staged", "failed"])
       .order("row_number");
@@ -1353,7 +1419,7 @@ async function reclaimExpiredManualMemberImportReissueLease(input: {
     .eq("updated_at", input.row.updated_at)
     .lt("updated_at", input.processingLeaseExpiredAt)
     .like("delivery_idempotency_key", `${MANUAL_MEMBER_IMPORT_REISSUE_KEY_PREFIX}%`)
-    .select("id,batch_id,status,member_id,row_number,generation,display_name,campus,mm_username,email,email_normalized,photo_filename,staging_bucket,staging_path,photo_content_type,photo_size_bytes,photo_attached_at,delivery_channel,delivery_attempted_at,delivery_sent_at,delivery_idempotency_key,staging_deleted_at,error_code,error_message,updated_at")
+    .select("id,batch_id,status,member_id,row_number,generation,display_name,campus,mm_username,email,email_normalized,photo_filename,staging_bucket,staging_path,photo_content_type,photo_size_bytes,image_upload_id,photo_sha256,photo_width,photo_height,photo_attached_at,delivery_channel,delivery_attempted_at,delivery_sent_at,delivery_idempotency_key,staging_deleted_at,error_code,error_message,updated_at")
     .maybeSingle();
   if (error) {
     throw new Error("중단된 초기 설정 링크 발급을 복구하지 못했습니다.");
@@ -1368,7 +1434,7 @@ export async function reissueManualMemberImportSetup(input: {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("manual_member_import_rows")
-    .select("id,batch_id,status,member_id,row_number,generation,display_name,campus,mm_username,email,email_normalized,photo_filename,staging_bucket,staging_path,photo_content_type,photo_size_bytes,photo_attached_at,delivery_channel,delivery_attempted_at,delivery_sent_at,delivery_idempotency_key,staging_deleted_at,error_code,error_message,updated_at")
+    .select("id,batch_id,status,member_id,row_number,generation,display_name,campus,mm_username,email,email_normalized,photo_filename,staging_bucket,staging_path,photo_content_type,photo_size_bytes,image_upload_id,photo_sha256,photo_width,photo_height,photo_attached_at,delivery_channel,delivery_attempted_at,delivery_sent_at,delivery_idempotency_key,staging_deleted_at,error_code,error_message,updated_at")
     .eq("batch_id", input.batchId)
     .eq("row_number", input.rowNumber)
     .maybeSingle();

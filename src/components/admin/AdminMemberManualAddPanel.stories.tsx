@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import AdminMemberManualAddPanel from "./AdminMemberManualAddPanel";
 
 const meta = {
@@ -44,6 +44,7 @@ export const RowsReady: Story = {
 export const AddsAndRemovesRow: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
     await userEvent.click(canvas.getByRole("button", { name: "행 추가" }));
     await expect(canvas.getByText("1번째 회원")).toBeVisible();
     await expect(canvas.getByText("MM ID 또는 이메일 중 하나는 필수입니다.")).toBeVisible();
@@ -53,13 +54,26 @@ export const AddsAndRemovesRow: Story = {
     await expect(canvas.getByRole("combobox", { name: "2행 캠퍼스" })).toBeVisible();
     const photoInput = canvas.getByLabelText("2행 사진 선택");
     await expect(photoInput).toBeVisible();
+    const response = await fetch("/icon-512.png");
+    const photo = new File([await response.blob()], "profile.png", { type: "image/png" });
+    await expect(response.ok).toBe(true);
     await userEvent.upload(
       photoInput,
-      new File(["image"], "profile.png", { type: "image/png" }),
+      photo,
     );
-    await expect(canvas.getByText("선택됨 · profile.png")).toBeVisible();
+    await expect(body.getByText("이미지 편집", { exact: true })).toBeVisible();
+    await waitFor(() => {
+      expect(body.getByTestId("image-crop-frame")).toBeVisible();
+    });
+    await expect(body.queryByText("결과 미리보기")).not.toBeInTheDocument();
+    await expect(canvasElement.ownerDocument.querySelector('input[type="range"]')).toBeNull();
+    await expect(body.queryByTestId("image-crop-tools")).not.toBeInTheDocument();
+    await expect(body.queryByRole("button", { name: "초기화" })).not.toBeInTheDocument();
+    await expect(body.queryByRole("button", { name: "이미지 변경" })).not.toBeInTheDocument();
+    await userEvent.click(body.getByRole("button", { name: /^적용$/ }));
+    await expect(await canvas.findByText("선택됨 · profile.png")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "사진 해제" }));
-    await expect(canvas.getByText(/JPEG·PNG·WebP·HEIC·HEIF/)).toBeVisible();
+    await expect(canvas.getByText(/JPEG·PNG·WebP·AVIF·HEIC\/HEIF·GIF·BMP·TIFF·SVG/)).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "행 삭제" }));
     await expect(canvas.getByText(/행 추가를 누르거나 회원 XLSX를 업로드/)).toBeVisible();
   },
@@ -265,7 +279,7 @@ export const ClearsZipConnectedPhoto: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("사진 ZIP 연결됨")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "사진 연결 해제" }));
-    await expect(canvas.getByText(/JPEG·PNG·WebP·HEIC·HEIF/)).toBeVisible();
+    await expect(canvas.getByText(/JPEG·PNG·WebP·AVIF·HEIC\/HEIF·GIF·BMP·TIFF·SVG/)).toBeVisible();
   },
 };
 

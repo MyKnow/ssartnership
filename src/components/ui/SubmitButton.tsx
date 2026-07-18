@@ -13,6 +13,8 @@ export default function SubmitButton({
   form,
   formAction,
   disabled,
+  name,
+  value,
 }: {
   children: React.ReactNode;
   pendingText?: string;
@@ -21,6 +23,8 @@ export default function SubmitButton({
   form?: string;
   formAction?: React.ButtonHTMLAttributes<HTMLButtonElement>["formAction"];
   disabled?: boolean;
+  name?: string;
+  value?: string;
 }) {
   const { pending } = useFormStatus();
 
@@ -32,6 +36,8 @@ export default function SubmitButton({
       disabled={pending || disabled}
       form={form}
       formAction={formAction}
+      name={name}
+      value={value}
     >
       <span className="inline-flex items-center gap-2">
         {pending ? <Spinner /> : null}

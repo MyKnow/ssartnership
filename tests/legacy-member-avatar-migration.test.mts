@@ -83,6 +83,10 @@ test("기존 base64 아바타는 data URL과 별도 content type을 안전하게
       }),
     /base64/i,
   );
+  assert.equal(
+    migrationLib.normalizeLegacyMemberAvatarContentType("image/heic"),
+    "image/heic",
+  );
 });
 
 test("기존 아바타 대상과 Storage 경로는 결정적이고 검증 가능하다", () => {

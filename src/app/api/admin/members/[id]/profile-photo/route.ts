@@ -41,9 +41,16 @@ export async function POST(
   }
 
   const { id: memberId } = await context.params;
-  const body = await request.json().catch(() => null) as { uploadId?: unknown } | null;
+  const body = await request.json().catch(() => null) as {
+    uploadId?: unknown;
+    uploadSource?: unknown;
+  } | null;
   const uploadId = typeof body?.uploadId === "string" ? body.uploadId.trim() : "";
-  if (!UUID_PATTERN.test(memberId) || !UUID_PATTERN.test(uploadId)) {
+  if (
+    !UUID_PATTERN.test(memberId)
+    || !UUID_PATTERN.test(uploadId)
+    || body?.uploadSource !== "common"
+  ) {
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
     return NextResponse.json({ ok: false, message: "사진 업로드를 확인해 주세요." }, { status: 400 });
   }

@@ -117,9 +117,9 @@ export const UploadAndCancelCrop: Story = {
     );
 
     const body = within(document.body);
-    await expect(await body.findByText("사진 조정")).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
     await userEvent.click(body.getByRole("button", { name: "취소" }));
-    await expect(body.queryByText("사진 조정")).not.toBeInTheDocument();
+    await expect(body.queryByText("이미지 편집")).not.toBeInTheDocument();
     await expect(args.onChange).not.toHaveBeenCalled();
   },
 };
@@ -147,7 +147,7 @@ export const UploadAndApplyCrop: Story = {
       );
 
       const body = within(document.body);
-      await expect(await body.findByText("사진 조정")).toBeInTheDocument();
+      await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
       await waitFor(() => {
         const cropImage = document.body.querySelector<HTMLImageElement>('img[src^="blob:"]');
         expect(cropImage).not.toBeNull();

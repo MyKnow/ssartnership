@@ -14,12 +14,11 @@ function PartnerReviewHelpersPreview() {
     kind: "existing" as const,
     url: "https://example.com/review.webp",
   };
-  const file = new File(["image"], "review.png", { type: "image/png" });
   const fileItem = {
     id: "file-1",
     kind: "file" as const,
     url: "blob:review",
-    file,
+    uploadId: "00000000-0000-4000-8000-000000000002",
   };
   const formData = buildReviewFormData({
     reviewId: "00000000-0000-4000-8000-000000000001",
@@ -49,8 +48,7 @@ function PartnerReviewHelpersPreview() {
       <div>form-title:{String(formData.get("title"))}</div>
       <div>form-body:{String(formData.get("body"))}</div>
       <div>form-manifest:{String(formData.get("imagesManifest"))}</div>
-      <div>form-file-count:{formData.getAll("imageFiles").length}</div>
-      <div>form-file-name:{(formData.getAll("imageFiles")[0] as File)?.name ?? "none"}</div>
+      <div>form-image-binary-count:{formData.getAll("imageFiles").length}</div>
       <div>merged:{merged.map((item) => item.id).join(",")}</div>
     </div>
   );
@@ -77,11 +75,10 @@ export const Summary: Story = {
     await expect(canvas.getByText("form-body:재방문 의사 있습니다.")).toBeInTheDocument();
     await expect(
       canvas.getByText(
-        'form-manifest:{"images":[{"kind":"existing","url":"https://example.com/review.webp"},{"kind":"upload"}]}',
+        'form-manifest:{"images":[{"kind":"existing","url":"https://example.com/review.webp"},{"kind":"upload","uploadId":"00000000-0000-4000-8000-000000000002"}]}',
       ),
     ).toBeInTheDocument();
-    await expect(canvas.getByText("form-file-count:1")).toBeInTheDocument();
-    await expect(canvas.getByText("form-file-name:review.png")).toBeInTheDocument();
+    await expect(canvas.getByText("form-image-binary-count:0")).toBeInTheDocument();
     await expect(canvas.getByText("merged:review-1,review-2,review-3")).toBeInTheDocument();
   },
 };

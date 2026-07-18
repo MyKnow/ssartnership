@@ -1,15 +1,9 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
-import dns from "node:dns/promises";
-import http from "node:http";
-import https from "node:https";
-import net from "node:net";
 import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
-import sharp from "sharp";
-import { isPublicIpAddress } from "../src/lib/image-proxy/ip.ts";
+import { fetchPublicImage } from "../src/lib/image-proxy/fetch.ts";
+import { normalizeImageBuffer } from "../src/lib/image-upload/transform-core.ts";
 import {
-  SUPPORTED_IMAGE_CONTENT_TYPES,
   assertSupabaseProjectRef,
   buildMemberProfileImageStoragePath,
   decodeLegacyMemberAvatarBase64,
@@ -21,8 +15,16 @@ import {
 const MEMBER_PROFILE_IMAGES_BUCKET = "member-profile-images";
 const PAGE_SIZE = 100;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_IMAGE_PIXELS = 25_000_000;
 const PROFILE_IMAGE_SIZE = 640;
+const PROFILE_POLICY = {
+  width: PROFILE_IMAGE_SIZE,
+  height: PROFILE_IMAGE_SIZE,
+  quality: 82,
+  maxSourceBytes: MAX_IMAGE_BYTES,
+  maxInputPixels: 25_000_000,
+  maxOutputBytes: MAX_IMAGE_BYTES,
+  fit: "cover",
+};
 
 function requiredEnv(name) {
   const value = process.env[name]?.trim();
@@ -30,42 +32,6 @@ function requiredEnv(name) {
     throw new Error(`${name} 환경 변수가 필요합니다.`);
   }
   return value;
-}
-
-function getImageContentType(headers) {
-  const rawValue = Array.isArray(headers["content-type"])
-    ? headers["content-type"][0]
-    : headers["content-type"];
-  return normalizeLegacyMemberAvatarContentType(rawValue);
-}
-
-function getContentLength(headers) {
-  const rawValue = Array.isArray(headers["content-length"])
-    ? headers["content-length"][0]
-    : headers["content-length"];
-  const value = Number.parseInt(rawValue ?? "", 10);
-  return Number.isFinite(value) ? value : null;
-}
-
-async function resolvePublicAddress(hostname) {
-  if (net.isIP(hostname)) {
-    if (!isPublicIpAddress(hostname)) {
-      throw new Error("공개 네트워크가 아닌 아바타 URL은 가져올 수 없습니다.");
-    }
-    return hostname;
-  }
-
-  let addresses;
-  try {
-    addresses = await dns.lookup(hostname, { all: true, verbatim: true });
-  } catch {
-    throw new Error("아바타 URL 호스트를 확인하지 못했습니다.");
-  }
-  const address = addresses.find((entry) => isPublicIpAddress(entry.address))?.address;
-  if (!address) {
-    throw new Error("공개 네트워크가 아닌 아바타 URL은 가져올 수 없습니다.");
-  }
-  return address;
 }
 
 function parseLegacyAvatarUrl(value) {
@@ -93,119 +59,32 @@ function parseLegacyAvatarUrl(value) {
 
 async function fetchLegacyAvatarUrl(value) {
   const target = parseLegacyAvatarUrl(value);
-  const address = await resolvePublicAddress(target.hostname);
-  const client = target.protocol === "https:" ? https : http;
-  const response = await new Promise((resolve, reject) => {
-    const request = client.request(
-      {
-        protocol: target.protocol,
-        hostname: address,
-        port: target.port || undefined,
-        method: "GET",
-        path: `${target.pathname}${target.search}`,
-        headers: {
-          Accept: "image/jpeg,image/png,image/webp",
-          "Accept-Encoding": "identity",
-          Host: target.host,
-        },
-        servername: target.protocol === "https:" ? target.hostname : undefined,
-        signal: AbortSignal.timeout(10_000),
-        timeout: 10_000,
-      },
-      resolve,
-    );
-    request.once("error", reject);
-    request.once("timeout", () => {
-      request.destroy(new Error("기존 아바타 URL 응답 시간이 초과되었습니다."));
-    });
-    request.end();
-  });
-
-  const statusCode = response.statusCode ?? 0;
-  if (statusCode < 200 || statusCode >= 300) {
-    response.resume();
+  try {
+    const fetched = await fetchPublicImage(target, { maxBytes: MAX_IMAGE_BYTES });
+    return {
+      contentType: fetched.contentType
+        ? normalizeLegacyMemberAvatarContentType(fetched.contentType)
+        : null,
+      source: fetched.body,
+    };
+  } catch {
     throw new Error("기존 아바타 URL을 가져오지 못했습니다.");
   }
-  const contentType = getImageContentType(response.headers);
-  if (!contentType) {
-    response.resume();
-    throw new Error("기존 아바타 URL의 콘텐츠 타입이 지원되지 않습니다.");
-  }
-  const contentLength = getContentLength(response.headers);
-  if (contentLength !== null && contentLength > MAX_IMAGE_BYTES) {
-    response.resume();
-    throw new Error("기존 아바타 URL 이미지가 5MB를 초과합니다.");
-  }
-
-  const source = await new Promise((resolve, reject) => {
-    const chunks = [];
-    let totalBytes = 0;
-    response.on("data", (chunk) => {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      totalBytes += buffer.length;
-      if (totalBytes > MAX_IMAGE_BYTES) {
-        response.destroy();
-        reject(new Error("기존 아바타 URL 이미지가 5MB를 초과합니다."));
-        return;
-      }
-      chunks.push(buffer);
-    });
-    response.once("end", () => resolve(Buffer.concat(chunks)));
-    response.once("error", () => reject(new Error("기존 아바타 URL을 가져오지 못했습니다.")));
-    response.once("aborted", () => reject(new Error("기존 아바타 URL 응답이 중단되었습니다.")));
-  });
-
-  if (source.length === 0) {
-    throw new Error("기존 아바타 URL 이미지 바이트가 비어 있습니다.");
-  }
-  return { contentType, source };
-}
-
-function getExpectedContentType(format) {
-  if (format === "jpeg") return "image/jpeg";
-  if (format === "png") return "image/png";
-  if (format === "webp") return "image/webp";
-  return null;
 }
 
 async function normalizeLegacyMemberAvatar({ contentType, source }) {
-  if (!SUPPORTED_IMAGE_CONTENT_TYPES.has(contentType)) {
-    throw new Error("기존 아바타 콘텐츠 타입이 지원되지 않습니다.");
-  }
   if (source.length === 0 || source.length > MAX_IMAGE_BYTES) {
     throw new Error("기존 아바타 이미지 크기가 허용 범위를 벗어났습니다.");
   }
-
-  let metadata;
   try {
-    metadata = await sharp(source, {
-      animated: false,
-      failOn: "error",
-      limitInputPixels: MAX_IMAGE_PIXELS,
-    }).metadata();
-  } catch {
-    throw new Error("기존 아바타 이미지를 읽지 못했습니다.");
-  }
-  if (getExpectedContentType(metadata.format) !== contentType) {
-    throw new Error("기존 아바타 이미지 형식이 콘텐츠 타입과 일치하지 않습니다.");
-  }
-
-  try {
-    const buffer = await sharp(source, {
-      animated: false,
-      failOn: "error",
-      limitInputPixels: MAX_IMAGE_PIXELS,
-    })
-      .rotate()
-      .resize(PROFILE_IMAGE_SIZE, PROFILE_IMAGE_SIZE, {
-        fit: "cover",
-        position: "centre",
-      })
-      .webp({ quality: 82, effort: 4 })
-      .toBuffer();
+    const normalized = await normalizeImageBuffer({
+      source,
+      declaredContentType: contentType,
+      policy: PROFILE_POLICY,
+    });
     return {
-      buffer,
-      sha256: createHash("sha256").update(buffer).digest("hex"),
+      buffer: normalized.buffer,
+      sha256: normalized.sha256,
     };
   } catch {
     throw new Error("기존 아바타 이미지를 안전하게 변환하지 못했습니다.");

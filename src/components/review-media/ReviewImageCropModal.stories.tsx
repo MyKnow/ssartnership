@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, fireEvent, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import ReviewImageCropModal from "./ReviewImageCropModal";
 
 const sourceUrl = `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -30,7 +30,7 @@ export const VisualOpen: Story = {};
 export const Open: Story = {
   play: async ({ args }) => {
     const body = within(document.body);
-    await expect(await body.findByText("사진 조정")).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
     await userEvent.click(body.getByRole("button", { name: "취소" }));
     await expect(args.onCancel).toHaveBeenCalled();
   },
@@ -42,8 +42,10 @@ export const ImageLoadError: Story = {
   },
   play: async () => {
     const body = within(document.body);
-    await expect(await body.findByText("사진 조정")).toBeInTheDocument();
-    await expect(await body.findByText("이미지를 불러올 수 없습니다. 다른 파일을 선택해 주세요.")).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
+    await expect(
+      await body.findByText("이미지를 불러올 수 없습니다. 팝업을 닫고 다른 파일을 선택해 주세요."),
+    ).toBeInTheDocument();
   },
 };
 
@@ -56,22 +58,19 @@ export const ApplySuccess: Story = {
 
     try {
       const body = within(document.body);
-      await expect(await body.findByText("사진 조정")).toBeInTheDocument();
+      await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
+      await expect(body.queryByText("결과 미리보기")).not.toBeInTheDocument();
+      await expect(document.body.querySelector('input[type="range"]')).toBeNull();
+      await expect(body.queryByTestId("image-crop-tools")).not.toBeInTheDocument();
+      await expect(body.queryByRole("button", { name: "초기화" })).not.toBeInTheDocument();
+      await expect(body.queryByRole("button", { name: "이미지 변경" })).not.toBeInTheDocument();
 
-      const slider = await body.findByRole("slider");
-      fireEvent.input(slider, { target: { value: "2" } });
-      fireEvent.change(slider, { target: { value: "2" } });
-
-      const frame = body
-        .getByText("드래그로 위치를 맞추고 슬라이더로 확대합니다.")
-        .closest("div")?.parentElement?.previousElementSibling;
-      if (frame instanceof HTMLElement) {
-        await userEvent.pointer([
-          { target: frame, coords: { x: 120, y: 120 }, keys: "[MouseLeft>]" },
-          { target: frame, coords: { x: 160, y: 170 } },
-          { target: frame, keys: "[/MouseLeft]" },
-        ]);
-      }
+      const frame = body.getByTestId("image-crop-frame");
+      await userEvent.pointer([
+        { target: frame, coords: { x: 120, y: 120 }, keys: "[MouseLeft>]" },
+        { target: frame, coords: { x: 160, y: 170 } },
+        { target: frame, keys: "[/MouseLeft]" },
+      ]);
 
       await userEvent.click(body.getByRole("button", { name: "적용" }));
       await expect(args.onApply).toHaveBeenCalled();

@@ -27,6 +27,10 @@ import {
   type PartnerBranchScopeType,
   type PartnerRegistrationMode,
 } from "@/lib/partner-branch-registration";
+import {
+  IMAGE_SOURCE_ACCEPT,
+  validateImageUploadSource,
+} from "@/lib/image-upload/policy";
 
 export type PartnerRegistrationFieldName =
   | "registrationMode"
@@ -256,21 +260,7 @@ export const PARTNER_REGISTRATION_SOURCE_LABELS: Record<
 
 export const PARTNER_REGISTRATION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const PARTNER_REGISTRATION_GALLERY_MAX_FILES = 5;
-export const PARTNER_REGISTRATION_IMAGE_ACCEPT =
-  "image/jpeg,image/png,image/webp,image/avif";
-export const PARTNER_REGISTRATION_ALLOWED_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-]);
-export const PARTNER_REGISTRATION_ALLOWED_IMAGE_EXTENSIONS = [
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".webp",
-  ".avif",
-] as const;
+export const PARTNER_REGISTRATION_IMAGE_ACCEPT = IMAGE_SOURCE_ACCEPT;
 
 export function isPartnerRegistrationRequestStatus(
   value: string,
@@ -319,18 +309,11 @@ function parseDelimitedInput(value: string) {
 }
 
 export function isPartnerRegistrationImageFile(file: File) {
-  const extension = file.name
-    .toLowerCase()
-    .match(/\.[^.]+$/)?.[0];
-  return (
-    PARTNER_REGISTRATION_ALLOWED_IMAGE_TYPES.has(file.type) &&
-    Boolean(
-      extension &&
-        PARTNER_REGISTRATION_ALLOWED_IMAGE_EXTENSIONS.includes(
-          extension as (typeof PARTNER_REGISTRATION_ALLOWED_IMAGE_EXTENSIONS)[number],
-        ),
-    )
-  );
+  return !validateImageUploadSource({
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  }, { maxSourceBytes: PARTNER_REGISTRATION_IMAGE_MAX_BYTES });
 }
 
 export function validatePartnerRegistrationImageFile(file: File) {
@@ -341,7 +324,7 @@ export function validatePartnerRegistrationImageFile(file: File) {
     return "이미지는 파일당 5MB 이하만 업로드할 수 있습니다.";
   }
   if (!isPartnerRegistrationImageFile(file)) {
-    return "이미지는 JPG, PNG, WebP, AVIF 파일만 업로드할 수 있습니다.";
+    return "지원하는 이미지 파일만 업로드할 수 있습니다.";
   }
   return null;
 }

@@ -10,6 +10,7 @@ import {
   DEFAULT_PROMOTION_AUDIENCES,
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
+import { assertPromotionSlideImageSource } from "@/lib/promotions/image-source";
 import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   createStoredEventRewardDraw,
@@ -21,8 +22,11 @@ import {
 import { getManagedEventCampaign } from "@/lib/promotions/events";
 import {
   deletePromotionSlideImageUrls,
-  uploadPromotionSlideImageFile,
 } from "@/lib/promotion-slide-storage-server";
+import { resolveImageUploadActorForServerAction } from "@/lib/image-upload/auth.server";
+import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
 import { logAdminAction } from "./shared-helpers";
 
 function getString(formData: FormData, key: string) {
@@ -181,6 +185,7 @@ type PromotionSlideDraftPayload = {
   eventSlug: string | null;
   adCampaignId: string | null;
   sponsorLabel: string;
+  uploadId: string | null;
 };
 
 function normalizeStringArray(value: unknown) {
@@ -248,6 +253,13 @@ function parsePromotionSlideDrafts(formData: FormData) {
     if (sponsorLabel.length > AD_PACKAGE_FORM_LIMITS.sponsorLabelMax) {
       throw new Error("광고 카드의 스폰서 표기는 60자 이하로 입력해 주세요.");
     }
+    const uploadId = typeof record.uploadId === "string" ? record.uploadId.trim() : "";
+    if (
+      uploadId
+      && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uploadId)
+    ) {
+      throw new Error("광고 이미지 업로드 정보를 확인해 주세요.");
+    }
     return {
       id,
       title: typeof record.title === "string" ? record.title.trim() : "",
@@ -264,6 +276,7 @@ function parsePromotionSlideDrafts(formData: FormData) {
           ? record.adCampaignId.trim()
           : null,
       sponsorLabel,
+      uploadId: uploadId || null,
     };
   });
   const ids = new Set(slides.map((slide) => slide.id));
@@ -417,11 +430,10 @@ export async function savePromotionSlidesAction(formData: FormData) {
   }> = [];
   const removedImageUrls = new Set<string>();
   const nextImageUrls = new Set<string>();
+  const uploadActor = await resolveImageUploadActorForServerAction("promotion", "admin");
+  const uploadRepository = getImageUploadRepository();
 
   for (const [index, slide] of slides.entries()) {
-    const fileKey = `slide_image_${slide.id}`;
-    const fileValue = formData.get(fileKey);
-    const file = fileValue instanceof File && fileValue.size > 0 ? fileValue : null;
     const existing = existingMap.get(slide.id);
     const isExistingSlide = Boolean(existing);
 
@@ -431,13 +443,31 @@ export async function savePromotionSlidesAction(formData: FormData) {
     if (slide.audiences.length === 0) {
       throw new Error("광고 카드의 노출 대상을 하나 이상 선택해 주세요.");
     }
-    if (!isExistingSlide && !file) {
+    if (!isExistingSlide && !slide.uploadId) {
       throw new Error("새 광고 카드는 이미지를 업로드해 주세요.");
     }
 
+    assertPromotionSlideImageSource({
+      imageSrc: slide.imageSrc,
+      existingImageSrc: existing?.image_src,
+      uploadId: slide.uploadId,
+    });
     let imageSrc = slide.imageSrc;
-    if (file) {
-      imageSrc = await uploadPromotionSlideImageFile(file, index + 1);
+    if (slide.uploadId) {
+      const attached = await uploadRepository.attach({
+        actor: uploadActor,
+        purpose: "promotion",
+        uploadId: slide.uploadId,
+        role: "slide",
+        policy: resolveImageTransformPolicy("promotion", "slide"),
+        destination: {
+          bucket: PROMOTION_SLIDES_BUCKET,
+          path: `promotions/${slide.id}-${slide.uploadId}.webp`,
+          isPublic: true,
+        },
+        resource: { type: "promotion_slide", id: slide.id },
+      });
+      imageSrc = attached.url ?? "";
     }
     if (!imageSrc) {
       throw new Error("광고 카드 이미지를 업로드해 주세요.");

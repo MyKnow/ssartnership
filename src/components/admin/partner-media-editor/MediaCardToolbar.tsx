@@ -6,11 +6,12 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
+import { IMAGE_SOURCE_ACCEPT } from "@/lib/image-upload/policy";
 
 export default function MediaCardToolbar({
   multiple,
   allowUrl = true,
-  accept = "image/*",
+  accept = IMAGE_SOURCE_ACCEPT,
   onAddUrl,
   onAddUrls,
   onAddFiles,
@@ -74,7 +75,7 @@ export default function MediaCardToolbar({
           </div>
         ) : (
           <p className="min-w-0 text-sm leading-6 text-muted-foreground">
-            JPG, PNG, WebP, AVIF 파일을 선택하면 구도를 조정한 뒤 저장됩니다.
+            JPEG, PNG, WebP, AVIF, HEIC/HEIF, GIF, BMP, TIFF, SVG 파일을 선택하면 구도를 조정한 뒤 저장됩니다.
           </p>
         )}
         <div

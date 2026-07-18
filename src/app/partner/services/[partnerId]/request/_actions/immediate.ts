@@ -93,7 +93,13 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
       );
     }
 
-    media = await resolvePartnerMediaPayload(formData, partnerId);
+    media = await resolvePartnerMediaPayload(
+      formData,
+      partnerId,
+      [context.thumbnail, ...context.images].filter(
+        (url): url is string => Boolean(url),
+      ),
+    );
 
     const result = await updatePartnerImmediateFields({
       companyIds,

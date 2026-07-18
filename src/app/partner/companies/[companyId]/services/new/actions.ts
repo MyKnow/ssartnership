@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
   getServerActionLogContext,
@@ -17,6 +16,7 @@ import {
 } from "@/lib/partner-portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
+import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import {
   insertPartnerRegistrationRequest,
   loadPartnerRegistrationCategories,
@@ -55,6 +55,14 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
     };
   }
 
+  const requestId = readFormIdempotencyKey(formData);
+  if (!requestId) {
+    return {
+      status: "error",
+      message: "제출 정보를 준비하지 못했습니다. 입력 내용은 유지되므로 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
   let categories;
   try {
     categories = await loadPartnerRegistrationCategories();
@@ -65,7 +73,6 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
     };
   }
 
-  const requestId = randomUUID();
   let insertedRequest;
   try {
     const media = await resolvePartnerRegistrationMediaPayload(formData, requestId);
@@ -98,22 +105,24 @@ export async function createPartnerPortalBrandRegistrationRequestAction(
     };
   }
 
-  scheduleProductEventLog({
-    ...(await getServerActionLogContext(getCompanyScopedPortalHref(scope.id))),
-    eventName: "partner_portal_brand_registration_submit",
-    actorType: "partner",
-    actorId: session.accountId,
-    targetType: "partner_registration_request",
-    targetId: insertedRequest.requestId,
-    properties: {
-      source: "partner_portal",
-      companyId: scope.id,
-      companyName: scope.name,
-      brandName: validation.values.brandName,
-      categoryLabel: insertedRequest.categoryLabel,
-      categoryMatched: insertedRequest.categoryMatched,
-    },
-  });
+  if (insertedRequest.created) {
+    scheduleProductEventLog({
+      ...(await getServerActionLogContext(getCompanyScopedPortalHref(scope.id))),
+      eventName: "partner_portal_brand_registration_submit",
+      actorType: "partner",
+      actorId: session.accountId,
+      targetType: "partner_registration_request",
+      targetId: insertedRequest.requestId,
+      properties: {
+        source: "partner_portal",
+        companyId: scope.id,
+        companyName: scope.name,
+        brandName: validation.values.brandName,
+        categoryLabel: insertedRequest.categoryLabel,
+        categoryMatched: insertedRequest.categoryMatched,
+      },
+    });
+  }
 
   revalidatePath("/admin/partner-registrations");
   revalidatePath(getCompanyScopedPortalHref(scope.id));
