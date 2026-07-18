@@ -1,8 +1,12 @@
 import {
+  MattermostApiError,
   MattermostAuthenticatedSession,
   MattermostClient,
 } from "@/lib/mattermost/client";
 import { getMattermostSenderKeyring } from "./config";
+import {
+  isMattermostSenderRuntimeFailureCode,
+} from "./health";
 import { mattermostSenderRepository } from "./repository";
 
 export type MattermostSenderSubject = {
@@ -67,7 +71,23 @@ export async function withActiveMattermostSenderForGeneration<T>(
   }
 
   const client = new MattermostClient();
-  return client.withAuthenticatedSender(sender.credentials, (session) => operation(session, sender));
+  try {
+    return await client.withAuthenticatedSender(
+      sender.credentials,
+      (session) => operation(session, sender),
+    );
+  } catch (error) {
+    if (
+      error instanceof MattermostApiError
+      && isMattermostSenderRuntimeFailureCode(error.code)
+    ) {
+      await mattermostSenderRepository.recordHealthFailure({
+        senderId: sender.id,
+        errorCode: error.code,
+      }).catch(() => undefined);
+    }
+    throw error;
+  }
 }
 
 export async function withActiveMattermostSenderForSubject<T>(
@@ -84,18 +104,22 @@ export async function withActiveMattermostSenderForSubject<T>(
     throw new MattermostSenderUnavailableError("sender_not_configured");
   }
 
-  let lastMissing: MattermostSenderUnavailableError | null = null;
+  let lastUnavailable: unknown = null;
   for (const generation of candidates) {
     try {
       return await withActiveMattermostSenderForGeneration(generation, operation);
     } catch (error) {
-      if (error instanceof MattermostSenderUnavailableError && error.code === "sender_not_configured") {
-        lastMissing = error;
+      if (
+        (error instanceof MattermostSenderUnavailableError && error.code === "sender_not_configured")
+        || (error instanceof MattermostApiError && isMattermostSenderRuntimeFailureCode(error.code))
+      ) {
+        lastUnavailable = error;
         continue;
       }
       throw error;
     }
   }
 
-  throw lastMissing ?? new MattermostSenderUnavailableError("sender_not_configured");
+  if (lastUnavailable) throw lastUnavailable;
+  throw new MattermostSenderUnavailableError("sender_not_configured");
 }

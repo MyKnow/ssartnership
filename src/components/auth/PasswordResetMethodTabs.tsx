@@ -10,8 +10,10 @@ type ResetMethod = "mattermost" | "manual_email" | "graduate_email";
 
 export default function PasswordResetMethodTabs({
   activeSenderGenerations = [],
+  configuredSenderGenerations = [],
 }: {
   activeSenderGenerations?: readonly number[];
+  configuredSenderGenerations?: readonly number[];
 }) {
   const [method, setMethod] = useState<ResetMethod>("mattermost");
   const id = useId();
@@ -65,6 +67,7 @@ export default function PasswordResetMethodTabs({
           <MattermostCodeVerificationForm
             purpose="reset_password"
             activeSenderGenerations={activeSenderGenerations}
+            configuredSenderGenerations={configuredSenderGenerations}
           />
         </section>
       ) : method === "manual_email" ? (

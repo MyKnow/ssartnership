@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import { SignupPageView } from "@/components/auth/AuthEntryViews";
 import { getHeaderSession } from "@/lib/header-session";
-import { getActiveMattermostSenderGenerations } from "@/lib/mattermost-senders/availability";
+import { getMattermostSenderSignupAvailability } from "@/lib/mattermost-senders/availability";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
@@ -19,9 +19,9 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
-  const [headerSession, activeSenderGenerations] = await Promise.all([
+  const [headerSession, senderAvailability] = await Promise.all([
     getHeaderSession(),
-    getActiveMattermostSenderGenerations(),
+    getMattermostSenderSignupAvailability(),
   ]);
   const { returnTo: rawReturnTo } = await searchParams;
   const returnTo = sanitizeReturnTo(
@@ -34,7 +34,8 @@ export default async function SignupPage({
       <SiteHeader initialSession={headerSession} />
       <SignupPageView
         returnTo={returnTo}
-        activeSenderGenerations={activeSenderGenerations}
+        activeSenderGenerations={senderAvailability.activeSenderGenerations}
+        configuredSenderGenerations={senderAvailability.configuredSenderGenerations}
       />
     </div>
   );
