@@ -1,15 +1,16 @@
+import { getMattermostDisplayName } from "@/lib/mm-member-sync/snapshot";
+import { MattermostApiError, type MattermostAuthenticatedSession } from "@/lib/mattermost/client";
+import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
+import { getMattermostSenderRoutingTemplate } from "@/lib/mattermost-senders/routing";
+import {
+  MattermostSenderUnavailableError,
+  withActiveMattermostSenderForGeneration,
+} from "@/lib/mattermost-senders/service";
 import type { MmUserDirectorySyncResult, MmUserDirectorySnapshot } from "./shared";
 import { mergeDirectorySnapshot } from "./shared";
-import {
-  getSsafyVerifyServerApiConfig,
-} from "@/lib/ssafy-verify/config";
-import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
-import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
-import {
-  extractSsafyVerifyMemberProfiles,
-  getSsafyVerifyProfileEventsNextCursor,
-  toMmUserDirectorySnapshot,
-} from "@/lib/ssafy-verify/profile";
+
+const CHANNEL_MEMBERS_PAGE_SIZE = 200;
+const USER_LOOKUP_CONCURRENCY = 8;
 
 type SelectableYearSnapshotBatch = {
   sourceYear: number;
@@ -18,69 +19,100 @@ type SelectableYearSnapshotBatch = {
   failures: MmUserDirectorySyncResult["failures"];
 };
 
-function createSnapshotBatch(): SelectableYearSnapshotBatch {
+function createSnapshotBatch(sourceYear = 0): SelectableYearSnapshotBatch {
   return {
-    sourceYear: 0,
+    sourceYear,
     checked: 0,
     snapshots: new Map<string, MmUserDirectorySnapshot>(),
     failures: [],
   };
 }
 
-async function getVerifyProfileEventSnapshots(): Promise<SelectableYearSnapshotBatch> {
-  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
-    trace: createSsafyVerifyApiTraceLogger({
-      actorType: "system",
-      properties: {
-        flow: "profile_events_directory_sync",
-      },
-    }),
-  });
-  const snapshots = new Map<string, MmUserDirectorySnapshot>();
-  const failures: MmUserDirectorySyncResult["failures"] = [];
-  let checked = 0;
-  let cursor: string | null = null;
-  const seenCursors = new Set<string>();
+function toSafeFailureReason(error: unknown) {
+  if (error instanceof MattermostSenderUnavailableError) {
+    return error.code;
+  }
+  if (error instanceof MattermostApiError) {
+    return error.code;
+  }
+  return "unavailable";
+}
 
-  for (;;) {
-    try {
-      const payload = await client.getProfileEvents({
-        cursor,
-        limit: 100,
-      });
-      const profiles = extractSsafyVerifyMemberProfiles(payload);
-      checked += profiles.length;
+function chunk<T>(values: readonly T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
 
-      for (const profile of profiles) {
-        const snapshot = toMmUserDirectorySnapshot(profile);
-        const existing = snapshots.get(snapshot.mmUserId);
-        snapshots.set(
-          snapshot.mmUserId,
-          mergeDirectorySnapshot(existing, snapshot),
-        );
-      }
-
-      const nextCursor = getSsafyVerifyProfileEventsNextCursor(payload);
-      if (!nextCursor || seenCursors.has(nextCursor)) {
-        break;
-      }
-      seenCursors.add(nextCursor);
-      cursor = nextCursor;
-    } catch (error) {
-      failures.push({
-        sourceYear: 0,
-        reason: error instanceof Error ? error.message : "SSAFY Verify 프로필 이벤트 동기화 실패",
-      });
-      break;
+async function collectChannelMemberIds(
+  session: MattermostAuthenticatedSession,
+  channelId: string,
+) {
+  const ids = new Set<string>();
+  for (let page = 0; ; page += 1) {
+    const nextPage = await session.listChannelMemberUserIds(
+      channelId,
+      page,
+      CHANNEL_MEMBERS_PAGE_SIZE,
+    );
+    for (const id of nextPage) {
+      ids.add(id);
+    }
+    if (nextPage.length < CHANNEL_MEMBERS_PAGE_SIZE) {
+      return [...ids];
     }
   }
+}
 
-  return {
-    sourceYear: 0,
-    checked,
-    snapshots,
-    failures,
-  };
+async function collectGenerationSnapshots(sourceYear: number): Promise<SelectableYearSnapshotBatch> {
+  const batch = createSnapshotBatch(sourceYear);
+  try {
+    await withActiveMattermostSenderForGeneration(sourceYear, async (session) => {
+      const template = getMattermostSenderRoutingTemplate(sourceYear);
+      const team = await session.getTeamByName(template.teamName);
+      const channel = await session.getChannelByName(team.id, template.channelName);
+      const memberIds = await collectChannelMemberIds(session, channel.id);
+      batch.checked = memberIds.length;
+
+      for (const ids of chunk(memberIds, USER_LOOKUP_CONCURRENCY)) {
+        const settled = await Promise.allSettled(ids.map((id) => session.getUserById(id)));
+        settled.forEach((item, index) => {
+          const userId = ids[index] ?? null;
+          if (item.status === "rejected") {
+            batch.failures.push({
+              sourceYear,
+              userId,
+              reason: toSafeFailureReason(item.reason),
+            });
+            return;
+          }
+          const user = item.value;
+          const snapshot: MmUserDirectorySnapshot = {
+            mmUserId: user.id,
+            mmUsername: user.username,
+            displayName: getMattermostDisplayName(user),
+            // Direct Mattermost never overwrites legacy SSAFY claims.
+            campus: null,
+            isStaff: false,
+            sourceYears: [sourceYear],
+          };
+          const existing = batch.snapshots.get(snapshot.mmUserId);
+          batch.snapshots.set(
+            snapshot.mmUserId,
+            mergeDirectorySnapshot(existing, snapshot),
+          );
+        });
+      }
+    });
+  } catch (error) {
+    batch.failures.push({
+      sourceYear,
+      reason: toSafeFailureReason(error),
+    });
+  }
+  return batch;
 }
 
 export function mergeSelectableYearSnapshotBatches(
@@ -110,10 +142,24 @@ export function mergeSelectableYearSnapshotBatches(
 }
 
 export async function getAllSelectableUserSnapshots() {
-  const batch = await getVerifyProfileEventSnapshots();
-  const batches = batch.checked === 0 && batch.failures.length === 0
-    ? [createSnapshotBatch()]
-    : [batch];
+  let activeGenerations: number[];
+  try {
+    const metadata = await mattermostSenderRepository.listMetadata();
+    activeGenerations = metadata
+      .filter((sender) => sender.status === "active")
+      .map((sender) => sender.generation)
+      .sort((left, right) => right - left);
+  } catch {
+    return mergeSelectableYearSnapshotBatches([
+      {
+        ...createSnapshotBatch(),
+        failures: [{ sourceYear: 0, reason: "sender_registry_unavailable" }],
+      },
+    ]);
+  }
 
-  return mergeSelectableYearSnapshotBatches(batches);
+  const batches = await Promise.all(activeGenerations.map(collectGenerationSnapshots));
+  return mergeSelectableYearSnapshotBatches(
+    batches.length > 0 ? batches : [createSnapshotBatch()],
+  );
 }

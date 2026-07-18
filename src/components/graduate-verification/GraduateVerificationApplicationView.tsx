@@ -19,6 +19,7 @@ import {
   getSsafyGenerationFromEducationStart,
   GRADUATE_CAMPUS_OPTIONS,
   MAX_GRADUATE_CERTIFICATE_BYTES,
+  type GraduateVerificationRequestKind,
 } from "@/lib/graduate-verification";
 import {
   GRADUATE_PROFILE_PHOTO_ACCEPT,
@@ -88,7 +89,11 @@ async function uploadSignedGraduateFile(input: {
   return upload.uploadId;
 }
 
-export default function GraduateVerificationApplicationView() {
+export default function GraduateVerificationApplicationView({
+  requestKind = "graduate_signup",
+}: {
+  requestKind?: GraduateVerificationRequestKind;
+}) {
   const certificateInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoSourceUrlRef = useRef<string | null>(null);
@@ -110,6 +115,7 @@ export default function GraduateVerificationApplicationView() {
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [photoSelecting, setPhotoSelecting] = useState(false);
   const [sourcePhotoUrl, setSourcePhotoUrl] = useState("");
@@ -122,6 +128,7 @@ export default function GraduateVerificationApplicationView() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<{ tone: "danger" | "success" | "info"; text: string } | null>(null);
   const currentYearMonth = useMemo(() => getGraduateCurrentYearMonth(), []);
+  const isExistingMemberRecovery = requestKind === "existing_member_recovery";
 
   useEffect(() => () => {
     photoSelectionRequestIdRef.current += 1;
@@ -149,6 +156,12 @@ export default function GraduateVerificationApplicationView() {
     ? getGraduateEmailCodeRemainingSeconds(codeExpiresAt, now)
     : 0;
   const isCodeExpired = codeSent && codeRemainingSeconds === 0;
+  const canSubmit =
+    consented &&
+    (!requiresCertificate || certificateFile !== null) &&
+    (!requiresProfileImage || photoFile !== null) &&
+    !photoSelecting &&
+    !pending;
 
   const normalizeEducationYear = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -195,7 +208,7 @@ export default function GraduateVerificationApplicationView() {
       const response = await fetch("/api/graduate-verification/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, requestKind }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "인증 코드를 보내지 못했습니다.");
@@ -221,7 +234,7 @@ export default function GraduateVerificationApplicationView() {
       const response = await fetch("/api/graduate-verification/email/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code, requestKind }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "이메일 인증을 완료하지 못했습니다.");
@@ -306,7 +319,7 @@ export default function GraduateVerificationApplicationView() {
         setResubmissionTargets([]);
         setResubmissionNote(null);
         setExistingRequestStatus(null);
-        setMessage({ tone: "success", text: "이메일 인증이 완료되었습니다. 교육 정보를 입력해 주세요." });
+        setMessage(null);
       }
     } catch (error) {
       setMessage({ tone: "danger", text: error instanceof Error ? error.message : "이메일 인증을 완료하지 못했습니다." });
@@ -403,7 +416,7 @@ export default function GraduateVerificationApplicationView() {
     ) {
       setMessage({
         tone: "danger",
-        text: "보완 요청된 정보와 개인정보·사진 이용 동의를 모두 확인해 주세요.",
+        text: "정보와 개인정보·사진 이용 동의를 모두 확인해 주세요.",
       });
       return;
     }
@@ -440,7 +453,7 @@ export default function GraduateVerificationApplicationView() {
       setResubmissionTargets([]);
       setResubmissionNote(null);
       setExistingRequestStatus("submitted");
-      setMessage({ tone: "success", text: isResubmission ? "보완 제출을 완료했습니다. 관리자 재검토 후 이메일로 안내해 드립니다." : "수료생 인증 신청을 제출했습니다. 관리자 검토 후 이메일로 비밀번호 설정 안내를 보내드립니다." });
+      setMessage({ tone: "success", text: isResubmission ? "보완 제출을 완료했습니다. 관리자 재검토 후 이메일로 안내해 드립니다." : isExistingMemberRecovery ? "기존 회원 복구 신청을 제출했습니다. 관리자가 기존 회원을 명시적으로 연결한 뒤 이메일로 비밀번호 설정 안내를 보냅니다." : "수료생 인증 신청을 제출했습니다. 관리자 검토 후 이메일로 비밀번호 설정 안내를 보내드립니다." });
     } catch (error) {
       setMessage({ tone: "danger", text: error instanceof Error ? error.message : "수료생 인증 신청을 제출하지 못했습니다." });
     } finally {
@@ -478,8 +491,8 @@ export default function GraduateVerificationApplicationView() {
     <Card className="mx-auto min-w-0 max-w-2xl" data-testid="graduate-verification-application">
       <div className="space-y-2">
         <p className="ui-kicker">Graduate verification</p>
-        <h1 className="text-ko-title text-2xl font-semibold text-foreground">수료생 인증</h1>
-        <p className="ui-body text-muted-foreground">이메일 인증, 교육이수증, 본인 사진을 제출하면 관리자 검토 후 계정을 설정할 수 있습니다.</p>
+        <h1 className="text-ko-title text-2xl font-semibold text-foreground">{isExistingMemberRecovery ? "기존 회원 복구" : "수료생 인증"}</h1>
+        <p className="ui-body text-muted-foreground">{isExistingMemberRecovery ? "기존 사이트 비밀번호를 모르는 회원은 이메일 인증, 교육이수증, 본인 사진을 제출해 주세요. 관리자가 기존 회원을 명시적으로 선택한 경우에만 이메일 로그인과 초기 비밀번호를 연결합니다." : "이메일 인증, 교육이수증, 본인 사진을 제출하면 관리자 검토 후 계정을 설정할 수 있습니다."}</p>
       </div>
 
       <ol className="mt-6 grid grid-cols-3 gap-2 text-center text-xs font-medium" aria-label="수료생 인증 단계">
@@ -489,7 +502,7 @@ export default function GraduateVerificationApplicationView() {
         })}
       </ol>
 
-      {message ? <InlineMessage className="mt-5" tone={message.tone} title={message.tone === "danger" ? "확인이 필요합니다" : message.tone === "success" ? "완료" : "안내"} description={message.text} /> : null}
+      {message ? <InlineMessage className="mt-5" tone={message.tone} title={message.tone === "danger" ? undefined : message.tone === "success" ? "완료" : "안내"} description={message.text} /> : null}
 
       {step === "email" ? (
         <section className="mt-6 space-y-4" aria-labelledby="graduate-email-heading">
@@ -522,8 +535,7 @@ export default function GraduateVerificationApplicationView() {
           </div>
           <label className="grid gap-2 text-sm font-medium">캠퍼스<Select aria-label="캠퍼스" value={campus} onChange={(event) => setCampus(event.target.value)} disabled={isResubmission}><option value="" disabled>캠퍼스를 선택해 주세요</option>{GRADUATE_CAMPUS_OPTIONS.map((option) => <option key={option} value={option}>{option} 캠퍼스</option>)}</Select></label>
           {isResubmission && !canEditEducationPeriod ? <p className="text-sm text-muted-foreground">기존 교육 정보는 유지됩니다. 교육 기간 보완 요청이 있을 때만 수정할 수 있습니다.</p> : null}
-          <InlineMessage tone={inferredGeneration ? "info" : "warning"} title={inferredGeneration ? `자동 계산된 ${inferredGeneration}기` : "기수 계산 불가"} description={inferredGeneration ? "교육 시작 연·월로 계산되며 직접 수정할 수 없습니다." : "2018년 12월 이후의 교육 시작 연·월을 입력해 주세요."} />
-          <div className="flex gap-2"><Button variant="ghost" onClick={() => setStep("email")}>이전</Button><Button onClick={continueToFiles}>파일 제출로 계속</Button></div>
+          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setStep("email")}>이전</Button><Button onClick={continueToFiles}>다음</Button></div>
         </section>
       ) : null}
 
@@ -544,24 +556,21 @@ export default function GraduateVerificationApplicationView() {
           ) : null}
           <input ref={certificateInputRef} type="file" accept="application/pdf,.pdf" aria-label="교육이수증 PDF 파일 선택" className="sr-only" onChange={(event) => { handleCertificateChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
           <input ref={photoInputRef} type="file" accept={GRADUATE_PROFILE_PHOTO_ACCEPT} aria-label="본인 사진 파일 선택" className="sr-only" onChange={(event) => { void handlePhotoChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
-          {requiresCertificate ? <div className="grid gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[1fr_auto] sm:items-center"><div><p className="font-semibold">교육이수증 PDF</p><p className="mt-1 text-sm text-muted-foreground">PDF, 최대 10MB, 5페이지 이하</p>{certificateFile ? <p className="mt-2 text-sm font-medium text-success">선택됨: {certificateFile.name}</p> : null}</div><Button variant="secondary" onClick={chooseCertificate}>{certificateFile ? "파일 바꾸기" : "PDF 선택"}</Button></div> : null}
-          {requiresProfileImage ? <div className="grid min-w-0 gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-semibold">1:1 본인 사진</p><p className="mt-1 text-ko-pretty text-sm text-muted-foreground">JPEG, PNG, WebP, HEIC, HEIF · 최대 5MB · 얼굴이 분명하게 보이는 사진</p>{photoFile ? <p className="mt-2 text-sm font-medium text-success">사진 크롭 완료</p> : null}</div><div className="flex shrink-0 items-center gap-3">{photoPreviewUrl ? <Image src={photoPreviewUrl} alt="선택한 본인 사진 미리보기" width={56} height={56} unoptimized className="h-14 w-14 rounded-[1rem] border border-border object-cover" /> : null}<Button variant="secondary" onClick={choosePhoto} loading={photoSelecting} loadingText="사진 변환 중" disabled={pending}>{photoFile ? "사진 바꾸기" : "사진 선택"}</Button></div></div> : null}
-          <label className="flex items-start gap-3 rounded-card border border-border bg-surface-control p-4 text-sm"><input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-primary" /><span>교육이수증과 본인 사진을 수료생 인증 검토 및 인증 카드·유효 QR 검증 화면 표시 목적으로 처리하는 데 동의합니다. 사진은 공개 URL로 제공하지 않습니다.</span></label>
-          <div className="flex flex-wrap gap-2"><Button variant="ghost" onClick={() => setStep("details")}>이전</Button><Button onClick={submit} loading={pending} loadingText="제출 중" disabled={photoSelecting}>{isResubmission ? "보완 제출" : "수료생 인증 제출"}</Button></div>
+          {requiresCertificate ? <div className="grid gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[1fr_auto] sm:items-center"><div><p className="font-semibold">교육이수증 PDF</p><p className="mt-1 text-sm text-muted-foreground">PDF(최대 10MB)</p>{certificateFile ? <p className="mt-2 text-sm font-medium text-success">선택됨: {certificateFile.name}</p> : null}</div><Button variant="secondary" onClick={chooseCertificate}>{certificateFile ? "파일 바꾸기" : "PDF 선택"}</Button></div> : null}
+          {requiresProfileImage ? <div className="grid min-w-0 gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-semibold">1:1 본인 사진</p><p className="mt-1 text-ko-pretty text-sm text-muted-foreground">얼굴이 분명하게 보이는 사진(최대 5MB)</p></div><div className="flex shrink-0 items-center gap-3">{photoPreviewUrl ? <button type="button" className="rounded-[1rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => setPhotoPreviewOpen(true)} aria-label="선택한 본인 사진 크게 보기"><Image src={photoPreviewUrl} alt="선택한 본인 사진 미리보기" width={84} height={84} unoptimized className="h-[84px] w-[84px] rounded-[1rem] border border-border object-cover" /></button> : null}<Button variant="secondary" onClick={choosePhoto} loading={photoSelecting} loadingText="사진 변환 중" disabled={pending}>{photoFile ? "사진 바꾸기" : "사진 선택"}</Button></div></div> : null}
+          <label className="flex items-center justify-center gap-3 rounded-card border border-border bg-surface-control p-4 text-sm"><input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="h-5 w-5 shrink-0 accent-primary" /><span>교육이수증과 본인 사진을 수료생 인증 검토 및 인증 카드·유효 QR 검증 화면 표시 목적으로 처리하는 데 동의합니다.</span></label>
+          <div className="flex flex-wrap justify-end gap-2"><Button variant="ghost" onClick={() => setStep("details")}>이전</Button><Button onClick={submit} loading={pending} loadingText="제출 중" disabled={!canSubmit}>제출</Button></div>
         </section>
       ) : null}
 
       {step === "submitted" ? (
         <section className="mt-6 space-y-4">
-          <InlineMessage
-            tone="success"
-            title={existingRequestStatus === "in_review" ? "검토 중" : "검토 대기 중"}
-            description="수료증과 본인 사진을 검토합니다. 보완이 필요하면 같은 이메일로 다시 안내합니다."
-          />
           {existingRequestStatus === "submitted" ? (
-            <Button variant="ghost" onClick={withdraw} loading={pending} loadingText="철회 중">
-              신청 철회
-            </Button>
+            <div className="flex justify-end">
+              <Button variant="danger" onClick={withdraw} loading={pending} loadingText="철회 중">
+                신청 철회
+              </Button>
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -581,6 +590,39 @@ export default function GraduateVerificationApplicationView() {
         onCancel={() => setCropOpen(false)}
         onApply={applyCroppedPhoto}
       />
+      {photoPreviewUrl && photoPreviewOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="선택한 본인 사진 확대"
+        >
+          <button
+            type="button"
+            className="absolute inset-0"
+            onClick={() => setPhotoPreviewOpen(false)}
+            aria-label="선택한 본인 사진 확대 닫기"
+          />
+          <button
+            type="button"
+            className="absolute right-6 top-6 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
+            onClick={() => setPhotoPreviewOpen(false)}
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+          <div className="relative z-10 aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-white/5 shadow-overlay">
+            <Image
+              src={photoPreviewUrl}
+              alt="선택한 본인 사진 확대"
+              fill
+              sizes="(max-width: 768px) 90vw, 448px"
+              unoptimized
+              className="object-contain"
+            />
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }

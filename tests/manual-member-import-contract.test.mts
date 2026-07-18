@@ -64,10 +64,12 @@ test("회원 생성은 준비 완료 배치만 원자적으로 선점한다", as
   assert.match(service, /async function checkpointManualMemberImportPhotoAttachment/);
   assert.match(service, /async function checkpointManualMemberImportDeliveryIntent/);
   assert.match(service, /async function checkpointManualMemberImportDeliveryAttempt/);
-  assert.match(service, /async function clearManualMemberImportDeliveryAttempt/);
+  assert.match(service, /if \(input\.row\.delivery_attempted_at\) \{[\s\S]*?throw new ManualMemberImportDeliveryOutcomeUnknownError\(\);/);
+  assert.match(service, /withActiveMattermostSenderForGeneration/);
+  assert.doesNotMatch(service, /async function clearManualMemberImportDeliveryAttempt/);
   assert.match(service, /async function checkpointManualMemberImportDeliverySent/);
   assert.match(service, /class ManualMemberImportDeliveryOutcomeUnknownError extends Error/);
-  assert.match(service, /async function getKnownMattermostDeliveryOutcome/);
+  assert.doesNotMatch(service, /async function getKnownMattermostDeliveryOutcome/);
   assert.match(service, /async function cleanupCreatedManualMemberImportStagingFiles/);
   assert.match(service, /variant: `manual-import-\$\{row\.id\}`/);
   assert.match(service, /manual_member_import_row_id: row\.id/);

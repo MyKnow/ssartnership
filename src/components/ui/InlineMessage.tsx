@@ -25,7 +25,7 @@ export default function InlineMessage({
   actionHref,
   actionLabel,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   tone?: keyof typeof tones;
   className?: string;
@@ -51,7 +51,7 @@ export default function InlineMessage({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
-          <Badge variant={badgeVariants[tone]}>{title}</Badge>
+          {title ? <Badge variant={badgeVariants[tone]}>{title}</Badge> : null}
           {description ? <p className="ui-body max-w-3xl">{description}</p> : null}
         </div>
         {resolvedAction ? <div className="shrink-0">{resolvedAction}</div> : null}

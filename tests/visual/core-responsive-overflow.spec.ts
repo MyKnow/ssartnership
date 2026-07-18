@@ -8,6 +8,7 @@ const coreStoryIds = [
   "domains-partner-pagestates-dashboard--cafe-ssafy-mixed-plans",
   "domains-admin-pagestates--dashboard-overview",
   "domains-admin-adminmembermanager--default",
+  "domains-admin-admincycleview--mattermost-sender-management",
 ] as const;
 
 const viewportWidths = [320, 360, 390, 768, 820, 1024, 1366, 1440, 1536] as const;

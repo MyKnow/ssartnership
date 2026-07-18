@@ -174,6 +174,15 @@ export const mockScenarios = [
     requiredStates: ["가입 폼", "이메일/아이디 오류", "완료 화면"],
   },
   {
+    id: "auth.signup.approval-pending",
+    label: "Mattermost 가입 승인 대기",
+    surface: "auth",
+    description: "Mattermost 프로필 파싱이 보류된 회원의 승인 신청과 대기 안내 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["api-route"],
+    requiredStates: ["승인 신청", "승인 대기", "로그인 이동"],
+  },
+  {
     id: "auth.graduate-verification.application",
     label: "수료생 이메일·증명서 인증 신청",
     surface: "auth",
@@ -181,6 +190,15 @@ export const mockScenarios = [
     syntheticOnly: true,
     dataSources: ["api-route", "service", "storybook"],
     requiredStates: ["이메일 인증", "교육 정보", "기수 자동 계산", "파일 크롭", "보완 요청", "제출 완료"],
+  },
+  {
+    id: "auth.member-email-recovery",
+    label: "기존 회원 이메일 로그인 복구",
+    surface: "auth",
+    description: "기존 사이트 비밀번호 확인 후 15분 제한 세션에서 이메일 코드로 로그인을 전환하는 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["api-route", "service"],
+    requiredStates: ["기존 비밀번호 확인", "이메일 등록", "6자리 코드", "세션 만료"],
   },
   {
     id: "auth.graduate-password-setup",
@@ -271,6 +289,15 @@ export const mockScenarios = [
     syntheticOnly: true,
     dataSources: ["service", "api-route", "storybook"],
     requiredStates: ["신규 인증", "보완 요청", "승인", "반려", "빈 큐"],
+  },
+  {
+    id: "admin.member-signup-requests.queue",
+    label: "관리자 Mattermost 가입 승인 큐",
+    surface: "admin",
+    description: "Mattermost 프로필 파싱이 되지 않은 회원의 부족한 정보를 입력하고 가입을 승인하거나 반려합니다.",
+    syntheticOnly: true,
+    dataSources: ["repository", "service"],
+    requiredStates: ["승인 대기", "정보 보완", "승인", "반려", "빈 큐", "권한 없음"],
   },
   {
     id: "admin.profile-photos.queue",

@@ -69,6 +69,11 @@ type ConvertedPartnerRow = {
   location: string;
   campus_slugs?: string[] | null;
   visibility?: string | null;
+  benefits?: string[] | null;
+  conditions?: string[] | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  map_url?: string | null;
 };
 
 type RegistrationBenefitGroupRow = {
@@ -320,7 +325,7 @@ async function createPartnerFromPortalRegistrationRequest({
             : request.branch_scope_type ?? "single_location",
         branch_scope_note: request.branch_scope_note ?? null,
       })
-      .select("id,name,location,campus_slugs,visibility")
+      .select("id,name,location,campus_slugs,visibility,benefits,conditions,period_start,period_end,map_url")
       .single();
 
     if (error) {
@@ -485,6 +490,11 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
             location: partner.location,
             categoryLabel: registrationRequest.category_label,
             campusSlugs: partner.campus_slugs ?? managedCampusSlugs,
+            benefitSummary: (partner.benefits ?? []).join("\n"),
+            conditions: (partner.conditions ?? []).join("\n"),
+            periodStart: partner.period_start,
+            periodEnd: partner.period_end,
+            mapUrl: partner.map_url,
           });
         }
 

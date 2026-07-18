@@ -3,6 +3,31 @@ import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 
 export const GRADUATE_COHORT_RULE_VERSION = "ssafy-half-year-v1" as const;
 
+/**
+ * A certificate can either provision a new graduate account or restore email
+ * access to an already-existing member.  Keep this explicit all the way from
+ * the email challenge to approval so the recovery path can never fall through
+ * to member creation.
+ */
+export const GRADUATE_VERIFICATION_REQUEST_KINDS = [
+  "graduate_signup",
+  "existing_member_recovery",
+] as const;
+
+export type GraduateVerificationRequestKind =
+  (typeof GRADUATE_VERIFICATION_REQUEST_KINDS)[number];
+
+export function parseGraduateVerificationRequestKind(
+  value: unknown,
+): GraduateVerificationRequestKind | null {
+  return typeof value === "string" &&
+    GRADUATE_VERIFICATION_REQUEST_KINDS.includes(
+      value as GraduateVerificationRequestKind,
+    )
+    ? (value as GraduateVerificationRequestKind)
+    : null;
+}
+
 export const GRADUATE_VERIFICATION_STATUSES = [
   "draft",
   "submitted",

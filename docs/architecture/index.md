@@ -1,6 +1,6 @@
 # Architecture Documentation Index
 
-작성 기준일: 2026-07-09
+작성 기준일: 2026-07-17
 
 이 디렉터리는 성능 개선, UI/UX 리팩토링, 기술 스택 마이그레이션 전에 현재 SSARTNERSHIP 사이트의 정보 구조와 구현 기준선을 보존하기 위한 문서 묶음이다. 코드보다 먼저 읽는 현행 시스템 명세로 사용한다.
 
@@ -21,7 +21,8 @@
 ## 기존 관련 문서
 
 - [이벤트 로깅 기준](./event-logging.md)
-- [SSAFY Verify 외부 API 위임](./ssafy-verify-external-api-delegation.md)
+- [Mattermost 직접 연동 전환](./mattermost-direct-reversion.md)
+- [SSAFY Verify 외부 API 위임 (역사 문서)](./ssafy-verify-external-api-delegation.md)
 - [수료생 증명서·프로필 사진 인증 v1](./graduate-verification-v1.md)
 - [디자인 시스템](../design-system/README.md)
 - [성능 문서](../performance/README.md)

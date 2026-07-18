@@ -9,6 +9,8 @@ import {
 } from "@/lib/admin-accounts";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { createAdminOperationalNotification } from "@/lib/operational-notifications";
+import { getCampusBySlug } from "@/lib/campuses";
+import type { NotificationTemplateContext } from "@/lib/notification-templates/context";
 import { logAdminAction } from "./shared-helpers";
 
 function adminManagementPathWithStatus(status: string, extra?: Record<string, string>) {
@@ -27,6 +29,8 @@ async function notifyAdminSecurityAlert(input: {
   title: string;
   body: string;
   metadata: Record<string, unknown>;
+  templateVariant: string;
+  templateContext: NotificationTemplateContext;
 }) {
   await createAdminOperationalNotification({
     type: "security_alert",
@@ -34,6 +38,8 @@ async function notifyAdminSecurityAlert(input: {
     body: input.body,
     targetUrl: "/admin/admins",
     metadata: input.metadata,
+    templateVariant: input.templateVariant,
+    templateContext: input.templateContext,
   }).catch((error) => {
     console.error("[admin-account-actions] security alert notification failed", error);
   });
@@ -70,6 +76,17 @@ export async function grantMemberAdminPermissionAction(formData: FormData) {
         targetLoginId: account.loginId,
         permissionId: account.permissionId,
         managedCampusSlugs: account.managedCampusSlugs,
+      },
+      templateVariant: "security_permission_granted",
+      templateContext: {
+        kind: "admin_security_permission_granted",
+        targetLoginId: account.loginId,
+        actionName: "관리자 권한 부여",
+        permissionTemplateName: account.permissionId,
+        managedCampusNames: account.managedCampusSlugs
+          .map((slug) => getCampusBySlug(slug)?.fullLabel ?? slug)
+          .join(", "),
+        adminUrl: "/admin/admins",
       },
     });
     revalidatePath("/admin/admins");
@@ -121,6 +138,14 @@ export async function updateAdminAccountStatusAction(formData: FormData) {
         isActive,
         actorAdminId: actor.adminId,
       },
+      templateVariant: "security_status_changed",
+      templateContext: {
+        kind: "admin_security_status_changed",
+        targetLoginId: adminId,
+        statusName: isActive ? "활성화" : "회수",
+        actorLoginId: actor.loginId,
+        adminUrl: "/admin/admins",
+      },
     });
     revalidatePath("/admin/admins");
   } catch (error) {
@@ -159,6 +184,17 @@ export async function applyAdminPermissionTemplateAction(formData: FormData) {
         templateKey,
         managedCampusSlugs: readManagedCampusSlugs(formData),
         actorAdminId: actor.adminId,
+      },
+      templateVariant: "security_template_changed",
+      templateContext: {
+        kind: "admin_security_template_changed",
+        targetLoginId: adminId,
+        permissionTemplateName: templateKey,
+        actorLoginId: actor.loginId,
+        managedCampusNames: readManagedCampusSlugs(formData)
+          .map((slug) => getCampusBySlug(slug)?.fullLabel ?? slug)
+          .join(", "),
+        adminUrl: "/admin/admins",
       },
     });
     revalidatePath("/admin/admins");

@@ -39,21 +39,14 @@ export async function buildMemberIdentifierReservationsForMember(memberId: strin
   }
 
   const source = member as MemberReservationSource;
-  const [mattermostResult, verificationResult] = await Promise.all([
-    source.mattermost_account_id
-      ? supabase
-          .from("mm_user_directory")
-          .select("mm_user_id,mm_username")
-          .eq("id", source.mattermost_account_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    supabase
-      .from("member_ssafy_verifications")
-      .select("ssafy_sub")
-      .eq("member_id", memberId)
-      .maybeSingle(),
-  ]);
-  if (mattermostResult.error || verificationResult.error) {
+  const mattermostResult = source.mattermost_account_id
+    ? await supabase
+        .from("mm_user_directory")
+        .select("mm_user_id,mm_username")
+        .eq("id", source.mattermost_account_id)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (mattermostResult.error) {
     return null;
   }
 
@@ -63,7 +56,6 @@ export async function buildMemberIdentifierReservationsForMember(memberId: strin
       emailNormalized: source.email_normalized,
       mmUserId: mattermostResult.data?.mm_user_id ?? null,
       mmUsername: mattermostResult.data?.mm_username ?? null,
-      ssafySub: verificationResult.data?.ssafy_sub ?? null,
     },
     secret,
   );

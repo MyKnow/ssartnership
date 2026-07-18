@@ -718,6 +718,17 @@ export async function createPartnerPlanUpgradeRequest(input: {
       body: `${getPartnerCompanyPlanDefinition(brand.planTier).label}에서 ${getPartnerCompanyPlanDefinition(requestedPlanTier).label}로 변경 요청이 접수되었습니다. 계좌이체 입금 확인이 필요합니다.`,
       targetUrl: "/admin/partners?tab=plans",
       metadata: { requestId: request.id, partnerId: brand.id, companyId: brand.companyId, requestedPlanTier, totalAmountKrw: charge.totalAmountKrw },
+      templateVariant: "partner_plan_upgrade_request",
+      templateContext: {
+        kind: "admin_partner_plan_upgrade_request",
+        companyName: brand.companyName,
+        partnerName: brand.name,
+        requesterName: request.requestedByDisplayName ?? "파트너 담당자",
+        currentPlanName: getPartnerCompanyPlanDefinition(brand.planTier).label,
+        requestedPlanName: getPartnerCompanyPlanDefinition(requestedPlanTier).label,
+        amountKrw: `${charge.totalAmountKrw.toLocaleString("ko-KR")}원`,
+        requestUrl: "/admin/partners?tab=plans",
+      },
     }).catch((error) => {
       console.error("[partner-plan-service] admin upgrade notification failed", error);
     }),
@@ -729,6 +740,14 @@ export async function createPartnerPlanUpgradeRequest(input: {
       body: `${brand.name}의 ${getPartnerCompanyPlanDefinition(requestedPlanTier).label} 업그레이드 청구서가 생성되었습니다. 계좌이체 후 관리자 확인을 기다려 주세요.`,
       targetUrl: getCompanyScopedPortalHref(brand.companyId, "plans"),
       metadata: { requestId: request.id, partnerId: brand.id, companyId: brand.companyId, requestedPlanTier, totalAmountKrw: charge.totalAmountKrw },
+      templateContext: {
+        kind: "partner_plan_upgrade_requested",
+        partnerName: brand.name,
+        requestedPlanName: getPartnerCompanyPlanDefinition(requestedPlanTier).label,
+        amountKrw: `${charge.totalAmountKrw.toLocaleString("ko-KR")}원`,
+        paymentDueAt: billingInvoice?.dueAt ?? "",
+        planUrl: getCompanyScopedPortalHref(brand.companyId, "plans"),
+      },
     }).catch((error) => {
       console.error("[partner-plan-service] partner upgrade notification failed", error);
     }),
@@ -938,6 +957,16 @@ export async function updatePartnerBrandPlanByAdmin(input: {
     body: `${getPartnerCompanyPlanDefinition(brand.planTier).label}에서 ${getPartnerCompanyPlanDefinition(input.nextPlanTier).label}로 변경되었습니다.`,
     targetUrl: getCompanyScopedPortalHref(brand.companyId, "plans"),
     metadata: { partnerId: input.partnerId, companyId: brand.companyId, nextPlanTier: input.nextPlanTier },
+    templateContext: {
+      kind: "partner_plan_changed",
+      partnerName: brand.name,
+      previousPlanName: getPartnerCompanyPlanDefinition(brand.planTier).label,
+      nextPlanName: getPartnerCompanyPlanDefinition(input.nextPlanTier).label,
+      effectiveAt: planWindow.planStartedAt ?? "",
+      expiresAt: planWindow.planExpiresAt ?? "",
+      planUrl: getCompanyScopedPortalHref(brand.companyId, "plans"),
+      note: input.note || "",
+    },
   }).catch((error) => {
     console.error("[partner-plan-service] plan change notification failed", error);
   });
@@ -1040,6 +1069,22 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
       : `${request.brandName}의 플랜 업그레이드 요청이 반려되었습니다.${adminNote ? ` 사유: ${adminNote}` : ""}`,
     targetUrl: getCompanyScopedPortalHref(request.companyId, "plans"),
     metadata: { requestId: request.id, partnerId: request.partnerId, companyId: request.companyId },
+    templateContext: approved
+      ? {
+          kind: "partner_plan_upgrade_approved",
+          partnerName: request.brandName,
+          requestedPlanName: getPartnerCompanyPlanDefinition(request.requestedPlanTier).label,
+          effectiveAt: billingInvoice?.paidAt ?? reviewedAt,
+          expiresAt: billingInvoice?.servicePeriodEnd ?? "",
+          planUrl: getCompanyScopedPortalHref(request.companyId, "plans"),
+        }
+      : {
+          kind: "partner_plan_upgrade_rejected",
+          partnerName: request.brandName,
+          requestedPlanName: getPartnerCompanyPlanDefinition(request.requestedPlanTier).label,
+          rejectionReason: adminNote || "관리자 검토 결과 반려되었습니다.",
+          planUrl: getCompanyScopedPortalHref(request.companyId, "plans"),
+        },
   }).catch((notificationError) => {
     console.error("[partner-plan-service] review notification failed", notificationError);
   });

@@ -30,9 +30,12 @@
 | GET | `/api/mm/certification-token` | 인증 QR token |
 | POST | `/api/mm/profile-sync` | 회원 프로필 동기화 |
 | POST | `/api/mm/reset-password/complete` | 비밀번호 재설정 완료 |
-| POST | `/api/ssafy/signup` | SSAFY Verify 기반 가입 |
-| POST | `/api/ssafy/reset-password` | SSAFY Verify 기반 재설정 |
-| POST | `/api/ssafy/verify-token` | SSAFY Verify token 검증 |
+| POST | `/api/mm/code/issue` | direct Mattermost DM 코드 발급 |
+| POST | `/api/mm/code/verify` | direct Mattermost DM 코드 검증 |
+| POST | `/api/mm/signup` | direct Mattermost 인증 가입 |
+| POST | `/api/member/recovery/start` | 기존 사이트 비밀번호로 15분 이메일 복구 세션 발급 |
+| POST | `/api/member/recovery/email/send` | 복구 세션의 이메일 코드 발송 |
+| POST | `/api/member/recovery/email/verify` | 복구 이메일 코드 검증 및 이메일 로그인 전환 |
 | GET | `/api/certification/avatar/[token]` | QR token 기반 avatar 조회 |
 
 ### Public/member feature APIs
@@ -90,7 +93,6 @@
 | GET | `/api/cron/partner-billing` | 협력사 billing batch |
 | GET | `/api/cron/push-expiring-partners` | 종료 예정 제휴 push |
 | GET | `/api/cron/rss` | RSS refresh |
-| GET | `/api/cron/ssafy-verify-notification-status` | SSAFY Verify notification status sync |
 
 ## External integrations
 
@@ -101,14 +103,13 @@
 - `NEXT_PUBLIC_SUPABASE_URL`은 image remote pattern 등 public 용도만 선택적으로 사용한다.
 - Preview sync는 production data를 preview로 복사하되 member password material과 legacy `members.avatar_base64`만 제거한다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
 
-### SSAFY Verify
+### Mattermost
 
-- Hosted/Auth, Server API, profile/directory/notification status를 사용한다.
-- public client id: `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`
-- server credential: `SSAFY_VERIFY_SERVER_CLIENT_ID`, `SSAFY_VERIFY_SERVER_CLIENT_SECRET`
-- issuer/base URL: `SSAFY_VERIFY_ISSUER`, `SSAFY_VERIFY_SERVER_API_BASE_URL`
-- redirect URI allowlist: `SSAFY_VERIFY_REDIRECT_URIS`
-- 자세한 위임 기준은 [ssafy-verify-external-api-delegation.md](./ssafy-verify-external-api-delegation.md)를 따른다.
+- `MattermostClient`는 로그인, 사용자·채널 조회, DM 생성·발송, avatar 조회, logout을 서버에서만 수행한다.
+- `MM_BASE_URL`은 서버 전용이며 MM 세션 토큰은 요청 메모리에서만 유지한다.
+- 기수별 Sender credential은 `mattermost_sender_credentials`에 AES-256-GCM으로 저장한다. key env는 `MM_SENDER_CREDENTIALS_KEY_V1`, 활성 키 버전 env는 `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`이다.
+- Sender 후보는 운영 화면에서 테스트 DM 성공 뒤에만 active가 되며, team/channel은 `s{generation}public`과 `town-square` 상수로 계산한다.
+- 상세 기준은 [Mattermost 직접 연동 전환](./mattermost-direct-reversion.md)을 따른다.
 
 ### SMTP
 
@@ -146,7 +147,7 @@
 | Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, optional `NEXT_PUBLIC_SUPABASE_URL` |
 | Data source | `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE` |
 | Preview sync | `PREVIEW_TEST_MEMBER_USERNAME`, `PREVIEW_TEST_MEMBER_PASSWORD` |
-| SSAFY Verify | `NEXT_PUBLIC_SSAFY_VERIFY_CLIENT_ID`, `SSAFY_VERIFY_*` |
+| Mattermost | `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_KEY_V1`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION` |
 | SMTP | `SMTP_*`, `NAVER_SMTP_*`, `SUGGEST_NOTIFY_EMAIL` |
 | Web Push/Cron | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` |
 | SEO | `NEXT_PUBLIC_SITE_URL` |

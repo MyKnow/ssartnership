@@ -4,7 +4,6 @@ import { createHmacDigest } from "@/lib/hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   getConfiguredCurrentSsafyYear,
-  getConfiguredManualMemberMmLookupGenerations,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
@@ -19,15 +18,11 @@ import {
   upsertMmUserDirectorySnapshot,
 } from "@/lib/mm-directory";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
-import { getSsafyVerifyServerApiConfig } from "@/lib/ssafy-verify/config";
-import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
-import {
-  extractSsafyVerifyMemberProfiles,
-  toMmUserDirectorySnapshot,
-  toSsafyVerifyMattermostUser,
-  type SsafyVerifyMemberProfile,
-} from "@/lib/ssafy-verify/profile";
-import { createSsafyVerifyServerApiClient } from "@/lib/ssafy-verify/server-api";
+import { resolveManualMemberResolution } from "@/lib/member-manual-add/lookup";
+import { renderEmailTemplateBody } from "@/lib/email-content";
+import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 import {
   MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
@@ -81,8 +76,8 @@ type ImportRow = {
   updated_at: string;
 };
 
-type ResolvedVerifyMember = {
-  profile: SsafyVerifyMemberProfile;
+type ResolvedMattermostMember = {
+  displayName: string;
   mattermostAccountId: string;
   mattermostUserId: string;
   resolvedGeneration: number;
@@ -127,15 +122,6 @@ function toErrors(messages: Array<{ rowNumber: number | null; message: string }>
   );
 }
 
-function getManualMemberNotificationConfig() {
-  const templateKey = process.env.SSAFY_VERIFY_MANUAL_MEMBER_SETUP_TEMPLATE_KEY?.trim();
-  const purpose = process.env.SSAFY_VERIFY_MANUAL_MEMBER_SETUP_PURPOSE?.trim();
-  if (!templateKey || !purpose) {
-    throw new Error("SSAFY Verify 수동 회원 설정 알림 템플릿이 설정되지 않았습니다.");
-  }
-  return { templateKey, purpose };
-}
-
 function buildSetupUrl(token: string) {
   const url = new URL("/auth/member/setup", SITE_URL);
   // Fragment values are not sent in request paths or Referer headers.
@@ -143,13 +129,20 @@ function buildSetupUrl(token: string) {
   return url.toString();
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+async function buildManualMemberSetupMattermostMessage(input: {
+  displayName: string;
+  setupUrl: string;
+}) {
+  const template = await resolveNotificationTemplate("mattermost.manual_member_setup");
+  const variables = {
+    siteName: SITE_NAME,
+    displayName: input.displayName || "회원",
+    setupUrl: input.setupUrl,
+  };
+  return [
+    renderNotificationTemplate(template.titleTemplate, variables),
+    renderNotificationTemplate(template.bodyTemplate, variables),
+  ].join("\n\n");
 }
 
 async function sendSetupEmail(input: {
@@ -162,26 +155,29 @@ async function sendSetupEmail(input: {
   const smtpConfig = getSmtpConfig();
   const transport = createSmtpTransport(smtpConfig);
   const setupUrl = buildSetupUrl(input.token);
-  const safeName = escapeHtml(input.displayName || "회원");
-  const safeUrl = escapeHtml(setupUrl);
-  const heading = input.reset ? "비밀번호 재설정" : "계정 비밀번호 설정";
+  const template = await resolveNotificationTemplate(
+    input.reset
+      ? "email.manual_member_password_reset"
+      : "email.manual_member_setup",
+  );
+  const variables = {
+    siteName: SITE_NAME,
+    displayName: input.displayName || "회원",
+    setupUrl,
+  };
+  const subject = renderNotificationTemplate(template.titleTemplate, variables);
+  const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, variables);
   await transport.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.email,
-    subject: `[${SITE_NAME}] ${heading}`,
+    subject,
     // Message-ID is correlation metadata only; SMTP delivery safety is handled
     // by the durable attempt checkpoint below, not by this header.
     messageId: input.idempotencyKey
       ? getManualMemberImportEmailMessageId(input.idempotencyKey)
       : undefined,
-    text: [
-      `${input.displayName || "회원"}님, 아래 링크에서 비밀번호를 ${input.reset ? "재설정" : "설정"}해 주세요.`,
-      "",
-      setupUrl,
-      "",
-      "링크는 24시간 동안 한 번만 사용할 수 있습니다.",
-    ].join("\n"),
-    html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.7"><h2>${heading}</h2><p>${safeName}님, 아래 링크에서 비밀번호를 설정해 주세요.</p><p><a href="${safeUrl}">비밀번호 설정하기</a></p><p>링크는 24시간 동안 한 번만 사용할 수 있습니다.</p></div>`,
+    text: renderedBody.text,
+    html: renderedBody.html,
   });
 }
 
@@ -223,41 +219,6 @@ class ManualMemberImportDeliveryOutcomeUnknownError extends Error {
   }
 }
 
-type MattermostDeliveryOutcome = "accepted" | "failed" | "unknown";
-
-function getMattermostDeliveryOutcome(input: {
-  idempotencyKey: string;
-  results: ReadonlyArray<{ idempotencyKey: string | null; status: string }>;
-}): MattermostDeliveryOutcome {
-  const target = input.results.find((item) => item.idempotencyKey === input.idempotencyKey);
-  if (!target) return "unknown";
-  const status = target.status.trim().toLowerCase();
-  if (["failed", "failure", "rejected", "bounced", "skipped", "cancelled"].includes(status)) {
-    return "failed";
-  }
-  if (["accepted", "queued", "pending", "retrying", "sent", "delivered", "success", "succeeded"].includes(status)) {
-    return "accepted";
-  }
-  return "unknown";
-}
-
-async function getKnownMattermostDeliveryOutcome(input: {
-  client: ReturnType<typeof createSsafyVerifyServerApiClient>;
-  deliveryIdempotencyKey: string;
-}): Promise<MattermostDeliveryOutcome> {
-  try {
-    const result = await input.client.listNotifications({
-      campaignId: input.deliveryIdempotencyKey,
-    });
-    return getMattermostDeliveryOutcome({
-      idempotencyKey: input.deliveryIdempotencyKey,
-      results: result.results,
-    });
-  } catch {
-    return "unknown";
-  }
-}
-
 function getSafeFailureMessage(error: unknown) {
   if (error instanceof ManualMemberImportDeliveryOutcomeUnknownError) {
     return error.message;
@@ -268,7 +229,7 @@ function getSafeFailureMessage(error: unknown) {
   }
   if (/duplicate|already|exists/i.test(error.message)) return "이미 활성화된 MM ID 또는 이메일입니다.";
   if (/photo|사진/i.test(error.message)) return "사진을 처리하지 못했습니다.";
-  if (/Verify|mattermost|SSAFY/i.test(error.message)) return "SSAFY Verify 조회 또는 알림에 실패했습니다.";
+  if (/mattermost|MM/i.test(error.message)) return "Mattermost 조회 또는 알림에 실패했습니다.";
   if (/email|SMTP/i.test(error.message)) return "이메일 알림을 보낼 수 없습니다.";
   return "회원 생성에 실패했습니다.";
 }
@@ -277,50 +238,41 @@ function isSupportedImageContentType(value: string | null): value is (typeof MAN
   return Boolean(value && MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES.includes(value as (typeof MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES)[number]));
 }
 
-async function resolveVerifyMember(input: {
+async function resolveMattermostMember(input: {
   mmUsername: string;
   generation: number;
-  mmLookupGenerations: number[];
 }) {
-  const years = input.generation === 0
-    ? input.mmLookupGenerations
-    : [input.generation];
-  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
-    trace: createSsafyVerifyApiTraceLogger({
-      actorType: "system",
-      identifier: input.mmUsername,
-      properties: { flow: "manual_member_import_lookup", generation: input.generation },
-    }),
-  });
-  for (const generation of years) {
-    const response = await client.findMattermostUsers({
-      username: input.mmUsername,
-      cohort: generation,
-    });
-    const profile = extractSsafyVerifyMemberProfiles(response).find((item) =>
-      input.generation === 0 ? item.isStaff : !item.isStaff,
-    );
-    if (!profile) continue;
-    const snapshot = toMmUserDirectorySnapshot(profile, [input.generation, generation]);
-    await upsertMmUserDirectorySnapshot({
-      ...snapshot,
-      isStaff: input.generation === 0 || snapshot.isStaff,
-    });
-    const directory = await findMmUserDirectoryEntryByUserId(profile.mattermostUserId);
-    if (!directory?.id) throw new Error("MM 계정 연결을 저장하지 못했습니다.");
-    return {
-      profile,
-      mattermostAccountId: directory.id,
-      mattermostUserId: toSsafyVerifyMattermostUser(profile).id,
-      resolvedGeneration: generation,
-    } satisfies ResolvedVerifyMember;
+  const resolution = await resolveManualMemberResolution(
+    input.mmUsername,
+    input.generation,
+  );
+  if (!resolution) {
+    throw new Error("Mattermost에서 회원을 찾지 못했습니다.");
   }
-  throw new Error("SSAFY Verify에서 회원을 찾지 못했습니다.");
+  await upsertMmUserDirectorySnapshot({
+    mmUserId: resolution.user.id,
+    mmUsername: resolution.user.username,
+    displayName: resolution.profile.displayName,
+    campus: null,
+    isStaff: input.generation === 0,
+    sourceYears: [resolution.resolvedYear],
+  });
+  const directory = await findMmUserDirectoryEntryByUserId(resolution.user.id);
+  if (!directory?.id) {
+    throw new Error("Mattermost 계정 연결을 저장하지 못했습니다.");
+  }
+  return {
+    displayName: resolution.profile.displayName,
+    mattermostAccountId: directory.id,
+    mattermostUserId: resolution.user.id,
+    resolvedGeneration: resolution.resolvedYear,
+  } satisfies ResolvedMattermostMember;
 }
 
 type ManualMemberImportReissueMattermostRecipient = {
   mattermostUserId: string;
   displayName: string;
+  senderGeneration: number;
 };
 
 type ManualMemberImportReissueEmailRecipient = {
@@ -333,6 +285,8 @@ type ManualMemberImportReissueMember = {
   display_name: string | null;
   mattermost_account_id: string | null;
   email_normalized: string | null;
+  generation: number | null;
+  staff_source_generation: number | null;
   must_change_password: boolean;
 };
 
@@ -341,7 +295,7 @@ async function resolveManualMemberImportReissueMember(input: {
 }): Promise<ManualMemberImportReissueMember> {
   const { data, error } = await getSupabaseAdminClient()
     .from("members")
-    .select("id,display_name,mattermost_account_id,email_normalized,must_change_password")
+    .select("id,display_name,mattermost_account_id,email_normalized,generation,staff_source_generation,must_change_password")
     .eq("id", input.memberId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -367,12 +321,23 @@ async function resolveManualMemberImportReissueMattermostRecipient(input: {
   if (!directory?.is_active || !directory.mm_user_id) {
     throw new Error("회원의 연결된 MM 계정을 확인하지 못했습니다.");
   }
+  const configuredSenderGeneration = input.member.generation === 0
+    ? input.member.staff_source_generation
+    : input.member.generation;
+  if (
+    typeof configuredSenderGeneration !== "number"
+    || !Number.isSafeInteger(configuredSenderGeneration)
+    || configuredSenderGeneration <= 0
+  ) {
+    throw new Error("회원의 Mattermost Sender 기수를 확인하지 못했습니다.");
+  }
 
   return {
     // Mattermost user IDs are immutable. Do not resolve the stored username
     // again: usernames can be renamed or reused by another account.
     mattermostUserId: directory.mm_user_id,
     displayName: input.member.display_name?.trim() || input.fallbackDisplayName?.trim() || "회원",
+    senderGeneration: configuredSenderGeneration,
   };
 }
 
@@ -579,7 +544,6 @@ export async function prepareManualMemberImport(input: {
     const settings = await getSsafyCycleSettings();
     const rowsResult = validateManualMemberImportRows(input.rows, {
       currentGeneration: getConfiguredCurrentSsafyYear(settings),
-      mmLookupGenerations: getConfiguredManualMemberMmLookupGenerations(settings),
     });
     const photoResult = validateManualMemberImportPhotoManifest(
       rowsResult.acceptedRows,
@@ -794,26 +758,6 @@ async function checkpointManualMemberImportDeliveryAttempt(input: {
   return { rowLeaseVersion: checkpoint.updated_at };
 }
 
-async function clearManualMemberImportDeliveryAttempt(input: {
-  row: ImportRow;
-  rowLeaseVersion: string;
-}): Promise<ImportRowCheckpoint> {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("manual_member_import_rows")
-    .update({ delivery_attempted_at: null })
-    .eq("id", input.row.id)
-    .eq("batch_id", input.row.batch_id)
-    .eq("status", "processing")
-    .eq("updated_at", input.rowLeaseVersion)
-    .select("updated_at")
-    .maybeSingle();
-  const checkpoint = (data as Pick<ImportRowLease, "updated_at"> | null) ?? null;
-  if (error || !checkpoint) {
-    throw new Error("설정 링크 전송 재시도 상태를 저장하지 못했습니다.");
-  }
-  return { rowLeaseVersion: checkpoint.updated_at };
-}
-
 async function checkpointManualMemberImportDeliverySent(input: {
   row: ImportRow;
   rowLeaseVersion: string;
@@ -849,7 +793,7 @@ async function deliverManualMemberImportSetup(input: {
   row: ImportRow;
   memberId: string;
   displayName: string;
-  verified: ResolvedVerifyMember | null;
+  resolvedMattermostMember: ResolvedMattermostMember | null;
   rowLeaseVersion: string;
   onRowLeaseUpdated: (rowLeaseVersion: string) => void;
 }): Promise<ManualMemberImportDelivery> {
@@ -884,7 +828,7 @@ async function deliverManualMemberImportSetup(input: {
   }
 
   const initialDeliveryChannel = deliveryChannel
-    ?? (input.verified ? "mattermost" : "email");
+    ?? (input.resolvedMattermostMember ? "mattermost" : "email");
   if (
     deliveryChannel !== initialDeliveryChannel
     || input.row.delivery_idempotency_key !== deliveryIdempotencyKey
@@ -905,42 +849,16 @@ async function deliverManualMemberImportSetup(input: {
   }
 
   if (input.row.delivery_attempted_at) {
-    if (deliveryChannel === "email") {
-      // SMTP does not offer a provider-side idempotency/status lookup. Once a
-      // request may have reached it, a blind retry could send a second link.
-      throw new ManualMemberImportDeliveryOutcomeUnknownError();
-    }
-
-    let recoveryClient: ReturnType<typeof createSsafyVerifyServerApiClient>;
-    try {
-      recoveryClient = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
-    } catch {
-      throw new ManualMemberImportDeliveryOutcomeUnknownError();
-    }
-    const priorOutcome = await getKnownMattermostDeliveryOutcome({
-      client: recoveryClient,
-      deliveryIdempotencyKey,
-    });
-    if (priorOutcome === "accepted") {
-      return checkpointDeliverySent("mattermost");
-    }
-    if (priorOutcome === "unknown") {
-      throw new ManualMemberImportDeliveryOutcomeUnknownError();
-    }
-    const cleared = await clearManualMemberImportDeliveryAttempt({
-      row: input.row,
-      rowLeaseVersion: currentRowLeaseVersion,
-    });
-    currentRowLeaseVersion = cleared.rowLeaseVersion;
-    input.onRowLeaseUpdated(currentRowLeaseVersion);
+    // Mattermost direct posts and SMTP do not expose a durable provider-side
+    // idempotency/status lookup. A retry could send a second setup link.
+    throw new ManualMemberImportDeliveryOutcomeUnknownError();
   }
 
   if (deliveryChannel === "mattermost") {
-    if (!input.verified) {
+    const recipient = input.resolvedMattermostMember;
+    if (!recipient) {
       throw new Error("MM 계정 설정 알림 대상을 확인하지 못했습니다.");
     }
-    const notification = getManualMemberNotificationConfig();
-    const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
     const setupToken = await ensureManualMemberImportPasswordAction({
       memberId: input.memberId,
       rowId: input.row.id,
@@ -955,48 +873,23 @@ async function deliverManualMemberImportSetup(input: {
     currentRowLeaseVersion = attempted.rowLeaseVersion;
     input.onRowLeaseUpdated(currentRowLeaseVersion);
 
-    let outcome: MattermostDeliveryOutcome;
     try {
-      const response = await client.sendMattermostNotification({
-        recipient: { mattermostUserId: input.verified.mattermostUserId },
-        purpose: notification.purpose,
-        templateKey: notification.templateKey,
-        message: {
-          title: `${SITE_NAME} 계정 설정`,
-          body: `아래 링크에서 ${SITE_NAME} 비밀번호를 설정해 주세요.\n${buildSetupUrl(setupToken)}\n\n링크는 24시간 동안 한 번만 사용할 수 있습니다.`,
-        },
-        idempotencyKey: deliveryIdempotencyKey,
+      const setupUrl = buildSetupUrl(setupToken);
+      const message = await buildManualMemberSetupMattermostMessage({
+        displayName: input.displayName,
+        setupUrl,
       });
-      outcome = getMattermostDeliveryOutcome({
-        idempotencyKey: deliveryIdempotencyKey,
-        results: response.results,
-      });
-      if (outcome === "unknown") {
-        outcome = await getKnownMattermostDeliveryOutcome({
-          client,
-          deliveryIdempotencyKey,
-        });
-      }
+      await withActiveMattermostSenderForGeneration(
+        recipient.resolvedGeneration,
+        (session) => session.sendDirectMessage(
+          recipient.mattermostUserId,
+          message,
+        ),
+      );
     } catch {
-      outcome = await getKnownMattermostDeliveryOutcome({
-        client,
-        deliveryIdempotencyKey,
-      });
+      throw new ManualMemberImportDeliveryOutcomeUnknownError();
     }
-
-    if (outcome === "accepted") {
-      return checkpointDeliverySent("mattermost");
-    }
-    if (outcome === "failed") {
-      const cleared = await clearManualMemberImportDeliveryAttempt({
-        row: input.row,
-        rowLeaseVersion: currentRowLeaseVersion,
-      });
-      currentRowLeaseVersion = cleared.rowLeaseVersion;
-      input.onRowLeaseUpdated(currentRowLeaseVersion);
-      throw new Error("MM 계정 설정 알림 전송에 실패했습니다.");
-    }
-    throw new ManualMemberImportDeliveryOutcomeUnknownError();
+    return checkpointDeliverySent("mattermost");
   }
 
   if (!input.row.email_normalized) {
@@ -1034,7 +927,6 @@ async function deliverManualMemberImportSetup(input: {
 
 async function processImportRow(
   row: ImportRow,
-  mmLookupGenerations: number[],
   rowLeaseVersion: string,
   onRowLeaseUpdated: (rowLeaseVersion: string) => void,
 ): Promise<ManualMemberImportCommitItem> {
@@ -1047,24 +939,23 @@ async function processImportRow(
     email: row.email_normalized,
   };
   try {
-    const verified = row.mm_username
-      ? await resolveVerifyMember({
+    const resolvedMattermostMember = row.mm_username
+      ? await resolveMattermostMember({
           mmUsername: row.mm_username,
           generation: row.generation,
-          mmLookupGenerations,
         })
       : null;
-    const displayName = verified?.profile.displayName ?? row.display_name;
-    const campus = verified?.profile.campus ?? row.campus;
+    const displayName = resolvedMattermostMember?.displayName ?? row.display_name;
+    const campus = row.campus;
     if (!displayName || !campus) throw new Error("회원 프로필 정보가 부족합니다.");
     const checkpoint = await checkpointManualMemberImportMember({
       row,
       rowLeaseVersion: currentRowLeaseVersion,
       displayName,
       campus,
-      mattermostAccountId: verified?.mattermostAccountId ?? null,
+      mattermostAccountId: resolvedMattermostMember?.mattermostAccountId ?? null,
       staffSourceGeneration: row.generation === 0
-        ? verified?.resolvedGeneration ?? null
+        ? resolvedMattermostMember?.resolvedGeneration ?? null
         : null,
     });
     const memberId = checkpoint.memberId;
@@ -1082,7 +973,7 @@ async function processImportRow(
       row,
       memberId,
       displayName,
-      verified,
+      resolvedMattermostMember,
       rowLeaseVersion: currentRowLeaseVersion,
       onRowLeaseUpdated: (updatedRowLeaseVersion) => {
         currentRowLeaseVersion = updatedRowLeaseVersion;
@@ -1370,8 +1261,6 @@ export async function commitManualMemberImport(input: {
     const retryableRows = ((rowsData ?? []) as ImportRow[])
       .filter(isRetryableManualMemberImportRow);
     if (retryableRows.length > 0) {
-      const settings = await getSsafyCycleSettings();
-      const mmLookupGenerations = getConfiguredManualMemberMmLookupGenerations(settings);
       for (const row of retryableRows) {
         await assertProcessingLease();
         const rowLease = await claimManualMemberImportRow(row);
@@ -1382,7 +1271,6 @@ export async function commitManualMemberImport(input: {
         await assertProcessingLease();
         await processImportRow(
           row,
-          mmLookupGenerations,
           rowLease.updated_at,
           (rowLeaseVersion) => {
             activeRowLease = { id: row.id, updated_at: rowLeaseVersion };
@@ -1592,37 +1480,20 @@ export async function reissueManualMemberImportSetup(input: {
       if (!mattermostRecipient) {
         throw new Error("회원의 연결된 MM 계정을 확인하지 못했습니다.");
       }
-      const notification = getManualMemberNotificationConfig();
-      const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig());
-      let outcome: MattermostDeliveryOutcome;
       try {
-        const response = await client.sendMattermostNotification({
-          recipient: { mattermostUserId: mattermostRecipient.mattermostUserId },
-          purpose: notification.purpose,
-          templateKey: notification.templateKey,
-          message: {
-            title: `${SITE_NAME} 계정 설정`,
-            body: `아래 링크에서 ${SITE_NAME} 비밀번호를 설정해 주세요.\n${buildSetupUrl(setupToken)}\n\n링크는 24시간 동안 한 번만 사용할 수 있습니다.`,
-          },
-          idempotencyKey: deliveryIdempotencyKey,
+        const setupUrl = buildSetupUrl(setupToken);
+        const message = await buildManualMemberSetupMattermostMessage({
+          displayName,
+          setupUrl,
         });
-        outcome = getMattermostDeliveryOutcome({
-          idempotencyKey: deliveryIdempotencyKey,
-          results: response.results,
-        });
-        if (outcome === "unknown") {
-          outcome = await getKnownMattermostDeliveryOutcome({
-            client,
-            deliveryIdempotencyKey,
-          });
-        }
+        await withActiveMattermostSenderForGeneration(
+          mattermostRecipient.senderGeneration,
+          (session) => session.sendDirectMessage(
+            mattermostRecipient.mattermostUserId,
+            message,
+          ),
+        );
       } catch {
-        outcome = await getKnownMattermostDeliveryOutcome({
-          client,
-          deliveryIdempotencyKey,
-        });
-      }
-      if (outcome !== "accepted") {
         throw new ManualMemberImportDeliveryOutcomeUnknownError();
       }
     } else {

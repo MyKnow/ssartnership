@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type KeyboardEvent } from "react";
-import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
+import MattermostCodeVerificationForm from "@/components/auth/MattermostCodeVerificationForm";
 import Button from "@/components/ui/Button";
 
 export type SignupMethod = "member" | "graduate";
@@ -17,9 +17,11 @@ function tabClassName(active: boolean) {
 export default function SignupMethodTabs({
   returnTo,
   initialMethod = "member",
+  activeSenderGenerations = [],
 }: {
   returnTo: string;
   initialMethod?: SignupMethod;
+  activeSenderGenerations?: readonly number[];
 }) {
   const [method, setMethod] = useState<SignupMethod>(initialMethod);
   const id = useId();
@@ -28,6 +30,7 @@ export default function SignupMethodTabs({
   const memberPanelId = `${id}-member-panel`;
   const graduatePanelId = `${id}-graduate-panel`;
   const graduateHref = `/auth/signup/graduate?returnTo=${encodeURIComponent(returnTo)}`;
+  const recoveryHref = `/auth/signup/graduate?kind=recovery&returnTo=${encodeURIComponent(returnTo)}`;
 
   function selectMethod(nextMethod: SignupMethod) {
     setMethod(nextMethod);
@@ -96,7 +99,12 @@ export default function SignupMethodTabs({
         hidden={method !== "member"}
         className="mt-5"
       >
-        <SsafyVerifyButton returnTo={returnTo} className="mt-0" label="SSAFY Verify로 시작하기" />
+        <MattermostCodeVerificationForm
+          purpose="signup"
+          returnTo={returnTo}
+          activeSenderGenerations={activeSenderGenerations}
+          className="mt-0 flex flex-col gap-4"
+        />
       </section>
       <section
         id={graduatePanelId}
@@ -105,7 +113,14 @@ export default function SignupMethodTabs({
         hidden={method !== "graduate"}
         className="mt-5"
       >
-        <Button href={graduateHref}>수료생 인증으로 시작하기</Button>
+        <div className="grid gap-2">
+          <Button href={graduateHref} size="lg" className="w-full">
+            수료생 신규 인증으로 시작하기
+          </Button>
+          <Button variant="secondary" size="lg" href={recoveryHref} className="w-full">
+            기존 회원 복구 신청
+          </Button>
+        </div>
       </section>
     </div>
   );

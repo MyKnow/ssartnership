@@ -3,7 +3,9 @@ import {
   createGraduateVerificationSubmission,
   getGraduateResubmissionTargets,
   getGraduateSubmissionFileRequirements,
+  parseGraduateVerificationRequestKind,
   validateGraduateCertificateUpload,
+  type GraduateVerificationRequestKind,
   type GraduateResubmissionTarget,
 } from "@/lib/graduate-verification";
 import {
@@ -24,6 +26,7 @@ import {
 } from "@/lib/graduate-verification-storage";
 import {
   sendGraduateAccountSetupEmail,
+  sendGraduateVerificationRejectionEmail,
   sendGraduateVerificationResubmissionEmail,
 } from "@/lib/graduate-verification-email";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
@@ -34,6 +37,7 @@ type GraduateChallengeRow = {
   id: string;
   email_normalized: string;
   purpose: string;
+  request_kind: string;
   expires_at: string;
   verified_at: string | null;
 };
@@ -45,6 +49,7 @@ type GraduateRequestRow = {
   certificate_sha256: string | null;
   profile_image_id: string | null;
   resubmission_targets: string[] | null;
+  request_kind: GraduateVerificationRequestKind;
 };
 
 type GraduateImageRow = {
@@ -77,7 +82,7 @@ export async function getVerifiedGraduateApplicationChallenge(challengeId: strin
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("graduate_email_challenges")
-    .select("id,email_normalized,purpose,expires_at,verified_at")
+    .select("id,email_normalized,purpose,request_kind,expires_at,verified_at")
     .eq("id", challengeId)
     .maybeSingle();
   if (error || !data) {
@@ -86,6 +91,7 @@ export async function getVerifiedGraduateApplicationChallenge(challengeId: strin
   const challenge = data as GraduateChallengeRow;
   if (
     challenge.purpose !== "application" ||
+    !parseGraduateVerificationRequestKind(challenge.request_kind) ||
     !challenge.verified_at ||
     new Date(challenge.expires_at).getTime() <= Date.now()
   ) {
@@ -251,12 +257,16 @@ async function validateGraduateApplicationFiles(input: {
   };
 }
 
-async function findOpenGraduateRequest(emailNormalized: string) {
+async function findOpenGraduateRequest(
+  emailNormalized: string,
+  requestKind: GraduateVerificationRequestKind,
+) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("graduate_verification_requests")
-    .select("id,status,certificate_storage_path,certificate_sha256,profile_image_id,resubmission_targets")
+    .select("id,status,certificate_storage_path,certificate_sha256,profile_image_id,resubmission_targets,request_kind")
     .eq("email_normalized", emailNormalized)
+    .eq("request_kind", requestKind)
     .in("status", ["draft", "submitted", "in_review", "needs_resubmission"])
     .order("created_at", { ascending: false })
     .limit(1)
@@ -349,6 +359,14 @@ export async function submitGraduateVerificationRequest(input: {
     );
   }
 
+  const requestKind = parseGraduateVerificationRequestKind(challenge.request_kind);
+  if (!requestKind) {
+    throw new GraduateVerificationServiceError(
+      "application_session_required",
+      "이메일 인증을 다시 진행해 주세요.",
+    );
+  }
+
   const supabase = getSupabaseAdminClient();
   if (
     await hasReservedMemberIdentifier({
@@ -372,13 +390,16 @@ export async function submitGraduateVerificationRequest(input: {
       "수료생 인증 신청 상태를 확인하지 못했습니다.",
     );
   }
-  if (existingMember?.id) {
+  if (requestKind === "graduate_signup" && existingMember?.id) {
     throw new GraduateVerificationServiceError(
       "request_conflict",
       "이미 수료생 계정이 있는 이메일입니다. 로그인 또는 비밀번호 재설정을 이용해 주세요.",
     );
   }
-  const existingRequest = await findOpenGraduateRequest(submission.value.emailNormalized);
+  const existingRequest = await findOpenGraduateRequest(
+    submission.value.emailNormalized,
+    requestKind,
+  );
   if (existingRequest && existingRequest.status !== "needs_resubmission") {
     throw new GraduateVerificationServiceError(
       "request_conflict",
@@ -474,6 +495,7 @@ export async function submitGraduateVerificationRequest(input: {
     if (!existingRequest) {
       const { error } = await supabase.from("graduate_verification_requests").insert({
         id: requestId,
+        request_kind: requestKind,
         email: submission.value.email,
         email_normalized: submission.value.emailNormalized,
         legal_name: submission.value.legalName,
@@ -644,7 +666,7 @@ export async function requestGraduateVerificationResubmission(input: {
     })
     .eq("id", input.requestId)
     .eq("status", "in_review")
-    .select("id,email,legal_name")
+    .select("id,email,legal_name,request_kind")
     .maybeSingle();
   if (error || !data?.id) {
     throw new Error("보완 요청을 처리하지 못했습니다.");
@@ -660,6 +682,7 @@ export async function requestGraduateVerificationResubmission(input: {
       displayName: data.legal_name,
       targets: targets.map((target) => targetLabels[target]),
       note,
+      requestKind: parseGraduateVerificationRequestKind(data.request_kind) ?? "graduate_signup",
     });
     await supabase
       .from("graduate_verification_requests")
@@ -680,9 +703,16 @@ export async function requestGraduateVerificationResubmission(input: {
 
 export async function withdrawGraduateVerificationRequest(input: {
   challengeId: string;
+  requestKind: GraduateVerificationRequestKind;
 }) {
   const challenge = await getVerifiedGraduateApplicationChallenge(input.challengeId);
   if (!challenge) {
+    throw new GraduateVerificationServiceError(
+      "application_session_required",
+      "이메일 인증을 다시 진행해 주세요.",
+    );
+  }
+  if (challenge.request_kind !== input.requestKind) {
     throw new GraduateVerificationServiceError(
       "application_session_required",
       "이메일 인증을 다시 진행해 주세요.",
@@ -699,6 +729,7 @@ export async function withdrawGraduateVerificationRequest(input: {
       updated_at: now,
     })
     .eq("email_normalized", challenge.email_normalized)
+    .eq("request_kind", input.requestKind)
     .in("status", ["draft", "submitted", "needs_resubmission"])
     .select("id,profile_image_id")
     .maybeSingle();
@@ -728,24 +759,30 @@ type GraduateApprovalRequest = {
   email: string;
   email_normalized: string;
   legal_name: string;
+  request_kind: GraduateVerificationRequestKind;
 };
 
 async function loadGraduateApprovalRequest(requestId: string) {
   const { data, error } = await getSupabaseAdminClient()
     .from("graduate_verification_requests")
-    .select("id,email,email_normalized,legal_name")
+    .select("id,email,email_normalized,legal_name,request_kind")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !data?.id) {
     throw new Error("수료생 인증 신청을 찾을 수 없습니다.");
   }
-  return data as GraduateApprovalRequest;
+  const requestKind = parseGraduateVerificationRequestKind(data.request_kind);
+  if (!requestKind) {
+    throw new Error("수료생 인증 유형을 확인하지 못했습니다.");
+  }
+  return { ...data, request_kind: requestKind } as GraduateApprovalRequest;
 }
 
 export async function approveGraduateVerificationRequest(input: {
   requestId: string;
   adminId: string;
   documentNumberHmac: string;
+  existingMemberId?: string | null;
 }) {
   await markGraduateVerificationInReview({
     requestId: input.requestId,
@@ -753,11 +790,15 @@ export async function approveGraduateVerificationRequest(input: {
   });
   const request = await loadGraduateApprovalRequest(input.requestId);
   if (
+    request.request_kind === "graduate_signup" &&
     await hasReservedMemberIdentifier({
       emailNormalized: request.email_normalized,
     })
   ) {
     throw new Error("이미 사용 이력이 있는 이메일입니다.");
+  }
+  if (request.request_kind === "existing_member_recovery" && !input.existingMemberId) {
+    throw new Error("기존 회원을 명시적으로 선택해 주세요.");
   }
   const setupToken = generateOpaqueToken();
   const { data, error } = await getSupabaseAdminClient().rpc(
@@ -768,6 +809,9 @@ export async function approveGraduateVerificationRequest(input: {
       p_document_number_hmac: input.documentNumberHmac,
       p_setup_token_hash: hashOpaqueToken(setupToken),
       p_setup_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      p_existing_member_id: request.request_kind === "existing_member_recovery"
+        ? input.existingMemberId ?? null
+        : null,
     },
   );
   const memberId = typeof data === "string" ? data : null;
@@ -780,6 +824,7 @@ export async function approveGraduateVerificationRequest(input: {
       to: request.email,
       displayName: request.legal_name,
       token: setupToken,
+      requestKind: request.request_kind,
     });
     await getSupabaseAdminClient()
       .from("graduate_verification_requests")
@@ -818,6 +863,7 @@ export async function resendGraduateAccountSetupEmail(input: {
       to: request.email,
       displayName: request.legal_name,
       token: setupToken,
+      requestKind: request.request_kind,
     });
     await getSupabaseAdminClient()
       .from("graduate_verification_requests")
@@ -920,7 +966,7 @@ export async function rejectGraduateVerificationRequest(input: {
     })
     .eq("id", input.requestId)
     .eq("status", "in_review")
-    .select("profile_image_id")
+    .select("profile_image_id,email,legal_name,request_kind")
     .maybeSingle();
   if (requestError || !request) {
     throw new Error("반려 처리할 수 없는 인증 신청입니다.");
@@ -938,6 +984,31 @@ export async function rejectGraduateVerificationRequest(input: {
       })
       .eq("id", request.profile_image_id);
   }
+
+  let emailSent = false;
+  try {
+    await sendGraduateVerificationRejectionEmail({
+      to: request.email,
+      displayName: request.legal_name,
+      reason,
+      requestKind: parseGraduateVerificationRequestKind(request.request_kind) ?? "graduate_signup",
+    });
+    emailSent = true;
+    await supabase
+      .from("graduate_verification_requests")
+      .update({
+        rejection_email_sent_at: new Date().toISOString(),
+        rejection_email_last_error_at: null,
+      })
+      .eq("id", input.requestId);
+  } catch {
+    await supabase
+      .from("graduate_verification_requests")
+      .update({ rejection_email_last_error_at: new Date().toISOString() })
+      .eq("id", input.requestId);
+  }
+
+  return { emailSent };
 }
 
 export async function approveMemberProfileImageReplacement(input: {

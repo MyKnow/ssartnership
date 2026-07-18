@@ -5,7 +5,11 @@ import {
   type RateLimitConfig,
 } from "@/lib/rate-limit";
 
-type MemberEmailVerificationRoute = "send" | "verify";
+type MemberEmailVerificationRoute =
+  | "send"
+  | "verify"
+  | "recovery-send"
+  | "recovery-verify";
 
 const MEMBER_EMAIL_VERIFICATION_RATE_LIMIT: RateLimitConfig = {
   table: "member_auth_attempts",

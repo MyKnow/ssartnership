@@ -49,6 +49,7 @@ const filters = {
   searchValue: "",
   sortValue: "recent" as const,
   filterValue: "all" as const,
+  mattermostLifecycleFilter: "all" as const,
   yearFilter: "all" as const,
   campusFilter: "all",
   serviceConsentFilter: "all" as const,
@@ -98,6 +99,15 @@ export const AdvancedFiltersActive: Story = {
       sortValue: "updated",
       serviceConsentFilter: "pending",
       pushEnabledFilter: "disabled",
+    },
+  },
+};
+
+export const LifecycleFiltersActive: Story = {
+  args: {
+    filters: {
+      ...filters,
+      mattermostLifecycleFilter: "disabled",
     },
   },
 };

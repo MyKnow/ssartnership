@@ -242,42 +242,13 @@ export async function syncMmUserDirectoryBySelectableYears(): Promise<MmUserDire
     );
   }
 
-  let staleIds: string[] = [];
-  if (failures.length === 0) {
-    const { data: existing, error: existingError } = await supabase
-      .from("mm_user_directory")
-      .select("mm_user_id");
-    if (existingError) {
-      throw wrapMmDirectoryDbError(
-        existingError,
-        "MM 유저 디렉토리를 불러오지 못했습니다.",
-      );
-    }
-
-    const seenIds = new Set(rows.map((row) => row.mm_user_id));
-    staleIds = (existing ?? [])
-      .map((row) => row.mm_user_id)
-      .filter((mmUserId) => !seenIds.has(mmUserId));
-
-    if (staleIds.length > 0) {
-      const { error: deactivateError } = await supabase
-        .from("mm_user_directory")
-        .update({ is_active: false, updated_at: now })
-        .in("mm_user_id", staleIds);
-      if (deactivateError) {
-        throw wrapMmDirectoryDbError(
-          deactivateError,
-          "MM 유저 디렉토리를 정리하지 못했습니다.",
-        );
-      }
-    }
-  }
-
   return {
     checked,
     uniqueUsers: rows.length,
     upserted: rows.length,
-    deleted: staleIds.length,
+    // Sender-scoped channel scans are intentionally partial. Absence from a
+    // scan is not proof of a deleted Mattermost account.
+    deleted: 0,
     failures,
   };
 }

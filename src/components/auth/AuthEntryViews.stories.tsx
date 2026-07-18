@@ -27,9 +27,6 @@ export const Login: Story = {
     const loginCard = canvas.getByTestId("password-login-card");
     const divider = canvas.getByRole("separator");
     const signupButton = canvas.getByRole("link", { name: "회원가입" });
-    const verifyButton = canvas.getByRole("button", {
-      name: "SSAFY Verify로 시작하기",
-    });
     const orderedElements = [
       username,
       password,
@@ -37,7 +34,6 @@ export const Login: Story = {
       loginButton,
       divider,
       signupButton,
-      verifyButton,
     ];
 
     await expect(
@@ -58,18 +54,24 @@ export const Login: Story = {
 };
 
 export const ResetPassword: Story = {
-  render: () => <ResetPasswordPageView />,
+  render: () => <ResetPasswordPageView activeSenderGenerations={[15]} />,
 };
 
 export const Signup: Story = {
-  render: (args) => <SignupPageView returnTo={args.returnTo} />,
+  render: (args) => <SignupPageView returnTo={args.returnTo} activeSenderGenerations={[15]} />,
 };
 
 export const SignupGraduate: Story = {
-  render: (args) => <SignupPageView returnTo={args.returnTo} initialMethod="graduate" />,
+  render: (args) => <SignupPageView returnTo={args.returnTo} initialMethod="graduate" activeSenderGenerations={[15]} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("tab", { name: "수료생" })).toHaveAttribute("aria-selected", "true");
-    await expect(canvas.getByRole("link", { name: "수료생 인증으로 시작하기" })).toBeVisible();
+    await expect(
+      canvas.getByRole("link", { name: "수료생 신규 인증으로 시작하기" }),
+    ).toBeVisible();
+    const graduateStart = canvas.getByRole("link", { name: "수료생 신규 인증으로 시작하기" });
+    const existingMemberRecovery = canvas.getByRole("link", { name: "기존 회원 복구 신청" });
+    await expect(graduateStart).toHaveClass(/text-base/);
+    await expect(existingMemberRecovery).toHaveClass(/text-base/);
   },
 };

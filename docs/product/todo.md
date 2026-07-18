@@ -2,12 +2,24 @@
 
 정렬 기준: 영향 범위 × 위험도 × 구현 효과. 위에 있는 항목일수록 먼저 처리한다.
 
-최종 점검: 2026-07-05
+최종 점검: 2026-07-17
 
-최신화 기준: 코드 변경으로 처리 가능한 SSAFY Verify/성능/보안 TODO와 Vercel 운영 env 정리는 이 브랜치에서 구현 완료했다.
-남은 항목은 다음 배포 후 운영 smoke 확인이다.
+최신화 기준: Mattermost 직접 연동과 운영자 Sender registry가 현행 인증 기준이다. 이전 SSAFY Verify 기록은 아래 역사 섹션으로 보존한다.
+
+## Mattermost 직접 연동 전환 (Issue #155)
+
+- [x] 기수별 AES-256-GCM Sender registry, Super Admin 이중 권한, 테스트 DM/원자 활성화
+- [x] 직접 Mattermost client, 수동 조회·알림·프로필/사진/lifecycle 전환
+- [x] direct DM 가입·재설정 코드와 MM 장애 이메일 복구
+- [x] 기존 회원 복구 request kind와 관리자 명시 대상 연결, 새 회원 행 생성 차단
+- [x] SSAFY Verify runtime/UI/routes/env 제거 및 direct 경로 컷오버
+- [ ] Preview/Production Sender 활성화와 7일 안정화 확인 후 Verify 전용 데이터·스키마·cron·테스트 forward migration 정리
+
+남은 항목은 Sender 운영 smoke와 안정화 기간 종료 뒤의 명시적 데이터 정리이다.
 
 ## 공개 readiness 보완 (Issue #55)
+
+> 아래는 2026-07-05 당시의 역사 기록이다. 현재 인증 연동은 Issue #155의 직접 Mattermost 기준을 따른다.
 
 - [x] SSAFY Verify Server API Production env 등록
 - [x] Production Verify profile-sync 라이브 스모크
@@ -150,6 +162,8 @@
    15-6. [x] Partner 알림센터
       대상: `src/app/partner/**`, `src/components/partner/**`, `src/lib/repositories/notification-repository.*`
       목표: `/partner/notifications` 별도 페이지에서 공지, 운영 알림, 승인/반려, 정산/리뷰 알림을 조회한다.
+
+## 역사 기록: SSAFY Verify 전환 후속 (2026-07-17에 대체됨)
 
 16. [x] SSAFY Verify 전환 후속
    대상: `src/app/api/ssafy/verify-token/route.ts`, `src/lib/ssafy-verify/**`, `src/app/auth/**`, `src/app/api/mm/login/route.ts`, `src/app/api/mm/reset-password/**`, `src/app/api/mm/change-password/route.ts`, `src/lib/mattermost/**`, `src/lib/mm-member-sync/**`

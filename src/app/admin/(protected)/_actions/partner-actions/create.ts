@@ -400,6 +400,11 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
         location: payload.location,
         categoryLabel: category?.label ?? null,
         campusSlugs: payload.campusSlugs,
+        benefitSummary: payload.benefits.join("\n"),
+        conditions: payload.conditions.join("\n"),
+        periodStart: payload.periodStart,
+        periodEnd: payload.periodEnd,
+        mapUrl: payload.mapUrl,
       });
     } catch (pushError) {
       console.error("new partner push failed", pushError);

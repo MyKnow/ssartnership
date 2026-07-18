@@ -1,6 +1,7 @@
 import { normalizeMmUsername } from "@/lib/validation";
 
-export type ManualMemberAddYear = 0 | 14 | 15;
+/** 0 is staff; student cohorts are resolved through active Sender records. */
+export type ManualMemberAddYear = number;
 
 export type ManualMemberAddInput = {
   raw: string;
@@ -58,12 +59,6 @@ export const MANUAL_MEMBER_ADD_INITIAL_STATE: ManualMemberAddFormState = {
   success: 0,
   failed: 0,
   items: [],
-};
-
-export const MANUAL_MEMBER_ADD_YEAR_FALLBACKS: ManualMemberAddYear[] = [15, 14];
-
-export type SenderSession = {
-  year: number;
 };
 
 export function wrapManualMemberAddDbError(

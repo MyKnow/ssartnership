@@ -11,7 +11,7 @@ Browser
   -> src/lib domain service/helper/repository interface
   -> mock repository or Supabase repository
   -> Supabase PostgreSQL / Storage
-  -> external services: SSAFY Verify, SMTP, Web Push, NTS business status, Vercel
+  -> external services: Mattermost, SMTP, Web Push, NTS business status, Vercel
 ```
 
 ## Next.js boundary
@@ -72,7 +72,7 @@ Browser
 | 도메인 | 주요 파일 |
 | --- | --- |
 | 인증/세션 | `user-auth.ts`, `auth.ts`, `partner-session.ts`, `partner-auth/*`, `request-guards.ts` |
-| SSAFY Verify | `ssafy-verify/*`, `mattermost/*`, `mm-directory/*`, `mm-member-sync/*` |
+| Mattermost 직접 연동 | `mattermost/client.ts`, `mattermost-senders/*`, `mm-directory/*`, `mm-member-sync/*`, `mattermost-code-verification.ts` |
 | 제휴 | `partner-visibility.ts`, `partner-benefit-visibility.ts`, `partner-audience.ts`, `partner-utils.ts`, `home-partner-*` |
 | 협력사 포털 | `partner-portal*.ts`, `partner-change-requests/*`, `partner-dashboard*`, `partner-plan-*`, `partner-billing*` |
 | 리뷰 | `partner-reviews.ts`, `review-validation.ts`, `review-media*.ts`, review repository |
@@ -96,7 +96,7 @@ Browser
 
 - product analytics: page view, partner click/detail, filter/search/sort, push, certification, suggest 등.
 - admin audit: 관리자 CRUD, push send, partner portal action, review moderation 등.
-- auth security: member/admin/partner auth, SSAFY Verify trace, password reset/change, access blocked 등.
+- auth security: member/admin/partner auth, Mattermost code/sender 안전 이벤트, password reset/change, access blocked 등.
 - partner metric rollups: event_logs를 기반으로 partner별 total/hour/day/weekday metric과 unique visitor를 집계한다.
 
 ## Error handling

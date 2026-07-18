@@ -215,6 +215,12 @@ const storybookViewportKeys = [
 const routeOwnedStateOverrides: Partial<
   Record<string, MockRequiredStateKey[]>
 > = {
+  "/auth/signup/pending": [
+    "default",
+    "pending",
+    "long-korean",
+    "mobile-overflow",
+  ],
   "/auth/signup/graduate": [
     "default",
     "validation-error",
@@ -275,6 +281,27 @@ const routeOwnedStateOverrides: Partial<
     "pending",
     "rejected",
     "success",
+    "long-korean",
+    "mobile-overflow",
+    "forbidden",
+  ],
+  "/admin/member-signup-requests": [
+    "default",
+    "empty",
+    "pending",
+    "rejected",
+    "success",
+    "long-korean",
+    "mobile-overflow",
+    "forbidden",
+  ],
+  "/admin/member-signup-requests/[requestId]": [
+    "default",
+    "pending",
+    "rejected",
+    "success",
+    "error",
+    "validation-error",
     "long-korean",
     "mobile-overflow",
     "forbidden",

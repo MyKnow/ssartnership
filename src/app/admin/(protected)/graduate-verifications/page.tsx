@@ -19,7 +19,7 @@ export default async function AdminGraduateVerificationsPage() {
   await requireAdminPermission("graduate_verifications", "read", { path: "/admin/graduate-verifications" });
   const supabase = getSupabaseAdminClient();
   const [requestsResult, setupEmailRetriesResult] = await Promise.all([
-    supabase.from("graduate_verification_requests").select("id,email,legal_name,education_start_year,education_start_month,education_end_year,education_end_month,inferred_generation,campus,status,profile_image_id,created_at").in("status", ["submitted", "in_review"]).order("created_at", { ascending: false }),
+    supabase.from("graduate_verification_requests").select("id,email,legal_name,education_start_year,education_start_month,education_end_year,education_end_month,inferred_generation,campus,request_kind,recovery_member_id,status,profile_image_id,created_at").in("status", ["submitted", "in_review"]).order("created_at", { ascending: false }),
     supabase
       .from("graduate_verification_requests")
       .select("id,email,legal_name,setup_email_last_error_at")

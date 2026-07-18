@@ -48,3 +48,16 @@ export const DeferredPrompt: Story = {
     await expect(await within(document.body).findByText("설치가 시작되었습니다.")).toBeInTheDocument();
   },
 };
+
+export const BrowserMenuFallback: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = await canvas.findByRole("button", { name: "앱 설치" });
+    await userEvent.click(button);
+    await expect(
+      await within(document.body).findByText(
+        "브라우저 메뉴에서 '앱 설치' 또는 '홈 화면에 추가'를 선택해 주세요.",
+      ),
+    ).toBeInTheDocument();
+  },
+};

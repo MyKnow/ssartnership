@@ -8,6 +8,7 @@ import {
   type AdminPermissionResource,
   canAdmin,
 } from "@/lib/admin-permissions";
+import { canManageMattermostSenders } from "@/lib/mattermost-senders/access";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export async function requireAdminPageAccess(path: string) {
@@ -86,6 +87,128 @@ export async function requireAdminPermission(
   }
 
   return session;
+}
+
+/**
+ * Sender credentials are more sensitive than ordinary admin resources. A
+ * mutable permission bit alone must never delegate access away from the
+ * super-admin template.
+ */
+export async function requireMattermostSenderAdmin(
+  action: AdminPermissionAction,
+  options?: {
+    path?: string;
+    redirectTo?: string;
+  },
+) {
+  const session = await requireAdminPermission(
+    "mattermost_senders",
+    action,
+    options,
+  );
+  if (canManageMattermostSenders(session.account, action)) {
+    return session;
+  }
+
+  const context = await getServerActionLogContext(options?.path ?? "/admin/cycle");
+  await logAuthSecurity({
+    ...context,
+    eventName: "admin_access",
+    status: "blocked",
+    actorType: "admin",
+    actorId: session.adminId,
+    identifier: session.loginId,
+    properties: {
+      reason: "super_admin_required",
+      resource: "mattermost_senders",
+      action,
+    },
+  });
+  redirect(options?.redirectTo ?? "/admin?error=permission_denied");
+}
+
+/**
+ * Approval requests contain password material until the decision is made.
+ * Keep the resource bit and the non-delegable Super Admin template gate.
+ */
+export async function requireMemberSignupRequestAdmin(
+  action: AdminPermissionAction,
+  options?: {
+    path?: string;
+    redirectTo?: string;
+  },
+) {
+  const session = await requireAdminPermission(
+    "member_signup_requests",
+    action,
+    options,
+  );
+  if (
+    session.account.permissionId === "super_admin"
+    && canAdmin(session.account.permissions, "member_signup_requests", action)
+  ) {
+    return session;
+  }
+
+  const context = await getServerActionLogContext(
+    options?.path ?? "/admin/member-signup-requests",
+  );
+  await logAuthSecurity({
+    ...context,
+    eventName: "admin_access",
+    status: "blocked",
+    actorType: "admin",
+    actorId: session.adminId,
+    identifier: session.loginId,
+    properties: {
+      reason: "super_admin_required",
+      resource: "member_signup_requests",
+      action,
+    },
+  });
+  redirect(options?.redirectTo ?? "/admin?error=permission_denied");
+}
+
+/**
+ * Notification content can contain operational policy and recovery guidance.
+ * Keep template access non-delegable to the Super Admin account.
+ */
+export async function requireNotificationTemplateAdmin(
+  action: AdminPermissionAction,
+  options?: {
+    path?: string;
+    redirectTo?: string;
+  },
+) {
+  const session = await requireAdminPermission(
+    "notification_templates",
+    action,
+    options,
+  );
+  if (
+    session.account.permissionId === "super_admin"
+    && canAdmin(session.account.permissions, "notification_templates", action)
+  ) {
+    return session;
+  }
+
+  const context = await getServerActionLogContext(
+    options?.path ?? "/admin/notification-templates",
+  );
+  await logAuthSecurity({
+    ...context,
+    eventName: "admin_access",
+    status: "blocked",
+    actorType: "admin",
+    actorId: session.adminId,
+    identifier: session.loginId,
+    properties: {
+      reason: "super_admin_required",
+      resource: "notification_templates",
+      action,
+    },
+  });
+  redirect(options?.redirectTo ?? "/admin?error=permission_denied");
 }
 
 export async function ensureAdminApiAccess(request: NextRequest) {

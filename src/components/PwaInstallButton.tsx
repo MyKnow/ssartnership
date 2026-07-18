@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ArrowDownTrayIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { trackProductEvent } from "@/lib/product-events";
 import Button from "@/components/ui/Button";
 import type { ButtonVariant } from "@/components/ui/Button";
@@ -80,19 +80,15 @@ export default function PwaInstallButton({
   const iosInstallHint = isClient && isIosBrowser();
   const standalone = isClient && isStandaloneMode();
 
-  const canShow = useMemo(() => {
-    if (!isClient || standalone || appInstalled) {
-      return false;
-    }
-    return Boolean(deferredPrompt) || iosInstallHint;
-  }, [appInstalled, deferredPrompt, iosInstallHint, isClient, standalone]);
-
-  if (!canShow) {
+  if (!isClient) {
     return null;
   }
 
+  const installed = standalone || appInstalled;
+  const InstallIcon = installed ? CheckCircleIcon : ArrowDownTrayIcon;
+
   const handleInstall = async () => {
-    if (pending) {
+    if (pending || installed) {
       return;
     }
     setPending(true);
@@ -122,6 +118,8 @@ export default function PwaInstallButton({
 
     if (iosInstallHint) {
       notify("브라우저의 공유 버튼에서 '홈 화면에 추가'를 선택해 설치해 주세요.");
+    } else {
+      notify("브라우저 메뉴에서 '앱 설치' 또는 '홈 화면에 추가'를 선택해 주세요.");
     }
     setPending(false);
   };
@@ -130,12 +128,13 @@ export default function PwaInstallButton({
     <Button
       variant={variant}
       onClick={() => void handleInstall()}
+      disabled={installed}
       loading={pending}
       loadingText="설치 준비 중"
       className={className}
     >
-      <ArrowDownTrayIcon className="h-5 w-5" aria-hidden="true" />
-      앱 설치
+      <InstallIcon className="h-5 w-5" aria-hidden="true" />
+      {installed ? "앱으로 실행 중" : "앱 설치"}
     </Button>
   );
 }

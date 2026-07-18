@@ -1,17 +1,31 @@
 import { SITE_NAME } from "./site";
 import { createSmtpTransport, getSmtpConfig } from "./smtp";
+import type { PartnerOperationalNotificationType } from "./partner-notification-routing";
+import {
+  renderEmailTemplateBody,
+} from "@/lib/email-content";
+import { getPartnerOperationalTemplateKey } from "./notification-templates/catalog";
+import { resolveNotificationTemplate } from "./notification-templates/repository.server";
+import { renderNotificationTemplate } from "./notification-templates/template";
+import {
+  mergeNotificationTemplateVariables,
+  type NotificationTemplateContext,
+} from "./notification-templates/context";
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function toHtml(value: string) {
-  return escapeHtml(value).replace(/\n/g, "<br />");
+async function renderPartnerEmailTemplate(
+  eventKey: string,
+  variables: Record<string, string | number | null | undefined>,
+) {
+  const template = await resolveNotificationTemplate(eventKey);
+  const renderedBody = renderEmailTemplateBody(
+    template.bodyTemplate,
+    template.bodyFormat,
+    variables,
+  );
+  return {
+    subject: renderNotificationTemplate(template.titleTemplate, variables),
+    ...renderedBody,
+  };
 }
 
 export async function sendPartnerPortalTemporaryPasswordEmail(input: {
@@ -22,40 +36,19 @@ export async function sendPartnerPortalTemporaryPasswordEmail(input: {
 }) {
   const smtpConfig = getSmtpConfig();
   const transporter = createSmtpTransport(smtpConfig);
-
-  const safeDisplayName = toHtml(input.displayName || "담당자");
-  const safeLoginId = toHtml(input.loginId);
-  const safeTemporaryPassword = toHtml(input.temporaryPassword);
+  const template = await renderPartnerEmailTemplate("email.partner_temporary_password", {
+    siteName: SITE_NAME,
+    displayName: input.displayName || "담당자",
+    loginId: input.loginId,
+    temporaryPassword: input.temporaryPassword,
+  });
 
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.to,
-    subject: `[${SITE_NAME}] 파트너사 포털 임시 비밀번호 안내`,
-    text: [
-      `${input.displayName || "담당자"}님,`,
-      "",
-      `요청하신 파트너사 포털 임시 비밀번호입니다.`,
-      `로그인 아이디: ${input.loginId}`,
-      `임시 비밀번호: ${input.temporaryPassword}`,
-      "",
-      "로그인 후 반드시 새 비밀번호로 변경해 주세요.",
-    ].join("\n"),
-    html: `
-      <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
-        <h2 style="margin: 0 0 12px;">파트너사 포털 임시 비밀번호 안내</h2>
-        <p style="margin: 0 0 16px; color: #334155;">
-          안녕하세요 ${safeDisplayName}님, 요청하신 임시 비밀번호를 전달드립니다.
-          로그인 후 반드시 새 비밀번호로 변경해 주세요.
-        </p>
-        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc;">
-          <p style="margin: 0 0 8px;"><strong>로그인 아이디</strong><br />${safeLoginId}</p>
-          <p style="margin: 0;"><strong>임시 비밀번호</strong><br />${safeTemporaryPassword}</p>
-        </div>
-        <p style="margin: 16px 0 0; color: #334155;">
-          ${SITE_NAME} 파트너사 포털에서 로그인 후, 비밀번호 변경 화면에서 새 비밀번호를 설정해 주세요.
-        </p>
-      </div>
-    `,
+    subject: template.subject,
+    text: template.text,
+    html: template.html,
   });
 }
 
@@ -67,40 +60,19 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
 }) {
   const smtpConfig = getSmtpConfig();
   const transporter = createSmtpTransport(smtpConfig);
-
-  const safeDisplayName = toHtml(input.displayName || "담당자");
-  const safeLoginId = toHtml(input.loginId);
-  const safeSetupUrl = escapeHtml(input.setupUrl);
+  const template = await renderPartnerEmailTemplate("email.partner_initial_setup", {
+    siteName: SITE_NAME,
+    displayName: input.displayName || "담당자",
+    loginId: input.loginId,
+    setupUrl: input.setupUrl,
+  });
 
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.to,
-    subject: `[${SITE_NAME}] 파트너사 포털 초기 설정 안내`,
-    text: [
-      `${input.displayName || "담당자"}님,`,
-      "",
-      "파트너사 포털 초기 설정 링크를 전송드립니다.",
-      `로그인 아이디: ${input.loginId}`,
-      `초기 설정 URL: ${input.setupUrl}`,
-      "",
-      "링크로 이동해 새 비밀번호를 설정해 주세요.",
-    ].join("\n"),
-    html: `
-      <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
-        <h2 style="margin: 0 0 12px;">파트너사 포털 초기 설정 안내</h2>
-        <p style="margin: 0 0 16px; color: #334155;">
-          안녕하세요 ${safeDisplayName}님, 파트너사 포털 초기 설정 링크를 전달드립니다.
-          아래 링크로 이동해 새 비밀번호 설정을 완료해 주세요.
-        </p>
-        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc;">
-          <p style="margin: 0 0 8px;"><strong>로그인 아이디</strong><br />${safeLoginId}</p>
-          <p style="margin: 0 0 8px;"><strong>초기 설정 URL</strong><br /><a href="${safeSetupUrl}" style="color: #2563eb; word-break: break-all;">${safeSetupUrl}</a></p>
-        </div>
-        <p style="margin: 16px 0 0; color: #334155;">
-          초기 설정을 마치면 해당 계정으로 파트너사 포털에 로그인할 수 있습니다.
-        </p>
-      </div>
-    `,
+    subject: template.subject,
+    text: template.text,
+    html: template.html,
   });
 }
 
@@ -110,40 +82,37 @@ export async function sendPartnerOperationalNotificationEmail(input: {
   title: string;
   body: string;
   targetUrl: string;
+  notificationType?: PartnerOperationalNotificationType;
+  templateContext?: NotificationTemplateContext;
+  templateVariant?: string;
 }) {
   const smtpConfig = getSmtpConfig();
   const transporter = createSmtpTransport(smtpConfig);
-
-  const safeDisplayName = toHtml(input.displayName || "담당자");
-  const safeTitle = toHtml(input.title);
-  const safeBody = toHtml(input.body);
-  const safeTargetUrl = escapeHtml(input.targetUrl);
+  const eventKey = input.notificationType
+    ? getPartnerOperationalTemplateKey(
+        "email",
+        input.notificationType,
+        input.templateVariant,
+      )
+    : "email.partner_operational";
+  const template = await renderPartnerEmailTemplate(eventKey, {
+    ...mergeNotificationTemplateVariables({
+      context: input.templateContext,
+      common: {
+        siteName: SITE_NAME,
+        displayName: input.displayName || "담당자",
+        title: input.title,
+        body: input.body,
+        targetUrl: input.targetUrl,
+      },
+    }),
+  });
 
   await transporter.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.to,
-    subject: `[${SITE_NAME}] ${input.title}`,
-    text: [
-      `${input.displayName || "담당자"}님,`,
-      "",
-      input.title,
-      input.body,
-      "",
-      input.targetUrl,
-    ].join("\n"),
-    html: `
-      <div style="font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; color: #0f172a; line-height: 1.7;">
-        <h2 style="margin: 0 0 12px;">${safeTitle}</h2>
-        <p style="margin: 0 0 16px; color: #334155;">
-          안녕하세요 ${safeDisplayName}님,
-        </p>
-        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; background: #f8fafc;">
-          <p style="margin: 0;">${safeBody}</p>
-        </div>
-        <p style="margin: 16px 0 0;">
-          <a href="${safeTargetUrl}" style="color: #2563eb; word-break: break-all;">알림 확인하기</a>
-        </p>
-      </div>
-    `,
+    subject: template.subject,
+    text: template.text,
+    html: template.html,
   });
 }

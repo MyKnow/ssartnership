@@ -160,6 +160,81 @@ test("member selectors derive campus and filter must-change users first", async 
   });
 
   assert.deepStrictEqual(filtered.map((member) => member.id), ["member-1", "member-2"]);
+
+  const lifecycleMembers = normalizeAdminMembers([
+    {
+      id: "member-active",
+      mmUserId: "mm-active",
+      mmUsername: "active",
+      displayName: "활성 회원",
+      generation: 15,
+      campus: "서울",
+      mustChangePassword: false,
+      serviceConsent: true,
+      privacyConsent: true,
+      marketingConsent: true,
+      hasProfileImage: false,
+      mattermostLoginDisabledAt: null,
+      mattermostLoginDisabledReason: null,
+    },
+    {
+      id: "member-graduated",
+      mmUserId: "mm-graduated",
+      mmUsername: "graduated",
+      displayName: "수료 회원",
+      generation: 15,
+      campus: "서울",
+      mustChangePassword: false,
+      serviceConsent: true,
+      privacyConsent: true,
+      marketingConsent: true,
+      hasProfileImage: false,
+      mattermostLoginDisabledAt: "2026-07-15T00:00:00.000Z",
+      mattermostLoginDisabledReason: "generation_completed",
+    },
+    {
+      id: "member-departed",
+      mmUserId: "mm-departed",
+      mmUsername: "departed",
+      displayName: "퇴사 회원",
+      generation: 0,
+      campus: "서울",
+      mustChangePassword: false,
+      serviceConsent: true,
+      privacyConsent: true,
+      marketingConsent: true,
+      hasProfileImage: false,
+      mattermostLoginDisabledAt: "2026-07-15T00:00:00.000Z",
+      mattermostLoginDisabledReason: "member_departed",
+    },
+  ]);
+
+  const lifecycleFilterArgs = {
+    members: lifecycleMembers,
+    searchValue: "",
+    sortValue: "recent" as const,
+    filterValue: "all" as const,
+    yearFilter: "all" as const,
+    campusFilter: "all",
+  };
+  assert.deepStrictEqual(
+    filterAdminMembers({ ...lifecycleFilterArgs, mattermostLifecycleFilter: "disabled" }).map(
+      (member) => member.id,
+    ),
+    ["member-graduated", "member-departed"],
+  );
+  assert.deepStrictEqual(
+    filterAdminMembers({ ...lifecycleFilterArgs, mattermostLifecycleFilter: "graduated" }).map(
+      (member) => member.id,
+    ),
+    ["member-graduated"],
+  );
+  assert.deepStrictEqual(
+    filterAdminMembers({ ...lifecycleFilterArgs, mattermostLifecycleFilter: "departed" }).map(
+      (member) => member.id,
+    ),
+    ["member-departed"],
+  );
 });
 
 test("log selectors build actor/name options and sort filtered logs", async () => {

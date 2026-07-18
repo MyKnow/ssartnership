@@ -33,16 +33,14 @@ type SignedUserSession = {
 export type UserSessionAuthenticationMethod =
   | "email"
   | "manual"
-  | "mattermost"
-  | "ssafy";
+  | "mattermost";
 
 function isUserSessionAuthenticationMethod(
   value: unknown,
 ): value is UserSessionAuthenticationMethod {
   return value === "email"
     || value === "manual"
-    || value === "mattermost"
-    || value === "ssafy";
+    || value === "mattermost";
 }
 
 export class UserSessionIssueError extends Error {
@@ -199,7 +197,7 @@ export async function setUserSession(
     throw new UserSessionIssueError("authentication_method_required");
   }
   if (
-    (authenticationMethod === "mattermost" || authenticationMethod === "ssafy")
+    authenticationMethod === "mattermost"
     && member.mattermost_login_disabled_at
   ) {
     throw new UserSessionIssueError("mattermost_login_disabled");

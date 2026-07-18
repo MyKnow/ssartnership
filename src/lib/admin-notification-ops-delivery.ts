@@ -1,14 +1,15 @@
 import { notificationRepository } from "@/lib/repositories";
 import { buildNotificationPayload } from "@/lib/push/payloads";
 import {
-  getSsafyVerifyServerApiConfig,
-} from "@/lib/ssafy-verify/config";
-import { createSsafyVerifyApiTraceLogger } from "@/lib/ssafy-verify/api-trace";
+  MattermostApiError,
+} from "@/lib/mattermost/client";
 import {
-  SsafyVerifyServerApiError,
-  createSsafyVerifyServerApiClient,
-  type SsafyVerifyNotificationTargetResult,
-} from "@/lib/ssafy-verify/server-api";
+  MattermostSenderUnavailableError,
+  withActiveMattermostSenderForGeneration,
+} from "@/lib/mattermost-senders/service";
+import {
+  absoluteUrl,
+} from "@/lib/admin-notification-ops-utils";
 import {
   createPushMessageLog,
   finalizePushMessageLog,
@@ -22,6 +23,13 @@ import type {
   AdminNotificationSource,
   AdminNotificationType,
 } from "@/lib/admin-notification-ops";
+import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  mergeNotificationTemplateVariables,
+  type NotificationTemplateContext,
+} from "@/lib/notification-templates/context";
 
 type AudienceMember = {
   id: string;
@@ -29,6 +37,7 @@ type AudienceMember = {
   isStaff: boolean;
   sourceYears: number[];
   generation: number;
+  senderGeneration: number | null;
 };
 
 type ChannelDeliveryResult = {
@@ -71,155 +80,178 @@ async function runBookkeepingTasks(
   }
 }
 
-function chunkMembers<T>(items: T[], size: number) {
-  const chunks: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size));
+function toMattermostDeliveryCode(error: unknown) {
+  if (error instanceof MattermostSenderUnavailableError) {
+    return error.code;
   }
-  return chunks;
-}
-
-function toVerifyDeliveryErrorMessage(error: unknown) {
-  if (error instanceof SsafyVerifyServerApiError) {
-    const requestSuffix = error.requestId ? ` (request_id: ${error.requestId})` : "";
-    return `${error.errorCode}: ${error.message}${requestSuffix}`;
+  if (error instanceof MattermostApiError) {
+    return error.code;
   }
-  return toErrorMessage(error, "SSAFY Verify Mattermost 알림 위임 실패");
+  return "unavailable";
 }
 
-function isVerifyDeliveryAccepted(status: string) {
-  const normalized = status.toLowerCase();
-  return normalized !== "failed" && normalized !== "skipped";
-}
-
-function toVerifyDeliveryStatus(status: string) {
-  if (status.toLowerCase() === "skipped") {
-    return "skipped" as const;
+function getSafeMattermostDeliveryErrorMessage(code: string) {
+  if (code === "sender_not_configured") {
+    return "대상 기수의 Mattermost Sender가 활성화되지 않았습니다.";
   }
-  return isVerifyDeliveryAccepted(status) ? "sent" as const : "failed" as const;
-}
-
-function toVerifyTargetErrorMessage(
-  status: string,
-  result: SsafyVerifyNotificationTargetResult | undefined,
-) {
-  if (!result?.errorCode && !result?.errorMessage && !result?.requestId) {
-    return `SSAFY Verify Mattermost 알림 상태: ${status}`;
+  if (code === "configuration_invalid") {
+    return "Mattermost Sender 서버 설정을 확인해 주세요.";
   }
-  const code = result.errorCode ?? "VERIFY_NOTIFICATION_FAILED";
-  const message = result.errorMessage ?? `SSAFY Verify Mattermost 알림 상태: ${status}`;
-  const requestSuffix = result.requestId ? ` (request_id: ${result.requestId})` : "";
-  return `${code}: ${message}${requestSuffix}`;
+  if (code === "not_found") {
+    return "Mattermost에서 수신자를 찾지 못했습니다.";
+  }
+  if (code === "unauthorized" || code === "forbidden") {
+    return "Mattermost Sender 권한을 확인해 주세요.";
+  }
+  if (code === "rate_limited") {
+    return "Mattermost 요청 한도로 발송하지 못했습니다.";
+  }
+  return "Mattermost 발송에 실패했습니다.";
 }
 
-async function sendMattermostCampaignDeliveriesViaVerify(params: {
+async function recordMattermostDelivery(input: {
+  notificationId: string;
+  member: AudienceMember;
+  status: "sent" | "failed";
+  providerNotificationId?: string | null;
+  providerStatus: string;
+  errorMessage?: string | null;
+  bookkeepingErrors: string[];
+}) {
+  await runBookkeepingTasks(
+    [
+      notificationRepository.recordNotificationDelivery({
+        notificationId: input.notificationId,
+        memberId: input.member.id,
+        channel: "mm",
+        status: input.status,
+        errorMessage: input.errorMessage ?? null,
+        provider: "mattermost",
+        providerNotificationId: input.providerNotificationId ?? null,
+        providerCampaignId: input.notificationId,
+        providerIdempotencyKey: `ssartnership:${input.notificationId}:mm:${input.member.id}`,
+        providerStatus: input.providerStatus,
+      }),
+    ],
+    "mm",
+    input.member.id,
+    input.bookkeepingErrors,
+  );
+}
+
+async function markGroupMattermostFailure(input: {
+  notificationId: string;
+  members: AudienceMember[];
+  error: unknown;
+  bookkeepingErrors: string[];
+}) {
+  const code = toMattermostDeliveryCode(input.error);
+  await Promise.all(input.members.map((member) => recordMattermostDelivery({
+    notificationId: input.notificationId,
+    member,
+    status: "failed",
+    providerStatus: code,
+    errorMessage: getSafeMattermostDeliveryErrorMessage(code),
+    bookkeepingErrors: input.bookkeepingErrors,
+  })));
+}
+
+async function sendMattermostCampaignDeliveriesDirect(params: {
   notificationId: string;
   notificationType: AdminNotificationType;
   title: string;
   body: string;
   url?: string | null;
   members: AudienceMember[];
+  source: AdminNotificationSource;
+  templateContext?: NotificationTemplateContext;
 }): Promise<ChannelDeliveryResult> {
-  const client = createSsafyVerifyServerApiClient(getSsafyVerifyServerApiConfig(), {
-    trace: createSsafyVerifyApiTraceLogger({
-      actorType: "system",
-      identifier: params.notificationId,
-      properties: {
-        flow: "admin_notification_mattermost_delivery",
-        notificationId: params.notificationId,
-        notificationType: params.notificationType,
-        targetCount: params.members.length,
-      },
-    }),
-  });
+  const bookkeepingErrors: string[] = [];
   let sent = 0;
   let failed = 0;
-  let skipped = 0;
-  const bookkeepingErrors: string[] = [];
-  const chunks = chunkMembers(params.members, 25);
+  const template = await resolveNotificationTemplate(
+    getCampaignTemplateKey("mattermost", params.notificationType, params.source),
+  );
+  const categoryLabel = params.notificationType === "marketing" ? "광고" : "공지";
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: params.templateContext,
+    common: {
+      categoryLabel,
+      title: params.title,
+      body: params.body,
+      targetLink: params.url ? `\n[바로가기](${absoluteUrl(params.url)})` : "",
+    },
+  });
+  const message = [
+    renderNotificationTemplate(template.titleTemplate, templateVariables),
+    renderNotificationTemplate(template.bodyTemplate, templateVariables),
+  ].filter(Boolean).join("\n");
+  const grouped = new Map<number, AudienceMember[]>();
+  const withoutSender: AudienceMember[] = [];
 
-  for (const [chunkIndex, members] of chunks.entries()) {
-    const batchIdempotencyKey = `ssartnership:${params.notificationId}:mm:${chunkIndex + 1}`;
+  for (const member of params.members) {
+    if (member.senderGeneration === null) {
+      withoutSender.push(member);
+      continue;
+    }
+    const members = grouped.get(member.senderGeneration) ?? [];
+    members.push(member);
+    grouped.set(member.senderGeneration, members);
+  }
+
+  if (withoutSender.length > 0) {
+    failed += withoutSender.length;
+    await markGroupMattermostFailure({
+      notificationId: params.notificationId,
+      members: withoutSender,
+      error: new MattermostSenderUnavailableError("sender_not_configured"),
+      bookkeepingErrors,
+    });
+  }
+
+  for (const [generation, members] of grouped) {
     try {
-      const result = await client.sendMattermostNotificationBatch({
-        campaignId: params.notificationId,
-        purpose: params.notificationType,
-        templateKey: "ssartnership_admin_notification",
-        message: {
-          title: params.title,
-          body: params.body,
-          url: params.url ?? undefined,
+      const outcome = await withActiveMattermostSenderForGeneration(
+        generation,
+        async (session) => {
+          const outcomes = await Promise.all(members.map(async (member) => {
+            try {
+              const post = await session.sendDirectMessage(member.mattermostUserId, message);
+              await recordMattermostDelivery({
+                notificationId: params.notificationId,
+                member,
+                status: "sent",
+                providerNotificationId: post.id,
+                providerStatus: "sent",
+                bookkeepingErrors,
+              });
+              return "sent" as const;
+            } catch (error) {
+              const code = toMattermostDeliveryCode(error);
+              await recordMattermostDelivery({
+                notificationId: params.notificationId,
+                member,
+                status: "failed",
+                providerStatus: code,
+                errorMessage: getSafeMattermostDeliveryErrorMessage(code),
+                bookkeepingErrors,
+              });
+              return "failed" as const;
+            }
+          }));
+          return outcomes;
         },
-        recipients: members.map((member) => ({
-          mattermostUserId: member.mattermostUserId,
-        })),
-        idempotencyKey: batchIdempotencyKey,
-      });
-
-      const targetResults =
-        result.results.length === members.length ? result.results : [];
-
-      for (const [memberIndex, member] of members.entries()) {
-        const targetResult = targetResults[memberIndex];
-        const verifyStatus = targetResult?.status ?? result.status;
-        const providerIdempotencyKey =
-          targetResult?.idempotencyKey ?? `${batchIdempotencyKey}:${memberIndex + 1}`;
-        const deliveryStatus = toVerifyDeliveryStatus(verifyStatus);
-        if (deliveryStatus === "sent") {
-          sent += 1;
-        } else if (deliveryStatus === "skipped") {
-          skipped += 1;
-        } else {
-          failed += 1;
-        }
-
-        await runBookkeepingTasks(
-          [
-            notificationRepository.recordNotificationDelivery({
-              notificationId: params.notificationId,
-              memberId: member.id,
-              channel: "mm",
-              status: deliveryStatus,
-              errorMessage:
-                deliveryStatus === "sent"
-                  ? null
-                  : toVerifyTargetErrorMessage(verifyStatus, targetResult),
-              provider: "ssafy_verify",
-              providerNotificationId:
-                targetResult?.notificationId ?? result.notificationId,
-              providerCampaignId: result.campaignId ?? params.notificationId,
-              providerIdempotencyKey,
-              providerStatus: verifyStatus,
-            }),
-          ],
-          "mm",
-          member.id,
-          bookkeepingErrors,
-        );
-      }
+      );
+      sent += outcome.filter((status) => status === "sent").length;
+      failed += outcome.filter((status) => status === "failed").length;
     } catch (error) {
-      const errorMessage = toVerifyDeliveryErrorMessage(error);
       failed += members.length;
-      for (const [memberIndex, member] of members.entries()) {
-        await runBookkeepingTasks(
-          [
-            notificationRepository.recordNotificationDelivery({
-              notificationId: params.notificationId,
-              memberId: member.id,
-              channel: "mm",
-              status: "failed",
-              errorMessage,
-              provider: "ssafy_verify",
-              providerCampaignId: params.notificationId,
-              providerIdempotencyKey: `${batchIdempotencyKey}:${memberIndex + 1}`,
-              providerStatus: "request_failed",
-            }),
-          ],
-          "mm",
-          member.id,
-          bookkeepingErrors,
-        );
-      }
+      await markGroupMattermostFailure({
+        notificationId: params.notificationId,
+        members,
+        error,
+        bookkeepingErrors,
+      });
     }
   }
 
@@ -227,7 +259,7 @@ async function sendMattermostCampaignDeliveriesViaVerify(params: {
     targeted: params.members.length,
     sent,
     failed,
-    skipped,
+    skipped: 0,
     bookkeepingErrors,
   };
 }
@@ -242,6 +274,7 @@ export async function sendPushCampaignDeliveries(params: {
     tag: string;
   };
   source: AdminNotificationSource;
+  templateContext?: NotificationTemplateContext;
   resolvedAudience: ResolvedPushAudience;
   subscriptions: StoredSubscription[];
   getWebPush: () => Promise<WebPushModule>;
@@ -250,13 +283,29 @@ export async function sendPushCampaignDeliveries(params: {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
+  const template = await resolveNotificationTemplate(
+    getCampaignTemplateKey("push", params.payload.type, params.source),
+  );
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: params.templateContext,
+    common: {
+      title: params.payload.title,
+      body: params.payload.body,
+      targetUrl: params.payload.url,
+    },
+  });
+  const payload = {
+    ...params.payload,
+    title: renderNotificationTemplate(template.titleTemplate, templateVariables),
+    body: renderNotificationTemplate(template.bodyTemplate, templateVariables),
+  };
   const messageLog = await createPushMessageLog({
-    payload: params.payload,
+    payload,
     source: params.source,
     audience: params.resolvedAudience,
   });
   const webpush = await params.getWebPush();
-  const serialized = buildNotificationPayload(params.payload);
+  const serialized = buildNotificationPayload(payload);
 
   let sent = 0;
   let failed = 0;
@@ -282,7 +331,7 @@ export async function sendPushCampaignDeliveries(params: {
           messageLogId: messageLog.id,
           memberId: subscription.member_id,
           subscriptionId: subscription.id,
-          payload: params.payload,
+          payload,
           status: "sent",
         }),
         notificationRepository.recordNotificationDelivery({
@@ -306,7 +355,7 @@ export async function sendPushCampaignDeliveries(params: {
           messageLogId: messageLog.id,
           memberId: subscription.member_id,
           subscriptionId: subscription.id,
-          payload: params.payload,
+          payload,
           status: "failed",
           errorMessage,
         }),
@@ -344,10 +393,15 @@ export async function sendMattermostCampaignDeliveries(params: {
   body: string;
   url?: string | null;
   members: AudienceMember[];
+  source?: AdminNotificationSource;
+  templateContext?: NotificationTemplateContext;
 }): Promise<ChannelDeliveryResult> {
   if (!params.members.length) {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
   }
 
-  return sendMattermostCampaignDeliveriesViaVerify(params);
+  return sendMattermostCampaignDeliveriesDirect({
+    ...params,
+    source: params.source ?? "manual",
+  });
 }

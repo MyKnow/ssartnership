@@ -138,9 +138,12 @@ export default function PromotionCarousel({
                 })
               }
             >
-              <div className="relative aspect-[21/9] w-full overflow-hidden rounded-overlay border border-border/70 bg-surface-muted shadow-raised">
+              <div
+                data-promotion-carousel-media
+                className="relative mx-auto aspect-[21/9] w-full max-h-none max-w-none overflow-hidden rounded-overlay border border-border/70 bg-surface-muted shadow-raised md:max-h-[20rem] md:max-w-[46.6667rem] lg:max-h-[28rem] lg:max-w-[65.3333rem]"
+              >
                 {slide.sponsorLabel ? (
-                  <span className="absolute left-3 top-3 z-10 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 text-xs font-semibold text-white shadow-flat backdrop-blur-md">
+                  <span className="absolute left-3 top-3 z-10 rounded-full border border-white/25 bg-black/70 px-3 py-1.5 text-xs font-semibold text-white shadow-flat backdrop-blur-md">
                     스폰서 · {slide.sponsorLabel}
                   </span>
                 ) : null}

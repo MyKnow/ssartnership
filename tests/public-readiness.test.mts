@@ -132,6 +132,6 @@ test("public readiness TODO keeps the launch blocker remediation tracked", () =>
 
   assert.match(todo, /공개 readiness 보완/);
   assert.match(todo, /Issue #55/);
-  assert.match(todo, /SSAFY Verify Server API Production env/);
+  assert.match(todo, /Mattermost 직접 연동 전환 \(Issue #155\)/);
   assert.match(todo, /GitHub Actions 공개 readiness gate/);
 });

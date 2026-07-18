@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import { SignupPageView } from "@/components/auth/AuthEntryViews";
 import { getHeaderSession } from "@/lib/header-session";
+import { getActiveMattermostSenderGenerations } from "@/lib/mattermost-senders/availability";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 
@@ -18,7 +19,10 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
-  const headerSession = await getHeaderSession();
+  const [headerSession, activeSenderGenerations] = await Promise.all([
+    getHeaderSession(),
+    getActiveMattermostSenderGenerations(),
+  ]);
   const { returnTo: rawReturnTo } = await searchParams;
   const returnTo = sanitizeReturnTo(
     Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo,
@@ -28,7 +32,10 @@ export default async function SignupPage({
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
-      <SignupPageView returnTo={returnTo} />
+      <SignupPageView
+        returnTo={returnTo}
+        activeSenderGenerations={activeSenderGenerations}
+      />
     </div>
   );
 }

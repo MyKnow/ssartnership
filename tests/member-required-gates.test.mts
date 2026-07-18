@@ -14,8 +14,6 @@ const gateEntrypointPaths = [
   new URL("../src/app/auth/change-password/page.tsx", import.meta.url),
   new URL("../src/app/auth/consent/page.tsx", import.meta.url),
   new URL("../src/components/auth/LoginForm.tsx", import.meta.url),
-  new URL("../src/components/auth/SsafyVerifyButton.tsx", import.meta.url),
-  new URL("../src/components/auth/SsafyVerifyCallbackRelay.tsx", import.meta.url),
 ];
 
 const gateCompletionPaths = [
@@ -43,10 +41,6 @@ const passwordLoginRoutePath = new URL(
 );
 const legacyMattermostLoginRoutePath = new URL(
   "../src/app/api/mm/login/route.ts",
-  import.meta.url,
-);
-const ssafyVerifyTokenRoutePath = new URL(
-  "../src/app/api/ssafy/verify-token/route.ts",
   import.meta.url,
 );
 const mattermostProfileSyncRoutePath = new URL(
@@ -171,23 +165,20 @@ test("본인 사진 게이트는 검증한 회원 세션을 헤더와 Drawer에�
   assert.match(source, /<SiteHeader initialSession=\{headerSession\}/);
 });
 
-test("모든 로그인 완료 경로는 사진 미제출 상태를 반환해 즉시 사진 게이트로 보낸다", async () => {
-  const [passwordLoginRoute, legacyMattermostLoginRoute, ssafyVerifyTokenRoute, loginForm, verifyButton, callbackRelay] =
+test("비밀번호 로그인 완료 경로는 사진 미제출 상태를 반환해 즉시 사진 게이트로 보낸다", async () => {
+  const [passwordLoginRoute, legacyMattermostLoginRoute, loginForm] =
     await Promise.all([
       readFile(passwordLoginRoutePath, "utf8"),
       readFile(legacyMattermostLoginRoutePath, "utf8"),
-      readFile(ssafyVerifyTokenRoutePath, "utf8"),
       readFile(new URL("../src/components/auth/LoginForm.tsx", import.meta.url), "utf8"),
-      readFile(new URL("../src/components/auth/SsafyVerifyButton.tsx", import.meta.url), "utf8"),
-      readFile(new URL("../src/components/auth/SsafyVerifyCallbackRelay.tsx", import.meta.url), "utf8"),
     ]);
 
-  for (const source of [passwordLoginRoute, legacyMattermostLoginRoute, ssafyVerifyTokenRoute]) {
+  for (const source of [passwordLoginRoute, legacyMattermostLoginRoute]) {
     assert.match(source, /getMemberProfilePhotoState/);
     assert.match(source, /requiresMemberProfilePhotoUpdate/);
     assert.match(source, /requiresProfilePhotoUpdate/);
   }
-  for (const source of [loginForm, verifyButton, callbackRelay]) {
+  for (const source of [loginForm]) {
     assert.match(source, /requiresProfilePhotoUpdate:\s*Boolean\([^)]*requiresProfilePhotoUpdate\)/);
   }
 });

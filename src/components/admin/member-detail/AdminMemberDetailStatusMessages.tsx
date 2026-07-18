@@ -62,7 +62,7 @@ export default function AdminMemberDetailStatusMessages({
         <InlineMessage
           tone="warning"
           title="MM 이용 상태를 종료 처리했습니다."
-          description="SSAFY Verify lifecycle 판정에 따라 MM 로그인을 중단하고 이메일 로그인 전환 대상으로 설정했습니다. 기존 회원 정보와 MM 연결 이력은 보존됩니다."
+          description="직접 Mattermost lifecycle 판정에 따라 MM 로그인을 중단하고 이메일 로그인 전환 대상으로 설정했습니다. 기존 회원 정보와 MM 연결 이력은 보존됩니다."
         />
       ) : null}
     </>

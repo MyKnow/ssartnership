@@ -5,9 +5,11 @@ import { cn } from "@/lib/cn";
 
 export default function PartnerFavoriteCountLabel({
   favoriteCount,
+  reducedVerticalPadding = false,
   className,
 }: {
   favoriteCount?: number | null;
+  reducedVerticalPadding?: boolean;
   className?: string;
 }) {
   const count = typeof favoriteCount === "number" ? favoriteCount : 0;
@@ -15,7 +17,8 @@ export default function PartnerFavoriteCountLabel({
   return (
     <span
       className={cn(
-        "inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium leading-none text-muted-foreground",
+        "inline-flex min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium leading-none text-muted-foreground",
+        reducedVerticalPadding ? "h-9 py-1" : "h-11",
         className,
       )}
       aria-label={`즐겨찾기 ${count.toLocaleString("ko-KR")}개`}

@@ -202,6 +202,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["auth.graduate-verification.application"],
   },
   {
+    routePath: "/auth/recover-email",
+    surface: "auth",
+    authScope: "public",
+    viewComponent: "MemberEmailRecoveryForm",
+    dataSources: ["api-route", "service"],
+    requiredScenarioIds: ["auth.member-email-recovery"],
+  },
+  {
     routePath: "/auth/graduate/setup",
     surface: "auth",
     authScope: "setup-token",
@@ -226,12 +234,12 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["auth.signup.default"],
   },
   {
-    routePath: "/auth/ssafy",
+    routePath: "/auth/signup/pending",
     surface: "auth",
     authScope: "public",
-    viewComponent: "SsafyAuthPage",
+    viewComponent: "SignupApprovalPendingPage",
     dataSources: ["api-route"],
-    requiredScenarioIds: ["auth.consent.default"],
+    requiredScenarioIds: ["auth.signup.approval-pending"],
   },
   {
     routePath: "/admin",
@@ -347,6 +355,22 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.profile-photos.queue"],
   },
   {
+    routePath: "/admin/member-signup-requests",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminMemberSignupApprovalQueue",
+    dataSources: ["repository", "service", "storybook"],
+    requiredScenarioIds: ["admin.member-signup-requests.queue"],
+  },
+  {
+    routePath: "/admin/member-signup-requests/[requestId]",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminMemberSignupApprovalDetail",
+    dataSources: ["repository", "service", "storybook"],
+    requiredScenarioIds: ["admin.member-signup-requests.queue"],
+  },
+  {
     routePath: "/admin/members/[memberId]",
     surface: "admin",
     authScope: "admin",
@@ -369,6 +393,14 @@ const mockRouteInventoryBase = [
     viewComponent: "AdminNotificationCenter",
     dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["admin.notifications.inbox"],
+  },
+  {
+    routePath: "/admin/notification-templates",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminNotificationTemplateManager",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.dashboard.default"],
   },
   {
     routePath: "/admin/partner-registrations",
@@ -692,7 +724,7 @@ const routeContracts = {
   "/auth/reset": {
     routeKind: "canonical",
     screenContractId: "auth.reset",
-    primaryTask: "SSAFY 인증을 통해 비밀번호 재설정을 시작한다.",
+    primaryTask: "Mattermost DM 인증을 통해 비밀번호 재설정을 시작한다.",
   },
   "/auth/reset/complete": {
     routeKind: "conditional",
@@ -702,12 +734,17 @@ const routeContracts = {
   "/auth/signup": {
     routeKind: "canonical",
     screenContractId: "auth.signup",
-    primaryTask: "회원 유형을 선택해 SSAFY Verify 또는 수료생 인증 가입을 시작한다.",
+    primaryTask: "회원 유형을 선택해 Mattermost DM 또는 수료생 인증 가입을 시작한다.",
   },
   "/auth/signup/graduate": {
     routeKind: "canonical",
     screenContractId: "auth.graduate-verification",
     primaryTask: "이메일, 교육이수증, 본인 사진으로 수료생 인증을 신청한다.",
+  },
+  "/auth/recover-email": {
+    routeKind: "canonical",
+    screenContractId: "auth.member-email-recovery",
+    primaryTask: "기존 사이트 비밀번호를 확인한 뒤 제한된 세션에서 이메일 로그인을 복구한다.",
   },
   "/auth/graduate/setup": {
     routeKind: "conditional",
@@ -724,10 +761,10 @@ const routeContracts = {
     screenContractId: "auth.signup-complete",
     primaryTask: "인증 결과를 확인하고 회원가입을 완료한다.",
   },
-  "/auth/ssafy": {
+  "/auth/signup/pending": {
     routeKind: "conditional",
-    screenContractId: "auth.ssafy-callback",
-    primaryTask: "SSAFY Verify 결과에 따라 가입 또는 로그인 흐름을 잇는다.",
+    screenContractId: "auth.signup-pending",
+    primaryTask: "Mattermost 가입 승인 신청이 접수되었음을 확인하고 로그인으로 이동한다.",
   },
   "/admin": {
     routeKind: "canonical",
@@ -799,6 +836,16 @@ const routeContracts = {
     screenContractId: "admin.profile-photos",
     primaryTask: "회원의 사진 변경 요청과 기존 프로필 사진 적합성을 검토한다.",
   },
+  "/admin/member-signup-requests": {
+    routeKind: "canonical",
+    screenContractId: "admin.member-signup-requests",
+    primaryTask: "Mattermost 프로필 파싱 실패 가입 신청을 확인하고 상세 검토로 이동한다.",
+  },
+  "/admin/member-signup-requests/[requestId]": {
+    routeKind: "canonical",
+    screenContractId: "admin.member-signup-request-detail",
+    primaryTask: "부족한 회원 정보를 입력해 Mattermost 가입 신청을 승인하거나 반려한다.",
+  },
   "/admin/members/[memberId]": {
     routeKind: "canonical",
     screenContractId: "admin.member-detail",
@@ -813,6 +860,11 @@ const routeContracts = {
     routeKind: "canonical",
     screenContractId: "admin.notifications",
     primaryTask: "내 운영 알림을 확인하고 읽음·수신 설정을 관리한다.",
+  },
+  "/admin/notification-templates": {
+    routeKind: "canonical",
+    screenContractId: "admin.notification-templates",
+    primaryTask: "모든 자동 알림 채널의 템플릿과 변수를 확인하고 수정한다.",
   },
   "/admin/partner-registrations": {
     routeKind: "canonical",

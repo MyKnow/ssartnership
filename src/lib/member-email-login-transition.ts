@@ -1,8 +1,11 @@
 import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { renderEmailTemplateBody } from "@/lib/email-content";
 import { normalizeMemberEmail } from "@/lib/member-domain";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { buildReservedMemberIdentifierHashes } from "@/lib/member-identifier-reservations";
 import {
   isMattermostLoginDisabledReason,
@@ -71,15 +74,6 @@ export class MemberEmailLoginTransitionError extends Error {
   }
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function buildEmailLoginSetupUrl(token: string) {
   const url = new URL("/auth/member/setup", SITE_URL);
   // A fragment is deliberately omitted from HTTP request paths and Referer.
@@ -95,22 +89,22 @@ async function sendEmailLoginTransitionEmail(input: {
   const smtpConfig = getSmtpConfig();
   const transport = createSmtpTransport(smtpConfig);
   const setupUrl = buildEmailLoginSetupUrl(input.token);
-  const safeName = escapeHtml(input.displayName || "회원");
-  const safeUrl = escapeHtml(setupUrl);
+  const template = await resolveNotificationTemplate("email.member_email_login_transition");
+  const subject = renderNotificationTemplate(template.titleTemplate, {
+    siteName: SITE_NAME,
+  });
+  const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, {
+    siteName: SITE_NAME,
+    displayName: input.displayName || "회원",
+    setupUrl,
+  });
 
   await transport.sendMail({
     from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
     to: input.email,
-    subject: `[${SITE_NAME}] 이메일 로그인 설정`,
-    text: [
-      `${input.displayName || "회원"}님, Mattermost 로그인을 이메일 로그인으로 전환합니다.`,
-      "아래 링크에서 이메일 로그인용 비밀번호를 설정해 주세요.",
-      "",
-      setupUrl,
-      "",
-      "링크는 24시간 동안 한 번만 사용할 수 있습니다.",
-    ].join("\n"),
-    html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.7"><h2>이메일 로그인 설정</h2><p>${safeName}님, Mattermost 로그인을 이메일 로그인으로 전환합니다.</p><p><a href="${safeUrl}">이메일 로그인 비밀번호 설정하기</a></p><p>링크는 24시간 동안 한 번만 사용할 수 있습니다.</p></div>`,
+    subject,
+    text: renderedBody.text,
+    html: renderedBody.html,
   });
 }
 

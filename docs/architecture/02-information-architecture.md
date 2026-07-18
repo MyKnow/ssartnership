@@ -2,7 +2,7 @@
 
 작성 기준일: 2026-07-09
 
-최종 교정일: 2026-07-10
+최종 교정일: 2026-07-17
 
 page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts`다. 2026-07-09 기준선은 62개였으며, 이번 IA 분리에서 `/admin/partner-requests`, `/admin/categories` 두 canonical route가 추가되어 구현 완료 시 64개가 된다.
 
@@ -19,7 +19,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | --- | --- | --- |
 | Root | `src/app/layout.tsx` | 전역 metadata, theme, toast, PWA provider, Vercel Analytics/Speed Insights |
 | Public site | `src/app/(site)` | 홈, 캠퍼스, 제휴 상세, 이벤트, 제안, 인증 카드, 알림, 쿠폰 |
-| Auth | `src/app/auth` | 회원 로그인, 가입, SSAFY Verify callback, 정책 동의, 비밀번호 재설정/변경 |
+| Auth | `src/app/auth` | 회원 로그인, Mattermost DM 가입/재설정, 이메일 복구, 정책 동의, 비밀번호 재설정/변경 |
 | Admin | `src/app/admin` | 관리자 로그인, setup, protected 운영 화면 |
 | Partner | `src/app/partner` | 파트너 로그인, setup, dashboard, 파트너사/제휴처/플랜/알림/지원 |
 | Legal | `src/app/legal/[kind]` | 약관/개인정보/마케팅 문서 버전 조회 |
@@ -48,9 +48,10 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | Route | Source | 목적 |
 | --- | --- | --- |
 | `/auth/login` | `auth/login/page.tsx` | 회원 로그인 |
-| `/auth/signup` | `auth/signup/page.tsx` | SSAFY Verify 기반 회원가입 시작 |
+| `/auth/signup` | `auth/signup/page.tsx` | Mattermost DM 또는 수료생 인증 회원가입 시작 |
 | `/auth/signup/complete` | `auth/signup/complete/page.tsx` | 회원가입 완료 |
-| `/auth/ssafy` | `auth/ssafy/page.tsx` | SSAFY Verify callback 처리 |
+| `/auth/signup/graduate` | `auth/signup/graduate/page.tsx` | 수료생 신규 가입 또는 기존 회원 복구 신청 |
+| `/auth/recover-email` | `auth/recover-email/page.tsx` | MM 장애 중 기존 비밀번호 기반 이메일 로그인 복구 |
 | `/auth/reset` | `auth/reset/page.tsx` | 비밀번호 재설정 시작 |
 | `/auth/reset/complete` | `auth/reset/complete/page.tsx` | 재설정 완료 토큰 처리 |
 | `/auth/change-password` | `auth/change-password/page.tsx` | 강제/자발 비밀번호 변경 |
@@ -68,7 +69,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | `/admin/admins` | `admin/(protected)/admins/page.tsx` | 관리자 계정/권한 관리 |
 | `/admin/advertisement` | `admin/(protected)/advertisement/page.tsx` | 광고/쿠폰 패키지 관리 |
 | `/admin/companies` | `admin/(protected)/companies/page.tsx` | 파트너사/계정 관리 |
-| `/admin/cycle` | `admin/(protected)/cycle/page.tsx` | SSAFY 기수 설정 |
+| `/admin/cycle` | `admin/(protected)/cycle/page.tsx` | SSAFY 기수 설정과 Super Admin Sender 관리 |
 | `/admin/event` | `admin/(protected)/event/page.tsx` | 이벤트 관리 |
 | `/admin/event/[slug]` | `admin/(protected)/event/[slug]/page.tsx` | 이벤트 상세 운영 |
 | `/admin/logs` | `admin/(protected)/logs/page.tsx` | product/admin/auth 로그 조회 |

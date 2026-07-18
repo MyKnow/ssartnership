@@ -1,7 +1,6 @@
 import LoginForm from "@/components/auth/LoginForm";
 import PasswordResetMethodTabs from "@/components/auth/PasswordResetMethodTabs";
 import SignupMethodTabs, { type SignupMethod } from "@/components/auth/SignupMethodTabs";
-import SsafyVerifyButton from "@/components/auth/SsafyVerifyButton";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
@@ -32,11 +31,6 @@ export function LoginPageView({ returnTo }: { returnTo: string }) {
             <Button variant="secondary" href={signupHref}>
               회원가입
             </Button>
-            <SsafyVerifyButton
-              className="mt-0"
-              returnTo={returnTo}
-              label="SSAFY Verify로 시작하기"
-            />
           </div>
         </div>
       </Container>
@@ -44,7 +38,11 @@ export function LoginPageView({ returnTo }: { returnTo: string }) {
   );
 }
 
-export function ResetPasswordPageView() {
+export function ResetPasswordPageView({
+  activeSenderGenerations = [],
+}: {
+  activeSenderGenerations?: readonly number[];
+}) {
   return (
     <main>
       <Container className="pb-16 pt-10">
@@ -52,7 +50,7 @@ export function ResetPasswordPageView() {
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             비밀번호 재설정
           </h1>
-          <PasswordResetMethodTabs />
+          <PasswordResetMethodTabs activeSenderGenerations={activeSenderGenerations} />
         </Card>
       </Container>
     </main>
@@ -62,9 +60,11 @@ export function ResetPasswordPageView() {
 export function SignupPageView({
   returnTo,
   initialMethod,
+  activeSenderGenerations = [],
 }: {
   returnTo: string;
   initialMethod?: SignupMethod;
+  activeSenderGenerations?: readonly number[];
 }) {
   return (
     <main>
@@ -73,7 +73,11 @@ export function SignupPageView({
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             회원가입
           </h1>
-          <SignupMethodTabs returnTo={returnTo} initialMethod={initialMethod} />
+          <SignupMethodTabs
+            returnTo={returnTo}
+            initialMethod={initialMethod}
+            activeSenderGenerations={activeSenderGenerations}
+          />
         </Card>
       </Container>
     </main>

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import CertificationEmailAction from "@/components/certification/CertificationEmailAction";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
 import CertificationMattermostSyncAction from "@/components/certification/CertificationMattermostSyncAction";
@@ -32,7 +33,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Unverified: Story = {};
+export const Unverified: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryByText(
+        "비밀번호 변경 또는 회원 탈퇴를 진행할 수 있습니다. 탈퇴 후 30일이 지나면 개인 식별 정보와 프로필 사진이 익명화됩니다.",
+      ),
+    ).not.toBeInTheDocument();
+  },
+};
 
 export const Verified: Story = {
   args: { emailVerified: true },

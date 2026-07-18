@@ -1,14 +1,19 @@
+import { forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
-export default function Select({
+const Select = forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement>
+>(function Select({
   className,
   "aria-label": ariaLabel,
   name,
   ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+}, ref) {
   return (
     <div className="relative">
       <select
+        ref={ref}
         {...props}
         name={name}
         aria-label={ariaLabel ?? name ?? "옵션 선택"}
@@ -29,4 +34,6 @@ export default function Select({
       </svg>
     </div>
   );
-}
+});
+
+export default Select;

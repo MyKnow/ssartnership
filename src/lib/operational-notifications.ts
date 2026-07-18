@@ -20,6 +20,16 @@ import { PushError } from "@/lib/push/types";
 import { sanitizeHttpUrl } from "@/lib/validation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
+import {
+  getAdminOperationalTemplateKey,
+  getPartnerOperationalTemplateKey,
+} from "@/lib/notification-templates/catalog";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  mergeNotificationTemplateVariables,
+  type NotificationTemplateContext,
+} from "@/lib/notification-templates/context";
 
 type DeliveryStatus = "pending" | "sent" | "failed" | "skipped";
 
@@ -449,15 +459,32 @@ export async function createAdminOperationalNotification(input: {
   targetUrl?: string | null;
   metadata?: Record<string, unknown>;
   requestedChannels?: AdminNotificationChannel[];
+  templateContext?: NotificationTemplateContext;
+  templateVariant?: string;
 }) {
   const supabase = getSupabaseAdminClient();
   const targetUrl = toTargetUrl(input.targetUrl, "/admin/notifications");
+  const inAppTemplate = await resolveNotificationTemplate(
+    getAdminOperationalTemplateKey("in_app", input.type, input.templateVariant),
+  );
+  const inAppVariables = mergeNotificationTemplateVariables({
+    context: input.templateContext,
+    common: { title: input.title, body: input.body, targetUrl },
+  });
+  const renderedTitle = renderNotificationTemplate(
+    inAppTemplate.titleTemplate,
+    inAppVariables,
+  );
+  const renderedBody = renderNotificationTemplate(
+    inAppTemplate.bodyTemplate,
+    inAppVariables,
+  );
   const { data: notification, error: notificationError } = await supabase
     .from("admin_notifications")
     .insert({
       type: input.type,
-      title: input.title,
-      body: input.body,
+      title: renderedTitle,
+      body: renderedBody,
       target_url: targetUrl,
       metadata: input.metadata ?? {},
     })
@@ -548,6 +575,8 @@ export async function createAdminOperationalNotification(input: {
       body: input.body,
       targetUrl,
       adminIds: pushTargetAdminIds,
+      templateContext: input.templateContext,
+      templateVariant: input.templateVariant,
     });
   }
 
@@ -561,6 +590,8 @@ async function sendAdminPushDeliveries(input: {
   body: string;
   targetUrl: string;
   adminIds: string[];
+  templateContext?: NotificationTemplateContext;
+  templateVariant?: string;
 }) {
   const supabase = getSupabaseAdminClient();
   if (!isPushConfigured()) {
@@ -586,11 +617,26 @@ async function sendAdminPushDeliveries(input: {
   if (error) {
     throw new Error(error.message);
   }
+  const template = await resolveNotificationTemplate(
+    getAdminOperationalTemplateKey("push", input.type, input.templateVariant),
+  );
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: input.templateContext,
+    common: { title: input.title, body: input.body, targetUrl: input.targetUrl },
+  });
+  const renderedTitle = renderNotificationTemplate(
+    template.titleTemplate,
+    templateVariables,
+  );
+  const renderedBody = renderNotificationTemplate(
+    template.bodyTemplate,
+    templateVariables,
+  );
   const webpush = await getWebPush();
   const serialized = toPushPayload({
     type: input.type,
-    title: input.title,
-    body: input.body,
+    title: renderedTitle,
+    body: renderedBody,
     targetUrl: input.targetUrl,
     tag: `${input.type}:${input.notificationId}`,
   });
@@ -649,16 +695,33 @@ export async function createPartnerOperationalNotification(input: {
   targetUrl?: string | null;
   metadata?: Record<string, unknown>;
   requestedChannels?: PartnerNotificationChannel[];
+  templateContext?: NotificationTemplateContext;
+  templateVariant?: string;
 }) {
   const supabase = getSupabaseAdminClient();
   const targetUrl = toTargetUrl(input.targetUrl, "/partner/notifications");
+  const inAppTemplate = await resolveNotificationTemplate(
+    getPartnerOperationalTemplateKey("in_app", input.type, input.templateVariant),
+  );
+  const inAppVariables = mergeNotificationTemplateVariables({
+    context: input.templateContext,
+    common: { title: input.title, body: input.body, targetUrl },
+  });
+  const renderedTitle = renderNotificationTemplate(
+    inAppTemplate.titleTemplate,
+    inAppVariables,
+  );
+  const renderedBody = renderNotificationTemplate(
+    inAppTemplate.bodyTemplate,
+    inAppVariables,
+  );
   const { data: notification, error: notificationError } = await supabase
     .from("partner_notifications")
     .insert({
       company_id: input.companyId,
       type: input.type,
-      title: input.title,
-      body: input.body,
+      title: renderedTitle,
+      body: renderedBody,
       target_url: targetUrl,
       metadata: input.metadata ?? {},
     })
@@ -738,6 +801,9 @@ export async function createPartnerOperationalNotification(input: {
           title: input.title,
           body: input.body,
           targetUrl,
+          notificationType: input.type,
+          templateContext: input.templateContext,
+          templateVariant: input.templateVariant,
         });
         await recordPartnerDelivery({
           notificationId: notification.id,
@@ -768,6 +834,8 @@ export async function createPartnerOperationalNotification(input: {
       body: input.body,
       targetUrl,
       accountIds: pushTargetAccountIds,
+      templateContext: input.templateContext,
+      templateVariant: input.templateVariant,
     });
   }
 
@@ -781,6 +849,8 @@ async function sendPartnerPushDeliveries(input: {
   body: string;
   targetUrl: string;
   accountIds: string[];
+  templateContext?: NotificationTemplateContext;
+  templateVariant?: string;
 }) {
   const supabase = getSupabaseAdminClient();
   if (!isPushConfigured()) {
@@ -806,11 +876,26 @@ async function sendPartnerPushDeliveries(input: {
   if (error) {
     throw new Error(error.message);
   }
+  const template = await resolveNotificationTemplate(
+    getPartnerOperationalTemplateKey("push", input.type as PartnerOperationalNotificationType, input.templateVariant),
+  );
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: input.templateContext,
+    common: { title: input.title, body: input.body, targetUrl: input.targetUrl },
+  });
+  const renderedTitle = renderNotificationTemplate(
+    template.titleTemplate,
+    templateVariables,
+  );
+  const renderedBody = renderNotificationTemplate(
+    template.bodyTemplate,
+    templateVariables,
+  );
   const webpush = await getWebPush();
   const serialized = toPushPayload({
     type: input.type,
-    title: input.title,
-    body: input.body,
+    title: renderedTitle,
+    body: renderedBody,
     targetUrl: input.targetUrl,
     tag: `${input.type}:${input.notificationId}`,
   });

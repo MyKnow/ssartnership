@@ -14,6 +14,7 @@ export default function PartnerFavoriteButton({
   favoriteCount,
   onToggle,
   compact = false,
+  reducedVerticalPadding = false,
   className,
 }: {
   partnerId: string;
@@ -21,6 +22,7 @@ export default function PartnerFavoriteButton({
   favoriteCount?: number | null;
   onToggle?: (nextFavorited: boolean) => void;
   compact?: boolean;
+  reducedVerticalPadding?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -41,6 +43,12 @@ export default function PartnerFavoriteButton({
 
   const label = isFavorited ? "즐겨찾기 해제" : "즐겨찾기";
   const Icon = isFavorited ? StarSolidIcon : StarOutlineIcon;
+  const favoriteStateClass = isFavorited
+    ? "border-amber-500/20 bg-amber-500/10 text-amber-700 hover:border-amber-500/30 hover:bg-amber-500/14 dark:text-amber-200"
+    : "border-border/80 bg-surface-control text-foreground hover:border-strong hover:bg-surface-elevated";
+  const buttonStateClass = isFavorited
+    ? "!border-amber-500/20 !bg-amber-500/10 !text-amber-700 hover:!border-amber-500/30 hover:!bg-amber-500/14 dark:!text-amber-200"
+    : "!border-border/80 !bg-surface-control !text-foreground hover:!border-strong hover:!bg-surface-elevated";
 
   const handleClick = async () => {
     if (isPending) {
@@ -92,9 +100,9 @@ export default function PartnerFavoriteButton({
       size={compact ? "sm" : "sm"}
       className={cn(
         "shrink-0 rounded-full px-3",
-        isFavorited
-          ? "!border-amber-500/20 !bg-amber-500/10 !text-amber-700 hover:!border-amber-500/30 hover:!bg-amber-500/14 dark:!text-amber-200"
-          : "!border-border/80 !bg-surface-control !text-foreground hover:!border-strong hover:!bg-surface-elevated",
+        reducedVerticalPadding
+          ? "!border-transparent !bg-transparent !px-0 !shadow-none hover:!border-transparent hover:!bg-transparent hover:!shadow-none"
+          : buttonStateClass,
         className,
       )}
       onClick={handleClick}
@@ -103,7 +111,14 @@ export default function PartnerFavoriteButton({
       ariaPressed={isFavorited}
       title={label}
     >
-      <span className="inline-flex items-center gap-1.5">
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5",
+          reducedVerticalPadding
+            ? `h-9 min-w-11 justify-center rounded-full border px-3 py-1 text-xs font-medium leading-none ${favoriteStateClass}`
+            : null,
+        )}
+      >
         <Icon
           className={cn(
             "h-4 w-4",

@@ -20,11 +20,17 @@ import type {
 } from "@/lib/push/types";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  mergeNotificationTemplateVariables,
+  type NotificationTemplateContext,
+} from "@/lib/notification-templates/context";
 import {
   EMPTY_CHANNEL_RESULTS,
   absoluteUrl,
   computeOperationStatus,
-  hasMattermostSenderForMember,
   getNotificationTypeLabel,
   getPreviewReasonLabel,
   getTypePreferenceEnabled,
@@ -33,7 +39,9 @@ import {
   mergeExclusionReasons,
   normalizeSelectedChannels,
   parseLogMetadata,
+  resolveMattermostSenderGenerationForMember,
 } from "@/lib/admin-notification-ops-utils";
+import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
 import {
   sendMattermostCampaignDeliveries,
   sendPushCampaignDeliveries,
@@ -60,6 +68,7 @@ export type AdminNotificationComposerInput = {
   audience: PushAudience;
   channels: AdminNotificationChannelSelection;
   confirmationText?: string | null;
+  templateContext?: NotificationTemplateContext;
 };
 
 export type AdminNotificationPreviewReasonCode =
@@ -173,6 +182,7 @@ type AudienceMember = {
   campus: string | null;
   isStaff: boolean;
   sourceYears: number[];
+  senderGeneration: number | null;
 };
 
 type AudienceContext = {
@@ -206,6 +216,7 @@ type NotificationCampaignMetadata = {
   warnings?: string[];
   campaignStatus?: AdminNotificationOperationLog["status"];
   completedAt?: string | null;
+  templateContextKind?: string;
 };
 
 type NotificationRow = {
@@ -303,6 +314,7 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
       campus: member.campus,
       isStaff: directoryEntry?.is_staff ?? member.generation === 0,
       sourceYears: directoryEntry?.source_years ?? [],
+      senderGeneration: null,
     } satisfies AudienceMember;
   });
 }
@@ -330,7 +342,27 @@ async function buildAudienceContext(
   }
 
   const resolvedAudience = await resolvePushAudience(input.audience);
-  const members = await listAudienceMembers(resolvedAudience);
+  const listedMembers = await listAudienceMembers(resolvedAudience);
+  let activeSenderGenerations = new Set<number>();
+  if (selectedChannels.includes("mm")) {
+    try {
+      const metadata = await mattermostSenderRepository.listMetadata();
+      activeSenderGenerations = new Set(
+        metadata
+          .filter((sender) => sender.status === "active")
+          .map((sender) => sender.generation),
+      );
+    } catch {
+      validationMessages.push("Mattermost Sender 목록을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+  const members = listedMembers.map((member) => ({
+    ...member,
+    senderGeneration: resolveMattermostSenderGenerationForMember(
+      member,
+      activeSenderGenerations,
+    ),
+  }));
   const activeMarketingPolicy = await getPolicyDocumentByKind("marketing").catch(
     () => null,
   );
@@ -453,8 +485,6 @@ async function buildAudienceContext(
       if (!preference.mmEnabled) {
         channelReasons.mm = "mm_disabled";
       } else if (!member.mattermostUserId) {
-        channelReasons.mm = "channel_unavailable";
-      } else if (!hasMattermostSenderForMember(member)) {
         channelReasons.mm = "channel_unavailable";
       } else {
         eligibleMemberIds.mm.push(member.id);
@@ -601,11 +631,34 @@ export async function sendAdminNotificationCampaign(
       channels: context.preview.channels,
     },
   };
+  if (input.templateContext) {
+    metadata.templateContextKind = input.templateContext.kind;
+  }
+
+  const inAppTemplate = await resolveNotificationTemplate(
+    getCampaignTemplateKey("in_app", input.notificationType, source),
+  );
+  const templateVariables = mergeNotificationTemplateVariables({
+    context: input.templateContext,
+    common: {
+      title: input.title.trim(),
+      body: input.body.trim(),
+      targetUrl: context.destinationUrl,
+    },
+  });
+  const renderedInAppTitle = renderNotificationTemplate(
+    inAppTemplate.titleTemplate,
+    templateVariables,
+  );
+  const renderedInAppBody = renderNotificationTemplate(
+    inAppTemplate.bodyTemplate,
+    templateVariables,
+  );
 
   const created = await notificationRepository.createNotification({
     type: input.notificationType,
-    title: input.title.trim(),
-    body: input.body.trim(),
+    title: renderedInAppTitle,
+    body: renderedInAppBody,
     targetUrl: context.destinationUrl,
     metadata,
     recipientMemberIds: context.selectedChannels.includes("in_app")
@@ -629,6 +682,7 @@ export async function sendAdminNotificationCampaign(
       notificationId: created.notification.id,
       payload: toPushPayload(input),
       source,
+      templateContext: input.templateContext,
       resolvedAudience: context.resolvedAudience,
       subscriptions: context.pushSubscriptions,
       getWebPush,
@@ -656,6 +710,8 @@ export async function sendAdminNotificationCampaign(
       body: input.body,
       url: input.url?.trim() ? normalizeNotificationTargetUrl(input.url) : null,
       members: mattermostMembers,
+      source,
+      templateContext: input.templateContext,
     });
     channelResults.mm = {
       targeted: mmResult.targeted,
