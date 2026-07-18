@@ -40,8 +40,10 @@ export function LoginPageView({ returnTo }: { returnTo: string }) {
 
 export function ResetPasswordPageView({
   activeSenderGenerations = [],
+  configuredSenderGenerations = [],
 }: {
   activeSenderGenerations?: readonly number[];
+  configuredSenderGenerations?: readonly number[];
 }) {
   return (
     <main>
@@ -50,7 +52,10 @@ export function ResetPasswordPageView({
           <h1 className="text-ko-title text-2xl font-semibold text-foreground">
             비밀번호 재설정
           </h1>
-          <PasswordResetMethodTabs activeSenderGenerations={activeSenderGenerations} />
+          <PasswordResetMethodTabs
+            activeSenderGenerations={activeSenderGenerations}
+            configuredSenderGenerations={configuredSenderGenerations}
+          />
         </Card>
       </Container>
     </main>
@@ -61,10 +66,12 @@ export function SignupPageView({
   returnTo,
   initialMethod,
   activeSenderGenerations = [],
+  configuredSenderGenerations = [],
 }: {
   returnTo: string;
   initialMethod?: SignupMethod;
   activeSenderGenerations?: readonly number[];
+  configuredSenderGenerations?: readonly number[];
 }) {
   return (
     <main>
@@ -77,6 +84,7 @@ export function SignupPageView({
             returnTo={returnTo}
             initialMethod={initialMethod}
             activeSenderGenerations={activeSenderGenerations}
+            configuredSenderGenerations={configuredSenderGenerations}
           />
         </Card>
       </Container>

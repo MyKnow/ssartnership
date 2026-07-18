@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/cleanup-manual-member-imports",
       "schedule": "35 0 * * *"
+    },
+    {
+      "path": "/api/cron/mattermost-sender-health",
+      "schedule": "45 0 * * *"
     }
   ]
 }

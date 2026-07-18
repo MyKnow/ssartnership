@@ -18,10 +18,12 @@ export default function SignupMethodTabs({
   returnTo,
   initialMethod = "member",
   activeSenderGenerations = [],
+  configuredSenderGenerations = [],
 }: {
   returnTo: string;
   initialMethod?: SignupMethod;
   activeSenderGenerations?: readonly number[];
+  configuredSenderGenerations?: readonly number[];
 }) {
   const [method, setMethod] = useState<SignupMethod>(initialMethod);
   const id = useId();
@@ -103,6 +105,7 @@ export default function SignupMethodTabs({
           purpose="signup"
           returnTo={returnTo}
           activeSenderGenerations={activeSenderGenerations}
+          configuredSenderGenerations={configuredSenderGenerations}
           className="mt-0 flex flex-col gap-4"
         />
       </section>
