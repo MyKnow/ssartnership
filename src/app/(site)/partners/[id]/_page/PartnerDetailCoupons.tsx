@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircleIcon, ClipboardIcon, TicketIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, CheckCircleIcon, ClipboardIcon, TicketIcon } from "@heroicons/react/24/outline";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { useToast } from "@/components/ui/Toast";
 import { getProductSessionId, trackProductEvent } from "@/lib/product-events";
-import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
+import type { AdCoupon, AvailableAdCoupon } from "@/lib/repositories/ad-package-repository";
 
 type CouponMessage = {
   tone: "success" | "error";
@@ -20,6 +20,8 @@ type RedeemResponse = {
   message?: string;
   coupon?: AdCoupon;
 };
+
+type IssueResponse = { ok?: boolean; message?: string; issue?: AvailableAdCoupon };
 
 function getUsageLabel(coupon: AdCoupon, usedCount: number) {
   if (typeof coupon.usageLimit !== "number") {
@@ -46,6 +48,8 @@ export default function PartnerDetailCoupons({
   const { notify } = useToast();
   const viewedCouponIds = useRef(new Set<string>());
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [issuingId, setIssuingId] = useState<string | null>(null);
+  const [issuedCoupons, setIssuedCoupons] = useState<Record<string, AvailableAdCoupon>>({});
   const [messages, setMessages] = useState<Record<string, CouponMessage>>({});
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>(() =>
     Object.fromEntries(coupons.map((coupon) => [coupon.id, coupon.usedCount])),
@@ -75,11 +79,12 @@ export default function PartnerDetailCoupons({
   }
 
   async function copyCouponCode(coupon: AdCoupon) {
-    if (!coupon.code) {
+    const code = issuedCoupons[coupon.id]?.assignedCode;
+    if (!code) {
       return;
     }
     try {
-      await navigator.clipboard.writeText(coupon.code);
+      await navigator.clipboard.writeText(code);
       trackProductEvent({
         eventName: "coupon_copy",
         targetType: "ad_coupon",
@@ -109,7 +114,31 @@ export default function PartnerDetailCoupons({
     }
   }
 
+  async function issueCoupon(coupon: AdCoupon) {
+    setIssuingId(coupon.id);
+    try {
+      const response = await fetch(`/api/coupons/${encodeURIComponent(coupon.id)}/issue`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const payload = (await response.json().catch(() => null)) as IssueResponse | null;
+      if (!response.ok || !payload?.ok || !payload.issue) {
+        throw new Error(payload?.message || "쿠폰 다운로드에 실패했습니다.");
+      }
+      setIssuedCoupons((current) => ({ ...current, [coupon.id]: payload.issue! }));
+      notify("쿠폰함에 쿠폰을 담았습니다.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "쿠폰 다운로드에 실패했습니다.";
+      notify(message);
+      setMessages((current) => ({ ...current, [coupon.id]: { tone: "error", text: message } }));
+    } finally {
+      setIssuingId(null);
+    }
+  }
+
   async function redeemCoupon(coupon: AdCoupon) {
+    const issue = issuedCoupons[coupon.id];
+    if (!issue?.issueId) return;
     setRedeemingId(coupon.id);
     setMessages((current) => ({
       ...current,
@@ -120,7 +149,7 @@ export default function PartnerDetailCoupons({
     }));
 
     try {
-      const response = await fetch(`/api/coupons/${encodeURIComponent(coupon.id)}/redeem`, {
+      const response = await fetch(`/api/coupon-issues/${encodeURIComponent(issue.issueId)}/redeem`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -135,10 +164,7 @@ export default function PartnerDetailCoupons({
         throw new Error(payload?.message || "쿠폰 사용 확인에 실패했습니다.");
       }
 
-      const nextUsedCount =
-        typeof payload.coupon?.usedCount === "number"
-          ? payload.coupon.usedCount
-          : (usageCounts[coupon.id] ?? coupon.usedCount) + 1;
+      const nextUsedCount = (usageCounts[coupon.id] ?? coupon.usedCount) + 1;
       setUsageCounts((current) => ({
         ...current,
         [coupon.id]: nextUsedCount,
@@ -183,7 +209,9 @@ export default function PartnerDetailCoupons({
         {coupons.map((coupon) => {
           const usedCount = usageCounts[coupon.id] ?? coupon.usedCount;
           const message = messages[coupon.id];
-          const canCopy = Boolean(coupon.code);
+          const issued = issuedCoupons[coupon.id];
+          const assignedCode = issued?.assignedCode ?? null;
+          const canCopy = Boolean(assignedCode);
           const isRedeeming = redeemingId === coupon.id;
           return (
             <article
@@ -210,13 +238,13 @@ export default function PartnerDetailCoupons({
                 <TicketIcon className="size-6 shrink-0 text-primary" aria-hidden="true" />
               </div>
 
-              {coupon.code ? (
+              {assignedCode ? (
                 <div className="rounded-2xl border border-dashed border-border bg-surface px-3 py-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Coupon Code
                   </p>
                   <p className="mt-1 break-all font-mono text-sm font-semibold text-foreground">
-                    {coupon.code}
+                    {assignedCode}
                   </p>
                 </div>
               ) : null}
@@ -266,7 +294,19 @@ export default function PartnerDetailCoupons({
                     쿠폰 열기
                   </Button>
                 ) : null}
-                {currentUserId ? (
+                {currentUserId && !issued ? (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="w-full justify-center sm:flex-1"
+                    loading={issuingId === coupon.id}
+                    loadingText="담는 중"
+                    onClick={() => { void issueCoupon(coupon); }}
+                  >
+                    <ArrowDownTrayIcon className="size-4" />
+                    쿠폰 다운로드
+                  </Button>
+                ) : currentUserId ? (
                   <Button
                     type="button"
                     variant="primary"

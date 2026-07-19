@@ -115,8 +115,11 @@ export const ServiceDetailDefault: Story = {
       initialReviews={partnerCanonicalReviews}
       initialReviewSort="latest"
       initialReviewOffset={partnerCanonicalReviews.length}
-      initialReviewHasMore={false}
-    />
+    initialReviewHasMore={false}
+    coupons={[]}
+    createCouponAction={async () => undefined}
+    uploadCouponCodesAction={async () => undefined}
+  />
   ),
   play: ({ canvasElement }) =>
     expectPageHeading(canvasElement, partnerCanonicalServiceContext.partnerName),

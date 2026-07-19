@@ -225,16 +225,6 @@ export default function AdminAdPackageManager({
             </FieldLabel>
             <div className="grid gap-3 sm:grid-cols-2">
               <FieldLabel>
-                시작
-                <Input name="startsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
-              </FieldLabel>
-              <FieldLabel>
-                종료
-                <Input name="endsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
-              </FieldLabel>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldLabel>
                 상태
                 <Select name="status" defaultValue="draft">
                   <option value="draft">초안</option>
@@ -297,6 +287,8 @@ export default function AdminAdPackageManager({
             description="캠페인에 붙일 쿠폰을 만들고 제휴처 상세에서 노출합니다."
           />
           <form action={createCouponAction} className="grid gap-4">
+            <input type="hidden" name="startsAt" value={defaultStartsAt} readOnly />
+            <input type="hidden" name="endsAt" value={defaultEndsAt} readOnly />
             <div className="grid gap-3 sm:grid-cols-2">
               <FieldLabel>
                 제휴처
@@ -359,15 +351,42 @@ export default function AdminAdPackageManager({
             </FieldLabel>
             <div className="grid gap-3 sm:grid-cols-2">
               <FieldLabel>
-                시작
-                <Input name="startsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
+                발급 방식
+                <Select name="issuanceType" defaultValue="service">
+                  <option value="service">서비스 발급형</option>
+                  <option value="partner_code_pool">파트너 코드형</option>
+                </Select>
               </FieldLabel>
               <FieldLabel>
-                종료
-                <Input name="endsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
+                사용 방식
+                <Select name="redemptionType" defaultValue="onsite">
+                  <option value="onsite">현장 확인</option>
+                  <option value="code">코드 제시</option>
+                  <option value="external">외부 링크</option>
+                </Select>
               </FieldLabel>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldLabel>
+                다운로드 시작
+                <Input name="downloadStartsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
+              </FieldLabel>
+              <FieldLabel>
+                다운로드 종료
+                <Input name="downloadEndsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
+              </FieldLabel>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldLabel>
+                사용 시작
+                <Input name="usageStartsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
+              </FieldLabel>
+              <FieldLabel>
+                사용 종료
+                <Input name="usageEndsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
+              </FieldLabel>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-4">
               <FieldLabel>
                 상태
                 <Select name="status" defaultValue="draft">
@@ -378,26 +397,28 @@ export default function AdminAdPackageManager({
                 </Select>
               </FieldLabel>
               <FieldLabel>
-                전체 제한
-                <Input name="usageLimit" type="number" min={0} step={1} placeholder="100" />
+                일 발급 한도
+                <Input name="dailyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
               </FieldLabel>
               <FieldLabel>
-                회원별 제한
-                <Input name="perMemberLimit" type="number" min={1} step={1} defaultValue={1} />
+                주 발급 한도
+                <Input name="weeklyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
+              </FieldLabel>
+              <FieldLabel>
+                월 발급 한도
+                <Input name="monthlyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
               </FieldLabel>
             </div>
-            <FieldLabel>
-              사용 방식
-              <Select name="redemptionType" defaultValue="onsite">
-                <option value="onsite">현장 확인</option>
-                <option value="code">코드 제시</option>
-                <option value="external">외부 링크</option>
-              </Select>
-            </FieldLabel>
-            <FieldLabel>
-              외부 링크
-              <Input name="externalUrl" type="url" placeholder="https://..." />
-            </FieldLabel>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldLabel>
+                회원별 보유/사용 제한
+                <Input name="perMemberLimit" type="number" min={1} step={1} defaultValue={1} />
+              </FieldLabel>
+              <FieldLabel>
+                외부 링크
+                <Input name="externalUrl" type="url" placeholder="https://..." />
+              </FieldLabel>
+            </div>
             <FieldLabel>
               조건
               <Textarea
@@ -405,6 +426,10 @@ export default function AdminAdPackageManager({
                 rows={4}
                 placeholder={"평일 점심 한정\n1일 1회 사용\n타 쿠폰 중복 불가"}
               />
+            </FieldLabel>
+            <FieldLabel>
+              파트너 코드 목록(한 줄에 하나)
+              <Textarea name="codePool" rows={4} placeholder="파트너가 전달한 쿠폰 코드를 붙여 넣으세요." />
             </FieldLabel>
             <Button type="submit" className="w-full justify-center sm:w-auto">
               쿠폰 생성

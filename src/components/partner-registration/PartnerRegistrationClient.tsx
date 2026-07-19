@@ -39,10 +39,6 @@ import ImageUploadSubmissionProvider, {
 import { useImageUploadFormDraft } from "@/components/media/useImageUploadFormDraft";
 import { useImageUploadSubmissionId } from "@/components/media/useImageUploadSubmissionId";
 import {
-  COUPON_ONLY_BENEFIT_TEXT,
-  COUPON_ONLY_CONDITION_TEXT,
-} from "@/lib/partner-coupon-only";
-import {
   partnerRegistrationInitialFormState,
   type PartnerRegistrationActionState,
   type PartnerRegistrationFormState,
@@ -91,7 +87,6 @@ export default function PartnerRegistrationClient({
     serviceMode,
     branchEntryMode,
     benefitActionType,
-    benefitListingMode,
     branchRows,
     webState,
     webFormAction,
@@ -114,7 +109,6 @@ export default function PartnerRegistrationClient({
     handleWebSubmit,
     handleServiceModeChange,
     handleBenefitActionTypeChange,
-    handleBenefitListingModeChange,
   } = usePartnerRegistrationController({
     webAction,
     initialWebState,
@@ -537,80 +531,10 @@ export default function PartnerRegistrationClient({
                     혜택과 이용 조건
                   </h2>
                   <p className="mt-1 text-ko-pretty text-sm leading-6 text-muted-foreground">
-                    상시 노출할 혜택이 있는지, 소모성 쿠폰만 운영하는지 먼저 선택합니다.
+                    제휴처에 항상 노출할 혜택과 이용 조건을 입력합니다. 쿠폰은 등록 후 별도로 운영할 수 있습니다.
                   </p>
                 </div>
-
-                <section className="grid min-w-0 gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      혜택 구성
-                    </p>
-                    <p className="mt-1 text-ko-pretty text-xs leading-5 text-muted-foreground">
-                      상세 카드에 항상 보일 혜택을 입력하거나, 수량과 사용 기간이 있는 쿠폰만 운영하도록 설정합니다.
-                    </p>
-                  </div>
-                  <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-                    <PartnerRegistrationOptionChip
-                      value="always_on"
-                      selected={benefitListingMode === "always_on"}
-                      label="상시 혜택 있음"
-                      description="상세 카드에 노출할 혜택과 조건을 직접 입력합니다."
-                      onClick={handleBenefitListingModeChange}
-                    />
-                    <PartnerRegistrationOptionChip
-                      value="coupon_only"
-                      selected={benefitListingMode === "coupon_only"}
-                      label="소모성 쿠폰만 제공"
-                      description="쿠폰별 수량, 기간, 조건을 별도로 운영합니다."
-                      onClick={handleBenefitListingModeChange}
-                    />
-                  </div>
-                </section>
-
-                {benefitListingMode === "coupon_only" ? (
-                  <>
-                    <input
-                      type="hidden"
-                      name="benefits"
-                      value={COUPON_ONLY_BENEFIT_TEXT}
-                    />
-                    <input
-                      type="hidden"
-                      name="conditions"
-                      value={COUPON_ONLY_CONDITION_TEXT}
-                    />
-                    <div className="grid min-w-0 gap-3 rounded-[1rem] border border-primary/15 bg-primary-soft p-4 text-primary">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
-                          쿠폰 전용 제휴처로 접수
-                        </p>
-                        <p className="mt-1 text-ko-pretty text-sm leading-6">
-                          상시 할인 문구 없이 등록하고, 승인 후 쿠폰 관리에서 쿠폰명, 수량, 사용 기간, 1인당 사용 횟수를 설정합니다.
-                        </p>
-                      </div>
-                      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-                        <div className="grid min-w-0 gap-1 rounded-[0.85rem] border border-primary/15 bg-surface/80 px-3 py-2">
-                          <span className="text-[11px] font-semibold text-muted-foreground">
-                            제출 혜택
-                          </span>
-                          <span className="truncate text-sm font-semibold text-foreground">
-                            {COUPON_ONLY_BENEFIT_TEXT}
-                          </span>
-                        </div>
-                        <div className="grid min-w-0 gap-1 rounded-[0.85rem] border border-primary/15 bg-surface/80 px-3 py-2">
-                          <span className="text-[11px] font-semibold text-muted-foreground">
-                            제출 조건
-                          </span>
-                          <span className="truncate text-sm font-semibold text-foreground">
-                            {COUPON_ONLY_CONDITION_TEXT}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
+                <>
                     {benefitActionType === "external_link" ? (
                       <Field
                         label="혜택 이용 링크"
@@ -665,8 +589,7 @@ export default function PartnerRegistrationClient({
                         />
                       </Field>
                     </div>
-                  </>
-                )}
+                </>
 
                 <Field label="태그" name="tags" error={fieldErrors.tags}>
                   <TokenChipField

@@ -28,6 +28,7 @@ import {
   getCompanyScopedPortalHref,
 } from "@/lib/partner-portal-paths";
 import type { PartnerServiceDetailViewProps } from "@/components/partner/partner-service-detail-view/types";
+import PartnerCouponPanel from "@/components/partner/partner-service-detail-view/PartnerCouponPanel";
 
 export default function PartnerServiceDetailViewContent({
   session,
@@ -48,6 +49,9 @@ export default function PartnerServiceDetailViewContent({
   initialReviewSort,
   initialReviewOffset,
   initialReviewHasMore,
+  coupons,
+  createCouponAction,
+  uploadCouponCodesAction,
 }: PartnerServiceDetailViewProps) {
   const visualState = getPartnerServiceVisualState(context);
   const portalHref = getCompanyScopedPortalHref(context.companyId);
@@ -215,6 +219,13 @@ export default function PartnerServiceDetailViewContent({
                   ""
                 }
                 inquiryRawValue={visualState.normalizedLinks.inquiryLink ?? ""}
+              />
+              <PartnerCouponPanel
+                coupons={coupons}
+                companyId={context.companyId}
+                partnerId={context.partnerId}
+                createAction={createCouponAction}
+                uploadCodesAction={uploadCouponCodesAction}
               />
             </>
           )}

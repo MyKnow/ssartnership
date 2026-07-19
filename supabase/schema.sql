@@ -3266,13 +3266,21 @@ create table if not exists ad_coupons (
   title text not null,
   description text not null default '',
   code text not null default '',
+  issuance_type text not null default 'service',
   redemption_type text not null default 'onsite',
   discount_label text not null default '',
   terms text[] not null default '{}'::text[],
   status text not null default 'draft',
   starts_at timestamp with time zone not null,
   ends_at timestamp with time zone not null,
+  download_starts_at timestamp with time zone,
+  download_ends_at timestamp with time zone,
+  usage_starts_at timestamp with time zone,
+  usage_ends_at timestamp with time zone,
   usage_limit integer,
+  daily_issue_limit integer,
+  weekly_issue_limit integer,
+  monthly_issue_limit integer,
   per_member_limit integer not null default 1,
   external_url text not null default '',
   created_at timestamp with time zone not null default now(),
@@ -3281,6 +3289,8 @@ create table if not exists ad_coupons (
     check (status in ('draft', 'active', 'paused', 'ended')),
   constraint ad_coupons_redemption_type_check
     check (redemption_type in ('onsite', 'code', 'external')),
+  constraint ad_coupons_issuance_type_check
+    check (issuance_type in ('service', 'partner_code_pool')),
   constraint ad_coupons_period_check
     check (starts_at <= ends_at),
   constraint ad_coupons_usage_limit_check
@@ -3328,6 +3338,49 @@ create index if not exists ad_coupon_redemptions_partner_created_idx
 create index if not exists ad_coupon_redemptions_member_coupon_idx
   on ad_coupon_redemptions(member_id, coupon_id)
   where member_id is not null and status = 'redeemed';
+
+create table if not exists ad_coupon_codes (
+  id uuid primary key default uuid_generate_v4(),
+  coupon_id uuid not null references ad_coupons(id) on delete cascade,
+  code text not null,
+  code_hash text not null,
+  status text not null default 'available',
+  issue_id uuid,
+  created_at timestamp with time zone not null default now(),
+  assigned_at timestamp with time zone,
+  used_at timestamp with time zone,
+  constraint ad_coupon_codes_status_check check (status in ('available', 'assigned', 'used', 'expired', 'cancelled')),
+  constraint ad_coupon_codes_code_check check (char_length(code) between 1 and 120),
+  unique (coupon_id, code_hash)
+);
+
+create table if not exists ad_coupon_issues (
+  id uuid primary key default uuid_generate_v4(),
+  coupon_id uuid not null references ad_coupons(id) on delete cascade,
+  member_id uuid not null references members(id) on delete cascade,
+  code_id uuid references ad_coupon_codes(id) on delete set null,
+  assigned_code text,
+  title_snapshot text not null,
+  description_snapshot text not null default '',
+  discount_label_snapshot text not null default '',
+  terms_snapshot text[] not null default '{}',
+  redemption_type_snapshot text not null,
+  external_url_snapshot text not null default '',
+  usage_starts_at timestamp with time zone not null,
+  usage_ends_at timestamp with time zone not null,
+  status text not null default 'issued',
+  issued_at timestamp with time zone not null default now(),
+  used_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  constraint ad_coupon_issues_status_check check (status in ('issued', 'used', 'expired', 'cancelled'))
+);
+
+alter table ad_coupon_codes
+  add constraint ad_coupon_codes_issue_fk foreign key (issue_id) references ad_coupon_issues(id) on delete set null;
+alter table ad_coupon_redemptions
+  add column if not exists issue_id uuid references ad_coupon_issues(id) on delete set null;
+create unique index if not exists ad_coupon_issues_active_member_idx
+  on ad_coupon_issues(coupon_id, member_id) where status = 'issued';
 
 create table if not exists promotion_events (
   id uuid primary key default uuid_generate_v4(),
