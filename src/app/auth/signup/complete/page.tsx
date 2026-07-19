@@ -52,7 +52,14 @@ export default async function SignupCompletePage({ searchParams }: PageProps) {
           <Card className="mx-auto max-w-2xl p-6 sm:p-8">
             <h1 className="text-2xl font-semibold text-foreground">회원가입 완료</h1>
             <MattermostSignupCompleteForm
-              session={signupSession}
+              session={{
+                mmUserId: signupSession.mmUserId,
+                mmUsername: signupSession.mmUsername,
+                displayName: signupSession.displayName,
+                subjectGeneration: signupSession.subjectGeneration,
+                senderGeneration: signupSession.senderGeneration,
+                signupMode: signupSession.signupMode,
+              }}
               requiredPolicies={requiredPolicies}
               marketingPolicy={marketingPolicy}
               returnTo={returnTo}

@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import {
@@ -31,6 +30,7 @@ import {
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 
 function getClientIdentifier(headerStore: Awaited<ReturnType<typeof headers>>) {
   const forwarded = headerStore.get("x-forwarded-for");
@@ -79,6 +79,14 @@ export async function createPartnerRegistrationRequestAction(
     };
   }
 
+  const requestId = readFormIdempotencyKey(formData);
+  if (!requestId) {
+    return {
+      status: "error",
+      message: "제출 정보를 준비하지 못했습니다. 입력 내용은 유지되므로 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
   let categories;
   try {
     categories = await loadPartnerRegistrationCategories();
@@ -90,7 +98,6 @@ export async function createPartnerRegistrationRequestAction(
   }
 
   const values = validation.values;
-  const requestId = randomUUID();
   let insertedRequest;
   try {
     const media = await resolvePartnerRegistrationMediaPayload(formData, requestId);
@@ -118,26 +125,28 @@ export async function createPartnerRegistrationRequestAction(
 
   await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
 
-  const [context, actor] = await Promise.all([
-    getServerActionLogContext("/partner-registration"),
-    resolveCurrentActor(),
-  ]);
-  scheduleProductEventLog({
-    ...context,
-    eventName: "partner_registration_submit",
-    actorType: actor.actorType,
-    actorId: actor.actorId,
-    targetType: "partner_registration_request",
-    targetId: insertedRequest.requestId,
-    properties: {
-      source: "public_web",
-      serviceMode: values.serviceMode,
-      benefitActionType: values.benefitActionType,
-      brandName: values.brandName,
-      categoryLabel: insertedRequest.categoryLabel,
-      categoryMatched: insertedRequest.categoryMatched,
-    },
-  });
+  if (insertedRequest.created) {
+    const [context, actor] = await Promise.all([
+      getServerActionLogContext("/partner-registration"),
+      resolveCurrentActor(),
+    ]);
+    scheduleProductEventLog({
+      ...context,
+      eventName: "partner_registration_submit",
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      targetType: "partner_registration_request",
+      targetId: insertedRequest.requestId,
+      properties: {
+        source: "public_web",
+        serviceMode: values.serviceMode,
+        benefitActionType: values.benefitActionType,
+        brandName: values.brandName,
+        categoryLabel: insertedRequest.categoryLabel,
+        categoryMatched: insertedRequest.categoryMatched,
+      },
+    });
+  }
 
   revalidatePath("/admin/partner-registrations");
 

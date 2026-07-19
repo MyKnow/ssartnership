@@ -73,6 +73,10 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
+            // Several interaction stories deliberately stub browser globals
+            // such as fetch. Run files in one browser sequence so those test
+            // doubles cannot leak into an unrelated story.
+            fileParallelism: false,
             provider: playwright({
               launchOptions: chromiumChannel ? { channel: chromiumChannel } : {},
             }),

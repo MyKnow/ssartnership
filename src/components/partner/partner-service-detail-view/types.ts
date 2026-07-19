@@ -15,6 +15,7 @@ export type PartnerServiceDetailViewProps = {
   mode: "view" | "edit";
   errorMessage?: string | null;
   successMessage?: string | null;
+  immediateSaveSucceeded?: boolean;
   saveImmediateAction: (formData: FormData) => void | Promise<void>;
   createAction: (formData: FormData) => void | Promise<void>;
   cancelAction: (formData: FormData) => void | Promise<void>;

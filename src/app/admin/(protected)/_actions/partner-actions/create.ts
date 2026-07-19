@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
@@ -36,6 +35,7 @@ import {
   parsePartnerPayload,
 } from "@/app/admin/(protected)/_actions/shared-parsers";
 import type { CreatedPartnerRecord } from "@/app/admin/(protected)/_actions/shared-types";
+import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 
 type AdminPartnerBranchPayload = {
   branchScopeType: PartnerBranchScopeType;
@@ -240,8 +240,11 @@ async function createPartnerRecord(
   formData: FormData,
   adminAccount: AdminScopeAccountLike,
 ): Promise<CreatedPartnerRecord> {
+  const partnerId = readFormIdempotencyKey(formData);
+  if (!partnerId) {
+    throw new Error("partner_form_invalid_submission");
+  }
   const payload = parsePartnerPayload(formData);
-  const partnerId = randomUUID();
   const companyPayload = parsePartnerCompanyPayload(formData);
   const media = await resolvePartnerMediaPayload(formData, partnerId);
   const managedCampusSlugs = resolveCreatedManagedCampusSlugs(
@@ -252,7 +255,7 @@ async function createPartnerRecord(
   const supabase = getSupabaseAdminClient();
   let companyProvision = null;
   let createdBrandProfileId: string | null = null;
-  let insertedPartner = false;
+  let createdPartner = false;
 
   try {
     companyProvision = await ensurePartnerCompanyRow(
@@ -316,10 +319,20 @@ async function createPartnerRecord(
       branch_scope_note: branchPayload.branchScopeNote,
     });
 
-    if (error) {
+    if (error?.code === "23505") {
+      const { data: existingPartner, error: existingPartnerError } = await supabase
+        .from("partners")
+        .select("id")
+        .eq("id", partnerId)
+        .maybeSingle();
+      if (existingPartnerError || !existingPartner) {
+        throw new Error(error.message);
+      }
+    } else if (error) {
       throw new Error(error.message);
+    } else {
+      createdPartner = true;
     }
-    insertedPartner = true;
 
     await persistAdminPartnerBranchLinks({
       supabase,
@@ -329,7 +342,7 @@ async function createPartnerRecord(
       branches: branchPayload.branches,
     });
   } catch (error) {
-    if (insertedPartner) {
+    if (createdPartner) {
       await supabase.from("partners").delete().eq("id", partnerId);
     }
     if (createdBrandProfileId) {
@@ -345,6 +358,7 @@ async function createPartnerRecord(
 
   return {
     partnerId,
+    created: createdPartner,
     payload,
     managedCampusSlugs,
     companyProvision,
@@ -354,7 +368,21 @@ async function createPartnerRecord(
 }
 
 async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
-  const { partnerId, payload, managedCampusSlugs, companyProvision, media, supabase } = record;
+  const {
+    partnerId,
+    created,
+    payload,
+    managedCampusSlugs,
+    companyProvision,
+    media,
+    supabase,
+  } = record;
+
+  if (!created) {
+    revalidatePartnerData();
+    revalidateAdminAndPublicPaths(partnerId);
+    return;
+  }
 
   await logAdminAction("partner_create", {
     targetType: "partner",

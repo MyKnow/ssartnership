@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -19,11 +19,21 @@ import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
+import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import {
-  createWebpFile,
-  isImageFile,
-  setInputFiles,
-} from "@/components/admin/partner-media-editor/utils";
+  loadImageUploadDraft,
+  loadImageUploadDraftFiles,
+  saveImageUploadDraft,
+  saveImageUploadDraftFiles,
+} from "@/lib/image-upload/draft.client";
+import {
+  IMAGE_SOURCE_ACCEPT,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import {
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
   PROMOTION_AUDIENCE_OPTIONS,
@@ -31,34 +41,24 @@ import {
 } from "@/lib/promotions/catalog";
 import type { ManagedPromotionSlide } from "@/lib/promotions/events";
 import { cn } from "@/lib/cn";
+import {
+  getPromotionCarouselDraftFiles,
+  getPromotionCarouselDraftValueKey,
+  PROMOTION_CAROUSEL_DRAFT_KEY,
+  readPromotionCarouselDraft,
+  serializePromotionCarouselDraft,
+  type PromotionCarouselDraftSlide,
+} from "./draft";
 
 const PROMOTION_ASPECT_RATIO = 21 / 9;
-const PROMOTION_ASPECT_RATIO_TOLERANCE = 0.01;
-const PROMOTION_OUTPUT_SIZE = {
-  width: 2100,
-  height: 900,
-} as const;
+const PROMOTION_IMAGE_POLICY = resolveImageTransformPolicy("promotion", "slide");
 
-type SlideDraft = {
-  id: string;
-  title: string;
-  subtitle: string;
-  imageSrc: string;
-  hasImageFile: boolean;
-  imageAlt: string;
-  href: string;
-  isActive: boolean;
-  audiences: PromotionAudience[];
-  allowedCampuses: CampusSlug[];
-  eventSlug: string | null;
-  adCampaignId: string | null;
-  sponsorLabel: string;
-  source: "database" | "catalog";
-};
+type SlideDraft = PromotionCarouselDraftSlide;
 
 type PendingCrop = {
   slideId: string;
   sourceUrl: string;
+  sourceFile: File;
 };
 
 export type PromotionEventPageOption = {
@@ -130,66 +130,9 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
   };
 }
 
-function getFileInputName(id: string) {
-  return `slide_image_${id}`;
-}
-
 function extractEventSlugFromHref(href: string) {
   const match = href.trim().match(/^\/events\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:[/?#]|$)/);
   return match?.[1] ?? null;
-}
-
-function loadImageElement(sourceUrl: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new window.Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
-    image.src = sourceUrl;
-  });
-}
-
-function isPromotionAspectRatio(width: number, height: number) {
-  if (width <= 0 || height <= 0) {
-    return false;
-  }
-  return Math.abs(width / height - PROMOTION_ASPECT_RATIO) <= PROMOTION_ASPECT_RATIO_TOLERANCE;
-}
-
-async function createPromotionWebpFileFromImage(image: HTMLImageElement, outputName: string) {
-  const canvas = document.createElement("canvas");
-  canvas.width = PROMOTION_OUTPUT_SIZE.width;
-  canvas.height = PROMOTION_OUTPUT_SIZE.height;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("이미지 처리에 실패했습니다.");
-  }
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(
-    image,
-    0,
-    0,
-    image.naturalWidth,
-    image.naturalHeight,
-    0,
-    0,
-    PROMOTION_OUTPUT_SIZE.width,
-    PROMOTION_OUTPUT_SIZE.height,
-  );
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((nextBlob) => {
-      if (!nextBlob) {
-        reject(new Error("이미지 변환에 실패했습니다."));
-        return;
-      }
-      resolve(nextBlob);
-    }, "image/webp", 0.78);
-  });
-
-  return createWebpFile(blob, outputName);
 }
 
 function SlideBadge({
@@ -251,6 +194,10 @@ export default function PromotionCarouselEditor({
   const fileInputRefs = useRef(new Map<string, HTMLInputElement | null>());
   const previewUrlRefs = useRef(new Map<string, string>());
   const formRef = useRef<HTMLFormElement | null>(null);
+  const allowUploadedFormSubmitRef = useRef(false);
+  const isSubmittingImagesRef = useRef(false);
+  const slidesRef = useRef(slides);
+  const [draftHydrated, setDraftHydrated] = useState(false);
 
   useEffect(() => {
     const previewUrls = previewUrlRefs.current;
@@ -263,6 +210,82 @@ export default function PromotionCarouselEditor({
       previewUrls.clear();
     };
   }, []);
+
+  useEffect(() => {
+    slidesRef.current = slides;
+  }, [slides]);
+
+  const persistDraft = useCallback(async (nextSlides = slidesRef.current) => {
+    const files = getPromotionCarouselDraftFiles(nextSlides);
+    saveImageUploadDraft({
+      formKey: PROMOTION_CAROUSEL_DRAFT_KEY,
+      values: {
+        [getPromotionCarouselDraftValueKey()]: serializePromotionCarouselDraft(nextSlides),
+      },
+      manifests: files
+        .flatMap((file) => file.uploadId
+          ? [{ uploadId: file.uploadId, role: file.role, order: file.order }]
+          : []),
+    });
+    await saveImageUploadDraftFiles(PROMOTION_CAROUSEL_DRAFT_KEY, files);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const draft = loadImageUploadDraft(PROMOTION_CAROUSEL_DRAFT_KEY);
+        const restoredSlides = readPromotionCarouselDraft(
+          draft?.values[getPromotionCarouselDraftValueKey()],
+        );
+        if (!restoredSlides) return;
+        const files = await loadImageUploadDraftFiles(PROMOTION_CAROUSEL_DRAFT_KEY);
+        if (cancelled) return;
+        const filesBySlideId = new Map(
+          files
+            .filter((file) => file.role === "slide")
+            .map((file) => [file.clientId, file]),
+        );
+        const nextSlides = restoredSlides.map((slide) => {
+          const file = filesBySlideId.get(slide.id);
+          if (!file) return slide;
+          const imageSrc = URL.createObjectURL(file.file);
+          previewUrlRefs.current.set(slide.id, imageSrc);
+          return {
+            ...slide,
+            imageSrc,
+            imageFile: file.file,
+            ...(file.uploadId || slide.uploadId
+              ? { uploadId: file.uploadId ?? slide.uploadId }
+              : {}),
+            hasImageFile: true,
+          };
+        });
+        setSlides(nextSlides);
+      } finally {
+        if (!cancelled) setDraftHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated) return;
+    const timer = window.setTimeout(() => {
+      void persistDraft();
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [draftHydrated, persistDraft, slides]);
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      void persistDraft();
+    };
+    window.addEventListener("pagehide", handlePageHide);
+    return () => window.removeEventListener("pagehide", handlePageHide);
+  }, [persistDraft]);
 
   const previewSlides = useMemo(
     () =>
@@ -293,6 +316,7 @@ export default function PromotionCarouselEditor({
           subtitle: slide.subtitle,
           imageSrc: slide.imageSrc,
           hasImageFile: slide.hasImageFile,
+          uploadId: slide.uploadId ?? null,
           imageAlt: slide.imageAlt,
           href: slide.href,
           isActive: slide.isActive,
@@ -431,36 +455,17 @@ export default function PromotionCarouselEditor({
     if (!file) {
       return;
     }
-    if (!isImageFile(file)) {
-      setError("이미지 파일만 업로드할 수 있습니다.");
+    const validationError = getImageUploadSourceError(file, PROMOTION_IMAGE_POLICY);
+    if (validationError) {
+      setError(validationError);
       return;
     }
-    const sourceUrl = URL.createObjectURL(file);
     try {
-      const image = await loadImageElement(sourceUrl);
-      if (isPromotionAspectRatio(image.naturalWidth, image.naturalHeight)) {
-        const normalizedFile = await createPromotionWebpFileFromImage(image, `${id}-slide.webp`);
-        const nextUrl = URL.createObjectURL(normalizedFile);
-        const input = fileInputRefs.current.get(id) ?? null;
-        setInputFiles(input, [normalizedFile]);
-        updateSlide(id, (slide) => ({
-          ...slide,
-          imageSrc: nextUrl,
-          hasImageFile: true,
-          imageAlt: slide.imageAlt || slide.title || "광고 카드 이미지",
-        }));
-        URL.revokeObjectURL(sourceUrl);
-        setError(null);
-        return;
-      }
-      setPendingCrop({ slideId: id, sourceUrl });
-    } catch {
-      URL.revokeObjectURL(sourceUrl);
-      const input = fileInputRefs.current.get(id) ?? null;
-      if (input) {
-        input.value = "";
-      }
-      setError("이미지를 불러올 수 없습니다. 다른 파일을 사용해 주세요.");
+      const sourceFile = await prepareImageUploadSource(file, PROMOTION_IMAGE_POLICY);
+      const sourceUrl = URL.createObjectURL(sourceFile);
+      setPendingCrop({ slideId: id, sourceUrl, sourceFile });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "이미지를 준비하지 못했습니다.");
     }
   }
 
@@ -470,8 +475,6 @@ export default function PromotionCarouselEditor({
     }
     const nextUrl = URL.createObjectURL(file);
     replacePreviewUrl(pendingCrop.slideId, nextUrl);
-    const input = fileInputRefs.current.get(pendingCrop.slideId) ?? null;
-    setInputFiles(input, [file]);
     setSlides((current) =>
       current.map((slide) =>
         slide.id === pendingCrop.slideId
@@ -479,6 +482,8 @@ export default function PromotionCarouselEditor({
               ...slide,
               imageSrc: nextUrl,
               hasImageFile: true,
+              imageFile: file,
+              uploadId: undefined,
               imageAlt: slide.imageAlt || slide.title || "광고 카드 이미지",
             }
           : slide,
@@ -509,6 +514,71 @@ export default function PromotionCarouselEditor({
     return slide.source === "database";
   }
 
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    if (allowUploadedFormSubmitRef.current) {
+      allowUploadedFormSubmitRef.current = false;
+      return;
+    }
+    if (validationErrors.length > 0) {
+      event.preventDefault();
+      void persistDraft();
+      setError(validationErrors[0] ?? "광고 카드 입력값을 확인해 주세요.");
+      return;
+    }
+    if (pendingCrop) {
+      event.preventDefault();
+      void persistDraft();
+      setError("이미지 조정을 완료한 뒤 저장해 주세요.");
+      return;
+    }
+    const uploads = slides.flatMap((slide) =>
+      slide.imageFile && !slide.uploadId
+        ? [{ clientId: slide.id, role: "slide", file: slide.imageFile }]
+        : [],
+    );
+    if (uploads.length === 0) {
+      void persistDraft();
+      return;
+    }
+    event.preventDefault();
+    if (isSubmittingImagesRef.current) {
+      return;
+    }
+    const form = event.currentTarget;
+    isSubmittingImagesRef.current = true;
+    setError(null);
+    try {
+      await persistDraft();
+      const results = await uploadImagesToStaging({
+        purpose: "promotion",
+        actorMode: "admin",
+        uploads,
+      });
+      const uploadIdsBySlideId = new Map(
+        results.map((result) => [result.clientId, result.uploadId]),
+      );
+      const nextSlides = slides.map((slide) => {
+        const uploadId = uploadIdsBySlideId.get(slide.id);
+        return uploadId
+          ? { ...slide, uploadId, imageFile: undefined }
+          : slide;
+      });
+      setSlides(nextSlides);
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      await persistDraft(nextSlides);
+      allowUploadedFormSubmitRef.current = true;
+      form.requestSubmit();
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error && uploadError.message
+          ? uploadError.message
+          : "광고 이미지를 업로드하지 못했습니다. 입력한 내용은 유지됩니다.",
+      );
+    } finally {
+      isSubmittingImagesRef.current = false;
+    }
+  };
+
   return (
     <div className="grid gap-6">
       <Card tone="elevated" className="grid gap-5">
@@ -533,7 +603,7 @@ export default function PromotionCarouselEditor({
         )}
       </Card>
 
-      <form ref={formRef} action={saveAction} className="grid gap-6">
+      <form ref={formRef} action={saveAction} onSubmit={handleSubmit} className="grid gap-6">
         <input type="hidden" name="slidesJson" value={serializedSlides} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -695,8 +765,7 @@ export default function PromotionCarouselEditor({
                       <input
                         ref={(element) => registerFileInput(slide.id, element)}
                         type="file"
-                        accept="image/*"
-                        name={getFileInputName(slide.id)}
+                        accept={IMAGE_SOURCE_ACCEPT}
                         className="hidden"
                         onChange={(event) => {
                           void onFileChange(slide.id, event.target.files?.[0] ?? null);
@@ -704,7 +773,7 @@ export default function PromotionCarouselEditor({
                       />
                     </div>
                     <p className="text-xs leading-6 text-muted-foreground">
-                      21:9 이미지는 원본 그대로 반영하고, 비율이 다르면 팝업에서 위치를 조정합니다.
+                      모든 이미지는 공통 편집 팝업에서 21:9 구도로 조정한 뒤 WebP로 저장됩니다.
                     </p>
                   </div>
 
@@ -931,11 +1000,12 @@ export default function PromotionCarouselEditor({
 
       <MediaCropModal
         open={Boolean(pendingCrop)}
-        title="광고 이미지 편집"
-        subtitle="21:9 비율 가이드에 맞춰 이미지를 조정합니다."
         aspectRatio={PROMOTION_ASPECT_RATIO}
         sourceUrl={pendingCrop?.sourceUrl ?? ""}
+        sourceFile={pendingCrop?.sourceFile}
         outputName={`${pendingCrop?.slideId ?? "promotion"}-slide.webp`}
+        purpose="promotion"
+        role="slide"
         onCancel={closeCrop}
         onApply={applyCroppedImage}
       />

@@ -23,7 +23,7 @@ export default function PartnerRegistrationMediaStep({
           제휴처 이미지
         </h2>
         <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-          대표 이미지와 상세 이미지는 JPG, PNG, WebP, AVIF만 업로드할 수 있습니다.
+          HEIC/HEIF를 포함한 지원 이미지 형식을 선택할 수 있으며, 조정 후 WebP로 안전하게 저장됩니다.
         </p>
       </div>
       <div className="grid min-w-0 gap-5">

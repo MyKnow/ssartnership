@@ -1,3 +1,6 @@
+"use client";
+
+import { type FormEvent, useRef, useState } from "react";
 import FormSection from "@/components/ui/FormSection";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
@@ -11,16 +14,80 @@ import {
 import type { PartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import { FieldGroup } from "./FieldGroup";
 import FloatingSubmitButton from "./FloatingSubmitButton";
+import ImageUploadSubmissionProvider, {
+  type ImageUploadSubmissionController,
+} from "@/components/media/ImageUploadSubmissionProvider";
+import { useImageUploadFormDraft } from "@/components/media/useImageUploadFormDraft";
 
 export function ImmediateChangeForm({
   context,
   saveImmediateAction,
+  clearDraftOnSuccess = false,
 }: {
   context: PartnerChangeRequestContext;
   saveImmediateAction: (formData: FormData) => void | Promise<void>;
+  clearDraftOnSuccess?: boolean;
 }) {
+  const imageUploadControllerRef = useRef<ImageUploadSubmissionController | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const allowUploadedFormSubmitRef = useRef(false);
+  const isSubmittingImagesRef = useRef(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const { saveDraft } = useImageUploadFormDraft({
+    formKey: `partner-change-request-${context.partnerId}`,
+    formRef,
+    imageUploadControllerRef,
+    clearOnSuccess: clearDraftOnSuccess,
+  });
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    if (allowUploadedFormSubmitRef.current) {
+      allowUploadedFormSubmitRef.current = false;
+      return;
+    }
+    const imageUploadController = imageUploadControllerRef.current;
+    if (!imageUploadController?.hasPendingUploads()) {
+      void saveDraft();
+      return;
+    }
+    event.preventDefault();
+    if (isSubmittingImagesRef.current) {
+      return;
+    }
+    const form = event.currentTarget;
+    isSubmittingImagesRef.current = true;
+    setImageUploadError(null);
+    try {
+      await saveDraft();
+      await imageUploadController.uploadPending();
+      await saveDraft();
+      allowUploadedFormSubmitRef.current = true;
+      form.requestSubmit();
+    } catch (error) {
+      setImageUploadError(
+        error instanceof Error && error.message
+          ? error.message
+          : "이미지를 업로드하지 못했습니다. 입력한 내용은 유지되므로 다시 시도해 주세요.",
+      );
+    } finally {
+      isSubmittingImagesRef.current = false;
+    }
+  };
+
   return (
-    <form action={saveImmediateAction} className="space-y-5 pb-24 sm:pb-28">
+    <ImageUploadSubmissionProvider
+      purpose="partner-change-request"
+      actorMode="partner"
+      draftKey={`partner-change-request-${context.partnerId}`}
+      controllerRef={imageUploadControllerRef}
+    >
+    <form
+      ref={formRef}
+      action={saveImmediateAction}
+      onSubmit={handleSubmit}
+      onChange={() => setImageUploadError(null)}
+      className="space-y-5 pb-24 sm:pb-28"
+    >
       <input type="hidden" name="companyId" value={context.companyId} />
       <input type="hidden" name="partnerId" value={context.partnerId} />
 
@@ -28,6 +95,7 @@ export function ImmediateChangeForm({
         title="즉시 반영 항목"
         description="메인 썸네일, 추가 이미지, 혜택 이용/문의 링크, 태그는 저장 즉시 반영됩니다."
       />
+      {imageUploadError ? <InlineMessage tone="danger" title="이미지 업로드 실패" description={imageUploadError} /> : null}
 
       <div className="grid gap-5">
         <PartnerThumbnailField initial={context.thumbnail} className="w-full" />
@@ -112,5 +180,6 @@ export function ImmediateChangeForm({
         </span>
       </FloatingSubmitButton>
     </form>
+    </ImageUploadSubmissionProvider>
   );
 }

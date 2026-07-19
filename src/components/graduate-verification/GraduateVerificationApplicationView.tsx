@@ -8,6 +8,7 @@ import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import ImageCropDialog from "@/components/media/ImageCropDialog";
+import { useSingleImageUploadDraft } from "@/components/media/useSingleImageUploadDraft";
 import {
   formatGraduateEmailCodeRemainingTime,
   getGraduateEmailCodeRemainingSeconds,
@@ -22,11 +23,14 @@ import {
   type GraduateVerificationRequestKind,
 } from "@/lib/graduate-verification";
 import {
-  GRADUATE_PROFILE_PHOTO_ACCEPT,
-  getGraduateProfilePhotoSourceError,
-  getGraduateProfilePhotoSourceFormat,
-  normalizeGraduateProfilePhotoSource,
-} from "@/lib/graduate-profile-photo.client";
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
+import { uploadImagesToStaging } from "@/lib/image-upload/client";
+import {
+  IMAGE_SOURCE_ACCEPT,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
 
 type ApplicationStep = "email" | "details" | "files" | "submitted";
 
@@ -36,6 +40,10 @@ type SignedUpload = {
 };
 
 type ResubmissionTarget = "education_period" | "certificate" | "profile_image";
+const GRADUATE_PROFILE_IMAGE_POLICY = resolveImageTransformPolicy(
+  "graduate-verification",
+  "profile",
+);
 
 const RESUBMISSION_TARGET_LABELS: Record<ResubmissionTarget, string> = {
   education_period: "교육 기간",
@@ -58,7 +66,7 @@ function getCertificateFileError(file: File) {
 }
 
 async function uploadSignedGraduateFile(input: {
-  kind: "certificate" | "profile_image";
+  kind: "certificate";
   file: File;
 }) {
   const signResponse = await fetch("/api/graduate-verification/uploads/sign", {
@@ -114,11 +122,13 @@ export default function GraduateVerificationApplicationView({
   const [campus, setCampus] = useState("");
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [profileImageUploadId, setProfileImageUploadId] = useState<string | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [photoSelecting, setPhotoSelecting] = useState(false);
   const [sourcePhotoUrl, setSourcePhotoUrl] = useState("");
+  const [sourcePhotoFile, setSourcePhotoFile] = useState<File | null>(null);
   const [resubmissionTargets, setResubmissionTargets] = useState<ResubmissionTarget[]>([]);
   const [resubmissionNote, setResubmissionNote] = useState<string | null>(null);
   const [existingRequestStatus, setExistingRequestStatus] = useState<
@@ -129,6 +139,24 @@ export default function GraduateVerificationApplicationView({
   const [message, setMessage] = useState<{ tone: "danger" | "success" | "info"; text: string } | null>(null);
   const currentYearMonth = useMemo(() => getGraduateCurrentYearMonth(), []);
   const isExistingMemberRecovery = requestKind === "existing_member_recovery";
+  const { persist: persistProfileDraft, clear: clearProfileDraft } = useSingleImageUploadDraft({
+    formKey: `graduate-verification-profile-${requestKind}`,
+    role: "profile",
+    file: photoFile,
+    uploadId: profileImageUploadId,
+    onRestore: (restored) => {
+      if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
+      const restoredPreviewUrl = URL.createObjectURL(restored.file);
+      photoPreviewUrlRef.current = restoredPreviewUrl;
+      setPhotoPreviewUrl(restoredPreviewUrl);
+      setPhotoFile(restored.file);
+      setProfileImageUploadId(restored.uploadId ?? null);
+      setMessage({
+        tone: "info",
+        text: "임시 저장한 본인 사진을 복원했습니다. 교육이수증을 다시 선택한 뒤 제출해 주세요.",
+      });
+    },
+  });
 
   useEffect(() => () => {
     photoSelectionRequestIdRef.current += 1;
@@ -356,30 +384,23 @@ export default function GraduateVerificationApplicationView({
 
   async function handlePhotoChange(file: File | null) {
     if (!file) return;
-    const error = getGraduateProfilePhotoSourceError(file);
+    const error = getImageUploadSourceError(file, GRADUATE_PROFILE_IMAGE_POLICY);
     if (error) {
       setMessage({ tone: "danger", text: error });
       return;
     }
     const requestId = photoSelectionRequestIdRef.current + 1;
     photoSelectionRequestIdRef.current = requestId;
-    const isHeif = getGraduateProfilePhotoSourceFormat(file) === "heif";
     setPhotoSelecting(true);
-    setMessage(
-      isHeif
-        ? {
-            tone: "info",
-            text: "HEIC/HEIF 사진을 기기에서 안전하게 변환하고 있습니다.",
-          }
-        : null,
-    );
+    setMessage(null);
     try {
-      const sourceFile = await normalizeGraduateProfilePhotoSource(file);
+      const sourceFile = await prepareImageUploadSource(file, GRADUATE_PROFILE_IMAGE_POLICY);
       if (photoSelectionRequestIdRef.current !== requestId) return;
       if (photoSourceUrlRef.current) URL.revokeObjectURL(photoSourceUrlRef.current);
       const sourceUrl = URL.createObjectURL(sourceFile);
       photoSourceUrlRef.current = sourceUrl;
       setSourcePhotoUrl(sourceUrl);
+      setSourcePhotoFile(sourceFile);
       setCropOpen(true);
       setMessage(null);
     } catch (nextError) {
@@ -404,6 +425,7 @@ export default function GraduateVerificationApplicationView({
     photoPreviewUrlRef.current = previewUrl;
     setPhotoPreviewUrl(previewUrl);
     setPhotoFile(file);
+    setProfileImageUploadId(null);
     setCropOpen(false);
     setMessage(null);
   }
@@ -423,20 +445,33 @@ export default function GraduateVerificationApplicationView({
     setPending(true);
     setMessage(null);
     try {
-      const [certificateUploadId, profileImageUploadId] = await Promise.all([
+      const [certificateUploadId, stagedProfileImageUploadId] = await Promise.all([
         requiresCertificate && certificateFile
           ? uploadSignedGraduateFile({ kind: "certificate", file: certificateFile })
           : Promise.resolve(null),
         requiresProfileImage && photoFile
-          ? uploadSignedGraduateFile({ kind: "profile_image", file: photoFile })
+          ? profileImageUploadId
+            ? Promise.resolve(profileImageUploadId)
+            : uploadImagesToStaging({
+              purpose: "graduate-verification",
+              uploads: [{ clientId: "graduate-profile", role: "profile", file: photoFile }],
+            }).then((uploads) => uploads[0]?.uploadId ?? null)
           : Promise.resolve(null),
       ]);
+      if (requiresProfileImage && !stagedProfileImageUploadId) {
+        throw new Error("본인 사진 업로드 정보를 확인하지 못했습니다.");
+      }
+      if (stagedProfileImageUploadId) {
+        setProfileImageUploadId(stagedProfileImageUploadId);
+        await persistProfileDraft(photoFile, stagedProfileImageUploadId);
+      }
       const response = await fetch("/api/graduate-verification/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           certificateUploadId,
-          profileImageUploadId,
+          profileImageUploadId: stagedProfileImageUploadId,
+          profileImageUploadSource: stagedProfileImageUploadId ? "common" : undefined,
           email,
           legalName,
           educationStartYear: Number(startYear),
@@ -449,6 +484,7 @@ export default function GraduateVerificationApplicationView({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "수료생 인증 신청을 제출하지 못했습니다.");
+      await clearProfileDraft();
       setStep("submitted");
       setResubmissionTargets([]);
       setResubmissionNote(null);
@@ -555,7 +591,7 @@ export default function GraduateVerificationApplicationView({
             />
           ) : null}
           <input ref={certificateInputRef} type="file" accept="application/pdf,.pdf" aria-label="교육이수증 PDF 파일 선택" className="sr-only" onChange={(event) => { handleCertificateChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
-          <input ref={photoInputRef} type="file" accept={GRADUATE_PROFILE_PHOTO_ACCEPT} aria-label="본인 사진 파일 선택" className="sr-only" onChange={(event) => { void handlePhotoChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
+          <input ref={photoInputRef} type="file" accept={IMAGE_SOURCE_ACCEPT} aria-label="본인 사진 파일 선택" className="sr-only" onChange={(event) => { void handlePhotoChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
           {requiresCertificate ? <div className="grid gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[1fr_auto] sm:items-center"><div><p className="font-semibold">교육이수증 PDF</p><p className="mt-1 text-sm text-muted-foreground">PDF(최대 10MB)</p>{certificateFile ? <p className="mt-2 text-sm font-medium text-success">선택됨: {certificateFile.name}</p> : null}</div><Button variant="secondary" onClick={chooseCertificate}>{certificateFile ? "파일 바꾸기" : "PDF 선택"}</Button></div> : null}
           {requiresProfileImage ? <div className="grid min-w-0 gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-semibold">1:1 본인 사진</p><p className="mt-1 text-ko-pretty text-sm text-muted-foreground">얼굴이 분명하게 보이는 사진(최대 5MB)</p></div><div className="flex shrink-0 items-center gap-3">{photoPreviewUrl ? <button type="button" className="rounded-[1rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => setPhotoPreviewOpen(true)} aria-label="선택한 본인 사진 크게 보기"><Image src={photoPreviewUrl} alt="선택한 본인 사진 미리보기" width={84} height={84} unoptimized className="h-[84px] w-[84px] rounded-[1rem] border border-border object-cover" /></button> : null}<Button variant="secondary" onClick={choosePhoto} loading={photoSelecting} loadingText="사진 변환 중" disabled={pending}>{photoFile ? "사진 바꾸기" : "사진 선택"}</Button></div></div> : null}
           <label className="flex items-center justify-center gap-3 rounded-card border border-border bg-surface-control p-4 text-sm"><input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="h-5 w-5 shrink-0 accent-primary" /><span>교육이수증과 본인 사진을 수료생 인증 검토 및 인증 카드·유효 QR 검증 화면 표시 목적으로 처리하는 데 동의합니다.</span></label>
@@ -577,16 +613,13 @@ export default function GraduateVerificationApplicationView({
 
       <ImageCropDialog
         open={cropOpen}
-        title="본인 사진 자르기"
-        subtitle="얼굴이 분명하게 보이도록 1:1 비율로 맞춰 주세요. 사진은 서버에서 다시 안전하게 변환됩니다."
         aspectRatio={1}
         sourceUrl={sourcePhotoUrl}
+        sourceFile={sourcePhotoFile ?? undefined}
         outputName="graduate-profile.webp"
         outputWidth={640}
         outputHeight={640}
-        accept={GRADUATE_PROFILE_PHOTO_ACCEPT}
-        validateFile={getGraduateProfilePhotoSourceError}
-        prepareFile={normalizeGraduateProfilePhotoSource}
+        policy={GRADUATE_PROFILE_IMAGE_POLICY}
         onCancel={() => setCropOpen(false)}
         onApply={applyCroppedPhoto}
       />

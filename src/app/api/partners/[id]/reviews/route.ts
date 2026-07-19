@@ -5,13 +5,11 @@ import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   deleteReviewMediaUrls,
-  verifyReviewMediaStorageUrls,
 } from "@/lib/review-media-storage";
 import {
   ensurePartnerReviewModerationAccess,
   ensureVisibleReviewPartner,
   getReviewMemberSession,
-  parseDirectUploadedReviewUrls,
   parseReviewFormFields,
   parseReviewListParams,
   parseRequestedReviewId,
@@ -99,13 +97,22 @@ export async function POST(
   }
 
   const reviewId = parseRequestedReviewId(formData) ?? randomUUID();
-  const directUploadedUrls = parseDirectUploadedReviewUrls(formData, id, reviewId);
+  const existingReview = await partnerReviewRepository.getPartnerReviewById(
+    reviewId,
+    session.userId,
+  );
+  if (existingReview) {
+    if (existingReview.partnerId !== id || existingReview.memberId !== session.userId) {
+      return NextResponse.json({ ok: false, message: "리뷰 요청을 확인해 주세요." }, { status: 409 });
+    }
+    const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
+    return NextResponse.json({ ok: true, review: existingReview, summary, idempotent: true });
+  }
   let uploadedUrls: string[] = [];
 
   try {
-    await verifyReviewMediaStorageUrls(directUploadedUrls);
-    const media = await resolveReviewMediaPayload(formData, id, reviewId);
-    uploadedUrls = [...directUploadedUrls, ...media.uploadedUrls];
+    const media = await resolveReviewMediaPayload(formData, id, reviewId, session.userId);
+    uploadedUrls = media.uploadedUrls;
     const review = await partnerReviewRepository.createPartnerReview({
       reviewId,
       partnerId: id,
@@ -131,6 +138,17 @@ export async function POST(
     });
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
+    const retriedReview = await partnerReviewRepository
+      .getPartnerReviewById(reviewId, session.userId)
+      .catch(() => null);
+    if (
+      retriedReview
+      && retriedReview.partnerId === id
+      && retriedReview.memberId === session.userId
+    ) {
+      const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
+      return NextResponse.json({ ok: true, review: retriedReview, summary, idempotent: true });
+    }
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
     const message =
       error instanceof Error && error.message

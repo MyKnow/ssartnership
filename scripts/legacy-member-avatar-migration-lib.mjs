@@ -2,6 +2,15 @@ const SUPPORTED_IMAGE_CONTENT_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/avif",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+  "image/gif",
+  "image/bmp",
+  "image/tiff",
+  "image/svg+xml",
 ]);
 
 const SUPABASE_PROJECT_REF_PATTERN = /^[a-z0-9]{20}$/;

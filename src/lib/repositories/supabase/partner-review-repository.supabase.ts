@@ -246,6 +246,28 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
     };
   }
 
+  async getPartnerReviewById(
+    reviewId: string,
+    currentUserId?: string | null,
+  ) {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partner_reviews")
+      .select(REVIEW_SELECT)
+      .eq("id", reviewId)
+      .maybeSingle();
+    if (error) {
+      throw new Error(error.message);
+    }
+    if (!data) return null;
+    const reactionStates = await getReviewReactionStates([reviewId], currentUserId);
+    return mapReview(
+      data as PartnerReviewRow,
+      currentUserId,
+      reactionStates.get(reviewId),
+    );
+  }
+
   async createPartnerReview(input: CreatePartnerReviewInput) {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase

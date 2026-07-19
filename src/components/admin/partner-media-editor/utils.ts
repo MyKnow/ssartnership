@@ -1,3 +1,4 @@
+import type { ClientImageUploadRequest } from "@/lib/image-upload/client";
 import type { PartnerMediaManifestEntry } from "../../../lib/partner-media";
 import type { MediaItem, MediaRole } from "./types";
 
@@ -25,7 +26,7 @@ export function createWebpFile(blob: Blob, fileName: string) {
 export function isImageFile(file: File) {
   return (
     file.type.startsWith("image/") ||
-    /\.(avif|gif|jpe?g|png|svg|webp|bmp|heic|heif)$/i.test(file.name)
+    /\.(avif|gif|jpe?g|png|svg|webp|bmp|tiff?|heic|heif)$/i.test(file.name)
   );
 }
 
@@ -50,11 +51,43 @@ export function manifestEntryForItem(item: MediaItem): PartnerMediaManifestEntry
   if (item.kind === "existing") {
     return { kind: "existing", url: item.url };
   }
-  return { kind: "upload" };
+  return item.uploadId
+    ? { kind: "upload", uploadId: item.uploadId }
+    : { kind: "upload" };
 }
 
 export function manifestForItems(items: MediaItem[]) {
   return items.map((item) => manifestEntryForItem(item));
+}
+
+export function getPendingMediaUploads(
+  items: MediaItem[],
+  role: MediaRole,
+): ClientImageUploadRequest[] {
+  return items.flatMap((item) =>
+    item.kind === "file" && item.file && !item.uploadId
+      ? [{ clientId: item.id, role, file: item.file }]
+      : [],
+  );
+}
+
+export function markMediaUploadsReady(
+  items: MediaItem[],
+  uploadIdsByClientId: ReadonlyMap<string, string>,
+) {
+  return items.map((item) => {
+    if (item.kind !== "file" || item.uploadId) {
+      return item;
+    }
+    const uploadId = uploadIdsByClientId.get(item.id);
+    return uploadId
+      // Keep the local WebP only for the 24-hour encrypted-by-browser draft.
+      // `getPendingMediaUploads` already excludes uploadId-bearing items, and
+      // the direct-upload input has no name, so this binary never reaches the
+      // Server Action FormData.
+      ? { ...item, uploadId }
+      : item;
+  });
 }
 
 export function setInputFiles(input: HTMLInputElement | null, files: File[]) {

@@ -82,6 +82,10 @@ export type PartnerReviewOwnedRecord = {
 export interface PartnerReviewRepository {
   getPartnerReviewSummary(partnerId: string): Promise<PartnerReviewSummary>;
   listPartnerReviews(context: PartnerReviewListContext): Promise<PartnerReviewListResult>;
+  getPartnerReviewById(
+    reviewId: string,
+    currentUserId?: string | null,
+  ): Promise<PartnerReview | null>;
   createPartnerReview(input: CreatePartnerReviewInput): Promise<PartnerReview>;
   updatePartnerReview(input: UpdatePartnerReviewInput): Promise<PartnerReview>;
   softDeletePartnerReview(input: SoftDeletePartnerReviewInput): Promise<void>;

@@ -4,23 +4,26 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ImageCropDialog from "@/components/media/ImageCropDialog";
+import { useSingleImageUploadDraft } from "@/components/media/useSingleImageUploadDraft";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import {
-  ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT,
-  getAdminMemberProfilePhotoSourceError,
-  getAdminMemberProfilePhotoUploadError,
-  isAdminMemberProfilePhotoHeifSource,
-  prepareAdminMemberProfilePhotoSource,
-} from "@/lib/admin-member-profile-photo.client";
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
+import { uploadImagesToStaging } from "@/lib/image-upload/client";
+import {
+  IMAGE_SOURCE_ACCEPT,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
 import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
-type SignedUpload = { uploadId: string; signedUrl: string };
 type Message = { variant: "error" | "info"; text: string };
+const PROFILE_IMAGE_POLICY = resolveImageTransformPolicy("profile", "profile");
 
 const REVIEW_STATUS_LABEL: Record<MemberProfilePhotoReviewStatus, string> = {
   missing: "사진 없음",
@@ -59,12 +62,29 @@ export default function AdminMemberProfilePhotoPanel({
   const previewUrlRef = useRef<string | null>(null);
   const selectionRequestIdRef = useRef(0);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadId, setUploadId] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
   const [pending, setPending] = useState(false);
   const [selecting, setSelecting] = useState(false);
+  const { persist: persistDraft, clear: clearDraft } = useSingleImageUploadDraft({
+    formKey: `admin-member-profile-${memberId}`,
+    role: "profile",
+    file,
+    uploadId,
+    onRestore: (restored) => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      const restoredPreviewUrl = URL.createObjectURL(restored.file);
+      previewUrlRef.current = restoredPreviewUrl;
+      setPreviewUrl(restoredPreviewUrl);
+      setFile(restored.file);
+      setUploadId(restored.uploadId ?? null);
+      setMessage({ variant: "info", text: "임시 저장한 사진을 복원했습니다. 다시 변경할 수 있습니다." });
+    },
+  });
 
   useEffect(() => () => {
     selectionRequestIdRef.current += 1;
@@ -74,7 +94,7 @@ export default function AdminMemberProfilePhotoPanel({
 
   async function selectFile(nextFile: File | null) {
     if (!nextFile) return;
-    const error = getAdminMemberProfilePhotoSourceError(nextFile);
+    const error = getImageUploadSourceError(nextFile, PROFILE_IMAGE_POLICY);
     if (error) {
       setMessage({ variant: "error", text: error });
       return;
@@ -82,21 +102,15 @@ export default function AdminMemberProfilePhotoPanel({
     const requestId = selectionRequestIdRef.current + 1;
     selectionRequestIdRef.current = requestId;
     setSelecting(true);
-    setMessage(
-      isAdminMemberProfilePhotoHeifSource(nextFile)
-        ? {
-            variant: "info",
-            text: "HEIC/HEIF 사진을 기기에서 안전하게 WebP로 변환하고 있습니다.",
-          }
-        : null,
-    );
+    setMessage(null);
     try {
-      const sourceFile = await prepareAdminMemberProfilePhotoSource(nextFile);
+      const sourceFile = await prepareImageUploadSource(nextFile, PROFILE_IMAGE_POLICY);
       if (selectionRequestIdRef.current !== requestId) return;
       if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
       const nextSourceUrl = URL.createObjectURL(sourceFile);
       sourceUrlRef.current = nextSourceUrl;
       setSourceUrl(nextSourceUrl);
+      setSourceFile(sourceFile);
       setCropOpen(true);
       setMessage(null);
     } catch (nextError) {
@@ -116,16 +130,12 @@ export default function AdminMemberProfilePhotoPanel({
   }
 
   function applyCroppedPhoto(nextFile: File) {
-    const error = getAdminMemberProfilePhotoUploadError(nextFile);
-    if (error) {
-      setMessage({ variant: "error", text: error });
-      return;
-    }
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     const nextPreviewUrl = URL.createObjectURL(nextFile);
     previewUrlRef.current = nextPreviewUrl;
     setPreviewUrl(nextPreviewUrl);
     setFile(nextFile);
+    setUploadId(null);
     setCropOpen(false);
     setMessage(null);
   }
@@ -135,35 +145,24 @@ export default function AdminMemberProfilePhotoPanel({
       setMessage({ variant: "error", text: "사진을 선택하고 1:1 비율로 잘라 주세요." });
       return;
     }
-    const uploadError = getAdminMemberProfilePhotoUploadError(file);
-    if (uploadError) {
-      setMessage({ variant: "error", text: uploadError });
-      return;
-    }
     setPending(true);
     setMessage(null);
     try {
-      const signResponse = await fetch(`/api/admin/members/${encodeURIComponent(memberId)}/profile-photo/sign`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ contentType: file.type, size: file.size }),
-      });
-      const signData = await signResponse.json().catch(() => ({}));
-      if (!signResponse.ok || !signData.upload) {
-        throw new Error(signData.message ?? "사진 업로드 준비에 실패했습니다.");
+      const stagedUploadId = uploadId ?? (await uploadImagesToStaging({
+        purpose: "profile",
+        actorMode: "admin",
+        uploads: [{ clientId: `member-${memberId}`, role: "profile", file }],
+      }))[0]?.uploadId;
+      if (!stagedUploadId) {
+        throw new Error("사진 업로드 정보를 확인하지 못했습니다.");
       }
-      const upload = signData.upload as SignedUpload;
-      const uploadResponse = await fetch(upload.signedUrl, {
-        method: "PUT",
-        headers: { "content-type": file.type, "x-upsert": "false" },
-        body: file,
-      });
-      if (!uploadResponse.ok) throw new Error("사진 업로드에 실패했습니다.");
+      setUploadId(stagedUploadId);
+      await persistDraft(file, stagedUploadId);
 
       const submitResponse = await fetch(`/api/admin/members/${encodeURIComponent(memberId)}/profile-photo`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uploadId: upload.uploadId }),
+        body: JSON.stringify({ uploadId: stagedUploadId, uploadSource: "common" }),
       });
       const submitData = await submitResponse.json().catch(() => ({}));
       if (!submitResponse.ok || !submitData.ok) {
@@ -173,6 +172,7 @@ export default function AdminMemberProfilePhotoPanel({
         variant: "info",
         text: "사진을 변경했습니다. 인증 카드와 QR에 바로 반영됩니다.",
       });
+      await clearDraft();
       router.refresh();
     } catch (error) {
       setMessage({
@@ -210,7 +210,7 @@ export default function AdminMemberProfilePhotoPanel({
             className="sr-only"
             type="file"
             aria-label="새 프로필 사진 파일 선택"
-            accept={ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT}
+            accept={IMAGE_SOURCE_ACCEPT}
             disabled={pending || selecting}
             onChange={(event) => {
               void selectFile(event.target.files?.[0] ?? null);
@@ -304,16 +304,13 @@ export default function AdminMemberProfilePhotoPanel({
       {message ? <FormMessage variant={message.variant}>{message.text}</FormMessage> : null}
       <ImageCropDialog
         open={cropOpen}
-        title="프로필 사진 자르기"
-        subtitle="얼굴이 선명하게 보이도록 1:1 비율로 맞춰 주세요."
         aspectRatio={1}
         sourceUrl={sourceUrl}
+        sourceFile={sourceFile ?? undefined}
         outputName="admin-member-profile.webp"
         outputWidth={640}
         outputHeight={640}
-        accept={ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT}
-        validateFile={getAdminMemberProfilePhotoSourceError}
-        prepareFile={prepareAdminMemberProfilePhotoSource}
+        policy={PROFILE_IMAGE_POLICY}
         onCancel={() => setCropOpen(false)}
         onApply={applyCroppedPhoto}
       />

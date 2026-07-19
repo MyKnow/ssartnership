@@ -6,6 +6,14 @@ import Image from "next/image";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import {
+  IMAGE_SOURCE_ACCEPT,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import {
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
+import {
   createReviewImageItemFromFile,
   isImageFile,
   revokeIfBlobUrl,
@@ -18,16 +26,20 @@ type PendingCrop = {
   sourceUrl: string;
 };
 
+const REVIEW_IMAGE_POLICY = resolveImageTransformPolicy("review", "image");
+
 export default function ReviewImageUploader({
   items,
   onChange,
   error,
   disabled,
+  onProcessingChange,
 }: {
   items: ReviewImageItem[];
   onChange: (nextItems: ReviewImageItem[]) => void;
   error?: string | null;
   disabled?: boolean;
+  onProcessingChange?: (processing: boolean) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const itemsRef = useRef<ReviewImageItem[]>(items);
@@ -35,6 +47,7 @@ export default function ReviewImageUploader({
   const pendingQueueRef = useRef<File[]>([]);
   const [activeCrop, setActiveCrop] = useState<PendingCrop | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -43,6 +56,10 @@ export default function ReviewImageUploader({
   useEffect(() => {
     activeCropRef.current = activeCrop;
   }, [activeCrop]);
+
+  useEffect(() => {
+    onProcessingChange?.(Boolean(activeCrop) || preparing || pendingQueueRef.current.length > 0);
+  }, [activeCrop, onProcessingChange, preparing]);
 
   useEffect(() => {
     return () => {
@@ -56,16 +73,30 @@ export default function ReviewImageUploader({
   const remainingCount = Math.max(0, 5 - items.length);
 
   const advanceCropQueue = () => {
+    void advanceCropQueueAsync();
+  };
+
+  const advanceCropQueueAsync = async () => {
     const [nextFile, ...rest] = pendingQueueRef.current;
     pendingQueueRef.current = rest;
     if (!nextFile) {
       setActiveCrop(null);
+      setPreparing(false);
       return;
     }
-    setActiveCrop({
-      file: nextFile,
-      sourceUrl: URL.createObjectURL(nextFile),
-    });
+    try {
+      setPreparing(true);
+      const sourceFile = await prepareImageUploadSource(nextFile, REVIEW_IMAGE_POLICY);
+      setActiveCrop({
+        file: sourceFile,
+        sourceUrl: URL.createObjectURL(sourceFile),
+      });
+    } catch (caught) {
+      setLocalError(caught instanceof Error ? caught.message : "이미지를 준비하지 못했습니다.");
+      advanceCropQueue();
+    } finally {
+      setPreparing(false);
+    }
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,7 +106,9 @@ export default function ReviewImageUploader({
       return;
     }
 
-    const validFiles = files.filter((file) => isImageFile(file)).slice(0, remainingCount);
+    const validFiles = files
+      .filter((file) => !getImageUploadSourceError(file, REVIEW_IMAGE_POLICY) && isImageFile(file))
+      .slice(0, remainingCount);
     if (validFiles.length === 0) {
       setLocalError("이미지 파일만 최대 5장까지 업로드할 수 있습니다.");
       return;
@@ -167,7 +200,7 @@ export default function ReviewImageUploader({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={IMAGE_SOURCE_ACCEPT}
         multiple
         className="hidden"
         onChange={handleFileChange}
@@ -180,6 +213,7 @@ export default function ReviewImageUploader({
       <ReviewImageCropModal
         open={Boolean(activeCrop)}
         sourceUrl={activeCrop?.sourceUrl ?? ""}
+        sourceFile={activeCrop?.file}
         outputName={`review-${items.length + 1}.webp`}
         onCancel={handleCropCancel}
         onApply={handleCropApply}

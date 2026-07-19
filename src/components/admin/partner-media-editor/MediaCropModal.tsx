@@ -1,6 +1,10 @@
 "use client";
 
 import ImageCropDialog from "@/components/media/ImageCropDialog";
+import {
+  resolveImageTransformPolicy,
+  type ImageUploadPurpose,
+} from "@/lib/image-upload/policy";
 
 function getOutputDimensions(aspectRatio: number) {
   if (Math.abs(aspectRatio - 1) < 0.01) {
@@ -19,44 +23,40 @@ function getOutputDimensions(aspectRatio: number) {
 
 export default function MediaCropModal({
   open,
-  title,
-  subtitle,
   aspectRatio,
   sourceUrl,
+  sourceFile,
   outputName,
-  queueCount = 1,
-  accept,
-  validateFile,
+  purpose,
+  role,
   onCancel,
   onApply,
 }: {
   open: boolean;
-  title: string;
-  subtitle: string;
   aspectRatio: number;
   sourceUrl: string;
+  sourceFile?: File;
   outputName: string;
-  queueCount?: number;
-  accept?: string;
-  validateFile?: (file: File) => string | null;
+  purpose?: ImageUploadPurpose;
+  role?: "thumbnail" | "gallery" | "slide";
   onCancel: () => void;
   onApply: (file: File) => void;
 }) {
-  const { width, height } = getOutputDimensions(aspectRatio);
+  const policy = purpose && role
+    ? resolveImageTransformPolicy(purpose, role)
+    : undefined;
+  const { width, height } = policy ?? getOutputDimensions(aspectRatio);
 
   return (
     <ImageCropDialog
       open={open}
-      title={title}
-      subtitle={subtitle}
       aspectRatio={aspectRatio}
       sourceUrl={sourceUrl}
+      sourceFile={sourceFile}
       outputName={outputName}
       outputWidth={width}
       outputHeight={height}
-      queueCount={queueCount}
-      accept={accept}
-      validateFile={validateFile}
+      policy={policy}
       onCancel={onCancel}
       onApply={onApply}
     />

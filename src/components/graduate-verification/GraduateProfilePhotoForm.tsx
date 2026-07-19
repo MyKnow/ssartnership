@@ -6,44 +6,20 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import ImageCropDialog from "@/components/media/ImageCropDialog";
+import { useSingleImageUploadDraft } from "@/components/media/useSingleImageUploadDraft";
 import { useToast } from "@/components/ui/Toast";
 import {
-  GRADUATE_PROFILE_PHOTO_ACCEPT,
-  getGraduateProfilePhotoSourceError,
-  getGraduateProfilePhotoSourceFormat,
-  normalizeGraduateProfilePhotoSource,
-} from "@/lib/graduate-profile-photo.client";
+  getImageUploadSourceError,
+  prepareImageUploadSource,
+} from "@/lib/image-upload/client-transform";
+import { uploadImagesToStaging } from "@/lib/image-upload/client";
+import {
+  IMAGE_SOURCE_ACCEPT,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
 import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
 
-type SignedUpload = {
-  uploadId: string;
-  signedUrl: string;
-};
-
-async function uploadReplacementPhoto(file: File) {
-  const signResponse = await fetch("/api/certification/photo/sign", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contentType: file.type, size: file.size }),
-  });
-  const signData = await signResponse.json().catch(() => ({}));
-  if (!signResponse.ok || !signData.upload) {
-    throw new Error(signData.message ?? "사진 업로드 준비에 실패했습니다.");
-  }
-  const upload = signData.upload as SignedUpload;
-  const uploadResponse = await fetch(upload.signedUrl, {
-    method: "PUT",
-    headers: {
-      "content-type": file.type,
-      "x-upsert": "false",
-    },
-    body: file,
-  });
-  if (!uploadResponse.ok) {
-    throw new Error("사진 업로드에 실패했습니다.");
-  }
-  return upload.uploadId;
-}
+const PROFILE_IMAGE_POLICY = resolveImageTransformPolicy("profile", "profile");
 
 export default function GraduateProfilePhotoForm({
   returnTo,
@@ -55,9 +31,11 @@ export default function GraduateProfilePhotoForm({
   const previewUrlRef = useRef<string | null>(null);
   const selectionRequestIdRef = useRef(0);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadId, setUploadId] = useState<string | null>(null);
   const [message, setMessage] = useState<{
     variant: "error" | "info";
     text: string;
@@ -66,6 +44,24 @@ export default function GraduateProfilePhotoForm({
   const [selecting, setSelecting] = useState(false);
   const router = useRouter();
   const { notify } = useToast();
+  const { persist: persistDraft, clear: clearDraft } = useSingleImageUploadDraft({
+    formKey: "member-profile-photo",
+    role: "profile",
+    file,
+    uploadId,
+    onRestore: (restored) => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      const restoredPreviewUrl = URL.createObjectURL(restored.file);
+      previewUrlRef.current = restoredPreviewUrl;
+      setPreviewUrl(restoredPreviewUrl);
+      setFile(restored.file);
+      setUploadId(restored.uploadId ?? null);
+      setMessage({
+        variant: "info",
+        text: "임시 저장한 사진을 복원했습니다. 다시 제출할 수 있습니다.",
+      });
+    },
+  });
 
   useEffect(() => () => {
     selectionRequestIdRef.current += 1;
@@ -75,30 +71,23 @@ export default function GraduateProfilePhotoForm({
 
   async function selectFile(nextFile: File | null) {
     if (!nextFile) return;
-    const error = getGraduateProfilePhotoSourceError(nextFile);
+    const error = getImageUploadSourceError(nextFile, PROFILE_IMAGE_POLICY);
     if (error) {
       setMessage({ variant: "error", text: error });
       return;
     }
     const requestId = selectionRequestIdRef.current + 1;
     selectionRequestIdRef.current = requestId;
-    const isHeif = getGraduateProfilePhotoSourceFormat(nextFile) === "heif";
     setSelecting(true);
-    setMessage(
-      isHeif
-        ? {
-            variant: "info",
-            text: "HEIC/HEIF 사진을 기기에서 안전하게 변환하고 있습니다.",
-          }
-        : null,
-    );
+    setMessage(null);
     try {
-      const sourceFile = await normalizeGraduateProfilePhotoSource(nextFile);
+      const sourceFile = await prepareImageUploadSource(nextFile, PROFILE_IMAGE_POLICY);
       if (selectionRequestIdRef.current !== requestId) return;
       if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
       const url = URL.createObjectURL(sourceFile);
       sourceUrlRef.current = url;
       setSourceUrl(url);
+      setSourceFile(sourceFile);
       setCropOpen(true);
       setMessage(null);
     } catch (nextError) {
@@ -123,6 +112,7 @@ export default function GraduateProfilePhotoForm({
     previewUrlRef.current = url;
     setPreviewUrl(url);
     setFile(nextFile);
+    setUploadId(null);
     setCropOpen(false);
     setMessage(null);
   }
@@ -138,11 +128,20 @@ export default function GraduateProfilePhotoForm({
     setPending(true);
     setMessage(null);
     try {
-      const uploadId = await uploadReplacementPhoto(file);
+      const stagedUploadId = uploadId ?? (await uploadImagesToStaging({
+        purpose: "profile",
+        actorMode: "member",
+        uploads: [{ clientId: "profile", role: "profile", file }],
+      }))[0]?.uploadId;
+      if (!stagedUploadId) {
+        throw new Error("사진 업로드 정보를 확인하지 못했습니다.");
+      }
+      setUploadId(stagedUploadId);
+      await persistDraft(file, stagedUploadId);
       const response = await fetch("/api/certification/photo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploadId }),
+        body: JSON.stringify({ uploadId: stagedUploadId, uploadSource: "common" }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -151,6 +150,7 @@ export default function GraduateProfilePhotoForm({
       notify(
         "사진 변경 요청을 제출했습니다. 기존 승인 사진은 새 사진이 승인될 때까지 계속 표시됩니다.",
       );
+      await clearDraft();
       router.replace(
         getMemberGateCompletionReturnTo(returnTo, "profile-photo"),
       );
@@ -177,7 +177,7 @@ export default function GraduateProfilePhotoForm({
           단체사진·로고·캐릭터·얼굴이 과도하게 가려진 사진은 사용할 수 없습니다.
         </p>
         <p className="text-ko-pretty">
-          JPEG, PNG, WebP, HEIC, HEIF를 선택할 수 있으며, 크롭 적용 후 640×640 WebP 파일로 제출됩니다.
+          JPEG, PNG, WebP, AVIF, HEIC/HEIF, GIF, BMP, TIFF, SVG를 선택할 수 있으며, 크롭 적용 후 640×640 WebP 파일로 제출됩니다.
         </p>
       </div>
       <input
@@ -185,7 +185,7 @@ export default function GraduateProfilePhotoForm({
         className="sr-only"
         type="file"
         aria-label="본인 사진 파일 선택"
-        accept={GRADUATE_PROFILE_PHOTO_ACCEPT}
+        accept={IMAGE_SOURCE_ACCEPT}
         onChange={(event) => {
           void selectFile(event.target.files?.[0] ?? null);
           event.target.value = "";
@@ -251,16 +251,13 @@ export default function GraduateProfilePhotoForm({
       ) : null}
       <ImageCropDialog
         open={cropOpen}
-        title="본인 사진 자르기"
-        subtitle="얼굴이 분명하게 보이도록 1:1 비율로 맞춰 주세요."
         aspectRatio={1}
         sourceUrl={sourceUrl}
+        sourceFile={sourceFile ?? undefined}
         outputName="graduate-profile.webp"
         outputWidth={640}
         outputHeight={640}
-        accept={GRADUATE_PROFILE_PHOTO_ACCEPT}
-        validateFile={getGraduateProfilePhotoSourceError}
-        prepareFile={normalizeGraduateProfilePhotoSource}
+        policy={PROFILE_IMAGE_POLICY}
         onCancel={() => setCropOpen(false)}
         onApply={applyCroppedPhoto}
       />

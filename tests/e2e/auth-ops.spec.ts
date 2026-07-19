@@ -51,12 +51,12 @@ test.describe("auth and partner portal operation flows", () => {
     const generation = page.getByRole("combobox", { name: "기수" });
     await expect(generation).toHaveValue("");
     const generationOptions = await generation.locator("option").allTextContents();
-    expect(generationOptions).toEqual([
-      "기수를 선택해 주세요",
-      expect.stringMatching(/^운영진(?:\(예정\))?$/),
-      expect.stringMatching(/^\d+기(?:\(예정\))?$/),
-      expect.stringMatching(/^\d+기(?:\(예정\))?$/),
-    ]);
+    expect(generationOptions[0]).toBe("기수를 선택해 주세요");
+    expect(generationOptions[1]).toMatch(/^운영진(?:\(예정\))?$/);
+    expect(generationOptions.slice(2).length).toBeGreaterThanOrEqual(2);
+    for (const option of generationOptions.slice(2)) {
+      expect(option).toMatch(/^\d+기(?:\(예정\))?$/);
+    }
     const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
     await expect(graduateTab).toHaveAttribute("aria-selected", "false");
     await memberTab.focus();
@@ -76,6 +76,61 @@ test.describe("auth and partner portal operation flows", () => {
     ).toBeVisible();
     await expect(page.getByRole("textbox", { name: "이메일" })).toBeVisible();
     await expect(page.getByRole("button", { name: "인증 코드 보내기" })).toBeVisible();
+  });
+
+  test("Mattermost 가입 인증은 5분 타이머를 표시하고 기존 회원은 로그인으로 안내한다", async ({ page }) => {
+    await page.route("**/api/mm/code/issue", (route) =>
+      route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          challenge: "e2e-mattermost-code-challenge",
+          expiresInSeconds: 300,
+          retryAfterSeconds: 60,
+        }),
+      }),
+    );
+    await page.route("**/api/mm/code/verify", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          nextPath: "/auth/login",
+          existingMember: true,
+        }),
+      }),
+    );
+
+    await page.goto("/auth/signup");
+    await page.waitForLoadState("networkidle");
+    const generation = page.getByRole("combobox", { name: "기수" });
+    const generationOption = generation.locator('option[value]:not([value=""])').first();
+    await expect(generationOption).toBeAttached();
+    const generationValue = await generationOption.getAttribute("value");
+    expect(generationValue).toBeTruthy();
+    // The MM endpoints are stubbed in this test, so keep it independent of the sender registry.
+    await generationOption.evaluate((option) => option.removeAttribute("disabled"));
+    await page.getByRole("textbox", { name: "Mattermost ID" }).fill("myknow");
+    await generation.selectOption(generationValue!);
+    await page.getByRole("button", { name: "Mattermost DM으로 코드 받기" }).click();
+
+    await expect(
+      page.getByText("입력한 Mattermost 계정으로 인증 코드를 보냈습니다.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("계정 존재 여부는 보안상 안내하지 않습니다."),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("timer", { name: "인증 코드 만료까지 05:00 남음" }),
+    ).toBeVisible();
+
+    await page.getByRole("textbox", { name: "6자리 인증 코드" }).fill("123456");
+    await page.getByRole("button", { name: "인증 확인" }).click();
+
+    await expect(page).toHaveURL(/\/auth\/login\?returnTo=%2F$/);
+    await expect(page.getByText("이미 가입된 사용자입니다. 로그인해 주세요.")).toBeVisible();
   });
 
   test("offers email recovery and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {

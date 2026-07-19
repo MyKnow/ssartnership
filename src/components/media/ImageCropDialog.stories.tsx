@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, fireEvent, fn, userEvent, waitFor, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import ImageCropDialog from "./ImageCropDialog";
 
 const sourceUrl = `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -17,14 +17,11 @@ const meta = {
   component: ImageCropDialog,
   args: {
     open: true,
-    title: "대표 이미지",
-    subtitle: "카드 목록에서 보일 1:1 이미지입니다.",
     aspectRatio: 1,
     sourceUrl,
     outputName: "partner-thumbnail.webp",
     outputWidth: 1200,
     outputHeight: 1200,
-    queueCount: 1,
     onCancel: fn(),
     onApply: fn(),
   },
@@ -42,8 +39,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async () => {
     const body = within(document.body);
-    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
-    await expect(body.getByText("저장 형식")).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
+    await expect(body.getByTestId("image-crop-frame")).toBeVisible();
+    await expect(body.queryByTestId("image-crop-tools")).not.toBeInTheDocument();
   },
 };
 
@@ -55,24 +53,49 @@ export const MobileViewport: Story = {
   },
   play: async () => {
     const body = within(document.body);
-    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
   },
 };
 
-export const QueuedGalleryImage: Story = {
+export const GalleryImage: Story = {
   args: {
-    title: "추가 이미지",
-    subtitle: "상세 페이지에서 보일 4:3 이미지입니다.",
     aspectRatio: 4 / 3,
     outputName: "partner-gallery.webp",
     outputWidth: 1600,
     outputHeight: 1200,
-    queueCount: 3,
   },
   play: async () => {
     const body = within(document.body);
-    await expect(await body.findByText("추가 이미지")).toBeInTheDocument();
-    await expect(body.getByText("여러 이미지를 순차 처리 중입니다. 남은 이미지 3개")).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
+    await expect(body.getByTestId("image-crop-frame")).toBeVisible();
+  },
+};
+
+export const PromotionLandscape: Story = {
+  args: {
+    aspectRatio: 21 / 9,
+    outputName: "promotion-slide.webp",
+    outputWidth: 2100,
+    outputHeight: 900,
+  },
+  parameters: {
+    chromatic: {
+      viewports: [360, 820, 1024, 1366],
+    },
+  },
+  play: async () => {
+    const body = within(document.body);
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
+    await expect(body.queryByText("결과 미리보기")).not.toBeInTheDocument();
+    await expect(document.body.querySelector('input[type="range"]')).toBeNull();
+    await expect(body.queryByTestId("image-crop-tools")).not.toBeInTheDocument();
+    await expect(body.queryByRole("button", { name: "초기화" })).not.toBeInTheDocument();
+    await expect(body.queryByRole("button", { name: "이미지 변경" })).not.toBeInTheDocument();
+    const content = body.getByTestId("image-crop-dialog-content");
+    await waitFor(() => {
+      expect(content.clientWidth).toBeGreaterThan(0);
+      expect(content.scrollWidth).toBeLessThanOrEqual(content.clientWidth);
+    });
   },
 };
 
@@ -82,82 +105,10 @@ export const ImageLoadError: Story = {
   },
   play: async () => {
     const body = within(document.body);
-    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
-    await expect(await body.findByText("이미지를 불러올 수 없습니다. 다른 파일을 선택해 주세요.")).toBeInTheDocument();
-  },
-};
-
-export const ReplacementValidationError: Story = {
-  args: {
-    validateFile: (file) =>
-      file.type.startsWith("image/") ? null : "이미지 파일만 업로드할 수 있습니다.",
-  },
-  play: async () => {
-    const body = within(document.body);
-    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
-    const input = document.body.querySelector<HTMLInputElement>('input[type="file"]');
-    await expect(input).not.toBeNull();
-    await userEvent.upload(input!, new File(["memo"], "memo.txt", { type: "text/plain" }), {
-      applyAccept: false,
-    });
-    await expect(await body.findByText("이미지 파일만 업로드할 수 있습니다.")).toBeInTheDocument();
-  },
-};
-
-export const ReplacementHeicPreparation: Story = {
-  args: {
-    accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif",
-    validateFile: () => null,
-    prepareFile: fn(async () => {
-      const response = await fetch(
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8igAAAABJRU5ErkJggg==",
-      );
-      return new File([await response.blob()], "converted.webp", { type: "image/webp" });
-    }),
-  },
-  play: async ({ args }) => {
-    const body = within(document.body);
-    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
-    const input = document.body.querySelector<HTMLInputElement>('input[type="file"]');
-    await expect(input).not.toBeNull();
-
-    await userEvent.upload(
-      input!,
-      new File(["heif-source"], "iphone.heic", { type: "image/heic" }),
-    );
-    await expect(args.prepareFile).toHaveBeenCalledTimes(1);
-  },
-};
-
-export const ReplacementConversionPending: Story = {
-  args: {
-    accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif",
-    validateFile: () => null,
-    prepareFile: async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 300));
-      const response = await fetch(
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8igAAAABJRU5ErkJggg==",
-      );
-      return new File([await response.blob()], "converted.webp", { type: "image/webp" });
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const body = within(document.body);
-    await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
-    const input = document.body.querySelector<HTMLInputElement>('input[type="file"]');
-    await expect(input).not.toBeNull();
-
-    await userEvent.upload(
-      input!,
-      new File(["heif-source"], "iphone.heic", { type: "image/heic" }),
-    );
-
-    const applyButton = body.getByRole("button", { name: "적용" });
-    await expect(applyButton).toBeDisabled();
-    await waitFor(() => expect(applyButton).toBeEnabled());
-
-    // Keep the story canvas referenced so the test is scoped to this story's mount.
-    await expect(canvasElement).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
+    await expect(
+      await body.findByText("이미지를 불러올 수 없습니다. 팝업을 닫고 다른 파일을 선택해 주세요."),
+    ).toBeInTheDocument();
   },
 };
 
@@ -170,17 +121,13 @@ export const ApplySuccess: Story = {
 
     try {
       const body = within(document.body);
-      await expect(await body.findByText("대표 이미지")).toBeInTheDocument();
-
-      const slider = await body.findByRole("slider");
-      fireEvent.input(slider, { target: { value: "1.4" } });
-      fireEvent.change(slider, { target: { value: "1.4" } });
+      await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
 
       await waitFor(() => {
         expect(document.body.querySelector(".reactEasyCrop_Container")).not.toBeNull();
       });
       await userEvent.click(body.getByRole("button", { name: "적용" }));
-      await expect(args.onApply).toHaveBeenCalled();
+      await waitFor(() => expect(args.onApply).toHaveBeenCalled());
     } finally {
       HTMLCanvasElement.prototype.toBlob = originalToBlob;
     }

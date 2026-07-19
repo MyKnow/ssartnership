@@ -290,7 +290,7 @@ export function usePartnerRegistrationController({
     );
     if (Object.keys(validation.fieldErrors).length === 0) {
       setClientFieldErrors({});
-      return;
+      return true;
     }
     event.preventDefault();
     setClientFieldErrors(validation.fieldErrors);
@@ -303,6 +303,7 @@ export function usePartnerRegistrationController({
     if (targetStep) {
       setActiveStep(targetStep.id);
     }
+    return false;
   }
 
   function handleServiceModeChange(value: PartnerServiceMode) {

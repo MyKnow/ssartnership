@@ -55,7 +55,7 @@ test("review media manifest parser accepts existing and upload entries", async (
     JSON.stringify({
       images: [
         { kind: "existing", url: "https://example.com/review.webp" },
-        { kind: "upload" },
+        { kind: "upload", uploadId: "03f5459b-dfee-4558-907a-509a396312f5" },
       ],
     }),
   );
@@ -63,6 +63,7 @@ test("review media manifest parser accepts existing and upload entries", async (
   assert.equal(parsed?.images.length, 2);
   assert.equal(parsed?.images[0]?.kind, "existing");
   assert.equal(parsed?.images[1]?.kind, "upload");
+  assert.equal(parsed?.images[1]?.kind === "upload" ? parsed.images[1].uploadId : null, "03f5459b-dfee-4558-907a-509a396312f5");
   assert.equal(parseReviewMediaManifest("{invalid"), null);
 });
 

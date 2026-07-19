@@ -84,6 +84,7 @@ export default async function AdminPartnerDetailPage({
   const partnerError = query.error
     ? adminPartnerDetailErrorMessages[String(query.error)] ?? null
     : null;
+  const partnerSaved = query.success === "updated";
 
   const supabase = getSupabaseAdminClient();
   const reviewFilters = {
@@ -355,6 +356,7 @@ export default async function AdminPartnerDetailPage({
               formAction={updatePartner}
               deleteAction={deletePartner}
               submitLabel="제휴처 저장"
+              clearDraftOnSuccess={partnerSaved}
               hiddenFields={[
                 { name: "updateRedirectTo", value: detailPath },
                 { name: "deleteRedirectTo", value: "/admin/partners" },

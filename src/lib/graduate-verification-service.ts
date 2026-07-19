@@ -11,19 +11,23 @@ import {
 import {
   getGraduateFileSha256,
   inspectGraduateCertificatePdf,
-  normalizeGraduateProfileImage,
 } from "@/lib/graduate-verification-files";
 import {
+  MEMBER_PROFILE_IMAGES_BUCKET,
   downloadGraduateVerificationUpload,
-  discardGraduateVerificationUpload,
-  getGraduateMemberProfileReplacementUpload,
   getGraduateVerificationUpload,
   markGraduateVerificationUploadsConsumed,
   promoteGraduateCertificate,
   removeGraduateStoredObject,
-  storeGraduateProfileImage,
   type GraduateStoredUpload,
 } from "@/lib/graduate-verification-storage";
+import {
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import {
+  type ImageUploadActor,
+} from "@/lib/image-upload/repository";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
 import {
   sendGraduateAccountSetupEmail,
   sendGraduateVerificationRejectionEmail,
@@ -55,6 +59,19 @@ type GraduateRequestRow = {
 type GraduateImageRow = {
   id: string;
   storage_path: string;
+};
+
+type MemberProfileImageRow = {
+  id: string;
+  member_id: string | null;
+  status: string;
+};
+
+type CommonProfileImageUpload = {
+  storagePath: string;
+  sha256: string;
+  width: number;
+  height: number;
 };
 
 type GraduateEmailMember = {
@@ -174,45 +191,28 @@ export async function issueGraduatePasswordResetAction(input: {
 async function requireGraduateApplicationUploads(input: {
   challengeId: string;
   certificateUploadId?: string | null;
-  profileImageUploadId?: string | null;
 }) {
-  const [certificate, profileImage] = await Promise.all([
-    input.certificateUploadId
-      ? getGraduateVerificationUpload({
-          challengeId: input.challengeId,
-          uploadId: input.certificateUploadId,
-          kind: "certificate",
-        })
-      : Promise.resolve(null),
-    input.profileImageUploadId
-      ? getGraduateVerificationUpload({
-          challengeId: input.challengeId,
-          uploadId: input.profileImageUploadId,
-          kind: "profile_image",
-        })
-      : Promise.resolve(null),
-  ]);
-  if (
-    (input.certificateUploadId && !certificate) ||
-    (input.profileImageUploadId && !profileImage)
-  ) {
+  const certificate = input.certificateUploadId
+    ? await getGraduateVerificationUpload({
+        challengeId: input.challengeId,
+        uploadId: input.certificateUploadId,
+        kind: "certificate",
+      })
+    : null;
+  if (input.certificateUploadId && !certificate) {
     throw new GraduateVerificationServiceError(
       "upload_invalid",
       "업로드가 만료되었거나 확인할 수 없습니다. 파일을 다시 업로드해 주세요.",
     );
   }
-  return { certificate, profileImage };
+  return { certificate };
 }
 
 async function validateGraduateApplicationFiles(input: {
   certificate: GraduateStoredUpload | null;
-  profileImage: GraduateStoredUpload | null;
 }) {
   const certificateBuffer = input.certificate
     ? await downloadGraduateVerificationUpload(input.certificate)
-    : null;
-  const profileImageBuffer = input.profileImage
-    ? await downloadGraduateVerificationUpload(input.profileImage)
     : null;
 
   if (input.certificate && certificateBuffer) {
@@ -235,25 +235,9 @@ async function validateGraduateApplicationFiles(input: {
     }
   }
 
-  let normalizedProfileImage: Awaited<ReturnType<typeof normalizeGraduateProfileImage>> | null = null;
-  if (input.profileImage && profileImageBuffer) {
-    try {
-      normalizedProfileImage = await normalizeGraduateProfileImage({
-        contentType: input.profileImage.content_type,
-        source: profileImageBuffer,
-      });
-    } catch (error) {
-      throw new GraduateVerificationServiceError(
-        "upload_invalid",
-        error instanceof Error ? error.message : "본인 사진을 확인해 주세요.",
-      );
-    }
-  }
-
   return {
     certificateBuffer,
     certificateSha256: certificateBuffer ? getGraduateFileSha256(certificateBuffer) : null,
-    normalizedProfileImage,
   };
 }
 
@@ -318,6 +302,50 @@ async function markPreviousImageSuperseded(input: {
     throw new Error("기존 본인 사진을 갱신하지 못했습니다.");
   }
   return (data ?? null) as GraduateImageRow | null;
+}
+
+async function attachCommonProfileImageUpload(input: {
+  actor: ImageUploadActor;
+  purpose: "profile" | "graduate-verification" | "manual-member-import";
+  uploadId: string;
+  destinationPath: string;
+  resource: { type: string; id: string };
+}): Promise<CommonProfileImageUpload> {
+  const attached = await getImageUploadRepository().attach({
+    actor: input.actor,
+    purpose: input.purpose,
+    uploadId: input.uploadId,
+    role: "profile",
+    policy: resolveImageTransformPolicy(input.purpose, "profile"),
+    destination: {
+      bucket: MEMBER_PROFILE_IMAGES_BUCKET,
+      path: input.destinationPath,
+      isPublic: false,
+      cacheControl: "private, no-store",
+    },
+    resource: input.resource,
+  });
+  if (attached.width !== 640 || attached.height !== 640) {
+    throw new Error("프로필 사진 크기를 확인하지 못했습니다.");
+  }
+  return {
+    storagePath: attached.path,
+    sha256: attached.sha256,
+    width: attached.width,
+    height: attached.height,
+  };
+}
+
+async function findMemberProfileImageByStoragePath(storagePath: string) {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("member_profile_images")
+    .select("id,member_id,status")
+    .eq("storage_path", storagePath)
+    .maybeSingle();
+  if (error) {
+    throw new Error("프로필 사진 상태를 확인하지 못했습니다.");
+  }
+  return (data as MemberProfileImageRow | null) ?? null;
 }
 
 export async function submitGraduateVerificationRequest(input: {
@@ -438,12 +466,11 @@ export async function submitGraduateVerificationRequest(input: {
   const uploads = await requireGraduateApplicationUploads({
     challengeId: input.challengeId,
     certificateUploadId: input.certificateUploadId,
-    profileImageUploadId: input.profileImageUploadId,
   });
   const files = await validateGraduateApplicationFiles(uploads);
   if (
-    (requiresCertificate && (!uploads.certificate || !files.certificateBuffer || !files.certificateSha256)) ||
-    (requiresProfileImage && (!uploads.profileImage || !files.normalizedProfileImage))
+    requiresCertificate
+    && (!uploads.certificate || !files.certificateBuffer || !files.certificateSha256)
   ) {
     throw new GraduateVerificationServiceError(
       "upload_invalid",
@@ -467,6 +494,7 @@ export async function submitGraduateVerificationRequest(input: {
   const requestId = existingRequest?.id ?? randomUUID();
   let promotedCertificatePath: string | null = null;
   let storedProfileImagePath: string | null = null;
+  let commonProfileImage: CommonProfileImageUpload | null = null;
   let newProfileImageId: string | null = null;
   let createdRequest = false;
   let persistedRequest = false;
@@ -478,18 +506,18 @@ export async function submitGraduateVerificationRequest(input: {
         requestId,
       });
     }
-    if (files.normalizedProfileImage) {
-      if (!uploads.profileImage) {
-        throw new GraduateVerificationServiceError(
-          "upload_invalid",
-          "본인 사진을 다시 업로드해 주세요.",
-        );
-      }
-      await discardGraduateVerificationUpload(uploads.profileImage);
-      storedProfileImagePath = await storeGraduateProfileImage({
-        requestId,
-        buffer: files.normalizedProfileImage.buffer,
+    if (input.profileImageUploadId) {
+      commonProfileImage = await attachCommonProfileImageUpload({
+        actor: { kind: "graduate_challenge", id: challenge.id },
+        purpose: "graduate-verification",
+        uploadId: input.profileImageUploadId,
+        destinationPath: `graduate-verification/${input.profileImageUploadId}.webp`,
+        // A fresh application can allocate a new request row after a failed
+        // database save. The verified challenge is stable across that retry,
+        // so use it as the attachment resource rather than a transient row ID.
+        resource: { type: "graduate_verification_challenge", id: challenge.id },
       });
+      storedProfileImagePath = commonProfileImage.storagePath;
     }
 
     if (!existingRequest) {
@@ -518,16 +546,16 @@ export async function submitGraduateVerificationRequest(input: {
       createdRequest = true;
     }
 
-    if (storedProfileImagePath && files.normalizedProfileImage) {
+    if (storedProfileImagePath && commonProfileImage) {
       const { data: image, error: imageError } = await supabase
         .from("member_profile_images")
         .insert({
           graduate_verification_request_id: requestId,
           storage_path: storedProfileImagePath,
-          sha256: files.normalizedProfileImage.sha256,
-          content_type: files.normalizedProfileImage.contentType,
-          width: files.normalizedProfileImage.width,
-          height: files.normalizedProfileImage.height,
+          sha256: commonProfileImage.sha256,
+          content_type: "image/webp",
+          width: commonProfileImage.width,
+          height: commonProfileImage.height,
           source: "graduate_verification",
           status: "pending",
         })
@@ -595,7 +623,7 @@ export async function submitGraduateVerificationRequest(input: {
       }
     }
 
-    const consumedUploadIds = [uploads.certificate?.id, uploads.profileImage?.id]
+    const consumedUploadIds = [uploads.certificate?.id]
       .filter((value): value is string => Boolean(value));
     await markGraduateVerificationUploadsConsumed(consumedUploadIds).catch(() => undefined);
     return {
@@ -623,9 +651,8 @@ export async function submitGraduateVerificationRequest(input: {
         // The image remains private and is eligible for a later cleanup pass.
       }
     }
-    if (storedProfileImagePath) {
-      await removeGraduateStoredObject("member-profile-images", storedProfileImagePath).catch(() => undefined);
-    }
+    // A common upload stays attached on a database failure so the client can
+    // retry the same upload ID without asking the applicant to reselect it.
     if (promotedCertificatePath) {
       await removeGraduateStoredObject("graduate-certificates", promotedCertificatePath).catch(() => undefined);
     }
@@ -1071,6 +1098,29 @@ export async function rejectMemberActiveProfilePhoto(input: {
   return data;
 }
 
+type ResolvedMemberProfileReplacement = {
+  path: string;
+  sha256: string;
+  width: number;
+  height: number;
+};
+
+async function resolveMemberProfileReplacement(input: {
+  uploadId: string;
+  actor: ImageUploadActor;
+  destinationPath: string;
+  resource: { type: string; id: string };
+}): Promise<ResolvedMemberProfileReplacement> {
+  const attached = await attachCommonProfileImageUpload({
+    actor: input.actor,
+    purpose: "profile",
+    uploadId: input.uploadId,
+    destinationPath: input.destinationPath,
+    resource: input.resource,
+  });
+  return { ...attached, path: attached.storagePath };
+}
+
 export async function submitMemberProfileImageReplacement(input: {
   memberId: string;
   uploadId: string;
@@ -1085,25 +1135,19 @@ export async function submitMemberProfileImageReplacement(input: {
   if (memberError || !member?.id) {
     throw new Error("회원 정보를 확인하지 못했습니다.");
   }
-  const upload = await getGraduateMemberProfileReplacementUpload({
+  const image = await resolveMemberProfileReplacement({
     uploadId: input.uploadId,
-    memberId: input.memberId,
+    actor: { kind: "member", id: input.memberId },
+    destinationPath: `members/${input.memberId}/uploads/${input.uploadId}.webp`,
+    resource: { type: "member_profile_replacement", id: input.memberId },
   });
-  if (!upload) {
-    throw new Error("사진 업로드가 만료되었거나 확인할 수 없습니다. 다시 선택해 주세요.");
+  const existing = await findMemberProfileImageByStoragePath(image.path);
+  if (existing) {
+    if (existing.member_id !== input.memberId) {
+      throw new Error("프로필 사진의 회원 연결을 확인하지 못했습니다.");
+    }
+    return { imageId: existing.id };
   }
-  const source = await downloadGraduateVerificationUpload(upload);
-  const image = await normalizeGraduateProfileImage({
-    contentType: upload.content_type,
-    source,
-  });
-  // The signed-upload original is only a short-lived intake object. Keep the
-  // normalized WebP below and discard the original as soon as decoding succeeds.
-  await discardGraduateVerificationUpload(upload);
-  const path = await storeGraduateProfileImage({
-    requestId: `replacement-${input.memberId}`,
-    buffer: image.buffer,
-  });
   let profileImageId: string | null = null;
   try {
     const { error: supersedeError } = await supabase
@@ -1122,9 +1166,9 @@ export async function submitMemberProfileImageReplacement(input: {
       .from("member_profile_images")
       .insert({
         member_id: input.memberId,
-        storage_path: path,
+        storage_path: image.path,
         sha256: image.sha256,
-        content_type: image.contentType,
+        content_type: "image/webp",
         width: image.width,
         height: image.height,
         source: "member_upload",
@@ -1143,7 +1187,7 @@ export async function submitMemberProfileImageReplacement(input: {
         .eq("id", profileImageId)
         .eq("status", "pending");
     }
-    await removeGraduateStoredObject("member-profile-images", path).catch(() => undefined);
+    // Keep the attached common image for a retry with the same upload ID.
     throw error;
   }
 }
@@ -1168,25 +1212,25 @@ export async function replaceMemberProfileImageByAdmin(input: {
   if (memberError || !member?.id) {
     throw new Error("회원 정보를 확인하지 못했습니다.");
   }
-  const upload = await getGraduateMemberProfileReplacementUpload({
+  const image = await resolveMemberProfileReplacement({
     uploadId: input.uploadId,
-    memberId: input.memberId,
+    actor: { kind: "admin", id: input.adminId },
+    destinationPath: `members/${input.memberId}/admin-uploads/${input.uploadId}.webp`,
+    resource: { type: "admin_member_profile_replacement", id: input.memberId },
   });
-  if (!upload) {
-    throw new Error("사진 업로드가 만료되었거나 확인할 수 없습니다. 다시 선택해 주세요.");
+  const existing = await findMemberProfileImageByStoragePath(image.path);
+  if (existing) {
+    if (existing.member_id !== input.memberId) {
+      throw new Error("프로필 사진의 회원 연결을 확인하지 못했습니다.");
+    }
+    if (existing.status === "pending") {
+      await approveMemberProfileImageReplacement({
+        imageId: existing.id,
+        adminId: input.adminId,
+      });
+    }
+    return { imageId: existing.id };
   }
-  const source = await downloadGraduateVerificationUpload(upload);
-  const image = await normalizeGraduateProfileImage({
-    contentType: upload.content_type,
-    source,
-  });
-  // The signed-upload original is only a short-lived intake object. Keep the
-  // normalized WebP below and discard the original as soon as decoding succeeds.
-  await discardGraduateVerificationUpload(upload);
-  const path = await storeGraduateProfileImage({
-    requestId: `admin-replacement-${input.memberId}`,
-    buffer: image.buffer,
-  });
   let profileImageId: string | null = null;
   try {
     const { error: supersedeError } = await supabase
@@ -1206,9 +1250,9 @@ export async function replaceMemberProfileImageByAdmin(input: {
       .from("member_profile_images")
       .insert({
         member_id: input.memberId,
-        storage_path: path,
+        storage_path: image.path,
         sha256: image.sha256,
-        content_type: image.contentType,
+        content_type: "image/webp",
         width: image.width,
         height: image.height,
         source: "manual_admin",
@@ -1233,7 +1277,7 @@ export async function replaceMemberProfileImageByAdmin(input: {
         .eq("id", profileImageId)
         .eq("status", "pending");
     }
-    await removeGraduateStoredObject("member-profile-images", path).catch(() => undefined);
+    // Keep the attached common image for a retry with the same upload ID.
     throw error;
   }
 }

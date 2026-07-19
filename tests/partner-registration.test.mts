@@ -128,22 +128,18 @@ test("partner registration template href normalizes selected options", async () 
   );
 });
 
-test("partner registration image validation allows raster files only", async () => {
+test("partner registration image validation accepts the common source formats and defers byte validation to staging", async () => {
   const { validatePartnerRegistrationImageFile } = await modulePromise;
 
   const webp = new File(["image"], "thumbnail.webp", { type: "image/webp" });
   const svg = new File(["<svg />"], "icon.svg", { type: "image/svg+xml" });
   const noExtension = new File(["image"], "thumbnail", { type: "image/png" });
+  const pdf = new File(["document"], "guide.pdf", { type: "application/pdf" });
 
   assert.equal(validatePartnerRegistrationImageFile(webp), null);
-  assert.equal(
-    validatePartnerRegistrationImageFile(svg),
-    "이미지는 JPG, PNG, WebP, AVIF 파일만 업로드할 수 있습니다.",
-  );
-  assert.equal(
-    validatePartnerRegistrationImageFile(noExtension),
-    "이미지는 JPG, PNG, WebP, AVIF 파일만 업로드할 수 있습니다.",
-  );
+  assert.equal(validatePartnerRegistrationImageFile(svg), null);
+  assert.equal(validatePartnerRegistrationImageFile(noExtension), null);
+  assert.match(validatePartnerRegistrationImageFile(pdf) ?? "", /지원하는 이미지/);
 });
 
 test("partner registration draft conversion preserves online site link and brand phone", async () => {

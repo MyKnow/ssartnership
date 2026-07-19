@@ -569,7 +569,7 @@ const mattermostTemplates: NotificationTemplateDefinition[] = [
     group: "Mattermost",
     channel: "mattermost",
     titleTemplate: "[싸트너십] {title}",
-    bodyTemplate: "인증 코드: `{code}`\n코드는 10분 동안 한 번만 사용할 수 있습니다.\n본인이 요청하지 않았다면 이 메시지를 무시해 주세요.",
+    bodyTemplate: "인증 코드: `{code}`\n코드는 5분 동안 한 번만 사용할 수 있습니다.\n본인이 요청하지 않았다면 이 메시지를 무시해 주세요.",
     variables: [title, code],
   }),
   defineTemplate({
@@ -579,7 +579,7 @@ const mattermostTemplates: NotificationTemplateDefinition[] = [
     group: "Mattermost",
     channel: "mattermost",
     titleTemplate: "[싸트너십] {title}",
-    bodyTemplate: "인증 코드: `{code}`\n코드는 10분 동안 한 번만 사용할 수 있습니다.\n본인이 요청하지 않았다면 이 메시지를 무시해 주세요.",
+    bodyTemplate: "인증 코드: `{code}`\n코드는 5분 동안 한 번만 사용할 수 있습니다.\n본인이 요청하지 않았다면 이 메시지를 무시해 주세요.",
     variables: [title, code],
   }),
   defineTemplate({

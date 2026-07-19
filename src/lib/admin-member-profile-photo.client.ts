@@ -7,8 +7,10 @@ import {
   getGraduateProfilePhotoSourceError,
   normalizeGraduateProfilePhotoSource,
 } from "@/lib/graduate-profile-photo.client";
+import { IMAGE_SOURCE_ACCEPT } from "@/lib/image-upload/policy";
 
-export const ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT = "image/*";
+/** @deprecated Profile upload surfaces now use IMAGE_SOURCE_ACCEPT directly. */
+export const ADMIN_MEMBER_PROFILE_PHOTO_ACCEPT = IMAGE_SOURCE_ACCEPT;
 
 type PhotoSource = Pick<File, "name" | "size" | "type">;
 
@@ -50,11 +52,7 @@ export function isAdminMemberProfilePhotoHeifSource(
  */
 export function getAdminMemberProfilePhotoSourceError(source: PhotoSource) {
   const contentType = getNormalizedContentType(source.type);
-  const extension = getFileExtension(source.name);
 
-  if (extension === "svg" || extension === "svgz" || contentType.includes("svg")) {
-    return "SVG 파일은 프로필 사진으로 사용할 수 없습니다.";
-  }
   if (
     !isGenericBinaryContentType(contentType)
     && !contentType.startsWith("image/")

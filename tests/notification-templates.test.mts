@@ -83,6 +83,32 @@ test("모든 현재 전송 채널의 템플릿과 반려 이메일 템플릿을 
   }
 });
 
+test("Mattermost 인증 코드 템플릿은 5분 만료 문구와 운영 보정 마이그레이션을 사용한다", async () => {
+  const { NOTIFICATION_TEMPLATE_CATALOG } = await catalogModulePromise;
+  const mattermostCodeTemplates = NOTIFICATION_TEMPLATE_CATALOG.filter((item) =>
+    item.eventKey === "mattermost.signup_code"
+      || item.eventKey === "mattermost.reset_password_code",
+  );
+
+  assert.equal(mattermostCodeTemplates.length, 2);
+  for (const template of mattermostCodeTemplates) {
+    assert.match(template.bodyTemplate, /5분/);
+    assert.doesNotMatch(template.bodyTemplate, /10분/);
+  }
+
+  const migration = await readFile(
+    new URL(
+      "../supabase/migrations/20260719020027_update_mattermost_code_template_ttl.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(migration, /mattermost\.signup_code/);
+  assert.match(migration, /mattermost\.reset_password_code/);
+  assert.match(migration, /10\[\[:space:\]\]\*분/);
+  assert.match(migration, /5분/);
+});
+
 test("의미 기반 자동·운영 템플릿은 실제 이벤트 변수를 계약한다", async () => {
   const { NOTIFICATION_TEMPLATE_CATALOG, getCampaignTemplateKey } = await catalogModulePromise;
   const { validateNotificationTemplate, renderNotificationTemplate } = await templateModulePromise;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useId } from "react";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -12,6 +13,11 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { cn } from "@/lib/cn";
 import { getCachedImageUrl } from "@/lib/image-cache";
+import {
+  IMAGE_SOURCE_ACCEPT,
+  resolveImageTransformPolicy,
+} from "@/lib/image-upload/policy";
+import { useImageUploadSubmission } from "@/components/media/ImageUploadSubmissionProvider";
 import {
   PARTNER_GALLERY_ASPECT_RATIO,
   PARTNER_THUMBNAIL_ASPECT_RATIO,
@@ -82,7 +88,7 @@ export default function MediaField({
   className,
   multiple = false,
   allowUrl = true,
-  accept = "image/*",
+  accept = IMAGE_SOURCE_ACCEPT,
   maxItems,
   validateFile,
 }: {
@@ -98,6 +104,9 @@ export default function MediaField({
   maxItems?: number;
   validateFile?: (file: File) => string | null;
 }) {
+  const imageUploadSubmission = useImageUploadSubmission();
+  const uploadPurpose = imageUploadSubmission?.purpose ?? "partner";
+  const fieldId = useId();
   const {
     items,
     error,
@@ -105,6 +114,10 @@ export default function MediaField({
     currentManifest,
     currentCrop,
     pendingCropCount,
+    pendingUploads,
+    markUploadsReady,
+    getDraftFiles,
+    restoreDraftFiles,
     handleAddUrl,
     handleAddUrls,
     ingestFiles,
@@ -120,7 +133,26 @@ export default function MediaField({
     multiple,
     maxItems,
     validateFile,
+    policy: resolveImageTransformPolicy(uploadPurpose, role),
+    directUpload: Boolean(imageUploadSubmission),
   });
+
+  useEffect(() => {
+    if (!imageUploadSubmission) return;
+    return imageUploadSubmission.registerField({
+      id: fieldId,
+      getPendingUploads: () => pendingUploads,
+      hasPendingCrop: () => pendingCropCount > 0,
+      markUploadsReady,
+      getDraftFiles,
+      draftRoles: [role],
+      restoreDraftFiles,
+    });
+  }, [fieldId, getDraftFiles, imageUploadSubmission, markUploadsReady, pendingCropCount, pendingUploads, restoreDraftFiles, role]);
+
+  useEffect(() => {
+    imageUploadSubmission?.notifyDraftChange();
+  }, [currentManifest, imageUploadSubmission]);
 
   const hasItems = items.length > 0;
   const canAddMore = !multiple || typeof maxItems !== "number" || items.length < maxItems;
@@ -138,7 +170,7 @@ export default function MediaField({
       <input
         ref={fileInputRef}
         type="file"
-        name={multiple ? "galleryFiles" : "thumbnailFile"}
+        name={imageUploadSubmission ? undefined : multiple ? "galleryFiles" : "thumbnailFile"}
         accept={accept}
         multiple={multiple}
         className="hidden"
@@ -331,14 +363,12 @@ export default function MediaField({
         <MediaCropModal
           key={currentCrop.id}
           open={Boolean(currentCrop)}
-          title={title}
-          subtitle={subtitle}
           aspectRatio={currentCrop.aspectRatio}
           sourceUrl={currentCrop.sourceUrl}
+          sourceFile={currentCrop.sourceFile}
           outputName={currentCrop.outputName}
-          queueCount={pendingCropCount}
-          accept={accept}
-          validateFile={validateFile}
+          purpose={uploadPurpose}
+          role={role}
           onCancel={dismissCurrentCrop}
           onApply={applyCurrentCrop}
         />

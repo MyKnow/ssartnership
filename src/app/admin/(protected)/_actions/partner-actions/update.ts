@@ -28,6 +28,10 @@ function getSafeAdminPartnerPath(value: FormDataEntryValue | null, fallback: str
   return fallback;
 }
 
+function getUpdatedPartnerRedirectPath(path: string) {
+  return `${path}${path.includes("?") ? "&" : "?"}success=updated`;
+}
+
 function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) {
     return null;
@@ -112,7 +116,11 @@ export async function updatePartnerAction(formData: FormData) {
     formData,
     redirectPath,
   );
-  const media = await resolvePartnerMediaPayload(formData, id);
+  const media = await resolvePartnerMediaPayload(
+    formData,
+    id,
+    collectPartnerMediaUrls(previousPartner),
+  );
   const hasCompanyPayload = Boolean(
     companyPayload.companyId ||
       companyPayload.name ||
@@ -337,5 +345,5 @@ export async function updatePartnerAction(formData: FormData) {
   }
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
-  redirect(redirectPath);
+  redirect(getUpdatedPartnerRedirectPath(redirectPath));
 }

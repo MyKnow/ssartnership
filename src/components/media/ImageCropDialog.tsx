@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Cropper, { type Area } from "react-easy-crop";
 import {
-  ArrowPathIcon,
-  ArrowUpTrayIcon,
   PhotoIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -13,6 +11,7 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
+import { type ImageTransformPolicy } from "@/lib/image-upload/policy";
 
 function createImage(sourceUrl: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -85,218 +84,68 @@ async function exportCroppedImage({
   return createWebpFile(blob, outputName);
 }
 
-async function createCroppedPreview({
-  sourceUrl,
-  crop,
-  aspectRatio,
-}: {
-  sourceUrl: string;
-  crop: Area;
-  aspectRatio: number;
-}) {
-  const image = await createImage(sourceUrl);
-  const width = 320;
-  const height = Math.max(1, Math.round(width / aspectRatio));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return null;
-  }
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(
-    image,
-    crop.x,
-    crop.y,
-    crop.width,
-    crop.height,
-    0,
-    0,
-    width,
-    height,
-  );
-  return canvas.toDataURL("image/webp", 0.72);
-}
-
-function getAspectLabel(aspectRatio: number) {
-  if (Math.abs(aspectRatio - 1) < 0.01) {
-    return "1:1";
-  }
-  if (Math.abs(aspectRatio - 4 / 3) < 0.01) {
-    return "4:3";
-  }
-  if (Math.abs(aspectRatio - 21 / 9) < 0.02) {
-    return "21:9";
-  }
-  return `${aspectRatio.toFixed(2)}:1`;
-}
-
 export default function ImageCropDialog({
   open,
-  title,
-  subtitle,
   aspectRatio,
   sourceUrl,
+  sourceFile,
   outputName,
   outputWidth,
   outputHeight,
   quality = 0.78,
-  queueCount = 1,
-  accept = "image/*",
-  validateFile,
-  prepareFile,
+  policy,
   onCancel,
   onApply,
 }: {
   open: boolean;
-  title: string;
-  subtitle: string;
   aspectRatio: number;
   sourceUrl: string;
+  sourceFile?: File;
   outputName: string;
   outputWidth: number;
   outputHeight: number;
   quality?: number;
-  queueCount?: number;
-  accept?: string;
-  validateFile?: (file: File) => string | null;
-  prepareFile?: (file: File) => Promise<File>;
+  policy?: ImageTransformPolicy;
   onCancel: () => void;
   onApply: (file: File) => void;
 }) {
   const { notify } = useToast();
   const portalRoot = typeof document === "undefined" ? null : document.body;
-  const replacementInputRef = useRef<HTMLInputElement | null>(null);
-  const replacementObjectUrlRef = useRef<string | null>(null);
-  const replacementRequestIdRef = useRef(0);
-  const [activeSourceUrl, setActiveSourceUrl] = useState(sourceUrl);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isReplacing, setIsReplacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requiresServerFallback, setRequiresServerFallback] = useState(false);
+  const effectiveOutputWidth = policy?.width ?? outputWidth;
+  const effectiveOutputHeight = policy?.height ?? outputHeight;
+  const effectiveAspectRatio = policy?.aspectRatio ?? aspectRatio;
+  const effectiveQuality = policy ? policy.quality / 100 : quality;
 
   useEffect(() => {
-    replacementRequestIdRef.current += 1;
     if (!open || !portalRoot) {
       return;
     }
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    if (replacementObjectUrlRef.current) {
-      URL.revokeObjectURL(replacementObjectUrlRef.current);
-      replacementObjectUrlRef.current = null;
-    }
-    setIsReplacing(false);
-    setActiveSourceUrl(sourceUrl);
     setCrop({ x: 0, y: 0 });
-    setZoom(1);
     setCroppedAreaPixels(null);
-    setPreviewUrl(null);
     setError(null);
+    setRequiresServerFallback(false);
     return () => {
-      replacementRequestIdRef.current += 1;
       document.body.style.overflow = previousOverflow;
-      if (replacementObjectUrlRef.current) {
-        URL.revokeObjectURL(replacementObjectUrlRef.current);
-        replacementObjectUrlRef.current = null;
-      }
     };
-  }, [open, portalRoot, sourceUrl]);
-
-  useEffect(() => {
-    if (!open || !activeSourceUrl || !croppedAreaPixels) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    let canceled = false;
-    const timer = window.setTimeout(() => {
-      createCroppedPreview({
-        sourceUrl: activeSourceUrl,
-        crop: croppedAreaPixels,
-        aspectRatio,
-      })
-        .then((nextPreviewUrl) => {
-          if (!canceled) {
-            setPreviewUrl(nextPreviewUrl);
-          }
-        })
-        .catch(() => {
-          if (!canceled) {
-            setPreviewUrl(null);
-          }
-        });
-    }, 80);
-
-    return () => {
-      canceled = true;
-      window.clearTimeout(timer);
-    };
-  }, [activeSourceUrl, aspectRatio, croppedAreaPixels, open]);
-
-  const resetAdjustments = () => {
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setCroppedAreaPixels(null);
-    setPreviewUrl(null);
-    setError(null);
-  };
-
-  const replaceSource = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    event.target.value = "";
-    if (!file) {
-      return;
-    }
-
-    const validationError = validateFile?.(file) ?? null;
-    if (validationError) {
-      setError(validationError);
-      notify(validationError);
-      return;
-    }
-
-    const requestId = replacementRequestIdRef.current + 1;
-    replacementRequestIdRef.current = requestId;
-    setIsReplacing(true);
-    setError(null);
-    try {
-      const sourceFile = prepareFile ? await prepareFile(file) : file;
-      if (replacementRequestIdRef.current !== requestId) {
-        return;
-      }
-
-      if (replacementObjectUrlRef.current) {
-        URL.revokeObjectURL(replacementObjectUrlRef.current);
-      }
-      const nextSourceUrl = URL.createObjectURL(sourceFile);
-      replacementObjectUrlRef.current = nextSourceUrl;
-      setActiveSourceUrl(nextSourceUrl);
-      resetAdjustments();
-    } catch (nextError) {
-      if (replacementRequestIdRef.current !== requestId) {
-        return;
-      }
-      const message =
-        nextError instanceof Error && nextError.message
-          ? nextError.message
-          : "이미지 변환에 실패했습니다.";
-      setError(message);
-      notify(message);
-    } finally {
-      if (replacementRequestIdRef.current === requestId) {
-        setIsReplacing(false);
-      }
-    }
-  };
+  }, [open, portalRoot, sourceFile, sourceUrl]);
 
   const exportFile = async () => {
+    if (requiresServerFallback && sourceFile) {
+      setIsExporting(true);
+      try {
+        onApply(sourceFile);
+      } finally {
+        setIsExporting(false);
+      }
+      return;
+    }
     if (!croppedAreaPixels) {
       const message = "이미지를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.";
       setError(message);
@@ -306,12 +155,12 @@ export default function ImageCropDialog({
     setIsExporting(true);
     try {
       const file = await exportCroppedImage({
-        sourceUrl: activeSourceUrl,
+        sourceUrl,
         crop: croppedAreaPixels,
         outputName,
-        outputWidth,
-        outputHeight,
-        quality,
+        outputWidth: effectiveOutputWidth,
+        outputHeight: effectiveOutputHeight,
+        quality: effectiveQuality,
       });
       onApply(file);
     } catch (nextError) {
@@ -330,155 +179,78 @@ export default function ImageCropDialog({
     return null;
   }
 
-  const aspectLabel = getAspectLabel(aspectRatio);
-  const zoomPercent = `${Math.round(zoom * 100)}%`;
-  const outputSizeLabel = `${outputWidth.toLocaleString("ko-KR")}x${outputHeight.toLocaleString("ko-KR")}`;
+  const outputSizeLabel = `${effectiveOutputWidth.toLocaleString("ko-KR")}x${effectiveOutputHeight.toLocaleString("ko-KR")}`;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-2 py-2 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6">
-      <div className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-6xl min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface-overlay shadow-overlay sm:max-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]">
-        <div className="flex min-w-0 shrink-0 items-start justify-between gap-3 border-b border-border/70 px-4 py-3 sm:px-5 sm:py-4">
-          <div className="min-w-0 pt-1">
-            <p className="truncate text-base font-semibold text-foreground">{title}</p>
-            <p className="line-clamp-1 text-sm leading-5 text-muted-foreground sm:line-clamp-2 sm:leading-6">
-              {subtitle}
-            </p>
-            {queueCount > 1 ? (
-              <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-primary">
-                여러 이미지를 순차 처리 중입니다. 남은 이미지 {queueCount}개
-              </p>
-            ) : null}
-          </div>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-black/70 px-2 py-2 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6">
+      <div className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface-overlay shadow-overlay sm:max-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]">
+        <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3 sm:px-5 sm:py-4">
+          <h2
+            data-testid="image-crop-dialog-title"
+            className="min-w-0 text-ko-title text-base font-semibold text-foreground"
+          >
+            이미지 편집
+          </h2>
           <Button variant="ghost" size="icon" onClick={onCancel} ariaLabel="닫기" title="닫기">
             <XMarkIcon className="h-5 w-5" />
           </Button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4">
-          <div className="grid min-h-0 gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-stretch">
+        <div
+          data-testid="image-crop-dialog-content"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-5 sm:py-4"
+        >
+          <div className="grid min-h-0 gap-3 sm:gap-4">
             <div
-              className="relative h-[15.5rem] w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-border bg-slate-950/95 sm:h-auto sm:min-h-[24rem] lg:min-h-[32rem]"
-              style={{ aspectRatio }}
+              data-testid="image-crop-frame"
+              className="relative h-[clamp(15.5rem,42dvh,21rem)] w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-border bg-slate-950/95 sm:h-[clamp(18rem,42dvh,26rem)] xl:h-[clamp(22rem,52dvh,32rem)]"
             >
-              <Cropper
-                image={activeSourceUrl}
-                crop={crop}
-                zoom={zoom}
-                aspect={aspectRatio}
-                minZoom={1}
-                maxZoom={4}
-                restrictPosition
-                showGrid
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={(_, croppedPixels) => setCroppedAreaPixels(croppedPixels)}
-                onMediaLoaded={() => setError(null)}
-                style={{
-                  cropAreaStyle: {
-                    border: "2px solid rgba(255,255,255,0.95)",
-                    boxShadow:
-                      "0 0 0 9999em rgba(2,6,23,0.58), 0 0 0 1px rgba(15,23,42,0.75)",
-                  },
-                }}
-                mediaProps={{
-                  onError: () => {
-                    setCroppedAreaPixels(null);
-                    setPreviewUrl(null);
-                    setError("이미지를 불러올 수 없습니다. 다른 파일을 선택해 주세요.");
-                  },
-                }}
-              />
-            </div>
-
-            <div className="grid min-h-0 content-start gap-2 rounded-[1.35rem] border border-border bg-surface-muted p-3 sm:gap-3 sm:p-4 lg:overflow-y-auto">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">조정</p>
-                <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted-foreground sm:line-clamp-2 sm:text-sm sm:leading-6">
-                  드래그로 위치를 맞추고 슬라이더로 확대합니다.
-                </p>
-              </div>
-
-              <div className="hidden min-w-0 gap-2 rounded-[1.1rem] border border-border bg-surface-inset p-2 sm:grid sm:p-3">
-                <div className="flex min-w-0 items-center justify-between gap-2">
-                  <p className="truncate text-xs font-semibold text-foreground">결과 미리보기</p>
-                  <span className="shrink-0 rounded-full border border-primary/15 bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">
-                    {aspectLabel}
-                  </span>
+              {requiresServerFallback && sourceFile ? (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center text-sm leading-6 text-slate-200">
+                  <PhotoIcon className="h-10 w-10 text-slate-400" />
+                  <p className="font-semibold">이 브라우저에서는 미리보기를 지원하지 않는 형식입니다.</p>
+                  <p className="max-w-md text-xs leading-5 text-slate-400">
+                    원본은 비공개 Staging으로 전송된 뒤 서버에서 {outputSizeLabel} WebP로 안전하게 변환됩니다. 이 경우 중앙 기준으로 맞춰집니다.
+                  </p>
                 </div>
-                <div
-                  className="relative h-24 min-w-0 overflow-hidden rounded-[0.9rem] border border-border bg-surface-muted sm:h-auto"
-                  style={{ aspectRatio }}
-                >
-                  {previewUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- preview is generated from canvas data URL
-                    <img src={previewUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full min-h-24 w-full flex-col items-center justify-center gap-2 px-3 text-center text-xs leading-5 text-muted-foreground">
-                      <PhotoIcon className="h-6 w-6" />
-                      <span className="line-clamp-2">미리보기를 준비하고 있습니다.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <label className="grid min-w-0 gap-1.5 text-sm font-medium text-foreground sm:gap-2">
-                <span className="flex min-w-0 items-center justify-between gap-3">
-                  <span className="truncate">확대</span>
-                  <span className="shrink-0 text-xs font-semibold text-primary">{zoomPercent}</span>
-                </span>
-                <input
-                  type="range"
-                  min={1}
-                  max={4}
-                  step={0.01}
-                  value={zoom}
-                  onChange={(event) => setZoom(Number(event.target.value))}
-                  className="h-2 w-full accent-primary"
+              ) : (
+                <Cropper
+                  image={sourceUrl}
+                  crop={crop}
+                  zoom={1}
+                  aspect={effectiveAspectRatio}
+                  restrictPosition
+                  showGrid
+                  zoomWithScroll={false}
+                  onCropChange={setCrop}
+                  onCropComplete={(_, croppedPixels) => setCroppedAreaPixels(croppedPixels)}
+                  onMediaLoaded={() => {
+                    setRequiresServerFallback(false);
+                    setError(null);
+                  }}
+                  style={{
+                    cropAreaStyle: {
+                      border: "2px solid rgba(255,255,255,0.95)",
+                      boxShadow:
+                        "0 0 0 9999em rgba(2,6,23,0.58), 0 0 0 1px rgba(15,23,42,0.75)",
+                    },
+                  }}
+                  mediaProps={{
+                    onError: () => {
+                      setCroppedAreaPixels(null);
+                      if (sourceFile) {
+                        setRequiresServerFallback(true);
+                        setError(null);
+                        return;
+                      }
+                      setError("이미지를 불러올 수 없습니다. 팝업을 닫고 다른 파일을 선택해 주세요.");
+                    },
+                  }}
                 />
-              </label>
-
-              <div className="grid min-w-0 grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={resetAdjustments}
-                  className="min-w-0"
-                >
-                  <ArrowPathIcon className="h-4 w-4" />
-                  초기화
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => replacementInputRef.current?.click()}
-                  loading={isReplacing}
-                  loadingText="변환 중"
-                  className="min-w-0"
-                >
-                  <ArrowUpTrayIcon className="h-4 w-4" />
-                  이미지 변경
-                </Button>
-              </div>
-
-              <input
-                ref={replacementInputRef}
-                type="file"
-                accept={accept}
-                className="hidden"
-                onChange={replaceSource}
-              />
-
-              <div className="hidden min-w-0 gap-1 rounded-[1rem] border border-border bg-surface-inset px-3 py-2.5 sm:grid">
-                <p className="truncate text-xs font-semibold text-foreground">저장 형식</p>
-                <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-                  {outputSizeLabel} WebP로 저장됩니다.
-                </p>
-              </div>
-
-              {error ? <FormMessage variant="error">{error}</FormMessage> : null}
+              )}
             </div>
+
+            {error ? <FormMessage variant="error">{error}</FormMessage> : null}
           </div>
         </div>
 
@@ -490,11 +262,11 @@ export default function ImageCropDialog({
             <Button
               onClick={exportFile}
               loading={isExporting}
-              loadingText="적용 중"
-              disabled={isReplacing}
+              loadingText={requiresServerFallback ? "서버 변환 준비 중" : "적용 중"}
+              disabled={requiresServerFallback && !sourceFile}
               className={cn("min-w-0 sm:w-auto", isExporting ? "pointer-events-none" : null)}
             >
-              적용
+              {requiresServerFallback ? "서버 변환으로 계속" : "적용"}
             </Button>
           </div>
         </div>

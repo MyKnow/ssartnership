@@ -53,6 +53,7 @@ const sensitiveTables = [
   "member_profile_images",
   "graduate_email_challenges",
   "graduate_verification_uploads",
+  "image_upload_sessions",
   "member_password_action_tokens",
   "member_email_challenges",
   "manual_member_import_batches",
@@ -91,14 +92,25 @@ test("sensitive public tables revoke broad anon and authenticated access", () =>
   }
 });
 
-test("수료증·본인 사진·수동 가져오기 staging bucket은 공개 Storage로 만들지 않는다", () => {
-  for (const bucket of ["graduate-certificates", "member-profile-images", "manual-member-import-staging"]) {
+test("수료증·본인 사진·수동 가져오기·공통 이미지 staging bucket은 공개 Storage로 만들지 않는다", () => {
+  for (const bucket of ["graduate-certificates", "member-profile-images", "manual-member-import-staging", "image-upload-staging"]) {
     const pattern = new RegExp(
       `\\(\\s*'${escapeRegex(bucket)}',\\s*'${escapeRegex(bucket)}',\\s*false(?:,|\\))`,
       "i",
     );
     assert.match(schemaSql, pattern, `${bucket} must remain private`);
   }
+});
+
+test("공통 이미지 업로드는 처리와 최종 연결을 분리한 상태 전이를 강제한다", () => {
+  assert.match(
+    schemaSql,
+    /image_upload_sessions_status_check[\s\S]*status in \('signed', 'processing', 'ready', 'attaching', 'attached', 'expired', 'failed'\)/i,
+  );
+  assert.match(
+    schemaSql,
+    /image_upload_sessions_expiry_idx[\s\S]*where status in \('signed', 'processing', 'ready', 'attaching'\)/i,
+  );
 });
 
 test("수동 가져오기 staging과 설정 토큰은 서버 전용 제약을 둔다", () => {

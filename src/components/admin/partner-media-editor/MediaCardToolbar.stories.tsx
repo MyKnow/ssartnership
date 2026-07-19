@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
+import { IMAGE_SOURCE_ACCEPT } from "@/lib/image-upload/policy";
 import MediaCardToolbar from "./MediaCardToolbar";
 
 const meta = {
@@ -8,7 +9,7 @@ const meta = {
   args: {
     multiple: false,
     allowUrl: true,
-    accept: "image/*",
+    accept: IMAGE_SOURCE_ACCEPT,
     onAddUrl: fn(() => true),
     onAddUrls: fn(() => true),
     onAddFiles: fn(() => true),
@@ -40,9 +41,11 @@ export const FileOnly: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("JPG, PNG, WebP, AVIF 파일을 선택하면 구도를 조정한 뒤 저장됩니다.")).toBeInTheDocument();
+    await expect(canvas.getByText(/HEIC\/HEIF.*SVG/)).toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: "이미지 추가" })).toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "추가" })).not.toBeInTheDocument();
+    const input = canvasElement.querySelector<HTMLInputElement>('input[type="file"]');
+    await expect(input).toHaveAttribute("accept", IMAGE_SOURCE_ACCEPT);
   },
 };
 

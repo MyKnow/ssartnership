@@ -1,5 +1,6 @@
 "use client";
 
+import { type FormEvent, useRef, useState } from "react";
 import {
   ClipboardDocumentListIcon,
   PhotoIcon,
@@ -32,6 +33,11 @@ import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
+import ImageUploadSubmissionProvider, {
+  type ImageUploadSubmissionController,
+} from "@/components/media/ImageUploadSubmissionProvider";
+import { useImageUploadFormDraft } from "@/components/media/useImageUploadFormDraft";
+import { useImageUploadSubmissionId } from "@/components/media/useImageUploadSubmissionId";
 import {
   COUPON_ONLY_BENEFIT_TEXT,
   COUPON_ONLY_CONDITION_TEXT,
@@ -115,6 +121,59 @@ export default function PartnerRegistrationClient({
     initialValues,
     brandProfiles,
   });
+  const imageUploadControllerRef = useRef<ImageUploadSubmissionController | null>(null);
+  const allowUploadedFormSubmitRef = useRef(false);
+  const isSubmittingImagesRef = useRef(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const draftKey = hiddenFields?.companyId
+    ? `partner-registration-company-${hiddenFields.companyId}`
+    : "partner-registration-public";
+  const submissionId = useImageUploadSubmissionId(draftKey);
+  const { saveDraft } = useImageUploadFormDraft({
+    formKey: draftKey,
+    formRef,
+    imageUploadControllerRef,
+    clearOnSuccess: webState.status === "success",
+  });
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    if (allowUploadedFormSubmitRef.current) {
+      allowUploadedFormSubmitRef.current = false;
+      return;
+    }
+    if (!handleWebSubmit(event)) {
+      return;
+    }
+
+    const imageUploadController = imageUploadControllerRef.current;
+    if (!imageUploadController?.hasPendingUploads()) {
+      void saveDraft();
+      return;
+    }
+
+    event.preventDefault();
+    if (isSubmittingImagesRef.current) {
+      return;
+    }
+    const form = event.currentTarget;
+    isSubmittingImagesRef.current = true;
+    setImageUploadError(null);
+    try {
+      await saveDraft();
+      await imageUploadController.uploadPending();
+      await saveDraft();
+      allowUploadedFormSubmitRef.current = true;
+      form.requestSubmit();
+    } catch (error) {
+      setImageUploadError(
+        error instanceof Error && error.message
+          ? error.message
+          : "이미지를 업로드하지 못했습니다. 입력한 내용은 유지되므로 다시 시도해 주세요.",
+      );
+    } finally {
+      isSubmittingImagesRef.current = false;
+    }
+  };
 
   const typeSelector = (
     <PartnerRegistrationTypeSelector
@@ -126,7 +185,12 @@ export default function PartnerRegistrationClient({
   );
 
   return (
-    <div className="grid min-w-0 gap-5">
+    <ImageUploadSubmissionProvider
+      purpose="partner-registration"
+      draftKey={draftKey}
+      controllerRef={imageUploadControllerRef}
+    >
+      <div className="grid min-w-0 gap-5">
         <Card tone="default" padding="md">
           <div className="grid min-w-0 gap-5">
             <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -151,20 +215,27 @@ export default function PartnerRegistrationClient({
                 {webState.message}
               </FormMessage>
             ) : null}
+            {imageUploadError ? <FormMessage variant="error">{imageUploadError}</FormMessage> : null}
 
             <form
               ref={formRef}
               action={webFormAction}
               noValidate
               className="grid min-w-0 gap-6"
-              onSubmit={handleWebSubmit}
-              onChange={clearClientFieldErrors}
+              onSubmit={handleSubmit}
+              onChange={() => {
+                clearClientFieldErrors();
+                setImageUploadError(null);
+              }}
             >
               <PartnerRegistrationStepProgress
                 activeStep={activeStep}
                 onStepClick={goToStep}
               />
               <input type="hidden" name="registrationMode" value={registrationMode} />
+              {submissionId ? (
+                <input type="hidden" name="idempotencyKey" value={submissionId} />
+              ) : null}
               <input type="hidden" name="serviceMode" value={serviceMode} />
               <input
                 type="hidden"
@@ -665,6 +736,7 @@ export default function PartnerRegistrationClient({
             onBenefitActionTypeChange={handleBenefitActionTypeChange}
           />
         ) : null}
-    </div>
+      </div>
+    </ImageUploadSubmissionProvider>
   );
 }

@@ -46,7 +46,7 @@ export const SelectedPhoto: Story = {
     const body = within(document.body);
     const input = body.getByLabelText("새 프로필 사진 파일 선택");
     await userEvent.upload(input, createSamplePhoto());
-    await expect(await body.findByText("프로필 사진 자르기")).toBeInTheDocument();
+    await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
 
     const applyButton = body.getByRole("button", { name: "적용" });
     await waitFor(() => expect(applyButton).toBeEnabled());
