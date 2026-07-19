@@ -3,6 +3,15 @@ import { requireAdminPermission } from "@/lib/admin-access";
 import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
+import {
+  clearNewPartnerNotificationSent,
+  sendAndRecordCampusScopedNewPartnerNotification,
+} from "@/lib/new-partner-notifications";
+import {
+  getPartnerVisibilityState,
+  normalizePartnerVisibility,
+  shouldNotifyPartnerBecamePublic,
+} from "@/lib/partner-visibility";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   cleanupPartnerCompanyProvision,
@@ -69,6 +78,21 @@ export async function updatePartnerAction(formData: FormData) {
   if (!previousPartner) {
     throw new Error("수정할 제휴처를 찾을 수 없습니다.");
   }
+  const previousVisibility = normalizePartnerVisibility(previousPartner.visibility);
+  const previousVisibilityState = getPartnerVisibilityState(
+    previousVisibility,
+    previousPartner.period_start,
+    previousPartner.period_end,
+  );
+  const nextVisibilityState = getPartnerVisibilityState(
+    payload.visibility,
+    payload.periodStart,
+    payload.periodEnd,
+  );
+  const shouldNotifyPublicTransition = shouldNotifyPartnerBecamePublic(
+    previousVisibilityState,
+    nextVisibilityState,
+  );
   const previousManagedCampusSlugs =
     (previousPartner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs ??
     [];
@@ -204,6 +228,33 @@ export async function updatePartnerAction(formData: FormData) {
           .maybeSingle()).data?.label ?? payload.categoryId;
   const previousCompanyLabel = previousCompany?.name ?? "없음";
   const nextCompanyLabel = nextCompany?.name ?? "없음";
+
+  if (nextVisibilityState !== "public" || shouldNotifyPublicTransition) {
+    try {
+      await clearNewPartnerNotificationSent(id);
+    } catch (error) {
+      console.error("[partner-update] publication notification state reset failed", error);
+    }
+  }
+
+  if (shouldNotifyPublicTransition) {
+    try {
+      await sendAndRecordCampusScopedNewPartnerNotification({
+        partnerId: id,
+        name: payload.name,
+        location: payload.location,
+        categoryLabel: nextCategoryLabel,
+        campusSlugs: payload.campusSlugs,
+        benefitSummary: payload.benefits.join("\n"),
+        conditions: payload.conditions.join("\n"),
+        periodStart: payload.periodStart,
+        periodEnd: payload.periodEnd,
+        mapUrl: payload.mapUrl,
+      });
+    } catch (error) {
+      console.error("[partner-update] public transition notification failed", error);
+    }
+  }
   const partnerAudit = buildAuditChangeSummary("제휴처", [
     {
       label: "회사 연결",

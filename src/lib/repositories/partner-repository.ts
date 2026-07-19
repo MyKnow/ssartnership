@@ -4,6 +4,7 @@ import type { PartnerAudienceKey } from "@/lib/partner-audience";
 export type PartnerViewContext = {
   authenticated: boolean;
   viewerAudience?: PartnerAudienceKey | null;
+  previewToken?: string | null;
 };
 
 export interface PartnerRepository {

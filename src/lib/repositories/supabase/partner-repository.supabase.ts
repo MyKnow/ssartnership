@@ -20,6 +20,10 @@ import {
   normalizePartnerBenefitVisibility,
 } from "@/lib/partner-benefit-visibility";
 import { isUuid } from "@/lib/uuid";
+import {
+  hashPartnerPreviewToken,
+  isValidPartnerPreviewToken,
+} from "@/lib/partner-preview";
 
 type PartnerRow = {
   id: string;
@@ -270,6 +274,25 @@ async function getPartnerRow(id: string) {
   return getCachedPartnerRowById(id, versionKey);
 }
 
+async function hasValidPreviewToken(id: string, token: string) {
+  if (!isUuid(id) || !isValidPartnerPreviewToken(token)) {
+    return false;
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("partner_preview_tokens")
+    .select("partner_id")
+    .eq("partner_id", id)
+    .eq("token_hash", hashPartnerPreviewToken(token))
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return Boolean(data);
+}
+
 export class SupabasePartnerRepository implements PartnerRepository {
   async getCategories(): Promise<Category[]> {
     const versionKey = await getPublicCacheVersionKey(["categories"]);
@@ -294,33 +317,40 @@ export class SupabasePartnerRepository implements PartnerRepository {
     id: string,
     context: PartnerViewContext = { authenticated: false },
   ): Promise<Partner | null> {
+    const previewToken = context.previewToken?.trim() || null;
+    if (previewToken && !(await hasValidPreviewToken(id, previewToken))) {
+      return null;
+    }
+
     const row = await getPartnerRow(id);
     if (!row) {
       return null;
     }
 
     const visibility = normalizePartnerVisibility(row.visibility);
-    if (visibility === "private") {
-      return null;
-    }
-    if (visibility === "confidential" && !context.authenticated) {
-      return null;
+    if (!previewToken) {
+      if (visibility === "private") {
+        return null;
+      }
+      if (visibility === "confidential" && !context.authenticated) {
+        return null;
+      }
+
+      if (
+        !canViewPartnerDetails(
+          visibility,
+          context.authenticated,
+          {
+            start: row.period_start,
+            end: row.period_end,
+          },
+        )
+      ) {
+        return null;
+      }
     }
 
     const categoryKey = extractCategoryKey(row.categories) ?? "health";
-    if (
-      !canViewPartnerDetails(
-        visibility,
-        context.authenticated,
-        {
-          start: row.period_start,
-          end: row.period_end,
-        },
-      )
-    ) {
-      return null;
-    }
-
     return maskPartnerBenefitsForAccess(toVisiblePartner(row, categoryKey), context);
   }
 

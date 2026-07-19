@@ -64,10 +64,33 @@ describe("new partner campus-scoped notifications", () => {
       "utf8",
     );
 
-    assert.match(createSource, /sendCampusScopedNewPartnerNotification/);
+    assert.match(createSource, /sendAndRecordCampusScopedNewPartnerNotification/);
+    assert.match(createSource, /getPartnerVisibilityState/);
     assert.doesNotMatch(createSource, /audience:\s*\{\s*scope:\s*"all"\s*\}/);
-    assert.match(registrationSource, /sendCampusScopedNewPartnerNotification/);
+    assert.match(registrationSource, /sendAndRecordCampusScopedNewPartnerNotification/);
+    assert.match(registrationSource, /getPartnerVisibilityState/);
     assert.match(registrationSource, /status\s*===\s*"converted"/);
     assert.match(registrationSource, /previousStatus\s*!==\s*"converted"/);
+  });
+
+  it("handles public transition notifications in updates and the daily publication sweep", () => {
+    const updateSource = readFileSync(
+      "src/app/admin/(protected)/_actions/partner-actions/update.ts",
+      "utf8",
+    );
+    const reviewSource = readFileSync(
+      "src/lib/partner-change-requests/commands/review.ts",
+      "utf8",
+    );
+    const cronSource = readFileSync(
+      "src/app/api/cron/push-expiring-partners/route.ts",
+      "utf8",
+    );
+
+    assert.match(updateSource, /shouldNotifyPartnerBecamePublic/);
+    assert.match(updateSource, /sendAndRecordCampusScopedNewPartnerNotification/);
+    assert.match(reviewSource, /shouldNotifyPartnerBecamePublic/);
+    assert.match(reviewSource, /sendAndRecordCampusScopedNewPartnerNotification/);
+    assert.match(cronSource, /runPendingPartnerPublicationNotifications/);
   });
 });

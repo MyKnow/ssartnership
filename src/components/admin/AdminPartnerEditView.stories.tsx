@@ -68,3 +68,15 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Create: Story = {
+  args: {
+    mode: "create",
+    partner: {
+      ...meta.args.partner,
+      id: undefined,
+      company: null,
+    },
+    submitLabel: "제휴처 추가",
+  },
+};

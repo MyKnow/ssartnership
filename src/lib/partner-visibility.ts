@@ -1,5 +1,9 @@
 import type { PartnerVisibility } from "@/lib/types";
-import { isWithinPeriod } from "@/lib/partner-utils";
+import {
+  getKstDateString,
+  getPartnerPeriodState,
+  isWithinPeriod,
+} from "@/lib/partner-utils";
 
 export const PARTNER_VISIBILITY_VALUES = [
   "public",
@@ -7,7 +11,7 @@ export const PARTNER_VISIBILITY_VALUES = [
   "private",
 ] as const;
 
-export type PartnerVisibilityState = PartnerVisibility | "expired";
+export type PartnerVisibilityState = PartnerVisibility | "upcoming" | "expired";
 type PartnerPeriod = {
   start?: string | null;
   end?: string | null;
@@ -28,8 +32,17 @@ export function getPartnerVisibilityState(
   visibility: PartnerVisibility,
   periodStart?: string | null,
   periodEnd?: string | null,
+  today = getKstDateString(),
 ): PartnerVisibilityState {
-  if (visibility !== "private" && !isWithinPeriod(periodStart, periodEnd)) {
+  if (visibility === "private") {
+    return "private";
+  }
+
+  const periodState = getPartnerPeriodState(periodStart, periodEnd, today);
+  if (periodState === "upcoming") {
+    return "upcoming";
+  }
+  if (periodState === "expired") {
     return "expired";
   }
 
@@ -44,6 +57,8 @@ export function getPartnerVisibilityLabel(visibility: PartnerVisibilityState) {
       return "대외비";
     case "private":
       return "비공개";
+    case "upcoming":
+      return "시작 전";
     case "expired":
       return "기간 만료";
   }
@@ -59,9 +74,18 @@ export function getPartnerVisibilityBadgeClass(
       return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
     case "private":
       return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+    case "upcoming":
+      return "bg-sky-500/15 text-sky-700 dark:text-sky-300";
     case "expired":
       return "bg-rose-500/15 text-rose-700 dark:text-rose-300";
   }
+}
+
+export function shouldNotifyPartnerBecamePublic(
+  previousState: PartnerVisibilityState,
+  nextState: PartnerVisibilityState,
+) {
+  return nextState === "public" && previousState !== "public";
 }
 
 export function canViewPartnerDetails(

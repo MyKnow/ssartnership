@@ -31,6 +31,8 @@ export default function PartnerBasicInfoSection({
   fieldErrors,
   focusField,
   onCampusSlugSelectionChange,
+  draftRestoreVersion = 0,
+  restoredCampusSlugs,
   values,
   setters,
 }: {
@@ -39,6 +41,8 @@ export default function PartnerBasicInfoSection({
   fieldErrors?: Partial<Record<PartnerCardFormField, string>>;
   focusField?: PartnerCardFormField;
   onCampusSlugSelectionChange?: (value: CampusSlug[]) => void;
+  draftRestoreVersion?: number;
+  restoredCampusSlugs?: CampusSlug[];
   values: {
     nameValue: string;
     visibilityValue: PartnerVisibility;
@@ -220,7 +224,9 @@ export default function PartnerBasicInfoSection({
         )}
 
         <PartnerCampusSlugField
+          key={`campus-slugs-${draftRestoreVersion}`}
           defaultValue={partner.campusSlugs}
+          initialSelectedSlugs={restoredCampusSlugs}
           location={values.locationValue}
           error={fieldErrors?.campusSlugs}
           onSelectionChange={onCampusSlugSelectionChange}

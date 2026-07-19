@@ -11,7 +11,7 @@ export function parseDate(value?: string | null) {
   return new Date(`${value}T00:00:00`);
 }
 
-function getKstDateString() {
+export function getKstDateString() {
   const now = new Date();
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   const year = kst.getUTCFullYear();
@@ -20,25 +20,30 @@ function getKstDateString() {
   return `${year}-${month}-${day}`;
 }
 
-export function isWithinPeriod(
+export type PartnerPeriodState = "upcoming" | "active" | "expired";
+
+export function getPartnerPeriodState(
   start?: string | null,
   end?: string | null,
-): boolean {
-  if (!start && !end) {
-    return true;
-  }
-
-  const today = getKstDateString();
+  today = getKstDateString(),
+): PartnerPeriodState {
   const startValue = start && /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : null;
   const endValue = end && /^\d{4}-\d{2}-\d{2}$/.test(end) ? end : null;
 
   if (startValue && today < startValue) {
-    return false;
+    return "upcoming";
   }
   if (endValue && today > endValue) {
-    return false;
+    return "expired";
   }
-  return true;
+  return "active";
+}
+
+export function isWithinPeriod(
+  start?: string | null,
+  end?: string | null,
+): boolean {
+  return getPartnerPeriodState(start, end) === "active";
 }
 
 export function compareEndDate(

@@ -9,6 +9,7 @@ import {
 } from "@/lib/push/ops";
 import { getExpiringPartnershipOffsets } from "@/lib/partner-notification-routing";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { runPendingPartnerPublicationNotifications } from "@/lib/new-partner-notifications";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,7 @@ export async function GET(request: NextRequest) {
       ),
     ),
   );
+  const publicationResult = await runPendingPartnerPublicationNotifications(today);
 
   memberPushResult.failures.forEach((failure) => {
     console.error("[push-expiring-partners] partner push failed", failure);
@@ -91,11 +93,18 @@ export async function GET(request: NextRequest) {
       console.error("[push-expiring-partners] operational notification failed", failure);
     });
   });
+  publicationResult.failures.forEach((failure) => {
+    console.error(
+      "[push-expiring-partners] public transition notification failed",
+      failure,
+    );
+  });
 
   return NextResponse.json({
     ok:
       memberPushResult.ok &&
-      operationalResults.every((result) => result.ok),
+      operationalResults.every((result) => result.ok) &&
+      publicationResult.failures.length === 0,
     today,
     targetDates,
     memberPush: memberPushResult,
@@ -104,5 +113,6 @@ export async function GET(request: NextRequest) {
       targetDate: targetDateByOffset.get(offset),
       ...operationalResults[index],
     })),
+    publication: publicationResult,
   });
 }

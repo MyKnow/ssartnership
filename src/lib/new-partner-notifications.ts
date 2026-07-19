@@ -12,6 +12,10 @@ import {
 } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { NotificationTemplateContext } from "@/lib/notification-templates/context";
+import {
+  getPartnerVisibilityState,
+} from "@/lib/partner-visibility";
+import { getKstDateString } from "@/lib/partner-utils";
 
 export type NewPartnerAudienceMember = {
   id: string;
@@ -37,6 +41,35 @@ export type CampusScopedNewPartnerNotificationResult =
       audience: null;
       notificationId: null;
     };
+
+type PartnerPublicationNotificationRow = {
+  id: string;
+  name: string;
+  location: string;
+  campus_slugs?: string[] | null;
+  benefits?: string[] | null;
+  conditions?: string[] | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  map_url?: string | null;
+  visibility?: string | null;
+  categories?:
+    | { label?: string | null }
+    | Array<{ label?: string | null }>
+    | null;
+};
+
+type PartnerPublicationNotificationStateRow = {
+  partner_id: string;
+  new_partner_notification_sent_at: string | null;
+};
+
+export type PendingPartnerPublicationNotificationResult = {
+  processed: number;
+  sent: number;
+  skipped: number;
+  failures: Array<{ partnerId: string; message: string }>;
+};
 
 function getCampusDisplayValues(slugs: CampusSlug[]) {
   return Array.from(
@@ -200,4 +233,151 @@ export async function sendCampusScopedNewPartnerNotification(params: {
     audience,
     notificationId: result.notificationId,
   };
+}
+
+export async function recordNewPartnerNotificationSent(partnerId: string) {
+  const now = new Date().toISOString();
+  const { error } = await getSupabaseAdminClient()
+    .from("partner_publication_notification_states")
+    .upsert(
+      {
+        partner_id: partnerId,
+        new_partner_notification_sent_at: now,
+        updated_at: now,
+      },
+      { onConflict: "partner_id" },
+    );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function clearNewPartnerNotificationSent(partnerId: string) {
+  const now = new Date().toISOString();
+  const { error } = await getSupabaseAdminClient()
+    .from("partner_publication_notification_states")
+    .upsert(
+      {
+        partner_id: partnerId,
+        new_partner_notification_sent_at: null,
+        updated_at: now,
+      },
+      { onConflict: "partner_id" },
+    );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function sendAndRecordCampusScopedNewPartnerNotification(
+  params: Parameters<typeof sendCampusScopedNewPartnerNotification>[0],
+) {
+  const result = await sendCampusScopedNewPartnerNotification(params);
+  if (result.sent) {
+    await recordNewPartnerNotificationSent(params.partnerId);
+  }
+  return result;
+}
+
+function getCategoryLabel(
+  relation: PartnerPublicationNotificationRow["categories"],
+) {
+  if (Array.isArray(relation)) {
+    return relation[0]?.label ?? null;
+  }
+  return relation?.label ?? null;
+}
+
+function isPublicState(
+  partner: PartnerPublicationNotificationRow,
+  today: string,
+): partner is PartnerPublicationNotificationRow & { visibility: "public" } {
+  return (
+    getPartnerVisibilityState(
+      "public",
+      partner.period_start,
+      partner.period_end,
+      today,
+    ) === "public"
+  );
+}
+
+export async function runPendingPartnerPublicationNotifications(
+  today?: string,
+): Promise<PendingPartnerPublicationNotificationResult> {
+  const resolvedToday = today ?? getKstDateString();
+  const supabase = getSupabaseAdminClient();
+  const { data: partnerRows, error: partnerError } = await supabase
+    .from("partners")
+    .select(
+      "id,name,location,campus_slugs,benefits,conditions,period_start,period_end,map_url,visibility,categories(label)",
+    )
+    .eq("visibility", "public");
+
+  if (partnerError) {
+    throw new Error(partnerError.message);
+  }
+
+  const partners = (partnerRows ?? []) as PartnerPublicationNotificationRow[];
+  if (partners.length === 0) {
+    return { processed: 0, sent: 0, skipped: 0, failures: [] };
+  }
+
+  const { data: stateRows, error: stateError } = await supabase
+    .from("partner_publication_notification_states")
+    .select("partner_id,new_partner_notification_sent_at")
+    .in("partner_id", partners.map((partner) => partner.id));
+
+  if (stateError) {
+    throw new Error(stateError.message);
+  }
+
+  const sentAtByPartnerId = new Map(
+    ((stateRows ?? []) as PartnerPublicationNotificationStateRow[]).map((row) => [
+      row.partner_id,
+      row.new_partner_notification_sent_at,
+    ]),
+  );
+  const pendingPartners = partners.filter(
+    (partner) =>
+      !sentAtByPartnerId.get(partner.id) && isPublicState(partner, resolvedToday),
+  );
+  const result: PendingPartnerPublicationNotificationResult = {
+    processed: pendingPartners.length,
+    sent: 0,
+    skipped: 0,
+    failures: [],
+  };
+
+  for (const partner of pendingPartners) {
+    try {
+      const notificationResult =
+        await sendAndRecordCampusScopedNewPartnerNotification({
+          partnerId: partner.id,
+          name: partner.name,
+          location: partner.location,
+          categoryLabel: getCategoryLabel(partner.categories),
+          campusSlugs: partner.campus_slugs ?? [],
+          benefitSummary: (partner.benefits ?? []).join("\n"),
+          conditions: (partner.conditions ?? []).join("\n"),
+          periodStart: partner.period_start,
+          periodEnd: partner.period_end,
+          mapUrl: partner.map_url,
+        });
+      if (notificationResult.sent) {
+        result.sent += 1;
+      } else {
+        result.skipped += 1;
+      }
+    } catch (error) {
+      result.failures.push({
+        partnerId: partner.id,
+        message: error instanceof Error ? error.message : "알 수 없는 오류",
+      });
+    }
+  }
+
+  return result;
 }
