@@ -25,6 +25,7 @@ function getInitialCampusSlugs(
 
 export default function PartnerCampusSlugField({
   defaultValue,
+  initialSelectedSlugs,
   location,
   error,
   name = "campusSlugs",
@@ -33,6 +34,7 @@ export default function PartnerCampusSlugField({
   onSelectionChange,
 }: {
   defaultValue?: CampusSlug[] | null;
+  initialSelectedSlugs?: CampusSlug[];
   location?: string | null;
   error?: string;
   name?: string;
@@ -41,8 +43,8 @@ export default function PartnerCampusSlugField({
   onSelectionChange?: (value: CampusSlug[]) => void;
 }) {
   const initialValue = useMemo(
-    () => getInitialCampusSlugs(defaultValue, location),
-    [defaultValue, location],
+    () => initialSelectedSlugs ?? getInitialCampusSlugs(defaultValue, location),
+    [defaultValue, initialSelectedSlugs, location],
   );
   const [selectedSlugs, setSelectedSlugs] = useState<CampusSlug[]>(initialValue);
   const allSelected = selectedSlugs.length === CAMPUS_SLUGS.length;

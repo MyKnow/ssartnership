@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import { inferCampusSlugsFromLocation, normalizeCampusSlugs } from "@/lib/campuses";
-import { sendCampusScopedNewPartnerNotification } from "@/lib/new-partner-notifications";
+import {
+  sendAndRecordCampusScopedNewPartnerNotification,
+} from "@/lib/new-partner-notifications";
 import {
   isPartnerRegistrationRequestStatus,
   type PartnerRegistrationRequestStatus,
@@ -16,6 +18,7 @@ import {
 } from "@/lib/partner-branch-registration";
 import { ensurePartnerCompanyRow } from "@/app/admin/(protected)/_actions/partner-support/company-provision";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { getPartnerVisibilityState } from "@/lib/partner-visibility";
 import {
   logAdminAction,
   revalidateAdminAndPublicPaths,
@@ -483,8 +486,14 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
           },
         });
 
-        if (partner.visibility !== "private") {
-          await sendCampusScopedNewPartnerNotification({
+        if (
+          getPartnerVisibilityState(
+            partner.visibility === "public" ? "public" : "private",
+            partner.period_start,
+            partner.period_end,
+          ) === "public"
+        ) {
+          await sendAndRecordCampusScopedNewPartnerNotification({
             partnerId: partner.id,
             name: partner.name,
             location: partner.location,

@@ -49,6 +49,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'partner_create',
   'partner_update',
   'partner_delete',
+  'partner_preview_link_create',
+  'partner_preview_link_remove',
   'partner_change_request_approve',
   'partner_change_request_reject',
   'member_update',

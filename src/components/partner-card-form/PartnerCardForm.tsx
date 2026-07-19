@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import type { PartnerVisibility } from "@/lib/types";
 import usePartnerCardFormState from "@/components/partner-card-form/usePartnerCardFormState";
 import PartnerFormHero from "@/components/partner-card-form/PartnerFormHero";
@@ -16,7 +16,10 @@ import PartnerBranchListEditor, {
   type BranchEditorRow,
 } from "@/components/partner-branches/PartnerBranchListEditor";
 import { cn } from "@/lib/cn";
-import { validateFormCampusSlugSelection } from "@/lib/campuses";
+import {
+  normalizeCampusSlugs,
+  validateFormCampusSlugSelection,
+} from "@/lib/campuses";
 import { isPartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
@@ -27,12 +30,22 @@ import ImageUploadSubmissionProvider, {
 } from "@/components/media/ImageUploadSubmissionProvider";
 import { useImageUploadFormDraft } from "@/components/media/useImageUploadFormDraft";
 import { useImageUploadSubmissionId } from "@/components/media/useImageUploadSubmissionId";
+import type { ImageUploadDraftValue } from "@/lib/image-upload/draft";
+import {
+  PARTNER_CARD_CREATE_DRAFT_KEY,
+  PARTNER_CARD_DRAFT_VALUE_KEY,
+  createPartnerCardDraftSnapshot,
+  readPartnerCardDraftSnapshot,
+  serializePartnerCardDraftSnapshot,
+  type PartnerCardDraftSnapshot,
+} from "@/lib/partner-card-form/draft";
 import {
   inferPartnerBranchScopeType,
   type PartnerBranchScopeType,
 } from "@/lib/partner-branch-registration";
 import {
   getBenefitListingMode,
+  removeCouponOnlyDefaults,
   type BenefitListingMode,
 } from "@/lib/partner-coupon-only";
 import type {
@@ -44,6 +57,22 @@ import type {
 } from "@/components/partner-card-form/types";
 
 type BranchEntryMode = "single" | "multi";
+
+function readDraftListValue(form: HTMLFormElement, name: string) {
+  const input = form.querySelector<HTMLInputElement>(
+    `input[type="hidden"][name="${name}"]`,
+  );
+  return (input?.value ?? "")
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function readCheckedDraftValues(form: HTMLFormElement, name: string) {
+  return Array.from(
+    form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`),
+  ).map((input) => input.value.trim()).filter(Boolean);
+}
 
 export default function PartnerCardForm({
   partner,
@@ -95,6 +124,9 @@ export default function PartnerCardForm({
   const [branchRows, setBranchRows] = useState<BranchEditorRow[]>(() =>
     parseInitialBranchEditorRows(),
   );
+  const [restoredDraftValues, setRestoredDraftValues] =
+    useState<PartnerCardDraftSnapshot | null>(null);
+  const [draftRestoreVersion, setDraftRestoreVersion] = useState(0);
   const {
     formRef,
     periodStart,
@@ -143,14 +175,6 @@ export default function PartnerCardForm({
     setAppliesToValue,
     companyFieldsLocked,
   } = usePartnerCardFormState({ partner, categoryId, focusField });
-  const draftKey = `admin-partner-${mode}-${partner.id ?? "new"}`;
-  const submissionId = useImageUploadSubmissionId(draftKey);
-  const { saveDraft } = useImageUploadFormDraft({
-    formKey: draftKey,
-    formRef,
-    imageUploadControllerRef,
-    clearOnSuccess: clearDraftOnSuccess,
-  });
   const branchListText = useMemo(
     () => (branchEntryMode === "multi" ? serializeBranchRows(branchRows) : ""),
     [branchEntryMode, branchRows],
@@ -169,6 +193,63 @@ export default function PartnerCardForm({
     });
   }, [branchEntryMode, branchRows, serviceModeValue]);
 
+  const restorePartnerDraftValues = useCallback(
+    (values: Record<string, ImageUploadDraftValue>) => {
+      const restored = readPartnerCardDraftSnapshot(
+        values[PARTNER_CARD_DRAFT_VALUE_KEY],
+      );
+      if (!restored) return;
+      setBranchEntryMode(restored.branchEntryMode);
+      setBenefitListingMode(restored.benefitListingMode);
+      setBranchRows(parseInitialBranchEditorRows(restored.branchListText));
+      setAppliesToValue(restored.appliesTo);
+      setRestoredDraftValues(restored);
+      setDraftRestoreVersion((current) => current + 1);
+    },
+    [setAppliesToValue],
+  );
+
+  const getPartnerDraftValues = useCallback(() => {
+    const form = formRef.current;
+    const snapshot = createPartnerCardDraftSnapshot({
+      branchEntryMode,
+      benefitListingMode,
+      branchListText,
+      conditions: form ? readDraftListValue(form, "conditions") : [],
+      benefits: form ? readDraftListValue(form, "benefits") : [],
+      tags: form ? readDraftListValue(form, "tags") : [],
+      appliesTo: form ? readCheckedDraftValues(form, "appliesTo") : appliesToValue,
+      campusSlugs: form ? readCheckedDraftValues(form, "campusSlugs") : [],
+    });
+    return {
+      [PARTNER_CARD_DRAFT_VALUE_KEY]: serializePartnerCardDraftSnapshot(snapshot),
+    };
+  }, [
+    appliesToValue,
+    benefitListingMode,
+    branchEntryMode,
+    branchListText,
+    formRef,
+  ]);
+
+  const draftKey =
+    mode === "create"
+      ? PARTNER_CARD_CREATE_DRAFT_KEY
+      : `admin-partner-${mode}-${partner.id ?? "new"}`;
+  const submissionId = useImageUploadSubmissionId(draftKey);
+  const {
+    saveDraft,
+    clearDraft,
+    draftStatus,
+  } = useImageUploadFormDraft({
+    formKey: draftKey,
+    formRef,
+    imageUploadControllerRef,
+    getAdditionalDraftValues: getPartnerDraftValues,
+    restoreAdditionalDraftValues: restorePartnerDraftValues,
+    clearOnSuccess: clearDraftOnSuccess,
+  });
+
   const mergedFieldErrors = useMemo(
     () => ({
       ...fieldErrors,
@@ -176,8 +257,54 @@ export default function PartnerCardForm({
     }),
     [fieldErrors, clientFieldErrors],
   );
+  const restoredCampusSlugs = restoredDraftValues
+    ? normalizeCampusSlugs(restoredDraftValues.campusSlugs)
+    : undefined;
+
+  const preserveCurrentPartnerDraftValues = useCallback(() => {
+    const form = formRef.current;
+    const snapshot = createPartnerCardDraftSnapshot({
+      branchEntryMode,
+      benefitListingMode,
+      branchListText,
+      conditions:
+        benefitListingMode === "always_on"
+          ? form
+            ? readDraftListValue(form, "conditions")
+            : []
+          : restoredDraftValues?.conditions ?? removeCouponOnlyDefaults(partner.conditions),
+      benefits:
+        benefitListingMode === "always_on"
+          ? form
+            ? readDraftListValue(form, "benefits")
+            : []
+          : restoredDraftValues?.benefits ?? removeCouponOnlyDefaults(partner.benefits),
+      tags: form
+        ? readDraftListValue(form, "tags")
+        : restoredDraftValues?.tags ?? partner.tags ?? [],
+      appliesTo: form
+        ? readCheckedDraftValues(form, "appliesTo")
+        : appliesToValue,
+      campusSlugs: form
+        ? readCheckedDraftValues(form, "campusSlugs")
+        : restoredDraftValues?.campusSlugs ?? [],
+    });
+    setRestoredDraftValues(snapshot);
+    setDraftRestoreVersion((current) => current + 1);
+  }, [
+    appliesToValue,
+    benefitListingMode,
+    branchEntryMode,
+    branchListText,
+    formRef,
+    partner.benefits,
+    partner.conditions,
+    partner.tags,
+    restoredDraftValues,
+  ]);
 
   const handleBenefitListingModeChange = (value: BenefitListingMode) => {
+    preserveCurrentPartnerDraftValues();
     setBenefitListingMode(value);
     if (value === "coupon_only") {
       setBenefitActionTypeValue("none");
@@ -191,7 +318,8 @@ export default function PartnerCardForm({
       allowUploadedFormSubmitRef.current = false;
       return;
     }
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     if (formData.get("partnerFormIntent") === "delete") {
       return;
     }
@@ -239,7 +367,7 @@ export default function PartnerCardForm({
           await imageUploadController.uploadPending();
           await saveDraft();
           allowUploadedFormSubmitRef.current = true;
-          event.currentTarget.requestSubmit();
+          form.requestSubmit();
         } catch (error) {
           setClientFormError(
             error instanceof Error && error.message
@@ -364,6 +492,8 @@ export default function PartnerCardForm({
             categoryOptions={categoryOptions}
             fieldErrors={mergedFieldErrors}
             focusField={focusField}
+            draftRestoreVersion={draftRestoreVersion}
+            restoredCampusSlugs={restoredCampusSlugs}
             onCampusSlugSelectionChange={(value) => {
               if (value.length > 0) {
                 setClientFieldErrors((current) => {
@@ -411,6 +541,7 @@ export default function PartnerCardForm({
               setBenefitActionTypeValue: (value) => {
                 setBenefitActionTypeValue(value);
                 if (benefitListingMode === "coupon_only" && value !== "none") {
+                  preserveCurrentPartnerDraftValues();
                   setBenefitListingMode("always_on");
                 }
               },
@@ -519,6 +650,8 @@ export default function PartnerCardForm({
             partner={partner}
             benefitListingMode={benefitListingMode}
             onBenefitListingModeChange={handleBenefitListingModeChange}
+            restoredDraftValues={restoredDraftValues}
+            draftRestoreVersion={draftRestoreVersion}
           />
 
           <PartnerAudienceSection
@@ -535,6 +668,9 @@ export default function PartnerCardForm({
             deleteAction={deleteAction}
             submitLabel={submitLabel}
             formError={clientFormError ?? formError}
+            draftStatus={mode === "create" ? draftStatus : undefined}
+            onSaveDraft={mode === "create" ? () => void saveDraft(true) : undefined}
+            onClearDraft={mode === "create" ? () => void clearDraft() : undefined}
           />
         </div>
       </form>

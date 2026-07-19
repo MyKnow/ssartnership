@@ -27,9 +27,25 @@ export const revalidate = 300;
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ preview?: string | string[] }>;
 }): Promise<Metadata> {
+  const resolvedSearchParams = await searchParams;
+  const preview = Array.isArray(resolvedSearchParams?.preview)
+    ? resolvedSearchParams.preview[0]
+    : resolvedSearchParams?.preview;
+  if (preview) {
+    return {
+      title: `제휴처 미리보기 | ${SITE_NAME}`,
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
   const resolvedParams = await params;
   const rawId = resolvedParams?.id
     ? decodeURIComponent(resolvedParams.id).trim()
@@ -101,13 +117,16 @@ export default async function PartnerDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ returnTo?: string | string[] }>;
+  searchParams?: Promise<{
+    returnTo?: string | string[];
+    preview?: string | string[];
+  }>;
 }) {
   const [headerSession, resolvedParams, resolvedSearchParams] = await Promise.all([
     getHeaderSession(),
     params,
     searchParams ??
-      Promise.resolve<{ returnTo?: string | string[] }>({}),
+      Promise.resolve<{ returnTo?: string | string[]; preview?: string | string[] }>({}),
   ]);
   const rawId = resolvedParams?.id
     ? decodeURIComponent(resolvedParams.id).trim()
@@ -115,12 +134,16 @@ export default async function PartnerDetailPage({
   if (!rawId) {
     notFound();
   }
+  const previewToken = Array.isArray(resolvedSearchParams.preview)
+    ? resolvedSearchParams.preview[0]
+    : resolvedSearchParams.preview;
   const viewerContext = await getPartnerViewerContext(headerSession?.userId);
   const pageData = await getPartnerDetailPageData(
     rawId,
     viewerContext.authenticated,
     headerSession?.userId ?? null,
     viewerContext.viewerAudience,
+    previewToken ?? null,
   );
   if (!pageData) {
     notFound();
@@ -153,6 +176,7 @@ export default async function PartnerDetailPage({
     isFavorited,
     currentUserId,
     adCoupons,
+    isPreview,
   } = pageData;
   const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
     ? resolvedSearchParams.returnTo[0]
@@ -173,6 +197,16 @@ export default async function PartnerDetailPage({
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
+      {isPreview ? (
+        <div className="border-b border-primary/15 bg-primary-soft/70">
+          <Container className="py-3">
+            <p className="text-sm font-semibold text-primary">미리보기</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              현재 제휴처 설정을 파트너사에 공유하기 위한 화면입니다. 실제 공개 상태와 이용 가능 시점은 관리자가 저장한 설정을 따릅니다.
+            </p>
+          </Container>
+        </div>
+      ) : null}
       <main>
         <Container className="pb-28 pt-10 md:pb-16">
           <script
@@ -187,16 +221,18 @@ export default async function PartnerDetailPage({
               __html: JSON.stringify(partnerJsonLd),
             }}
           />
-          <AnalyticsEventOnMount
-            eventName="partner_detail_view"
-            targetType="partner"
-            targetId={partner.id}
-            properties={{
-              categoryKey: partner.category,
-              isActive,
-            }}
-            dedupeKey={`partner-detail:${partner.id}`}
-          />
+          {!isPreview ? (
+            <AnalyticsEventOnMount
+              eventName="partner_detail_view"
+              targetType="partner"
+              targetId={partner.id}
+              properties={{
+                categoryKey: partner.category,
+                isActive,
+              }}
+              dedupeKey={`partner-detail:${partner.id}`}
+            />
+          ) : null}
           <div className="flex flex-col gap-6">
             <PageHeader
               eyebrow={categoryLabel}

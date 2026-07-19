@@ -723,7 +723,7 @@ const automaticCampaignTemplates = (["new_partner", "expiring_partner"] as const
       requiredVariables: context.requiredVariables,
       source: "automatic",
       audience: "member",
-      trigger: type === "new_partner" ? "공개 제휴처가 등록·승인되었을 때" : "제휴 종료 예정일에 도달했을 때",
+      trigger: type === "new_partner" ? "공개 제휴처가 등록·승인되거나 시작 전·비공개에서 공개로 전환되었을 때" : "제휴 종료 예정일에 도달했을 때",
       contextKey: context.contextKey,
     }),
   );

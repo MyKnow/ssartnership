@@ -33,15 +33,18 @@ function PartnerVisibilityPreview() {
       <div>normalize-empty:{normalizePartnerVisibility("")}</div>
       <div>normalize-confidential:{normalizePartnerVisibility(" Confidential ")}</div>
       <div>state-public:{getPartnerVisibilityState("public", makeRelativeDate(-1), makeRelativeDate(1))}</div>
+      <div>state-upcoming:{getPartnerVisibilityState("public", makeRelativeDate(1), makeRelativeDate(5))}</div>
       <div>state-expired:{getPartnerVisibilityState("confidential", makeRelativeDate(-5), makeRelativeDate(-1))}</div>
       <div>state-private:{getPartnerVisibilityState("private", makeRelativeDate(-5), makeRelativeDate(-1))}</div>
       <div>label-public:{getPartnerVisibilityLabel("public")}</div>
       <div>label-confidential:{getPartnerVisibilityLabel("confidential")}</div>
       <div>label-private:{getPartnerVisibilityLabel("private")}</div>
+      <div>label-upcoming:{getPartnerVisibilityLabel("upcoming")}</div>
       <div>label-expired:{getPartnerVisibilityLabel("expired")}</div>
       <div>badge-public:{getPartnerVisibilityBadgeClass("public")}</div>
       <div>badge-confidential:{getPartnerVisibilityBadgeClass("confidential")}</div>
       <div>badge-private:{getPartnerVisibilityBadgeClass("private")}</div>
+      <div>badge-upcoming:{getPartnerVisibilityBadgeClass("upcoming")}</div>
       <div>badge-expired:{getPartnerVisibilityBadgeClass("expired")}</div>
       <div>view-public:{String(canViewPartnerDetails("public", false))}</div>
       <div>view-confidential-guest:{String(canViewPartnerDetails("confidential", false))}</div>
@@ -85,11 +88,13 @@ export const Summary: Story = {
     await expect(canvas.getByText("normalize-empty:public")).toBeInTheDocument();
     await expect(canvas.getByText("normalize-confidential:confidential")).toBeInTheDocument();
     await expect(canvas.getByText("state-public:public")).toBeInTheDocument();
+    await expect(canvas.getByText("state-upcoming:upcoming")).toBeInTheDocument();
     await expect(canvas.getByText("state-expired:expired")).toBeInTheDocument();
     await expect(canvas.getByText("state-private:private")).toBeInTheDocument();
     await expect(canvas.getByText("label-public:공개")).toBeInTheDocument();
     await expect(canvas.getByText("label-confidential:대외비")).toBeInTheDocument();
     await expect(canvas.getByText("label-private:비공개")).toBeInTheDocument();
+    await expect(canvas.getByText("label-upcoming:시작 전")).toBeInTheDocument();
     await expect(canvas.getByText("label-expired:기간 만료")).toBeInTheDocument();
     await expect(
       canvas.getByText("badge-public:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"),
@@ -99,6 +104,9 @@ export const Summary: Story = {
     ).toBeInTheDocument();
     await expect(
       canvas.getByText("badge-private:bg-slate-500/15 text-slate-700 dark:text-slate-300"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByText("badge-upcoming:bg-sky-500/15 text-sky-700 dark:text-sky-300"),
     ).toBeInTheDocument();
     await expect(
       canvas.getByText("badge-expired:bg-rose-500/15 text-rose-700 dark:text-rose-300"),
