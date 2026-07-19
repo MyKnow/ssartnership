@@ -6,6 +6,14 @@ import {
   summarizeAdPackageMetrics,
   type AdPackageMetricEvent,
 } from "@/lib/ad-packages";
+import {
+  getMemberIssueCountSnapshot,
+  isMemberIssueLimitReached,
+} from "@/lib/ad-coupon-domain";
+import {
+  hashCouponVerificationPassword,
+  verifyCouponVerificationPassword,
+} from "@/lib/coupon-verification-password";
 import type {
   AdCampaign,
   AdCampaignWithStats,
@@ -22,6 +30,8 @@ import type {
   ListAvailableCouponsForMemberInput,
   ListIssuedCouponsForMemberInput,
   RedeemAdCouponInput,
+  RedeemAdCouponIssueInput,
+  RedeemAdCouponIssueResult,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
 } from "@/lib/repositories/ad-package-repository";
@@ -145,9 +155,13 @@ function createMockCoupons(): AdCoupon[] {
       dailyIssueLimit: null,
       weeklyIssueLimit: null,
       monthlyIssueLimit: null,
+      perMemberDailyIssueLimit: null,
+      perMemberWeeklyIssueLimit: null,
+      perMemberMonthlyIssueLimit: null,
       issuedCount: 0,
       remainingIssueCount: null,
       perMemberLimit: 1,
+      hasOnsitePassword: false,
       usedCount: 0,
       externalUrl: "",
       createdAt: "2026-07-01T00:00:00.000Z",
@@ -176,9 +190,13 @@ function createMockCoupons(): AdCoupon[] {
       dailyIssueLimit: null,
       weeklyIssueLimit: null,
       monthlyIssueLimit: null,
+      perMemberDailyIssueLimit: null,
+      perMemberWeeklyIssueLimit: null,
+      perMemberMonthlyIssueLimit: null,
       issuedCount: 0,
       remainingIssueCount: null,
       perMemberLimit: 1,
+      hasOnsitePassword: false,
       usedCount: 0,
       externalUrl: "",
       createdAt: "2026-07-01T00:00:00.000Z",
@@ -198,8 +216,11 @@ export class MockAdPackageRepository implements AdPackageRepository {
     assignedCode: string | null;
     issuedAt: string;
     usedAt: string | null;
+    onsitePasswordHash: string | null;
+    onsitePasswordSalt: string | null;
   }>;
   private couponCodes: Map<string, Set<string>>;
+  private couponPasswords: Map<string, { hash: string; salt: string }>;
   private events: AdPackageMetricEvent[];
 
   constructor() {
@@ -208,6 +229,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
     this.redemptions = [];
     this.issues = [];
     this.couponCodes = new Map();
+    this.couponPasswords = new Map();
     this.events = [];
   }
 
@@ -283,6 +305,21 @@ export class MockAdPackageRepository implements AdPackageRepository {
           now,
         }),
       )
+      .filter(({ coupon }) =>
+        !isMemberIssueLimitReached(
+          getMemberIssueCountSnapshot({
+            couponId: coupon.id,
+            memberId: input.memberId,
+            limits: {
+              daily: coupon.perMemberDailyIssueLimit,
+              weekly: coupon.perMemberWeeklyIssueLimit,
+              monthly: coupon.perMemberMonthlyIssueLimit,
+            },
+            records: this.issues,
+            now,
+          }),
+        ),
+      )
       .map(({ coupon, memberUsedCount }) =>
         toAvailableCoupon(coupon, memberUsedCount),
       )
@@ -333,6 +370,16 @@ export class MockAdPackageRepository implements AdPackageRepository {
   async createCoupon(input: CreateAdCouponInput): Promise<AdCoupon> {
     const now = isoNow();
     const partnerName = MOCK_PARTNER_NAMES.get(input.partnerId) ?? "제휴처";
+    const redemptionType = input.redemptionType ?? "onsite";
+    if (redemptionType === "onsite" && !input.onsitePassword) {
+      throw new Error("현장 확인형 쿠폰은 제휴처 확인 비밀번호가 필요합니다.");
+    }
+    if (redemptionType !== "onsite" && input.onsitePassword) {
+      throw new Error("현장 확인 비밀번호는 현장 확인형 쿠폰에만 설정할 수 있습니다.");
+    }
+    const passwordHash = input.onsitePassword
+      ? await hashCouponVerificationPassword(input.onsitePassword)
+      : null;
     const coupon: AdCoupon = {
       id: `coupon-${crypto.randomUUID()}`,
       campaignId: input.campaignId ?? null,
@@ -342,7 +389,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
       description: input.description ?? "",
       code: input.code ?? "",
       issuanceType: input.issuanceType ?? "service",
-      redemptionType: input.redemptionType ?? "onsite",
+      redemptionType,
       discountLabel: input.discountLabel ?? "",
       terms: [...(input.terms ?? [])],
       status: input.status ?? "draft",
@@ -356,15 +403,22 @@ export class MockAdPackageRepository implements AdPackageRepository {
       dailyIssueLimit: input.dailyIssueLimit ?? null,
       weeklyIssueLimit: input.weeklyIssueLimit ?? null,
       monthlyIssueLimit: input.monthlyIssueLimit ?? null,
+      perMemberDailyIssueLimit: input.perMemberDailyIssueLimit ?? null,
+      perMemberWeeklyIssueLimit: input.perMemberWeeklyIssueLimit ?? null,
+      perMemberMonthlyIssueLimit: input.perMemberMonthlyIssueLimit ?? null,
       issuedCount: 0,
       remainingIssueCount: null,
       perMemberLimit: input.perMemberLimit ?? 1,
+      hasOnsitePassword: Boolean(passwordHash),
       usedCount: 0,
       externalUrl: input.externalUrl ?? "",
       createdAt: now,
       updatedAt: now,
     };
     this.coupons = [coupon, ...this.coupons];
+    if (passwordHash) {
+      this.couponPasswords.set(coupon.id, passwordHash);
+    }
     return cloneCoupon(coupon);
   }
 
@@ -379,6 +433,20 @@ export class MockAdPackageRepository implements AdPackageRepository {
     }
     if (this.issues.some((issue) => issue.couponId === coupon.id && issue.memberId === input.memberId && !issue.usedAt)) {
       return { ok: false, reason: "member_limit", message: "이미 보유한 쿠폰입니다." };
+    }
+    const memberIssueLimits = getMemberIssueCountSnapshot({
+      couponId: coupon.id,
+      memberId: input.memberId,
+      limits: {
+        daily: coupon.perMemberDailyIssueLimit,
+        weekly: coupon.perMemberWeeklyIssueLimit,
+        monthly: coupon.perMemberMonthlyIssueLimit,
+      },
+      records: this.issues,
+      now,
+    });
+    if (isMemberIssueLimitReached(memberIssueLimits)) {
+      return { ok: false, reason: "member_limit", message: "회원별 발급 한도에 도달했습니다." };
     }
     const pool = this.couponCodes.get(coupon.id);
     const pooledCode = pool ? [...pool][0] ?? null : null;
@@ -398,6 +466,8 @@ export class MockAdPackageRepository implements AdPackageRepository {
       assignedCode,
       issuedAt: isoNow(),
       usedAt: null,
+      onsitePasswordHash: this.couponPasswords.get(coupon.id)?.hash ?? null,
+      onsitePasswordSalt: this.couponPasswords.get(coupon.id)?.salt ?? null,
     };
     const available = toAvailableCoupon(coupon, 0);
     if (!available) {
@@ -452,6 +522,84 @@ export class MockAdPackageRepository implements AdPackageRepository {
     return { addedCount, skippedCount: normalized.length - addedCount };
   }
 
+  async redeemCouponIssue(
+    input: RedeemAdCouponIssueInput,
+  ): Promise<RedeemAdCouponIssueResult> {
+    const issue = this.issues.find(
+      (item) => item.id === input.issueId && item.memberId === input.memberId,
+    );
+    if (!issue) {
+      return { ok: false, reason: "not_found", message: "쿠폰을 찾을 수 없습니다." };
+    }
+    if (issue.usedAt) {
+      return {
+        ok: false,
+        reason: "inactive",
+        message: "이미 사용했거나 사용할 수 없는 쿠폰입니다.",
+      };
+    }
+    const coupon = this.coupons.find((item) => item.id === issue.couponId);
+    if (!coupon) {
+      return { ok: false, reason: "not_found", message: "쿠폰을 찾을 수 없습니다." };
+    }
+    const now = Date.now();
+    if (
+      now < new Date(coupon.usageStartsAt).getTime() ||
+      now > new Date(coupon.usageEndsAt).getTime()
+    ) {
+      return { ok: false, reason: "expired", message: "쿠폰 사용 기간이 아닙니다." };
+    }
+    if (coupon.status !== "active") {
+      return { ok: false, reason: "inactive", message: "현재 사용할 수 없는 쿠폰입니다." };
+    }
+    if (issue.onsitePasswordHash && issue.onsitePasswordSalt) {
+      if (!input.onsitePassword) {
+        return {
+          ok: false,
+          reason: "onsite_password_required",
+          message: "제휴처 확인 비밀번호를 입력해 주세요.",
+        };
+      }
+      const isValid = await verifyCouponVerificationPassword(input.onsitePassword, {
+        hash: issue.onsitePasswordHash,
+        salt: issue.onsitePasswordSalt,
+      });
+      if (!isValid) {
+        return {
+          ok: false,
+          reason: "onsite_password_invalid",
+          message: "제휴처 확인 비밀번호가 올바르지 않습니다.",
+        };
+      }
+    }
+
+    const usedAt = isoNow();
+    this.issues = this.issues.map((item) =>
+      item.id === issue.id ? { ...item, usedAt } : item,
+    );
+    const redemption: AdCouponRedemption = {
+      id: `redemption-${crypto.randomUUID()}`,
+      couponId: coupon.id,
+      campaignId: coupon.campaignId,
+      partnerId: coupon.partnerId,
+      memberId: input.memberId,
+      sessionId: input.sessionId ?? null,
+      redemptionCode: issue.assignedCode ?? "",
+      createdAt: usedAt,
+    };
+    this.redemptions = [redemption, ...this.redemptions];
+    this.events = [
+      { eventName: "coupon_redeem", campaignId: coupon.campaignId, couponId: coupon.id },
+      ...this.events,
+    ];
+    return {
+      ok: true,
+      couponId: coupon.id,
+      issueId: issue.id,
+      assignedCode: issue.assignedCode,
+    };
+  }
+
   async redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult> {
     const coupon = this.coupons.find((item) => item.id === input.couponId);
     if (!coupon) {
@@ -465,6 +613,14 @@ export class MockAdPackageRepository implements AdPackageRepository {
     const usedCount = this.countCouponRedemptions(coupon.id);
     const campaign = this.campaigns.find((item) => item.id === coupon.campaignId);
     const couponWithCount = { ...coupon, usedCount };
+    if (coupon.redemptionType === "onsite") {
+      return {
+        ok: false,
+        reason: "onsite_verification_required",
+        message: "현장형 쿠폰은 쿠폰함의 제휴처 확인 화면에서 사용해 주세요.",
+        coupon: cloneCoupon(couponWithCount),
+      };
+    }
     if (!isAdCouponRedeemable({ coupon: couponWithCount, campaign })) {
       return {
         ok: false,

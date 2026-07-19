@@ -8,6 +8,14 @@ import {
   type AdPackageMetricEvent,
   type AdCouponIssuanceType,
 } from "@/lib/ad-packages";
+import {
+  getMemberIssueCountSnapshot,
+  isMemberIssueLimitReached,
+} from "@/lib/ad-coupon-domain";
+import {
+  hashCouponVerificationPassword,
+  verifyCouponVerificationPassword,
+} from "@/lib/coupon-verification-password";
 import type {
   AdCampaign,
   AdCampaignWithStats,
@@ -24,6 +32,8 @@ import type {
   ListAvailableCouponsForMemberInput,
   ListIssuedCouponsForMemberInput,
   RedeemAdCouponInput,
+  RedeemAdCouponIssueInput,
+  RedeemAdCouponIssueResult,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
 } from "@/lib/repositories/ad-package-repository";
@@ -38,7 +48,7 @@ const AD_METRIC_EVENT_NAMES = [
 ] as const;
 
 const AD_COUPON_SELECT =
-  "id,campaign_id,partner_id,title,description,code,issuance_type,redemption_type,discount_label,terms,status,starts_at,ends_at,download_starts_at,download_ends_at,usage_starts_at,usage_ends_at,usage_limit,daily_issue_limit,weekly_issue_limit,monthly_issue_limit,per_member_limit,external_url,created_at,updated_at,partners(name)";
+  "id,campaign_id,partner_id,title,description,code,issuance_type,redemption_type,discount_label,terms,status,starts_at,ends_at,download_starts_at,download_ends_at,usage_starts_at,usage_ends_at,usage_limit,daily_issue_limit,weekly_issue_limit,monthly_issue_limit,per_member_daily_issue_limit,per_member_weekly_issue_limit,per_member_monthly_issue_limit,per_member_limit,onsite_password_hash,onsite_password_salt,external_url,created_at,updated_at,partners(name)";
 
 type PartnerJoin = { name?: string | null } | Array<{ name?: string | null }> | null;
 
@@ -82,7 +92,12 @@ type AdCouponRow = {
   daily_issue_limit: number | null;
   weekly_issue_limit: number | null;
   monthly_issue_limit: number | null;
+  per_member_daily_issue_limit: number | null;
+  per_member_weekly_issue_limit: number | null;
+  per_member_monthly_issue_limit: number | null;
   per_member_limit: number | null;
+  onsite_password_hash: string | null;
+  onsite_password_salt: string | null;
   external_url: string | null;
   created_at: string;
   updated_at: string;
@@ -107,6 +122,19 @@ type CouponIssueRow = {
   assigned_code: string | null;
   issued_at: string;
   used_at: string | null;
+};
+
+type CouponIssueVerificationRow = {
+  id: string;
+  coupon_id: string;
+  member_id: string;
+  assigned_code: string | null;
+  redemption_type_snapshot: string;
+  onsite_password_hash_snapshot: string | null;
+  onsite_password_salt_snapshot: string | null;
+  status: string;
+  usage_starts_at: string;
+  usage_ends_at: string;
 };
 
 type EventLogRow = {
@@ -199,9 +227,13 @@ function mapCouponRow(row: AdCouponRow, usedCount = 0): AdCoupon {
     dailyIssueLimit: row.daily_issue_limit,
     weeklyIssueLimit: row.weekly_issue_limit,
     monthlyIssueLimit: row.monthly_issue_limit,
+    perMemberDailyIssueLimit: row.per_member_daily_issue_limit,
+    perMemberWeeklyIssueLimit: row.per_member_weekly_issue_limit,
+    perMemberMonthlyIssueLimit: row.per_member_monthly_issue_limit,
     issuedCount: 0,
     remainingIssueCount: null,
     perMemberLimit: row.per_member_limit ?? 1,
+    hasOnsitePassword: Boolean(row.onsite_password_hash && row.onsite_password_salt),
     usedCount,
     externalUrl: row.external_url ?? "",
     createdAt: row.created_at,
@@ -496,7 +528,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     const campaignIds = rows
       .map((row) => row.campaign_id)
       .filter((id): id is string => Boolean(id));
-    const [redemptionResult, campaignResult] = await Promise.all([
+    const [redemptionResult, campaignResult, memberIssueResult] = await Promise.all([
       supabase
         .from("ad_coupon_redemptions")
         .select("coupon_id,member_id")
@@ -510,12 +542,20 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
             )
             .in("id", campaignIds)
         : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from("ad_coupon_issues")
+        .select("coupon_id,issued_at")
+        .in("coupon_id", couponIds)
+        .eq("member_id", input.memberId),
     ]);
     if (redemptionResult.error) {
       throw new Error(redemptionResult.error.message);
     }
     if (campaignResult.error) {
       throw new Error(campaignResult.error.message);
+    }
+    if (memberIssueResult.error) {
+      throw new Error(memberIssueResult.error.message);
     }
 
     const redemptionRows = (redemptionResult.data ?? []) as Array<{
@@ -527,6 +567,25 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       redemptionRows.filter((row) => row.member_id === input.memberId),
       "coupon_id",
     );
+    const memberIssueRows = (memberIssueResult.data ?? []) as Array<{
+      coupon_id: string;
+      issued_at: string;
+    }>;
+    const memberIssueRecordsByCoupon = new Map<string, Array<{
+      couponId: string;
+      memberId: string;
+      issuedAt: string;
+    }>>();
+    for (const row of memberIssueRows) {
+      memberIssueRecordsByCoupon.set(row.coupon_id, [
+        ...(memberIssueRecordsByCoupon.get(row.coupon_id) ?? []),
+        {
+          couponId: row.coupon_id,
+          memberId: input.memberId,
+          issuedAt: row.issued_at,
+        },
+      ]);
+    }
     const campaignsById = new Map(
       ((campaignResult.data ?? []) as AdCampaignRow[]).map((row) => [
         row.id,
@@ -549,6 +608,21 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
           campaign,
           now,
         }),
+      )
+      .filter(({ coupon }) =>
+        !isMemberIssueLimitReached(
+          getMemberIssueCountSnapshot({
+            couponId: coupon.id,
+            memberId: input.memberId,
+            limits: {
+              daily: coupon.perMemberDailyIssueLimit,
+              weekly: coupon.perMemberWeeklyIssueLimit,
+              monthly: coupon.perMemberMonthlyIssueLimit,
+            },
+            records: memberIssueRecordsByCoupon.get(coupon.id) ?? [],
+            now,
+          }),
+        ),
       )
       .map(({ coupon, memberUsedCount }) =>
         toAvailableCoupon(coupon, memberUsedCount),
@@ -606,6 +680,16 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
 
   async createCoupon(input: CreateAdCouponInput): Promise<AdCoupon> {
     const supabase = getSupabaseAdminClient();
+    const redemptionType = input.redemptionType ?? "onsite";
+    if (redemptionType === "onsite" && !input.onsitePassword) {
+      throw new Error("현장 확인형 쿠폰은 제휴처 확인 비밀번호가 필요합니다.");
+    }
+    if (redemptionType !== "onsite" && input.onsitePassword) {
+      throw new Error("현장 확인 비밀번호는 현장 확인형 쿠폰에만 설정할 수 있습니다.");
+    }
+    const passwordHash = input.onsitePassword
+      ? await hashCouponVerificationPassword(input.onsitePassword)
+      : null;
     const { data, error } = await supabase
       .from("ad_coupons")
       .insert({
@@ -615,7 +699,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         description: input.description ?? "",
         code: input.code ?? "",
         issuance_type: input.issuanceType ?? "service",
-        redemption_type: input.redemptionType ?? "onsite",
+        redemption_type: redemptionType,
         discount_label: input.discountLabel ?? "",
         terms: input.terms ?? [],
         status: input.status ?? "draft",
@@ -629,7 +713,12 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         daily_issue_limit: input.dailyIssueLimit ?? null,
         weekly_issue_limit: input.weeklyIssueLimit ?? null,
         monthly_issue_limit: input.monthlyIssueLimit ?? null,
+        per_member_daily_issue_limit: input.perMemberDailyIssueLimit ?? null,
+        per_member_weekly_issue_limit: input.perMemberWeeklyIssueLimit ?? null,
+        per_member_monthly_issue_limit: input.perMemberMonthlyIssueLimit ?? null,
         per_member_limit: input.perMemberLimit ?? 1,
+        onsite_password_hash: passwordHash?.hash ?? null,
+        onsite_password_salt: passwordHash?.salt ?? null,
         external_url: input.externalUrl ?? "",
       })
       .select(AD_COUPON_SELECT)
@@ -654,7 +743,9 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
           ? "inactive"
           : error.message.includes("member_limit")
             ? "member_limit"
-            : error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
+            : error.message.includes("member_daily_limit") || error.message.includes("member_weekly_limit") || error.message.includes("member_monthly_limit")
+              ? "member_limit"
+              : error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
               ? error.message.includes("code_unavailable") ? "code_unavailable" : "usage_limit"
               : "invalid";
       return { ok: false, reason, message: "현재 쿠폰을 다운로드할 수 없습니다." };
@@ -753,6 +844,122 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return { addedCount: rows.length, skippedCount: uniqueCodes.length - rows.length };
   }
 
+  async redeemCouponIssue(
+    input: RedeemAdCouponIssueInput,
+  ): Promise<RedeemAdCouponIssueResult> {
+    const supabase = getSupabaseAdminClient();
+    const { data: issueData, error: issueError } = await supabase
+      .from("ad_coupon_issues")
+      .select(
+        "id,coupon_id,member_id,assigned_code,redemption_type_snapshot,onsite_password_hash_snapshot,onsite_password_salt_snapshot,status,usage_starts_at,usage_ends_at",
+      )
+      .eq("id", input.issueId)
+      .eq("member_id", input.memberId)
+      .maybeSingle();
+    if (issueError) {
+      throw new Error(issueError.message);
+    }
+    if (!issueData) {
+      return {
+        ok: false,
+        reason: "not_found",
+        message: "쿠폰을 찾을 수 없습니다.",
+      };
+    }
+
+    const issue = issueData as CouponIssueVerificationRow;
+    if (issue.status !== "issued") {
+      return {
+        ok: false,
+        reason: "inactive",
+        message: "이미 사용했거나 사용할 수 없는 쿠폰입니다.",
+      };
+    }
+    const now = Date.now();
+    if (
+      now < new Date(issue.usage_starts_at).getTime() ||
+      now > new Date(issue.usage_ends_at).getTime()
+    ) {
+      return {
+        ok: false,
+        reason: "expired",
+        message: "쿠폰 사용 기간이 아닙니다.",
+      };
+    }
+
+    let verifiedPasswordHash: string | null = null;
+    if (
+      issue.redemption_type_snapshot === "onsite" &&
+      issue.onsite_password_hash_snapshot &&
+      issue.onsite_password_salt_snapshot
+    ) {
+      if (!input.onsitePassword) {
+        return {
+          ok: false,
+          reason: "onsite_password_required",
+          message: "제휴처 확인 비밀번호를 입력해 주세요.",
+        };
+      }
+      const isValid = await verifyCouponVerificationPassword(input.onsitePassword, {
+        hash: issue.onsite_password_hash_snapshot,
+        salt: issue.onsite_password_salt_snapshot,
+      });
+      if (!isValid) {
+        return {
+          ok: false,
+          reason: "onsite_password_invalid",
+          message: "제휴처 확인 비밀번호가 올바르지 않습니다.",
+        };
+      }
+      verifiedPasswordHash = issue.onsite_password_hash_snapshot;
+    }
+
+    const { data, error } = await supabase.rpc("redeem_ad_coupon_issue", {
+      p_issue_id: input.issueId,
+      p_member_id: input.memberId,
+      p_session_id: input.sessionId ?? null,
+      p_metadata: input.metadata ?? {},
+      p_verified_onsite_password_hash: verifiedPasswordHash,
+    });
+    if (error) {
+      const reason = error.message.includes("expired")
+        ? "expired"
+        : error.message.includes("inactive")
+          ? "inactive"
+          : error.message.includes("not_found")
+            ? "not_found"
+            : error.message.includes("onsite_password")
+              ? "onsite_password_invalid"
+              : "invalid";
+      return {
+        ok: false,
+        reason,
+        message:
+          reason === "onsite_password_invalid"
+            ? "제휴처 확인 비밀번호가 올바르지 않습니다."
+            : "쿠폰 사용 확인에 실패했습니다.",
+      };
+    }
+    const row = (Array.isArray(data) ? data[0] : data) as {
+      coupon_id?: string;
+      issue_id?: string;
+      assigned_code?: string | null;
+    } | null;
+    if (!row?.coupon_id || !row.issue_id) {
+      return {
+        ok: false,
+        reason: "invalid",
+        message: "쿠폰 사용 확인 결과를 확인할 수 없습니다.",
+      };
+    }
+    return {
+      ok: true,
+      couponId: row.coupon_id,
+      issueId: row.issue_id,
+      assignedCode: row.assigned_code ?? null,
+    };
+  }
+
   async redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult> {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
@@ -816,6 +1023,14 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     const campaign = campaignResult.data
       ? mapCampaignRow(campaignResult.data as AdCampaignRow)
       : null;
+    if (coupon.redemptionType === "onsite") {
+      return {
+        ok: false,
+        reason: "onsite_verification_required",
+        message: "현장형 쿠폰은 쿠폰함의 제휴처 확인 화면에서 사용해 주세요.",
+        coupon,
+      };
+    }
     if (!isAdCouponRedeemable({ coupon, campaign })) {
       return {
         ok: false,

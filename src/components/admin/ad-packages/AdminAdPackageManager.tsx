@@ -64,6 +64,10 @@ function formatPeriod(startsAt: string, endsAt: string) {
   return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
 }
 
+function formatIssueLimit(value: number | null) {
+  return value === null ? "무제한" : `${value.toLocaleString("ko-KR")}회`;
+}
+
 function FieldLabel({
   children,
   className,
@@ -415,8 +419,55 @@ export default function AdminAdPackageManager({
                 <Input name="perMemberLimit" type="number" min={1} step={1} defaultValue={1} />
               </FieldLabel>
               <FieldLabel>
+                현장 확인 비밀번호
+                <Input
+                  name="onsitePassword"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]+"
+                  autoComplete="off"
+                  placeholder="현장 확인형만 입력"
+                  aria-describedby="onsite-password-help"
+                />
+                <span id="onsite-password-help" className="text-xs font-normal text-muted-foreground">
+                  현장 확인형 쿠폰을 사용할 때 제휴처가 확인할 숫자 비밀번호입니다. 길이 제한은 없습니다.
+                </span>
+              </FieldLabel>
+              <FieldLabel>
                 외부 링크
                 <Input name="externalUrl" type="url" placeholder="https://..." />
+              </FieldLabel>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FieldLabel>
+                회원별 일 발급 한도
+                <Input
+                  name="perMemberDailyIssueLimit"
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="무제한"
+                />
+              </FieldLabel>
+              <FieldLabel>
+                회원별 주 발급 한도
+                <Input
+                  name="perMemberWeeklyIssueLimit"
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="무제한"
+                />
+              </FieldLabel>
+              <FieldLabel>
+                회원별 월 발급 한도
+                <Input
+                  name="perMemberMonthlyIssueLimit"
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="무제한"
+                />
               </FieldLabel>
             </div>
             <FieldLabel>
@@ -537,6 +588,14 @@ export default function AdminAdPackageManager({
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {coupon.discountLabel || coupon.code || "할인 표기 없음"}
                               </p>
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                회원별 발급 · 일 {formatIssueLimit(coupon.perMemberDailyIssueLimit)} · 주 {formatIssueLimit(coupon.perMemberWeeklyIssueLimit)} · 월 {formatIssueLimit(coupon.perMemberMonthlyIssueLimit)}
+                              </p>
+                              {coupon.redemptionType === "onsite" ? (
+                                <p className="mt-1 text-xs font-medium text-primary">
+                                  {coupon.hasOnsitePassword ? "현장 확인 비밀번호 설정됨" : "현장 확인 비밀번호 미설정"}
+                                </p>
+                              ) : null}
                             </div>
                             <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
                               {coupon.usedCount}

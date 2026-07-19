@@ -33,6 +33,7 @@ function statusForReason(reason: string) {
       return 404;
     case "member_limit":
     case "usage_limit":
+    case "onsite_verification_required":
       return 409;
     case "inactive":
     case "invalid":
