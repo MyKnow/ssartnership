@@ -12,6 +12,7 @@ import type {
   CreateAdCampaignInput,
   CreateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
+import { normalizeCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { sanitizeHttpUrl } from "@/lib/validation";
 
 export const AD_PACKAGE_FORM_LIMITS = {
@@ -242,6 +243,24 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
   if (externalUrl && !safeExternalUrl) {
     throw new Error("외부 쿠폰 링크 형식을 확인해 주세요.");
   }
+  const issuanceType = parseStatus(
+    getString(formData, "issuanceType"),
+    issuanceTypes,
+    "service",
+  );
+  const redemptionType = parseStatus(
+    getString(formData, "redemptionType"),
+    redemptionTypes,
+    "onsite",
+  );
+  const rawOnsitePassword = getString(formData, "onsitePassword");
+  const onsitePassword = normalizeCouponVerificationPassword(rawOnsitePassword);
+  if (redemptionType === "onsite" && !onsitePassword) {
+    throw new Error("현장 확인형 쿠폰은 제휴처 확인 비밀번호가 필요합니다.");
+  }
+  if (redemptionType !== "onsite" && onsitePassword) {
+    throw new Error("현장 확인 비밀번호는 현장 확인형 쿠폰에만 설정할 수 있습니다.");
+  }
 
   return {
     campaignId,
@@ -257,16 +276,8 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
       AD_PACKAGE_FORM_LIMITS.codeMax,
       "쿠폰 코드는 120자 이하로 입력해 주세요.",
     ),
-    issuanceType: parseStatus(
-      getString(formData, "issuanceType"),
-      issuanceTypes,
-      "service",
-    ),
-    redemptionType: parseStatus(
-      getString(formData, "redemptionType"),
-      redemptionTypes,
-      "onsite",
-    ),
+    issuanceType,
+    redemptionType,
     discountLabel: limitLength(
       getString(formData, "discountLabel"),
       AD_PACKAGE_FORM_LIMITS.discountLabelMax,
@@ -284,7 +295,17 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
     dailyIssueLimit: parseNullableLimit(getString(formData, "dailyIssueLimit")),
     weeklyIssueLimit: parseNullableLimit(getString(formData, "weeklyIssueLimit")),
     monthlyIssueLimit: parseNullableLimit(getString(formData, "monthlyIssueLimit")),
+    perMemberDailyIssueLimit: parseNullableLimit(
+      getString(formData, "perMemberDailyIssueLimit"),
+    ),
+    perMemberWeeklyIssueLimit: parseNullableLimit(
+      getString(formData, "perMemberWeeklyIssueLimit"),
+    ),
+    perMemberMonthlyIssueLimit: parseNullableLimit(
+      getString(formData, "perMemberMonthlyIssueLimit"),
+    ),
     perMemberLimit: parsePositiveInteger(getString(formData, "perMemberLimit"), 1),
+    onsitePassword,
     externalUrl: safeExternalUrl ?? "",
   };
 }

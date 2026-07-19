@@ -3281,7 +3281,12 @@ create table if not exists ad_coupons (
   daily_issue_limit integer,
   weekly_issue_limit integer,
   monthly_issue_limit integer,
+  per_member_daily_issue_limit integer,
+  per_member_weekly_issue_limit integer,
+  per_member_monthly_issue_limit integer,
   per_member_limit integer not null default 1,
+  onsite_password_hash text,
+  onsite_password_salt text,
   external_url text not null default '',
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
@@ -3295,6 +3300,17 @@ create table if not exists ad_coupons (
     check (starts_at <= ends_at),
   constraint ad_coupons_usage_limit_check
     check (usage_limit is null or usage_limit >= 0),
+  constraint ad_coupons_per_member_issue_limit_check
+    check (
+      (per_member_daily_issue_limit is null or per_member_daily_issue_limit >= 0)
+      and (per_member_weekly_issue_limit is null or per_member_weekly_issue_limit >= 0)
+      and (per_member_monthly_issue_limit is null or per_member_monthly_issue_limit >= 0)
+    ),
+  constraint ad_coupons_onsite_password_check
+    check (
+      (onsite_password_hash is null and onsite_password_salt is null)
+      or (redemption_type = 'onsite' and char_length(onsite_password_hash) > 0 and char_length(onsite_password_salt) > 0)
+    ),
   constraint ad_coupons_per_member_limit_check
     check (per_member_limit >= 1)
 );
@@ -3366,13 +3382,22 @@ create table if not exists ad_coupon_issues (
   terms_snapshot text[] not null default '{}',
   redemption_type_snapshot text not null,
   external_url_snapshot text not null default '',
+  onsite_password_hash_snapshot text,
+  onsite_password_salt_snapshot text,
   usage_starts_at timestamp with time zone not null,
   usage_ends_at timestamp with time zone not null,
   status text not null default 'issued',
   issued_at timestamp with time zone not null default now(),
   used_at timestamp with time zone,
   created_at timestamp with time zone not null default now(),
-  constraint ad_coupon_issues_status_check check (status in ('issued', 'used', 'expired', 'cancelled'))
+  constraint ad_coupon_issues_status_check check (status in ('issued', 'used', 'expired', 'cancelled')),
+  constraint ad_coupon_issues_onsite_password_snapshot_check
+    check (
+      (onsite_password_hash_snapshot is null and onsite_password_salt_snapshot is null)
+      or (redemption_type_snapshot = 'onsite'
+        and char_length(onsite_password_hash_snapshot) > 0
+        and char_length(onsite_password_salt_snapshot) > 0)
+    )
 );
 
 alter table ad_coupon_codes
@@ -3381,6 +3406,8 @@ alter table ad_coupon_redemptions
   add column if not exists issue_id uuid references ad_coupon_issues(id) on delete set null;
 create unique index if not exists ad_coupon_issues_active_member_idx
   on ad_coupon_issues(coupon_id, member_id) where status = 'issued';
+create index if not exists ad_coupon_issues_member_coupon_issued_idx
+  on ad_coupon_issues(coupon_id, member_id, issued_at desc);
 
 create table if not exists promotion_events (
   id uuid primary key default uuid_generate_v4(),
