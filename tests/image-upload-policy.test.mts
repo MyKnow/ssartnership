@@ -60,6 +60,12 @@ test("역할별 공통 WebP 정책은 기존 출력 규격을 유지한다", asy
   assert.equal(profile.width, 640);
   assert.equal(profile.height, 640);
   assert.equal(profile.quality, 82);
+
+  const signupProfile = resolveImageTransformPolicy("member-signup-profile", "profile");
+  assert.equal(signupProfile.width, 640);
+  assert.equal(signupProfile.height, 640);
+  assert.equal(signupProfile.quality, 82);
+  assert.equal(signupProfile.key, "member-signup-profile-profile");
 });
 
 test("공통 manifest는 기존 URL과 업로드 ID를 섞어 안전하게 해석한다", async () => {

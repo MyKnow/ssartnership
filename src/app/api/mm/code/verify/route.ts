@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import {
   delayMemberAuthAttempt,
@@ -10,10 +11,16 @@ import {
   consumeMattermostVerificationCode,
   type MattermostVerificationPurpose,
 } from "@/lib/mattermost-code-verification";
-import { setMattermostCodeSession } from "@/lib/mattermost-code-session";
-import { getMattermostDisplayName } from "@/lib/mm-member-sync/snapshot";
-import { classifyMattermostSignupProfile } from "@/lib/mm-signup-approval";
+import {
+  clearMattermostCodeSession,
+  setMattermostCodeSession,
+} from "@/lib/mattermost-code-session";
+import {
+  classifyMattermostSignupProfile,
+  getMattermostSignupDisplayName,
+} from "@/lib/mm-signup-approval";
 import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
+import { hasExistingMattermostMember } from "@/lib/member-identifier-reservations";
 import {
   getResetPasswordCompletionCookieOptions,
   issueResetPasswordCompletionToken,
@@ -126,15 +133,19 @@ export async function POST(request: Request) {
         verified.senderGeneration,
         (session) => session.getUserById(verified.mmUserId),
       );
-      const mmUsername = verifiedUser.username.trim();
-      const displayName = getMattermostDisplayName(verifiedUser).trim();
-      const profileClassification = classifyMattermostSignupProfile({
+      const profileInput = {
         id: verifiedUser.id,
         username: verifiedUser.username,
         nickname: verifiedUser.nickname,
         firstName: verifiedUser.firstName,
         lastName: verifiedUser.lastName,
-      });
+      };
+      const mmUsername = verifiedUser.username.trim();
+      const profileClassification = classifyMattermostSignupProfile(profileInput);
+      const displayName = getMattermostSignupDisplayName(
+        profileInput,
+        profileClassification.profile,
+      ).trim();
       if (
         verifiedUser.id !== verified.mmUserId
         || verifiedUser.deleteAt > 0
@@ -145,6 +156,30 @@ export async function POST(request: Request) {
       ) {
         throw new Error("mattermost_signup_profile_invalid");
       }
+      if (await hasExistingMattermostMember({
+        mmUserId: verified.mmUserId,
+        mmUsername,
+      })) {
+        await clearMattermostCodeSession();
+        await recordMemberAuthAttempt("mattermost-code-verify", throttleContext, true);
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_mattermost_code",
+          status: "success",
+          actorType: "guest",
+          properties: {
+            purpose,
+            phase: "verify",
+            generation: verified.senderGeneration,
+            outcome: "existing_member",
+          },
+        });
+        return NextResponse.json({
+          ok: true,
+          nextPath: "/auth/login",
+          existingMember: true,
+        });
+      }
       await setMattermostCodeSession({
         purpose,
         mmUserId: verified.mmUserId,
@@ -154,6 +189,7 @@ export async function POST(request: Request) {
         senderGeneration: verified.senderGeneration,
         signupMode: profileClassification.mode,
         parseExclusionReason: profileClassification.parseReason,
+        ...(purpose === "signup" ? { signupUploadOwnerId: randomUUID() } : {}),
       });
       await recordMemberAuthAttempt("mattermost-code-verify", throttleContext, true);
       await logAuthSecurity({

@@ -1,4 +1,5 @@
 import { validatePasswordPolicy } from "@/lib/validation";
+import { isUuid } from "@/lib/uuid";
 
 export type MemberSignupCompleteInput = {
   password: string;
@@ -7,6 +8,7 @@ export type MemberSignupCompleteInput = {
   privacyPolicyId: string;
   marketingPolicyId: string | null;
   marketingPolicyChecked: boolean;
+  profileImageUploadId: string | null;
 };
 
 export type MemberSignupCompleteFieldErrors = Partial<
@@ -14,7 +16,8 @@ export type MemberSignupCompleteFieldErrors = Partial<
     | "password"
     | "confirmPassword"
     | "servicePolicyId"
-    | "privacyPolicyId",
+    | "privacyPolicyId"
+    | "profileImageUploadId",
     string
   >
 >;
@@ -28,10 +31,55 @@ export type MemberSignupActionStateInput = {
   hasMarketingPolicy: boolean;
 };
 
+export function getMemberSignupPasswordError(value: string, required = true) {
+  if (!value && !required) {
+    return undefined;
+  }
+  return validatePasswordPolicy(value) ?? undefined;
+}
+
+export function getMemberSignupConfirmPasswordError(
+  password: string,
+  confirmPassword: string,
+  required = true,
+) {
+  if (!confirmPassword && !required) {
+    return undefined;
+  }
+  if (!confirmPassword) {
+    return "비밀번호 확인을 입력해 주세요.";
+  }
+  return password === confirmPassword ? undefined : "비밀번호가 일치하지 않습니다.";
+}
+
+export function getMemberSignupPasswordFieldErrors(
+  input: Pick<MemberSignupCompleteInput, "password" | "confirmPassword">,
+  options: {
+    requirePassword?: boolean;
+    requireConfirmPassword?: boolean;
+  } = {},
+): Pick<MemberSignupCompleteFieldErrors, "password" | "confirmPassword"> {
+  const passwordError = getMemberSignupPasswordError(
+    input.password,
+    options.requirePassword ?? true,
+  );
+  const confirmPasswordError = getMemberSignupConfirmPasswordError(
+    input.password,
+    input.confirmPassword,
+    options.requireConfirmPassword ?? true,
+  );
+  return {
+    ...(passwordError ? { password: passwordError } : {}),
+    ...(confirmPasswordError ? { confirmPassword: confirmPasswordError } : {}),
+  };
+}
+
 export function getMemberSignupActionState(input: MemberSignupActionStateInput) {
-  const passwordsReady = Boolean(input.password)
-    && Boolean(input.confirmPassword)
-    && input.password === input.confirmPassword;
+  const passwordErrors = getMemberSignupPasswordFieldErrors({
+    password: input.password,
+    confirmPassword: input.confirmPassword,
+  });
+  const passwordsReady = Object.keys(passwordErrors).length === 0;
   const requiredPoliciesChecked = input.serviceChecked && input.privacyChecked;
   const shouldAgreeAll = !requiredPoliciesChecked;
 
@@ -67,17 +115,28 @@ export function parseMemberSignupCompleteInput(input: unknown):
       ? value.marketingPolicyId
       : null,
     marketingPolicyChecked: value.marketingPolicyChecked === true,
+    profileImageUploadId: typeof value.profileImageUploadId === "string"
+      && value.profileImageUploadId.trim()
+      ? value.profileImageUploadId.trim().toLowerCase()
+      : null,
   };
   const fieldErrors: MemberSignupCompleteFieldErrors = {};
-  const passwordError = validatePasswordPolicy(data.password);
-  if (passwordError) fieldErrors.password = passwordError;
-  if (!data.confirmPassword) {
-    fieldErrors.confirmPassword = "비밀번호 확인을 입력해 주세요.";
-  } else if (data.password !== data.confirmPassword) {
-    fieldErrors.confirmPassword = "비밀번호가 일치하지 않습니다.";
-  }
+  Object.assign(
+    fieldErrors,
+    getMemberSignupPasswordFieldErrors({
+      password: data.password,
+      confirmPassword: data.confirmPassword,
+    }),
+  );
   if (!data.servicePolicyId) fieldErrors.servicePolicyId = "서비스 이용약관에 동의해 주세요.";
   if (!data.privacyPolicyId) fieldErrors.privacyPolicyId = "개인정보 처리방침에 동의해 주세요.";
+  if (
+    typeof value.profileImageUploadId === "string"
+    && value.profileImageUploadId.trim()
+    && !isUuid(value.profileImageUploadId)
+  ) {
+    fieldErrors.profileImageUploadId = "프로필 사진 업로드 정보를 확인해 주세요.";
+  }
   return Object.keys(fieldErrors).length > 0
     ? { ok: false, fieldErrors }
     : { ok: true, data };

@@ -67,6 +67,19 @@ test("direct Mattermost verification stores only challenge/code hashes and uses 
   assert.doesNotMatch(service, /console\.(log|error)|credentials\.password/);
 });
 
+test("가입 코드 검증은 본인 인증 뒤 기존 회원을 로그인으로 분기한다", () => {
+  const route = read("src/app/api/mm/code/verify/route.ts");
+  const memberIdentifiers = read("src/lib/member-identifier-reservations.ts");
+
+  assert.match(route, /hasExistingMattermostMember/);
+  assert.match(route, /existingMember:\s*true/);
+  assert.match(route, /nextPath:\s*"\/auth\/login"/);
+  assert.match(route, /clearMattermostCodeSession/);
+  assert.match(memberIdentifiers, /findMmUserDirectoryEntryByUserId/);
+  assert.match(memberIdentifiers, /\.from\("members"\)/);
+  assert.match(memberIdentifiers, /\.is\("deleted_at", null\)/);
+});
+
 test("sender credentials remain encrypted and browser-facing interfaces have no credential fields", () => {
   const crypto = read("src/lib/mattermost-senders/crypto.ts");
   const manager = read("src/components/admin/MattermostSenderManager.tsx");

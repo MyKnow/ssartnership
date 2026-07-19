@@ -6,6 +6,7 @@ import type {
 export const IMAGE_UPLOAD_STAGING_BUCKET = "image-upload-staging";
 export const IMAGE_UPLOAD_SIGNED_URL_TTL_SECONDS = 10 * 60;
 export const IMAGE_UPLOAD_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+export const IMAGE_UPLOAD_APPROVAL_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function getImageUploadSignedUrlExpiresAt(now = new Date()) {
   return new Date(now.getTime() + IMAGE_UPLOAD_SIGNED_URL_TTL_SECONDS * 1000);
@@ -24,7 +25,8 @@ export type ImageUploadOwnerKind =
   | "member"
   | "partner"
   | "graduate_challenge"
-  | "guest";
+  | "guest"
+  | "signup";
 
 export type ImageUploadActor = {
   kind: ImageUploadOwnerKind;
@@ -100,9 +102,27 @@ export type AttachImageUploadInput = {
   now?: Date;
 };
 
+export type RetainImageUploadForApprovalInput = {
+  actor: ImageUploadActor;
+  purpose: ImageUploadPurpose;
+  uploadId: string;
+  role: string;
+  expiresAt: Date;
+  now?: Date;
+};
+
+export type DiscardImageUploadInput = {
+  actor: ImageUploadActor;
+  purpose: ImageUploadPurpose;
+  uploadId: string;
+  now?: Date;
+};
+
 export interface ImageUploadRepository {
   sign(input: SignImageUploadInput): Promise<SignedImageUpload[]>;
   complete(input: CompleteImageUploadInput): Promise<CompletedImageUpload[]>;
   attach(input: AttachImageUploadInput): Promise<AttachedImageUpload>;
+  retainForApproval(input: RetainImageUploadForApprovalInput): Promise<void>;
+  discard(input: DiscardImageUploadInput): Promise<void>;
   expireStale(now?: Date): Promise<number>;
 }

@@ -47,7 +47,7 @@ function waitForUploadCompletionRetry(delayMs: number) {
 
 async function completeStagedUploads(input: {
   purpose: ImageUploadPurpose;
-  actorMode?: "admin" | "member" | "partner" | "guest";
+  actorMode?: "admin" | "member" | "partner" | "guest" | "signup";
   uploadIds: string[];
 }) {
   let lastMessage = "이미지를 처리하지 못했습니다.";
@@ -87,7 +87,7 @@ async function completeStagedUploads(input: {
 
 export async function uploadImagesToStaging(input: {
   purpose: ImageUploadPurpose;
-  actorMode?: "admin" | "member" | "partner" | "guest";
+  actorMode?: "admin" | "member" | "partner" | "guest" | "signup";
   uploads: ClientImageUploadRequest[];
 }): Promise<ClientImageUploadResult[]> {
   if (input.uploads.length === 0) return [];

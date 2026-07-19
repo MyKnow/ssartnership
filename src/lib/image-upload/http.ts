@@ -12,7 +12,7 @@ const MAX_FILE_NAME_LENGTH = 255;
 const MAX_CLIENT_ID_LENGTH = 128;
 const MAX_ROLE_LENGTH = 64;
 const IMAGE_UPLOAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ACTOR_MODES = ["admin", "member", "partner", "guest"] as const;
+const ACTOR_MODES = ["admin", "member", "partner", "guest", "signup"] as const;
 
 export type ParsedImageUploadSignRequest = {
   purpose: ImageUploadPurpose;
@@ -41,6 +41,14 @@ function parseActorMode(value: unknown): ImageUploadActorMode | undefined | null
 
 function parsePurpose(value: unknown): ImageUploadPurpose | null {
   return isImageUploadPurpose(value) ? value : null;
+}
+
+function isAllowedPurposeActorCombination(
+  purpose: ImageUploadPurpose,
+  actorMode: ImageUploadActorMode | undefined,
+) {
+  if (purpose === "member-signup-profile") return actorMode === "signup";
+  return actorMode !== "signup";
 }
 
 function isSafeFileName(value: string) {
@@ -91,7 +99,12 @@ export function parseImageUploadSignRequest(value: unknown): ParsedImageUploadSi
   if (!record) return null;
   const purpose = parsePurpose(record.purpose);
   const actorMode = parseActorMode(record.actorMode);
-  if (!purpose || actorMode === null || !Array.isArray(record.uploads)) return null;
+  if (
+    !purpose
+    || actorMode === null
+    || !isAllowedPurposeActorCombination(purpose, actorMode ?? undefined)
+    || !Array.isArray(record.uploads)
+  ) return null;
   if (record.uploads.length === 0 || record.uploads.length > MAX_IMAGE_UPLOADS_PER_REQUEST) return null;
   const uploads = record.uploads.map((item) => parseUpload(item, purpose));
   if (uploads.some((item) => item === null)) return null;
@@ -109,7 +122,12 @@ export function parseImageUploadCompleteRequest(value: unknown): ParsedImageUplo
   if (!record) return null;
   const purpose = parsePurpose(record.purpose);
   const actorMode = parseActorMode(record.actorMode);
-  if (!purpose || actorMode === null || !Array.isArray(record.uploadIds)) return null;
+  if (
+    !purpose
+    || actorMode === null
+    || !isAllowedPurposeActorCombination(purpose, actorMode ?? undefined)
+    || !Array.isArray(record.uploadIds)
+  ) return null;
   if (record.uploadIds.length === 0 || record.uploadIds.length > MAX_IMAGE_UPLOADS_PER_REQUEST) return null;
   if (!record.uploadIds.every(isImageUploadId)) return null;
   const uploadIds = record.uploadIds as string[];

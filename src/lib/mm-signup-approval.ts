@@ -28,15 +28,26 @@ export type MattermostSignupProfileClassification = {
   parseReason: MattermostSignupParseReason | null;
 };
 
-export function classifyMattermostSignupProfile(
-  user: MattermostSignupProfileInput,
-): MattermostSignupProfileClassification {
-  const profile = parseSsafyProfileFromUser({
+function parseMattermostSignupProfile(user: MattermostSignupProfileInput) {
+  return parseSsafyProfileFromUser({
     nickname: user.nickname,
     first_name: user.firstName,
     last_name: user.lastName,
     username: user.username,
   });
+}
+
+export function getMattermostSignupDisplayName(
+  user: MattermostSignupProfileInput,
+  profile = parseMattermostSignupProfile(user),
+) {
+  return profile.displayName?.trim() || user.nickname.trim() || user.username.trim();
+}
+
+export function classifyMattermostSignupProfile(
+  user: MattermostSignupProfileInput,
+): MattermostSignupProfileClassification {
+  const profile = parseMattermostSignupProfile(user);
   const mode = profile.parseModeCandidateMatch === true ? "direct" : "approval";
   const parseReason = normalizeMattermostSignupParseReason(
     profile.parsedExclusionReason,
@@ -133,6 +144,8 @@ export type MattermostSignupApprovalRequestSummary = {
   consentAgreedAt: string;
   createdAt: string;
   updatedAt: string;
+  expiresAt?: string;
+  hasProfileImage?: boolean;
 };
 
 type MattermostSignupApprovalRequestRow = Record<string, unknown>;
@@ -157,5 +170,9 @@ export function toSafeMattermostSignupApprovalRequest(
     consentAgreedAt: String(row.consent_agreed_at ?? ""),
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? ""),
+    ...(typeof row.expires_at === "string" ? { expiresAt: row.expires_at } : {}),
+    ...(typeof row.profile_image_upload_id === "string"
+      ? { hasProfileImage: true }
+      : {}),
   };
 }

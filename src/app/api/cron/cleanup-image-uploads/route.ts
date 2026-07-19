@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminSession } from "@/lib/auth";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { expireMattermostSignupApprovalRequests } from "@/lib/mm-signup-approval/repository";
 
 export const runtime = "nodejs";
 
@@ -14,10 +15,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {
+    const approval = await expireMattermostSignupApprovalRequests();
     const expired = await getImageUploadRepository().expireStale();
     return NextResponse.json({
       ok: true,
       expired,
+      approval,
       processedAt: new Date().toISOString(),
     });
   } catch {

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import Badge from "@/components/ui/Badge";
@@ -98,6 +99,23 @@ export default function AdminMemberSignupApprovalDetail({
           </div>
         </dl>
       </Card>
+
+      {isPending && request.hasProfileImage ? (
+        <Card className="grid gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Mattermost 프로필 사진</h2>
+            <p className="mt-1 text-sm text-muted-foreground">승인 요청 권한을 확인한 관리자만 임시 이미지를 볼 수 있습니다.</p>
+          </div>
+          <Image
+            src={`/api/admin/member-signup-requests/${encodeURIComponent(request.id)}/profile-image`}
+            alt="Mattermost 프로필 사진"
+            width={160}
+            height={160}
+            unoptimized
+            className="h-40 w-40 rounded-card border border-border object-cover"
+          />
+        </Card>
+      ) : null}
 
       {isPending ? (
         <>

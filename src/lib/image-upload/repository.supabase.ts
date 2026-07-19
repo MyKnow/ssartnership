@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   IMAGE_UPLOAD_SESSION_TTL_MS,
+  IMAGE_UPLOAD_APPROVAL_SESSION_TTL_MS,
   IMAGE_UPLOAD_STAGING_BUCKET,
   getImageUploadSignedUrlExpiresAt,
   isImageUploadSignedUrlExpired,
@@ -9,6 +10,8 @@ import {
   type CompleteImageUploadInput,
   type CompletedImageUpload,
   type ImageUploadRepository,
+  type RetainImageUploadForApprovalInput,
+  type DiscardImageUploadInput,
   type SignImageUploadInput,
   type SignedImageUpload,
 } from "@/lib/image-upload/repository";
@@ -22,6 +25,7 @@ import {
   validateNormalizedImageUpload,
 } from "@/lib/image-upload/transform.server";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { isUuid } from "@/lib/uuid";
 
 type ImageUploadSessionRow = {
   id: string;
@@ -45,6 +49,7 @@ type ImageUploadSessionRow = {
   expires_at: string;
   attached_resource_type: string | null;
   attached_resource_id: string | null;
+  failure_code: string | null;
 };
 
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
@@ -77,6 +82,21 @@ function assertOwnedSession(
     || session.purpose !== input.purpose
   ) {
     throw new Error("이미지 업로드 권한을 확인해 주세요.");
+  }
+}
+
+function assertSignupPurposeBoundary(input: {
+  actor: { kind: string; id: string };
+  purpose: ImageUploadPurpose;
+}) {
+  if (input.purpose === "member-signup-profile" && input.actor.kind !== "signup") {
+    throw new Error("신규 가입 프로필 업로드 권한을 확인해 주세요.");
+  }
+  if (input.actor.kind === "signup" && input.purpose !== "member-signup-profile") {
+    throw new Error("signup 업로드 권한은 신규 가입 프로필에서만 사용할 수 있습니다.");
+  }
+  if (input.actor.kind === "signup" && !isUuid(input.actor.id)) {
+    throw new Error("signup 업로드 소유자를 확인해 주세요.");
   }
 }
 
@@ -131,6 +151,7 @@ async function markFailed(
 
 export class SupabaseImageUploadRepository implements ImageUploadRepository {
   async sign(input: SignImageUploadInput): Promise<SignedImageUpload[]> {
+    assertSignupPurposeBoundary(input);
     if (input.uploads.length === 0 || input.uploads.length > MAX_SIGNED_UPLOADS_PER_REQUEST) {
       throw new Error("한 번에 업로드할 수 있는 이미지 수를 확인해 주세요.");
     }
@@ -200,6 +221,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
   }
 
   async complete(input: CompleteImageUploadInput): Promise<CompletedImageUpload[]> {
+    assertSignupPurposeBoundary(input);
     const uploadIds = Array.from(new Set(input.uploadIds));
     if (uploadIds.length === 0 || uploadIds.length > MAX_SIGNED_UPLOADS_PER_REQUEST) {
       throw new Error("이미지 업로드 정보를 확인해 주세요.");
@@ -232,6 +254,9 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             .eq("id", session.id)
             .in("status", ["signed", "processing", "ready"]);
           throw new Error("이미지 업로드 시간이 만료되었습니다. 다시 시도해 주세요.");
+        }
+        if (session.status === "attached" && input.purpose === "member-signup-profile") {
+          throw new Error("가입 프로필 업로드가 이미 처리되었습니다.");
         }
         if (session.status === "attached" || session.status === "ready") {
           if (!session.width || !session.height) {
@@ -282,6 +307,9 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             throw new Error("이미지 업로드 상태를 확인해 주세요.");
           }
           assertOwnedSession(latest, input);
+          if (latest.status === "attached" && input.purpose === "member-signup-profile") {
+            throw new Error("가입 프로필 업로드가 이미 처리되었습니다.");
+          }
           if (latest.status === "attached" || latest.status === "ready") {
             if (!latest.width || !latest.height) {
               throw new Error("이미지 업로드 상태를 확인해 주세요.");
@@ -360,6 +388,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
   }
 
   async attach(input: AttachImageUploadInput): Promise<AttachedImageUpload> {
+    assertSignupPurposeBoundary(input);
     const now = input.now ?? new Date();
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
@@ -530,19 +559,116 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     return toAttachedImage(attachedSession);
   }
 
+  async retainForApproval(input: RetainImageUploadForApprovalInput): Promise<void> {
+    assertSignupPurposeBoundary(input);
+    if (
+      input.actor.kind !== "signup"
+      || input.purpose !== "member-signup-profile"
+      || input.role !== "profile"
+    ) {
+      throw new Error("승인용 프로필 업로드 권한을 확인해 주세요.");
+    }
+    const now = input.now ?? new Date();
+    const latestAllowedExpiry = new Date(now.getTime() + IMAGE_UPLOAD_APPROVAL_SESSION_TTL_MS);
+    if (
+      input.expiresAt.getTime() <= now.getTime()
+      || input.expiresAt.getTime() > latestAllowedExpiry.getTime()
+    ) {
+      throw new Error("승인용 이미지 보관 기간을 확인해 주세요.");
+    }
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("image_upload_sessions")
+      .select("*")
+      .eq("id", input.uploadId)
+      .maybeSingle();
+    if (error || !data) {
+      throw new Error("이미지 업로드 세션을 찾을 수 없습니다.");
+    }
+    const session = asSessionRow(data);
+    assertOwnedSession(session, input);
+    if (session.role !== input.role || session.status !== "ready") {
+      throw new Error("승인에 사용할 이미지 업로드가 준비되지 않았습니다.");
+    }
+    if (new Date(session.expires_at).getTime() <= now.getTime()) {
+      throw new Error("이미지 업로드 시간이 만료되었습니다.");
+    }
+    const { data: retained, error: retainError } = await supabase
+      .from("image_upload_sessions")
+      .update({ expires_at: input.expiresAt.toISOString(), failure_code: null })
+      .eq("id", session.id)
+      .eq("owner_kind", input.actor.kind)
+      .eq("owner_id", input.actor.id)
+      .eq("purpose", input.purpose)
+      .eq("role", input.role)
+      .eq("status", "ready")
+      .select("id")
+      .maybeSingle();
+    if (retainError || !retained?.id) {
+      throw new Error("승인용 이미지 보관 기간을 저장하지 못했습니다.");
+    }
+  }
+
+  async discard(input: DiscardImageUploadInput): Promise<void> {
+    assertSignupPurposeBoundary(input);
+    const now = input.now ?? new Date();
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("image_upload_sessions")
+      .select("*")
+      .eq("id", input.uploadId)
+      .maybeSingle();
+    if (error || !data) {
+      throw new Error("이미지 업로드 세션을 찾을 수 없습니다.");
+    }
+    const session = asSessionRow(data);
+    assertOwnedSession(session, input);
+    if (session.status === "expired") return;
+
+    const removals = await Promise.all([
+      supabase.storage
+        .from(session.storage_bucket)
+        .remove([session.storage_path]),
+      ...(session.final_bucket && session.final_path
+        ? [supabase.storage.from(session.final_bucket).remove([session.final_path])]
+        : []),
+    ]);
+    const removalError = removals.find((result) => result.error)?.error;
+    if (removalError) {
+      await supabase
+        .from("image_upload_sessions")
+        .update({
+          status: "failed",
+          failure_code: "discard_cleanup_pending",
+          expires_at: now.toISOString(),
+        })
+        .eq("id", session.id)
+        .in("status", ["signed", "processing", "ready", "attaching", "attached"]);
+      throw new Error("이미지 임시 파일을 바로 삭제하지 못했습니다.");
+    }
+    const { error: updateError } = await supabase
+      .from("image_upload_sessions")
+      .update({ status: "expired", failure_code: null, expires_at: now.toISOString() })
+      .eq("id", session.id)
+      .in("status", ["signed", "processing", "ready", "attaching", "attached", "failed"]);
+    if (updateError) {
+      throw new Error("이미지 업로드 만료 상태를 저장하지 못했습니다.");
+    }
+  }
+
   async expireStale(now = new Date()): Promise<number> {
     const supabase = getSupabaseAdminClient();
     const [signedResult, sessionResult] = await Promise.all([
       supabase
         .from("image_upload_sessions")
-        .select("id,status,storage_bucket,storage_path,final_bucket,final_path")
+        .select("id,status,storage_bucket,storage_path,final_bucket,final_path,failure_code")
         .eq("status", "signed")
         .lte("signed_url_expires_at", now.toISOString())
         .limit(100),
       supabase
         .from("image_upload_sessions")
-        .select("id,status,storage_bucket,storage_path,final_bucket,final_path")
-        .in("status", ["signed", "processing", "ready", "attaching"])
+        .select("id,status,storage_bucket,storage_path,final_bucket,final_path,failure_code")
+        .in("status", ["signed", "processing", "ready", "attaching", "failed"])
         .lte("expires_at", now.toISOString())
         .limit(100),
     ]);
@@ -558,29 +684,37 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       ).values(),
     ) as Array<Pick<
       ImageUploadSessionRow,
-      "id" | "status" | "storage_bucket" | "storage_path" | "final_bucket" | "final_path"
+      "id" | "status" | "storage_bucket" | "storage_path" | "final_bucket" | "final_path" | "failure_code"
     >>;
     if (sessions.length === 0) return 0;
-    await Promise.all(
-      sessions.map((session) => supabase.storage.from(session.storage_bucket).remove([session.storage_path]).catch(() => undefined)),
-    );
-    await Promise.all(
-      sessions
-        .filter((session) => session.status === "attaching" && session.final_bucket && session.final_path)
-        .map((session) => supabase.storage
-          .from(session.final_bucket!)
-          .remove([session.final_path!])
-          .catch(() => undefined)),
-    );
-    const { error: updateError } = await supabase
-      .from("image_upload_sessions")
-      .update({ status: "expired" })
-      .in("id", sessions.map((session) => session.id))
-      .in("status", ["signed", "processing", "ready", "attaching"]);
-    if (updateError) {
-      throw new Error("만료된 이미지 업로드 상태를 저장하지 못했습니다.");
+    let expiredCount = 0;
+    for (const session of sessions) {
+      const removals = await Promise.all([
+        supabase.storage.from(session.storage_bucket).remove([session.storage_path]),
+        ...(session.final_bucket && session.final_path
+          ? [supabase.storage.from(session.final_bucket).remove([session.final_path])]
+          : []),
+      ]);
+      const removalError = removals.find((result) => result.error)?.error;
+      if (removalError) {
+        await supabase
+          .from("image_upload_sessions")
+          .update({ status: "failed", failure_code: "discard_cleanup_pending", expires_at: now.toISOString() })
+          .eq("id", session.id)
+          .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
+        continue;
+      }
+      const { error: updateError } = await supabase
+        .from("image_upload_sessions")
+        .update({ status: "expired", failure_code: null })
+        .eq("id", session.id)
+        .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
+      if (updateError) {
+        throw new Error("만료된 이미지 업로드 상태를 저장하지 못했습니다.");
+      }
+      expiredCount += 1;
     }
-    return sessions.length;
+    return expiredCount;
   }
 }
 

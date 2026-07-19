@@ -56,6 +56,7 @@ export const IMAGE_UPLOAD_PURPOSES = [
   "partner-change-request",
   "review",
   "profile",
+  "member-signup-profile",
   "graduate-verification",
   "manual-member-import",
   "promotion",
@@ -167,6 +168,7 @@ const policies = [
   definePolicy({ ...PARTNER_GALLERY_POLICY, purpose: "partner-change-request" }),
   definePolicy({ ...PROFILE_POLICY, purpose: "graduate-verification" }),
   definePolicy({ ...PROFILE_POLICY, purpose: "manual-member-import" }),
+  definePolicy({ ...PROFILE_POLICY, purpose: "member-signup-profile" }),
 ] satisfies ImageTransformPolicy[];
 
 export const IMAGE_TRANSFORM_POLICIES = Object.freeze(
