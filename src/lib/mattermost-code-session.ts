@@ -6,6 +6,7 @@ import {
   type MattermostSignupMode,
   type MattermostSignupParseReason,
 } from "@/lib/mm-signup-approval";
+import { isUuid } from "@/lib/uuid";
 
 const COOKIE_NAME = "mattermost_code_session";
 const SESSION_TTL_MS = 20 * 60 * 1000;
@@ -21,6 +22,7 @@ export type MattermostCodeSession = {
   senderGeneration: number;
   signupMode?: MattermostSignupMode;
   parseExclusionReason?: MattermostSignupParseReason | null;
+  signupUploadOwnerId?: string;
 };
 
 type SignedMattermostCodeSession = MattermostCodeSession & {
@@ -60,6 +62,9 @@ function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null
   ) {
     return null;
   }
+  if (payload.purpose === "signup" && !isUuid(String(payload.signupUploadOwnerId ?? ""))) {
+    return null;
+  }
   const signupMode = payload.purpose === "signup"
     ? payload.signupMode === "approval"
       ? "approval"
@@ -72,6 +77,9 @@ function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null
     ...payload,
     ...(signupMode ? { signupMode } : {}),
     ...(parseExclusionReason ? { parseExclusionReason } : {}),
+    ...(payload.purpose === "signup"
+      ? { signupUploadOwnerId: payload.signupUploadOwnerId as string }
+      : {}),
   } as SignedMattermostCodeSession;
 }
 
@@ -92,6 +100,9 @@ function verifySessionToken(token: string) {
 }
 
 export async function setMattermostCodeSession(session: MattermostCodeSession) {
+  if (session.purpose === "signup" && !isUuid(session.signupUploadOwnerId ?? "")) {
+    throw new Error("signupUploadOwnerId가 필요합니다.");
+  }
   const now = Date.now();
   const payload = Buffer.from(JSON.stringify({
     ...session,

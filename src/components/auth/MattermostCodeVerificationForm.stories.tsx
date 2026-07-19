@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import MattermostCodeVerificationForm from "./MattermostCodeVerificationForm";
 
 const meta = {
@@ -39,6 +39,44 @@ export const Signup: Story = {
     await expect(options[1]).not.toBeDisabled();
     await expect(options[2]).not.toBeDisabled();
     await expect(options[3]).toBeDisabled();
+  },
+};
+
+function installMattermostCodeIssueFetchMock() {
+  window.fetch = async (input) => {
+    if (String(input).includes("/api/mm/code/issue")) {
+      return Response.json(
+        {
+          ok: true,
+          challenge: "storybook-mattermost-code-challenge",
+          expiresInSeconds: 300,
+          retryAfterSeconds: 60,
+        },
+        { status: 202 },
+      );
+    }
+    return Response.json({ ok: true });
+  };
+}
+
+export const CodeIssued: Story = {
+  play: async ({ canvasElement }) => {
+    installMattermostCodeIssueFetchMock();
+    const canvas = within(canvasElement);
+
+    await userEvent.type(canvas.getByRole("textbox", { name: "Mattermost ID" }), "myknow");
+    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "기수" }), "15");
+    await userEvent.click(canvas.getByRole("button", { name: "Mattermost DM으로 코드 받기" }));
+
+    await expect(
+      canvas.getByText("입력한 Mattermost 계정으로 인증 코드를 보냈습니다."),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("timer", { name: "인증 코드 만료까지 05:00 남음" }),
+    ).toHaveTextContent("05:00");
+    await expect(canvas.getByRole("textbox", { name: "6자리 인증 코드" })).toHaveAttribute(
+      "aria-describedby",
+    );
   },
 };
 

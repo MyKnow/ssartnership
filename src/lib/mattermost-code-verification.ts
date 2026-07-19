@@ -1,5 +1,6 @@
 import { randomInt } from "node:crypto";
 import { createHmacDigest } from "@/lib/hmac.js";
+import { MATTERMOST_VERIFICATION_CODE_TTL_SECONDS } from "@/lib/mattermost-code-expiration";
 import { hashOpaqueToken, generateOpaqueToken } from "@/lib/password";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { MattermostVerificationRequest } from "@/lib/mattermost-code-input";
@@ -20,7 +21,7 @@ type MattermostVerificationTarget = {
   senderGeneration: number;
 };
 
-const CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_TTL_MS = MATTERMOST_VERIFICATION_CODE_TTL_SECONDS * 1_000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
 export class MattermostCodeVerificationError extends Error {
@@ -219,7 +220,11 @@ export async function issueMattermostVerificationCode(input: {
       sent: false,
       errorCode: "not_found",
     });
-    return { challenge, retryAfterSeconds: Math.ceil(RESEND_COOLDOWN_MS / 1000) };
+    return {
+      challenge,
+      expiresInSeconds: MATTERMOST_VERIFICATION_CODE_TTL_SECONDS,
+      retryAfterSeconds: Math.ceil(RESEND_COOLDOWN_MS / 1000),
+    };
   }
 
   try {
@@ -240,7 +245,11 @@ export async function issueMattermostVerificationCode(input: {
     }).catch(() => undefined);
   }
 
-  return { challenge, retryAfterSeconds: Math.ceil(RESEND_COOLDOWN_MS / 1000) };
+  return {
+    challenge,
+    expiresInSeconds: MATTERMOST_VERIFICATION_CODE_TTL_SECONDS,
+    retryAfterSeconds: Math.ceil(RESEND_COOLDOWN_MS / 1000),
+  };
 }
 
 export async function consumeMattermostVerificationCode(input: {

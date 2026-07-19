@@ -10,11 +10,12 @@ import type { ImageUploadPurpose } from "@/lib/image-upload/policy";
 import { getGraduateApplicationSession } from "@/lib/graduate-verification-security";
 import { getPartnerSession } from "@/lib/partner-session";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { getMattermostCodeSession } from "@/lib/mattermost-code-session";
 
 export const IMAGE_UPLOAD_GUEST_COOKIE = "image_upload_guest";
 export const IMAGE_UPLOAD_GUEST_COOKIE_MAX_AGE_SECONDS = 2 * 60 * 60;
 
-export type ImageUploadActorMode = "admin" | "member" | "partner" | "guest";
+export type ImageUploadActorMode = "admin" | "member" | "partner" | "guest" | "signup";
 
 export class ImageUploadAuthorizationError extends Error {
   constructor(
@@ -89,6 +90,17 @@ async function getGraduateActor() {
   return { kind: "graduate_challenge" as const, id: session.challengeId };
 }
 
+async function getSignupActor(purpose: ImageUploadPurpose) {
+  if (purpose !== "member-signup-profile") {
+    throw new ImageUploadAuthorizationError(403, "신규 가입 프로필 업로드 용도만 사용할 수 있습니다.");
+  }
+  const session = await getMattermostCodeSession("signup");
+  if (!session?.signupUploadOwnerId) {
+    throw new ImageUploadAuthorizationError(401, "Mattermost 가입 인증을 다시 진행해 주세요.");
+  }
+  return { kind: "signup" as const, id: session.signupUploadOwnerId };
+}
+
 function normalizeGuestOwner(value: string | undefined | null) {
   return value && /^[0-9a-f-]{36}$/i.test(value) ? value : null;
 }
@@ -99,6 +111,12 @@ export async function resolveImageUploadActorForRoute(input: {
   guestOwner?: string | null;
 }): Promise<{ actor: ImageUploadActor; guestOwnerToSet?: string }> {
   const { purpose, actorMode } = input;
+  if (purpose === "member-signup-profile" && actorMode !== "signup") {
+    throw new ImageUploadAuthorizationError(403, "신규 가입 프로필 업로드에는 signup 권한이 필요합니다.");
+  }
+  if (actorMode === "signup" && purpose !== "member-signup-profile") {
+    throw new ImageUploadAuthorizationError(403, "signup 권한은 신규 가입 프로필 업로드에서만 사용할 수 있습니다.");
+  }
   if (actorMode === "admin") {
     return { actor: await getAdminActorForPurpose(purpose) };
   }
@@ -119,6 +137,9 @@ export async function resolveImageUploadActorForRoute(input: {
       ...(existing ? {} : { guestOwnerToSet: guestOwner }),
     };
   }
+  if (actorMode === "signup") {
+    return { actor: await getSignupActor(purpose) };
+  }
 
   switch (purpose) {
     case "partner":
@@ -131,6 +152,8 @@ export async function resolveImageUploadActorForRoute(input: {
       return { actor: await getMemberActor() };
     case "profile":
       return { actor: await getMemberActor() };
+    case "member-signup-profile":
+      throw new ImageUploadAuthorizationError(403, "신규 가입 프로필 업로드에는 signup 권한이 필요합니다.");
     case "graduate-verification":
       return { actor: await getGraduateActor() };
     case "partner-registration": {
@@ -152,6 +175,12 @@ export async function resolveImageUploadActorForServerAction(
   purpose: ImageUploadPurpose,
   actorMode?: ImageUploadActorMode,
 ): Promise<ImageUploadActor> {
+  if (purpose === "member-signup-profile" && actorMode !== "signup") {
+    throw new ImageUploadAuthorizationError(403, "신규 가입 프로필 업로드에는 signup 권한이 필요합니다.");
+  }
+  if (actorMode === "signup" && purpose !== "member-signup-profile") {
+    throw new ImageUploadAuthorizationError(403, "signup 권한은 신규 가입 프로필 업로드에서만 사용할 수 있습니다.");
+  }
   if (actorMode === "admin") return getAdminActorForPurpose(purpose);
   if (actorMode === "member") return getMemberActor();
   if (actorMode === "partner") return getPartnerActor();
@@ -163,6 +192,7 @@ export async function resolveImageUploadActorForServerAction(
     }
     return { kind: "guest", id: guestOwner };
   }
+  if (actorMode === "signup") return getSignupActor(purpose);
   if (purpose === "partner-registration") {
     const partner = await getPartnerSession();
     if (partner?.accountId && !partner.mustChangePassword) {
@@ -182,5 +212,6 @@ export function isImageUploadOwnerKind(value: unknown): value is ImageUploadOwne
     || value === "member"
     || value === "partner"
     || value === "graduate_challenge"
-    || value === "guest";
+    || value === "guest"
+    || value === "signup";
 }

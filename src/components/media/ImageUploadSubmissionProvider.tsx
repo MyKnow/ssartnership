@@ -19,7 +19,7 @@ import type { ImageUploadDraftFile } from "@/lib/image-upload/draft.client";
 import type { ImageUploadDraftManifest } from "@/lib/image-upload/draft";
 import type { ImageUploadPurpose } from "@/lib/image-upload/policy";
 
-export type ImageUploadActorMode = "admin" | "member" | "partner" | "guest";
+export type ImageUploadActorMode = "admin" | "member" | "partner" | "guest" | "signup";
 
 export type ImageUploadSubmissionField = {
   id: string;

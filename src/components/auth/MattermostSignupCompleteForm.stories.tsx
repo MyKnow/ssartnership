@@ -95,10 +95,47 @@ export const Signup: Story = {
     );
     await expect(submit).toBeEnabled();
 
-    const checkboxes = canvas.getAllByRole("checkbox");
-    await checkboxes[0].click();
-    await checkboxes[1].click();
-    await expect(canvas.getByRole("button", { name: "회원가입하기" })).toBeEnabled();
+    const requests: Array<{ url: string; body: string }> = [];
+    window.fetch = async (input, init) => {
+      requests.push({
+        url: String(input),
+        body: String(init?.body ?? ""),
+      });
+      return Response.json({ ok: true, redirectTo: "/" });
+    };
+
+    await userEvent.click(submit);
+    await expect(canvas.getAllByRole("checkbox")).toHaveLength(3);
+    for (const checkbox of canvas.getAllByRole("checkbox")) {
+      await expect(checkbox).toBeChecked();
+    }
+    await expect(requests).toHaveLength(1);
+    await expect(requests[0].url).toBe("/api/mm/signup");
+    await expect(JSON.parse(requests[0].body)).toMatchObject({
+      servicePolicyId: servicePolicy.id,
+      privacyPolicyId: privacyPolicy.id,
+      marketingPolicyId: marketingPolicy.id,
+      marketingPolicyChecked: true,
+    });
+  },
+};
+
+export const InlineValidation: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const password = canvas.getByLabelText("사이트 비밀번호");
+    const confirmPassword = canvas.getByLabelText("비밀번호 확인");
+
+    await userEvent.type(password, "passwordonly");
+    await userEvent.tab();
+    await expect(
+      canvas.getByText("비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다."),
+    ).toBeInTheDocument();
+
+    await userEvent.clear(password);
+    await userEvent.type(password, "Password!123");
+    await userEvent.type(confirmPassword, "Password!124");
+    await expect(canvas.getByText("비밀번호가 일치하지 않습니다.")).toBeInTheDocument();
   },
 };
 
