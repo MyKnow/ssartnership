@@ -106,10 +106,13 @@ test.describe("auth and partner portal operation flows", () => {
     await page.goto("/auth/signup");
     await page.waitForLoadState("networkidle");
     const generation = page.getByRole("combobox", { name: "기수" });
-    const activeGeneration = await generation.locator("option:not([disabled])").evaluateAll(
-      (options) => options.map((option) => (option as HTMLOptionElement).value)
-        .find(Boolean) ?? "",
-    );
+    const readActiveGeneration = () =>
+      generation.locator("option:not([disabled])").evaluateAll(
+        (options) => options.map((option) => (option as HTMLOptionElement).value)
+          .find(Boolean) ?? "",
+      );
+    await expect.poll(readActiveGeneration, { timeout: 15_000 }).not.toBe("");
+    const activeGeneration = await readActiveGeneration();
     expect(activeGeneration).not.toBe("");
     await page.getByRole("textbox", { name: "Mattermost ID" }).fill("myknow");
     await generation.selectOption(activeGeneration);
