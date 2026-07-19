@@ -256,6 +256,15 @@ export class MockAdPackageRepository implements AdPackageRepository {
     });
   }
 
+  async listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]> {
+    return this.coupons
+      .filter((coupon) => coupon.partnerId === partnerId)
+      .map((coupon) => ({
+        ...cloneCoupon(coupon),
+        usedCount: this.countCouponRedemptions(coupon.id),
+      }));
+  }
+
   async listActiveCouponsForPartner(
     partnerId: string,
     options?: { now?: Date },

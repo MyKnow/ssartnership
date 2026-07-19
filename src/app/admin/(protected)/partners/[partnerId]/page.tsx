@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPartnerReviewManager from "@/components/admin/partner-detail/AdminPartnerReviewManager";
 import AdminPartnerChangeHistory from "@/components/admin/partner-detail/AdminPartnerChangeHistory";
+import AdminPartnerCouponManager from "@/components/admin/ad-packages/AdminPartnerCouponManager";
 import AdminPartnerPreviewLinkPanel from "@/components/admin/AdminPartnerPreviewLinkPanel";
 import PartnerCardForm from "@/components/PartnerCardForm";
 import CategoryColorBadge from "@/components/ui/CategoryColorBadge";
@@ -14,12 +15,14 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
+import { createAdCouponAction } from "@/app/admin/(protected)/_actions/ad-package-actions";
 import {
   generatePartnerPreviewLink,
   removePartnerPreviewLink,
 } from "@/app/admin/(protected)/_actions/partner-actions/preview";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import {
   assertAdminCanAccessManagedCampuses,
   getManagedCampusFilterValues,
@@ -40,6 +43,11 @@ import {
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { fetchRequestSummariesForPartner } from "@/lib/partner-change-requests/summary";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { adPackageRepository } from "@/lib/repositories";
+import type {
+  AdCampaignWithStats,
+  AdCoupon,
+} from "@/lib/repositories/ad-package-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -90,8 +98,25 @@ export default async function AdminPartnerDetailPage({
     ? adminPartnerDetailErrorMessages[String(query.error)] ?? null
     : null;
   const partnerSaved = query.success === "updated";
+  const couponCreated = query.success === "ad-coupon-created";
+  const canReadCoupons = canAdmin(
+    adminSession.account.permissions,
+    "home_ads",
+    "read",
+  );
+  const canCreateCoupons = canAdmin(
+    adminSession.account.permissions,
+    "home_ads",
+    "create",
+  );
 
   const supabase = getSupabaseAdminClient();
+  const couponManagementDataPromise = canReadCoupons
+    ? Promise.all([
+        adPackageRepository.listAdminCampaigns(),
+        adPackageRepository.listAdminCouponsForPartner(partnerId),
+      ])
+    : Promise.resolve<[AdCampaignWithStats[], AdCoupon[]]>([[], []]);
   const reviewFilters = {
     ...parseAdminReviewFilters(query),
     partnerId,
@@ -113,6 +138,7 @@ export default async function AdminPartnerDetailPage({
     reviewData,
     reviewCountResult,
     previewTokenResult,
+    couponManagementData,
   ] = await Promise.all([
     supabase
       .from("categories")
@@ -137,7 +163,10 @@ export default async function AdminPartnerDetailPage({
       .select("created_at")
       .eq("partner_id", partnerId)
       .maybeSingle(),
+    couponManagementDataPromise,
   ]);
+
+  const [adCampaigns, adCoupons] = couponManagementData;
 
   if (!partnerResult.data) {
     notFound();
@@ -234,6 +263,9 @@ export default async function AdminPartnerDetailPage({
         />
 
         {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
+        {couponCreated ? (
+          <FormMessage variant="info">제휴처 쿠폰을 생성했습니다.</FormMessage>
+        ) : null}
 
         <Card tone="elevated">
           <div className="flex flex-wrap items-center gap-2">
@@ -311,6 +343,15 @@ export default async function AdminPartnerDetailPage({
         </Card>
 
         <PartnerMetricTimeseriesPanel data={metricTimeseries} />
+
+        <AdminPartnerCouponManager
+          partnerId={partner.id}
+          partnerName={partner.name ?? "제휴처"}
+          campaigns={adCampaigns.filter((campaign) => campaign.partnerId === partner.id)}
+          coupons={adCoupons}
+          createCouponAction={createAdCouponAction}
+          canCreateCoupon={canCreateCoupons}
+        />
 
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">
           <div className="grid min-w-0 gap-4">

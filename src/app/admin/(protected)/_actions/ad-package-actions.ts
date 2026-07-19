@@ -27,6 +27,7 @@ function revalidateAdPackagePaths(partnerId?: string | null) {
   revalidatePath("/admin/advertisement");
   if (partnerId) {
     revalidatePath(`/partners/${partnerId}`);
+    revalidatePath(`/admin/partners/${partnerId}`);
   }
 }
 
@@ -87,7 +88,7 @@ export async function updateAdCampaignStatusAction(formData: FormData) {
 }
 
 export async function createAdCouponAction(formData: FormData) {
-  await requireAdminPermission("home_ads", "create", { path: "/admin/advertisement" });
+  await requireAdminPermission("home_ads", "create", { path: "/admin/partners" });
   const input = parseCreateAdCouponForm(formData);
   const coupon = await adPackageRepository.createCoupon(input);
   const codePool = normalizeCouponCodeRows(
@@ -109,5 +110,7 @@ export async function createAdCouponAction(formData: FormData) {
     },
   });
   revalidateAdPackagePaths(coupon.partnerId);
-  redirectAdvertisement("ad-coupon-created");
+  redirect(
+    `/admin/partners/${encodeURIComponent(coupon.partnerId)}?success=ad-coupon-created`,
+  );
 }

@@ -420,6 +420,48 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     });
   }
 
+  async listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]> {
+    if (!partnerId) {
+      return [];
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("ad_coupons")
+      .select(AD_COUPON_SELECT)
+      .eq("partner_id", partnerId)
+      .order("created_at", { ascending: false });
+    if (error) {
+      if (isMissingAdPackageSchemaMessage(error.message, "ad_coupons")) {
+        return [];
+      }
+      throw new Error(error.message);
+    }
+
+    const rows = (data ?? []) as AdCouponRow[];
+    const couponIds = rows.map((row) => row.id);
+    if (couponIds.length === 0) {
+      return [];
+    }
+
+    const { data: redemptionData, error: redemptionError } = await supabase
+      .from("ad_coupon_redemptions")
+      .select("coupon_id")
+      .in("coupon_id", couponIds)
+      .eq("status", "redeemed");
+    if (redemptionError) {
+      throw new Error(redemptionError.message);
+    }
+
+    const redemptionCounts = countByKey(
+      (redemptionData ?? []) as Array<{ coupon_id: string | null }>,
+      "coupon_id",
+    );
+    return rows.map((row) =>
+      mapCouponRow(row, redemptionCounts.get(row.id) ?? 0),
+    );
+  }
+
   async listActiveCouponsForPartner(
     partnerId: string,
     options?: { now?: Date },

@@ -272,6 +272,43 @@ export const CompactListWithoutAddress: Story = {
   },
 };
 
+export const LongKoreanContentOnMobile: Story = {
+  args: {
+    partner: {
+      ...basePartner,
+      name: "피치플레이헬스&필라테스 역삼점 서울 강남 캠퍼스 제휴처",
+      location: "서울 강남구 논현로86길 20 지하1층 역삼역 3번 출구 인근",
+      benefits: [
+        "헬스 1개월 33,000원 및 필라테스 10회 199,000원",
+        "신규 회원 등록 시 운동복 무료 대여",
+        "개인별 체험 상담 제공",
+      ],
+      thumbnail: demoImage,
+      images: [demoImage],
+    },
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile1",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const card = canvas.getByTestId("partner-card");
+    const title = canvas.getByRole("link", {
+      name: "피치플레이헬스&필라테스 역삼점 서울 강남 캠퍼스 제휴처 상세 보기",
+    });
+    const location = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-card-location]",
+    );
+
+    await expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
+    await expect(title).toHaveClass("truncate");
+    await expect(location).not.toBeNull();
+    await expect(location).toHaveClass("line-clamp-2");
+  },
+};
+
 export const InactivePeriod: Story = {
   args: {
     partner: {

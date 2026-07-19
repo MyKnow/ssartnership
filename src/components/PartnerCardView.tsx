@@ -101,7 +101,7 @@ export default function PartnerCardView({
       data-testid="partner-card"
       onClick={handleCardSurfaceClick}
       className={cn(
-        "@container/card relative h-full w-full min-w-0 rounded-card border border-border/80 bg-surface-overlay shadow-flat backdrop-blur-md transition-surface duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
+        "@container/card relative h-full w-full min-w-0 overflow-hidden rounded-card border border-border/80 bg-surface-overlay shadow-flat backdrop-blur-md transition-surface duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover-shadow-raised",
         variant === "list"
           ? "grid grid-cols-1 items-center gap-2 p-3 min-[360px]:gap-3 min-[360px]:p-4 min-[480px]:grid-cols-[minmax(0,1fr)_2.75rem]"
           : "flex flex-col gap-5 p-5",

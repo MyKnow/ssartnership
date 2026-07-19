@@ -20,6 +20,26 @@ async function createCodeCoupon(
 }
 
 describe("mock ad package repository", () => {
+  it("lists every coupon for an admin partner detail page", async () => {
+    const repository = new MockAdPackageRepository();
+    const standaloneCoupon = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "캠페인 없는 제휴처 쿠폰",
+      status: "draft",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+      onsitePassword: "1234",
+    });
+
+    const coupons = await repository.listAdminCouponsForPartner("restaurant-001");
+
+    assert.deepEqual(
+      coupons.map((coupon) => coupon.id),
+      [standaloneCoupon.id, "coupon-restaurant-lunch"],
+    );
+    assert.equal(coupons[0]?.status, "draft");
+  });
+
   it("lists active coupons for a partner", async () => {
     const repository = new MockAdPackageRepository();
     const coupons = await repository.listActiveCouponsForPartner("restaurant-001", {
