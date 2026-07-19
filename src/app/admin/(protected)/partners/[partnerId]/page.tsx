@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPartnerReviewManager from "@/components/admin/partner-detail/AdminPartnerReviewManager";
 import AdminPartnerChangeHistory from "@/components/admin/partner-detail/AdminPartnerChangeHistory";
+import AdminPartnerPreviewLinkPanel from "@/components/admin/AdminPartnerPreviewLinkPanel";
 import PartnerCardForm from "@/components/PartnerCardForm";
 import CategoryColorBadge from "@/components/ui/CategoryColorBadge";
 import Badge from "@/components/ui/Badge";
@@ -13,6 +14,10 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
+import {
+  generatePartnerPreviewLink,
+  removePartnerPreviewLink,
+} from "@/app/admin/(protected)/_actions/partner-actions/preview";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
@@ -107,6 +112,7 @@ export default async function AdminPartnerDetailPage({
     metricsResult,
     reviewData,
     reviewCountResult,
+    previewTokenResult,
   ] = await Promise.all([
     supabase
       .from("categories")
@@ -126,6 +132,11 @@ export default async function AdminPartnerDetailPage({
       managedCampusSlugs: managedCampusFilter,
     }),
     fetchPartnerReviewVisibilityCounts(supabase, partnerId),
+    supabase
+      .from("partner_preview_tokens")
+      .select("created_at")
+      .eq("partner_id", partnerId)
+      .maybeSingle(),
   ]);
 
   if (!partnerResult.data) {
@@ -361,6 +372,12 @@ export default async function AdminPartnerDetailPage({
                 { name: "updateRedirectTo", value: detailPath },
                 { name: "deleteRedirectTo", value: "/admin/partners" },
               ]}
+            />
+            <AdminPartnerPreviewLinkPanel
+              partnerId={partner.id}
+              hasActiveLink={Boolean(previewTokenResult.data?.created_at)}
+              generateAction={generatePartnerPreviewLink}
+              removeAction={removePartnerPreviewLink}
             />
           </div>
 

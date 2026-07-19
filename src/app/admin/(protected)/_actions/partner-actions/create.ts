@@ -5,7 +5,9 @@ import {
   type AdminScopeAccountLike,
   resolveCreatedManagedCampusSlugs,
 } from "@/lib/admin-scope";
-import { sendCampusScopedNewPartnerNotification } from "@/lib/new-partner-notifications";
+import {
+  sendAndRecordCampusScopedNewPartnerNotification,
+} from "@/lib/new-partner-notifications";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import {
   DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
@@ -36,6 +38,7 @@ import {
 } from "@/app/admin/(protected)/_actions/shared-parsers";
 import type { CreatedPartnerRecord } from "@/app/admin/(protected)/_actions/shared-types";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
+import { getPartnerVisibilityState } from "@/lib/partner-visibility";
 
 type AdminPartnerBranchPayload = {
   branchScopeType: PartnerBranchScopeType;
@@ -414,7 +417,12 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
     },
   });
 
-  if (payload.visibility !== "private") {
+  const visibilityState = getPartnerVisibilityState(
+    payload.visibility,
+    payload.periodStart,
+    payload.periodEnd,
+  );
+  if (visibilityState === "public") {
     const { data: category } = await supabase
       .from("categories")
       .select("label")
@@ -422,7 +430,7 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
       .maybeSingle();
 
     try {
-      await sendCampusScopedNewPartnerNotification({
+      await sendAndRecordCampusScopedNewPartnerNotification({
         partnerId,
         name: payload.name,
         location: payload.location,

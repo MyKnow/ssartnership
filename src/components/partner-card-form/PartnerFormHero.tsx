@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
+  getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
 import type { PartnerCardFormMode } from "@/components/partner-card-form/types";
 
@@ -26,6 +27,11 @@ export default function PartnerFormHero({
       : "기존 상세 페이지와 같은 흐름으로 내용을 갱신하세요.";
   const periodLabel =
     periodStart || periodEnd ? `${periodStart} ~ ${periodEnd}` : "기간 미설정";
+  const visibilityState = getPartnerVisibilityState(
+    visibilityValue,
+    periodStart || null,
+    periodEnd || null,
+  );
 
   return (
     <Card className="relative overflow-hidden">
@@ -49,10 +55,10 @@ export default function PartnerFormHero({
           <Badge
             className={cn(
               "text-xs",
-              getPartnerVisibilityBadgeClass(visibilityValue),
+              getPartnerVisibilityBadgeClass(visibilityState),
             )}
           >
-            {getPartnerVisibilityLabel(visibilityValue)}
+            {getPartnerVisibilityLabel(visibilityState)}
           </Badge>
           <span className="text-xs font-medium text-muted-foreground">
             {periodLabel}

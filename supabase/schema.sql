@@ -95,6 +95,18 @@ create table if not exists partners (
     check (plan_tier in ('basic', 'partner', 'boost'))
 );
 
+create table if not exists partner_publication_notification_states (
+  partner_id uuid primary key references partners(id) on delete cascade,
+  new_partner_notification_sent_at timestamp with time zone,
+  updated_at timestamp with time zone not null default now()
+);
+
+create table if not exists partner_preview_tokens (
+  partner_id uuid primary key references partners(id) on delete cascade,
+  token_hash text not null unique,
+  created_at timestamp with time zone not null default now()
+);
+
 create or replace function public.infer_partner_campus_slugs(input_location text)
 returns text[]
 language sql
@@ -2997,6 +3009,9 @@ create index if not exists partner_change_requests_created_at_idx on partner_cha
 create unique index if not exists partner_change_requests_pending_partner_idx
   on partner_change_requests(partner_id)
   where status = 'pending';
+create index if not exists partner_publication_notification_pending_idx
+  on partner_publication_notification_states(new_partner_notification_sent_at)
+  where new_partner_notification_sent_at is null;
 create index if not exists password_reset_attempts_identifier_idx on password_reset_attempts(identifier);
 create index if not exists push_subscriptions_member_id_idx on push_subscriptions(member_id);
 create index if not exists push_subscriptions_active_idx on push_subscriptions(is_active);
@@ -3779,6 +3794,8 @@ alter table partner_push_subscriptions enable row level security;
 alter table partner_notifications enable row level security;
 alter table partner_notification_recipients enable row level security;
 alter table partner_notification_deliveries enable row level security;
+alter table partner_publication_notification_states enable row level security;
+alter table partner_preview_tokens enable row level security;
 alter table operational_notification_dedupes enable row level security;
 alter table admin_audit_logs enable row level security;
 alter table auth_security_logs enable row level security;
@@ -3840,6 +3857,10 @@ revoke all on table partner_registration_branches from anon;
 revoke all on table partner_registration_branches from authenticated;
 revoke all on table partner_reviews from anon;
 revoke all on table partner_reviews from authenticated;
+revoke all on table partner_publication_notification_states from anon;
+revoke all on table partner_publication_notification_states from authenticated;
+revoke all on table partner_preview_tokens from anon;
+revoke all on table partner_preview_tokens from authenticated;
 revoke all on table partner_review_reactions from anon;
 revoke all on table partner_review_reactions from authenticated;
 revoke all on table partner_favorites from anon;

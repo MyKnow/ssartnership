@@ -170,6 +170,9 @@ export class MockPartnerRepository implements PartnerRepository {
     if (!partner) {
       return null;
     }
+    if (context.previewToken) {
+      return null;
+    }
     if (
       !canViewPartnerDetails(partner.visibility, context.authenticated, {
         start: partner.period.start,

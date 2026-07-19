@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
   type MutableRefObject,
   type RefObject,
 } from "react";
@@ -20,6 +21,13 @@ import type { ImageUploadDraftValue } from "@/lib/image-upload/draft";
 const DRAFT_SAVE_DEBOUNCE_MS = 350;
 
 type DraftValue = ImageUploadDraftValue;
+
+export type ImageUploadFormDraftStatus =
+  | "idle"
+  | "saving"
+  | "saved"
+  | "restored"
+  | "error";
 
 function getDraftableFormValues(form: HTMLFormElement) {
   const values: Record<string, DraftValue> = {};
@@ -78,6 +86,31 @@ function restoreFormValues(
   form: HTMLFormElement,
   values: Record<string, DraftValue>,
 ) {
+  const setNativeValue = (
+    control: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+    value: string,
+  ) => {
+    const setter = Object.getOwnPropertyDescriptor(
+      Object.getPrototypeOf(control),
+      "value",
+    )?.set as ((nextValue: string) => void) | undefined;
+    if (setter) {
+      setter.call(control, value);
+    } else {
+      control.value = value;
+    }
+  };
+  const setNativeChecked = (control: HTMLInputElement, checked: boolean) => {
+    const setter = Object.getOwnPropertyDescriptor(
+      Object.getPrototypeOf(control),
+      "checked",
+    )?.set as ((nextValue: boolean) => void) | undefined;
+    if (setter) {
+      setter.call(control, checked);
+    } else {
+      control.checked = checked;
+    }
+  };
   const controls = form.querySelectorAll<
     HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
   >("input[name], select[name], textarea[name]");
@@ -95,7 +128,7 @@ function restoreFormValues(
             ? saved
             : control.checked;
         if (control.checked === checked) continue;
-        control.checked = checked;
+        setNativeChecked(control, checked);
         control.dispatchEvent(new Event("input", { bubbles: true }));
         control.dispatchEvent(new Event("change", { bubbles: true }));
         continue;
@@ -103,7 +136,7 @@ function restoreFormValues(
       if (control.type === "radio") {
         const checked = control.value === String(saved);
         if (control.checked === checked) continue;
-        control.checked = checked;
+        setNativeChecked(control, checked);
         control.dispatchEvent(new Event("input", { bubbles: true }));
         control.dispatchEvent(new Event("change", { bubbles: true }));
         continue;
@@ -111,7 +144,7 @@ function restoreFormValues(
     }
     const nextValue = String(saved);
     if (control.value === nextValue) continue;
-    control.value = nextValue;
+    setNativeValue(control, nextValue);
     control.dispatchEvent(new Event("input", { bubbles: true }));
     control.dispatchEvent(new Event("change", { bubbles: true }));
   }
@@ -127,6 +160,10 @@ export type ImageUploadFormDraftOptions = {
   formKey: string;
   formRef: RefObject<HTMLFormElement | null>;
   imageUploadControllerRef?: MutableRefObject<ImageUploadSubmissionController | null>;
+  getAdditionalDraftValues?: () => Record<string, ImageUploadDraftValue>;
+  restoreAdditionalDraftValues?: (
+    values: Record<string, ImageUploadDraftValue>,
+  ) => void;
   clearOnSuccess?: boolean;
 };
 
@@ -139,25 +176,50 @@ export function useImageUploadFormDraft({
   formKey,
   formRef,
   imageUploadControllerRef,
+  getAdditionalDraftValues,
+  restoreAdditionalDraftValues,
   clearOnSuccess = false,
 }: ImageUploadFormDraftOptions) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoringRef = useRef(false);
+  const draftClearedRef = useRef(false);
+  const saveRequestRef = useRef(0);
+  const mountedRef = useRef(true);
+  const [draftStatus, setDraftStatus] = useState<ImageUploadFormDraftStatus>("idle");
 
-  const saveDraft = useCallback(async () => {
+  const saveDraft = useCallback(async (force = false) => {
     const form = formRef.current;
-    if (!form || restoringRef.current) return;
+    if (!form || restoringRef.current || (!force && draftClearedRef.current)) return;
+    if (force) {
+      draftClearedRef.current = false;
+    }
+    const saveRequestId = saveRequestRef.current + 1;
+    saveRequestRef.current = saveRequestId;
+    setDraftStatus("saving");
     const controller = imageUploadControllerRef?.current;
-    saveImageUploadDraft({
-      formKey,
-      values: getDraftableFormValues(form),
-      manifests: controller?.getDraftManifests() ?? [],
-    });
-    await saveImageUploadDraftFiles(formKey, controller?.getDraftFiles() ?? []);
-  }, [formKey, formRef, imageUploadControllerRef]);
+    try {
+      saveImageUploadDraft({
+        formKey,
+        values: {
+          ...getDraftableFormValues(form),
+          ...getAdditionalDraftValues?.(),
+        },
+        manifests: controller?.getDraftManifests() ?? [],
+      });
+      await saveImageUploadDraftFiles(formKey, controller?.getDraftFiles() ?? []);
+      if (mountedRef.current && saveRequestRef.current === saveRequestId) {
+        setDraftStatus("saved");
+      }
+    } catch {
+      if (mountedRef.current && saveRequestRef.current === saveRequestId) {
+        setDraftStatus("error");
+      }
+    }
+  }, [formKey, formRef, getAdditionalDraftValues, imageUploadControllerRef]);
 
   const scheduleDraftSave = useCallback(() => {
     if (restoringRef.current) return;
+    draftClearedRef.current = false;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
@@ -168,12 +230,23 @@ export function useImageUploadFormDraft({
   }, [saveDraft]);
 
   const clearDraft = useCallback(async () => {
+    draftClearedRef.current = true;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
     await clearImageUploadDraft(formKey);
+    if (mountedRef.current) {
+      setDraftStatus("idle");
+    }
   }, [formKey]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const form = formRef.current;
@@ -215,6 +288,7 @@ export function useImageUploadFormDraft({
       restoringRef.current = true;
       try {
         restoreFormValues(form, draft.values);
+        restoreAdditionalDraftValues?.(draft.values);
         const files = await loadImageUploadDraftFiles(formKey);
         for (let attempt = 0; attempt < 12 && !cancelled; attempt += 1) {
           const controller = imageUploadControllerRef?.current;
@@ -224,6 +298,9 @@ export function useImageUploadFormDraft({
           }
           await nextAnimationFrame();
         }
+        if (!cancelled && mountedRef.current) {
+          setDraftStatus("restored");
+        }
       } finally {
         restoringRef.current = false;
       }
@@ -231,7 +308,13 @@ export function useImageUploadFormDraft({
     return () => {
       cancelled = true;
     };
-  }, [clearOnSuccess, formKey, formRef, imageUploadControllerRef]);
+  }, [
+    clearOnSuccess,
+    formKey,
+    formRef,
+    imageUploadControllerRef,
+    restoreAdditionalDraftValues,
+  ]);
 
   useEffect(() => {
     if (clearOnSuccess) {
@@ -239,5 +322,5 @@ export function useImageUploadFormDraft({
     }
   }, [clearDraft, clearOnSuccess]);
 
-  return { saveDraft, clearDraft, scheduleDraftSave };
+  return { saveDraft, clearDraft, scheduleDraftSave, draftStatus };
 }

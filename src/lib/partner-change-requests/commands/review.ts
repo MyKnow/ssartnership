@@ -2,6 +2,12 @@ import { deletePartnerMediaUrls } from "../../partner-media-storage.ts";
 import { buildAtomicAuditRpcContext } from "../../audit-rpc-context.ts";
 import { buildAdminMutationAuditProperties } from "../../admin-mutation-audit.ts";
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
+import { sendAndRecordCampusScopedNewPartnerNotification } from "../../new-partner-notifications.ts";
+import {
+  getPartnerVisibilityState,
+  normalizePartnerVisibility,
+  shouldNotifyPartnerBecamePublic,
+} from "../../partner-visibility.ts";
 import { getSupabaseAdminClient } from "../../supabase/server.ts";
 import { collectRemovedPartnerMediaUrls } from "../media-cleanup.ts";
 import { fetchRequestSummary, toSummary } from "../summary.ts";
@@ -50,7 +56,7 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
 
   const { data: currentPartner, error: currentPartnerError } = await supabase
     .from("partners")
-    .select("thumbnail,images")
+    .select("thumbnail,images,visibility,period_start,period_end")
     .eq("id", summary.partnerId)
     .maybeSingle();
 
@@ -66,6 +72,20 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
       "대상 파트너사를 찾을 수 없습니다.",
     );
   }
+
+  const currentVisibility = normalizePartnerVisibility(currentPartner.visibility);
+  const shouldNotifyPublicTransition = shouldNotifyPartnerBecamePublic(
+    getPartnerVisibilityState(
+      currentVisibility,
+      currentPartner.period_start,
+      currentPartner.period_end,
+    ),
+    getPartnerVisibilityState(
+      currentVisibility,
+      summary.requestedPeriodStart,
+      summary.requestedPeriodEnd,
+    ),
+  );
 
   const { error } = await supabase.rpc(
     "resolve_partner_change_request_with_audit",
@@ -100,6 +120,28 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
       "not_found",
       "승인된 요청을 확인하지 못했습니다.",
     );
+  }
+
+  if (shouldNotifyPublicTransition) {
+    try {
+      await sendAndRecordCampusScopedNewPartnerNotification({
+        partnerId: approved.partnerId,
+        name: approved.requestedPartnerName,
+        location: approved.requestedPartnerLocation,
+        categoryLabel: approved.categoryLabel,
+        campusSlugs: approved.requestedCampusSlugs,
+        benefitSummary: approved.requestedBenefits.join("\n"),
+        conditions: approved.requestedConditions.join("\n"),
+        periodStart: approved.requestedPeriodStart,
+        periodEnd: approved.requestedPeriodEnd,
+        mapUrl: approved.requestedMapUrl,
+      });
+    } catch (error) {
+      console.error(
+        "[partner-change-request] public transition notification failed",
+        error,
+      );
+    }
   }
 
   return approved;

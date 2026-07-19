@@ -31,10 +31,12 @@ const getPartnerByIdCached = cache(
     id: string,
     authenticated: boolean,
     viewerAudience?: PartnerAudienceKey | null,
+    previewToken?: string | null,
   ) =>
     partnerRepository.getPartnerById(id, {
       authenticated,
       viewerAudience,
+      previewToken,
     }),
 );
 
@@ -147,6 +149,7 @@ export type PartnerDetailPageData = {
   currentUserId: string | null;
   isFavorited: boolean;
   adCoupons: AdCoupon[];
+  isPreview: boolean;
 };
 
 export type PartnerDetailAccessGateData = {
@@ -159,10 +162,11 @@ export async function getPartnerDetailPageData(
   authenticated: boolean,
   currentUserId?: string | null,
   viewerAudience?: PartnerAudienceKey | null,
+  previewToken?: string | null,
 ): Promise<PartnerDetailPageData | PartnerDetailAccessGateData | null> {
   const [categories, partner, favoriteIds, favoriteCounts] = await Promise.all([
     getCategoriesCached(),
-    getPartnerByIdCached(rawId, authenticated, viewerAudience),
+    getPartnerByIdCached(rawId, authenticated, viewerAudience, previewToken),
     currentUserId ? partnerFavoriteRepository.getMemberFavoritePartnerIds(currentUserId, [rawId]) : Promise.resolve(new Set<string>()),
     getFavoriteCountsSafe([rawId]),
   ]);
@@ -271,5 +275,6 @@ export async function getPartnerDetailPageData(
     currentUserId: currentUserId ?? null,
     isFavorited: favoriteIds.has(rawId),
     adCoupons,
+    isPreview: Boolean(previewToken),
   };
 }

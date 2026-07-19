@@ -2,6 +2,7 @@ import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import TokenChipField from "@/components/admin/TokenChipField";
 import { cn } from "@/lib/cn";
+import type { PartnerCardDraftSnapshot } from "@/lib/partner-card-form/draft";
 import {
   COUPON_ONLY_BENEFIT_TEXT,
   COUPON_ONLY_CONDITION_TEXT,
@@ -14,13 +15,22 @@ export default function PartnerChipSections({
   partner,
   benefitListingMode,
   onBenefitListingModeChange,
+  restoredDraftValues,
+  draftRestoreVersion = 0,
 }: {
   partner: PartnerCardFormValues;
   benefitListingMode: BenefitListingMode;
   onBenefitListingModeChange: (value: BenefitListingMode) => void;
+  restoredDraftValues?: PartnerCardDraftSnapshot | null;
+  draftRestoreVersion?: number;
 }) {
-  const editableConditions = removeCouponOnlyDefaults(partner.conditions);
-  const editableBenefits = removeCouponOnlyDefaults(partner.benefits);
+  const editableConditions = restoredDraftValues
+    ? restoredDraftValues.conditions
+    : removeCouponOnlyDefaults(partner.conditions);
+  const editableBenefits = restoredDraftValues
+    ? restoredDraftValues.benefits
+    : removeCouponOnlyDefaults(partner.benefits);
+  const tags = restoredDraftValues?.tags ?? partner.tags ?? [];
 
   return (
     <>
@@ -109,6 +119,7 @@ export default function PartnerChipSections({
             />
             <div className="mt-6">
               <TokenChipField
+                key={`conditions-${draftRestoreVersion}`}
                 name="conditions"
                 initialValues={editableConditions}
                 placeholder="조건을 입력하고 Enter"
@@ -125,6 +136,7 @@ export default function PartnerChipSections({
             />
             <div className="mt-6">
               <TokenChipField
+                key={`benefits-${draftRestoreVersion}`}
                 name="benefits"
                 initialValues={editableBenefits}
                 placeholder="혜택을 입력하고 Enter"
@@ -143,8 +155,9 @@ export default function PartnerChipSections({
         />
         <div className="mt-6">
           <TokenChipField
+            key={`tags-${draftRestoreVersion}`}
             name="tags"
-            initialValues={partner.tags ?? []}
+            initialValues={tags}
             placeholder="태그를 입력하고 Enter"
             helpText="짧은 키워드를 칩으로 저장합니다. 줄바꿈으로 여러 개를 한 번에 넣고 위/아래 화살표로 정리할 수 있습니다."
             emptyText="아직 등록된 태그가 없습니다."

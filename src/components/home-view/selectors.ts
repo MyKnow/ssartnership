@@ -21,7 +21,7 @@ const LOCK_ORDER = {
 
 export type HomePartnerViewModel = Partner & {
   _index: number;
-  _visibilityState: "public" | "confidential" | "private" | "expired";
+  _visibilityState: "public" | "confidential" | "private" | "upcoming" | "expired";
   _lockKind: "confidential" | "private" | null;
   _isActive: boolean;
   _isExpired: boolean;
