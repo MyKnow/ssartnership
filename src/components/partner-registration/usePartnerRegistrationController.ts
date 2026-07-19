@@ -171,8 +171,7 @@ export function usePartnerRegistrationController({
     () => ({ ...clientFieldErrors, ...(webState.fieldErrors ?? {}) }),
     [clientFieldErrors, webState.fieldErrors],
   );
-  const effectiveBenefitActionType =
-    benefitListingMode === "coupon_only" ? "none" : benefitActionType;
+  const effectiveBenefitActionType = benefitActionType;
   const activeBranchRows = useMemo(
     () => (branchEntryMode === "multi" ? branchRows : []),
     [branchEntryMode, branchRows],
@@ -317,9 +316,6 @@ export function usePartnerRegistrationController({
     value: AdminPartnerFileBenefitActionType,
   ) {
     setBenefitActionType(value);
-    if (benefitListingMode === "coupon_only" && value !== "none") {
-      setBenefitListingMode("always_on");
-    }
   }
 
   function handleBenefitListingModeChange(value: BenefitListingMode) {

@@ -8,6 +8,7 @@ import type {
   PartnerReviewSort,
   PartnerReviewSummary,
 } from "@/lib/partner-reviews";
+import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
 
 export type PartnerServiceDetailViewProps = {
   session: PartnerSession;
@@ -28,4 +29,7 @@ export type PartnerServiceDetailViewProps = {
   initialReviewSort: PartnerReviewSort;
   initialReviewOffset: number;
   initialReviewHasMore: boolean;
+  coupons: AdCoupon[];
+  createCouponAction: (formData: FormData) => void | Promise<void>;
+  uploadCouponCodesAction: (formData: FormData) => void | Promise<void>;
 };

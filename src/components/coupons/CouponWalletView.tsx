@@ -42,7 +42,7 @@ function formatGlobalRemaining(value: number | null) {
 
 function getNearestExpiryLabel(coupons: AvailableAdCoupon[]) {
   const nearest = coupons
-    .map((item) => new Date(item.coupon.endsAt))
+    .map((item) => new Date(item.coupon.usageEndsAt))
     .filter((date) => !Number.isNaN(date.getTime()))
     .sort((left, right) => left.getTime() - right.getTime())[0];
 
@@ -111,6 +111,7 @@ function CouponWalletAccordionItem({
   defaultOpen?: boolean;
 }) {
   const { coupon, remainingGlobalUses, remainingMemberUses } = item;
+  const assignedCode = item.assignedCode ?? coupon.code;
   const detailHref = `/partners/${encodeURIComponent(coupon.partnerId)}#coupons`;
 
   return (
@@ -140,7 +141,7 @@ function CouponWalletAccordionItem({
             </span>
             <span className="inline-flex min-w-0 items-center gap-1">
               <CalendarDaysIcon className="size-4 shrink-0" aria-hidden="true" />
-              <span className="block min-w-0 truncate">{formatDate(coupon.endsAt)}</span>
+              <span className="block min-w-0 truncate">{formatDate(coupon.usageEndsAt)}</span>
             </span>
           </div>
         </div>
@@ -200,6 +201,14 @@ function CouponWalletAccordionItem({
                 <span className="block min-w-0 truncate">{formatDate(coupon.endsAt)}</span>
               </p>
             </div>
+            {assignedCode ? (
+              <div className="rounded-xl border border-dashed border-border bg-surface px-3 py-2">
+                <p className="text-xs font-medium text-muted-foreground">내 쿠폰 코드</p>
+                <p className="mt-1 break-all font-mono text-sm font-semibold text-foreground">
+                  {assignedCode}
+                </p>
+              </div>
+            ) : null}
             <Button href={detailHref} variant="primary" className="mt-1 w-full justify-center">
               제휴처 상세 보기
               <ArrowRightIcon className="size-4" aria-hidden="true" />
@@ -257,7 +266,7 @@ function CouponWalletSectionView({ section }: { section: CouponWalletSection }) 
       <div className="grid gap-3">
         {section.items.map((item, index) => (
           <CouponWalletAccordionItem
-            key={item.coupon.id}
+            key={item.issueId ?? item.coupon.id}
             accordionName={`coupon-wallet-${section.id}`}
             item={item}
             defaultOpen={index === 0}

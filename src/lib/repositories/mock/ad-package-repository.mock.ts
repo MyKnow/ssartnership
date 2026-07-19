@@ -1,5 +1,6 @@
 import {
   getAdPackageDefinition,
+  isAdCouponDownloadable,
   isAdCouponRedeemable,
   normalizeAdChannelsForTier,
   summarizeAdPackageMetrics,
@@ -10,11 +11,16 @@ import type {
   AdCampaignWithStats,
   AdCoupon,
   AdCouponRedemption,
+  AddAdCouponCodesInput,
+  AddAdCouponCodesResult,
   AdPackageRepository,
   AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  IssueAdCouponInput,
+  IssueAdCouponResult,
   ListAvailableCouponsForMemberInput,
+  ListIssuedCouponsForMemberInput,
   RedeemAdCouponInput,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
@@ -124,13 +130,23 @@ function createMockCoupons(): AdCoupon[] {
       title: "1일 체험권 무료",
       description: "SSAFY 인증 후 평일 운영 시간에 1회 체험할 수 있습니다.",
       code: "SSAFY-TRIAL",
+      issuanceType: "service",
       redemptionType: "onsite",
       discountLabel: "1일 무료",
       terms: ["평일 한정", "운동복 대여 별도", "첫 방문 1회 사용"],
       status: "active",
       startsAt: "2026-07-01T00:00:00.000Z",
       endsAt: "2026-08-31T23:59:59.000Z",
+      downloadStartsAt: "2026-07-01T00:00:00.000Z",
+      downloadEndsAt: "2026-08-31T23:59:59.000Z",
+      usageStartsAt: "2026-07-01T00:00:00.000Z",
+      usageEndsAt: "2026-08-31T23:59:59.000Z",
       usageLimit: 50,
+      dailyIssueLimit: null,
+      weeklyIssueLimit: null,
+      monthlyIssueLimit: null,
+      issuedCount: 0,
+      remainingIssueCount: null,
       perMemberLimit: 1,
       usedCount: 0,
       externalUrl: "",
@@ -145,13 +161,23 @@ function createMockCoupons(): AdCoupon[] {
       title: "점심 세트 10% 할인",
       description: "평일 11:30-13:30 SSAFY 인증 후 점심 세트에 적용됩니다.",
       code: "SSAFY-LUNCH",
+      issuanceType: "service",
       redemptionType: "onsite",
       discountLabel: "10% 할인",
       terms: ["평일 점심 한정", "1일 1회 사용", "타 쿠폰 중복 불가"],
       status: "active",
       startsAt: "2026-07-01T00:00:00.000Z",
       endsAt: "2026-07-31T23:59:59.000Z",
+      downloadStartsAt: "2026-07-01T00:00:00.000Z",
+      downloadEndsAt: "2026-07-31T23:59:59.000Z",
+      usageStartsAt: "2026-07-01T00:00:00.000Z",
+      usageEndsAt: "2026-07-31T23:59:59.000Z",
       usageLimit: 100,
+      dailyIssueLimit: null,
+      weeklyIssueLimit: null,
+      monthlyIssueLimit: null,
+      issuedCount: 0,
+      remainingIssueCount: null,
       perMemberLimit: 1,
       usedCount: 0,
       externalUrl: "",
@@ -165,12 +191,23 @@ export class MockAdPackageRepository implements AdPackageRepository {
   private campaigns: AdCampaign[];
   private coupons: AdCoupon[];
   private redemptions: AdCouponRedemption[];
+  private issues: Array<{
+    id: string;
+    couponId: string;
+    memberId: string;
+    assignedCode: string | null;
+    issuedAt: string;
+    usedAt: string | null;
+  }>;
+  private couponCodes: Map<string, Set<string>>;
   private events: AdPackageMetricEvent[];
 
   constructor() {
     this.campaigns = createMockCampaigns();
     this.coupons = createMockCoupons();
     this.redemptions = [];
+    this.issues = [];
+    this.couponCodes = new Map();
     this.events = [];
   }
 
@@ -205,7 +242,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
     return this.coupons
       .filter((coupon) => coupon.partnerId === partnerId)
       .filter((coupon) =>
-        isAdCouponRedeemable({
+        isAdCouponDownloadable({
           coupon: {
             ...coupon,
             usedCount: this.countCouponRedemptions(coupon.id),
@@ -240,7 +277,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
         memberUsedCount: this.countCouponRedemptions(coupon.id, input.memberId),
       }))
       .filter(({ coupon, campaign }) =>
-        isAdCouponRedeemable({
+        isAdCouponDownloadable({
           coupon,
           campaign,
           now,
@@ -304,13 +341,23 @@ export class MockAdPackageRepository implements AdPackageRepository {
       title: input.title,
       description: input.description ?? "",
       code: input.code ?? "",
+      issuanceType: input.issuanceType ?? "service",
       redemptionType: input.redemptionType ?? "onsite",
       discountLabel: input.discountLabel ?? "",
       terms: [...(input.terms ?? [])],
       status: input.status ?? "draft",
       startsAt: input.startsAt,
       endsAt: input.endsAt,
+      downloadStartsAt: input.downloadStartsAt ?? input.startsAt,
+      downloadEndsAt: input.downloadEndsAt ?? input.endsAt,
+      usageStartsAt: input.usageStartsAt ?? input.startsAt,
+      usageEndsAt: input.usageEndsAt ?? input.endsAt,
       usageLimit: input.usageLimit ?? null,
+      dailyIssueLimit: input.dailyIssueLimit ?? null,
+      weeklyIssueLimit: input.weeklyIssueLimit ?? null,
+      monthlyIssueLimit: input.monthlyIssueLimit ?? null,
+      issuedCount: 0,
+      remainingIssueCount: null,
       perMemberLimit: input.perMemberLimit ?? 1,
       usedCount: 0,
       externalUrl: input.externalUrl ?? "",
@@ -319,6 +366,90 @@ export class MockAdPackageRepository implements AdPackageRepository {
     };
     this.coupons = [coupon, ...this.coupons];
     return cloneCoupon(coupon);
+  }
+
+  async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {
+    const coupon = this.coupons.find((item) => item.id === input.couponId);
+    if (!coupon) {
+      return { ok: false, reason: "not_found", message: "쿠폰을 찾을 수 없습니다." };
+    }
+    const now = new Date();
+    if (coupon.status !== "active" || now < new Date(coupon.downloadStartsAt) || now > new Date(coupon.downloadEndsAt)) {
+      return { ok: false, reason: "inactive", message: "지금 다운로드할 수 없는 쿠폰입니다." };
+    }
+    if (this.issues.some((issue) => issue.couponId === coupon.id && issue.memberId === input.memberId && !issue.usedAt)) {
+      return { ok: false, reason: "member_limit", message: "이미 보유한 쿠폰입니다." };
+    }
+    const pool = this.couponCodes.get(coupon.id);
+    const pooledCode = pool ? [...pool][0] ?? null : null;
+    if (pooledCode) pool?.delete(pooledCode);
+    const assignedCode = coupon.issuanceType === "partner_code_pool"
+      ? pooledCode
+      : coupon.redemptionType === "code"
+        ? `SSAFY-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+        : null;
+    if (coupon.issuanceType === "partner_code_pool" && !assignedCode) {
+      return { ok: false, reason: "code_unavailable", message: "남은 쿠폰 코드가 없습니다." };
+    }
+    const issue = {
+      id: `issue-${crypto.randomUUID()}`,
+      couponId: coupon.id,
+      memberId: input.memberId,
+      assignedCode,
+      issuedAt: isoNow(),
+      usedAt: null,
+    };
+    const available = toAvailableCoupon(coupon, 0);
+    if (!available) {
+      return { ok: false, reason: "usage_limit", message: "현재 발급할 수 없는 쿠폰입니다." };
+    }
+    this.issues = [issue, ...this.issues];
+    return {
+      ok: true,
+      issue: {
+        ...available,
+        issueId: issue.id,
+        assignedCode,
+        issuedAt: issue.issuedAt,
+      },
+    };
+  }
+
+  async listIssuedCouponsForMember(
+    input: ListIssuedCouponsForMemberInput,
+  ): Promise<AvailableAdCoupon[]> {
+    const now = input.now ?? new Date();
+    const items: AvailableAdCoupon[] = [];
+    for (const issue of this.issues) {
+      if (issue.memberId !== input.memberId || issue.usedAt) {
+        continue;
+      }
+      const coupon = this.coupons.find((item) => item.id === issue.couponId);
+      if (!coupon || new Date(coupon.usageEndsAt).getTime() < now.getTime()) {
+        continue;
+      }
+      const available = toAvailableCoupon(coupon, 0);
+      if (!available) {
+        continue;
+      }
+      items.push({
+        ...available,
+        issueId: issue.id,
+        assignedCode: issue.assignedCode,
+        issuedAt: issue.issuedAt,
+        usedAt: issue.usedAt,
+      });
+    }
+    return items;
+  }
+
+  async addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult> {
+    const existing = this.couponCodes.get(input.couponId) ?? new Set<string>();
+    const normalized = input.codes.map((code) => code.trim()).filter(Boolean);
+    const addedCount = normalized.filter((code) => !existing.has(code)).length;
+    normalized.forEach((code) => existing.add(code));
+    this.couponCodes.set(input.couponId, existing);
+    return { addedCount, skippedCount: normalized.length - addedCount };
   }
 
   async redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult> {
