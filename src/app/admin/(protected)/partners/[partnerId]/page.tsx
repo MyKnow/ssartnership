@@ -15,7 +15,12 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
 import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
-import { createAdCouponAction } from "@/app/admin/(protected)/_actions/ad-package-actions";
+import {
+  createAdCouponAction,
+  deleteAdCouponAction,
+  duplicateAdCouponAction,
+  updateAdCouponAction,
+} from "@/app/admin/(protected)/_actions/ad-package-actions";
 import {
   generatePartnerPreviewLink,
   removePartnerPreviewLink,
@@ -98,7 +103,15 @@ export default async function AdminPartnerDetailPage({
     ? adminPartnerDetailErrorMessages[String(query.error)] ?? null
     : null;
   const partnerSaved = query.success === "updated";
-  const couponCreated = query.success === "ad-coupon-created";
+  const couponSuccessMessages: Record<string, string> = {
+    "ad-coupon-created": "제휴처 쿠폰을 생성했습니다.",
+    "ad-coupon-updated": "제휴처 쿠폰을 수정했습니다.",
+    "ad-coupon-duplicated": "제휴처 쿠폰을 초안으로 복제했습니다.",
+    "ad-coupon-deleted": "제휴처 쿠폰을 삭제했습니다.",
+  };
+  const couponSuccess = query.success
+    ? couponSuccessMessages[String(query.success)] ?? null
+    : null;
   const canReadCoupons = canAdmin(
     adminSession.account.permissions,
     "home_ads",
@@ -108,6 +121,16 @@ export default async function AdminPartnerDetailPage({
     adminSession.account.permissions,
     "home_ads",
     "create",
+  );
+  const canUpdateCoupons = canAdmin(
+    adminSession.account.permissions,
+    "home_ads",
+    "update",
+  );
+  const canDeleteCoupons = canAdmin(
+    adminSession.account.permissions,
+    "home_ads",
+    "delete",
   );
 
   const supabase = getSupabaseAdminClient();
@@ -263,9 +286,7 @@ export default async function AdminPartnerDetailPage({
         />
 
         {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
-        {couponCreated ? (
-          <FormMessage variant="info">제휴처 쿠폰을 생성했습니다.</FormMessage>
-        ) : null}
+        {couponSuccess ? <FormMessage variant="info">{couponSuccess}</FormMessage> : null}
 
         <Card tone="elevated">
           <div className="flex flex-wrap items-center gap-2">
@@ -350,7 +371,12 @@ export default async function AdminPartnerDetailPage({
           campaigns={adCampaigns.filter((campaign) => campaign.partnerId === partner.id)}
           coupons={adCoupons}
           createCouponAction={createAdCouponAction}
+          updateCouponAction={updateAdCouponAction}
+          duplicateCouponAction={duplicateAdCouponAction}
+          deleteCouponAction={deleteAdCouponAction}
           canCreateCoupon={canCreateCoupons}
+          canUpdateCoupon={canUpdateCoupons}
+          canDeleteCoupon={canDeleteCoupons}
         />
 
         <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">

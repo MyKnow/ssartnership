@@ -45,15 +45,24 @@ describe("ad coupon validation", () => {
     );
   });
 
-  it("allows an unlimited-length numeric password but rejects invalid types", () => {
-    const password = "8".repeat(256);
-    const input = parseCreateAdCouponForm(buildForm({ onsitePassword: password }));
-    assert.equal(input.onsitePassword, password);
+  it("requires an onsite PIN to be exactly four digits", () => {
+    const input = parseCreateAdCouponForm(buildForm({ onsitePassword: "0000" }));
+    assert.equal(input.onsitePassword, "0000");
+    assert.throws(() => parseCreateAdCouponForm(buildForm({ onsitePassword: "123" })));
+    assert.throws(() => parseCreateAdCouponForm(buildForm({ onsitePassword: "12345" })));
     assert.throws(() => parseCreateAdCouponForm(buildForm({ onsitePassword: "12-34" })));
     assert.throws(() =>
       parseCreateAdCouponForm(
         buildForm({ redemptionType: "code", onsitePassword: "1234" }),
       ),
     );
+  });
+
+  it("allows an update form to keep an existing onsite PIN blank", () => {
+    const input = parseCreateAdCouponForm(
+      buildForm({ onsitePassword: "", title: "수정할 쿠폰" }),
+      { allowExistingOnsitePassword: true },
+    );
+    assert.equal(input.onsitePassword, null);
   });
 });

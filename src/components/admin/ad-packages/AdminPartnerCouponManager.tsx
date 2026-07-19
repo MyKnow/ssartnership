@@ -1,17 +1,14 @@
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
-import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
-import Textarea from "@/components/ui/Textarea";
-import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import type { AdCouponStatus } from "@/lib/ad-packages";
 import type {
   AdCampaignWithStats,
   AdCoupon,
 } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
+import AdminPartnerCouponForm from "./AdminPartnerCouponForm";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 
@@ -29,11 +26,6 @@ const statusBadgeClass: Record<AdCouponStatus, string> = {
   ended: "bg-surface-inset text-muted-foreground",
 };
 
-function toDateTimeLocal(date: Date) {
-  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 16);
-}
-
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "short",
@@ -43,20 +35,6 @@ function formatDateTime(value: string) {
 
 function formatIssueLimit(value: number | null) {
   return value === null ? "무제한" : `${value.toLocaleString("ko-KR")}회`;
-}
-
-function FieldLabel({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={cn("grid min-w-0 gap-2 text-sm font-medium text-foreground", className)}>
-      {children}
-    </label>
-  );
 }
 
 function CouponStatusBadge({ status }: { status: AdCouponStatus }) {
@@ -72,26 +50,102 @@ function CouponStatusBadge({ status }: { status: AdCouponStatus }) {
   );
 }
 
+function CouponManagementActions({
+  coupon,
+  partnerId,
+  campaigns,
+  updateCouponAction,
+  duplicateCouponAction,
+  deleteCouponAction,
+  canUpdateCoupon,
+  canCreateCoupon,
+  canDeleteCoupon,
+  partnerName,
+}: {
+  coupon: AdCoupon;
+  partnerId: string;
+  campaigns: AdCampaignWithStats[];
+  updateCouponAction?: ServerAction;
+  duplicateCouponAction?: ServerAction;
+  deleteCouponAction?: ServerAction;
+  canUpdateCoupon: boolean;
+  canCreateCoupon: boolean;
+  canDeleteCoupon: boolean;
+  partnerName: string;
+}) {
+  if (!canUpdateCoupon && !canCreateCoupon && !canDeleteCoupon) {
+    return null;
+  }
+
+  return (
+    <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+      {canUpdateCoupon && updateCouponAction ? (
+        <details className="min-w-0">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-center rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground transition-interactive hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
+            수정
+          </summary>
+          <div className="mt-3 min-w-0 sm:min-w-[min(42rem,calc(100vw-3rem))]">
+            <AdminPartnerCouponForm
+              partnerId={partnerId}
+              partnerName={partnerName}
+              campaigns={campaigns}
+              action={updateCouponAction}
+              mode="edit"
+              coupon={coupon}
+              title={`${coupon.title} 수정`}
+              description="기존 PIN을 바꾸지 않으면 입력하지 않은 상태로 저장할 수 있습니다."
+              submitLabel="쿠폰 수정"
+            />
+          </div>
+        </details>
+      ) : null}
+      {canCreateCoupon && duplicateCouponAction ? (
+        <form action={duplicateCouponAction}>
+          <input type="hidden" name="partnerId" value={partnerId} readOnly />
+          <input type="hidden" name="couponId" value={coupon.id} readOnly />
+          <Button type="submit" variant="soft" className="w-full justify-center sm:w-auto">
+            복제
+          </Button>
+        </form>
+      ) : null}
+      {canDeleteCoupon && deleteCouponAction ? (
+        <form action={deleteCouponAction}>
+          <input type="hidden" name="partnerId" value={partnerId} readOnly />
+          <input type="hidden" name="couponId" value={coupon.id} readOnly />
+          <Button type="submit" variant="danger" className="w-full justify-center sm:w-auto">
+            삭제
+          </Button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AdminPartnerCouponManager({
   partnerId,
   partnerName,
   campaigns,
   coupons,
   createCouponAction,
+  updateCouponAction,
+  duplicateCouponAction,
+  deleteCouponAction,
   canCreateCoupon = true,
+  canUpdateCoupon = false,
+  canDeleteCoupon = false,
 }: {
   partnerId: string;
   partnerName: string;
   campaigns: AdCampaignWithStats[];
   coupons: AdCoupon[];
   createCouponAction: ServerAction;
+  updateCouponAction?: ServerAction;
+  duplicateCouponAction?: ServerAction;
+  deleteCouponAction?: ServerAction;
   canCreateCoupon?: boolean;
+  canUpdateCoupon?: boolean;
+  canDeleteCoupon?: boolean;
 }) {
-  const now = new Date();
-  const defaultStartsAt = toDateTimeLocal(now);
-  const defaultEndsAt = toDateTimeLocal(
-    new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-  );
   const activeCouponCount = coupons.filter((coupon) => coupon.status === "active").length;
   const usedCount = coupons.reduce((sum, coupon) => sum + coupon.usedCount, 0);
   const campaignOptions = campaigns.filter((campaign) => campaign.partnerId === partnerId);
@@ -114,197 +168,16 @@ export default function AdminPartnerCouponManager({
       />
 
       {canCreateCoupon ? (
-        <Card tone="elevated" className="grid min-w-0 gap-4">
-        <div>
-          <h3 id="partner-coupon-heading" className="text-lg font-semibold text-foreground">
-            쿠폰 생성
-          </h3>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다.
-          </p>
-        </div>
-        <form action={createCouponAction} className="grid min-w-0 gap-4">
-          <input type="hidden" name="partnerId" value={partnerId} readOnly />
-          <input type="hidden" name="startsAt" value={defaultStartsAt} readOnly />
-          <input type="hidden" name="endsAt" value={defaultEndsAt} readOnly />
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <FieldLabel>
-              제휴처
-              <div className="flex h-11 min-w-0 items-center rounded-[1rem] border border-border bg-surface-inset px-3.5 text-sm text-foreground">
-                <span className="truncate">{partnerName}</span>
-              </div>
-            </FieldLabel>
-            <FieldLabel>
-              캠페인
-              <Select name="campaignId">
-                <option value="">캠페인 없이 쿠폰만 등록</option>
-                {campaignOptions.map((campaign) => (
-                  <option key={campaign.id} value={campaign.id}>
-                    {campaign.title}
-                  </option>
-                ))}
-              </Select>
-            </FieldLabel>
-          </div>
-
-          <FieldLabel>
-            쿠폰명
-            <Input
-              name="title"
-              maxLength={AD_PACKAGE_FORM_LIMITS.titleMax}
-              required
-              placeholder="예: 점심 세트 10% 할인"
-            />
-          </FieldLabel>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <FieldLabel>
-              할인 표기
-              <Input
-                name="discountLabel"
-                maxLength={AD_PACKAGE_FORM_LIMITS.discountLabelMax}
-                placeholder="10% 할인"
-              />
-            </FieldLabel>
-            <FieldLabel>
-              쿠폰 코드
-              <Input
-                name="code"
-                maxLength={AD_PACKAGE_FORM_LIMITS.codeMax}
-                placeholder="SSAFY-LUNCH"
-              />
-            </FieldLabel>
-          </div>
-
-          <FieldLabel>
-            설명
-            <Textarea
-              name="description"
-              maxLength={AD_PACKAGE_FORM_LIMITS.descriptionMax}
-              rows={3}
-              placeholder="사용 가능 시간, 대상 메뉴, 매장 확인 방법"
-            />
-          </FieldLabel>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <FieldLabel>
-              발급 방식
-              <Select name="issuanceType" defaultValue="service">
-                <option value="service">서비스 발급형</option>
-                <option value="partner_code_pool">파트너 코드형</option>
-              </Select>
-            </FieldLabel>
-            <FieldLabel>
-              사용 방식
-              <Select name="redemptionType" defaultValue="onsite">
-                <option value="onsite">현장 확인</option>
-                <option value="code">코드 제시</option>
-                <option value="external">외부 링크</option>
-              </Select>
-            </FieldLabel>
-          </div>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <FieldLabel>
-              다운로드 시작
-              <Input name="downloadStartsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
-            </FieldLabel>
-            <FieldLabel>
-              다운로드 종료
-              <Input name="downloadEndsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
-            </FieldLabel>
-          </div>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <FieldLabel>
-              사용 시작
-              <Input name="usageStartsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
-            </FieldLabel>
-            <FieldLabel>
-              사용 종료
-              <Input name="usageEndsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
-            </FieldLabel>
-          </div>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <FieldLabel>
-              상태
-              <Select name="status" defaultValue="draft">
-                <option value="draft">초안</option>
-                <option value="active">활성</option>
-                <option value="paused">일시중지</option>
-                <option value="ended">종료</option>
-              </Select>
-            </FieldLabel>
-            <FieldLabel>
-              일 발급 한도
-              <Input name="dailyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-            </FieldLabel>
-            <FieldLabel>
-              주 발급 한도
-              <Input name="weeklyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-            </FieldLabel>
-            <FieldLabel>
-              월 발급 한도
-              <Input name="monthlyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-            </FieldLabel>
-          </div>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <FieldLabel>
-              회원별 보유/사용 제한
-              <Input name="perMemberLimit" type="number" min={1} step={1} defaultValue={1} />
-            </FieldLabel>
-            <FieldLabel>
-              현장 확인 비밀번호
-              <Input
-                name="onsitePassword"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]+"
-                autoComplete="off"
-                placeholder="현장 확인형만 입력"
-                aria-describedby="partner-onsite-password-help"
-              />
-              <span id="partner-onsite-password-help" className="text-xs font-normal text-muted-foreground">
-                현장 확인형 쿠폰을 사용할 때 제휴처가 확인할 숫자 비밀번호입니다. 길이 제한은 없습니다.
-              </span>
-            </FieldLabel>
-            <FieldLabel>
-              외부 링크
-              <Input name="externalUrl" type="url" placeholder="https://..." />
-            </FieldLabel>
-          </div>
-
-          <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-            <FieldLabel>
-              회원별 일 발급 한도
-              <Input name="perMemberDailyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-            </FieldLabel>
-            <FieldLabel>
-              회원별 주 발급 한도
-              <Input name="perMemberWeeklyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-            </FieldLabel>
-            <FieldLabel>
-              회원별 월 발급 한도
-              <Input name="perMemberMonthlyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-            </FieldLabel>
-          </div>
-
-          <FieldLabel>
-            조건
-            <Textarea name="terms" rows={4} placeholder={"평일 점심 한정\n1일 1회 사용\n타 쿠폰 중복 불가"} />
-          </FieldLabel>
-          <FieldLabel>
-            파트너 코드 목록(한 줄에 하나)
-            <Textarea name="codePool" rows={4} placeholder="파트너가 전달한 쿠폰 코드를 붙여 넣으세요." />
-          </FieldLabel>
-          <Button type="submit" className="w-full justify-center sm:w-fit">
-            쿠폰 생성
-          </Button>
-        </form>
-        </Card>
+        <AdminPartnerCouponForm
+          partnerId={partnerId}
+          partnerName={partnerName}
+          campaigns={campaignOptions}
+          action={createCouponAction}
+          mode="create"
+          title="쿠폰 생성"
+          description="제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다."
+          submitLabel="쿠폰 생성"
+        />
       ) : null}
 
       <section className="grid min-w-0 gap-4" aria-label={`${partnerName} 쿠폰 목록`}>
@@ -314,8 +187,8 @@ export default function AdminPartnerCouponManager({
           </Card>
         ) : (
           coupons.map((coupon) => (
-            <Card key={coupon.id} tone="default" className="grid min-w-0 gap-3">
-              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <Card key={coupon.id} tone="default" className="grid min-w-0 gap-3 overflow-hidden">
+              <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <CouponStatusBadge status={coupon.status} />
@@ -344,14 +217,28 @@ export default function AdminPartnerCouponManager({
                   </p>
                   {coupon.redemptionType === "onsite" ? (
                     <p className="mt-1 text-xs font-medium text-primary">
-                      {coupon.hasOnsitePassword ? "현장 확인 비밀번호 설정됨" : "현장 확인 비밀번호 미설정"}
+                      {coupon.hasOnsitePassword ? "현장 확인 PIN 설정됨" : "현장 확인 PIN 미설정"}
                     </p>
                   ) : null}
                 </div>
-                <span className="shrink-0 self-start rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
-                  {coupon.usedCount}
-                  {coupon.usageLimit !== null ? `/${coupon.usageLimit}` : "회 사용"}
-                </span>
+                <div className="grid min-w-0 gap-3 xl:min-w-[13rem] xl:justify-items-end">
+                  <span className="justify-self-start rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary xl:justify-self-end">
+                    {coupon.usedCount}
+                    {coupon.usageLimit !== null ? `/${coupon.usageLimit}` : "회 사용"}
+                  </span>
+                  <CouponManagementActions
+                    coupon={coupon}
+                    partnerId={partnerId}
+                    partnerName={partnerName}
+                    campaigns={campaignOptions}
+                    updateCouponAction={updateCouponAction}
+                    duplicateCouponAction={duplicateCouponAction}
+                    deleteCouponAction={deleteCouponAction}
+                    canUpdateCoupon={canUpdateCoupon}
+                    canCreateCoupon={canCreateCoupon}
+                    canDeleteCoupon={canDeleteCoupon}
+                  />
+                </div>
               </div>
             </Card>
           ))

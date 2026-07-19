@@ -11,8 +11,8 @@ export function normalizeCouponVerificationPassword(value: unknown) {
   if (value === undefined || value === null || value === "") {
     return null;
   }
-  if (typeof value !== "string" || !/^\d+$/.test(value)) {
-    throw new Error("현장 확인 비밀번호는 숫자만 입력해 주세요.");
+  if (typeof value !== "string" || !/^\d{4}$/.test(value)) {
+    throw new Error("현장 확인 PIN은 숫자 4자리로 입력해 주세요.");
   }
   return value;
 }

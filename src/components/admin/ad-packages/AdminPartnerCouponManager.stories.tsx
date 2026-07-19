@@ -94,6 +94,11 @@ const meta = {
       }),
     ],
     createCouponAction: async () => {},
+    updateCouponAction: async () => {},
+    duplicateCouponAction: async () => {},
+    deleteCouponAction: async () => {},
+    canUpdateCoupon: true,
+    canDeleteCoupon: true,
   },
   parameters: {
     chromatic: { viewports: [360, 820, 1366] },
@@ -107,8 +112,12 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("카페 싸피 역삼점")).toBeInTheDocument();
+    await expect(canvas.getAllByText("카페 싸피 역삼점").length).toBeGreaterThan(0);
     await expect(canvas.getByRole("button", { name: "쿠폰 생성" })).toBeInTheDocument();
     await expect(canvas.getByText("신규 회원 디저트 세트")).toBeInTheDocument();
+    await expect(canvas.getAllByText("수정").length).toBeGreaterThan(0);
+    await expect(canvas.getAllByRole("button", { name: "복제" }).length).toBeGreaterThan(0);
+    await expect(canvas.getAllByRole("button", { name: "삭제" }).length).toBeGreaterThan(0);
+    await expect(canvas.getByText("현장 확인형 쿠폰에 사용할 숫자 4자리 PIN입니다.")).toBeInTheDocument();
   },
 };

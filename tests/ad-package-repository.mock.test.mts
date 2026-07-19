@@ -40,6 +40,72 @@ describe("mock ad package repository", () => {
     assert.equal(coupons[0]?.status, "draft");
   });
 
+  it("updates a coupon while keeping its existing PIN and duplicates it as a new draft", async () => {
+    const repository = new MockAdPackageRepository();
+    const source = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "기존 혜택",
+      code: "SOURCE-CODE",
+      status: "active",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+      usageLimit: 40,
+      perMemberDailyIssueLimit: 1,
+      onsitePassword: "0000",
+    });
+
+    const updated = await repository.updateCoupon({
+      couponId: source.id,
+      partnerId: source.partnerId,
+      title: "수정한 혜택",
+      code: "UPDATED-CODE",
+      status: "active",
+      startsAt: source.startsAt,
+      endsAt: source.endsAt,
+      usageLimit: 50,
+      perMemberDailyIssueLimit: 2,
+      onsitePassword: null,
+    });
+
+    assert.equal(updated.title, "수정한 혜택");
+    assert.equal(updated.usageLimit, 50);
+    assert.equal(updated.hasOnsitePassword, true);
+
+    const duplicated = await repository.duplicateCoupon({ couponId: updated.id });
+    assert.notEqual(duplicated.id, updated.id);
+    assert.equal(duplicated.status, "draft");
+    assert.equal(duplicated.code, "");
+    assert.equal(duplicated.usageLimit, 50);
+    assert.equal(duplicated.perMemberDailyIssueLimit, 2);
+    assert.equal(duplicated.hasOnsitePassword, true);
+  });
+
+  it("deletes an unused coupon and protects coupons with usage history", async () => {
+    const repository = new MockAdPackageRepository();
+    const unused = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "삭제 대상",
+      redemptionType: "code",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+    });
+    await repository.deleteCoupon(unused.id);
+    assert.equal(
+      (await repository.listAdminCouponsForPartner("restaurant-001")).some(
+        (coupon) => coupon.id === unused.id,
+      ),
+      false,
+    );
+
+    const used = await createCodeCoupon(repository);
+    await repository.redeemCoupon({
+      couponId: used.id,
+      memberId: "member-delete-guard",
+      sessionId: "session-delete-guard",
+    });
+    await assert.rejects(() => repository.deleteCoupon(used.id));
+  });
+
   it("lists active coupons for a partner", async () => {
     const repository = new MockAdPackageRepository();
     const coupons = await repository.listActiveCouponsForPartner("restaurant-001", {
@@ -213,7 +279,7 @@ describe("mock ad package repository", () => {
       status: "active",
       startsAt: "2026-07-01T00:00:00.000Z",
       endsAt: "2026-07-31T23:59:59.000Z",
-      onsitePassword: "987654",
+      onsitePassword: "9876",
     });
     const issued = await repository.issueCoupon({
       couponId: coupon.id,
@@ -234,7 +300,7 @@ describe("mock ad package repository", () => {
     const wrong = await repository.redeemCouponIssue({
       issueId: issued.issue.issueId,
       memberId: "member-2",
-      onsitePassword: "123456",
+      onsitePassword: "1234",
     });
     assert.equal(wrong.ok, false);
     assert.equal(wrong.reason, "onsite_password_invalid");
@@ -242,7 +308,7 @@ describe("mock ad package repository", () => {
     const valid = await repository.redeemCouponIssue({
       issueId: issued.issue.issueId,
       memberId: "member-2",
-      onsitePassword: "987654",
+      onsitePassword: "9876",
     });
     assert.equal(valid.ok, true);
   });
