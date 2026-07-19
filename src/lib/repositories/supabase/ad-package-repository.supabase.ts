@@ -1,21 +1,28 @@
 import {
   getAdPackageDefinition,
+  isAdCouponDownloadable,
   isAdCouponRedeemable,
   normalizeAdChannelsForTier,
   normalizeAdPackageTier,
   summarizeAdPackageMetrics,
   type AdPackageMetricEvent,
+  type AdCouponIssuanceType,
 } from "@/lib/ad-packages";
 import type {
   AdCampaign,
   AdCampaignWithStats,
   AdCoupon,
   AdCouponRedemption,
+  AddAdCouponCodesInput,
+  AddAdCouponCodesResult,
   AdPackageRepository,
   AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  IssueAdCouponInput,
+  IssueAdCouponResult,
   ListAvailableCouponsForMemberInput,
+  ListIssuedCouponsForMemberInput,
   RedeemAdCouponInput,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
@@ -29,6 +36,9 @@ const AD_METRIC_EVENT_NAMES = [
   "coupon_redeem",
   "ad_push_send",
 ] as const;
+
+const AD_COUPON_SELECT =
+  "id,campaign_id,partner_id,title,description,code,issuance_type,redemption_type,discount_label,terms,status,starts_at,ends_at,download_starts_at,download_ends_at,usage_starts_at,usage_ends_at,usage_limit,daily_issue_limit,weekly_issue_limit,monthly_issue_limit,per_member_limit,external_url,created_at,updated_at,partners(name)";
 
 type PartnerJoin = { name?: string | null } | Array<{ name?: string | null }> | null;
 
@@ -57,13 +67,21 @@ type AdCouponRow = {
   title: string;
   description: string | null;
   code: string | null;
+  issuance_type: string | null;
   redemption_type: string | null;
   discount_label: string | null;
   terms: unknown;
   status: string | null;
   starts_at: string;
   ends_at: string;
+  download_starts_at: string | null;
+  download_ends_at: string | null;
+  usage_starts_at: string | null;
+  usage_ends_at: string | null;
   usage_limit: number | null;
+  daily_issue_limit: number | null;
+  weekly_issue_limit: number | null;
+  monthly_issue_limit: number | null;
   per_member_limit: number | null;
   external_url: string | null;
   created_at: string;
@@ -80,6 +98,15 @@ type RedemptionRow = {
   session_id: string | null;
   redemption_code: string | null;
   created_at: string;
+};
+
+type CouponIssueRow = {
+  id: string;
+  coupon_id: string;
+  member_id: string;
+  assigned_code: string | null;
+  issued_at: string;
+  used_at: string | null;
 };
 
 type EventLogRow = {
@@ -136,6 +163,15 @@ function mapCampaignRow(row: AdCampaignRow): AdCampaign {
 }
 
 function mapCouponRow(row: AdCouponRow, usedCount = 0): AdCoupon {
+  const downloadStartsAt = row.download_starts_at ?? row.starts_at;
+  const downloadEndsAt = row.download_ends_at ?? row.ends_at;
+  const usageStartsAt = row.usage_starts_at ?? row.starts_at;
+  const usageEndsAt = row.usage_ends_at ?? row.ends_at;
+  const issuanceType = normalizeStatus<AdCouponIssuanceType>(
+    row.issuance_type,
+    ["service", "partner_code_pool"],
+    "service",
+  );
   return {
     id: row.id,
     campaignId: row.campaign_id,
@@ -144,6 +180,7 @@ function mapCouponRow(row: AdCouponRow, usedCount = 0): AdCoupon {
     title: row.title,
     description: row.description ?? "",
     code: row.code ?? "",
+    issuanceType,
     redemptionType: normalizeStatus(
       row.redemption_type,
       ["onsite", "code", "external"] as const,
@@ -154,7 +191,16 @@ function mapCouponRow(row: AdCouponRow, usedCount = 0): AdCoupon {
     status: normalizeStatus(row.status, ["draft", "active", "paused", "ended"] as const, "draft"),
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    downloadStartsAt,
+    downloadEndsAt,
+    usageStartsAt,
+    usageEndsAt,
     usageLimit: row.usage_limit,
+    dailyIssueLimit: row.daily_issue_limit,
+    weeklyIssueLimit: row.weekly_issue_limit,
+    monthlyIssueLimit: row.monthly_issue_limit,
+    issuedCount: 0,
+    remainingIssueCount: null,
     perMemberLimit: row.per_member_limit ?? 1,
     usedCount,
     externalUrl: row.external_url ?? "",
@@ -278,9 +324,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     const [couponResult, redemptionResult, eventResult] = await Promise.all([
       supabase
         .from("ad_coupons")
-        .select(
-          "id,campaign_id,partner_id,title,description,code,redemption_type,discount_label,terms,status,starts_at,ends_at,usage_limit,per_member_limit,external_url,created_at,updated_at,partners(name)",
-        )
+        .select(AD_COUPON_SELECT)
         .in("campaign_id", campaignIds)
         .order("created_at", { ascending: false }),
       supabase
@@ -352,13 +396,11 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("ad_coupons")
-      .select(
-        "id,campaign_id,partner_id,title,description,code,redemption_type,discount_label,terms,status,starts_at,ends_at,usage_limit,per_member_limit,external_url,created_at,updated_at,partners(name)",
-      )
+      .select(AD_COUPON_SELECT)
       .eq("partner_id", partnerId)
       .eq("status", "active")
-      .lte("starts_at", now.toISOString())
-      .gte("ends_at", now.toISOString())
+      .lte("download_starts_at", now.toISOString())
+      .gte("download_ends_at", now.toISOString())
       .order("created_at", { ascending: false });
     if (error) {
       if (isMissingAdPackageSchemaMessage(error.message, "ad_coupons")) {
@@ -411,7 +453,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return rows
       .map((row) => mapCouponRow(row, useCounts.get(row.id) ?? 0))
       .filter((coupon) =>
-        isAdCouponRedeemable({
+        isAdCouponDownloadable({
           coupon,
           campaign: coupon.campaignId ? campaignsById.get(coupon.campaignId) : null,
           now,
@@ -431,14 +473,12 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("ad_coupons")
-      .select(
-        "id,campaign_id,partner_id,title,description,code,redemption_type,discount_label,terms,status,starts_at,ends_at,usage_limit,per_member_limit,external_url,created_at,updated_at,partners(name)",
-      )
+      .select(AD_COUPON_SELECT)
       .in("partner_id", partnerIds)
       .eq("status", "active")
-      .lte("starts_at", now.toISOString())
-      .gte("ends_at", now.toISOString())
-      .order("ends_at", { ascending: true })
+      .lte("download_starts_at", now.toISOString())
+      .gte("download_ends_at", now.toISOString())
+      .order("download_ends_at", { ascending: true })
       .order("created_at", { ascending: false });
     if (error) {
       if (isMissingAdPackageSchemaMessage(error.message, "ad_coupons")) {
@@ -504,7 +544,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         };
       })
       .filter(({ coupon, campaign }) =>
-        isAdCouponRedeemable({
+        isAdCouponDownloadable({
           coupon,
           campaign,
           now,
@@ -574,19 +614,25 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         title: input.title,
         description: input.description ?? "",
         code: input.code ?? "",
+        issuance_type: input.issuanceType ?? "service",
         redemption_type: input.redemptionType ?? "onsite",
         discount_label: input.discountLabel ?? "",
         terms: input.terms ?? [],
         status: input.status ?? "draft",
         starts_at: input.startsAt,
         ends_at: input.endsAt,
+        download_starts_at: input.downloadStartsAt ?? input.startsAt,
+        download_ends_at: input.downloadEndsAt ?? input.endsAt,
+        usage_starts_at: input.usageStartsAt ?? input.startsAt,
+        usage_ends_at: input.usageEndsAt ?? input.endsAt,
         usage_limit: input.usageLimit ?? null,
+        daily_issue_limit: input.dailyIssueLimit ?? null,
+        weekly_issue_limit: input.weeklyIssueLimit ?? null,
+        monthly_issue_limit: input.monthlyIssueLimit ?? null,
         per_member_limit: input.perMemberLimit ?? 1,
         external_url: input.externalUrl ?? "",
       })
-      .select(
-        "id,campaign_id,partner_id,title,description,code,redemption_type,discount_label,terms,status,starts_at,ends_at,usage_limit,per_member_limit,external_url,created_at,updated_at,partners(name)",
-      )
+      .select(AD_COUPON_SELECT)
       .single();
     if (error) {
       throw new Error(error.message);
@@ -594,13 +640,124 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return mapCouponRow(data as AdCouponRow);
   }
 
+  async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase.rpc("issue_ad_coupon", {
+      p_coupon_id: input.couponId,
+      p_member_id: input.memberId,
+      p_session_id: input.sessionId ?? null,
+    });
+    if (error) {
+      const reason = error.message.includes("not_found")
+        ? "not_found"
+        : error.message.includes("not_downloadable")
+          ? "inactive"
+          : error.message.includes("member_limit")
+            ? "member_limit"
+            : error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
+              ? error.message.includes("code_unavailable") ? "code_unavailable" : "usage_limit"
+              : "invalid";
+      return { ok: false, reason, message: "현재 쿠폰을 다운로드할 수 없습니다." };
+    }
+    const issueRow = (Array.isArray(data) ? data[0] : data) as {
+      issue_id?: string;
+      coupon_id?: string;
+      assigned_code?: string | null;
+      issued_at?: string;
+    } | null;
+    if (!issueRow?.issue_id || !issueRow.coupon_id) {
+      return { ok: false, reason: "invalid", message: "쿠폰 다운로드 결과를 확인할 수 없습니다." };
+    }
+    const { data: couponData, error: couponError } = await supabase
+      .from("ad_coupons")
+      .select(AD_COUPON_SELECT)
+      .eq("id", issueRow.coupon_id)
+      .single();
+    if (couponError) {
+      throw new Error(couponError.message);
+    }
+    const coupon = mapCouponRow(couponData as AdCouponRow);
+    const available = toAvailableCoupon(coupon, 0);
+    if (!available) {
+      return { ok: false, reason: "usage_limit", message: "현재 쿠폰을 사용할 수 없습니다." };
+    }
+    return {
+      ok: true,
+      issue: {
+        ...available,
+        issueId: issueRow.issue_id,
+        assignedCode: issueRow.assigned_code ?? null,
+        issuedAt: issueRow.issued_at ?? new Date().toISOString(),
+      },
+    };
+  }
+
+  async listIssuedCouponsForMember(
+    input: ListIssuedCouponsForMemberInput,
+  ): Promise<AvailableAdCoupon[]> {
+    if (!input.memberId) return [];
+    const supabase = getSupabaseAdminClient();
+    const { data: issueData, error: issueError } = await supabase
+      .from("ad_coupon_issues")
+      .select("id,coupon_id,member_id,assigned_code,issued_at,used_at")
+      .eq("member_id", input.memberId)
+      .eq("status", "issued")
+      .order("issued_at", { ascending: false });
+    if (issueError) throw new Error(issueError.message);
+    const issues = (issueData ?? []) as CouponIssueRow[];
+    if (issues.length === 0) return [];
+    const couponIds = [...new Set(issues.map((issue) => issue.coupon_id))];
+    const { data: couponData, error: couponError } = await supabase
+      .from("ad_coupons")
+      .select(AD_COUPON_SELECT)
+      .in("id", couponIds);
+    if (couponError) throw new Error(couponError.message);
+    const coupons = new Map(
+      ((couponData ?? []) as AdCouponRow[]).map((row) => [row.id, mapCouponRow(row)]),
+    );
+    const now = input.now ?? new Date();
+    return issues.flatMap((issue) => {
+      const coupon = coupons.get(issue.coupon_id);
+      if (!coupon || new Date(coupon.usageEndsAt).getTime() < now.getTime()) return [];
+      const available = toAvailableCoupon(coupon, 0);
+      return available
+        ? [{ ...available, issueId: issue.id, assignedCode: issue.assigned_code, issuedAt: issue.issued_at, usedAt: issue.used_at }]
+        : [];
+    });
+  }
+
+  async addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult> {
+    const supabase = getSupabaseAdminClient();
+    const uniqueCodes = [...new Set(input.codes.map((code) => code.trim()).filter(Boolean))];
+    if (uniqueCodes.length === 0) return { addedCount: 0, skippedCount: 0 };
+    const { data: existing, error: existingError } = await supabase
+      .from("ad_coupon_codes")
+      .select("code")
+      .eq("coupon_id", input.couponId)
+      .in("code", uniqueCodes);
+    if (existingError) throw new Error(existingError.message);
+    const existingCodes = new Set((existing ?? []).map((row) => String((row as { code: string }).code)));
+    const rows = await Promise.all(uniqueCodes
+      .filter((code) => !existingCodes.has(code))
+      .map(async (code) => ({
+        coupon_id: input.couponId,
+        code,
+        code_hash: Array.from(new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(code))))
+          .map((value) => value.toString(16).padStart(2, "0")).join(""),
+        status: "available",
+      })));
+    if (rows.length > 0) {
+      const { error } = await supabase.from("ad_coupon_codes").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+    return { addedCount: rows.length, skippedCount: uniqueCodes.length - rows.length };
+  }
+
   async redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult> {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("ad_coupons")
-      .select(
-        "id,campaign_id,partner_id,title,description,code,redemption_type,discount_label,terms,status,starts_at,ends_at,usage_limit,per_member_limit,external_url,created_at,updated_at,partners(name)",
-      )
+      .select(AD_COUPON_SELECT)
       .eq("id", input.couponId)
       .maybeSingle();
     if (error) {

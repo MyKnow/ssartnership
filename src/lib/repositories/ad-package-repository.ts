@@ -2,6 +2,7 @@ import type {
   AdCampaignStatus,
   AdChannel,
   AdCouponRedemptionType,
+  AdCouponIssuanceType,
   AdCouponStatus,
   AdPackageMetrics,
   AdPackageTier,
@@ -34,13 +35,23 @@ export type AdCoupon = {
   title: string;
   description: string;
   code: string;
+  issuanceType: AdCouponIssuanceType;
   redemptionType: AdCouponRedemptionType;
   discountLabel: string;
   terms: string[];
   status: AdCouponStatus;
   startsAt: string;
   endsAt: string;
+  downloadStartsAt: string;
+  downloadEndsAt: string;
+  usageStartsAt: string;
+  usageEndsAt: string;
   usageLimit: number | null;
+  dailyIssueLimit: number | null;
+  weeklyIssueLimit: number | null;
+  monthlyIssueLimit: number | null;
+  issuedCount: number;
+  remainingIssueCount: number | null;
   perMemberLimit: number;
   usedCount: number;
   externalUrl: string;
@@ -85,13 +96,21 @@ export type CreateAdCouponInput = {
   title: string;
   description?: string;
   code?: string;
+  issuanceType?: AdCouponIssuanceType;
   redemptionType?: AdCouponRedemptionType;
   discountLabel?: string;
   terms?: string[];
   status?: AdCouponStatus;
   startsAt: string;
   endsAt: string;
+  downloadStartsAt?: string;
+  downloadEndsAt?: string;
+  usageStartsAt?: string;
+  usageEndsAt?: string;
   usageLimit?: number | null;
+  dailyIssueLimit?: number | null;
+  weeklyIssueLimit?: number | null;
+  monthlyIssueLimit?: number | null;
   perMemberLimit?: number;
   externalUrl?: string;
 };
@@ -116,6 +135,10 @@ export type ListAvailableCouponsForMemberInput = {
 
 export type AvailableAdCoupon = {
   coupon: AdCoupon;
+  issueId?: string | null;
+  assignedCode?: string | null;
+  issuedAt?: string | null;
+  usedAt?: string | null;
   memberUsedCount: number;
   remainingMemberUses: number;
   remainingGlobalUses: number | null;
@@ -151,5 +174,40 @@ export interface AdPackageRepository {
   createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign>;
   updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void>;
   createCoupon(input: CreateAdCouponInput): Promise<AdCoupon>;
+  issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult>;
+  listIssuedCouponsForMember(input: ListIssuedCouponsForMemberInput): Promise<AvailableAdCoupon[]>;
+  addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult>;
   redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult>;
 }
+
+export type IssueAdCouponInput = {
+  couponId: string;
+  memberId: string;
+  sessionId?: string | null;
+};
+
+export type IssueAdCouponResult =
+  | {
+      ok: true;
+      issue: AvailableAdCoupon;
+    }
+  | {
+      ok: false;
+      reason: "not_found" | "inactive" | "member_limit" | "usage_limit" | "code_unavailable" | "invalid";
+      message: string;
+    };
+
+export type ListIssuedCouponsForMemberInput = {
+  memberId: string;
+  now?: Date;
+};
+
+export type AddAdCouponCodesInput = {
+  couponId: string;
+  codes: string[];
+};
+
+export type AddAdCouponCodesResult = {
+  addedCount: number;
+  skippedCount: number;
+};

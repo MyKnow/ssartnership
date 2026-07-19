@@ -44,6 +44,13 @@ export const AD_COUPON_STATUSES = [
 
 export type AdCouponStatus = (typeof AD_COUPON_STATUSES)[number];
 
+export const AD_COUPON_ISSUANCE_TYPES = [
+  "service",
+  "partner_code_pool",
+] as const;
+
+export type AdCouponIssuanceType = (typeof AD_COUPON_ISSUANCE_TYPES)[number];
+
 export const AD_COUPON_REDEMPTION_TYPES = [
   "onsite",
   "code",
@@ -99,6 +106,8 @@ export type AdCouponLike = {
   status?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
+  usageStartsAt?: string | null;
+  usageEndsAt?: string | null;
   usageLimit?: number | null;
   usedCount?: number | null;
 };
@@ -216,7 +225,7 @@ export function isAdCouponRedeemable({
   if (coupon.status !== "active") {
     return false;
   }
-  if (!isActiveWindow(coupon.startsAt, coupon.endsAt, now)) {
+  if (!isActiveWindow(coupon.usageStartsAt ?? coupon.startsAt, coupon.usageEndsAt ?? coupon.endsAt, now)) {
     return false;
   }
   if (!isAdCampaignActive(campaign, now)) {
@@ -230,6 +239,20 @@ export function isAdCouponRedeemable({
     return false;
   }
   return true;
+}
+
+export function isAdCouponDownloadable({
+  coupon,
+  campaign,
+  now = new Date(),
+}: {
+  coupon: AdCouponLike & { downloadStartsAt?: string | null; downloadEndsAt?: string | null };
+  campaign?: AdCampaignLike | null;
+  now?: Date;
+}) {
+  if (coupon.status !== "active") return false;
+  if (!isActiveWindow(coupon.downloadStartsAt ?? coupon.startsAt, coupon.downloadEndsAt ?? coupon.endsAt, now)) return false;
+  return isAdCampaignActive(campaign, now);
 }
 
 export function createEmptyAdPackageMetrics(): AdPackageMetrics {

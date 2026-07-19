@@ -5,6 +5,7 @@ import {
   type AdCampaignStatus,
   type AdChannel,
   type AdCouponRedemptionType,
+  type AdCouponIssuanceType,
   type AdCouponStatus,
 } from "@/lib/ad-packages";
 import type {
@@ -17,7 +18,7 @@ export const AD_PACKAGE_FORM_LIMITS = {
   titleMax: 80,
   descriptionMax: 240,
   sponsorLabelMax: 60,
-  codeMax: 40,
+  codeMax: 120,
   discountLabelMax: 80,
   termsMax: 8,
   termMax: 80,
@@ -40,6 +41,10 @@ const redemptionTypes = new Set<AdCouponRedemptionType>([
   "onsite",
   "code",
   "external",
+]);
+const issuanceTypes = new Set<AdCouponIssuanceType>([
+  "service",
+  "partner_code_pool",
 ]);
 
 function getString(formData: FormData, key: string) {
@@ -71,6 +76,10 @@ function parseDateTimeLocal(value: string, message: string) {
     throw new Error("기간 형식을 확인해 주세요.");
   }
   return date.toISOString();
+}
+
+function parseOptionalDateTimeLocal(value: string, fallback: string) {
+  return value ? parseDateTimeLocal(value, "기간 형식을 확인해 주세요.") : fallback;
 }
 
 function assertPeriod(startsAt: string, endsAt: string) {
@@ -210,6 +219,24 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
     "종료 시각을 입력해 주세요.",
   );
   assertPeriod(startsAt, endsAt);
+  const downloadStartsAt = parseOptionalDateTimeLocal(
+    getString(formData, "downloadStartsAt"),
+    startsAt,
+  );
+  const downloadEndsAt = parseOptionalDateTimeLocal(
+    getString(formData, "downloadEndsAt"),
+    endsAt,
+  );
+  const usageStartsAt = parseOptionalDateTimeLocal(
+    getString(formData, "usageStartsAt"),
+    startsAt,
+  );
+  const usageEndsAt = parseOptionalDateTimeLocal(
+    getString(formData, "usageEndsAt"),
+    endsAt,
+  );
+  assertPeriod(downloadStartsAt, downloadEndsAt);
+  assertPeriod(usageStartsAt, usageEndsAt);
   const externalUrl = getString(formData, "externalUrl");
   const safeExternalUrl = externalUrl ? sanitizeHttpUrl(externalUrl) : "";
   if (externalUrl && !safeExternalUrl) {
@@ -228,7 +255,12 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
     code: limitLength(
       getString(formData, "code"),
       AD_PACKAGE_FORM_LIMITS.codeMax,
-      "쿠폰 코드는 40자 이하로 입력해 주세요.",
+      "쿠폰 코드는 120자 이하로 입력해 주세요.",
+    ),
+    issuanceType: parseStatus(
+      getString(formData, "issuanceType"),
+      issuanceTypes,
+      "service",
     ),
     redemptionType: parseStatus(
       getString(formData, "redemptionType"),
@@ -244,7 +276,14 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
     status: parseStatus(getString(formData, "status"), couponStatuses, "draft"),
     startsAt,
     endsAt,
+    downloadStartsAt,
+    downloadEndsAt,
+    usageStartsAt,
+    usageEndsAt,
     usageLimit: parseNullableLimit(getString(formData, "usageLimit")),
+    dailyIssueLimit: parseNullableLimit(getString(formData, "dailyIssueLimit")),
+    weeklyIssueLimit: parseNullableLimit(getString(formData, "weeklyIssueLimit")),
+    monthlyIssueLimit: parseNullableLimit(getString(formData, "monthlyIssueLimit")),
     perMemberLimit: parsePositiveInteger(getString(formData, "perMemberLimit"), 1),
     externalUrl: safeExternalUrl ?? "",
   };

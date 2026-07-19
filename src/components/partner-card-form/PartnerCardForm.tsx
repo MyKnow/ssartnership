@@ -43,11 +43,6 @@ import {
   inferPartnerBranchScopeType,
   type PartnerBranchScopeType,
 } from "@/lib/partner-branch-registration";
-import {
-  getBenefitListingMode,
-  removeCouponOnlyDefaults,
-  type BenefitListingMode,
-} from "@/lib/partner-coupon-only";
 import type {
   PartnerCardCategoryOption,
   PartnerCardCompanyOption,
@@ -114,13 +109,6 @@ export default function PartnerCardForm({
   const allowUploadedFormSubmitRef = useRef(false);
   const [branchEntryMode, setBranchEntryMode] =
     useState<BranchEntryMode>("single");
-  const [benefitListingMode, setBenefitListingMode] =
-    useState<BenefitListingMode>(() =>
-      getBenefitListingMode({
-        benefits: partner.benefits,
-        conditions: partner.conditions,
-      }),
-    );
   const [branchRows, setBranchRows] = useState<BranchEditorRow[]>(() =>
     parseInitialBranchEditorRows(),
   );
@@ -200,7 +188,6 @@ export default function PartnerCardForm({
       );
       if (!restored) return;
       setBranchEntryMode(restored.branchEntryMode);
-      setBenefitListingMode(restored.benefitListingMode);
       setBranchRows(parseInitialBranchEditorRows(restored.branchListText));
       setAppliesToValue(restored.appliesTo);
       setRestoredDraftValues(restored);
@@ -213,7 +200,7 @@ export default function PartnerCardForm({
     const form = formRef.current;
     const snapshot = createPartnerCardDraftSnapshot({
       branchEntryMode,
-      benefitListingMode,
+      benefitListingMode: "always_on",
       branchListText,
       conditions: form ? readDraftListValue(form, "conditions") : [],
       benefits: form ? readDraftListValue(form, "benefits") : [],
@@ -226,7 +213,6 @@ export default function PartnerCardForm({
     };
   }, [
     appliesToValue,
-    benefitListingMode,
     branchEntryMode,
     branchListText,
     formRef,
@@ -260,58 +246,6 @@ export default function PartnerCardForm({
   const restoredCampusSlugs = restoredDraftValues
     ? normalizeCampusSlugs(restoredDraftValues.campusSlugs)
     : undefined;
-
-  const preserveCurrentPartnerDraftValues = useCallback(() => {
-    const form = formRef.current;
-    const snapshot = createPartnerCardDraftSnapshot({
-      branchEntryMode,
-      benefitListingMode,
-      branchListText,
-      conditions:
-        benefitListingMode === "always_on"
-          ? form
-            ? readDraftListValue(form, "conditions")
-            : []
-          : restoredDraftValues?.conditions ?? removeCouponOnlyDefaults(partner.conditions),
-      benefits:
-        benefitListingMode === "always_on"
-          ? form
-            ? readDraftListValue(form, "benefits")
-            : []
-          : restoredDraftValues?.benefits ?? removeCouponOnlyDefaults(partner.benefits),
-      tags: form
-        ? readDraftListValue(form, "tags")
-        : restoredDraftValues?.tags ?? partner.tags ?? [],
-      appliesTo: form
-        ? readCheckedDraftValues(form, "appliesTo")
-        : appliesToValue,
-      campusSlugs: form
-        ? readCheckedDraftValues(form, "campusSlugs")
-        : restoredDraftValues?.campusSlugs ?? [],
-    });
-    setRestoredDraftValues(snapshot);
-    setDraftRestoreVersion((current) => current + 1);
-  }, [
-    appliesToValue,
-    benefitListingMode,
-    branchEntryMode,
-    branchListText,
-    formRef,
-    partner.benefits,
-    partner.conditions,
-    partner.tags,
-    restoredDraftValues,
-  ]);
-
-  const handleBenefitListingModeChange = (value: BenefitListingMode) => {
-    preserveCurrentPartnerDraftValues();
-    setBenefitListingMode(value);
-    if (value === "coupon_only") {
-      setBenefitActionTypeValue("none");
-      setBenefitActionLinkValue("");
-      setReservationLinkValue("");
-    }
-  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     if (allowUploadedFormSubmitRef.current) {
@@ -538,13 +472,7 @@ export default function PartnerCardForm({
               setLocationValue,
               setDetailDescriptionValue,
               setMapUrlValue,
-              setBenefitActionTypeValue: (value) => {
-                setBenefitActionTypeValue(value);
-                if (benefitListingMode === "coupon_only" && value !== "none") {
-                  preserveCurrentPartnerDraftValues();
-                  setBenefitListingMode("always_on");
-                }
-              },
+              setBenefitActionTypeValue,
               setBenefitActionLinkValue,
               setReservationLinkValue,
               setInquiryLinkValue,
@@ -648,8 +576,6 @@ export default function PartnerCardForm({
 
           <PartnerChipSections
             partner={partner}
-            benefitListingMode={benefitListingMode}
-            onBenefitListingModeChange={handleBenefitListingModeChange}
             restoredDraftValues={restoredDraftValues}
             draftRestoreVersion={draftRestoreVersion}
           />

@@ -10,6 +10,7 @@ import {
 } from "@/lib/ad-package-validation";
 import type { AdCampaignStatus } from "@/lib/ad-packages";
 import { adPackageRepository } from "@/lib/repositories";
+import { normalizeCouponCodeRows } from "@/lib/ad-coupon-domain";
 import { logAdminAction } from "./shared-helpers";
 
 function getString(formData: FormData, key: string) {
@@ -89,6 +90,12 @@ export async function createAdCouponAction(formData: FormData) {
   await requireAdminPermission("home_ads", "create", { path: "/admin/advertisement" });
   const input = parseCreateAdCouponForm(formData);
   const coupon = await adPackageRepository.createCoupon(input);
+  const codePool = normalizeCouponCodeRows(
+    String(formData.get("codePool") ?? "").split(/\r?\n/),
+  );
+  if (coupon.issuanceType === "partner_code_pool" && codePool.codes.length > 0) {
+    await adPackageRepository.addCouponCodes({ couponId: coupon.id, codes: codePool.codes });
+  }
 
   await logAdminAction("ad_coupon_create", {
     targetType: "ad_coupon",
@@ -98,6 +105,7 @@ export async function createAdCouponAction(formData: FormData) {
       partnerId: coupon.partnerId,
       campaignId: coupon.campaignId,
       redemptionType: coupon.redemptionType,
+      issuanceType: coupon.issuanceType,
     },
   });
   revalidateAdPackagePaths(coupon.partnerId);

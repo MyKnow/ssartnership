@@ -3,9 +3,7 @@ import { redirect } from "next/navigation";
 import Container from "@/components/ui/Container";
 import SiteHeader from "@/components/SiteHeader";
 import CouponWalletView from "@/components/coupons/CouponWalletView";
-import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
-import { isWithinPeriod } from "@/lib/partner-utils";
-import { adPackageRepository, partnerRepository } from "@/lib/repositories";
+import { adPackageRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import { getHeaderSession } from "@/lib/header-session";
 import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
@@ -21,17 +19,6 @@ export const metadata: Metadata = {
   },
 };
 
-function getVisiblePartnerIds(
-  partners: Awaited<ReturnType<typeof partnerRepository.getPartners>>,
-) {
-  return partners
-    .filter((partner) => partner.name)
-    .filter((partner) => partner.visibility !== "private")
-    .filter((partner) => !partner.benefitAccessStatus)
-    .filter((partner) => isWithinPeriod(partner.period.start, partner.period.end))
-    .map((partner) => partner.id);
-}
-
 export default async function CouponsPage() {
   const session = await getSignedUserSession();
   if (!session?.userId) {
@@ -46,20 +33,8 @@ export default async function CouponsPage() {
     redirect(`/auth/login?returnTo=${encodeURIComponent("/coupons")}`);
   }
 
-  const viewerAudience = resolvePartnerAudienceFromMemberYear(
-    member.generation,
-    new Date(),
-    undefined,
-    { graduateVerifiedAt: member.graduateVerifiedAt },
-  );
-  const partners = await partnerRepository.getPartners({
-    authenticated: true,
-    viewerAudience,
-  });
-  const partnerIds = getVisiblePartnerIds(partners);
-  const coupons = await adPackageRepository.listAvailableCouponsForMember({
+  const coupons = await adPackageRepository.listIssuedCouponsForMember({
     memberId: session.userId,
-    partnerIds,
   });
 
   return (

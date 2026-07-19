@@ -16,13 +16,14 @@ import {
   getPartnerCompanyPlanDefinition,
 } from "@/lib/partner-company-plans";
 import { filterPartnerPortalMetricsForPlan } from "@/lib/partner-dashboard";
-import { partnerReviewRepository } from "@/lib/repositories";
+import { adPackageRepository, partnerReviewRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import {
   cancelPartnerChangeRequestAction,
   savePartnerImmediateChanges,
   submitPartnerChangeRequest,
 } from "@/app/partner/services/[partnerId]/request/actions";
+import { createPartnerCouponAction, uploadPartnerCouponCodesAction } from "./coupon-actions";
 
 type PartnerServiceDetailPageSearchParams = {
   mode?: string | string[];
@@ -130,6 +131,7 @@ export default async function PartnerCompanyServiceDetailPage({
     serviceMetricsSnapshot.metrics,
     context.brandPlanTier,
   );
+  const coupons = await adPackageRepository.listActiveCouponsForPartner(partnerId).catch(() => []);
 
   const paramsData = (await searchParams) ?? {};
   const mode = readSearchParam(paramsData.mode) === "edit" ? "edit" : "view";
@@ -167,6 +169,9 @@ export default async function PartnerCompanyServiceDetailPage({
       initialReviewSort="latest"
       initialReviewOffset={reviewData.nextOffset}
       initialReviewHasMore={reviewData.hasMore}
+      coupons={coupons}
+      createCouponAction={createPartnerCouponAction}
+      uploadCouponCodesAction={uploadPartnerCouponCodesAction}
     />
   );
 }
