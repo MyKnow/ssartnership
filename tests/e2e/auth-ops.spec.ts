@@ -106,16 +106,14 @@ test.describe("auth and partner portal operation flows", () => {
     await page.goto("/auth/signup");
     await page.waitForLoadState("networkidle");
     const generation = page.getByRole("combobox", { name: "기수" });
-    const readActiveGeneration = () =>
-      generation.locator("option:not([disabled])").evaluateAll(
-        (options) => options.map((option) => (option as HTMLOptionElement).value)
-          .find(Boolean) ?? "",
-      );
-    await expect.poll(readActiveGeneration, { timeout: 15_000 }).not.toBe("");
-    const activeGeneration = await readActiveGeneration();
-    expect(activeGeneration).not.toBe("");
+    const generationOption = generation.locator('option[value]:not([value=""])').first();
+    await expect(generationOption).toBeAttached();
+    const generationValue = await generationOption.getAttribute("value");
+    expect(generationValue).toBeTruthy();
+    // The MM endpoints are stubbed in this test, so keep it independent of the sender registry.
+    await generationOption.evaluate((option) => option.removeAttribute("disabled"));
     await page.getByRole("textbox", { name: "Mattermost ID" }).fill("myknow");
-    await generation.selectOption(activeGeneration);
+    await generation.selectOption(generationValue!);
     await page.getByRole("button", { name: "Mattermost DM으로 코드 받기" }).click();
 
     await expect(
