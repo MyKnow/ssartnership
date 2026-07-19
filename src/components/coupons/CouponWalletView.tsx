@@ -209,6 +209,16 @@ function CouponWalletAccordionItem({
                 </p>
               </div>
             ) : null}
+            {coupon.redemptionType === "onsite" && coupon.hasOnsitePassword && item.issueId ? (
+              <Button
+                href={`/coupons?issueId=${encodeURIComponent(item.issueId)}`}
+                variant="primary"
+                className="mt-1 w-full justify-center"
+              >
+                제휴처 확인 화면
+                <ArrowRightIcon className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null}
             <Button href={detailHref} variant="primary" className="mt-1 w-full justify-center">
               제휴처 상세 보기
               <ArrowRightIcon className="size-4" aria-hidden="true" />

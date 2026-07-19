@@ -50,9 +50,13 @@ export type AdCoupon = {
   dailyIssueLimit: number | null;
   weeklyIssueLimit: number | null;
   monthlyIssueLimit: number | null;
+  perMemberDailyIssueLimit: number | null;
+  perMemberWeeklyIssueLimit: number | null;
+  perMemberMonthlyIssueLimit: number | null;
   issuedCount: number;
   remainingIssueCount: number | null;
   perMemberLimit: number;
+  hasOnsitePassword: boolean;
   usedCount: number;
   externalUrl: string;
   createdAt: string;
@@ -111,7 +115,12 @@ export type CreateAdCouponInput = {
   dailyIssueLimit?: number | null;
   weeklyIssueLimit?: number | null;
   monthlyIssueLimit?: number | null;
+  perMemberDailyIssueLimit?: number | null;
+  perMemberWeeklyIssueLimit?: number | null;
+  perMemberMonthlyIssueLimit?: number | null;
   perMemberLimit?: number;
+  /** Plaintext is accepted only transiently at the server-action boundary. */
+  onsitePassword?: string | null;
   externalUrl?: string;
 };
 
@@ -157,6 +166,7 @@ export type RedeemAdCouponResult =
         | "inactive"
         | "usage_limit"
         | "member_limit"
+        | "onsite_verification_required"
         | "invalid";
       message: string;
       coupon?: AdCoupon | null;
@@ -178,6 +188,7 @@ export interface AdPackageRepository {
   listIssuedCouponsForMember(input: ListIssuedCouponsForMemberInput): Promise<AvailableAdCoupon[]>;
   addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult>;
   redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult>;
+  redeemCouponIssue(input: RedeemAdCouponIssueInput): Promise<RedeemAdCouponIssueResult>;
 }
 
 export type IssueAdCouponInput = {
@@ -211,3 +222,30 @@ export type AddAdCouponCodesResult = {
   addedCount: number;
   skippedCount: number;
 };
+
+export type RedeemAdCouponIssueInput = {
+  issueId: string;
+  memberId: string;
+  sessionId?: string | null;
+  onsitePassword?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type RedeemAdCouponIssueResult =
+  | {
+      ok: true;
+      couponId: string;
+      issueId: string;
+      assignedCode: string | null;
+    }
+  | {
+      ok: false;
+      reason:
+        | "not_found"
+        | "inactive"
+        | "expired"
+        | "onsite_password_required"
+        | "onsite_password_invalid"
+        | "invalid";
+      message: string;
+    };

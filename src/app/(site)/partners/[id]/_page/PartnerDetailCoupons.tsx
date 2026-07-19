@@ -306,6 +306,14 @@ export default function PartnerDetailCoupons({
                     <ArrowDownTrayIcon className="size-4" />
                     쿠폰 다운로드
                   </Button>
+                ) : currentUserId && coupon.redemptionType === "onsite" && coupon.hasOnsitePassword && issued?.issueId ? (
+                  <Button
+                    href={`/coupons?issueId=${encodeURIComponent(issued.issueId)}`}
+                    variant="primary"
+                    className="w-full justify-center sm:flex-1"
+                  >
+                    제휴처 확인 화면
+                  </Button>
                 ) : currentUserId ? (
                   <Button
                     type="button"
