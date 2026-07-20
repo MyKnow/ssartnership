@@ -152,24 +152,17 @@ function PartnerSetupHeroSkeleton() {
 
 function PartnerDetailMediaSkeleton() {
   return (
-    <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-      <Card className="relative overflow-hidden p-6 sm:p-8">
-        <div className="flex flex-wrap items-center gap-2">
-          <Skeleton className="h-7 w-20 rounded-full" />
-          <Skeleton className="h-7 w-24 rounded-full" />
-          <Skeleton className="h-7 w-20 rounded-full" />
-        </div>
-        <div className="mt-6 space-y-3">
+    <div className="grid gap-6">
+      <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
+        <Skeleton className="order-2 h-[24rem] w-full rounded-[2rem] border border-border bg-surface-muted md:order-1" />
+        <Card className="order-1 min-h-[24rem] space-y-4 p-6 sm:p-8 md:order-2">
+          <Skeleton className="h-5 w-20" />
           <Skeleton className="h-12 w-full max-w-2xl" />
           <Skeleton className="h-4 w-full max-w-xl" />
           <Skeleton className="h-4 w-full max-w-lg" />
-        </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-64 w-full rounded-[2rem]" />
-          <Skeleton className="h-64 w-full rounded-[2rem]" />
-        </div>
-      </Card>
-      <Skeleton className="order-2 h-[28rem] w-full rounded-[2rem] border border-border bg-surface-muted xl:order-2" />
+        </Card>
+      </div>
+      <Skeleton className="h-48 w-full rounded-[2rem] border border-border bg-surface-muted" />
     </div>
   );
 }

@@ -16,6 +16,9 @@ export const CLIENT_PRODUCT_EVENT_NAMES = [
   "partner_map_click",
   "reservation_click",
   "inquiry_click",
+  "partner_benefit_use_open",
+  "partner_benefit_use_select",
+  "partner_benefit_use_confirm",
   "share_link_copy",
   "push_settings_view",
   "pwa_install_click",
@@ -130,6 +133,20 @@ function parseProperties(
     case "inquiry_click":
     case "share_link_copy":
       return z.object({ source: shortText.optional() }).strip().parse(rawProperties);
+    case "partner_benefit_use_open":
+      return z
+        .object({ source: shortText.optional() })
+        .strip()
+        .parse(rawProperties);
+    case "partner_benefit_use_select":
+    case "partner_benefit_use_confirm":
+      return z
+        .object({
+          source: shortText.optional(),
+          benefitIndex: nonNegativeInteger.optional(),
+        })
+        .strip()
+        .parse(rawProperties);
     case "push_settings_view":
       return z.object({ configured: z.boolean().optional() }).strip().parse(rawProperties);
     case "pwa_install_click":
@@ -265,6 +282,9 @@ function parseProductEventTarget(
     case "partner_map_click":
     case "reservation_click":
     case "inquiry_click":
+    case "partner_benefit_use_open":
+    case "partner_benefit_use_select":
+    case "partner_benefit_use_confirm":
       return parseFixedTarget(eventName, targetType, targetId, "partner", {
         targetId: "partner",
       });

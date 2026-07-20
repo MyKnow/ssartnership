@@ -21,6 +21,8 @@ import PartnerDetailReviews, {
   PartnerDetailReviewsFallback,
 } from "./_page/PartnerDetailReviews";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import { getPartnerServiceMode } from "@/lib/partner-service-mode";
+import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -193,6 +195,17 @@ export default async function PartnerDetailPage({
           href: `/certification?${new URLSearchParams({ returnTo: partnerReturnTo }).toString()}`,
         }
       : benefitUseAction;
+  const offlineBenefitAction: OfflinePartnerBenefitAction | null =
+    isActive &&
+    getPartnerServiceMode(partner.location) === "offline" &&
+    partner.benefits.length > 0
+      ? {
+          partnerId: partner.id,
+          partnerName: partner.name,
+          benefits: partner.benefits,
+          returnTo: partnerReturnTo,
+        }
+      : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -234,63 +247,82 @@ export default async function PartnerDetailPage({
             />
           ) : null}
           <div className="flex flex-col gap-6">
-            <PageHeader
-              eyebrow={categoryLabel}
-              title={partner.name}
-              description={
-                partner.detailDescription ||
-                "혜택과 이용 조건을 확인하고 바로 이용할 수 있습니다."
-              }
-              backHref={directoryReturnTo}
-              backLabel="혜택 목록으로"
-              actions={
-                <ShareLinkButton targetType="partner" targetId={partner.id} />
-              }
-            />
-
-            <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-              <PartnerDetailSummaryCard
-                partner={partner}
-                categoryLabel={categoryLabel}
-                badgeStyle={badgeStyle}
-                chipStyle={chipStyle}
-                mapLink={mapLink}
-                currentUserId={currentUserId}
-                isFavorited={isFavorited}
-                metrics={metrics}
-                detailPanel={
-                  <PartnerDetailContactSection
-                    isActive={isActive}
-                    contactCount={contactCount}
-                    benefitUseAction={resolvedBenefitUseAction}
-                    inquiryDisplay={inquiryDisplay}
-                    normalizedLinks={normalizedLinks}
-                    partnerId={partner.id}
-                  />
-                }
-                primaryActionPanel={
-                  <PartnerDetailContactSection
-                    isActive={isActive}
-                    contactCount={contactCount}
-                    benefitUseAction={resolvedBenefitUseAction}
-                    inquiryDisplay={inquiryDisplay}
-                    normalizedLinks={normalizedLinks}
-                    partnerId={partner.id}
-                    mode="primary"
-                    className="hidden md:block"
-                  />
-                }
-              />
-
+            <div
+              data-partner-detail-hero
+              className="grid gap-6 md:grid-cols-2 md:items-stretch"
+            >
               <PartnerImageCarousel
-                key={carouselKey}
-                className="order-1 xl:order-2"
-                images={partner.images ?? []}
+                key={`${carouselKey}:thumbnail`}
+                className="order-2 h-full md:order-1"
+                images={partner.thumbnail ? [partner.thumbnail] : []}
                 name={partner.name}
-                matchHeightSelector="[data-partner-detail-summary]"
+                variant="hero"
+                showThumbnails={false}
                 priority
               />
+              <div className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-2">
+                <PageHeader
+                  className="h-full border-0 pb-0"
+                  eyebrow={categoryLabel}
+                  title={partner.name}
+                  description={
+                    partner.detailDescription ||
+                    "혜택과 이용 조건을 확인하고 바로 이용할 수 있습니다."
+                  }
+                  backHref={directoryReturnTo}
+                  backLabel="혜택 목록으로"
+                  actions={
+                    <ShareLinkButton targetType="partner" targetId={partner.id} />
+                  }
+                />
+              </div>
             </div>
+
+            {partner.images?.length ? (
+              <section data-partner-detail-gallery className="grid min-w-0 gap-3">
+                <p className="ui-section-title">추가 이미지</p>
+                <PartnerImageCarousel
+                  key={`${carouselKey}:gallery`}
+                  images={partner.images}
+                  name={`${partner.name} 추가 이미지`}
+                />
+              </section>
+            ) : null}
+
+            <PartnerDetailSummaryCard
+              partner={partner}
+              categoryLabel={categoryLabel}
+              badgeStyle={badgeStyle}
+              chipStyle={chipStyle}
+              mapLink={mapLink}
+              currentUserId={currentUserId}
+              isFavorited={isFavorited}
+              metrics={metrics}
+              detailPanel={
+                <PartnerDetailContactSection
+                  isActive={isActive}
+                  contactCount={contactCount}
+                  benefitUseAction={resolvedBenefitUseAction}
+                  inquiryDisplay={inquiryDisplay}
+                  normalizedLinks={normalizedLinks}
+                  partnerId={partner.id}
+                  offlineBenefitAction={offlineBenefitAction}
+                />
+              }
+              primaryActionPanel={
+                <PartnerDetailContactSection
+                  isActive={isActive}
+                  contactCount={contactCount}
+                  benefitUseAction={resolvedBenefitUseAction}
+                  inquiryDisplay={inquiryDisplay}
+                  normalizedLinks={normalizedLinks}
+                  partnerId={partner.id}
+                  offlineBenefitAction={offlineBenefitAction}
+                  mode="primary"
+                  className="hidden md:block"
+                />
+              }
+            />
 
             <PartnerDetailCoupons
               coupons={adCoupons}
@@ -311,6 +343,7 @@ export default async function PartnerDetailPage({
           <PartnerDetailMobileActionBar
             partnerId={partner.id}
             benefitUseAction={resolvedBenefitUseAction}
+            offlineBenefitAction={offlineBenefitAction}
             inquiryAction={
               inquiryDisplay
                 ? { href: inquiryDisplay.href, label: inquiryDisplay.label }

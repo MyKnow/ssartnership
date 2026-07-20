@@ -57,6 +57,17 @@ test("rollup rows are accumulated into service metrics", async () => {
     },
     {
       partner_id: "partner-a",
+      metric_name: "partner_benefit_use",
+      metric_kind: "pv",
+      granularity: "total",
+      bucket_timezone: "Asia/Seoul",
+      bucket_local_start: null,
+      bucket_local_date: null,
+      bucket_local_dow: null,
+      metric_count: 4,
+    },
+    {
+      partner_id: "partner-a",
       metric_name: "partner_detail_view",
       metric_kind: "uv",
       granularity: "total",
@@ -74,6 +85,7 @@ test("rollup rows are accumulated into service metrics", async () => {
   assert.equal(metrics.detailUv, 7);
   assert.equal(metrics.cardClicks, 3);
   assert.equal(metrics.reservationClicks, 2);
+  assert.equal(metrics.benefitUsageCount, 4);
   assert.equal(metrics.totalClicks, 5);
 });
 

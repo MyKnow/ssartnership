@@ -42,6 +42,7 @@ export function createPartnerCardFormState(
     mapUrlValue: partner.mapUrl ?? "",
     benefitActionTypeValue: resolvePartnerBenefitActionType(partner),
     benefitActionLinkValue: partner.benefitActionLink ?? partner.reservationLink ?? "",
+    benefitVerificationPinValue: "",
     reservationLinkValue: partner.reservationLink ?? "",
     inquiryLinkValue: partner.inquiryLink ?? "",
     companyNameValue: partner.company?.name ?? "",
@@ -88,6 +89,9 @@ export default function usePartnerCardFormState({
   );
   const [benefitActionLinkValue, setBenefitActionLinkValue] = useState(
     defaults.benefitActionLinkValue,
+  );
+  const [benefitVerificationPinValue, setBenefitVerificationPinValue] = useState(
+    defaults.benefitVerificationPinValue,
   );
   const [reservationLinkValue, setReservationLinkValue] = useState(
     defaults.reservationLinkValue,
@@ -155,6 +159,8 @@ export default function usePartnerCardFormState({
     setBenefitActionTypeValue,
     benefitActionLinkValue,
     setBenefitActionLinkValue,
+    benefitVerificationPinValue,
+    setBenefitVerificationPinValue,
     reservationLinkValue,
     setReservationLinkValue,
     inquiryLinkValue,

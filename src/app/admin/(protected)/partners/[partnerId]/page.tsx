@@ -171,7 +171,7 @@ export default async function AdminPartnerDetailPage({
     supabase
       .from("partners")
       .select(
-        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)",
+        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)",
       )
       .eq("id", partnerId)
       .maybeSingle(),
@@ -340,6 +340,11 @@ export default async function AdminPartnerDetailPage({
                   hint: "예약 CTA",
                 },
                 {
+                  label: "혜택 이용",
+                  value: `${metrics?.benefitUsageCount ?? 0}`,
+                  hint: "제휴처 확인 완료",
+                },
+                {
                   label: "문의 클릭",
                   value: `${metrics?.inquiryClicks ?? 0}`,
                   hint: "문의 CTA",
@@ -399,6 +404,10 @@ export default async function AdminPartnerDetailPage({
                 mapUrl: partner.map_url ?? "",
                 benefitActionType: partner.benefit_action_type ?? undefined,
                 benefitActionLink: partner.benefit_action_link ?? undefined,
+                benefitVerificationPinConfigured: Boolean(
+                  partner.benefit_verification_pin_hash &&
+                    partner.benefit_verification_pin_salt,
+                ),
                 reservationLink: partner.reservation_link ?? "",
                 inquiryLink: partner.inquiry_link ?? "",
                 period: {

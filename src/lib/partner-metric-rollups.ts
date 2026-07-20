@@ -7,6 +7,7 @@ export const PARTNER_METRIC_EVENT_NAMES = [
   "partner_map_click",
   "reservation_click",
   "inquiry_click",
+  "partner_benefit_use",
 ] as const;
 
 export type PartnerMetricEventName =
@@ -131,6 +132,9 @@ export function applyPartnerMetricCount(
       break;
     case "inquiry_click":
       metrics.inquiryClicks += count;
+      break;
+    case "partner_benefit_use":
+      metrics.benefitUsageCount = (metrics.benefitUsageCount ?? 0) + count;
       break;
   }
 

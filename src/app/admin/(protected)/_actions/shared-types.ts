@@ -14,6 +14,7 @@ export type PartnerCoreInput = {
   mapUrl: string | null;
   benefitActionType: PartnerBenefitActionType;
   benefitActionLink: string | null;
+  benefitVerificationPin: string | null;
   reservationLink: string | null;
   inquiryLink: string | null;
   periodStart: string | null;

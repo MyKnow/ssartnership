@@ -56,6 +56,7 @@ export default function PartnerBasicInfoSection({
     mapUrlValue: string;
     benefitActionTypeValue: PartnerBenefitActionType;
     benefitActionLinkValue: string;
+    benefitVerificationPinValue: string;
     reservationLinkValue: string;
     inquiryLinkValue: string;
   };
@@ -72,6 +73,7 @@ export default function PartnerBasicInfoSection({
     setMapUrlValue: (value: string) => void;
     setBenefitActionTypeValue: (value: PartnerBenefitActionType) => void;
     setBenefitActionLinkValue: (value: string) => void;
+    setBenefitVerificationPinValue: (value: string) => void;
     setReservationLinkValue: (value: string) => void;
     setInquiryLinkValue: (value: string) => void;
   };
@@ -272,6 +274,34 @@ export default function PartnerBasicInfoSection({
             </Select>
           </FieldGroup>
         </div>
+
+        {!isOnlineService ? (
+          <FieldGroup label="혜택 이용 확인 PIN" error={fieldErrors?.benefitVerificationPin}>
+            <Input
+              name="benefitVerificationPin"
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              maxLength={4}
+              autoComplete="new-password"
+              value={values.benefitVerificationPinValue}
+              onChange={(event) =>
+                setters.setBenefitVerificationPinValue(
+                  event.target.value.replace(/\D/g, "").slice(0, 4),
+                )
+              }
+              autoFocus={focusField === "benefitVerificationPin"}
+              aria-invalid={Boolean(fieldErrors?.benefitVerificationPin) || undefined}
+              className={getPartnerCardInvalidClass(Boolean(fieldErrors?.benefitVerificationPin))}
+              placeholder="숫자 4자리"
+            />
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {partner.benefitVerificationPinConfigured
+                ? "변경할 때만 입력하세요. 비워두면 기존 PIN을 유지합니다."
+                : "파트너가 현장에서 혜택 이용을 확인할 때 사용하는 PIN입니다."}
+            </p>
+          </FieldGroup>
+        ) : null}
 
         <FieldGroup
           label="혜택 이용 링크"

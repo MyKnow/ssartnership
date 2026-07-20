@@ -53,6 +53,11 @@ const METRIC_ACCESS_ITEMS = [
     description: "문의 링크 클릭 수",
   },
   {
+    key: "benefitUsageCount",
+    label: "혜택 이용",
+    description: "제휴처에서 확인 완료된 상시 혜택 이용 횟수",
+  },
+  {
     key: "timeseries",
     label: "시계열 추이",
     description: "일자별 성과 변화",

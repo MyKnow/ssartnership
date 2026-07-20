@@ -12,6 +12,8 @@ import {
   normalizePartnerVisibility,
   shouldNotifyPartnerBecamePublic,
 } from "@/lib/partner-visibility";
+import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
+import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   cleanupPartnerCompanyProvision,
@@ -67,7 +69,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
+      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -145,6 +147,22 @@ export async function updatePartnerAction(formData: FormData) {
     id,
     collectPartnerMediaUrls(previousPartner),
   );
+  const previousBenefitVerificationPinHash =
+    (previousPartner as { benefit_verification_pin_hash?: string | null })
+      .benefit_verification_pin_hash ?? null;
+  const previousBenefitVerificationPinSalt =
+    (previousPartner as { benefit_verification_pin_salt?: string | null })
+      .benefit_verification_pin_salt ?? null;
+  const nextBenefitVerificationPin = payload.benefitVerificationPin
+    ? await hashCouponVerificationPassword(payload.benefitVerificationPin)
+    : getPartnerServiceMode(payload.location) === "online"
+      ? null
+      : previousBenefitVerificationPinHash && previousBenefitVerificationPinSalt
+        ? {
+            hash: previousBenefitVerificationPinHash,
+            salt: previousBenefitVerificationPinSalt,
+          }
+        : null;
   const hasCompanyPayload = Boolean(
     companyPayload.companyId ||
       companyPayload.name ||
@@ -185,6 +203,8 @@ export async function updatePartnerAction(formData: FormData) {
         map_url: payload.mapUrl,
         benefit_action_type: payload.benefitActionType,
         benefit_action_link: payload.benefitActionLink,
+        benefit_verification_pin_hash: nextBenefitVerificationPin?.hash ?? null,
+        benefit_verification_pin_salt: nextBenefitVerificationPin?.salt ?? null,
         reservation_link: payload.reservationLink,
         inquiry_link: payload.inquiryLink,
         period_start: payload.periodStart,

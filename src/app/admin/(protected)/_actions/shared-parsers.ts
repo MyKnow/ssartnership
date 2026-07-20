@@ -239,6 +239,9 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const rawMapUrl = String(formData.get("mapUrl") || "").trim();
   const rawBenefitActionType = String(formData.get("benefitActionType") || "").trim();
   const rawBenefitActionLink = String(formData.get("benefitActionLink") || "").trim();
+  const rawBenefitVerificationPin = String(
+    formData.get("benefitVerificationPin") || "",
+  ).trim();
   const rawReservationLink = String(formData.get("reservationLink") || "").trim();
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
   const rawVisibility = String(formData.get("visibility") || "").trim();
@@ -298,6 +301,11 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     benefitActionType === "external_link" ? parsedBenefitActionLink : null;
   const reservationLink = benefitActionLink;
 
+  if (rawBenefitVerificationPin && !/^\d{4}$/.test(rawBenefitVerificationPin)) {
+    throw new Error("partner_form_invalid_benefit_verification_pin");
+  }
+  const benefitVerificationPin = rawBenefitVerificationPin || null;
+
   const inquiryLink = parsePartnerLink(rawInquiryLink);
   if (rawInquiryLink && !inquiryLink) {
     throw new Error("partner_form_invalid_inquiry_url");
@@ -327,6 +335,7 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     mapUrl,
     benefitActionType,
     benefitActionLink,
+    benefitVerificationPin,
     reservationLink,
     inquiryLink,
     periodStart: periodStart || null,

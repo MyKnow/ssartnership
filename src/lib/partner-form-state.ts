@@ -9,6 +9,7 @@ export type PartnerFormField =
   | "mapUrl"
   | "benefitActionType"
   | "benefitActionLink"
+  | "benefitVerificationPin"
   | "reservationLink"
   | "inquiryLink"
   | "visibility"

@@ -1,6 +1,9 @@
 import ContactCopyRow from "@/components/ContactCopyRow";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
+import PartnerBenefitUseAction, {
+  type OfflinePartnerBenefitAction,
+} from "@/components/partner/PartnerBenefitUseAction";
 import PartnerDetailBenefitActionLink from "./PartnerDetailBenefitActionLink";
 import PartnerDetailInfoRow from "./PartnerDetailInfoRow";
 
@@ -37,6 +40,7 @@ export default function PartnerDetailContactSection({
   inquiryDisplay,
   normalizedLinks,
   partnerId,
+  offlineBenefitAction,
   className,
   mode = "details",
 }: {
@@ -50,6 +54,7 @@ export default function PartnerDetailContactSection({
     inquiryLink: string;
   };
   partnerId: string;
+  offlineBenefitAction?: OfflinePartnerBenefitAction | null;
   className?: string;
   mode?: "details" | "primary";
 }) {
@@ -67,6 +72,15 @@ export default function PartnerDetailContactSection({
   }
 
   if (mode === "primary") {
+    if (offlineBenefitAction) {
+      return (
+        <section className={cn("min-w-0", className)} aria-label="혜택 이용">
+          <div data-primary-benefit-action className="w-full">
+            <PartnerBenefitUseAction action={offlineBenefitAction} />
+          </div>
+        </section>
+      );
+    }
     if (!benefitUseAction) {
       return null;
     }
@@ -142,7 +156,7 @@ export default function PartnerDetailContactSection({
     );
   }
 
-  if (contactCount === 0) {
+  if (contactCount === 0 && !offlineBenefitAction) {
     return (
       <div
         className={cn(

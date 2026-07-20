@@ -21,6 +21,7 @@ export type PartnerPortalServiceMetrics = {
   mapClicks: number;
   reservationClicks: number;
   inquiryClicks: number;
+  benefitUsageCount?: number;
   reviewCount: number;
   totalClicks: number;
 };
@@ -60,6 +61,7 @@ const zeroMetrics = (): PartnerPortalServiceMetrics => ({
   mapClicks: 0,
   reservationClicks: 0,
   inquiryClicks: 0,
+  benefitUsageCount: 0,
   reviewCount: 0,
   totalClicks: 0,
 });
@@ -81,6 +83,8 @@ export function sumPartnerPortalMetrics(
       reservationClicks:
         accumulator.reservationClicks + metrics.reservationClicks,
       inquiryClicks: accumulator.inquiryClicks + metrics.inquiryClicks,
+      benefitUsageCount:
+        (accumulator.benefitUsageCount ?? 0) + (metrics.benefitUsageCount ?? 0),
       reviewCount: accumulator.reviewCount + metrics.reviewCount,
       totalClicks: accumulator.totalClicks + metrics.totalClicks,
     }),
@@ -113,6 +117,9 @@ export function filterPartnerPortalMetricsForPlan(
       : 0,
     inquiryClicks: canAccessPartnerMetric(planTier, "inquiryClicks")
       ? metrics.inquiryClicks
+      : 0,
+    benefitUsageCount: canAccessPartnerMetric(planTier, "benefitUsageCount")
+      ? metrics.benefitUsageCount ?? 0
       : 0,
     reviewCount: canAccessPartnerMetric(planTier, "reviewCount")
       ? metrics.reviewCount

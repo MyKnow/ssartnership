@@ -44,6 +44,11 @@ const canonicalPublicViewContracts = [
     pageFile: "src/app/(site)/support/bug-report/page.tsx",
   },
   {
+    routePath: "/partners/[id]/benefit-use",
+    viewComponent: "PartnerBenefitVerificationView",
+    pageFile: "src/app/(site)/partners/[id]/benefit-use/page.tsx",
+  },
+  {
     routePath: "/auth/login",
     viewComponent: "LoginPageView",
     pageFile: "src/app/auth/login/page.tsx",

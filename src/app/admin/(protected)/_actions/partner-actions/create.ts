@@ -39,6 +39,7 @@ import {
 import type { CreatedPartnerRecord } from "@/app/admin/(protected)/_actions/shared-types";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import { getPartnerVisibilityState } from "@/lib/partner-visibility";
+import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
 
 type AdminPartnerBranchPayload = {
   branchScopeType: PartnerBranchScopeType;
@@ -250,6 +251,9 @@ async function createPartnerRecord(
   const payload = parsePartnerPayload(formData);
   const companyPayload = parsePartnerCompanyPayload(formData);
   const media = await resolvePartnerMediaPayload(formData, partnerId);
+  const benefitVerificationPinHash = payload.benefitVerificationPin
+    ? await hashCouponVerificationPassword(payload.benefitVerificationPin)
+    : null;
   const managedCampusSlugs = resolveCreatedManagedCampusSlugs(
     adminAccount,
     payload.campusSlugs,
@@ -305,6 +309,8 @@ async function createPartnerRecord(
       map_url: payload.mapUrl,
       benefit_action_type: payload.benefitActionType,
       benefit_action_link: payload.benefitActionLink,
+      benefit_verification_pin_hash: benefitVerificationPinHash?.hash ?? null,
+      benefit_verification_pin_salt: benefitVerificationPinHash?.salt ?? null,
       reservation_link: payload.reservationLink,
       inquiry_link: payload.inquiryLink,
       period_start: payload.periodStart,
