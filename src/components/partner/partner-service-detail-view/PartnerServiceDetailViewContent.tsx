@@ -50,6 +50,7 @@ export default function PartnerServiceDetailViewContent({
   initialReviewOffset,
   initialReviewHasMore,
   coupons,
+  partnerPeriodEnd,
   createCouponAction,
   uploadCouponCodesAction,
 }: PartnerServiceDetailViewProps) {
@@ -224,6 +225,7 @@ export default function PartnerServiceDetailViewContent({
                 coupons={coupons}
                 companyId={context.companyId}
                 partnerId={context.partnerId}
+                partnerPeriodEnd={partnerPeriodEnd}
                 createAction={createCouponAction}
                 uploadCodesAction={uploadCouponCodesAction}
               />

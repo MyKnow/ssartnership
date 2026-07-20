@@ -170,6 +170,7 @@ export default async function PartnerCompanyServiceDetailPage({
       initialReviewOffset={reviewData.nextOffset}
       initialReviewHasMore={reviewData.hasMore}
       coupons={coupons}
+      partnerPeriodEnd={context.periodEnd}
       createCouponAction={createPartnerCouponAction}
       uploadCouponCodesAction={uploadPartnerCouponCodesAction}
     />

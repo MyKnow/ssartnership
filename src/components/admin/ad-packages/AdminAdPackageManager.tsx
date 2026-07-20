@@ -1,5 +1,5 @@
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
@@ -265,9 +265,9 @@ export default function AdminAdPackageManager({
                 placeholder="계약 조건, 후속 연락, 리포트 전달 방식"
               />
             </FieldLabel>
-            <Button type="submit" className="w-full justify-center sm:w-auto">
+            <FormSubmitButton loadingText="생성 중" className="w-full justify-center sm:w-auto">
               캠페인 생성
-            </Button>
+            </FormSubmitButton>
           </form>
         </Card>
       </div>
@@ -315,14 +315,14 @@ export default function AdminAdPackageManager({
                       <form key={status} action={updateCampaignStatusAction}>
                         <input type="hidden" name="campaignId" value={campaign.id} />
                         <input type="hidden" name="status" value={status} />
-                        <Button
-                          type="submit"
+                        <FormSubmitButton
                           variant={status === "active" ? "soft" : "secondary"}
                           size="sm"
                           disabled={campaign.status === status}
+                          loadingText="변경 중"
                         >
                           {statusLabels[status]}
-                        </Button>
+                        </FormSubmitButton>
                       </form>
                     ))}
                   </div>

@@ -45,6 +45,45 @@ describe("ad coupon validation", () => {
     );
   });
 
+  it("treats blank member periodic limits as unlimited", () => {
+    const input = parseCreateAdCouponForm(
+      buildForm({
+        perMemberDailyIssueLimit: "",
+        perMemberWeeklyIssueLimit: "",
+        perMemberMonthlyIssueLimit: "",
+      }),
+    );
+
+    assert.equal(input.perMemberDailyIssueLimit, null);
+    assert.equal(input.perMemberWeeklyIssueLimit, null);
+    assert.equal(input.perMemberMonthlyIssueLimit, null);
+  });
+
+  it("uses the partner affiliation end date at 23:59 when coupon end fields are blank", () => {
+    const input = parseCreateAdCouponForm(
+      buildForm({
+        endsAt: "",
+        downloadEndsAt: "",
+        usageEndsAt: "",
+      }),
+      { partnerPeriodEnd: "2026-08-31" },
+    );
+
+    assert.equal(input.endsAt, "2026-08-31T14:59:59.000Z");
+    assert.equal(input.downloadEndsAt, "2026-08-31T14:59:59.000Z");
+    assert.equal(input.usageEndsAt, "2026-08-31T14:59:59.000Z");
+  });
+
+  it("requires an explicit overall end when the partner has no affiliation end date", () => {
+    assert.throws(
+      () =>
+        parseCreateAdCouponForm(
+          buildForm({ endsAt: "", downloadEndsAt: "", usageEndsAt: "" }),
+        ),
+      /전체 유효 종료 시각/,
+    );
+  });
+
   it("requires an onsite PIN to be exactly four digits", () => {
     const input = parseCreateAdCouponForm(buildForm({ onsitePassword: "0000" }));
     assert.equal(input.onsitePassword, "0000");
@@ -64,5 +103,25 @@ describe("ad coupon validation", () => {
       { allowExistingOnsitePassword: true },
     );
     assert.equal(input.onsitePassword, null);
+  });
+
+  it("requires a link only for external redemption", () => {
+    assert.throws(() =>
+      parseCreateAdCouponForm(buildForm({ redemptionType: "external" })),
+    );
+
+    const input = parseCreateAdCouponForm(
+      buildForm({
+        redemptionType: "external",
+        externalUrl: "https://example.com/coupon",
+        onsitePassword: "",
+      }),
+    );
+    assert.equal(input.externalUrl, "https://example.com/coupon");
+    assert.throws(() =>
+      parseCreateAdCouponForm(
+        buildForm({ externalUrl: "https://example.com/coupon" }),
+      ),
+    );
   });
 });

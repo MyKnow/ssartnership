@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { parseCreateAdCouponForm } from "@/lib/ad-package-validation";
 import { adPackageRepository } from "@/lib/repositories";
+import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { parseCouponCodeWorkbook } from "@/lib/ad-coupon-code-import.server";
@@ -14,8 +15,16 @@ export async function createPartnerCouponAction(formData: FormData) {
   const partnerId = String(formData.get("partnerId") ?? "").trim();
   const scope = await assertPartnerPortalCompanyAccess(session, companyId);
   if (!scope || !partnerId) throw new Error("제휴처 권한을 확인할 수 없습니다.");
+  const context = await getPartnerChangeRequestContext(
+    [scope.id],
+    partnerId,
+    session.accountId,
+  );
+  if (!context) throw new Error("제휴처 권한을 확인할 수 없습니다.");
   formData.set("partnerId", partnerId);
-  const input = parseCreateAdCouponForm(formData);
+  const input = parseCreateAdCouponForm(formData, {
+    partnerPeriodEnd: context.periodEnd,
+  });
   await adPackageRepository.createCoupon({ ...input, partnerId });
   revalidatePath(`/partner/companies/${companyId}/services/${partnerId}`);
   revalidatePath(`/partners/${partnerId}`);
