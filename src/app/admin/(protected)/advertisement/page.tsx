@@ -3,7 +3,6 @@ import AdminAdvertisementView from "@/components/admin/AdminAdvertisementView";
 import AdminShell from "@/components/admin/AdminShell";
 import {
   createAdCampaignAction,
-  createAdCouponAction,
   updateAdCampaignStatusAction,
 } from "@/app/admin/(protected)/_actions/ad-package-actions";
 import { savePromotionSlidesAction } from "@/app/admin/(protected)/_actions/promotion-actions";
@@ -35,9 +34,6 @@ function statusMessage(status?: string) {
   }
   if (status === "ad-campaign-updated") {
     return "광고 패키지 캠페인 상태를 변경했습니다.";
-  }
-  if (status === "ad-coupon-created") {
-    return "쿠폰을 생성했습니다.";
   }
   return null;
 }
@@ -76,7 +72,6 @@ export default async function AdminAdvertisementPage({
           .map((partner) => ({ id: partner.id, name: partner.name }))}
         createCampaignAction={createAdCampaignAction}
         updateCampaignStatusAction={updateAdCampaignStatusAction}
-        createCouponAction={createAdCouponAction}
         initialSlides={slides}
         eventPageOptions={eventPageOptions}
         adCampaignOptions={adCampaignOptions}

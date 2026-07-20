@@ -42,18 +42,19 @@ export default function PartnerCouponPanel({
           <Input name="endsAt" type="datetime-local" required />
         </label>
         <label className="grid gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
-          현장 확인 비밀번호
+          현장 확인 PIN
           <Input
             name="onsitePassword"
             type="text"
             inputMode="numeric"
-            pattern="[0-9]+"
+            pattern="[0-9]{4}"
+            maxLength={4}
             autoComplete="off"
-            placeholder="제휴처에서 사용할 숫자 비밀번호"
+            placeholder="제휴처에서 사용할 4자리 PIN"
             required
           />
           <span className="text-xs font-normal text-muted-foreground">
-            회원이 쿠폰을 사용할 때 제휴처가 확인할 숫자입니다. 길이 제한은 없습니다.
+            회원이 쿠폰을 사용할 때 제휴처가 확인할 숫자 4자리 PIN입니다.
           </span>
         </label>
         <Input name="perMemberDailyIssueLimit" type="number" min={0} step={1} placeholder="회원별 일 발급 한도 (무제한)" />
@@ -76,7 +77,7 @@ export default function PartnerCouponPanel({
               </p>
               {coupon.redemptionType === "onsite" ? (
                 <p className="mt-1 text-xs font-medium text-primary">
-                  {coupon.hasOnsitePassword ? "현장 확인 비밀번호 설정됨" : "현장 확인 비밀번호 미설정"}
+                  {coupon.hasOnsitePassword ? "현장 확인 PIN 설정됨" : "현장 확인 PIN 미설정"}
                 </p>
               ) : null}
               {coupon.issuanceType === "partner_code_pool" ? (

@@ -11,7 +11,7 @@ export default function PartnerValueBadge({
   return (
     <Badge
       className={cn(
-        "!inline-block min-w-0 max-w-[calc(100vw-6rem)] !whitespace-normal break-words text-left !leading-4 tracking-normal sm:max-w-full bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100",
+        "!inline-block min-w-0 max-w-full !whitespace-normal break-words text-left !leading-4 tracking-normal bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100",
         className,
       )}
     >

@@ -49,11 +49,6 @@ function formatCurrency(value: number) {
   return `${value.toLocaleString("ko-KR")}원`;
 }
 
-function toDateTimeLocal(date: Date) {
-  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 16);
-}
-
 function formatPeriod(startsAt: string, endsAt: string) {
   const formatter = new Intl.DateTimeFormat("ko-KR", {
     month: "2-digit",
@@ -62,10 +57,6 @@ function formatPeriod(startsAt: string, endsAt: string) {
     minute: "2-digit",
   });
   return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
-}
-
-function formatIssueLimit(value: number | null) {
-  return value === null ? "무제한" : `${value.toLocaleString("ko-KR")}회`;
 }
 
 function FieldLabel({
@@ -137,17 +128,12 @@ export default function AdminAdPackageManager({
   partners,
   createCampaignAction,
   updateCampaignStatusAction,
-  createCouponAction,
 }: {
   campaigns: AdCampaignWithStats[];
   partners: PartnerOption[];
   createCampaignAction: ServerAction;
   updateCampaignStatusAction: ServerAction;
-  createCouponAction: ServerAction;
 }) {
-  const now = new Date();
-  const defaultStartsAt = toDateTimeLocal(now);
-  const defaultEndsAt = toDateTimeLocal(new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000));
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === "active");
   const couponCount = campaigns.reduce((sum, campaign) => sum + campaign.coupons.length, 0);
   const redemptions = campaigns.reduce(
@@ -179,7 +165,7 @@ export default function AdminAdPackageManager({
 
       <PackageCatalog />
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4">
         <Card tone="elevated" className="grid gap-4">
           <SectionHeading
             title="캠페인 생성"
@@ -284,209 +270,6 @@ export default function AdminAdPackageManager({
             </Button>
           </form>
         </Card>
-
-        <Card tone="elevated" className="grid gap-4">
-          <SectionHeading
-            title="쿠폰 생성"
-            description="캠페인에 붙일 쿠폰을 만들고 제휴처 상세에서 노출합니다."
-          />
-          <form action={createCouponAction} className="grid gap-4">
-            <input type="hidden" name="startsAt" value={defaultStartsAt} readOnly />
-            <input type="hidden" name="endsAt" value={defaultEndsAt} readOnly />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldLabel>
-                제휴처
-                <Select name="partnerId" required>
-                  <option value="">선택</option>
-                  {partners.map((partner) => (
-                    <option key={partner.id} value={partner.id}>
-                      {partner.name}
-                    </option>
-                  ))}
-                </Select>
-              </FieldLabel>
-              <FieldLabel>
-                캠페인
-                <Select name="campaignId">
-                  <option value="">캠페인 없이 쿠폰만 등록</option>
-                  {campaigns.map((campaign) => (
-                    <option key={campaign.id} value={campaign.id}>
-                      {campaign.title}
-                    </option>
-                  ))}
-                </Select>
-              </FieldLabel>
-            </div>
-            <FieldLabel>
-              쿠폰명
-              <Input
-                name="title"
-                maxLength={AD_PACKAGE_FORM_LIMITS.titleMax}
-                required
-                placeholder="예: 점심 세트 10% 할인"
-              />
-            </FieldLabel>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldLabel>
-                할인 표기
-                <Input
-                  name="discountLabel"
-                  maxLength={AD_PACKAGE_FORM_LIMITS.discountLabelMax}
-                  placeholder="10% 할인"
-                />
-              </FieldLabel>
-              <FieldLabel>
-                쿠폰 코드
-                <Input
-                  name="code"
-                  maxLength={AD_PACKAGE_FORM_LIMITS.codeMax}
-                  placeholder="SSAFY-LUNCH"
-                />
-              </FieldLabel>
-            </div>
-            <FieldLabel>
-              설명
-              <Textarea
-                name="description"
-                maxLength={AD_PACKAGE_FORM_LIMITS.descriptionMax}
-                rows={3}
-                placeholder="사용 가능 시간, 대상 메뉴, 매장 확인 방법"
-              />
-            </FieldLabel>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldLabel>
-                발급 방식
-                <Select name="issuanceType" defaultValue="service">
-                  <option value="service">서비스 발급형</option>
-                  <option value="partner_code_pool">파트너 코드형</option>
-                </Select>
-              </FieldLabel>
-              <FieldLabel>
-                사용 방식
-                <Select name="redemptionType" defaultValue="onsite">
-                  <option value="onsite">현장 확인</option>
-                  <option value="code">코드 제시</option>
-                  <option value="external">외부 링크</option>
-                </Select>
-              </FieldLabel>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldLabel>
-                다운로드 시작
-                <Input name="downloadStartsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
-              </FieldLabel>
-              <FieldLabel>
-                다운로드 종료
-                <Input name="downloadEndsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
-              </FieldLabel>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldLabel>
-                사용 시작
-                <Input name="usageStartsAt" type="datetime-local" defaultValue={defaultStartsAt} required />
-              </FieldLabel>
-              <FieldLabel>
-                사용 종료
-                <Input name="usageEndsAt" type="datetime-local" defaultValue={defaultEndsAt} required />
-              </FieldLabel>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-4">
-              <FieldLabel>
-                상태
-                <Select name="status" defaultValue="draft">
-                  <option value="draft">초안</option>
-                  <option value="active">활성</option>
-                  <option value="paused">일시중지</option>
-                  <option value="ended">종료</option>
-                </Select>
-              </FieldLabel>
-              <FieldLabel>
-                일 발급 한도
-                <Input name="dailyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-              </FieldLabel>
-              <FieldLabel>
-                주 발급 한도
-                <Input name="weeklyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-              </FieldLabel>
-              <FieldLabel>
-                월 발급 한도
-                <Input name="monthlyIssueLimit" type="number" min={0} step={1} placeholder="무제한" />
-              </FieldLabel>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldLabel>
-                회원별 보유/사용 제한
-                <Input name="perMemberLimit" type="number" min={1} step={1} defaultValue={1} />
-              </FieldLabel>
-              <FieldLabel>
-                현장 확인 비밀번호
-                <Input
-                  name="onsitePassword"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]+"
-                  autoComplete="off"
-                  placeholder="현장 확인형만 입력"
-                  aria-describedby="onsite-password-help"
-                />
-                <span id="onsite-password-help" className="text-xs font-normal text-muted-foreground">
-                  현장 확인형 쿠폰을 사용할 때 제휴처가 확인할 숫자 비밀번호입니다. 길이 제한은 없습니다.
-                </span>
-              </FieldLabel>
-              <FieldLabel>
-                외부 링크
-                <Input name="externalUrl" type="url" placeholder="https://..." />
-              </FieldLabel>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <FieldLabel>
-                회원별 일 발급 한도
-                <Input
-                  name="perMemberDailyIssueLimit"
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="무제한"
-                />
-              </FieldLabel>
-              <FieldLabel>
-                회원별 주 발급 한도
-                <Input
-                  name="perMemberWeeklyIssueLimit"
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="무제한"
-                />
-              </FieldLabel>
-              <FieldLabel>
-                회원별 월 발급 한도
-                <Input
-                  name="perMemberMonthlyIssueLimit"
-                  type="number"
-                  min={0}
-                  step={1}
-                  placeholder="무제한"
-                />
-              </FieldLabel>
-            </div>
-            <FieldLabel>
-              조건
-              <Textarea
-                name="terms"
-                rows={4}
-                placeholder={"평일 점심 한정\n1일 1회 사용\n타 쿠폰 중복 불가"}
-              />
-            </FieldLabel>
-            <FieldLabel>
-              파트너 코드 목록(한 줄에 하나)
-              <Textarea name="codePool" rows={4} placeholder="파트너가 전달한 쿠폰 코드를 붙여 넣으세요." />
-            </FieldLabel>
-            <Button type="submit" className="w-full justify-center sm:w-auto">
-              쿠폰 생성
-            </Button>
-          </form>
-        </Card>
       </div>
 
       <section className="grid gap-4" aria-label="광고 캠페인 목록">
@@ -571,42 +354,6 @@ export default function AdminAdPackageManager({
                   minItemWidth="11rem"
                 />
 
-                {campaign.coupons.length > 0 ? (
-                  <div className="grid gap-2">
-                    <p className="text-sm font-semibold text-foreground">연결 쿠폰</p>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {campaign.coupons.map((coupon) => (
-                        <div
-                          key={coupon.id}
-                          className="rounded-2xl border border-border bg-surface-inset px-4 py-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">
-                                {coupon.title}
-                              </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {coupon.discountLabel || coupon.code || "할인 표기 없음"}
-                              </p>
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                회원별 발급 · 일 {formatIssueLimit(coupon.perMemberDailyIssueLimit)} · 주 {formatIssueLimit(coupon.perMemberWeeklyIssueLimit)} · 월 {formatIssueLimit(coupon.perMemberMonthlyIssueLimit)}
-                              </p>
-                              {coupon.redemptionType === "onsite" ? (
-                                <p className="mt-1 text-xs font-medium text-primary">
-                                  {coupon.hasOnsitePassword ? "현장 확인 비밀번호 설정됨" : "현장 확인 비밀번호 미설정"}
-                                </p>
-                              ) : null}
-                            </div>
-                            <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
-                              {coupon.usedCount}
-                              {coupon.usageLimit !== null ? `/${coupon.usageLimit}` : ""}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
               </Card>
             );
           })

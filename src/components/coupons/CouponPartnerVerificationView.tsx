@@ -36,8 +36,8 @@ export default function CouponPartnerVerificationView({
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   async function verifyCoupon() {
-    if (!item.issueId || !password) {
-      setMessage({ tone: "error", text: "제휴처 확인 비밀번호를 입력해 주세요." });
+    if (!item.issueId || !/^\d{4}$/.test(password)) {
+      setMessage({ tone: "error", text: "제휴처 확인 PIN은 숫자 4자리로 입력해 주세요." });
       return;
     }
     setIsSubmitting(true);
@@ -99,15 +99,16 @@ export default function CouponPartnerVerificationView({
             name="onsitePassword"
             type="password"
             inputMode="numeric"
-            pattern="[0-9]+"
+            pattern="[0-9]{4}"
+            maxLength={4}
             autoComplete="off"
             value={password}
-            onChange={(event) => setPassword(event.target.value.replace(/\D/g, ""))}
-            placeholder="숫자 비밀번호 입력"
+            onChange={(event) => setPassword(event.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="4자리 PIN 입력"
             className="h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           <span className="text-xs font-normal text-muted-foreground">
-            비밀번호는 숫자만 입력하며 길이 제한은 없습니다.
+            제휴처에서 확인할 숫자 4자리 PIN입니다.
           </span>
         </label>
         {message ? (
