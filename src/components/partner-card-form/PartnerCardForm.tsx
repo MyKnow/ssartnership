@@ -76,7 +76,6 @@ export default function PartnerCardForm({
   companyOptions,
   categoryId,
   formAction,
-  deleteAction,
   submitLabel,
   className,
   focusField,
@@ -91,7 +90,6 @@ export default function PartnerCardForm({
   companyOptions?: PartnerCardCompanyOption[];
   categoryId?: string;
   formAction?: (formData: FormData) => void | Promise<void>;
-  deleteAction?: (formData: FormData) => void | Promise<void>;
   submitLabel?: string;
   className?: string;
   focusField?: PartnerCardFormField;
@@ -100,6 +98,7 @@ export default function PartnerCardForm({
   hiddenFields?: Array<{ name: string; value: string }>;
   clearDraftOnSuccess?: boolean;
 }) {
+  const formId = `partner-card-form-${mode}-${partner.id ?? "new"}`;
   const [clientFieldErrors, setClientFieldErrors] = useState<
     Partial<Record<PartnerCardFormField, string>>
   >({});
@@ -256,9 +255,6 @@ export default function PartnerCardForm({
     }
     const form = event.currentTarget;
     const formData = new FormData(form);
-    if (formData.get("partnerFormIntent") === "delete") {
-      return;
-    }
     const location = String(formData.get("location") || "").trim();
     const benefitActionType = String(formData.get("benefitActionType") || "").trim();
     const benefitActionLink = String(formData.get("benefitActionLink") || "").trim();
@@ -407,15 +403,18 @@ export default function PartnerCardForm({
       controllerRef={imageUploadControllerRef}
     >
       <article className={cn("grid gap-6", className)}>
-      <PartnerFormHero
-        mode={mode}
-        visibilityValue={visibilityValue as PartnerVisibility}
-        periodStart={periodStart}
-        periodEnd={periodEnd}
-      />
+      {mode === "create" ? (
+        <PartnerFormHero
+          mode={mode}
+          visibilityValue={visibilityValue as PartnerVisibility}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+        />
+      ) : null}
 
       <form
         ref={formRef}
+        id={formId}
         action={formAction}
         onSubmit={handleSubmit}
         onChange={() => setClientFormError(null)}
@@ -615,9 +614,8 @@ export default function PartnerCardForm({
 
           <PartnerFormActions
             mode={mode}
-            partnerId={partner.id}
-            deleteAction={deleteAction}
             submitLabel={submitLabel}
+            formId={formId}
             formError={clientFormError ?? formError}
             draftStatus={mode === "create" ? draftStatus : undefined}
             onSaveDraft={mode === "create" ? () => void saveDraft(true) : undefined}

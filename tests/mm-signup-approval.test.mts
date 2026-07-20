@@ -194,7 +194,7 @@ test("실패한 업로드 정리는 signed URL 만료 시각도 함께 닫는다
     repository,
     /status: "expired",\s+failure_code: null,\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
   );
-  assert.match(repository, /markFailed\(claimedSession\.id, "attach_failed", \["attaching"\]\)/);
+  assert.match(repository, /markFailed\(supabase, claimedSession\.id, "attach_failed", \["attaching"\]\)/);
 });
 
 test("가입 API는 승인 모드에서 회원 세션을 발급하지 않고 대기 페이지로 보낸다", async () => {

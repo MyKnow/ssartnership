@@ -128,7 +128,7 @@ export const NoScrollNoop: Story = {
 
     fireEvent.scroll(window);
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: "맨 위로 이동" }));
+    await expect(canvas.queryByRole("button", { name: "맨 위로 이동" })).not.toBeInTheDocument();
     await expect(scrollYValue).toBe(0);
 
     window.scrollTo = originalScrollTo;

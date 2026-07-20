@@ -114,8 +114,32 @@ create table if not exists partner_publication_notification_states (
 create table if not exists partner_preview_tokens (
   partner_id uuid primary key references partners(id) on delete cascade,
   token_hash text not null unique,
+  token_ciphertext text,
+  token_nonce text,
+  token_auth_tag text,
+  token_key_version smallint,
   created_at timestamp with time zone not null default now()
 );
+
+alter table partner_preview_tokens
+  drop constraint if exists partner_preview_tokens_encrypted_fields_check;
+alter table partner_preview_tokens
+  add constraint partner_preview_tokens_encrypted_fields_check
+  check (
+    (
+      token_ciphertext is null
+      and token_nonce is null
+      and token_auth_tag is null
+      and token_key_version is null
+    )
+    or (
+      token_ciphertext is not null
+      and token_nonce is not null
+      and token_auth_tag is not null
+      and token_key_version is not null
+      and token_key_version between 1 and 99
+    )
+  );
 
 create or replace function public.infer_partner_campus_slugs(input_location text)
 returns text[]

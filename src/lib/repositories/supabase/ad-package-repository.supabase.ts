@@ -1020,6 +1020,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       .select("id,coupon_id,member_id,assigned_code,issued_at,used_at")
       .eq("member_id", input.memberId)
       .eq("status", "issued")
+      .is("used_at", null)
       .order("issued_at", { ascending: false });
     if (issueError) throw new Error(issueError.message);
     const issues = (issueData ?? []) as CouponIssueRow[];

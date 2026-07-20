@@ -80,9 +80,9 @@ export default function PartnerImageCarousel({
   return (
     <div
       ref={rootRef}
+      data-partner-image-carousel={variant}
       className={cn(
-        "grid items-start gap-3",
-        variant === "hero" && "h-full md:items-stretch",
+        "grid min-w-0 items-start gap-3",
         showThumbnails && thumbPlacement === "side"
           ? "xl:grid-cols-[minmax(0,1fr)_7.5rem] xl:items-start"
           : "xl:grid-cols-1 xl:items-start",
@@ -94,7 +94,7 @@ export default function PartnerImageCarousel({
         className={cn(
           "relative w-full overflow-hidden rounded-3xl border border-border bg-surface-muted",
           variant === "hero"
-            ? "aspect-[4/3] min-h-[16rem] sm:min-h-[20rem] md:h-full md:min-h-0 md:aspect-auto"
+            ? "aspect-square"
             : "aspect-[4/3]",
         )}
         onClick={() => {

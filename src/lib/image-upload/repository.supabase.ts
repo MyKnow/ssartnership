@@ -68,8 +68,9 @@ function buildStagingPath(id: string, fileName: string) {
   return `staging/${id}${getSafeFileExtension(fileName)}`;
 }
 
-function getPublicUrl(bucket: string, path: string) {
-  const supabase = getSupabaseAdminClient();
+type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
+
+function getPublicUrl(supabase: SupabaseAdminClient, bucket: string, path: string) {
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
 
@@ -139,11 +140,12 @@ function toAttachedImage(session: ImageUploadSessionRow): AttachedImageUpload {
 }
 
 async function markFailed(
+  supabase: SupabaseAdminClient,
   id: string,
   code: string,
   statuses: Array<ImageUploadSessionRow["status"]>,
 ) {
-  await getSupabaseAdminClient()
+  await supabase
     .from("image_upload_sessions")
     .update({ status: "failed", failure_code: code })
     .eq("id", id)
@@ -151,6 +153,12 @@ async function markFailed(
 }
 
 export class SupabaseImageUploadRepository implements ImageUploadRepository {
+  private readonly supabase: SupabaseAdminClient;
+
+  constructor(supabase: SupabaseAdminClient = getSupabaseAdminClient()) {
+    this.supabase = supabase;
+  }
+
   async sign(input: SignImageUploadInput): Promise<SignedImageUpload[]> {
     assertSignupPurposeBoundary(input);
     if (input.uploads.length === 0 || input.uploads.length > MAX_SIGNED_UPLOADS_PER_REQUEST) {
@@ -177,7 +185,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         sourceSizeBytes: upload.size,
       };
     });
-    const supabase = getSupabaseAdminClient();
+    const supabase = this.supabase;
     const { error: insertError } = await supabase.from("image_upload_sessions").insert(
       sessions.map((session) => ({
         id: session.id,
@@ -216,7 +224,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         }),
       );
     } catch (error) {
-      await Promise.all(sessions.map((session) => markFailed(session.id, "sign_failed", ["signed"])));
+      await Promise.all(sessions.map((session) => markFailed(supabase, session.id, "sign_failed", ["signed"])));
       throw error;
     }
   }
@@ -228,7 +236,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       throw new Error("이미지 업로드 정보를 확인해 주세요.");
     }
     const now = input.now ?? new Date();
-    const supabase = getSupabaseAdminClient();
+    const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
       .select("*")
@@ -378,7 +386,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             height: normalized.height,
           } satisfies CompletedImageUpload;
         } catch (error) {
-          await markFailed(claimedSession.id, "complete_failed", ["processing"]);
+          await markFailed(supabase, claimedSession.id, "complete_failed", ["processing"]);
           throw error instanceof Error
             ? error
             : new Error("이미지를 처리하지 못했습니다.");
@@ -391,7 +399,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
   async attach(input: AttachImageUploadInput): Promise<AttachedImageUpload> {
     assertSignupPurposeBoundary(input);
     const now = input.now ?? new Date();
-    const supabase = getSupabaseAdminClient();
+    const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
       .select("*")
@@ -554,7 +562,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         throw new Error("이미지를 최종 보관소로 옮기지 못했습니다.");
       }
       const url = input.destination.isPublic
-        ? getPublicUrl(input.destination.bucket, input.destination.path)
+        ? getPublicUrl(supabase, input.destination.bucket, input.destination.path)
         : null;
       const { data: attachedData, error: updateError } = await supabase
         .from("image_upload_sessions")
@@ -596,7 +604,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         .catch(() => undefined);
       return toAttachedImage(attachedSession);
     } catch (error) {
-      await markFailed(claimedSession.id, "attach_failed", ["attaching"]).catch(() => undefined);
+      await markFailed(supabase, claimedSession.id, "attach_failed", ["attaching"]).catch(() => undefined);
       throw error instanceof Error
         ? error
         : new Error("이미지를 최종 보관소에 연결하지 못했습니다.");
@@ -620,7 +628,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     ) {
       throw new Error("승인용 이미지 보관 기간을 확인해 주세요.");
     }
-    const supabase = getSupabaseAdminClient();
+    const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
       .select("*")
@@ -656,7 +664,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
   async discard(input: DiscardImageUploadInput): Promise<void> {
     assertSignupPurposeBoundary(input);
     const now = input.now ?? new Date();
-    const supabase = getSupabaseAdminClient();
+    const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
       .select("*")
@@ -707,7 +715,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
   }
 
   async expireStale(now = new Date()): Promise<number> {
-    const supabase = getSupabaseAdminClient();
+    const supabase = this.supabase;
     const [signedResult, sessionResult] = await Promise.all([
       supabase
         .from("image_upload_sessions")

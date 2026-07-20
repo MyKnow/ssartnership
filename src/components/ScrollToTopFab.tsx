@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUpIcon } from "@heroicons/react/24/outline";
-import { cn } from "@/lib/cn";
+import { FloatingAction } from "@/components/FloatingActionGroup";
 
 export default function ScrollToTopFab({
   threshold = 320,
@@ -62,28 +62,29 @@ export default function ScrollToTopFab({
     window.requestAnimationFrame(step);
   };
 
+  if (!visible) {
+    return null;
+  }
+
   return (
-    <div
-      className={cn(
-        "pointer-events-none fixed bottom-safe-bottom-6 right-6 z-40 transition-all duration-200 ease-out",
-        visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
-      )}
-    >
-      <button
-        type="button"
-        className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-950/18 bg-slate-950/30 text-white transition hover:opacity-90 dark:border-white/30 dark:bg-white/14 dark:text-white"
-        aria-label="맨 위로 이동"
-        title="맨 위로 이동"
-        onClick={scrollToTop}
-        style={{
-          backdropFilter: "blur(5px) saturate(220%)",
-          WebkitBackdropFilter: "blur(5px) saturate(180%)",
-          boxShadow:
-            "0 12px 30px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.18)",
-        }}
-      >
-        <ArrowUpIcon className="h-5 w-5" />
-      </button>
-    </div>
+    <FloatingAction fallbackClassName="pointer-events-none fixed bottom-safe-bottom-6 right-6 z-40">
+      <div className="order-first pointer-events-none flex shrink-0 self-end translate-y-0 opacity-100 transition-all duration-200 ease-out">
+        <button
+          type="button"
+          className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-950/18 bg-slate-950/30 text-white transition hover:opacity-90 dark:border-white/30 dark:bg-white/14 dark:text-white"
+          aria-label="맨 위로 이동"
+          title="맨 위로 이동"
+          onClick={scrollToTop}
+          style={{
+            backdropFilter: "blur(5px) saturate(220%)",
+            WebkitBackdropFilter: "blur(5px) saturate(180%)",
+            boxShadow:
+              "0 12px 30px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.18)",
+          }}
+        >
+          <ArrowUpIcon className="h-5 w-5" />
+        </button>
+      </div>
+    </FloatingAction>
   );
 }

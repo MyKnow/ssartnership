@@ -56,6 +56,15 @@ describe("ad coupon domain", () => {
       getRemainingIssueCount({ ...quotas, codePoolRemaining: 3 }),
       3,
     );
+    assert.equal(
+      getRemainingIssueCount({
+        daily: { limit: null, issued: 999 },
+        weekly: { limit: null, issued: 999 },
+        monthly: { limit: null, issued: 999 },
+        codePoolRemaining: null,
+      }),
+      null,
+    );
   });
 
   it("normalizes manually entered and spreadsheet code rows", () => {

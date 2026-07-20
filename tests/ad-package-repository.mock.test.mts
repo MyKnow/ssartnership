@@ -20,6 +20,96 @@ async function createCodeCoupon(
 }
 
 describe("mock ad package repository", () => {
+  it("downloads a service coupon and treats blank member periodic limits as unlimited", async () => {
+    const repository = new MockAdPackageRepository();
+    const now = Date.now();
+    const coupon = await repository.createCoupon({
+      partnerId: "health-001",
+      title: "무제한 회원 발급 쿠폰",
+      status: "active",
+      startsAt: new Date(now - 60_000).toISOString(),
+      endsAt: new Date(now + 86_400_000).toISOString(),
+      downloadStartsAt: new Date(now - 60_000).toISOString(),
+      downloadEndsAt: new Date(now + 86_400_000).toISOString(),
+      usageStartsAt: new Date(now - 60_000).toISOString(),
+      usageEndsAt: new Date(now + 86_400_000).toISOString(),
+      perMemberDailyIssueLimit: null,
+      perMemberWeeklyIssueLimit: null,
+      perMemberMonthlyIssueLimit: null,
+      onsitePassword: "2468",
+    });
+
+    const first = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-unlimited",
+    });
+    assert.equal(first.ok, true);
+    if (!first.ok || !first.issue.issueId) return;
+
+    const redeemed = await repository.redeemCouponIssue({
+      issueId: first.issue.issueId,
+      memberId: "member-unlimited",
+      onsitePassword: "2468",
+    });
+    assert.equal(redeemed.ok, true);
+
+    const second = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-unlimited",
+    });
+    assert.equal(second.ok, true);
+    if (second.ok) {
+      assert.equal(second.issue.assignedCode, null);
+    }
+  });
+
+  it("assigns partner code pool rows once and reports exhaustion", async () => {
+    const repository = new MockAdPackageRepository();
+    const now = Date.now();
+    const coupon = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "파트너 코드 쿠폰",
+      issuanceType: "partner_code_pool",
+      redemptionType: "code",
+      status: "active",
+      startsAt: new Date(now - 60_000).toISOString(),
+      endsAt: new Date(now + 86_400_000).toISOString(),
+      downloadStartsAt: new Date(now - 60_000).toISOString(),
+      downloadEndsAt: new Date(now + 86_400_000).toISOString(),
+      usageStartsAt: new Date(now - 60_000).toISOString(),
+      usageEndsAt: new Date(now + 86_400_000).toISOString(),
+    });
+    const added = await repository.addCouponCodes({
+      couponId: coupon.id,
+      codes: [" PARTNER-001 ", "PARTNER-001", "PARTNER-002"],
+    });
+    assert.deepEqual(added, { addedCount: 2, skippedCount: 0 });
+
+    const first = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-code-1",
+    });
+    const second = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-code-2",
+    });
+    const exhausted = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-code-3",
+    });
+
+    assert.equal(first.ok, true);
+    assert.equal(second.ok, true);
+    if (first.ok && second.ok) {
+      assert.equal(first.issue.assignedCode, "PARTNER-001");
+      assert.equal(second.issue.assignedCode, "PARTNER-002");
+    }
+    assert.equal(exhausted.ok, false);
+    if (!exhausted.ok) {
+      assert.equal(exhausted.reason, "code_unavailable");
+    }
+  });
+
   it("lists every coupon for an admin partner detail page", async () => {
     const repository = new MockAdPackageRepository();
     const standaloneCoupon = await repository.createCoupon({

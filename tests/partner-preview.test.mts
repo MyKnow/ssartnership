@@ -17,4 +17,49 @@ describe("partner preview links", () => {
     assert.equal(isValidPartnerPreviewToken(token), true);
     assert.equal(isValidPartnerPreviewToken("hash"), false);
   });
+
+  it("stores the preview token encrypted and binds it to the partner", async () => {
+    const {
+      decryptPartnerPreviewToken,
+      encryptPartnerPreviewToken,
+    } = await import(
+      new URL("../src/lib/partner-preview-token-crypto.ts", import.meta.url).href,
+    );
+    const token = "b".repeat(64);
+    const encryptionKey = "test-preview-key-".padEnd(32, "x");
+    const encrypted = encryptPartnerPreviewToken("partner-1", token, encryptionKey);
+
+    assert.notEqual(encrypted.ciphertext, token);
+    assert.equal(encrypted.keyVersion, 1);
+    assert.equal(decryptPartnerPreviewToken("partner-1", encrypted, encryptionKey), token);
+    assert.throws(
+      () => decryptPartnerPreviewToken("partner-2", encrypted, encryptionKey),
+      /복호화에 실패했습니다/,
+    );
+  });
+
+  it("rejects malformed or unsupported encrypted preview tokens", async () => {
+    const {
+      decryptPartnerPreviewToken,
+      encryptPartnerPreviewToken,
+    } = await import(
+      new URL("../src/lib/partner-preview-token-crypto.ts", import.meta.url).href,
+    );
+    const token = "c".repeat(64);
+    const encryptionKey = "test-preview-key-".padEnd(32, "x");
+    const encrypted = encryptPartnerPreviewToken("partner-1", token, encryptionKey);
+
+    assert.throws(
+      () => decryptPartnerPreviewToken(
+        "partner-1",
+        { ...encrypted, keyVersion: 2 },
+        encryptionKey,
+      ),
+      /복호화에 실패했습니다/,
+    );
+    assert.throws(
+      () => encryptPartnerPreviewToken("partner-1", "not-a-preview-token", encryptionKey),
+      /토큰 형식이 올바르지 않습니다/,
+    );
+  });
 });

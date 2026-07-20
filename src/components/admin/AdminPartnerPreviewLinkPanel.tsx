@@ -13,6 +13,7 @@ export type PartnerPreviewLinkActionResult = {
 export type PartnerPreviewLinkPanelProps = {
   partnerId: string;
   hasActiveLink: boolean;
+  initialPreviewUrl?: string | null;
   generateAction: (partnerId: string) => Promise<PartnerPreviewLinkActionResult>;
   removeAction: (partnerId: string) => Promise<void>;
 };
@@ -20,11 +21,12 @@ export type PartnerPreviewLinkPanelProps = {
 export default function AdminPartnerPreviewLinkPanel({
   partnerId,
   hasActiveLink: initialHasActiveLink,
+  initialPreviewUrl = null,
   generateAction,
   removeAction,
 }: PartnerPreviewLinkPanelProps) {
   const [hasActiveLink, setHasActiveLink] = useState(initialHasActiveLink);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialPreviewUrl);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { notify } = useToast();
@@ -104,6 +106,9 @@ export default function AdminPartnerPreviewLinkPanel({
               <Button type="button" variant="primary" onClick={handleCopy} disabled={isPending}>
                 링크 복사
               </Button>
+              <Button type="button" variant="secondary" onClick={handleGenerate} loading={isPending} loadingText="생성 중">
+                새 링크 생성
+              </Button>
               <Button type="button" variant="danger" onClick={handleRemove} loading={isPending} loadingText="제거 중">
                 링크 제거
               </Button>
@@ -113,7 +118,7 @@ export default function AdminPartnerPreviewLinkPanel({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3">
             <p className="text-sm leading-6 text-muted-foreground">
               {hasActiveLink
-                ? "현재 발급된 링크가 있습니다. 보안을 위해 기존 링크는 다시 표시하지 않습니다."
+                ? "현재 발급된 링크가 있습니다. 이전 발급 링크는 보안상 다시 표시할 수 없으므로 새 링크를 생성해 주세요."
                 : "아직 발급된 미리보기 링크가 없습니다."}
             </p>
             <Button type="button" variant="secondary" onClick={handleGenerate} loading={isPending} loadingText="생성 중">

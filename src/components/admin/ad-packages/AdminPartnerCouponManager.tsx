@@ -81,13 +81,13 @@ function CouponManagementActions({
   }
 
   return (
-    <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
       {canUpdateCoupon && updateCouponAction ? (
         <details className="min-w-0">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-center rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground transition-interactive hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-center whitespace-nowrap rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground transition-interactive hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
             수정
           </summary>
-          <div className="mt-3 min-w-0 sm:min-w-[min(42rem,calc(100vw-3rem))]">
+          <div className="mt-3 w-full min-w-0 sm:min-w-[min(42rem,calc(100vw-3rem))]">
             <AdminPartnerCouponForm
               partnerId={partnerId}
               partnerName={partnerName}
@@ -96,8 +96,6 @@ function CouponManagementActions({
               action={updateCouponAction}
               mode="edit"
               coupon={coupon}
-              title={`${coupon.title} 수정`}
-              description="기존 PIN을 바꾸지 않으면 입력하지 않은 상태로 저장할 수 있습니다."
               submitLabel="쿠폰 수정"
             />
           </div>
@@ -192,8 +190,6 @@ export default function AdminPartnerCouponManager({
               campaigns={campaignOptions}
               action={createCouponAction}
               mode="create"
-              title="쿠폰 생성"
-              description="제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다."
               submitLabel="쿠폰 생성"
             />
           </div>
@@ -207,9 +203,9 @@ export default function AdminPartnerCouponManager({
           </Card>
         ) : (
           coupons.map((coupon) => (
-            <Card key={coupon.id} tone="default" className="grid min-w-0 gap-3 overflow-hidden">
-              <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0">
+            <Card key={coupon.id} tone="default" className="grid min-w-0 gap-4 overflow-hidden">
+              <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+                <div className="min-w-0 md:col-start-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <CouponStatusBadge status={coupon.status} />
                     <span className="rounded-full border border-border bg-surface-inset px-3 py-1 text-xs font-semibold text-muted-foreground">
@@ -223,16 +219,16 @@ export default function AdminPartnerCouponManager({
                           : "코드 제시"}
                     </span>
                   </div>
-                  <h3 className="mt-3 truncate text-lg font-semibold text-foreground" title={coupon.title}>
+                  <h3 className="mt-3 break-words text-lg font-semibold text-foreground" title={coupon.title}>
                     {coupon.title}
                   </h3>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">
+                  <p className="mt-1 break-words text-sm text-muted-foreground">
                     {coupon.discountLabel || coupon.code || "할인 표기 없음"}
                   </p>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">
                     다운로드 {formatDateTime(coupon.downloadStartsAt)} - {formatDateTime(coupon.downloadEndsAt)}
                   </p>
-                  <p className="text-xs leading-5 text-muted-foreground">
+                  <p className="break-words text-xs leading-5 text-muted-foreground">
                     회원별 발급 · 일 {formatIssueLimit(coupon.perMemberDailyIssueLimit)} · 주 {formatIssueLimit(coupon.perMemberWeeklyIssueLimit)} · 월 {formatIssueLimit(coupon.perMemberMonthlyIssueLimit)}
                   </p>
                   {coupon.redemptionType === "onsite" ? (
@@ -241,26 +237,26 @@ export default function AdminPartnerCouponManager({
                     </p>
                   ) : null}
                 </div>
-                <div className="grid min-w-0 gap-3 xl:min-w-[13rem] xl:justify-items-end">
-                  <span className="justify-self-start rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary xl:justify-self-end">
+                <div className="flex min-w-0 flex-wrap items-center justify-start gap-3 md:col-start-2 md:min-w-[13rem] md:flex-col md:items-end md:justify-start">
+                  <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
                     {coupon.usedCount}
                     {coupon.usageLimit !== null ? `/${coupon.usageLimit}` : "회 사용"}
                   </span>
-                  <CouponManagementActions
-                    coupon={coupon}
-                    partnerId={partnerId}
-                    partnerName={partnerName}
-                    partnerPeriodEnd={partnerPeriodEnd}
-                    campaigns={campaignOptions}
-                    updateCouponAction={updateCouponAction}
-                    duplicateCouponAction={duplicateCouponAction}
-                    deleteCouponAction={deleteCouponAction}
-                    canUpdateCoupon={canUpdateCoupon}
-                    canCreateCoupon={canCreateCoupon}
-                    canDeleteCoupon={canDeleteCoupon}
-                  />
                 </div>
               </div>
+              <CouponManagementActions
+                coupon={coupon}
+                partnerId={partnerId}
+                partnerName={partnerName}
+                partnerPeriodEnd={partnerPeriodEnd}
+                campaigns={campaignOptions}
+                updateCouponAction={updateCouponAction}
+                duplicateCouponAction={duplicateCouponAction}
+                deleteCouponAction={deleteCouponAction}
+                canUpdateCoupon={canUpdateCoupon}
+                canCreateCoupon={canCreateCoupon}
+                canDeleteCoupon={canDeleteCoupon}
+              />
             </Card>
           ))
         )}
