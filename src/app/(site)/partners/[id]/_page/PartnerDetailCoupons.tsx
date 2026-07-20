@@ -23,13 +23,6 @@ type RedeemResponse = {
 
 type IssueResponse = { ok?: boolean; message?: string; issue?: AvailableAdCoupon };
 
-function getUsageLabel(coupon: AdCoupon, usedCount: number) {
-  if (typeof coupon.usageLimit !== "number") {
-    return `${usedCount.toLocaleString("ko-KR")}회 사용`;
-  }
-  return `${usedCount.toLocaleString("ko-KR")} / ${coupon.usageLimit.toLocaleString("ko-KR")}회 사용`;
-}
-
 function getLoginHref(returnTo: string) {
   return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
 }
@@ -51,9 +44,6 @@ export default function PartnerDetailCoupons({
   const [issuingId, setIssuingId] = useState<string | null>(null);
   const [issuedCoupons, setIssuedCoupons] = useState<Record<string, AvailableAdCoupon>>({});
   const [messages, setMessages] = useState<Record<string, CouponMessage>>({});
-  const [usageCounts, setUsageCounts] = useState<Record<string, number>>(() =>
-    Object.fromEntries(coupons.map((coupon) => [coupon.id, coupon.usedCount])),
-  );
   const loginHref = useMemo(() => getLoginHref(returnTo), [returnTo]);
 
   useEffect(() => {
@@ -164,11 +154,6 @@ export default function PartnerDetailCoupons({
         throw new Error(payload?.message || "쿠폰 사용 확인에 실패했습니다.");
       }
 
-      const nextUsedCount = (usageCounts[coupon.id] ?? coupon.usedCount) + 1;
-      setUsageCounts((current) => ({
-        ...current,
-        [coupon.id]: nextUsedCount,
-      }));
       setMessages((current) => ({
         ...current,
         [coupon.id]: {
@@ -207,7 +192,6 @@ export default function PartnerDetailCoupons({
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {coupons.map((coupon) => {
-          const usedCount = usageCounts[coupon.id] ?? coupon.usedCount;
           const message = messages[coupon.id];
           const issued = issuedCoupons[coupon.id];
           const assignedCode = issued?.assignedCode ?? null;
@@ -224,9 +208,6 @@ export default function PartnerDetailCoupons({
                     <Badge variant="success" className="tracking-normal">
                       {coupon.discountLabel || "쿠폰"}
                     </Badge>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {getUsageLabel(coupon, usedCount)}
-                    </span>
                   </div>
                   <h2 className="mt-3 text-lg font-semibold text-foreground">{coupon.title}</h2>
                   {coupon.description ? (

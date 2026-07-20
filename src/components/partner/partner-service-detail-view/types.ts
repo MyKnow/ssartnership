@@ -30,6 +30,7 @@ export type PartnerServiceDetailViewProps = {
   initialReviewOffset: number;
   initialReviewHasMore: boolean;
   coupons: AdCoupon[];
+  partnerPeriodEnd?: string | null;
   createCouponAction: (formData: FormData) => void | Promise<void>;
   uploadCouponCodesAction: (formData: FormData) => void | Promise<void>;
 };

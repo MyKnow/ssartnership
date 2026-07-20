@@ -56,7 +56,7 @@ async function assertManagedAdPartner(
   }
   const { data, error } = await getSupabaseAdminClient()
     .from("partners")
-    .select("id,managed_campus_slugs")
+    .select("id,managed_campus_slugs,period_end")
     .eq("id", partnerId)
     .maybeSingle();
   if (error || !data) {
@@ -70,6 +70,12 @@ async function assertManagedAdPartner(
   } catch {
     throw new Error("제휴처 권한을 확인해 주세요.");
   }
+  return {
+    periodEnd:
+      typeof (data as { period_end?: string | null }).period_end === "string"
+        ? (data as { period_end: string }).period_end
+        : null,
+  };
 }
 
 async function assertCampaignBelongsToPartner(
@@ -147,8 +153,10 @@ export async function updateAdCampaignStatusAction(formData: FormData) {
 export async function createAdCouponAction(formData: FormData) {
   const partnerId = getString(formData, "partnerId");
   const session = await requireAdminPermission("home_ads", "create", { path: "/admin/partners" });
-  await assertManagedAdPartner(session, partnerId);
-  const input = parseCreateAdCouponForm(formData);
+  const managedPartner = await assertManagedAdPartner(session, partnerId);
+  const input = parseCreateAdCouponForm(formData, {
+    partnerPeriodEnd: managedPartner.periodEnd,
+  });
   await assertCampaignBelongsToPartner(input.campaignId, input.partnerId);
   const coupon = await adPackageRepository.createCoupon(input);
   const codePool = normalizeCouponCodeRows(
@@ -186,8 +194,16 @@ export async function updateAdCouponAction(formData: FormData) {
   if (submittedPartnerId !== existing.partnerId) {
     throw new Error("다른 제휴처의 쿠폰은 수정할 수 없습니다.");
   }
-  await assertManagedAdPartner(session, existing.partnerId);
-  const input = parseUpdateAdCouponForm(formData);
+  const managedPartner = await assertManagedAdPartner(session, existing.partnerId);
+  const parsedInput = parseUpdateAdCouponForm(formData, {
+    partnerPeriodEnd: managedPartner.periodEnd,
+  });
+  const input = {
+    ...parsedInput,
+    // The legacy static code is no longer editable in the UI, but must not be
+    // erased when an existing coupon is otherwise updated.
+    code: formData.has("code") ? parsedInput.code : existing.code,
+  };
   await assertCampaignBelongsToPartner(input.campaignId, existing.partnerId);
   const coupon = await adPackageRepository.updateCoupon({
     ...input,

@@ -13,6 +13,7 @@ import type {
   CreateAdCouponInput,
   UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
+import { getPartnerPeriodEndAt } from "@/lib/ad-coupon-period";
 import { normalizeCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { sanitizeHttpUrl } from "@/lib/validation";
 
@@ -68,11 +69,16 @@ function limitLength(value: string, max: number, message: string) {
   return value;
 }
 
-function parseDateTimeLocal(value: string, message: string) {
+function parseDateTimeLocal(
+  value: string,
+  message: string,
+  options?: { endOfMinute?: boolean },
+) {
   if (!value) {
     throw new Error(message);
   }
-  const normalized = value.length === 16 ? `${value}:00+09:00` : value;
+  const seconds = options?.endOfMinute ? "59" : "00";
+  const normalized = value.length === 16 ? `${value}:${seconds}+09:00` : value;
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) {
     throw new Error("기간 형식을 확인해 주세요.");
@@ -80,8 +86,14 @@ function parseDateTimeLocal(value: string, message: string) {
   return date.toISOString();
 }
 
-function parseOptionalDateTimeLocal(value: string, fallback: string) {
-  return value ? parseDateTimeLocal(value, "기간 형식을 확인해 주세요.") : fallback;
+function parseOptionalDateTimeLocal(
+  value: string,
+  fallback: string,
+  options?: { endOfMinute?: boolean },
+) {
+  return value
+    ? parseDateTimeLocal(value, "기간 형식을 확인해 주세요.", options)
+    : fallback;
 }
 
 function assertPeriod(startsAt: string, endsAt: string) {
@@ -206,7 +218,10 @@ export function parseCreateAdCampaignForm(
 
 export function parseCreateAdCouponForm(
   formData: FormData,
-  options?: { allowExistingOnsitePassword?: boolean },
+  options?: {
+    allowExistingOnsitePassword?: boolean;
+    partnerPeriodEnd?: string | null;
+  },
 ): CreateAdCouponInput {
   const partnerId = requireString(formData, "partnerId", "제휴처를 선택해 주세요.");
   const campaignId = getString(formData, "campaignId") || null;
@@ -215,13 +230,19 @@ export function parseCreateAdCouponForm(
     AD_PACKAGE_FORM_LIMITS.titleMax,
     "쿠폰명은 80자 이하로 입력해 주세요.",
   );
+  const partnerPeriodEndAt = getPartnerPeriodEndAt(options?.partnerPeriodEnd);
+  const rawEndsAt = getString(formData, "endsAt");
+  if (!rawEndsAt && !partnerPeriodEndAt) {
+    throw new Error("제휴처 기간 종료일이 없어 전체 유효 종료 시각을 입력해 주세요.");
+  }
   const startsAt = parseDateTimeLocal(
     requireString(formData, "startsAt", "시작 시각을 입력해 주세요."),
     "시작 시각을 입력해 주세요.",
   );
-  const endsAt = parseDateTimeLocal(
-    requireString(formData, "endsAt", "종료 시각을 입력해 주세요."),
-    "종료 시각을 입력해 주세요.",
+  const endsAt = parseOptionalDateTimeLocal(
+    rawEndsAt,
+    partnerPeriodEndAt ?? startsAt,
+    { endOfMinute: true },
   );
   assertPeriod(startsAt, endsAt);
   const downloadStartsAt = parseOptionalDateTimeLocal(
@@ -230,7 +251,8 @@ export function parseCreateAdCouponForm(
   );
   const downloadEndsAt = parseOptionalDateTimeLocal(
     getString(formData, "downloadEndsAt"),
-    endsAt,
+    partnerPeriodEndAt ?? endsAt,
+    { endOfMinute: true },
   );
   const usageStartsAt = parseOptionalDateTimeLocal(
     getString(formData, "usageStartsAt"),
@@ -238,15 +260,11 @@ export function parseCreateAdCouponForm(
   );
   const usageEndsAt = parseOptionalDateTimeLocal(
     getString(formData, "usageEndsAt"),
-    endsAt,
+    partnerPeriodEndAt ?? endsAt,
+    { endOfMinute: true },
   );
   assertPeriod(downloadStartsAt, downloadEndsAt);
   assertPeriod(usageStartsAt, usageEndsAt);
-  const externalUrl = getString(formData, "externalUrl");
-  const safeExternalUrl = externalUrl ? sanitizeHttpUrl(externalUrl) : "";
-  if (externalUrl && !safeExternalUrl) {
-    throw new Error("외부 쿠폰 링크 형식을 확인해 주세요.");
-  }
   const issuanceType = parseStatus(
     getString(formData, "issuanceType"),
     issuanceTypes,
@@ -257,6 +275,17 @@ export function parseCreateAdCouponForm(
     redemptionTypes,
     "onsite",
   );
+  const externalUrl = getString(formData, "externalUrl");
+  const safeExternalUrl = externalUrl ? sanitizeHttpUrl(externalUrl) : "";
+  if (externalUrl && !safeExternalUrl) {
+    throw new Error("외부 쿠폰 링크 형식을 확인해 주세요.");
+  }
+  if (redemptionType === "external" && !safeExternalUrl) {
+    throw new Error("외부 링크형 쿠폰은 외부 링크를 입력해 주세요.");
+  }
+  if (redemptionType !== "external" && externalUrl) {
+    throw new Error("외부 링크는 외부 링크형 쿠폰에만 설정할 수 있습니다.");
+  }
   const rawOnsitePassword = getString(formData, "onsitePassword");
   const onsitePassword = normalizeCouponVerificationPassword(rawOnsitePassword);
   if (
@@ -314,16 +343,20 @@ export function parseCreateAdCouponForm(
     ),
     perMemberLimit: parsePositiveInteger(getString(formData, "perMemberLimit"), 1),
     onsitePassword,
-    externalUrl: safeExternalUrl ?? "",
+    externalUrl: redemptionType === "external" ? safeExternalUrl ?? "" : "",
   };
 }
 
 export function parseUpdateAdCouponForm(
   formData: FormData,
+  options?: { partnerPeriodEnd?: string | null },
 ): UpdateAdCouponInput {
   const couponId = requireString(formData, "couponId", "쿠폰을 찾을 수 없습니다.");
   return {
     couponId,
-    ...parseCreateAdCouponForm(formData, { allowExistingOnsitePassword: true }),
+    ...parseCreateAdCouponForm(formData, {
+      allowExistingOnsitePassword: true,
+      partnerPeriodEnd: options?.partnerPeriodEnd,
+    }),
   };
 }

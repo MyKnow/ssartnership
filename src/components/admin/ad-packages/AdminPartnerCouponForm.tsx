@@ -1,8 +1,12 @@
-import Button from "@/components/ui/Button";
+"use client";
+
+import { useState } from "react";
 import Card from "@/components/ui/Card";
+import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
+import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import type { AdCampaignWithStats, AdCoupon } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
@@ -32,7 +36,7 @@ function FieldLabel({
   );
 }
 
-function getDefaultValues(coupon?: AdCoupon) {
+function getDefaultValues(coupon?: AdCoupon, partnerPeriodEnd?: string | null) {
   if (coupon) {
     return {
       startsAt: formatDateTimeLocal(coupon.startsAt),
@@ -64,7 +68,7 @@ function getDefaultValues(coupon?: AdCoupon) {
 
   const now = new Date();
   const startsAt = toDateTimeLocal(now);
-  const endsAt = toDateTimeLocal(new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000));
+  const endsAt = toDateTimeLocalInput(getPartnerPeriodEndAt(partnerPeriodEnd));
   return {
     startsAt,
     endsAt,
@@ -100,6 +104,7 @@ export default function AdminPartnerCouponForm({
   action,
   mode,
   coupon,
+  partnerPeriodEnd,
   title,
   description,
   submitLabel,
@@ -110,11 +115,15 @@ export default function AdminPartnerCouponForm({
   action: ServerAction;
   mode: "create" | "edit";
   coupon?: AdCoupon;
+  partnerPeriodEnd?: string | null;
   title: string;
   description: string;
   submitLabel: string;
 }) {
-  const defaults = getDefaultValues(coupon);
+  const defaults = getDefaultValues(coupon, partnerPeriodEnd);
+  const hasPartnerPeriodEnd = Boolean(getPartnerPeriodEndAt(partnerPeriodEnd));
+  const [issuanceType, setIssuanceType] = useState(defaults.issuanceType);
+  const [redemptionType, setRedemptionType] = useState(defaults.redemptionType);
 
   return (
     <Card tone="elevated" className="grid min-w-0 gap-4">
@@ -157,26 +166,15 @@ export default function AdminPartnerCouponForm({
           />
         </FieldLabel>
 
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-          <FieldLabel>
-            할인 표기
-            <Input
-              name="discountLabel"
-              maxLength={AD_PACKAGE_FORM_LIMITS.discountLabelMax}
-              defaultValue={defaults.discountLabel}
-              placeholder="10% 할인"
-            />
-          </FieldLabel>
-          <FieldLabel>
-            쿠폰 코드
-            <Input
-              name="code"
-              maxLength={AD_PACKAGE_FORM_LIMITS.codeMax}
-              defaultValue={defaults.code}
-              placeholder="서비스 발급형은 자동 지정"
-            />
-          </FieldLabel>
-        </div>
+        <FieldLabel>
+          할인 표기
+          <Input
+            name="discountLabel"
+            maxLength={AD_PACKAGE_FORM_LIMITS.discountLabelMax}
+            defaultValue={defaults.discountLabel}
+            placeholder="10% 할인"
+          />
+        </FieldLabel>
 
         <FieldLabel>
           설명
@@ -192,14 +190,26 @@ export default function AdminPartnerCouponForm({
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           <FieldLabel>
             발급 방식
-            <Select name="issuanceType" defaultValue={defaults.issuanceType}>
+            <Select
+              name="issuanceType"
+              value={issuanceType}
+              onChange={(event) => {
+                setIssuanceType(event.target.value as typeof defaults.issuanceType);
+              }}
+            >
               <option value="service">서비스 발급형</option>
               <option value="partner_code_pool">파트너 코드형</option>
             </Select>
           </FieldLabel>
           <FieldLabel>
             사용 방식
-            <Select name="redemptionType" defaultValue={defaults.redemptionType}>
+            <Select
+              name="redemptionType"
+              value={redemptionType}
+              onChange={(event) => {
+                setRedemptionType(event.target.value as typeof defaults.redemptionType);
+              }}
+            >
               <option value="onsite">현장 확인</option>
               <option value="code">코드 제시</option>
               <option value="external">외부 링크</option>
@@ -214,7 +224,17 @@ export default function AdminPartnerCouponForm({
           </FieldLabel>
           <FieldLabel>
             전체 유효 종료
-            <Input name="endsAt" type="datetime-local" defaultValue={defaults.endsAt} required />
+            <Input
+              name="endsAt"
+              type="datetime-local"
+              defaultValue={defaults.endsAt}
+              required={!hasPartnerPeriodEnd}
+            />
+            <span className="text-xs font-normal text-muted-foreground">
+              {hasPartnerPeriodEnd
+                ? "비워두면 제휴 기간 종료일 23:59로 설정됩니다."
+                : "제휴 기간 종료일이 없어 직접 입력해야 합니다."}
+            </span>
           </FieldLabel>
         </div>
 
@@ -225,7 +245,17 @@ export default function AdminPartnerCouponForm({
           </FieldLabel>
           <FieldLabel>
             다운로드 종료
-            <Input name="downloadEndsAt" type="datetime-local" defaultValue={defaults.downloadEndsAt} required />
+            <Input
+              name="downloadEndsAt"
+              type="datetime-local"
+              defaultValue={defaults.downloadEndsAt}
+              required={!hasPartnerPeriodEnd}
+            />
+            <span className="text-xs font-normal text-muted-foreground">
+              {hasPartnerPeriodEnd
+                ? "비워두면 제휴 기간 종료일 23:59로 설정됩니다."
+                : "제휴 기간 종료일이 없어 직접 입력해야 합니다."}
+            </span>
           </FieldLabel>
         </div>
 
@@ -236,7 +266,17 @@ export default function AdminPartnerCouponForm({
           </FieldLabel>
           <FieldLabel>
             사용 종료
-            <Input name="usageEndsAt" type="datetime-local" defaultValue={defaults.usageEndsAt} required />
+            <Input
+              name="usageEndsAt"
+              type="datetime-local"
+              defaultValue={defaults.usageEndsAt}
+              required={!hasPartnerPeriodEnd}
+            />
+            <span className="text-xs font-normal text-muted-foreground">
+              {hasPartnerPeriodEnd
+                ? "비워두면 제휴 기간 종료일 23:59로 설정됩니다."
+                : "제휴 기간 종료일이 없어 직접 입력해야 합니다."}
+            </span>
           </FieldLabel>
         </div>
 
@@ -273,24 +313,27 @@ export default function AdminPartnerCouponForm({
             회원별 총 보유/사용 제한
             <Input name="perMemberLimit" type="number" min={1} step={1} defaultValue={defaults.perMemberLimit} />
           </FieldLabel>
-          <FieldLabel>
-            현장 확인 PIN
-            <Input
-              name="onsitePassword"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]{4}"
-              maxLength={4}
-              autoComplete="off"
-              placeholder={mode === "edit" ? "변경 시 4자리 입력" : "4자리 숫자 입력"}
-              aria-describedby={`partner-onsite-password-help-${mode}`}
-            />
-            <span id={`partner-onsite-password-help-${mode}`} className="text-xs font-normal text-muted-foreground">
-              {mode === "edit"
-                ? "변경하지 않으면 기존 PIN을 유지합니다. 숫자 4자리만 입력해 주세요."
-                : "현장 확인형 쿠폰에 사용할 숫자 4자리 PIN입니다."}
-            </span>
-          </FieldLabel>
+          {redemptionType === "onsite" ? (
+            <FieldLabel>
+              현장 확인 PIN
+              <Input
+                name="onsitePassword"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                autoComplete="off"
+                required={mode === "create"}
+                placeholder={mode === "edit" ? "변경 시 4자리 입력" : "4자리 숫자 입력"}
+                aria-describedby={`partner-onsite-password-help-${mode}`}
+              />
+              <span id={`partner-onsite-password-help-${mode}`} className="text-xs font-normal text-muted-foreground">
+                {mode === "edit"
+                  ? "변경하지 않으면 기존 PIN을 유지합니다. 숫자 4자리만 입력해 주세요."
+                  : "현장 확인형 쿠폰에 사용할 숫자 4자리 PIN입니다."}
+              </span>
+            </FieldLabel>
+          ) : null}
         </div>
 
         <div className="grid min-w-0 gap-3 sm:grid-cols-3">
@@ -308,21 +351,25 @@ export default function AdminPartnerCouponForm({
           </FieldLabel>
         </div>
 
-        <FieldLabel>
-          외부 링크
-          <Input name="externalUrl" type="url" defaultValue={defaults.externalUrl} placeholder="https://..." />
-        </FieldLabel>
+        {redemptionType === "external" ? (
+          <FieldLabel>
+            외부 링크
+            <Input name="externalUrl" type="url" defaultValue={defaults.externalUrl} placeholder="https://..." required />
+          </FieldLabel>
+        ) : null}
         <FieldLabel>
           조건
           <Textarea name="terms" rows={4} defaultValue={defaults.terms} placeholder={"평일 점심 한정\n1일 1회 사용\n타 쿠폰 중복 불가"} />
         </FieldLabel>
-        <FieldLabel>
-          {mode === "edit" ? "파트너 코드 추가 목록(한 줄에 하나)" : "파트너 코드 목록(한 줄에 하나)"}
-          <Textarea name="codePool" rows={4} placeholder="파트너가 전달한 쿠폰 코드를 붙여 넣으세요." />
-        </FieldLabel>
-        <Button type="submit" className="w-full justify-center sm:w-fit">
+        {issuanceType === "partner_code_pool" ? (
+          <FieldLabel>
+            {mode === "edit" ? "파트너 코드 추가 목록(한 줄에 하나)" : "파트너 코드 목록(한 줄에 하나)"}
+            <Textarea name="codePool" rows={4} placeholder="파트너가 전달한 쿠폰 코드를 붙여 넣으세요." />
+          </FieldLabel>
+        ) : null}
+        <FormSubmitButton loadingText={mode === "edit" ? "저장 중" : "생성 중"} className="w-full justify-center sm:w-fit">
           {submitLabel}
-        </Button>
+        </FormSubmitButton>
       </form>
     </Card>
   );

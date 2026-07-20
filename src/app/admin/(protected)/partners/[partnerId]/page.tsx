@@ -368,6 +368,7 @@ export default async function AdminPartnerDetailPage({
         <AdminPartnerCouponManager
           partnerId={partner.id}
           partnerName={partner.name ?? "제휴처"}
+          partnerPeriodEnd={partner.period_end}
           campaigns={adCampaigns.filter((campaign) => campaign.partnerId === partner.id)}
           coupons={adCoupons}
           createCouponAction={createAdCouponAction}
