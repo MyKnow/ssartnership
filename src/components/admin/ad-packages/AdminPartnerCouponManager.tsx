@@ -1,5 +1,5 @@
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import SectionHeading from "@/components/ui/SectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import type { AdCouponStatus } from "@/lib/ad-packages";
@@ -61,6 +61,7 @@ function CouponManagementActions({
   canCreateCoupon,
   canDeleteCoupon,
   partnerName,
+  partnerPeriodEnd,
 }: {
   coupon: AdCoupon;
   partnerId: string;
@@ -72,6 +73,7 @@ function CouponManagementActions({
   canCreateCoupon: boolean;
   canDeleteCoupon: boolean;
   partnerName: string;
+  partnerPeriodEnd?: string | null;
 }) {
   if (!canUpdateCoupon && !canCreateCoupon && !canDeleteCoupon) {
     return null;
@@ -88,6 +90,7 @@ function CouponManagementActions({
             <AdminPartnerCouponForm
               partnerId={partnerId}
               partnerName={partnerName}
+              partnerPeriodEnd={partnerPeriodEnd}
               campaigns={campaigns}
               action={updateCouponAction}
               mode="edit"
@@ -103,18 +106,18 @@ function CouponManagementActions({
         <form action={duplicateCouponAction}>
           <input type="hidden" name="partnerId" value={partnerId} readOnly />
           <input type="hidden" name="couponId" value={coupon.id} readOnly />
-          <Button type="submit" variant="soft" className="w-full justify-center sm:w-auto">
+          <FormSubmitButton variant="soft" loadingText="복제 중" className="w-full justify-center sm:w-auto">
             복제
-          </Button>
+          </FormSubmitButton>
         </form>
       ) : null}
       {canDeleteCoupon && deleteCouponAction ? (
         <form action={deleteCouponAction}>
           <input type="hidden" name="partnerId" value={partnerId} readOnly />
           <input type="hidden" name="couponId" value={coupon.id} readOnly />
-          <Button type="submit" variant="danger" className="w-full justify-center sm:w-auto">
+          <FormSubmitButton variant="danger" loadingText="삭제 중" className="w-full justify-center sm:w-auto">
             삭제
-          </Button>
+          </FormSubmitButton>
         </form>
       ) : null}
     </div>
@@ -124,6 +127,7 @@ function CouponManagementActions({
 export default function AdminPartnerCouponManager({
   partnerId,
   partnerName,
+  partnerPeriodEnd,
   campaigns,
   coupons,
   createCouponAction,
@@ -136,6 +140,7 @@ export default function AdminPartnerCouponManager({
 }: {
   partnerId: string;
   partnerName: string;
+  partnerPeriodEnd?: string | null;
   campaigns: AdCampaignWithStats[];
   coupons: AdCoupon[];
   createCouponAction: ServerAction;
@@ -171,6 +176,7 @@ export default function AdminPartnerCouponManager({
         <AdminPartnerCouponForm
           partnerId={partnerId}
           partnerName={partnerName}
+          partnerPeriodEnd={partnerPeriodEnd}
           campaigns={campaignOptions}
           action={createCouponAction}
           mode="create"
@@ -230,6 +236,7 @@ export default function AdminPartnerCouponManager({
                     coupon={coupon}
                     partnerId={partnerId}
                     partnerName={partnerName}
+                    partnerPeriodEnd={partnerPeriodEnd}
                     campaigns={campaignOptions}
                     updateCouponAction={updateCouponAction}
                     duplicateCouponAction={duplicateCouponAction}

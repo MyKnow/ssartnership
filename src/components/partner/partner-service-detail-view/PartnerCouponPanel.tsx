@@ -1,24 +1,30 @@
 "use client";
 
 import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import Input from "@/components/ui/Input";
+import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
 import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
 
 export default function PartnerCouponPanel({
   coupons,
   companyId,
   partnerId,
+  partnerPeriodEnd,
   createAction,
   uploadCodesAction,
 }: {
   coupons: AdCoupon[];
   companyId: string;
   partnerId: string;
+  partnerPeriodEnd?: string | null;
   createAction: (formData: FormData) => void | Promise<void>;
   uploadCodesAction: (formData: FormData) => void | Promise<void>;
 }) {
+  const defaultEndAt = toDateTimeLocalInput(getPartnerPeriodEndAt(partnerPeriodEnd));
+  const hasPartnerPeriodEnd = Boolean(defaultEndAt);
+
   return (
     <Card className="space-y-5 p-6 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -39,7 +45,17 @@ export default function PartnerCouponPanel({
         </label>
         <label className="grid gap-1.5 text-sm font-medium text-foreground">
           사용 종료일
-          <Input name="endsAt" type="datetime-local" required />
+          <Input
+            name="endsAt"
+            type="datetime-local"
+            defaultValue={defaultEndAt}
+            required={!hasPartnerPeriodEnd}
+          />
+          <span className="text-xs font-normal text-muted-foreground">
+            {hasPartnerPeriodEnd
+              ? "비워두면 제휴 기간 종료일 23:59로 설정됩니다."
+              : "제휴 기간 종료일이 없어 직접 입력해야 합니다."}
+          </span>
         </label>
         <label className="grid gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
           현장 확인 PIN
@@ -63,7 +79,7 @@ export default function PartnerCouponPanel({
         <input type="hidden" name="issuanceType" value="service" />
         <input type="hidden" name="redemptionType" value="onsite" />
         <input type="hidden" name="status" value="draft" />
-        <Button type="submit" className="justify-center sm:col-span-2">쿠폰 추가</Button>
+        <FormSubmitButton loadingText="추가 중" className="justify-center sm:col-span-2">쿠폰 추가</FormSubmitButton>
       </form>
       {coupons.length > 0 ? (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -86,7 +102,7 @@ export default function PartnerCouponPanel({
                   <input type="hidden" name="partnerId" value={partnerId} />
                   <input type="hidden" name="couponId" value={coupon.id} />
                   <input name="codePoolFile" type="file" accept=".xlsx" className="min-w-0 text-xs" required />
-                  <Button type="submit" variant="secondary" className="shrink-0">코드 추가</Button>
+                  <FormSubmitButton variant="secondary" loadingText="추가 중" className="shrink-0">코드 추가</FormSubmitButton>
                 </form>
               ) : null}
             </div>
