@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import AdminAdvertisementView from "./AdminAdvertisementView";
 
 const meta = {
@@ -12,7 +13,6 @@ const meta = {
     ],
     createCampaignAction: async () => {},
     updateCampaignStatusAction: async () => {},
-    createCouponAction: async () => {},
     initialSlides: [],
     eventPageOptions: [
       {
@@ -35,4 +35,14 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryByRole("heading", { name: "쿠폰 생성" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("heading", { name: "캠페인 생성" }),
+    ).toBeInTheDocument();
+  },
+};

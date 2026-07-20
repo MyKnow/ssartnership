@@ -124,6 +124,14 @@ export type CreateAdCouponInput = {
   externalUrl?: string;
 };
 
+export type UpdateAdCouponInput = CreateAdCouponInput & {
+  couponId: string;
+};
+
+export type DuplicateAdCouponInput = {
+  couponId: string;
+};
+
 export type UpdateAdCampaignStatusInput = {
   campaignId: string;
   status: AdCampaignStatus;
@@ -174,6 +182,8 @@ export type RedeemAdCouponResult =
 
 export interface AdPackageRepository {
   listAdminCampaigns(options?: { now?: Date }): Promise<AdCampaignWithStats[]>;
+  listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]>;
+  getAdminCouponById(couponId: string): Promise<AdCoupon | null>;
   listActiveCouponsForPartner(
     partnerId: string,
     options?: { now?: Date },
@@ -184,6 +194,9 @@ export interface AdPackageRepository {
   createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign>;
   updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void>;
   createCoupon(input: CreateAdCouponInput): Promise<AdCoupon>;
+  updateCoupon(input: UpdateAdCouponInput): Promise<AdCoupon>;
+  duplicateCoupon(input: DuplicateAdCouponInput): Promise<AdCoupon>;
+  deleteCoupon(couponId: string): Promise<void>;
   issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult>;
   listIssuedCouponsForMember(input: ListIssuedCouponsForMemberInput): Promise<AvailableAdCoupon[]>;
   addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult>;

@@ -21,7 +21,6 @@ export default function AdminAdvertisementView({
   partners,
   createCampaignAction,
   updateCampaignStatusAction,
-  createCouponAction,
   initialSlides,
   eventPageOptions,
   adCampaignOptions,
@@ -60,7 +59,6 @@ export default function AdminAdvertisementView({
         partners={partners}
         createCampaignAction={createCampaignAction}
         updateCampaignStatusAction={updateCampaignStatusAction}
-        createCouponAction={createCouponAction}
       />
       <section className="grid gap-4">
         <AdminSectionHeading

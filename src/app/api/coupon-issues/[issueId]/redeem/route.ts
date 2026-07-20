@@ -4,6 +4,7 @@ import { consumeProductEventQuota } from "@/lib/product-event-throttle";
 import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { normalizeCouponVerificationPassword } from "@/lib/coupon-verification-password";
 
 export const runtime = "nodejs";
 
@@ -82,13 +83,16 @@ export async function POST(
     typeof onsitePassword !== "string"
   ) {
     return NextResponse.json(
-      { ok: false, message: "현장 확인 비밀번호 형식을 확인해 주세요." },
+      { ok: false, message: "현장 확인 PIN 형식을 확인해 주세요." },
       { status: 400 },
     );
   }
-  if (typeof onsitePassword === "string" && onsitePassword && !/^\d+$/.test(onsitePassword)) {
+  let normalizedOnsitePassword: string | null = null;
+  try {
+    normalizedOnsitePassword = normalizeCouponVerificationPassword(onsitePassword);
+  } catch {
     return NextResponse.json(
-      { ok: false, message: "현장 확인 비밀번호는 숫자만 입력해 주세요." },
+      { ok: false, message: "현장 확인 PIN은 숫자 4자리로 입력해 주세요." },
       { status: 400 },
     );
   }
@@ -113,7 +117,7 @@ export async function POST(
       issueId,
       memberId: session.userId,
       sessionId,
-      onsitePassword: typeof onsitePassword === "string" ? onsitePassword || null : null,
+      onsitePassword: normalizedOnsitePassword,
       metadata: {
         path: context.path,
         userAgent: context.userAgent,

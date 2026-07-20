@@ -91,8 +91,8 @@ describe("ad coupon domain", () => {
     assert.equal(isMemberIssueLimitReached(snapshot), true);
   });
 
-  it("accepts an unlimited-length numeric onsite password and rejects non-numeric values", () => {
-    const password = "9".repeat(300);
+  it("accepts a four-digit onsite PIN and rejects other values", () => {
+    const password = "9876";
     assert.equal(normalizeCouponVerificationPassword(password), password);
     assert.equal(normalizeCouponVerificationPassword(""), null);
     assert.throws(() => normalizeCouponVerificationPassword("12 34"));
@@ -100,15 +100,15 @@ describe("ad coupon domain", () => {
   });
 
   it("stores and verifies only a salted password hash", async () => {
-    const stored = await hashCouponVerificationPassword("20260720");
-    assert.notEqual(stored.hash, "20260720");
+    const stored = await hashCouponVerificationPassword("2020");
+    assert.notEqual(stored.hash, "2020");
     assert.notEqual(stored.salt, "");
     assert.equal(
-      await verifyCouponVerificationPassword("20260720", stored),
+      await verifyCouponVerificationPassword("2020", stored),
       true,
     );
     assert.equal(
-      await verifyCouponVerificationPassword("20260721", stored),
+      await verifyCouponVerificationPassword("2021", stored),
       false,
     );
   });

@@ -25,6 +25,7 @@ import type {
   AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  DuplicateAdCouponInput,
   IssueAdCouponInput,
   IssueAdCouponResult,
   ListAvailableCouponsForMemberInput,
@@ -34,6 +35,7 @@ import type {
   RedeemAdCouponIssueResult,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
+  UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 
 const MOCK_PARTNER_NAMES = new Map([
@@ -256,6 +258,25 @@ export class MockAdPackageRepository implements AdPackageRepository {
     });
   }
 
+  async listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]> {
+    return this.coupons
+      .filter((coupon) => coupon.partnerId === partnerId)
+      .map((coupon) => ({
+        ...cloneCoupon(coupon),
+        usedCount: this.countCouponRedemptions(coupon.id),
+      }));
+  }
+
+  async getAdminCouponById(couponId: string): Promise<AdCoupon | null> {
+    const coupon = this.coupons.find((item) => item.id === couponId);
+    return coupon
+      ? {
+          ...cloneCoupon(coupon),
+          usedCount: this.countCouponRedemptions(coupon.id),
+        }
+      : null;
+  }
+
   async listActiveCouponsForPartner(
     partnerId: string,
     options?: { now?: Date },
@@ -420,6 +441,115 @@ export class MockAdPackageRepository implements AdPackageRepository {
       this.couponPasswords.set(coupon.id, passwordHash);
     }
     return cloneCoupon(coupon);
+  }
+
+  async updateCoupon(input: UpdateAdCouponInput): Promise<AdCoupon> {
+    const existing = this.coupons.find((coupon) => coupon.id === input.couponId);
+    if (!existing) {
+      throw new Error("쿠폰을 찾을 수 없습니다.");
+    }
+    if (input.partnerId !== existing.partnerId) {
+      throw new Error("다른 제휴처의 쿠폰은 수정할 수 없습니다.");
+    }
+    if (input.campaignId) {
+      const campaign = this.campaigns.find((item) => item.id === input.campaignId);
+      if (!campaign || campaign.partnerId !== existing.partnerId) {
+        throw new Error("같은 제휴처의 캠페인만 연결할 수 있습니다.");
+      }
+    }
+
+    const redemptionType = input.redemptionType ?? existing.redemptionType;
+    if (redemptionType === "onsite" && !input.onsitePassword && !this.couponPasswords.has(existing.id)) {
+      throw new Error("현장 확인형 쿠폰은 제휴처 확인 PIN이 필요합니다.");
+    }
+    if (redemptionType !== "onsite" && input.onsitePassword) {
+      throw new Error("현장 확인 PIN은 현장 확인형 쿠폰에만 설정할 수 있습니다.");
+    }
+
+    const nextPassword = input.onsitePassword
+      ? await hashCouponVerificationPassword(input.onsitePassword)
+      : redemptionType === "onsite"
+        ? this.couponPasswords.get(existing.id) ?? null
+        : null;
+    const updated: AdCoupon = {
+      ...existing,
+      campaignId: input.campaignId ?? null,
+      title: input.title,
+      description: input.description ?? "",
+      code: input.code ?? "",
+      issuanceType: input.issuanceType ?? "service",
+      redemptionType,
+      discountLabel: input.discountLabel ?? "",
+      terms: [...(input.terms ?? [])],
+      status: input.status ?? "draft",
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      downloadStartsAt: input.downloadStartsAt ?? input.startsAt,
+      downloadEndsAt: input.downloadEndsAt ?? input.endsAt,
+      usageStartsAt: input.usageStartsAt ?? input.startsAt,
+      usageEndsAt: input.usageEndsAt ?? input.endsAt,
+      usageLimit: input.usageLimit ?? null,
+      dailyIssueLimit: input.dailyIssueLimit ?? null,
+      weeklyIssueLimit: input.weeklyIssueLimit ?? null,
+      monthlyIssueLimit: input.monthlyIssueLimit ?? null,
+      perMemberDailyIssueLimit: input.perMemberDailyIssueLimit ?? null,
+      perMemberWeeklyIssueLimit: input.perMemberWeeklyIssueLimit ?? null,
+      perMemberMonthlyIssueLimit: input.perMemberMonthlyIssueLimit ?? null,
+      perMemberLimit: input.perMemberLimit ?? 1,
+      hasOnsitePassword: Boolean(nextPassword),
+      externalUrl: input.externalUrl ?? "",
+      updatedAt: isoNow(),
+    };
+    this.coupons = this.coupons.map((coupon) =>
+      coupon.id === updated.id ? updated : coupon,
+    );
+    if (nextPassword) {
+      this.couponPasswords.set(updated.id, nextPassword);
+    } else {
+      this.couponPasswords.delete(updated.id);
+    }
+    return cloneCoupon(updated);
+  }
+
+  async duplicateCoupon(input: DuplicateAdCouponInput): Promise<AdCoupon> {
+    const source = this.coupons.find((coupon) => coupon.id === input.couponId);
+    if (!source) {
+      throw new Error("쿠폰을 찾을 수 없습니다.");
+    }
+    const now = isoNow();
+    const duplicate: AdCoupon = {
+      ...cloneCoupon(source),
+      id: `coupon-${crypto.randomUUID()}`,
+      title: `복제 - ${source.title}`.slice(0, 80),
+      code: "",
+      status: "draft",
+      issuedCount: 0,
+      remainingIssueCount: null,
+      usedCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.coupons = [duplicate, ...this.coupons];
+    const password = this.couponPasswords.get(source.id);
+    if (password) {
+      this.couponPasswords.set(duplicate.id, { ...password });
+    }
+    return cloneCoupon(duplicate);
+  }
+
+  async deleteCoupon(couponId: string): Promise<void> {
+    if (!this.coupons.some((coupon) => coupon.id === couponId)) {
+      throw new Error("쿠폰을 찾을 수 없습니다.");
+    }
+    if (
+      this.issues.some((issue) => issue.couponId === couponId) ||
+      this.redemptions.some((redemption) => redemption.couponId === couponId)
+    ) {
+      throw new Error("사용 이력이 있는 쿠폰은 삭제할 수 없습니다. 상태를 종료로 변경해 주세요.");
+    }
+    this.coupons = this.coupons.filter((coupon) => coupon.id !== couponId);
+    this.couponCodes.delete(couponId);
+    this.couponPasswords.delete(couponId);
   }
 
   async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {

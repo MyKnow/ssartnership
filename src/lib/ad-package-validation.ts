@@ -11,6 +11,7 @@ import {
 import type {
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 import { normalizeCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { sanitizeHttpUrl } from "@/lib/validation";
@@ -203,7 +204,10 @@ export function parseCreateAdCampaignForm(
   };
 }
 
-export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput {
+export function parseCreateAdCouponForm(
+  formData: FormData,
+  options?: { allowExistingOnsitePassword?: boolean },
+): CreateAdCouponInput {
   const partnerId = requireString(formData, "partnerId", "제휴처를 선택해 주세요.");
   const campaignId = getString(formData, "campaignId") || null;
   const title = limitLength(
@@ -255,7 +259,11 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
   );
   const rawOnsitePassword = getString(formData, "onsitePassword");
   const onsitePassword = normalizeCouponVerificationPassword(rawOnsitePassword);
-  if (redemptionType === "onsite" && !onsitePassword) {
+  if (
+    redemptionType === "onsite" &&
+    !onsitePassword &&
+    !options?.allowExistingOnsitePassword
+  ) {
     throw new Error("현장 확인형 쿠폰은 제휴처 확인 비밀번호가 필요합니다.");
   }
   if (redemptionType !== "onsite" && onsitePassword) {
@@ -307,5 +315,15 @@ export function parseCreateAdCouponForm(formData: FormData): CreateAdCouponInput
     perMemberLimit: parsePositiveInteger(getString(formData, "perMemberLimit"), 1),
     onsitePassword,
     externalUrl: safeExternalUrl ?? "",
+  };
+}
+
+export function parseUpdateAdCouponForm(
+  formData: FormData,
+): UpdateAdCouponInput {
+  const couponId = requireString(formData, "couponId", "쿠폰을 찾을 수 없습니다.");
+  return {
+    couponId,
+    ...parseCreateAdCouponForm(formData, { allowExistingOnsitePassword: true }),
   };
 }

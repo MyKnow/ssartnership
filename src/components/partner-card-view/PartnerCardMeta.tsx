@@ -97,7 +97,7 @@ export default function PartnerCardMeta({
     >
       <div
         className={cn(
-          "grid min-w-0 gap-4 @xs/card:items-start",
+          "grid w-full min-w-0 gap-4 overflow-hidden @xs/card:items-start",
           compact
             ? "grid-cols-[auto_minmax(0,1fr)] !items-stretch gap-2 sm:gap-3"
             : "@xs/card:grid-cols-[minmax(8rem,9rem)_minmax(0,1fr)]",
@@ -113,13 +113,13 @@ export default function PartnerCardMeta({
         >
           <div
             className={cn(
-              "flex items-start gap-3",
+              "flex min-w-0 items-start gap-3",
               compact ? "justify-start" : "justify-between",
             )}
           >
             <div
               className={cn(
-                "flex min-w-0 flex-1 flex-wrap items-center",
+                "flex min-w-0 flex-1 flex-wrap items-center overflow-hidden",
                 compact ? "gap-1" : "gap-2",
               )}
             >
@@ -132,7 +132,7 @@ export default function PartnerCardMeta({
               </div>
             ) : null}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden">
             {canNavigate ? (
               <Link
                 href={detailHref}
@@ -165,7 +165,7 @@ export default function PartnerCardMeta({
                 "min-w-0 text-muted-foreground",
                 compact
                   ? "min-h-4 line-clamp-1 break-words text-xs leading-normal sm:min-h-5 sm:text-sm"
-                  : "break-words text-sm leading-snug",
+                  : "line-clamp-2 break-words text-sm leading-snug",
               )}
               title={compact && !isOnlineService ? partner.location : undefined}
               aria-hidden={compact && isOnlineService ? true : undefined}
