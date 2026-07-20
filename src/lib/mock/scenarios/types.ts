@@ -33,6 +33,7 @@ export type MockRequiredStateKey =
   | "validation-error"
   | "unauthorized"
   | "forbidden"
+  | "pin-not-configured"
   | "expired"
   | "pending"
   | "rejected"

@@ -36,6 +36,16 @@ function errorResponse(error: string, status = 400, extra: Record<string, unknow
   return NextResponse.json({ ok: false, error, ...extra }, { status });
 }
 
+function getSignupFailureReason(error: unknown) {
+  if (error instanceof UserSessionIssueError) {
+    return error.code;
+  }
+  const message = error instanceof Error ? error.message : "";
+  return /^[a-z0-9][a-z0-9_:-]{0,80}$/.test(message)
+    ? message
+    : "signup_failed";
+}
+
 async function discardSignupProfileUpload(input: {
   uploadId: string | null;
   ownerId: string | undefined;
@@ -259,6 +269,12 @@ export async function POST(request: Request) {
       "/",
     ) });
   } catch (error) {
+    const reason = getSignupFailureReason(error);
+    console.error("[mm/signup] signup_failed", {
+      requestId: context.requestId,
+      reason,
+      message: error instanceof Error ? error.message.slice(0, 240) : "unknown_error",
+    });
     await logAuthSecurity({
       ...context,
       eventName: "member_signup_complete",
@@ -266,7 +282,7 @@ export async function POST(request: Request) {
       actorType: "guest",
       properties: {
         source: "mattermost_code",
-        reason: error instanceof UserSessionIssueError ? error.code : "signup_failed",
+        reason,
       },
     });
     return errorResponse("signup_failed", 503);

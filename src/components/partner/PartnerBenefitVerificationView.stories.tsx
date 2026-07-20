@@ -19,6 +19,7 @@ const meta = {
     },
     cohortCardThemes: [],
     initialTimestamp: "2026-07-20T06:00:00.000Z",
+    pinConfigured: true,
   },
   render: (args) => (
     <Container className="pb-12 pt-6" size="wide">
@@ -47,5 +48,24 @@ export const Default: Story = {
     await expect(
       canvas.getByRole("button", { name: "인증 카드와 혜택 확인" }),
     ).toBeVisible();
+  },
+};
+
+export const PinNotConfigured: Story = {
+  args: {
+    pinConfigured: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("certification-card-frame")).toBeVisible();
+    await expect(canvas.getByText("카페 싸피 역삼점")).toBeVisible();
+    await expect(canvas.getByText("아메리카노 1+1 및 디저트 20% 할인")).toBeVisible();
+    await expect(
+      canvasElement.querySelector('input[name="partnerBenefitPin"]'),
+    ).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "인증 카드와 혜택 확인" }),
+    ).not.toBeInTheDocument();
   },
 };

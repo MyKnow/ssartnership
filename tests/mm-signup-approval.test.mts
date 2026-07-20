@@ -180,6 +180,23 @@ test("승인 이후 signup 브라우저가 완료 API로 업로드를 다시 조
   );
 });
 
+test("실패한 업로드 정리는 signed URL 만료 시각도 함께 닫는다", async () => {
+  const repository = await readFile(
+    new URL("../src/lib/image-upload/repository.supabase.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    repository,
+    /failure_code: "discard_cleanup_pending",\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
+  );
+  assert.match(
+    repository,
+    /status: "expired",\s+failure_code: null,\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
+  );
+  assert.match(repository, /markFailed\(claimedSession\.id, "attach_failed", \["attaching"\]\)/);
+});
+
 test("가입 API는 승인 모드에서 회원 세션을 발급하지 않고 대기 페이지로 보낸다", async () => {
   const route = await readFile(
     new URL("../src/app/api/mm/signup/route.ts", import.meta.url),

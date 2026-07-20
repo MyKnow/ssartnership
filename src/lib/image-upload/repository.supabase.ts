@@ -53,6 +53,7 @@ type ImageUploadSessionRow = {
 };
 
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
+const STORAGE_RETRY_DELAYS_MS = [0, 120, 300] as const;
 
 function asSessionRow(value: unknown): ImageUploadSessionRow {
   return value as ImageUploadSessionRow;
@@ -493,70 +494,113 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       throw new Error("이미지 업로드 상태를 확인해 주세요.");
     }
 
-    const { data: blob, error: downloadError } = await supabase.storage
-      .from(claimedSession.storage_bucket)
-      .download(claimedSession.storage_path);
-    if (downloadError || !blob) {
-      throw new Error("처리된 이미지 파일을 찾을 수 없습니다.");
-    }
-    const stagedBuffer = Buffer.from(await blob.arrayBuffer());
-    await validateNormalizedImageUpload({
-      source: stagedBuffer,
-      policy: expectedPolicy,
-      expectedSha256: claimedSession.sha256,
-    });
-    const { error: uploadError } = await supabase.storage
-      .from(input.destination.bucket)
-      .upload(input.destination.path, stagedBuffer, {
-        contentType: "image/webp",
-        cacheControl: input.destination.cacheControl ?? "31536000",
-        upsert: true,
-      });
-    if (uploadError) {
-      throw new Error("이미지를 최종 보관소로 옮기지 못했습니다.");
-    }
-    const url = input.destination.isPublic
-      ? getPublicUrl(input.destination.bucket, input.destination.path)
-      : null;
-    const { data: attachedData, error: updateError } = await supabase
-      .from("image_upload_sessions")
-      .update({
-        status: "attached",
-        content_type: "image/webp",
-        final_url: url,
-        attached_at: now.toISOString(),
-      })
-      .eq("id", claimedSession.id)
-      .eq("status", "attaching")
-      .select("*")
-      .maybeSingle();
-    if (updateError) {
-      throw new Error("이미지 연결 상태를 저장하지 못했습니다.");
-    }
-    let attachedSession = attachedData ? asSessionRow(attachedData) : null;
-    if (!attachedSession) {
-      const { data: latestData, error: latestError } = await supabase
+    try {
+      let stagedBuffer: Buffer | null = null;
+      let lastStagingError: unknown = null;
+      for (const [attempt, delay] of STORAGE_RETRY_DELAYS_MS.entries()) {
+        if (delay > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        }
+        try {
+          const { data: blob, error: downloadError } = await supabase.storage
+            .from(claimedSession.storage_bucket)
+            .download(claimedSession.storage_path);
+          if (downloadError || !blob) {
+            throw new Error("처리된 이미지 파일을 찾을 수 없습니다.");
+          }
+          const candidateBuffer = Buffer.from(await blob.arrayBuffer());
+          await validateNormalizedImageUpload({
+            source: candidateBuffer,
+            policy: expectedPolicy,
+            expectedSha256: claimedSession.sha256,
+          });
+          stagedBuffer = candidateBuffer;
+          break;
+        } catch (error) {
+          lastStagingError = error;
+          if (attempt === STORAGE_RETRY_DELAYS_MS.length - 1) {
+            throw error;
+          }
+        }
+      }
+      if (!stagedBuffer) {
+        throw lastStagingError instanceof Error
+          ? lastStagingError
+          : new Error("처리된 이미지 파일을 확인하지 못했습니다.");
+      }
+
+      let finalUploadError: unknown = null;
+      for (const [attempt, delay] of STORAGE_RETRY_DELAYS_MS.entries()) {
+        if (delay > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        }
+        const { error: uploadError } = await supabase.storage
+          .from(input.destination.bucket)
+          .upload(input.destination.path, stagedBuffer, {
+            contentType: "image/webp",
+            cacheControl: input.destination.cacheControl ?? "31536000",
+            upsert: true,
+          });
+        if (!uploadError) {
+          finalUploadError = null;
+          break;
+        }
+        finalUploadError = uploadError;
+        if (attempt === STORAGE_RETRY_DELAYS_MS.length - 1) {
+          break;
+        }
+      }
+      if (finalUploadError) {
+        throw new Error("이미지를 최종 보관소로 옮기지 못했습니다.");
+      }
+      const url = input.destination.isPublic
+        ? getPublicUrl(input.destination.bucket, input.destination.path)
+        : null;
+      const { data: attachedData, error: updateError } = await supabase
         .from("image_upload_sessions")
-        .select("*")
+        .update({
+          status: "attached",
+          content_type: "image/webp",
+          final_url: url,
+          attached_at: now.toISOString(),
+        })
         .eq("id", claimedSession.id)
+        .eq("status", "attaching")
+        .select("*")
         .maybeSingle();
-      if (latestError || !latestData) {
+      if (updateError) {
+        throw new Error("이미지 연결 상태를 저장하지 못했습니다.");
+      }
+      let attachedSession = attachedData ? asSessionRow(attachedData) : null;
+      if (!attachedSession) {
+        const { data: latestData, error: latestError } = await supabase
+          .from("image_upload_sessions")
+          .select("*")
+          .eq("id", claimedSession.id)
+          .maybeSingle();
+        if (latestError || !latestData) {
+          throw new Error("이미지 연결 상태를 확인하지 못했습니다.");
+        }
+        attachedSession = asSessionRow(latestData);
+      }
+      if (
+        attachedSession.status !== "attached"
+        || !hasSameDestination(attachedSession, input.destination)
+        || !hasSameResource(attachedSession, input.resource)
+      ) {
         throw new Error("이미지 연결 상태를 확인하지 못했습니다.");
       }
-      attachedSession = asSessionRow(latestData);
+      await supabase.storage
+        .from(claimedSession.storage_bucket)
+        .remove([claimedSession.storage_path])
+        .catch(() => undefined);
+      return toAttachedImage(attachedSession);
+    } catch (error) {
+      await markFailed(claimedSession.id, "attach_failed", ["attaching"]).catch(() => undefined);
+      throw error instanceof Error
+        ? error
+        : new Error("이미지를 최종 보관소에 연결하지 못했습니다.");
     }
-    if (
-      attachedSession.status !== "attached"
-      || !hasSameDestination(attachedSession, input.destination)
-      || !hasSameResource(attachedSession, input.resource)
-    ) {
-      throw new Error("이미지 연결 상태를 확인하지 못했습니다.");
-    }
-    await supabase.storage
-      .from(claimedSession.storage_bucket)
-      .remove([claimedSession.storage_path])
-      .catch(() => undefined);
-    return toAttachedImage(attachedSession);
   }
 
   async retainForApproval(input: RetainImageUploadForApprovalInput): Promise<void> {
@@ -640,6 +684,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         .update({
           status: "failed",
           failure_code: "discard_cleanup_pending",
+          signed_url_expires_at: now.toISOString(),
           expires_at: now.toISOString(),
         })
         .eq("id", session.id)
@@ -648,7 +693,12 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     }
     const { error: updateError } = await supabase
       .from("image_upload_sessions")
-      .update({ status: "expired", failure_code: null, expires_at: now.toISOString() })
+      .update({
+        status: "expired",
+        failure_code: null,
+        signed_url_expires_at: now.toISOString(),
+        expires_at: now.toISOString(),
+      })
       .eq("id", session.id)
       .in("status", ["signed", "processing", "ready", "attaching", "attached", "failed"]);
     if (updateError) {
@@ -699,14 +749,24 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       if (removalError) {
         await supabase
           .from("image_upload_sessions")
-          .update({ status: "failed", failure_code: "discard_cleanup_pending", expires_at: now.toISOString() })
+          .update({
+            status: "failed",
+            failure_code: "discard_cleanup_pending",
+            signed_url_expires_at: now.toISOString(),
+            expires_at: now.toISOString(),
+          })
           .eq("id", session.id)
           .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
         continue;
       }
       const { error: updateError } = await supabase
         .from("image_upload_sessions")
-        .update({ status: "expired", failure_code: null })
+        .update({
+          status: "expired",
+          failure_code: null,
+          signed_url_expires_at: now.toISOString(),
+          expires_at: now.toISOString(),
+        })
         .eq("id", session.id)
         .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
       if (updateError) {

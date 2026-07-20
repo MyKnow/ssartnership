@@ -11,7 +11,10 @@ import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import { isPartnerBenefitUseAvailable, normalizePartnerBenefitSelection } from "@/lib/partner-benefit-usage";
-import { partnerRepository } from "@/lib/repositories";
+import {
+  partnerBenefitUsageRepository,
+  partnerRepository,
+} from "@/lib/repositories";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { SITE_NAME } from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
@@ -90,11 +93,12 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
-  const [headerSession, member, cohortCardThemes, photoState] = await Promise.all([
+  const [headerSession, member, cohortCardThemes, photoState, verificationContext] = await Promise.all([
     getHeaderSession(session.userId),
     getMemberCanonicalProfile(session.userId),
     listCohortCardThemes(),
     getMemberProfilePhotoState(session.userId),
+    partnerBenefitUsageRepository.getVerificationContext(partner.id),
   ]);
   if (!member) {
     redirect(
@@ -122,7 +126,11 @@ export default async function PartnerBenefitUsePage({
             <PageHeader
               eyebrow="Offline Benefit"
               title="혜택 이용 확인"
-              description="제휴처에서 싸트너십 인증 카드와 확인 PIN을 확인합니다."
+              description={
+                verificationContext?.pinHash && verificationContext.pinSalt
+                  ? "제휴처에서 싸트너십 인증 카드와 확인 PIN을 확인합니다."
+                  : "제휴처에서 싸트너십 인증 카드와 선택한 혜택을 확인합니다."
+              }
               backHref={detailPath}
               backLabel="제휴처로 돌아가기"
             />
@@ -140,6 +148,9 @@ export default async function PartnerBenefitUsePage({
               }}
               cohortCardThemes={cohortCardThemes}
               initialTimestamp={new Date().toISOString()}
+              pinConfigured={Boolean(
+                verificationContext?.pinHash && verificationContext.pinSalt,
+              )}
             />
           </div>
         </Container>
