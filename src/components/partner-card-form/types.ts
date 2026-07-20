@@ -36,6 +36,7 @@ export type PartnerCardFormValues = {
   mapUrl?: string;
   benefitActionType?: PartnerBenefitActionType;
   benefitActionLink?: string;
+  benefitVerificationPinConfigured?: boolean;
   reservationLink?: string;
   inquiryLink?: string;
   period?: {

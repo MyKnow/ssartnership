@@ -4,6 +4,9 @@ import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { trackProductEvent } from "@/lib/product-events";
 import type { BenefitUseAction } from "@/lib/partner-links";
+import PartnerBenefitUseAction, {
+  type OfflinePartnerBenefitAction,
+} from "@/components/partner/PartnerBenefitUseAction";
 
 type MobileInquiryAction = {
   href: string;
@@ -13,13 +16,16 @@ type MobileInquiryAction = {
 export default function PartnerDetailMobileActionBar({
   partnerId,
   benefitUseAction,
+  offlineBenefitAction,
   inquiryAction,
 }: {
   partnerId: string;
   benefitUseAction: BenefitUseAction | null;
+  offlineBenefitAction?: OfflinePartnerBenefitAction | null;
   inquiryAction: MobileInquiryAction | null;
 }) {
-  if (!benefitUseAction && !inquiryAction) {
+  const hasBenefitAction = Boolean(offlineBenefitAction || benefitUseAction);
+  if (!hasBenefitAction && !inquiryAction) {
     return null;
   }
 
@@ -28,12 +34,17 @@ export default function PartnerDetailMobileActionBar({
       <Container className="py-3">
         <div
           className={
-            benefitUseAction && inquiryAction
+            hasBenefitAction && inquiryAction
               ? "grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-2"
               : "grid"
           }
         >
-          {benefitUseAction ? (
+          {offlineBenefitAction ? (
+            <PartnerBenefitUseAction
+              action={offlineBenefitAction}
+              className="min-w-0 justify-center px-3"
+            />
+          ) : benefitUseAction ? (
             <Button
               href={benefitUseAction.href}
               target={
@@ -71,7 +82,7 @@ export default function PartnerDetailMobileActionBar({
                   : undefined
               }
               variant={
-                benefitUseAction && !benefitUseAction.disabled
+                hasBenefitAction && !benefitUseAction?.disabled
                   ? "secondary"
                   : "primary"
               }

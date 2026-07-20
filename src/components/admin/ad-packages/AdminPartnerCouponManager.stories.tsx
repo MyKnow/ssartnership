@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import AdminPartnerCouponManager from "./AdminPartnerCouponManager";
 import type {
   AdCampaignWithStats,
@@ -113,11 +113,14 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText("카페 싸피 역삼점").length).toBeGreaterThan(0);
-    await expect(canvas.getByRole("button", { name: "쿠폰 생성" })).toBeInTheDocument();
+    const createAccordionButton = canvas.getByRole("button", { name: "쿠폰 생성" });
+    await expect(createAccordionButton).toBeInTheDocument();
+    await expect(createAccordionButton.closest("details")).not.toHaveAttribute("open");
     await expect(canvas.getByText("신규 회원 디저트 세트")).toBeInTheDocument();
     await expect(canvas.getAllByText("수정").length).toBeGreaterThan(0);
     await expect(canvas.getAllByRole("button", { name: "복제" }).length).toBeGreaterThan(0);
     await expect(canvas.getAllByRole("button", { name: "삭제" }).length).toBeGreaterThan(0);
+    await userEvent.click(createAccordionButton);
     await expect(canvas.getByText("현장 확인형 쿠폰에 사용할 숫자 4자리 PIN입니다.")).toBeInTheDocument();
   },
 };

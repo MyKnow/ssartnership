@@ -38,12 +38,16 @@ export default function PartnerImageCarousel({
   className,
   matchHeightSelector,
   priority = false,
+  variant = "default",
+  showThumbnails = true,
 }: {
   images: string[];
   name: string;
   className?: string;
   matchHeightSelector?: string;
   priority?: boolean;
+  variant?: "default" | "hero";
+  showThumbnails?: boolean;
 }) {
   const {
     cachedImages,
@@ -77,8 +81,9 @@ export default function PartnerImageCarousel({
     <div
       ref={rootRef}
       className={cn(
-        "grid gap-3 items-start",
-        thumbPlacement === "side"
+        "grid items-start gap-3",
+        variant === "hero" && "h-full md:items-stretch",
+        showThumbnails && thumbPlacement === "side"
           ? "xl:grid-cols-[minmax(0,1fr)_7.5rem] xl:items-start"
           : "xl:grid-cols-1 xl:items-start",
         className,
@@ -86,7 +91,12 @@ export default function PartnerImageCarousel({
     >
       <button
         type="button"
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-border bg-surface-muted"
+        className={cn(
+          "relative w-full overflow-hidden rounded-3xl border border-border bg-surface-muted",
+          variant === "hero"
+            ? "aspect-[4/3] min-h-[16rem] sm:min-h-[20rem] md:h-full md:min-h-0 md:aspect-auto"
+            : "aspect-[4/3]",
+        )}
         onClick={() => {
           if (hasImages) {
             setOpen(true);
@@ -111,7 +121,7 @@ export default function PartnerImageCarousel({
         )}
       </button>
 
-      {hasImages ? (
+      {hasImages && showThumbnails ? (
         <ThumbStrip
           images={cachedImages}
           activeIndex={activeIndex}

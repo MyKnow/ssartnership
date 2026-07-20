@@ -63,6 +63,12 @@ export default function PartnerServiceMetricsPanel({
       hint: "혜택 이용 클릭 수",
     },
     {
+      key: "benefitUsageCount",
+      label: "혜택 이용",
+      value: formatCount(metrics.benefitUsageCount ?? 0),
+      hint: "제휴처 확인이 완료된 상시 혜택 이용 수",
+    },
+    {
       key: "inquiryClicks",
       label: "문의 클릭 수",
       value: formatCount(metrics.inquiryClicks),

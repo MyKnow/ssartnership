@@ -28,6 +28,7 @@ const partnerDashboard = [
   "partner.company.dashboard.empty",
   "partner.company.dashboard.pending-review",
 ] satisfies MockScenarioId[];
+const publicPartnerBenefitUse = ["public.partner.benefit-use"] satisfies MockScenarioId[];
 
 const mockRouteInventoryBase = [
   {
@@ -1011,16 +1012,36 @@ const routeContracts = {
   RouteContractDefinition
 >;
 
-export const mockRouteInventory: MockRouteInventoryItem[] =
-  mockRouteInventoryBase.map((route) => {
-    const contract = routeContracts[route.routePath];
-    const routeWithContract = {
-      ...route,
-      ...contract,
-    } satisfies Omit<MockRouteInventoryItem, "requiredStateKeys">;
+const partnerBenefitUseRouteInput = {
+  routePath: "/partners/[id]/benefit-use",
+  routeKind: "canonical",
+  screenContractId: "member.partner-benefit-use",
+  primaryTask: "SSAFY 인증 카드와 제휴처 PIN으로 오프라인 상시 혜택 이용을 확인한다.",
+  surface: "public",
+  authScope: "member",
+  viewComponent: "PartnerBenefitVerificationView",
+  dataSources: ["repository", "api-route", "storybook"],
+  requiredScenarioIds: publicPartnerBenefitUse,
+} satisfies Omit<MockRouteInventoryItem, "requiredStateKeys">;
 
-    return {
-      ...routeWithContract,
-      requiredStateKeys: getRequiredStateKeysForRoute(routeWithContract),
-    };
-  });
+const partnerBenefitUseRoute: MockRouteInventoryItem = {
+  ...partnerBenefitUseRouteInput,
+  requiredStateKeys: getRequiredStateKeysForRoute(partnerBenefitUseRouteInput),
+};
+
+const baseRouteInventory: MockRouteInventoryItem[] = mockRouteInventoryBase.map((route) => {
+  const contract = routeContracts[route.routePath];
+  const routeWithContract = {
+    ...route,
+    ...contract,
+  } satisfies Omit<MockRouteInventoryItem, "requiredStateKeys">;
+
+  return {
+    ...routeWithContract,
+    requiredStateKeys: getRequiredStateKeysForRoute(routeWithContract),
+  };
+});
+
+export const mockRouteInventory: MockRouteInventoryItem[] = baseRouteInventory.concat(
+  partnerBenefitUseRoute,
+);

@@ -145,6 +145,8 @@ export default function PartnerCardForm({
     setBenefitActionTypeValue,
     benefitActionLinkValue,
     setBenefitActionLinkValue,
+    benefitVerificationPinValue,
+    setBenefitVerificationPinValue,
     reservationLinkValue,
     setReservationLinkValue,
     inquiryLinkValue,
@@ -260,6 +262,9 @@ export default function PartnerCardForm({
     const location = String(formData.get("location") || "").trim();
     const benefitActionType = String(formData.get("benefitActionType") || "").trim();
     const benefitActionLink = String(formData.get("benefitActionLink") || "").trim();
+    const benefitVerificationPin = String(
+      formData.get("benefitVerificationPin") || "",
+    ).trim();
     const detailDescription = String(formData.get("detailDescription") || "").trim();
     const campusSlugSelection = validateFormCampusSlugSelection(
       formData.getAll("campusSlugs").map((item) => String(item).trim()),
@@ -286,8 +291,20 @@ export default function PartnerCardForm({
           message: partnerFormErrorMessages.partner_form_invalid_detail_description,
         }
       : null;
+    const benefitVerificationPinError =
+      benefitVerificationPin && !/^\d{4}$/.test(benefitVerificationPin)
+        ? {
+            field: "benefitVerificationPin" as const,
+            message: partnerFormErrorMessages.partner_form_invalid_benefit_verification_pin,
+          }
+        : null;
 
-    if (campusSlugSelection.ok && !benefitActionError && !detailDescriptionError) {
+    if (
+      campusSlugSelection.ok &&
+      !benefitActionError &&
+      !detailDescriptionError &&
+      !benefitVerificationPinError
+    ) {
       const imageUploadController = imageUploadControllerRef.current;
       if (imageUploadController?.hasPendingUploads()) {
         event.preventDefault();
@@ -328,7 +345,8 @@ export default function PartnerCardForm({
           !current.campusSlugs &&
           !current.benefitActionType &&
           !current.benefitActionLink &&
-          !current.detailDescription
+          !current.detailDescription &&
+          !current.benefitVerificationPin
         ) {
           return current;
         }
@@ -337,12 +355,14 @@ export default function PartnerCardForm({
           benefitActionType: _benefitActionType,
           benefitActionLink: _benefitActionLink,
           detailDescription: _detailDescription,
+          benefitVerificationPin: _benefitVerificationPin,
           ...nextErrors
         } = current;
         void _campusSlugs;
         void _benefitActionType;
         void _benefitActionLink;
         void _detailDescription;
+        void _benefitVerificationPin;
         return nextErrors;
       });
       return;
@@ -362,6 +382,9 @@ export default function PartnerCardForm({
       ...(detailDescriptionError
         ? { detailDescription: detailDescriptionError.message }
         : {}),
+      ...(benefitVerificationPinError
+        ? { benefitVerificationPin: benefitVerificationPinError.message }
+        : {}),
     }));
     if (!campusSlugSelection.ok) {
       event.currentTarget
@@ -371,7 +394,7 @@ export default function PartnerCardForm({
     }
     event.currentTarget
       .querySelector<HTMLElement>(
-        `[name="${benefitActionError?.field ?? detailDescriptionError?.field}"]`,
+        `[name="${benefitActionError?.field ?? detailDescriptionError?.field ?? benefitVerificationPinError?.field}"]`,
       )
       ?.focus();
   };
@@ -453,6 +476,7 @@ export default function PartnerCardForm({
               mapUrlValue,
               benefitActionTypeValue,
               benefitActionLinkValue,
+              benefitVerificationPinValue,
               reservationLinkValue,
               inquiryLinkValue,
             }}
@@ -474,6 +498,7 @@ export default function PartnerCardForm({
               setMapUrlValue,
               setBenefitActionTypeValue,
               setBenefitActionLinkValue,
+              setBenefitVerificationPinValue,
               setReservationLinkValue,
               setInquiryLinkValue,
             }}

@@ -29,6 +29,7 @@ export function createEmptyPartnerServiceMetrics(): PartnerPortalServiceMetrics 
     mapClicks: 0,
     reservationClicks: 0,
     inquiryClicks: 0,
+    benefitUsageCount: 0,
     reviewCount: 0,
     totalClicks: 0,
   };

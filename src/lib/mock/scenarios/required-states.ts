@@ -331,6 +331,16 @@ const routeOwnedStateOverrides: Partial<
     "mobile-overflow",
     "locked-metric",
   ],
+  "/partners/[id]/benefit-use": [
+    "default",
+    "validation-error",
+    "success",
+    "error",
+    "unauthorized",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
 };
 
 const collectionRoutes = new Set([

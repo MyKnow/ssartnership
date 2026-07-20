@@ -198,6 +198,16 @@ const mockStorybookScenarioCoverageBase = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
+    routePath: "/partners/[id]/benefit-use",
+    scenarioId: "public.partner.benefit-use",
+    storyId: "screens-public-partnerbenefitverificationview--default",
+    storyFile: "src/components/partner/PartnerBenefitVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "PartnerBenefitVerificationView",
+    coveredStateKeys: ["default", "long-korean", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
     routePath: "/partners/[id]",
     scenarioId: "public.partner.detail.member",
     storyId: "screens-public-partnerdetailview--empty",

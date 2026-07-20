@@ -8,6 +8,14 @@ import type { Partner } from "@/lib/types";
 import PartnerDetailContactSection from "./PartnerDetailContactSection";
 import PartnerDetailSummaryCard from "./PartnerDetailSummaryCard";
 
+const demoImage = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720">
+    <rect width="960" height="720" fill="#dbeafe"/>
+    <circle cx="480" cy="330" r="150" fill="#2563eb" opacity="0.18"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#1d4ed8" font-size="56" font-family="sans-serif">Partner</text>
+  </svg>`,
+)} `;
+
 const partner: Partner = {
   id: "story-detail-partner",
   name: "바디라인 역삼점",
@@ -16,8 +24,8 @@ const partner: Partner = {
   createdAt: "2026-06-01T00:00:00.000Z",
   location: "서울 강남구 테헤란로 123",
   period: { start: "2026-01-01", end: "2099-12-31" },
-  thumbnail: null,
-  images: [],
+  thumbnail: demoImage,
+  images: [demoImage],
   conditions: ["내 인증 화면 제시", "다른 프로모션과 중복 적용 불가"],
   benefits: ["월 이용권 20% 할인", "첫 방문 체형 상담 무료"],
   appliesTo: ["student", "staff"],
@@ -34,75 +42,94 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader
-        eyebrow="건강"
-        title={value.name}
-        description="핵심 혜택을 확인하고 바로 이용할 수 있습니다."
-        backHref="/?category=health#benefits"
-        backLabel="혜택 목록으로"
-      />
-      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-        <PartnerDetailSummaryCard
-          partner={value}
-          categoryLabel="건강"
-          mapLink={value.mapUrl}
-          currentUserId={null}
-          metrics={{
-            favoriteCount: 32,
-            reviewCount: 8,
-            detailViews: 320,
-            detailUv: 210,
-            cardClicks: 120,
-            mapClicks: 40,
-            reservationClicks: 26,
-            inquiryClicks: 12,
-            totalClicks: 198,
-          }}
-          detailPanel={
-            <PartnerDetailContactSection
-              isActive
-              contactCount={2}
-              benefitUseAction={action}
-              inquiryDisplay={{
-                label: "0507-1382-2343",
-                href: "tel:050713822343",
-                type: "phone",
-              }}
-              normalizedLinks={{
-                benefitActionLink: "",
-                reservationLink: "",
-                inquiryLink: "0507-1382-2343",
-              }}
-              partnerId={value.id}
-            />
-          }
-          primaryActionPanel={
-            <PartnerDetailContactSection
-              isActive
-              contactCount={2}
-              benefitUseAction={action}
-              inquiryDisplay={{
-                label: "0507-1382-2343",
-                href: "tel:050713822343",
-                type: "phone",
-              }}
-              normalizedLinks={{
-                benefitActionLink: "",
-                reservationLink: "",
-                inquiryLink: "0507-1382-2343",
-              }}
-              partnerId={value.id}
-              mode="primary"
-              className="hidden md:block"
-            />
-          }
-        />
+      <div
+        data-partner-detail-hero
+        className="grid gap-6 md:grid-cols-2 md:items-stretch"
+      >
         <PartnerImageCarousel
-          images={value.images ?? []}
+          images={value.thumbnail ? [value.thumbnail] : []}
           name={value.name}
-          className="order-1 xl:order-2"
+          className="order-2 h-full md:order-1"
+          variant="hero"
+          showThumbnails={false}
         />
+        <div className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-2">
+          <PageHeader
+            className="h-full border-0 pb-0"
+            eyebrow="건강"
+            title={value.name}
+            description="핵심 혜택을 확인하고 바로 이용할 수 있습니다."
+            backHref="/?category=health#benefits"
+            backLabel="혜택 목록으로"
+          />
+        </div>
       </div>
+
+      {value.images?.length ? (
+        <section data-partner-detail-gallery className="grid min-w-0 gap-3">
+          <p className="ui-section-title">추가 이미지</p>
+          <PartnerImageCarousel
+            images={value.images}
+            name={`${value.name} 추가 이미지`}
+          />
+        </section>
+      ) : null}
+
+      <PartnerDetailSummaryCard
+        partner={value}
+        categoryLabel="건강"
+        mapLink={value.mapUrl}
+        currentUserId={null}
+        metrics={{
+          favoriteCount: 32,
+          reviewCount: 8,
+          detailViews: 320,
+          detailUv: 210,
+          cardClicks: 120,
+          mapClicks: 40,
+          reservationClicks: 26,
+          inquiryClicks: 12,
+          totalClicks: 198,
+        }}
+        detailPanel={
+          <PartnerDetailContactSection
+            isActive
+            contactCount={2}
+            benefitUseAction={action}
+            inquiryDisplay={{
+              label: "0507-1382-2343",
+              href: "tel:050713822343",
+              type: "phone",
+            }}
+            normalizedLinks={{
+              benefitActionLink: "",
+              reservationLink: "",
+              inquiryLink: "0507-1382-2343",
+            }}
+            partnerId={value.id}
+          />
+        }
+        primaryActionPanel={
+          <PartnerDetailContactSection
+            isActive
+            contactCount={2}
+            benefitUseAction={action}
+            inquiryDisplay={{
+              label: "0507-1382-2343",
+              href: "tel:050713822343",
+              type: "phone",
+            }}
+            normalizedLinks={{
+              benefitActionLink: "",
+              reservationLink: "",
+              inquiryLink: "0507-1382-2343",
+            }}
+            partnerId={value.id}
+            mode="primary"
+            className="hidden md:block"
+          />
+        }
+      />
     </div>
   );
 }
@@ -173,8 +200,8 @@ export const Default: Story = {
       name: "바디라인 역삼점 이미지 크게 보기",
     });
     await expect(imageCarouselButton.parentElement).toHaveClass(
-      "order-1",
-      "xl:order-2",
+      "order-2",
+      "md:order-1",
     );
 
     const primaryAction = summaryCard.querySelector<HTMLElement>(
@@ -305,6 +332,7 @@ export const Empty: Story = {
       ...partner,
       benefits: [],
       conditions: [],
+      thumbnail: null,
       images: [],
       tags: [],
       detailDescription: null,

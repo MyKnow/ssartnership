@@ -1,3 +1,4 @@
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import Card from "@/components/ui/Card";
 import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -173,17 +174,30 @@ export default function AdminPartnerCouponManager({
       />
 
       {canCreateCoupon ? (
-        <AdminPartnerCouponForm
-          partnerId={partnerId}
-          partnerName={partnerName}
-          partnerPeriodEnd={partnerPeriodEnd}
-          campaigns={campaignOptions}
-          action={createCouponAction}
-          mode="create"
-          title="쿠폰 생성"
-          description="제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다."
-          submitLabel="쿠폰 생성"
-        />
+        <details className="group min-w-0 overflow-hidden rounded-panel border border-border bg-surface shadow-flat">
+          <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 outline-none transition-colors hover:bg-surface-elevated focus-visible:bg-surface-elevated [&::-webkit-details-marker]:hidden sm:px-6">
+            <span className="min-w-0 text-left text-lg font-semibold text-foreground">
+              쿠폰 생성
+            </span>
+            <ChevronDownIcon
+              className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="border-t border-border/70 p-3 sm:p-4">
+            <AdminPartnerCouponForm
+              partnerId={partnerId}
+              partnerName={partnerName}
+              partnerPeriodEnd={partnerPeriodEnd}
+              campaigns={campaignOptions}
+              action={createCouponAction}
+              mode="create"
+              title="쿠폰 생성"
+              description="제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다."
+              submitLabel="쿠폰 생성"
+            />
+          </div>
+        </details>
       ) : null}
 
       <section className="grid min-w-0 gap-4" aria-label={`${partnerName} 쿠폰 목록`}>

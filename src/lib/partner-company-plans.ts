@@ -15,6 +15,7 @@ export type PartnerMetricKey =
   | "mapClicks"
   | "reservationClicks"
   | "inquiryClicks"
+  | "benefitUsageCount"
   | "totalClicks"
   | "timeseries"
   | "adPerformance";
@@ -32,6 +33,7 @@ export type PartnerCompanyPlanDefinition = {
 const BASIC_METRICS = [
   "favoriteCount",
   "reviewCount",
+  "benefitUsageCount",
   "detailViews",
   "totalClicks",
 ] as const satisfies readonly PartnerMetricKey[];

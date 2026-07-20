@@ -12,16 +12,21 @@ test.describe("auth and partner portal operation flows", () => {
 
   test("preserves the partner detail return path through member certification login", async ({ page }) => {
     await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
+    await page.waitForLoadState("networkidle");
 
-    await page.getByRole("link", { name: "인증하고 혜택 이용" }).first().click();
+    await page.getByRole("button", { name: "혜택 이용하기" }).first().click();
+    const benefitDialog = page.getByRole("dialog", { name: "혜택 이용하기" });
+    await expect(benefitDialog).toBeVisible();
+    await benefitDialog.getByRole("combobox", { name: "이용할 혜택" }).selectOption({ index: 1 });
+    await benefitDialog.getByRole("button", { name: "확인" }).click();
 
     await expect(page).toHaveURL(/\/auth\/login\?returnTo=/, { timeout: 15_000 });
     const loginUrl = new URL(page.url());
-    const certificationReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
-    expect(certificationReturnTo).toContain("/certification?returnTo=");
-    expect(decodeURIComponent(certificationReturnTo)).toContain(
-      "/partners/health-001",
-    );
+    const benefitUseReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
+    const decodedReturnTo = decodeURIComponent(benefitUseReturnTo);
+    expect(decodedReturnTo).toContain("/partners/health-001/benefit-use");
+    expect(decodedReturnTo).toContain("benefit=");
+    expect(decodedReturnTo).toContain("returnTo=");
   });
 
   test("member login shows field-level validation before submitting", async ({ page }) => {
