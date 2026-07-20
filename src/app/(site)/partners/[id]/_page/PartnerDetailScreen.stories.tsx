@@ -6,6 +6,7 @@ import AppErrorScreen from "@/components/errors/AppErrorScreen";
 import { PublicPartnerDetailSkeleton } from "@/components/loading/RoutePageSkeletons";
 import type { Partner } from "@/lib/types";
 import PartnerDetailContactSection from "./PartnerDetailContactSection";
+import PartnerDetailMobileActionBar from "./PartnerDetailMobileActionBar";
 import PartnerDetailSummaryCard from "./PartnerDetailSummaryCard";
 
 const demoImage = `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -49,11 +50,14 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
         <PartnerImageCarousel
           images={value.thumbnail ? [value.thumbnail] : []}
           name={value.name}
-          className="order-2 h-full md:order-1"
+          className="order-2 h-full md:order-2"
           variant="hero"
           showThumbnails={false}
         />
-        <div className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-2">
+        <div
+          data-partner-detail-hero-info
+          className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-1"
+        >
           <PageHeader
             className="h-full border-0 pb-0"
             eyebrow="건강"
@@ -109,26 +113,14 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
             partnerId={value.id}
           />
         }
-        primaryActionPanel={
-          <PartnerDetailContactSection
-            isActive
-            contactCount={2}
-            benefitUseAction={action}
-            inquiryDisplay={{
-              label: "0507-1382-2343",
-              href: "tel:050713822343",
-              type: "phone",
-            }}
-            normalizedLinks={{
-              benefitActionLink: "",
-              reservationLink: "",
-              inquiryLink: "0507-1382-2343",
-            }}
-            partnerId={value.id}
-            mode="primary"
-            className="hidden md:block"
-          />
-        }
+      />
+      <PartnerDetailMobileActionBar
+        partnerId={value.id}
+        benefitUseAction={action}
+        inquiryAction={{
+          label: "0507-1382-2343",
+          href: "tel:050713822343",
+        }}
       />
     </div>
   );
@@ -199,16 +191,25 @@ export const Default: Story = {
     const imageCarouselButton = canvas.getByRole("button", {
       name: "바디라인 역삼점 이미지 크게 보기",
     });
+    const heroInfo = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-hero-info]",
+    );
+    await expect(heroInfo).not.toBeNull();
+    await expect(heroInfo).toHaveClass("order-1", "md:order-1");
     await expect(imageCarouselButton.parentElement).toHaveClass(
       "order-2",
-      "md:order-1",
+      "md:order-2",
     );
 
     const primaryAction = summaryCard.querySelector<HTMLElement>(
       "[data-primary-benefit-action]",
     );
-    await expect(primaryAction).not.toBeNull();
-    await expect(primaryAction).toHaveClass("w-full");
+    await expect(primaryAction).toBeNull();
+    const desktopActionFab = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-desktop-action-fab]",
+    );
+    await expect(desktopActionFab).not.toBeNull();
+    await expect(desktopActionFab).toHaveClass("hidden", "md:flex");
     const inquirySection = summaryCard.querySelector<HTMLElement>(
       "[data-inquiry-section]",
     );
@@ -303,9 +304,9 @@ export const Default: Story = {
     const summaryContent = summaryCard.querySelector<HTMLElement>(
       "[data-partner-detail-summary-content]",
     );
-    await expect(summaryContent?.lastElementChild).toHaveAttribute(
-      "data-primary-benefit-action-panel",
-    );
+    await expect(
+      summaryContent?.querySelector("[data-primary-benefit-action-panel]"),
+    ).toBeNull();
   },
 };
 

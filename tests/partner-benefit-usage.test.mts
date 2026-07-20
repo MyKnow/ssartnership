@@ -7,7 +7,10 @@ import {
   normalizePartnerBenefitSelection,
 } from "../src/lib/partner-benefit-usage.ts";
 import { hashCouponVerificationPassword } from "../src/lib/coupon-verification-password.ts";
-import { recordPartnerBenefitUsage } from "../src/lib/partner-benefit-usage-service.ts";
+import {
+  PartnerBenefitUsageError,
+  recordPartnerBenefitUsage,
+} from "../src/lib/partner-benefit-usage-service.ts";
 import { MockPartnerBenefitUsageRepository } from "../src/lib/repositories/mock/partner-benefit-usage-repository.mock.ts";
 
 test("benefit selection accepts only an exact registered benefit", () => {
@@ -88,4 +91,33 @@ test("idempotent benefit-use retries do not create a second aggregate record", a
   assert.equal(first.isNew, true);
   assert.equal(retry.isNew, false);
   assert.equal(retry.usageId, first.usageId);
+});
+
+test("benefit-use cannot record usage when the partner PIN is not configured", async () => {
+  const repository = new MockPartnerBenefitUsageRepository([
+    {
+      partnerId: "partner-without-pin",
+      location: "서울 강남구 테헤란로 212",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-07-31",
+      benefits: ["헬스 1개월 33,000원"],
+      pinHash: null,
+      pinSalt: null,
+    },
+  ]);
+
+  await assert.rejects(
+    () =>
+      recordPartnerBenefitUsage({
+        repository,
+        partnerId: "partner-without-pin",
+        memberId: "member-1",
+        benefit: "헬스 1개월 33,000원",
+        pin: "0427",
+        idempotencyKey: "no-pin-request",
+      }),
+    (error: unknown) =>
+      error instanceof PartnerBenefitUsageError &&
+      error.code === "pin_not_configured",
+  );
 });

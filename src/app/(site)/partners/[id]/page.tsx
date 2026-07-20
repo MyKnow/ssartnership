@@ -253,14 +253,17 @@ export default async function PartnerDetailPage({
             >
               <PartnerImageCarousel
                 key={`${carouselKey}:thumbnail`}
-                className="order-2 h-full md:order-1"
+                className="order-2 h-full md:order-2"
                 images={partner.thumbnail ? [partner.thumbnail] : []}
                 name={partner.name}
                 variant="hero"
                 showThumbnails={false}
                 priority
               />
-              <div className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-2">
+              <div
+                data-partner-detail-hero-info
+                className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-1"
+              >
                 <PageHeader
                   className="h-full border-0 pb-0"
                   eyebrow={categoryLabel}
@@ -307,19 +310,6 @@ export default async function PartnerDetailPage({
                   normalizedLinks={normalizedLinks}
                   partnerId={partner.id}
                   offlineBenefitAction={offlineBenefitAction}
-                />
-              }
-              primaryActionPanel={
-                <PartnerDetailContactSection
-                  isActive={isActive}
-                  contactCount={contactCount}
-                  benefitUseAction={resolvedBenefitUseAction}
-                  inquiryDisplay={inquiryDisplay}
-                  normalizedLinks={normalizedLinks}
-                  partnerId={partner.id}
-                  offlineBenefitAction={offlineBenefitAction}
-                  mode="primary"
-                  className="hidden md:block"
                 />
               }
             />

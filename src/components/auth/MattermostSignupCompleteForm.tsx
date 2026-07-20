@@ -124,6 +124,11 @@ export default function MattermostSignupCompleteForm({
     setFormError(null);
   }
 
+  function clearProfileImageUploadDraft() {
+    profileImageUploadIdRef.current = null;
+    sessionStorage.removeItem(profileImageKey);
+  }
+
   function setPasswordFieldErrors(nextErrors: Pick<MemberSignupCompleteFieldErrors, "password" | "confirmPassword">) {
     setFieldErrors((previous) => ({
       ...previous,
@@ -261,15 +266,18 @@ export default function MattermostSignupCompleteForm({
           return;
         }
         if (data.error === "already_registered") {
+          clearProfileImageUploadDraft();
           sessionStorage.setItem("signup:alreadyRegistered", "1");
           router.replace(data.redirectTo ?? "/auth/login");
           return;
         }
         if (data.error === "verification_expired") {
+          clearProfileImageUploadDraft();
           setFormError("Mattermost 인증 상태가 만료되었습니다. 인증 코드를 다시 요청해 주세요.");
           return;
         }
         if (data.error === "generation_completed") {
+          clearProfileImageUploadDraft();
           setFormError("선택한 기수는 회원가입을 진행할 수 없습니다.");
           return;
         }
@@ -277,6 +285,9 @@ export default function MattermostSignupCompleteForm({
           notify("승인 요청이 접수되었습니다.");
           router.replace(data.redirectTo ?? "/auth/signup/pending");
           return;
+        }
+        if (data.error === "signup_failed" || response.status === 503) {
+          clearProfileImageUploadDraft();
         }
         setFormError("회원가입을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.");
         return;

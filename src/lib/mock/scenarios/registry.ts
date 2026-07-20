@@ -53,7 +53,13 @@ export const mockScenarios = [
     description: "회원 인증 카드와 제휴처 4자리 PIN으로 오프라인 상시 혜택 이용을 확인하는 상태입니다.",
     syntheticOnly: true,
     dataSources: ["repository", "api-route", "storybook"],
-    requiredStates: ["혜택 선택 완료", "인증 카드", "PIN 입력", "이용 확인 완료"],
+    requiredStates: [
+      "혜택 선택 완료",
+      "인증 카드",
+      "PIN 입력",
+      "PIN 미설정 조회",
+      "이용 확인 완료",
+    ],
     seed: { partnerIds: ["cafe-001"], routeParams: { id: "cafe-001", benefit: "혜택 1" } },
   },
   {

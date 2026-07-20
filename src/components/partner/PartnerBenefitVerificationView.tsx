@@ -36,6 +36,7 @@ export default function PartnerBenefitVerificationView({
   member,
   cohortCardThemes,
   initialTimestamp,
+  pinConfigured,
 }: {
   partnerId: string;
   partnerName: string;
@@ -43,6 +44,7 @@ export default function PartnerBenefitVerificationView({
   member: VerificationMember;
   cohortCardThemes: readonly CohortCardTheme[];
   initialTimestamp: string;
+  pinConfigured: boolean;
 }) {
   const idempotencyKeyRef = useRef<string | null>(null);
   const [pin, setPin] = useState("");
@@ -125,49 +127,53 @@ export default function PartnerBenefitVerificationView({
           <p className="mt-3 text-xs font-medium text-muted-foreground">선택한 혜택</p>
           <p className="mt-1 break-words text-base font-semibold text-foreground">{benefit}</p>
         </div>
-        <label className="grid gap-2 text-sm font-medium text-foreground">
-          제휴처 확인 PIN
-          <input
-            id="partnerBenefitPin"
-            name="partnerBenefitPin"
-            type="password"
-            inputMode="numeric"
-            pattern="[0-9]{4}"
-            maxLength={4}
-            autoComplete="off"
-            value={pin}
-            disabled={isCompleted}
-            onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
-            placeholder="4자리 PIN 입력"
-            className="h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <span className="text-xs font-normal text-muted-foreground">
-            제휴처에서 관리하는 숫자 4자리 PIN입니다.
-          </span>
-        </label>
-        {message ? (
-          <p
-            className={
-              message.tone === "error"
-                ? "text-sm font-medium text-danger"
-                : "text-sm font-medium text-success"
-            }
-          >
-            {message.text}
-          </p>
+        {pinConfigured ? (
+          <>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              제휴처 확인 PIN
+              <input
+                id="partnerBenefitPin"
+                name="partnerBenefitPin"
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                autoComplete="off"
+                value={pin}
+                disabled={isCompleted}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="4자리 PIN 입력"
+                className="h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <span className="text-xs font-normal text-muted-foreground">
+                제휴처에서 관리하는 숫자 4자리 PIN입니다.
+              </span>
+            </label>
+            {message ? (
+              <p
+                className={
+                  message.tone === "error"
+                    ? "text-sm font-medium text-danger"
+                    : "text-sm font-medium text-success"
+                }
+              >
+                {message.text}
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              className="w-full justify-center"
+              loading={isSubmitting}
+              loadingText="확인 중"
+              disabled={isCompleted}
+              onClick={() => {
+                void confirmBenefitUse();
+              }}
+            >
+              {isCompleted ? "혜택 이용 확인 완료" : "인증 카드와 혜택 확인"}
+            </Button>
+          </>
         ) : null}
-        <Button
-          type="button"
-          className="w-full justify-center"
-          loading={isSubmitting}
-          loadingText="확인 중"
-          disabled={isCompleted}
-          onClick={() => {
-            void confirmBenefitUse();
-          }}
-        >
-          {isCompleted ? "혜택 이용 확인 완료" : "인증 카드와 혜택 확인"}
-        </Button>
       </Card>
     </div>
   );
