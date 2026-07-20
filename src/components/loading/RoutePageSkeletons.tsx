@@ -154,8 +154,8 @@ function PartnerDetailMediaSkeleton() {
   return (
     <div className="grid gap-6">
       <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
-        <Skeleton className="order-2 h-[24rem] w-full rounded-[2rem] border border-border bg-surface-muted md:order-1" />
-        <Card className="order-1 min-h-[24rem] space-y-4 p-6 sm:p-8 md:order-2">
+        <Skeleton className="order-2 h-[24rem] w-full rounded-[2rem] border border-border bg-surface-muted md:order-2" />
+        <Card className="order-1 min-h-[24rem] space-y-4 p-6 sm:p-8 md:order-1">
           <Skeleton className="h-5 w-20" />
           <Skeleton className="h-12 w-full max-w-2xl" />
           <Skeleton className="h-4 w-full max-w-xl" />

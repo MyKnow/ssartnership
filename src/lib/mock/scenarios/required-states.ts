@@ -114,6 +114,11 @@ export const mockRequiredStateDefinitions = [
     description: "로그인은 되었지만 접근 권한이 없는 상태입니다.",
   },
   {
+    key: "pin-not-configured",
+    label: "PIN 미설정",
+    description: "제휴처 확인 PIN 없이 인증 카드와 선택 혜택만 확인하는 상태입니다.",
+  },
+  {
     key: "expired",
     label: "만료",
     description: "토큰, 기간, 플랜, 이벤트가 만료된 상태입니다.",
@@ -333,6 +338,7 @@ const routeOwnedStateOverrides: Partial<
   ],
   "/partners/[id]/benefit-use": [
     "default",
+    "pin-not-configured",
     "validation-error",
     "success",
     "error",
