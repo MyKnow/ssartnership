@@ -122,5 +122,11 @@ export const Default: Story = {
     await expect(canvas.getAllByRole("button", { name: "삭제" }).length).toBeGreaterThan(0);
     await userEvent.click(createAccordionButton);
     await expect(canvas.getByText("현장 확인형 쿠폰에 사용할 숫자 4자리 PIN입니다.")).toBeInTheDocument();
+
+    const createSubmitButtons = canvas.getAllByRole("button", {
+      name: /^쿠폰 생성$/,
+    });
+    await userEvent.click(createSubmitButtons[createSubmitButtons.length - 1]);
+    await expect(canvas.getByText("Error", { exact: true })).toBeInTheDocument();
   },
 };

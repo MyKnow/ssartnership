@@ -21,7 +21,6 @@ const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
 type CouponWalletSection = {
   id: "available";
   title: string;
-  description: string;
   items: AvailableAdCoupon[];
 };
 
@@ -40,65 +39,14 @@ function formatGlobalRemaining(value: number | null) {
   return `전체 ${value.toLocaleString("ko-KR")}회 남음`;
 }
 
-function getNearestExpiryLabel(coupons: AvailableAdCoupon[]) {
-  const nearest = coupons
-    .map((item) => new Date(item.coupon.usageEndsAt))
-    .filter((date) => !Number.isNaN(date.getTime()))
-    .sort((left, right) => left.getTime() - right.getTime())[0];
-
-  if (!nearest) {
-    return "만료 예정 없음";
-  }
-
-  return `${dateFormatter.format(nearest)}까지`;
-}
-
 function buildWalletSections(coupons: AvailableAdCoupon[]): CouponWalletSection[] {
   return [
     {
       id: "available",
       title: "사용 가능한 쿠폰",
-      description: "제휴처 상세에서 쿠폰을 확인하고 사용할 수 있습니다.",
       items: coupons,
     },
   ];
-}
-
-function CouponWalletStats({ coupons }: { coupons: AvailableAdCoupon[] }) {
-  const totalRemainingUses = coupons.reduce(
-    (sum, item) => sum + item.remainingMemberUses,
-    0,
-  );
-  const stats = [
-    {
-      label: "쿠폰",
-      value: `${coupons.length.toLocaleString("ko-KR")}개`,
-    },
-    {
-      label: "사용 가능",
-      value: `${totalRemainingUses.toLocaleString("ko-KR")}회`,
-    },
-    {
-      label: "가장 빠른 만료",
-      value: getNearestExpiryLabel(coupons),
-    },
-  ];
-
-  return (
-    <div className="grid gap-2 sm:grid-cols-3">
-      {stats.map((stat) => (
-        <div
-          key={stat.label}
-          className="rounded-2xl border border-border/80 bg-surface px-4 py-3 shadow-flat"
-        >
-          <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
-          <p className="mt-1 text-sm font-semibold text-foreground sm:text-base">
-            {stat.value}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 function CouponWalletAccordionItem({
@@ -113,6 +61,7 @@ function CouponWalletAccordionItem({
   const { coupon, remainingGlobalUses, remainingMemberUses } = item;
   const assignedCode = item.assignedCode ?? coupon.code;
   const detailHref = `/partners/${encodeURIComponent(coupon.partnerId)}#coupons`;
+  const hasTerms = coupon.terms.length > 0;
 
   return (
     <details
@@ -134,16 +83,6 @@ function CouponWalletAccordionItem({
           <h3 className="mt-3 truncate text-ko-title text-base font-semibold leading-7 text-foreground sm:text-lg">
             {coupon.title}
           </h3>
-          <div className="mt-2 flex min-w-0 flex-wrap gap-2 text-xs font-semibold text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <TicketIcon className="size-4" aria-hidden="true" />
-              내 {remainingMemberUses.toLocaleString("ko-KR")}회
-            </span>
-            <span className="inline-flex min-w-0 items-center gap-1">
-              <CalendarDaysIcon className="size-4 shrink-0" aria-hidden="true" />
-              <span className="block min-w-0 truncate">{formatDate(coupon.usageEndsAt)}</span>
-            </span>
-          </div>
         </div>
         <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] border border-border bg-surface-control text-muted-foreground transition group-open:rotate-180 group-open:border-primary/20 group-open:bg-primary-soft group-open:text-primary">
           <ChevronDownIcon className="size-5" aria-hidden="true" />
@@ -151,21 +90,17 @@ function CouponWalletAccordionItem({
       </summary>
 
       <div className="border-t border-border/70 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="min-w-0 space-y-3">
-            {coupon.description ? (
-              <p className="line-clamp-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
-                {coupon.description}
-              </p>
-            ) : (
-              <p className="text-ko-pretty text-sm leading-6 text-muted-foreground">
-                제휴처 상세에서 쿠폰 사용 방법을 확인해 주세요.
-              </p>
-            )}
+        <div className={hasTerms ? "grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]" : "grid gap-3"}>
+          {hasTerms ? (
+            <div className="min-w-0 space-y-3">
+              {coupon.description ? (
+                <p className="line-clamp-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
+                  {coupon.description}
+                </p>
+              ) : null}
 
-            <div className="rounded-2xl border border-border/80 bg-surface-muted px-3 py-3">
-              <p className="text-xs font-semibold text-muted-foreground">사용 조건</p>
-              {coupon.terms.length > 0 ? (
+              <div className="rounded-2xl border border-border/80 bg-surface-muted px-3 py-3">
+                <p className="text-xs font-semibold text-muted-foreground">사용 조건</p>
                 <ul className="mt-2 grid gap-1 text-xs leading-5 text-muted-foreground">
                   {coupon.terms.map((term) => (
                     <li key={term} className="line-clamp-2 text-ko-pretty">
@@ -173,15 +108,16 @@ function CouponWalletAccordionItem({
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="mt-2 text-ko-pretty text-xs leading-5 text-muted-foreground">
-                  별도 사용 조건은 제휴처 상세를 확인해 주세요.
-                </p>
-              )}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="grid min-w-0 gap-2 rounded-2xl border border-border/80 bg-surface-inset px-3 py-3 text-sm">
+            {!hasTerms && coupon.description ? (
+              <p className="line-clamp-2 text-ko-pretty text-sm leading-6 text-muted-foreground">
+                {coupon.description}
+              </p>
+            ) : null}
             <div>
               <p className="text-xs font-medium text-muted-foreground">내 남은 사용 횟수</p>
               <p className="mt-1 font-semibold text-foreground">
@@ -215,7 +151,7 @@ function CouponWalletAccordionItem({
                 variant="primary"
                 className="mt-1 w-full justify-center"
               >
-                제휴처 확인 화면
+                사용하기
                 <ArrowRightIcon className="size-4" aria-hidden="true" />
               </Button>
             ) : null}
@@ -267,7 +203,6 @@ function CouponWalletSectionView({ section }: { section: CouponWalletSection }) 
           <h2 id={`coupon-wallet-${section.id}`} className="mt-2 text-base font-semibold text-foreground">
             {section.title}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
         </div>
         <Badge variant="primary" className="w-fit tracking-normal">
           {section.items.length.toLocaleString("ko-KR")}개
@@ -292,10 +227,6 @@ export default function CouponWalletView({
 }: {
   coupons: AvailableAdCoupon[];
 }) {
-  const totalRemainingUses = coupons.reduce(
-    (sum, item) => sum + item.remainingMemberUses,
-    0,
-  );
   const sections = buildWalletSections(coupons);
 
   return (
@@ -304,18 +235,7 @@ export default function CouponWalletView({
         eyebrow="Coupon Wallet"
         title="쿠폰함"
         description="지금 내 계정으로 사용할 수 있는 제휴 쿠폰을 모아봅니다."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="primary" className="tracking-normal">
-              {coupons.length.toLocaleString("ko-KR")}개 쿠폰
-            </Badge>
-            <Badge variant="neutral" className="tracking-normal">
-              {totalRemainingUses.toLocaleString("ko-KR")}회 사용 가능
-            </Badge>
-          </div>
-        }
       />
-      <CouponWalletStats coupons={coupons} />
       {sections.map((section) => (
         <CouponWalletSectionView key={section.id} section={section} />
       ))}

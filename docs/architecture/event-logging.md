@@ -45,7 +45,6 @@
 - `category_delete`
 - `partner_create`
 - `partner_update`
-- `partner_delete`
 - `member_update`
 - `member_delete`
 - `push_send`
@@ -55,6 +54,8 @@
 - `partner_portal_change_request_cancel`
 - `partner_portal_review_hide`
 - `partner_portal_review_restore`
+
+제휴처 자체 삭제는 현재 지원하지 않습니다. 기존에 남아 있는 관련 감사 로그는 이력 보존을 위해 삭제하지 않습니다.
 
 ### 3. Auth Security
 인증/보안 추적용 로그입니다.

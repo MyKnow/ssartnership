@@ -9,6 +9,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import { useToast } from "@/components/ui/Toast";
 import { getProductSessionId, trackProductEvent } from "@/lib/product-events";
 import type { AdCoupon, AvailableAdCoupon } from "@/lib/repositories/ad-package-repository";
+import { indexIssuedCouponsByCouponId } from "./issued-coupon-map";
 
 type CouponMessage = {
   tone: "success" | "error";
@@ -29,11 +30,13 @@ function getLoginHref(returnTo: string) {
 
 export default function PartnerDetailCoupons({
   coupons,
+  initialIssuedCoupons,
   partnerId,
   currentUserId,
   returnTo,
 }: {
   coupons: AdCoupon[];
+  initialIssuedCoupons: AvailableAdCoupon[];
   partnerId: string;
   currentUserId: string | null;
   returnTo: string;
@@ -42,9 +45,19 @@ export default function PartnerDetailCoupons({
   const viewedCouponIds = useRef(new Set<string>());
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
   const [issuingId, setIssuingId] = useState<string | null>(null);
-  const [issuedCoupons, setIssuedCoupons] = useState<Record<string, AvailableAdCoupon>>({});
+  const initialIssuedCouponMap = useMemo(
+    () => indexIssuedCouponsByCouponId(initialIssuedCoupons),
+    [initialIssuedCoupons],
+  );
+  const [issuedCoupons, setIssuedCoupons] = useState<Record<string, AvailableAdCoupon>>(
+    initialIssuedCouponMap,
+  );
   const [messages, setMessages] = useState<Record<string, CouponMessage>>({});
   const loginHref = useMemo(() => getLoginHref(returnTo), [returnTo]);
+
+  useEffect(() => {
+    setIssuedCoupons((current) => ({ ...initialIssuedCouponMap, ...current }));
+  }, [initialIssuedCouponMap]);
 
   useEffect(() => {
     for (const coupon of coupons) {
@@ -183,11 +196,7 @@ export default function PartnerDetailCoupons({
   return (
     <Card id="coupons" className="w-full scroll-mt-28 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <SectionHeading
-          title="SSAFY 쿠폰"
-          description="제휴처가 제공하는 한정 혜택입니다."
-        />
-        <Badge variant="primary">{coupons.length.toLocaleString("ko-KR")}개 제공</Badge>
+        <SectionHeading title="쿠폰" />
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -293,7 +302,7 @@ export default function PartnerDetailCoupons({
                     variant="primary"
                     className="w-full justify-center sm:flex-1"
                   >
-                    제휴처 확인 화면
+                    사용하기
                   </Button>
                 ) : currentUserId ? (
                   <Button

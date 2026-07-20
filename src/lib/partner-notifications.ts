@@ -393,7 +393,7 @@ async function loadSupabasePartnerNotificationCenter(
       queryAuditLogs({
         supabase,
         targetType: "partner",
-        actions: ["partner_create", "partner_update", "partner_delete"],
+        actions: ["partner_create", "partner_update"],
         targetIds: partnerIds,
         limit: 20,
       }),

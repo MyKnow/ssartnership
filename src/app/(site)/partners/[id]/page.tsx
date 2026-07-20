@@ -7,13 +7,13 @@ import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
-import ShareLinkButton from "@/components/ShareLinkButton";
 import { SITE_NAME } from "@/lib/site";
 import { createCanonicalAlternates } from "@/lib/seo";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import PartnerDetailCoupons from "./_page/PartnerDetailCoupons";
+import PartnerDetailHeroMeta from "./_page/PartnerDetailHeroMeta";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
 import PartnerDetailSummaryCard from "./_page/PartnerDetailSummaryCard";
 import PartnerDetailMobileActionBar from "./_page/PartnerDetailMobileActionBar";
@@ -169,7 +169,6 @@ export default async function PartnerDetailPage({
     benefitUseAction,
     inquiryDisplay,
     contactCount,
-    badgeStyle,
     chipStyle,
     breadcrumbJsonLd,
     partnerJsonLd,
@@ -178,6 +177,7 @@ export default async function PartnerDetailPage({
     isFavorited,
     currentUserId,
     adCoupons,
+    issuedAdCoupons,
     isPreview,
   } = pageData;
   const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
@@ -249,41 +249,48 @@ export default async function PartnerDetailPage({
           <div className="flex flex-col gap-6">
             <div
               data-partner-detail-hero
-              className="grid gap-6 md:grid-cols-2 md:items-stretch"
+              className="grid min-w-0"
             >
-              <PartnerImageCarousel
-                key={`${carouselKey}:thumbnail`}
-                className="order-2 h-full md:order-2"
-                images={partner.thumbnail ? [partner.thumbnail] : []}
-                name={partner.name}
-                variant="hero"
-                showThumbnails={false}
-                priority
-              />
               <div
                 data-partner-detail-hero-info
-                className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-1"
+                className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-6 shadow-flat md:gap-0 md:grid-cols-[140px_minmax(0,1fr)] md:items-stretch"
               >
-                <PageHeader
-                  className="h-full border-0 pb-0"
-                  eyebrow={categoryLabel}
-                  title={partner.name}
-                  description={
-                    partner.detailDescription ||
-                    "혜택과 이용 조건을 확인하고 바로 이용할 수 있습니다."
-                  }
-                  backHref={directoryReturnTo}
-                  backLabel="혜택 목록으로"
-                  actions={
-                    <ShareLinkButton targetType="partner" targetId={partner.id} />
-                  }
+                <PartnerImageCarousel
+                  key={`${carouselKey}:thumbnail`}
+                  className="mx-auto w-full max-w-none md:mx-0 md:max-w-[140px] md:self-center"
+                  images={partner.thumbnail ? [partner.thumbnail] : []}
+                  name={partner.name}
+                  variant="hero"
+                  showThumbnails={false}
+                  priority
                 />
+                <div className="flex min-w-0 flex-col gap-4 md:ml-4">
+                  <PartnerDetailHeroMeta
+                    partnerId={partner.id}
+                    categoryLabel={categoryLabel}
+                    chipStyle={chipStyle}
+                    currentUserId={currentUserId}
+                    isFavorited={isFavorited}
+                    favoriteCount={metrics.favoriteCount}
+                  />
+                  <PageHeader
+                    className="h-full border-0 border-b-0 pb-0"
+                    title={partner.name}
+                    description={
+                      partner.detailDescription ||
+                      "혜택과 이용 조건을 확인하고 바로 이용할 수 있습니다."
+                    }
+                  />
+                </div>
               </div>
             </div>
 
             {partner.images?.length ? (
-              <section data-partner-detail-gallery className="grid min-w-0 gap-3">
-                <p className="ui-section-title">추가 이미지</p>
+              <section
+                aria-label={`${partner.name} 추가 이미지`}
+                data-partner-detail-gallery
+                className="grid min-w-0 gap-3"
+              >
                 <PartnerImageCarousel
                   key={`${carouselKey}:gallery`}
                   images={partner.images}
@@ -294,13 +301,8 @@ export default async function PartnerDetailPage({
 
             <PartnerDetailSummaryCard
               partner={partner}
-              categoryLabel={categoryLabel}
-              badgeStyle={badgeStyle}
               chipStyle={chipStyle}
               mapLink={mapLink}
-              currentUserId={currentUserId}
-              isFavorited={isFavorited}
-              metrics={metrics}
               detailPanel={
                 <PartnerDetailContactSection
                   isActive={isActive}
@@ -316,6 +318,7 @@ export default async function PartnerDetailPage({
 
             <PartnerDetailCoupons
               coupons={adCoupons}
+              initialIssuedCoupons={issuedAdCoupons}
               partnerId={partner.id}
               currentUserId={currentUserId}
               returnTo={partnerReturnTo}

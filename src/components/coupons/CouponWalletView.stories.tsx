@@ -8,6 +8,7 @@ const now = "2026-07-08T09:00:00.000+09:00";
 
 const availableCoupons = [
   {
+    issueId: "mock-issued-coupon-cafe-morning",
     coupon: {
       id: "mock-coupon-cafe-morning",
       campaignId: "mock-campaign-cafe-morning",
@@ -52,6 +53,7 @@ const availableCoupons = [
     remainingGlobalUses: 48,
   },
   {
+    issueId: "mock-issued-coupon-space-evening",
     coupon: {
       id: "mock-coupon-space-evening",
       campaignId: "mock-campaign-space-evening",
@@ -136,6 +138,15 @@ export const AvailableAccordion: Story = {
     }
 
     await expect(canvas.getByRole("heading", { name: "쿠폰함" })).toBeVisible();
+    await expect(canvas.queryByText("가장 빠른 만료")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("내 2회")).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByText("제휴처 상세에서 쿠폰을 확인하고 사용할 수 있습니다."),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByText("제휴처 상세에서 쿠폰 사용 방법을 확인해 주세요."),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getAllByRole("link", { name: "사용하기" }).length).toBeGreaterThan(0);
     await expect(firstDetails).toHaveAttribute("open");
     await expect(secondDetails).not.toHaveAttribute("open");
     await expect(canvas.getByText(/앱 주문 전 SSAFY 인증 카드/)).toBeVisible();

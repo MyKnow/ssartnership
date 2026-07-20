@@ -8,6 +8,3 @@ export {
   approvePartnerChangeRequestAction,
   rejectPartnerChangeRequestAction,
 } from "./partner-actions/review";
-export {
-  deletePartnerAction,
-} from "./partner-actions/delete";

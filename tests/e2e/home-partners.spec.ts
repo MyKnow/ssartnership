@@ -339,7 +339,7 @@ test.describe("public partner discovery", () => {
     await resultCard.getByRole("link", { name: "제휴 상세 보기" }).click();
 
     await expect(page).toHaveURL(/returnTo=/);
-    await page.getByRole("link", { name: "혜택 목록으로" }).click();
+    await page.goBack();
 
     await expect(page).toHaveURL(/q=/);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);

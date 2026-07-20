@@ -6,6 +6,7 @@ import AppErrorScreen from "@/components/errors/AppErrorScreen";
 import { PublicPartnerDetailSkeleton } from "@/components/loading/RoutePageSkeletons";
 import type { Partner } from "@/lib/types";
 import PartnerDetailContactSection from "./PartnerDetailContactSection";
+import PartnerDetailHeroMeta from "./PartnerDetailHeroMeta";
 import PartnerDetailMobileActionBar from "./PartnerDetailMobileActionBar";
 import PartnerDetailSummaryCard from "./PartnerDetailSummaryCard";
 
@@ -45,33 +46,41 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
     <div className="mx-auto max-w-6xl space-y-6">
       <div
         data-partner-detail-hero
-        className="grid gap-6 md:grid-cols-2 md:items-stretch"
+        className="grid min-w-0"
       >
-        <PartnerImageCarousel
-          images={value.thumbnail ? [value.thumbnail] : []}
-          name={value.name}
-          className="order-2 h-full md:order-2"
-          variant="hero"
-          showThumbnails={false}
-        />
         <div
           data-partner-detail-hero-info
-          className="order-1 h-full min-w-0 rounded-card border border-border bg-surface p-5 shadow-flat sm:p-6 md:order-1"
+          className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-6 shadow-flat md:gap-0 md:grid-cols-[140px_minmax(0,1fr)] md:items-stretch"
         >
-          <PageHeader
-            className="h-full border-0 pb-0"
-            eyebrow="건강"
-            title={value.name}
-            description="핵심 혜택을 확인하고 바로 이용할 수 있습니다."
-            backHref="/?category=health#benefits"
-            backLabel="혜택 목록으로"
+          <PartnerImageCarousel
+            className="mx-auto w-full max-w-none md:mx-0 md:max-w-[140px] md:self-center"
+            images={value.thumbnail ? [value.thumbnail] : []}
+            name={value.name}
+            variant="hero"
+            showThumbnails={false}
           />
+          <div className="flex min-w-0 flex-col gap-4 md:ml-4">
+            <PartnerDetailHeroMeta
+              partnerId={value.id}
+              categoryLabel="건강"
+              currentUserId={null}
+              favoriteCount={32}
+            />
+            <PageHeader
+              className="h-full border-0 border-b-0 pb-0"
+              title={value.name}
+              description="핵심 혜택을 확인하고 바로 이용할 수 있습니다."
+            />
+          </div>
         </div>
       </div>
 
       {value.images?.length ? (
-        <section data-partner-detail-gallery className="grid min-w-0 gap-3">
-          <p className="ui-section-title">추가 이미지</p>
+        <section
+          aria-label={`${value.name} 추가 이미지`}
+          data-partner-detail-gallery
+          className="grid min-w-0 gap-3"
+        >
           <PartnerImageCarousel
             images={value.images}
             name={`${value.name} 추가 이미지`}
@@ -81,20 +90,7 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
 
       <PartnerDetailSummaryCard
         partner={value}
-        categoryLabel="건강"
         mapLink={value.mapUrl}
-        currentUserId={null}
-        metrics={{
-          favoriteCount: 32,
-          reviewCount: 8,
-          detailViews: 320,
-          detailUv: 210,
-          cardClicks: 120,
-          mapClicks: 40,
-          reservationClicks: 26,
-          inquiryClicks: 12,
-          totalClicks: 198,
-        }}
         detailPanel={
           <PartnerDetailContactSection
             isActive
@@ -187,19 +183,79 @@ export const Default: Story = {
     if (!summaryCard) {
       return;
     }
-    await expect(summaryCard).toHaveClass("order-2", "xl:order-1");
+    await expect(summaryCard).not.toHaveClass("order-2");
     const imageCarouselButton = canvas.getByRole("button", {
       name: "바디라인 역삼점 이미지 크게 보기",
     });
+    const hero = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-hero]",
+    );
+    await expect(hero).not.toBeNull();
+    await expect(hero).toHaveClass("grid", "min-w-0");
     const heroInfo = canvasElement.querySelector<HTMLElement>(
       "[data-partner-detail-hero-info]",
     );
     await expect(heroInfo).not.toBeNull();
-    await expect(heroInfo).toHaveClass("order-1", "md:order-1");
-    await expect(imageCarouselButton.parentElement).toHaveClass(
-      "order-2",
-      "md:order-2",
+    await expect(heroInfo).toHaveClass(
+      "rounded-card",
+      "border",
+      "gap-4",
+      "p-6",
+      "md:gap-0",
+      "md:grid-cols-[140px_minmax(0,1fr)]",
+      "md:items-stretch",
     );
+    const heroMeta = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-hero-meta]",
+    );
+    await expect(heroMeta).not.toBeNull();
+    await expect(within(heroMeta!).getByText("건강")).toBeVisible();
+    await expect(
+      within(heroMeta!).getByRole("button", { name: "공유 링크 복사" }),
+    ).toBeVisible();
+    await expect(
+      within(heroMeta!).queryByLabelText("이용 기간 2026-01-01부터 2099-12-31까지"),
+    ).toBeNull();
+    const heroCarousel = canvasElement.querySelector<HTMLElement>(
+      '[data-partner-image-carousel="hero"]',
+    );
+    await expect(heroCarousel).not.toBeNull();
+    await expect(heroCarousel).toHaveClass(
+      "max-w-none",
+      "md:max-w-[140px]",
+      "md:self-center",
+    );
+    await expect(
+      canvasElement.querySelector<HTMLElement>("[data-partner-detail-hero-info] > div:nth-child(2)"),
+    ).toHaveClass("md:ml-4");
+    await expect(heroInfo).toContainElement(imageCarouselButton);
+    await expect(imageCarouselButton).toHaveClass("aspect-square");
+    await expect(
+      summaryCard.querySelector('[aria-label^="이용 기간"]'),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: "혜택 목록으로" }),
+    ).toBeNull();
+    const gallery = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-gallery]",
+    );
+    await expect(gallery).not.toBeNull();
+    await expect(
+      Boolean(
+        hero &&
+          gallery &&
+          (hero.compareDocumentPosition(gallery) &
+            Node.DOCUMENT_POSITION_FOLLOWING),
+      ),
+    ).toBe(true);
+    await expect(
+      Boolean(
+        gallery &&
+          summaryCard &&
+          (gallery.compareDocumentPosition(summaryCard) &
+            Node.DOCUMENT_POSITION_FOLLOWING),
+      ),
+    ).toBe(true);
 
     const primaryAction = summaryCard.querySelector<HTMLElement>(
       "[data-primary-benefit-action]",
@@ -284,15 +340,20 @@ export const Default: Story = {
       ).toHaveClass("h-px", "w-full", "min-[480px]:h-8", "min-[480px]:w-px");
     });
 
-    const additionalInformationSummary = summaryCard.querySelector<HTMLElement>(
-      "[data-additional-information-summary]",
+    const additionalInformation = summaryCard.querySelector<HTMLElement>(
+      "[data-additional-information-section]",
     );
-    await expect(additionalInformationSummary).toHaveClass("truncate");
-    await expect(additionalInformationSummary).toHaveTextContent(
-      "이용 조건과 제휴처 정보 · 조건 2 · 태그 5 · 제휴처 소개",
-    );
-    const additionalInformation = additionalInformationSummary?.closest("details");
-    await expect(additionalInformation).not.toHaveAttribute("open");
+    await expect(additionalInformation).not.toBeNull();
+    await expect(
+      within(additionalInformation!).getByRole("heading", {
+        level: 3,
+        name: "이용조건 및 태그",
+      }),
+    ).toBeInTheDocument();
+    await expect(additionalInformation).toHaveTextContent("이용 조건");
+    await expect(additionalInformation).toHaveTextContent("#운동");
+    await expect(additionalInformation).not.toHaveTextContent("제휴처 소개");
+    await expect(additionalInformation?.querySelector("details")).toBeNull();
 
     const tagList = summaryCard.querySelector<HTMLElement>(
       "[data-partner-tag-list]",

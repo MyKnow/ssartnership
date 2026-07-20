@@ -14,7 +14,7 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
-import { deletePartner, updatePartner } from "@/app/admin/(protected)/actions";
+import { updatePartner } from "@/app/admin/(protected)/actions";
 import {
   createAdCouponAction,
   deleteAdCouponAction,
@@ -47,6 +47,8 @@ import {
 } from "@/lib/partner-visibility";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { fetchRequestSummariesForPartner } from "@/lib/partner-change-requests/summary";
+import { buildPartnerPreviewUrl } from "@/lib/partner-preview";
+import { decryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { adPackageRepository } from "@/lib/repositories";
 import type {
@@ -183,7 +185,7 @@ export default async function AdminPartnerDetailPage({
     fetchPartnerReviewVisibilityCounts(supabase, partnerId),
     supabase
       .from("partner_preview_tokens")
-      .select("created_at")
+      .select("created_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
       .eq("partner_id", partnerId)
       .maybeSingle(),
     couponManagementDataPromise,
@@ -227,7 +229,6 @@ export default async function AdminPartnerDetailPage({
   const auditActions = [
     "partner_create",
     "partner_update",
-    "partner_delete",
     "partner_change_request_approve",
     "partner_change_request_reject",
     "partner_portal_immediate_update",
@@ -275,6 +276,26 @@ export default async function AdminPartnerDetailPage({
   const totalReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.totalCount;
   const visibleReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.visibleCount;
   const hiddenReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.hiddenCount;
+  const previewTokenRow = previewTokenResult.data;
+  let initialPreviewUrl: string | null = null;
+  if (
+    previewTokenRow?.token_ciphertext
+    && previewTokenRow.token_nonce
+    && previewTokenRow.token_auth_tag
+    && typeof previewTokenRow.token_key_version === "number"
+  ) {
+    try {
+      const token = decryptPartnerPreviewToken(partner.id, {
+        ciphertext: previewTokenRow.token_ciphertext,
+        nonce: previewTokenRow.token_nonce,
+        authTag: previewTokenRow.token_auth_tag,
+        keyVersion: previewTokenRow.token_key_version,
+      });
+      initialPreviewUrl = buildPartnerPreviewUrl(partner.id, token);
+    } catch {
+      initialPreviewUrl = null;
+    }
+  }
 
   return (
     <AdminShell title={partner.name} backHref="/admin/partners" backLabel="제휴처">
@@ -282,11 +303,18 @@ export default async function AdminPartnerDetailPage({
         <AdminPageHeader
           eyebrow="Partner Detail"
           title={partner.name}
-          description="제휴처 정보, 성과 집계, 리뷰 운영을 한 화면에서 관리합니다."
         />
 
         {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
         {couponSuccess ? <FormMessage variant="info">{couponSuccess}</FormMessage> : null}
+
+        <AdminPartnerPreviewLinkPanel
+          partnerId={partner.id}
+          hasActiveLink={Boolean(previewTokenRow?.created_at)}
+          initialPreviewUrl={initialPreviewUrl}
+          generateAction={generatePartnerPreviewLink}
+          removeAction={removePartnerPreviewLink}
+        />
 
         <Card tone="elevated">
           <div className="flex flex-wrap items-center gap-2">
@@ -442,19 +470,11 @@ export default async function AdminPartnerDetailPage({
               }))}
               categoryId={partner.category_id}
               formAction={updatePartner}
-              deleteAction={deletePartner}
               submitLabel="제휴처 저장"
               clearDraftOnSuccess={partnerSaved}
               hiddenFields={[
                 { name: "updateRedirectTo", value: detailPath },
-                { name: "deleteRedirectTo", value: "/admin/partners" },
               ]}
-            />
-            <AdminPartnerPreviewLinkPanel
-              partnerId={partner.id}
-              hasActiveLink={Boolean(previewTokenResult.data?.created_at)}
-              generateAction={generatePartnerPreviewLink}
-              removeAction={removePartnerPreviewLink}
             />
           </div>
 
