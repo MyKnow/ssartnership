@@ -20,7 +20,10 @@ import {
   buildPartnerStructuredData,
 } from "@/lib/seo/partners";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
-import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
+import type {
+  AdCoupon,
+  AvailableAdCoupon,
+} from "@/lib/repositories/ad-package-repository";
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
@@ -70,6 +73,18 @@ const getActiveCouponsSafe = cache(async (partnerId: string) => {
     }
     console.error("[partner-detail] ad coupon fetch failed", error);
     return [] as AdCoupon[];
+  }
+});
+
+const getIssuedCouponsSafe = cache(async (memberId: string) => {
+  try {
+    return await adPackageRepository.listIssuedCouponsForMember({ memberId });
+  } catch (error) {
+    if (isMissingAdCouponSchemaError(error)) {
+      return [] as AvailableAdCoupon[];
+    }
+    console.error("[partner-detail] issued coupon fetch failed", error);
+    return [] as AvailableAdCoupon[];
   }
 });
 
@@ -149,6 +164,7 @@ export type PartnerDetailPageData = {
   currentUserId: string | null;
   isFavorited: boolean;
   adCoupons: AdCoupon[];
+  issuedAdCoupons: AvailableAdCoupon[];
   isPreview: boolean;
 };
 
@@ -217,7 +233,15 @@ export async function getPartnerDetailPageData(
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
   const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
-  const adCoupons = await getActiveCouponsSafe(partner.id);
+  const [adCoupons, memberCoupons] = await Promise.all([
+    getActiveCouponsSafe(partner.id),
+    currentUserId
+      ? getIssuedCouponsSafe(currentUserId)
+      : Promise.resolve([] as AvailableAdCoupon[]),
+  ]);
+  const issuedAdCoupons = memberCoupons.filter(
+    (item) => item.coupon.partnerId === partner.id,
+  );
   const metrics = {
     ...createEmptyPartnerServiceMetrics(),
     favoriteCount: favoriteCounts.get(rawId) ?? 0,
@@ -275,6 +299,7 @@ export async function getPartnerDetailPageData(
     currentUserId: currentUserId ?? null,
     isFavorited: favoriteIds.has(rawId),
     adCoupons,
+    issuedAdCoupons,
     isPreview: Boolean(previewToken),
   };
 }

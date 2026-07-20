@@ -381,15 +381,15 @@
 - Priority: `P1`
 - Category: `maintainability`
 - Targets: `src/app/admin/(protected)/_actions/partner-actions.ts`
-- Current Problem: 관리자 파트너 액션 파일이 생성, 수정, 승인/거절, 삭제 흐름과 push/audit/revalidate까지 한 파일에서 관리해 수정 범위가 넓다.
-- Planned Change: façade는 유지하고 내부를 `create`, `update`, `review`, `delete` 모듈로 분리한다.
+- Current Problem: 관리자 파트너 액션 파일이 생성, 수정, 승인/거절 흐름과 push/audit/revalidate까지 한 파일에서 관리해 수정 범위가 넓다.
+- Planned Change: façade는 유지하고 내부를 `create`, `update`, `review` 모듈로 분리한다. 제휴처 자체 삭제는 지원하지 않는다.
 - Validation: `npx eslint` 대상 파일, `npx tsc --noEmit`, `git diff --check`
 - Status: `done`
 - Completed:
   - `src/app/admin/(protected)/_actions/partner-actions.ts`를 façade로 축소
-  - `src/app/admin/(protected)/_actions/partner-actions/create.ts`, `update.ts`, `review.ts`, `delete.ts` 추가
+  - `src/app/admin/(protected)/_actions/partner-actions/create.ts`, `update.ts`, `review.ts` 추가
 - Validation Result:
-  - `npx eslint 'src/app/admin/(protected)/_actions/partner-actions.ts' 'src/app/admin/(protected)/_actions/partner-actions/create.ts' 'src/app/admin/(protected)/_actions/partner-actions/update.ts' 'src/app/admin/(protected)/_actions/partner-actions/review.ts' 'src/app/admin/(protected)/_actions/partner-actions/delete.ts'`
+  - `npx eslint 'src/app/admin/(protected)/_actions/partner-actions.ts' 'src/app/admin/(protected)/_actions/partner-actions/create.ts' 'src/app/admin/(protected)/_actions/partner-actions/update.ts' 'src/app/admin/(protected)/_actions/partner-actions/review.ts'`
   - `npx tsc --noEmit`
   - `git diff --check`
 

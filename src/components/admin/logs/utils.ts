@@ -48,7 +48,6 @@ const auditLabels: Record<string, string> = {
   partner_company_delete: '파트너사 삭제',
   partner_create: '제휴처 생성',
   partner_update: '제휴처 수정',
-  partner_delete: '제휴처 삭제',
   partner_preview_link_create: '제휴처 미리보기 링크 생성',
   partner_preview_link_remove: '제휴처 미리보기 링크 제거',
   partner_change_request_approve: '제휴처 변경 요청 승인',

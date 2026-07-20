@@ -48,7 +48,6 @@ const meta = {
     ],
     categoryId: "category-food",
     formAction: async () => {},
-    deleteAction: async () => {},
     submitLabel: "제휴처 저장",
     hiddenFields: [
       {

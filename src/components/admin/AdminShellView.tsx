@@ -12,6 +12,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import ScrollToTopFab from "@/components/ScrollToTopFab";
+import FloatingActionGroup from "@/components/FloatingActionGroup";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
@@ -144,11 +145,14 @@ export default function AdminShellView({
           </div>
         </header>
 
-        <main>
-          <Container className="pb-16 pt-8" size="dashboard">
-            {children}
-          </Container>
-        </main>
+        <FloatingActionGroup>
+          <ScrollToTopFab />
+          <main>
+            <Container className="pb-16 pt-8" size="dashboard">
+              {children}
+            </Container>
+          </main>
+        </FloatingActionGroup>
       </div>
 
       <div className="hidden min-h-screen md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
@@ -213,15 +217,16 @@ export default function AdminShellView({
             </Container>
           </header>
 
-          <main>
-            <Container className="pb-16 pt-8" size="dashboard">
-              {children}
-            </Container>
-          </main>
+          <FloatingActionGroup>
+            <ScrollToTopFab />
+            <main>
+              <Container className="pb-16 pt-8" size="dashboard">
+                {children}
+              </Container>
+            </main>
+          </FloatingActionGroup>
         </div>
       </div>
-
-      <ScrollToTopFab />
     </div>
   );
 }

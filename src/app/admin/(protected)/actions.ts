@@ -49,7 +49,6 @@ import {
 import {
   approvePartnerChangeRequestAction,
   createPartnerFormActionImpl,
-  deletePartnerAction,
   rejectPartnerChangeRequestAction,
   updatePartnerAction,
 } from "./_actions/partner-actions";
@@ -184,10 +183,6 @@ export async function updatePartnerReview(formData: FormData) {
 
 export async function deletePartnerReview(formData: FormData) {
   return deletePartnerReviewAction(formData);
-}
-
-export async function deletePartner(formData: FormData) {
-  return deletePartnerAction(formData);
 }
 
 export async function backfillMemberProfiles() {

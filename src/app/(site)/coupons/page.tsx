@@ -68,15 +68,16 @@ export default async function CouponsPage({
       <main>
         <Container className="pb-16 pt-8 sm:pt-10" size="wide">
           {selectedItem ? (
-            <div className="mx-auto mb-6 max-w-5xl">
+            <div className="mx-auto max-w-5xl">
               <CouponPartnerVerificationView
                 item={selectedItem}
                 member={verificationMember}
                 cohortCardThemes={cohortCardThemes}
               />
             </div>
-          ) : null}
-          <CouponWalletView coupons={coupons} />
+          ) : (
+            <CouponWalletView coupons={coupons} />
+          )}
         </Container>
       </main>
     </div>

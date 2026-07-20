@@ -11,13 +11,16 @@ export default function FormMessage({
   children,
   variant = "muted",
   className,
+  id,
 }: {
   children: React.ReactNode;
   variant?: keyof typeof variants;
   className?: string;
+  id?: string;
 }) {
   return (
     <p
+      id={id}
       className={cn(variants[variant], className)}
       role={variant === "error" ? "alert" : undefined}
     >

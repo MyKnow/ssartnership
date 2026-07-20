@@ -30,6 +30,16 @@ export async function POST(
       couponId,
       memberId: session.userId,
     });
+    if (!result.ok && result.reason === "member_limit") {
+      const existingIssue = (
+        await adPackageRepository.listIssuedCouponsForMember({
+          memberId: session.userId,
+        })
+      ).find((item) => item.coupon.id === couponId && item.issueId);
+      if (existingIssue) {
+        return NextResponse.json({ ok: true, issue: existingIssue });
+      }
+    }
     if (!result.ok) {
       return NextResponse.json(result, { status: statusForReason(result.reason) });
     }

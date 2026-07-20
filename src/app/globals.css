@@ -381,6 +381,10 @@ body {
     bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
   }
 
+  .bottom-safe-bottom-20 {
+    bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+
   .ui-grid-cards {
     display: grid;
     gap: 1rem;

@@ -178,24 +178,6 @@ export function createOperationEntry(input: {
           : "/partner",
         createdAt: input.createdAt,
       };
-    case "partner_delete":
-      return {
-        id: `audit:${input.id}`,
-        category: "operation",
-        status: "deleted",
-        tone: "danger",
-        badgeLabel: "제휴처",
-        title: `${input.partnerName ?? "제휴처"}가 삭제되었습니다`,
-        body: summaryText ?? "제휴처 정보가 삭제되었습니다.",
-        companyId: input.companyId,
-        companyName: input.companyName,
-        partnerId: input.partnerId,
-        partnerName: input.partnerName,
-        href: input.companyId
-          ? getCompanyScopedPortalHref(input.companyId)
-          : "/partner",
-        createdAt: input.createdAt,
-      };
     case "partner_review_hide":
       return {
         id: `audit:${input.id}`,

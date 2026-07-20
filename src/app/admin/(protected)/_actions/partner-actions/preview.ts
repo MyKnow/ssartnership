@@ -8,6 +8,7 @@ import {
   createPartnerPreviewToken,
   hashPartnerPreviewToken,
 } from "@/lib/partner-preview";
+import { encryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/uuid";
 import { logAdminAction } from "@/app/admin/(protected)/_actions/shared-helpers";
@@ -46,6 +47,7 @@ export async function generatePartnerPreviewLink(partnerId: string) {
   const normalizedPartnerId = typeof partnerId === "string" ? partnerId.trim() : "";
   const { adminSession, supabase } = await requireManagedPartner(normalizedPartnerId);
   const token = createPartnerPreviewToken();
+  const encryptedToken = encryptPartnerPreviewToken(normalizedPartnerId, token);
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("partner_preview_tokens")
@@ -53,6 +55,10 @@ export async function generatePartnerPreviewLink(partnerId: string) {
       {
         partner_id: normalizedPartnerId,
         token_hash: hashPartnerPreviewToken(token),
+        token_ciphertext: encryptedToken.ciphertext,
+        token_nonce: encryptedToken.nonce,
+        token_auth_tag: encryptedToken.authTag,
+        token_key_version: encryptedToken.keyVersion,
         created_at: now,
       },
       { onConflict: "partner_id" },
