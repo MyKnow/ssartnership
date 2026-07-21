@@ -86,7 +86,9 @@ as $$
         'member_mau', day_series.member_mau,
         'wau_observed_through', least(day_series.activity_date + 6, windows.today_date),
         'mau_observed_through', least(day_series.activity_date + 29, windows.today_date)
-      ) order by day_series.activity_date)), '[]'::jsonb) as daily_series
+      ) order by day_series.activity_date)
+      from day_series
+    ), '[]'::jsonb) as daily_series
   from windows
   cross join metric_counts;
 $$;
