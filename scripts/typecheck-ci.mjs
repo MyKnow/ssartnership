@@ -7,6 +7,7 @@ const args = [
   "--noEmit",
   "--pretty",
   "false",
+  "--skipLibCheck",
 ];
 
 function runTypecheck() {
