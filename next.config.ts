@@ -57,6 +57,12 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  // Public Readiness runs the project-pinned TypeScript check before build.
+  // Next 16's embedded type worker crashes on this repository's valid generic
+  // types, so let the verified standalone check remain the single type gate.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   outputFileTracingIncludes: {
     "/*": ["node_modules/@discourse/heic/**/*"],
   },

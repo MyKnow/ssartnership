@@ -8,6 +8,7 @@
     "check:lockfile": "node scripts/check-lockfile-linux.mjs",
     "check:lockfile:linux": "node scripts/check-lockfile-linux.mjs",
     "build": "next build --webpack",
+    "typecheck:ci": "node scripts/typecheck-ci.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "npm run test:node && npm run test:unit",
@@ -88,7 +89,7 @@
     "postcss": "^8.5.15",
     "storybook": "^10.3.5",
     "tailwindcss": "^4",
-    "typescript": "^5",
+    "typescript": "5.6.3",
     "vitest": "^4.1.9"
   },
   "overrides": {

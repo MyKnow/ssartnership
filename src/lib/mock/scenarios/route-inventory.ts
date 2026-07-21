@@ -292,6 +292,15 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.dashboard.default"],
   },
   {
+    routePath: "/admin/cycle/mock",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminAllCertificationCardMocks",
+    dataSources: ["service"],
+    requiredScenarioIds: ["admin.dashboard.default"],
+    notes: "기수 카드 테마의 운영용 전체 목업 화면입니다.",
+  },
+  {
     routePath: "/admin/denied",
     surface: "admin",
     authScope: "public",
@@ -796,6 +805,11 @@ const routeContracts = {
     routeKind: "canonical",
     screenContractId: "admin.cycle",
     primaryTask: "SSAFY 기수 운영 기준과 카드 테마를 관리한다.",
+  },
+  "/admin/cycle/mock": {
+    routeKind: "mock-only",
+    screenContractId: null,
+    primaryTask: "운영진과 기수별 인증 카드 테마를 한 화면에서 점검한다.",
   },
   "/admin/denied": {
     routeKind: "conditional",

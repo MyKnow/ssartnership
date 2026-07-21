@@ -33,6 +33,7 @@ export default function PartnerBenefitVerificationView({
   partnerId,
   partnerName,
   benefit,
+  useCount,
   member,
   cohortCardThemes,
   initialTimestamp,
@@ -41,6 +42,7 @@ export default function PartnerBenefitVerificationView({
   partnerId: string;
   partnerName: string;
   benefit: string;
+  useCount: number;
   member: VerificationMember;
   cohortCardThemes: readonly CohortCardTheme[];
   initialTimestamp: string;
@@ -79,6 +81,7 @@ export default function PartnerBenefitVerificationView({
           credentials: "same-origin",
           body: JSON.stringify({
             benefit,
+            useCount,
             pin,
             idempotencyKey: idempotencyKeyRef.current,
             sessionId: getProductSessionId(),
@@ -92,7 +95,7 @@ export default function PartnerBenefitVerificationView({
       setIsCompleted(true);
       setMessage({
         tone: "success",
-        text: "인증 카드와 혜택이 확인되었습니다. 제휴처에 혜택을 적용해 주세요.",
+        text: `인증 카드와 혜택이 확인되었습니다. 제휴 혜택 ${useCount}회 적용해 주세요.`,
       });
     } catch (error) {
       setMessage({
@@ -117,7 +120,7 @@ export default function PartnerBenefitVerificationView({
         member={member}
         initialTimestamp={initialTimestamp}
         cohortCardThemes={cohortCardThemes}
-        cardClassName="!aspect-[16/10] min-[480px]:!aspect-[16/9]"
+        cardClassName="!aspect-[16/10] md:!aspect-[16/9]"
         disableTracking
       />
 
@@ -127,6 +130,8 @@ export default function PartnerBenefitVerificationView({
           <p className="mt-1 break-words text-sm font-semibold text-foreground">{partnerName}</p>
           <p className="mt-3 text-xs font-medium text-muted-foreground">선택한 혜택</p>
           <p className="mt-1 break-words text-base font-semibold text-foreground">{benefit}</p>
+          <p className="mt-3 text-xs font-medium text-muted-foreground">이용 횟수</p>
+          <p className="mt-1 text-base font-semibold text-foreground">{useCount}회</p>
         </div>
         {pinConfigured ? (
           <>
