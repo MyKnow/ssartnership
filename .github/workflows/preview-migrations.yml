@@ -81,11 +81,11 @@ jobs:
           SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
         run: |
           set -euo pipefail
-          supabase migration repair \
+            supabase migration repair \
             --status reverted \
             --db-url "$SUPABASE_PREVIEW_DB_URL" \
             --yes \
-            20260712133729 20260712143858
+            20260712133729 20260712143858 20260720121433
 
       - name: Apply pending Preview migrations
         env:
