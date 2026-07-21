@@ -29,6 +29,7 @@ import {
 } from "@/lib/partner-portal-paths";
 import type { PartnerServiceDetailViewProps } from "@/components/partner/partner-service-detail-view/types";
 import PartnerCouponPanel from "@/components/partner/partner-service-detail-view/PartnerCouponPanel";
+import PartnerBenefitUsageHistory from "@/components/partner/PartnerBenefitUsageHistory";
 
 export default function PartnerServiceDetailViewContent({
   session,
@@ -53,6 +54,9 @@ export default function PartnerServiceDetailViewContent({
   partnerPeriodEnd,
   createCouponAction,
   uploadCouponCodesAction,
+  benefitUsageHistory,
+  selectedUsageBenefit,
+  benefitUsageBaseHref,
 }: PartnerServiceDetailViewProps) {
   const visualState = getPartnerServiceVisualState(context);
   const portalHref = getCompanyScopedPortalHref(context.companyId);
@@ -177,6 +181,19 @@ export default function PartnerServiceDetailViewContent({
               />
 
               <PartnerMetricTimeseriesPanel data={metricTimeseries} />
+
+              <PartnerBenefitUsageHistory
+                benefits={context.currentBenefits}
+                selectedBenefit={selectedUsageBenefit}
+                history={benefitUsageHistory}
+                createHref={({ benefit, page }) => {
+                  const params = new URLSearchParams();
+                  if (benefit) params.set("usageBenefit", benefit);
+                  if (page && page > 1) params.set("usagePage", String(page));
+                  const query = params.toString();
+                  return `${benefitUsageBaseHref}${query ? `?${query}` : ""}`;
+                }}
+              />
 
               {pendingRequest ? (
                 <PartnerPendingRequestSection

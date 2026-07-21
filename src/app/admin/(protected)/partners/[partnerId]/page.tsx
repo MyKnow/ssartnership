@@ -14,6 +14,7 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
 import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
+import PartnerBenefitUsageHistory from "@/components/partner/PartnerBenefitUsageHistory";
 import { updatePartner } from "@/app/admin/(protected)/actions";
 import {
   createAdCouponAction,
@@ -50,7 +51,7 @@ import { fetchRequestSummariesForPartner } from "@/lib/partner-change-requests/s
 import { buildPartnerPreviewUrl } from "@/lib/partner-preview";
 import { decryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { adPackageRepository } from "@/lib/repositories";
+import { adPackageRepository, partnerBenefitUsageRepository } from "@/lib/repositories";
 import type {
   AdCampaignWithStats,
   AdCoupon,
@@ -85,6 +86,15 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
     return null;
   }
   return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function readFirstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function parseUsagePage(value: string) {
+  const page = Number.parseInt(value, 10);
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 export default async function AdminPartnerDetailPage({
@@ -215,6 +225,16 @@ export default async function AdminPartnerDetailPage({
     }).categories,
   );
   const metrics = metricsResult.metricsByPartnerId.get(partnerId);
+  const requestedUsageBenefit = readFirstQueryValue(query.usageBenefit);
+  const selectedUsageBenefit = (partner.benefits ?? []).includes(requestedUsageBenefit)
+    ? requestedUsageBenefit
+    : null;
+  const usageHistory = await partnerBenefitUsageRepository.listUsageHistory({
+    partnerId,
+    benefit: selectedUsageBenefit,
+    page: parseUsagePage(readFirstQueryValue(query.usagePage)),
+    pageSize: 25,
+  });
   const visibilityState = getPartnerVisibilityState(
     partner.visibility,
     partner.period_start,
@@ -397,6 +417,20 @@ export default async function AdminPartnerDetailPage({
         </Card>
 
         <PartnerMetricTimeseriesPanel data={metricTimeseries} />
+
+        <PartnerBenefitUsageHistory
+          benefits={partner.benefits ?? []}
+          selectedBenefit={selectedUsageBenefit}
+          history={usageHistory}
+          createHref={({ benefit, page }) => {
+            const params = new URLSearchParams();
+            if (benefit) params.set("usageBenefit", benefit);
+            if (page && page > 1) params.set("usagePage", String(page));
+            const queryString = params.toString();
+            return `${detailPath}${queryString ? `?${queryString}` : ""}`;
+          }}
+          memberHref={(memberId) => `/admin/members/${encodeURIComponent(memberId)}`}
+        />
 
         <AdminPartnerCouponManager
           partnerId={partner.id}

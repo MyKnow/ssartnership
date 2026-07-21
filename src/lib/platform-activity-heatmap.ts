@@ -32,6 +32,15 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
+export function formatActivityWindow(input: { anchorDate: string; windowDays: number; observedThrough: string }) {
+  const anchor = parseDateKey(input.anchorDate);
+  const observed = parseDateKey(input.observedThrough);
+  if (!anchor || !observed || input.windowDays < 1) return { label: "집계 대기", observedLabel: "집계 대기", isComplete: false };
+  const end = addDays(anchor, input.windowDays - 1);
+  const format = (value: Date) => toDateKey(value).replaceAll("-", ".");
+  return { label: `${format(anchor)} ~ ${format(end)}`, observedLabel: `${format(anchor)} ~ ${format(observed)}`, isComplete: observed.getTime() >= end.getTime() };
+}
+
 export function getActivityIntensity(
   count: number,
   peakCount: number,

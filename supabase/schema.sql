@@ -898,12 +898,15 @@ create table if not exists partner_benefit_usages (
   partner_id uuid not null references partners(id) on delete cascade,
   member_id uuid not null references members(id) on delete cascade,
   benefit_snapshot text not null,
+  use_count integer not null default 1,
   idempotency_key text not null unique,
   verified_at timestamp with time zone not null default now(),
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamp with time zone not null default now(),
   constraint partner_benefit_usages_benefit_snapshot_length_check
     check (char_length(trim(benefit_snapshot)) between 1 and 500),
+  constraint partner_benefit_usages_use_count_check
+    check (use_count between 1 and 99),
   constraint partner_benefit_usages_idempotency_key_length_check
     check (char_length(trim(idempotency_key)) between 16 and 128)
 );

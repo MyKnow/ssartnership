@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { trackProductEvent } from "@/lib/product-events";
+import { MAX_PARTNER_BENEFIT_USE_COUNT } from "@/lib/partner-benefit-usage";
 
 export type OfflinePartnerBenefitAction = {
   partnerId: string;
@@ -25,6 +26,7 @@ export default function PartnerBenefitUseAction({
   const dialogId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBenefit, setSelectedBenefit] = useState("");
+  const [useCount, setUseCount] = useState(1);
   const portalRoot = typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function PartnerBenefitUseAction({
       return;
     }
     setSelectedBenefit("");
+    setUseCount(1);
     setIsOpen(true);
     trackProductEvent({
       eventName: "partner_benefit_use_open",
@@ -88,10 +91,12 @@ export default function PartnerBenefitUseAction({
       properties: {
         source: "partner_detail_benefit_dialog",
         ...(benefitIndex >= 0 ? { benefitIndex } : {}),
+        useCount,
       },
     });
     const params = new URLSearchParams({
       benefit: selectedBenefit,
+      useCount: String(useCount),
       returnTo: action.returnTo,
     });
     setIsOpen(false);
@@ -175,6 +180,36 @@ export default function PartnerBenefitUseAction({
                     ))}
                   </select>
                 </label>
+
+                <div className="mt-5 grid gap-2">
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground">이용 횟수</p>
+                    <p className="shrink-0 text-sm font-medium text-muted-foreground">제휴 혜택 {useCount}회 적용</p>
+                  </div>
+                  <div className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center rounded-2xl border border-border bg-surface-control p-1">
+                    <button
+                      type="button"
+                      aria-label="이용 횟수 줄이기"
+                      disabled={useCount <= 1}
+                      onClick={() => setUseCount((current) => Math.max(1, current - 1))}
+                      className="inline-flex size-11 items-center justify-center rounded-xl text-xl font-semibold text-foreground transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      −
+                    </button>
+                    <output aria-live="polite" className="min-w-0 text-center text-base font-semibold text-foreground">
+                      {useCount}회
+                    </output>
+                    <button
+                      type="button"
+                      aria-label="이용 횟수 늘리기"
+                      disabled={useCount >= MAX_PARTNER_BENEFIT_USE_COUNT}
+                      onClick={() => setUseCount((current) => Math.min(MAX_PARTNER_BENEFIT_USE_COUNT, current + 1))}
+                      className="inline-flex size-11 items-center justify-center rounded-xl text-xl font-semibold text-foreground transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-2">
                   <Button
