@@ -74,6 +74,25 @@ test("회원가입 완료 API는 검증 세션을 사용하고 Mattermost 재조
   assert.doesNotMatch(route, /session\.getUserById/);
 });
 
+test("회원가입 실패는 서버 로그와 화면에 원인 단계와 요청 ID를 남긴다", async () => {
+  const [route, form] = await Promise.all([
+    readFile(
+      new URL("../src/app/api/mm/signup/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/components/auth/MattermostSignupCompleteForm.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(route, /step: failureStep/);
+  assert.match(route, /requestId: context\.requestId/);
+  assert.match(route, /reason,\s+step: failureStep/);
+  assert.match(form, /data\.reason/);
+  assert.match(form, /data\.requestId/);
+});
+
 test("회원가입 완료 버튼은 비밀번호가 비어 있거나 불일치하면 비활성화한다", () => {
   assert.deepEqual(
     getMemberSignupActionState({

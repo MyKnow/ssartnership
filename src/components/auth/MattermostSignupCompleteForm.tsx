@@ -288,6 +288,13 @@ export default function MattermostSignupCompleteForm({
         }
         if (data.error === "signup_failed" || response.status === 503) {
           clearProfileImageUploadDraft();
+          const reason = typeof data.reason === "string" ? data.reason : "signup_failed";
+          const step = typeof data.step === "string" ? data.step : "unknown_step";
+          const requestId = typeof data.requestId === "string" ? data.requestId : null;
+          setFormError(
+            `회원가입을 완료하지 못했습니다. 원인: ${reason} (${step})${requestId ? ` · 요청 ID: ${requestId}` : ""}`,
+          );
+          return;
         }
         setFormError("회원가입을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.");
         return;

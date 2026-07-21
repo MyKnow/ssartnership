@@ -38,11 +38,33 @@ function getSignupFailureReason(error: unknown) {
   if (error instanceof UserSessionIssueError) {
     return error.code;
   }
+  if (
+    error
+    && typeof error === "object"
+    && "code" in error
+    && typeof error.code === "string"
+    && /^[a-z0-9][a-z0-9_:-]{0,40}$/.test(error.code)
+  ) {
+    return error.code;
+  }
   const message = error instanceof Error ? error.message : "";
   return /^[a-z0-9][a-z0-9_:-]{0,80}$/.test(message)
     ? message
     : "signup_failed";
 }
+
+type SignupFailureStep =
+  | "policy_load"
+  | "generation_check"
+  | "directory_upsert"
+  | "directory_lookup"
+  | "existing_member_check"
+  | "approval_request"
+  | "member_insert"
+  | "profile_image_attach"
+  | "policy_consent"
+  | "session_issue"
+  | "session_cleanup";
 
 async function discardSignupProfileUpload(input: {
   uploadId: string | null;
@@ -74,20 +96,21 @@ export async function POST(request: Request) {
     return errorResponse("verification_expired", 401);
   }
 
-  const [activePolicies, marketingPolicy] = await Promise.all([
-    getActiveRequiredPolicies(),
-    getPolicyDocumentByKind("marketing"),
-  ]);
-  const policyError = getSelectedPolicyValidationError(
-    parsed.data,
-    activePolicies,
-    marketingPolicy,
-  );
-  if (policyError) {
-    return errorResponse("policy_outdated", 409, { message: policyError });
-  }
-
+  let failureStep: SignupFailureStep = "policy_load";
   try {
+    const [activePolicies, marketingPolicy] = await Promise.all([
+      getActiveRequiredPolicies(),
+      getPolicyDocumentByKind("marketing"),
+    ]);
+    const policyError = getSelectedPolicyValidationError(
+      parsed.data,
+      activePolicies,
+      marketingPolicy,
+    );
+    if (policyError) {
+      return errorResponse("policy_outdated", 409, { message: policyError });
+    }
+
     // The signed completion session was issued only after the verification
     // route fetched and validated the Mattermost profile. Re-fetching it here
     // makes signup depend on a second external request and can turn a valid
@@ -99,6 +122,7 @@ export async function POST(request: Request) {
     const parseExclusionReason: MattermostSignupParseReason | null = approvalMode
       ? verification.parseExclusionReason ?? "profile_unavailable"
       : null;
+    failureStep = "generation_check";
     if (
       verification.subjectGeneration > 0
       && await isMattermostLoginDisabledForGeneration(verification.subjectGeneration)
@@ -115,6 +139,7 @@ export async function POST(request: Request) {
     const sourceYears = [
       isStaff ? verification.senderGeneration : verification.subjectGeneration,
     ];
+    failureStep = "directory_upsert";
     await upsertMmUserDirectorySnapshot({
       mmUserId,
       mmUsername,
@@ -123,11 +148,13 @@ export async function POST(request: Request) {
       isStaff,
       sourceYears,
     });
+    failureStep = "directory_lookup";
     const directory = await findMmUserDirectoryEntryByUserId(mmUserId);
     if (!directory?.id) {
       throw new Error("directory_missing");
     }
 
+    failureStep = "existing_member_check";
     if (await hasExistingMattermostMember({ mmUserId, mmUsername })) {
       await discardSignupProfileUpload({
         uploadId: parsed.data.profileImageUploadId,
@@ -140,6 +167,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdminClient();
     const password = hashPassword(parsed.data.password);
     if (approvalMode) {
+      failureStep = "approval_request";
       const approvalRequest = await createMattermostSignupApprovalRequest({
         mmUserId,
         mattermostAccountId: directory.id,
@@ -159,6 +187,7 @@ export async function POST(request: Request) {
         profileImageUploadId: parsed.data.profileImageUploadId,
         signupUploadOwnerId: verification.signupUploadOwnerId,
       });
+      failureStep = "session_cleanup";
       await clearMattermostCodeSession();
       await logAuthSecurity({
         ...context,
@@ -178,6 +207,7 @@ export async function POST(request: Request) {
     }
 
     const now = new Date().toISOString();
+    failureStep = "member_insert";
     const { data: inserted, error: insertError } = await supabase
       .from("members")
       .insert({
@@ -198,6 +228,7 @@ export async function POST(request: Request) {
 
     try {
       if (parsed.data.profileImageUploadId) {
+        failureStep = "profile_image_attach";
         if (!verification.signupUploadOwnerId) {
           throw new Error("signup_upload_owner_missing");
         }
@@ -207,6 +238,7 @@ export async function POST(request: Request) {
           signupUploadOwnerId: verification.signupUploadOwnerId,
         });
       }
+      failureStep = "policy_consent";
       await recordRequiredPolicyConsent({
         memberId: inserted.id,
         activePolicies,
@@ -220,6 +252,7 @@ export async function POST(request: Request) {
         ipAddress: context.ipAddress ?? null,
         userAgent: context.userAgent ?? null,
       });
+      failureStep = "session_issue";
       await setUserSession(inserted.id, false, {
         authenticationMethod: "mattermost",
         freshAuthentication: true,
@@ -233,6 +266,7 @@ export async function POST(request: Request) {
       throw error;
     }
 
+    failureStep = "session_cleanup";
     await clearMattermostCodeSession();
     await logAuthSecurity({
       ...context,
@@ -254,7 +288,7 @@ export async function POST(request: Request) {
     console.error("[mm/signup] signup_failed", {
       requestId: context.requestId,
       reason,
-      message: error instanceof Error ? error.message.slice(0, 240) : "unknown_error",
+      step: failureStep,
     });
     await logAuthSecurity({
       ...context,
@@ -264,8 +298,13 @@ export async function POST(request: Request) {
       properties: {
         source: "mattermost_code",
         reason,
+        step: failureStep,
       },
     });
-    return errorResponse("signup_failed", 503);
+    return errorResponse("signup_failed", 503, {
+      reason,
+      step: failureStep,
+      requestId: context.requestId,
+    });
   }
 }
