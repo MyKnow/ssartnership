@@ -81,6 +81,7 @@ test("idempotent benefit-use retries do not create a second aggregate record", a
     partnerId: "partner-1",
     memberId: "member-1",
     benefit: "헬스 1개월 33,000원",
+    useCount: 1,
     pin: "0427",
     idempotencyKey: "retry-key",
   };
@@ -113,6 +114,7 @@ test("benefit-use cannot record usage when the partner PIN is not configured", a
         partnerId: "partner-without-pin",
         memberId: "member-1",
         benefit: "헬스 1개월 33,000원",
+        useCount: 1,
         pin: "0427",
         idempotencyKey: "no-pin-request",
       }),

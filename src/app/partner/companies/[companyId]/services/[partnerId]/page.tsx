@@ -6,7 +6,10 @@ import {
   getPartnerChangeRequestErrorMessage,
 } from "@/lib/partner-change-requests";
 import type { PartnerChangeRequestErrorCode } from "@/lib/partner-change-request-errors";
-import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
+import {
+  getCompanyScopedPartnerServiceHref,
+  getPartnerPasswordChangeHref,
+} from "@/lib/partner-portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
@@ -16,7 +19,11 @@ import {
   getPartnerCompanyPlanDefinition,
 } from "@/lib/partner-company-plans";
 import { filterPartnerPortalMetricsForPlan } from "@/lib/partner-dashboard";
-import { adPackageRepository, partnerReviewRepository } from "@/lib/repositories";
+import {
+  adPackageRepository,
+  partnerBenefitUsageRepository,
+  partnerReviewRepository,
+} from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import {
   cancelPartnerChangeRequestAction,
@@ -29,6 +36,8 @@ type PartnerServiceDetailPageSearchParams = {
   mode?: string | string[];
   error?: string | string[];
   success?: string | string[];
+  usageBenefit?: string | string[];
+  usagePage?: string | string[];
 };
 
 function readSearchParam(value?: string | string[]) {
@@ -36,6 +45,11 @@ function readSearchParam(value?: string | string[]) {
     return value[0] ?? "";
   }
   return value ?? "";
+}
+
+function parseUsagePage(value: string) {
+  const page = Number.parseInt(value, 10);
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 function isPartnerChangeRequestErrorCode(
@@ -127,13 +141,23 @@ export default async function PartnerCompanyServiceDetailPage({
             warningMessage: `${getPartnerCompanyPlanDefinition(context.brandPlanTier).label} 플랜에서는 시계열 상세 지표가 제공되지 않습니다.`,
           }),
     ]);
+  const paramsData = (await searchParams) ?? {};
+  const requestedUsageBenefit = readSearchParam(paramsData.usageBenefit);
+  const selectedUsageBenefit = context.currentBenefits.includes(requestedUsageBenefit)
+    ? requestedUsageBenefit
+    : null;
+  const benefitUsageHistory = await partnerBenefitUsageRepository.listUsageHistory({
+    partnerId,
+    benefit: selectedUsageBenefit,
+    page: parseUsagePage(readSearchParam(paramsData.usagePage)),
+    pageSize: 25,
+  });
   const filteredServiceMetrics = filterPartnerPortalMetricsForPlan(
     serviceMetricsSnapshot.metrics,
     context.brandPlanTier,
   );
   const coupons = await adPackageRepository.listActiveCouponsForPartner(partnerId).catch(() => []);
 
-  const paramsData = (await searchParams) ?? {};
   const mode = readSearchParam(paramsData.mode) === "edit" ? "edit" : "view";
   const errorCode = readSearchParam(paramsData.error);
   const successCode = readSearchParam(paramsData.success);
@@ -173,6 +197,9 @@ export default async function PartnerCompanyServiceDetailPage({
       partnerPeriodEnd={context.periodEnd}
       createCouponAction={createPartnerCouponAction}
       uploadCouponCodesAction={uploadPartnerCouponCodesAction}
+      benefitUsageHistory={benefitUsageHistory}
+      selectedUsageBenefit={selectedUsageBenefit}
+      benefitUsageBaseHref={getCompanyScopedPartnerServiceHref(companyId, partnerId)}
     />
   );
 }

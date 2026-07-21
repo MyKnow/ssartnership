@@ -17,11 +17,15 @@ import { AdminLogsExplorer } from '@/components/admin/logs/AdminLogsExplorer';
 import { RANGE_PRESET_OPTIONS } from '@/components/admin/logs/utils';
 import type { AdminLogsPageData } from '@/lib/log-insights';
 import { useAdminLogsManager } from '@/components/admin/logs-manager/useAdminLogsManager';
+import AdminForwardActivityPanel from '@/components/admin/logs/AdminForwardActivityPanel';
+import { emptyForwardActivityMetrics, type ForwardActivityMetrics } from '@/lib/platform-activity-forward-metrics';
 
 export default function AdminLogsManagerContent({
   initialData,
+  activityMetrics = emptyForwardActivityMetrics(),
 }: {
   initialData: AdminLogsPageData;
+  activityMetrics?: ForwardActivityMetrics;
 }) {
   const logs = useAdminLogsManager(initialData);
 
@@ -111,6 +115,8 @@ export default function AdminLogsManagerContent({
             </div>
           ) : null}
         </section>
+
+        <AdminForwardActivityPanel metrics={activityMetrics} />
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
