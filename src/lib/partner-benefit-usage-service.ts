@@ -1,6 +1,7 @@
 import {
   isPartnerBenefitUseAvailable,
   isPartnerBenefitUsePin,
+  normalizePartnerBenefitUseCount,
   normalizePartnerBenefitSelection,
 } from "@/lib/partner-benefit-usage";
 import {
@@ -19,6 +20,7 @@ export type PartnerBenefitUsageErrorCode =
   | "benefit_not_found"
   | "pin_not_configured"
   | "pin_invalid"
+  | "use_count_invalid"
   | "idempotency_conflict";
 
 export class PartnerBenefitUsageError extends Error {
@@ -51,6 +53,7 @@ export async function recordPartnerBenefitUsage({
   partnerId,
   memberId,
   benefit,
+  useCount,
   pin,
   idempotencyKey,
   metadata,
@@ -59,6 +62,7 @@ export async function recordPartnerBenefitUsage({
   partnerId: string;
   memberId: string;
   benefit: string;
+  useCount: number;
   pin: string;
   idempotencyKey: string;
   metadata?: Record<string, unknown>;
@@ -75,7 +79,7 @@ export async function recordPartnerBenefitUsage({
       periodEnd: context.periodEnd,
     })
   ) {
-    throw new PartnerBenefitUsageError("benefit_unavailable");
+    throw new PartnerBenefitUsageError("use_count_invalid");
   }
 
   const selectedBenefit = normalizePartnerBenefitSelection(context.benefits, benefit);
@@ -88,6 +92,10 @@ export async function recordPartnerBenefitUsage({
   }
   if (!isPartnerBenefitUsePin(pin)) {
     throw new PartnerBenefitUsageError("pin_invalid");
+  }
+  const normalizedUseCount = normalizePartnerBenefitUseCount(useCount);
+  if (normalizedUseCount === null) {
+    throw new PartnerBenefitUsageError("benefit_unavailable");
   }
 
   const isPinValid = await verifyCouponVerificationPassword(pin, {
@@ -103,6 +111,7 @@ export async function recordPartnerBenefitUsage({
       partnerId,
       memberId,
       benefit: selectedBenefit,
+      useCount: normalizedUseCount,
       idempotencyKey,
       metadata,
     });

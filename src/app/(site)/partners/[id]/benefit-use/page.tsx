@@ -10,7 +10,11 @@ import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
-import { isPartnerBenefitUseAvailable, normalizePartnerBenefitSelection } from "@/lib/partner-benefit-usage";
+import {
+  isPartnerBenefitUseAvailable,
+  normalizePartnerBenefitSelection,
+  normalizePartnerBenefitUseCount,
+} from "@/lib/partner-benefit-usage";
 import {
   partnerBenefitUsageRepository,
   partnerRepository,
@@ -35,9 +39,10 @@ function getPartnerPath(partnerId: string, returnTo: string) {
 function getBenefitUsePath(
   partnerId: string,
   benefit: string,
+  useCount: number,
   returnTo: string,
 ) {
-  const params = new URLSearchParams({ benefit, returnTo });
+  const params = new URLSearchParams({ benefit, useCount: String(useCount), returnTo });
   return `/partners/${encodeURIComponent(partnerId)}/benefit-use?${params}`;
 }
 
@@ -48,6 +53,7 @@ export default async function PartnerBenefitUsePage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{
     benefit?: string | string[];
+    useCount?: string | string[];
     returnTo?: string | string[];
   }>;
 }) {
@@ -63,10 +69,14 @@ export default async function PartnerBenefitUsePage({
   const benefit = Array.isArray(resolvedSearchParams.benefit)
     ? resolvedSearchParams.benefit[0]
     : resolvedSearchParams.benefit;
+  const rawUseCount = Array.isArray(resolvedSearchParams.useCount)
+    ? resolvedSearchParams.useCount[0]
+    : resolvedSearchParams.useCount;
+  const useCount = normalizePartnerBenefitUseCount(rawUseCount);
 
   if (!session?.userId) {
     const requestedPath = benefit
-      ? getBenefitUsePath(partnerId, benefit, returnTo)
+      ? getBenefitUsePath(partnerId, benefit, useCount ?? 1, returnTo)
       : detailPath;
     redirect(`/auth/login?returnTo=${encodeURIComponent(requestedPath)}`);
   }
@@ -89,7 +99,7 @@ export default async function PartnerBenefitUsePage({
   }
 
   const selectedBenefit = normalizePartnerBenefitSelection(partner.benefits, benefit);
-  if (!selectedBenefit) {
+  if (!selectedBenefit || useCount === null) {
     redirect(detailPath);
   }
 
@@ -103,7 +113,7 @@ export default async function PartnerBenefitUsePage({
   if (!member) {
     redirect(
       `/auth/login?returnTo=${encodeURIComponent(
-        getBenefitUsePath(partnerId, selectedBenefit, returnTo),
+        getBenefitUsePath(partnerId, selectedBenefit, useCount, returnTo),
       )}`,
     );
   }
@@ -138,6 +148,7 @@ export default async function PartnerBenefitUsePage({
               partnerId={partner.id}
               partnerName={partner.name}
               benefit={selectedBenefit}
+              useCount={useCount}
               member={{
                 mattermostUsername: member.mattermostUsername,
                 displayName: member.displayName,

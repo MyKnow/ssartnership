@@ -3,6 +3,8 @@ import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
+export const MAX_PARTNER_BENEFIT_USE_COUNT = 99;
+
 export type PartnerBenefitUsageAvailabilityInput = {
   location: string | null | undefined;
   periodStart?: string | null;
@@ -20,6 +22,22 @@ function getKstDateString(now: Date) {
 
 export function isPartnerBenefitUsePin(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}$/.test(value);
+}
+
+export function normalizePartnerBenefitUseCount(value: unknown) {
+  if (value === undefined || value === null || value === "") {
+    return 1;
+  }
+
+  const normalized = typeof value === "number"
+    ? value
+    : typeof value === "string" && /^\d{1,2}$/.test(value.trim())
+      ? Number(value.trim())
+      : Number.NaN;
+
+  return Number.isInteger(normalized) && normalized >= 1 && normalized <= MAX_PARTNER_BENEFIT_USE_COUNT
+    ? normalized
+    : null;
 }
 
 export function normalizePartnerBenefitSelection(

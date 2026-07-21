@@ -4,15 +4,16 @@ import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import { requireAdminPermission } from '@/lib/admin-access';
 import { getAdminLogAccessPolicy } from '@/lib/admin-log-access';
 import { getAdminLogsPageData } from '@/lib/log-insights';
+import { fetchForwardActivityMetrics } from '@/lib/platform-activity-forward-metrics';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminLogsPage() {
   const session = await requireAdminPermission('logs', 'read', { path: '/admin/logs' });
-  const data = await getAdminLogsPageData(
-    { preset: '24h' },
-    getAdminLogAccessPolicy(session.account),
-  );
+  const [data, activity] = await Promise.all([
+    getAdminLogsPageData({ preset: '24h' }, getAdminLogAccessPolicy(session.account)),
+    fetchForwardActivityMetrics(),
+  ]);
 
   return (
     <AdminShell title="로그 조회" backHref="/admin" backLabel="관리 홈">
@@ -22,7 +23,7 @@ export default async function AdminLogsPage() {
           title="운영 로그 조회"
           description="제품 이벤트, 관리자 감사, 인증 보안 로그를 공통 탐색 규칙으로 확인합니다."
         />
-        <AdminLogsManager initialData={data} />
+        <AdminLogsManager initialData={data} activityMetrics={activity.metrics} />
       </div>
     </AdminShell>
   );

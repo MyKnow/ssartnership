@@ -9,6 +9,7 @@ import type {
   PartnerReviewSummary,
 } from "@/lib/partner-reviews";
 import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
+import type { PartnerBenefitUsageHistoryPage } from "@/lib/repositories/partner-benefit-usage-repository";
 
 export type PartnerServiceDetailViewProps = {
   session: PartnerSession;
@@ -33,4 +34,7 @@ export type PartnerServiceDetailViewProps = {
   partnerPeriodEnd?: string | null;
   createCouponAction: (formData: FormData) => void | Promise<void>;
   uploadCouponCodesAction: (formData: FormData) => void | Promise<void>;
+  benefitUsageHistory: PartnerBenefitUsageHistoryPage;
+  selectedUsageBenefit: string | null;
+  benefitUsageBaseHref: string;
 };

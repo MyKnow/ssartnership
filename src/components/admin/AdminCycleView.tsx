@@ -1,4 +1,5 @@
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import Link from "next/link";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminCycleGenerationSelector from "@/components/admin/AdminCycleGenerationSelector";
 import MattermostSenderManager from "@/components/admin/MattermostSenderManager";
@@ -107,7 +108,7 @@ export default function AdminCycleView({
 
   return (
     <div className="grid gap-6">
-      <AdminPageHeader eyebrow="Cycle" title="기수 계산 기준 관리" description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다." />
+      <div className="flex flex-wrap items-start justify-between gap-3"><AdminPageHeader eyebrow="Cycle" title="기수 계산 기준 관리" description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다." /><Link href="/admin/cycle/mock" className="rounded-xl border border-border bg-surface-control px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-muted">전체 목업보기</Link></div>
       <StatsRow
         items={[
           { label: "현재 기수", value: currentYearLabel, hint: `${currentSemester}학기 기준` },

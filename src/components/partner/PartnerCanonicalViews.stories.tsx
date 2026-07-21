@@ -117,6 +117,9 @@ export const ServiceDetailDefault: Story = {
       initialReviewOffset={partnerCanonicalReviews.length}
     initialReviewHasMore={false}
     coupons={[]}
+    benefitUsageHistory={{ items: [], total: 0, page: 1, pageSize: 25 }}
+    selectedUsageBenefit={null}
+    benefitUsageBaseHref="/partner/companies/story/services/story"
     createCouponAction={async () => undefined}
     uploadCouponCodesAction={async () => undefined}
   />

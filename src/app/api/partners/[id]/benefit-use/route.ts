@@ -21,6 +21,7 @@ type BenefitUseRequestBody = {
   benefit?: unknown;
   pin?: unknown;
   idempotencyKey?: unknown;
+  useCount?: unknown;
   sessionId?: unknown;
 };
 
@@ -47,6 +48,7 @@ function getStatusForCode(code: PartnerBenefitUsageErrorCode) {
     case "pin_not_configured":
       return 503;
     case "pin_invalid":
+    case "use_count_invalid":
     case "benefit_not_found":
     case "benefit_unavailable":
     case "idempotency_conflict":
@@ -60,6 +62,7 @@ type PartnerBenefitUsageErrorCode =
   | "benefit_not_found"
   | "pin_not_configured"
   | "pin_invalid"
+  | "use_count_invalid"
   | "idempotency_conflict";
 
 function getMessageForCode(code: PartnerBenefitUsageErrorCode) {
@@ -74,6 +77,8 @@ function getMessageForCode(code: PartnerBenefitUsageErrorCode) {
       return "제휴처의 혜택 확인 PIN이 아직 설정되지 않았습니다.";
     case "pin_invalid":
       return "제휴처 확인 PIN이 올바르지 않습니다.";
+    case "use_count_invalid":
+      return "혜택 횟수는 1~99회로 입력해 주세요.";
     case "idempotency_conflict":
       return "이미 처리된 이용 확인 요청입니다. 화면을 새로고침해 주세요.";
   }
@@ -200,12 +205,24 @@ export async function POST(
     });
     return NextResponse.json({ ok: false, message: "요청 식별자를 확인해 주세요." }, { status: 400 });
   }
+  const useCountValue = typeof body.useCount === "number" ? body.useCount : Number.NaN;
+  if (!Number.isInteger(useCountValue) || useCountValue < 1 || useCountValue > 99) {
+    scheduleAttemptLog(context, {
+      actorId: session.userId,
+      partnerId,
+      sessionId,
+      result: "failure",
+      reasonCode: "use_count_invalid",
+    });
+    return NextResponse.json({ ok: false, message: "혜택 횟수는 1~99회로 입력해 주세요." }, { status: 400 });
+  }
 
   try {
     const result = await recordPartnerBenefitUsage({
       partnerId,
       memberId: session.userId,
       benefit: body.benefit,
+      useCount: useCountValue,
       pin: body.pin,
       idempotencyKey: body.idempotencyKey,
       metadata: {
@@ -228,7 +245,7 @@ export async function POST(
       eventName: "partner_benefit_use_success",
       targetType: "partner",
       targetId: partnerId,
-      properties: { benefitLength: result.benefitSnapshot.length },
+      properties: { benefitLength: result.benefitSnapshot.length, useCount: result.useCount, verificationMethod: "pin" },
     });
     if (result.isNew) {
       scheduleProductEventLog({
@@ -239,7 +256,7 @@ export async function POST(
         eventName: "partner_benefit_use",
         targetType: "partner",
         targetId: partnerId,
-        properties: { source: "partner_verification" },
+        properties: { source: "partner_verification", useCount: result.useCount, verificationMethod: "pin" },
       });
     }
 
