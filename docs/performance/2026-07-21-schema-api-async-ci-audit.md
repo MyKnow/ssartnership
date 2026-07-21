@@ -15,7 +15,7 @@
 - `platform_active_identities`는 KST 일자, 식별자 종류, 단방향 해시만 저장하는 private projection이다. RLS를 켜고 `anon`/`authenticated` 권한을 제거했다.
 - `event_logs` insert trigger는 로그인 회원과 비로그인 `guest` 세션을 분리해 projection을 갱신한다.
 - `event_logs` 전체를 group-by/upsert하는 별도 DML migration을 추가했다. 따라서 재실행해도 같은 행을 중복 생성하지 않고, 배포 전 로그도 DAU·WAU·MAU 과거 구간에 포함된다.
-- 관리자 홈은 로그인 회원 DAU/WAU/MAU와 비로그인 방문 세션을 명확히 분리해 표시한다. 2026-07-21 확인 시 최근 30일 원본 로그 기준 회원 MAU는 40명, 비로그인 방문 세션은 1,316개였다.
+- 관리자 홈은 로그인 회원 DAU/WAU/MAU와 비로그인 방문 세션을 명확히 분리해 표시한다. 2026-07-21 확인 시 최근 30일 원본 로그 기준 회원 MAU는 40명, 비로그인 방문 세션은 1,316개였고, 활동 잔디는 최근 12주를 보여준다.
 
 ### 중복 제휴처 집계 RPC
 

@@ -2172,23 +2172,32 @@ as $$
     cross join parameters
     where identities.activity_date between parameters.as_of_date - 29 and parameters.as_of_date
   ),
+  series_activity as (
+    select
+      identities.activity_date,
+      identities.identity_kind,
+      identities.identity_hash
+    from public.platform_active_identities as identities
+    cross join parameters
+    where identities.activity_date between parameters.as_of_date - 83 and parameters.as_of_date
+  ),
   daily_activity as (
     select
       series.activity_date,
-      count(recent_activity.identity_hash) filter (
-        where recent_activity.identity_kind = 'member'
+      count(series_activity.identity_hash) filter (
+        where series_activity.identity_kind = 'member'
       )::bigint as member_active_count,
-      count(recent_activity.identity_hash) filter (
-        where recent_activity.identity_kind = 'guest_session'
+      count(series_activity.identity_hash) filter (
+        where series_activity.identity_kind = 'guest_session'
       )::bigint as guest_session_count
     from parameters
     cross join lateral generate_series(
-      parameters.as_of_date - 29,
+      parameters.as_of_date - 83,
       parameters.as_of_date,
       interval '1 day'
     ) as series(activity_date)
-    left join recent_activity
-      on recent_activity.activity_date = series.activity_date::date
+    left join series_activity
+      on series_activity.activity_date = series.activity_date::date
     group by series.activity_date
   ),
   metric_counts as (

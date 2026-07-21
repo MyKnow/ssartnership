@@ -1,6 +1,10 @@
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Badge from "@/components/ui/Badge";
 import Surface from "@/components/ui/Surface";
+import {
+  buildActivityHeatmap,
+  type ActivityHeatmapCell,
+} from "@/lib/platform-activity-heatmap";
 import type { AdminPlatformActivityMetrics } from "@/lib/platform-activity-metrics";
 
 type ActivityMetricCard = {
@@ -8,6 +12,16 @@ type ActivityMetricCard = {
   value: number;
   description: string;
 };
+
+const ACTIVITY_INTENSITY_CLASSES = [
+  "bg-surface-muted",
+  "bg-primary/20",
+  "bg-primary/35",
+  "bg-primary/50",
+  "bg-primary/70",
+] as const;
+
+const WEEKDAY_LABELS = ["", "월", "", "수", "", "금", ""] as const;
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -26,10 +40,24 @@ export default function AdminPlatformActivityMetricsPanel({
     { label: "WAU", value: metrics.memberWau, description: "최근 7일 활성 회원" },
     { label: "MAU", value: metrics.memberMau, description: "최근 30일 활성 회원" },
   ];
-  const peakMemberActiveCount = Math.max(
-    1,
-    ...metrics.dailySeries.map((point) => point.memberActiveCount),
-  );
+  const activityHeatmap = buildActivityHeatmap(metrics.dailySeries);
+  const activeDays = metrics.dailySeries.filter((point) => point.memberActiveCount > 0).length;
+
+  function renderActivityCell(cell: ActivityHeatmapCell) {
+    if (!cell.date) {
+      return <span key="empty" aria-hidden="true" className="block size-3 sm:size-4 xl:size-5" />;
+    }
+
+    return (
+      <span
+        key={cell.date}
+        role="img"
+        aria-label={`${cell.date} 로그인 회원 ${cell.memberActiveCount.toLocaleString("ko-KR")}명, 비로그인 방문 ${cell.guestSessionCount.toLocaleString("ko-KR")}회`}
+        title={`${cell.date}: 로그인 회원 ${cell.memberActiveCount.toLocaleString("ko-KR")}명 · 비로그인 방문 ${cell.guestSessionCount.toLocaleString("ko-KR")}회`}
+        className={`block size-3 rounded-[3px] ring-1 ring-inset ring-border/60 transition-[filter] hover:brightness-90 sm:size-4 xl:size-5 ${ACTIVITY_INTENSITY_CLASSES[cell.intensity]}`}
+      />
+    );
+  }
 
   return (
     <section className="grid min-w-0 gap-4" aria-label="서비스 활성도">
@@ -63,9 +91,9 @@ export default function AdminPlatformActivityMetricsPanel({
       <Surface level="inset" padding="md" className="grid min-w-0 gap-3">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-semibold text-foreground">최근 30일 회원 활성 추이</p>
+            <p className="font-semibold text-foreground">최근 12주 회원 활동</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              로그 보관 시작일 {formatDate(metrics.historyStartDate)}
+              로그 보관 시작일 {formatDate(metrics.historyStartDate)} · 활동일 {activeDays}일
             </p>
           </div>
           <Badge variant="neutral">
@@ -73,34 +101,53 @@ export default function AdminPlatformActivityMetricsPanel({
           </Badge>
         </div>
 
-        {metrics.dailySeries.length > 0 ? (
-          <ol
-            className="grid min-w-0 grid-cols-10 items-end gap-1.5 xl:grid-cols-[repeat(15,minmax(0,1fr))]"
-            aria-label="최근 30일 로그인 회원 활성 추이"
-          >
-            {metrics.dailySeries.map((point) => {
-              const percent = Math.max(
-                8,
-                Math.round((point.memberActiveCount / peakMemberActiveCount) * 100),
-              );
-              return (
-                <li
-                  key={point.date}
-                  className="group relative flex h-20 min-w-0 items-end rounded-lg bg-surface-muted px-1 pb-1"
-                  title={`${point.date}: 로그인 회원 ${point.memberActiveCount.toLocaleString("ko-KR")}명, 비로그인 방문 ${point.guestSessionCount.toLocaleString("ko-KR")}회`}
-                >
-                  <span
-                    className="w-full rounded-md bg-primary transition-colors group-hover:bg-primary/80"
-                    style={{ height: `${percent}%` }}
-                  />
-                  <span className="sr-only">
-                    {point.date} 로그인 회원 {point.memberActiveCount.toLocaleString("ko-KR")}명,
-                    비로그인 방문 {point.guestSessionCount.toLocaleString("ko-KR")}회
+        {activityHeatmap.length > 0 ? (
+          <div className="grid min-w-0 gap-3" role="group" aria-label="최근 12주 로그인 회원 활동 잔디">
+            <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
+              <span aria-hidden="true" />
+              <div className="grid grid-flow-col grid-rows-1 auto-cols-max gap-1 text-[10px] leading-4 text-muted-foreground sm:gap-1.5 xl:gap-2">
+                {activityHeatmap.map((week) => (
+                  <span key={week.key} className="w-3 text-center sm:w-4 xl:w-5">
+                    {week.monthLabel}
                   </span>
-                </li>
-              );
-            })}
-          </ol>
+                ))}
+              </div>
+            </div>
+            <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
+              <div className="grid grid-rows-7 gap-1 text-[10px] leading-4 text-muted-foreground sm:gap-1.5 xl:gap-2">
+                {WEEKDAY_LABELS.map((label, index) => (
+                  <span key={`${label}-${index}`} className="flex h-3 items-center sm:h-4 xl:h-5">
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <div
+                className="grid min-w-0 grid-flow-col grid-rows-7 auto-cols-max gap-1 sm:gap-1.5 xl:gap-2"
+                role="list"
+                aria-label="최근 12주 로그인 회원 활동 일별 목록"
+              >
+                {activityHeatmap.flatMap((week) => week.cells).map((cell, index) => (
+                  <span key={cell.date ?? `empty-${index}`} role={cell.date ? "listitem" : undefined}>
+                    {renderActivityCell(cell)}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>회원 활동이 많을수록 진하게 표시됩니다.</span>
+              <div className="flex items-center gap-1.5" aria-label="활동량 범례">
+                <span>적음</span>
+                {ACTIVITY_INTENSITY_CLASSES.map((className, index) => (
+                  <span
+                    key={className}
+                    aria-label={index === 0 ? "활동 없음" : `활동량 ${index}단계`}
+                    className={`size-3 rounded-[3px] ring-1 ring-inset ring-border/60 ${className}`}
+                  />
+                ))}
+                <span>많음</span>
+              </div>
+            </div>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">활성 추이를 집계하고 있습니다.</p>
         )}

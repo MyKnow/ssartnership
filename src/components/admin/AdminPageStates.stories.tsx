@@ -142,9 +142,9 @@ function DashboardOverviewState({
                 guestSessionDau: 67,
                 guestSessionWau: 240,
                 guestSessionMau: 592,
-                historyStartDate: "2026-06-18",
-                dailySeries: Array.from({ length: 30 }, (_, index) => {
-                  const date = new Date(Date.UTC(2026, 5, 22 + index));
+                historyStartDate: "2026-04-29",
+                dailySeries: Array.from({ length: 84 }, (_, index) => {
+                  const date = new Date(Date.UTC(2026, 3, 29 + index));
                   return {
                     date: date.toISOString().slice(0, 10),
                     memberActiveCount: 18 + ((index * 11) % 37),
