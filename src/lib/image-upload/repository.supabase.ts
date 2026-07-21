@@ -14,6 +14,7 @@ import {
   type DiscardImageUploadInput,
   type SignImageUploadInput,
   type SignedImageUpload,
+  ImageUploadError,
 } from "@/lib/image-upload/repository";
 import {
   resolveImageTransformPolicy,
@@ -35,6 +36,7 @@ type ImageUploadSessionRow = {
   role: string;
   storage_bucket: string;
   storage_path: string;
+  source_storage_path: string | null;
   source_content_type: string | null;
   source_size_bytes: number | null;
   content_type: string | null;
@@ -66,6 +68,18 @@ function getSafeFileExtension(name: string) {
 
 function buildStagingPath(id: string, fileName: string) {
   return `staging/${id}${getSafeFileExtension(fileName)}`;
+}
+
+function buildProcessedPath(id: string) {
+  return `processed/${id}.webp`;
+}
+
+function getSessionStoragePaths(session: Pick<ImageUploadSessionRow, "storage_path" | "source_storage_path">) {
+  return Array.from(new Set(
+    [session.storage_path, session.source_storage_path].filter(
+      (path): path is string => Boolean(path),
+    ),
+  ));
 }
 
 type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
@@ -195,6 +209,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         role: session.role,
         storage_bucket: IMAGE_UPLOAD_STAGING_BUCKET,
         storage_path: session.path,
+        source_storage_path: session.path,
         source_content_type: session.sourceContentType,
         source_size_bytes: session.sourceSizeBytes,
         signed_url_expires_at: signedUrlExpiresAt.toISOString(),
@@ -339,9 +354,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         const claimedSession = asSessionRow(claimedData);
 
         try {
+          const sourceStoragePath = claimedSession.source_storage_path ?? claimedSession.storage_path;
           const { data: blob, error: downloadError } = await supabase.storage
             .from(claimedSession.storage_bucket)
-            .download(claimedSession.storage_path);
+            .download(sourceStoragePath);
           if (downloadError || !blob) {
             throw new Error("이미지 파일을 찾을 수 없습니다.");
           }
@@ -350,9 +366,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             declaredContentType: claimedSession.source_content_type,
             policy: resolveImageTransformPolicy(input.purpose, claimedSession.role),
           });
+          const processedStoragePath = buildProcessedPath(claimedSession.id);
           const { error: uploadError } = await supabase.storage
             .from(claimedSession.storage_bucket)
-            .upload(claimedSession.storage_path, normalized.buffer, {
+            .upload(processedStoragePath, normalized.buffer, {
               contentType: normalized.contentType,
               cacheControl: "private, no-store",
               upsert: true,
@@ -364,6 +381,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             .from("image_upload_sessions")
             .update({
               status: "ready",
+              storage_path: processedStoragePath,
               content_type: normalized.contentType,
               sha256: normalized.sha256,
               width: normalized.width,
@@ -377,6 +395,12 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             .maybeSingle();
           if (updateError || !readyData) {
             throw new Error("이미지 업로드 상태를 저장하지 못했습니다.");
+          }
+          if (sourceStoragePath !== processedStoragePath) {
+            await supabase.storage
+              .from(claimedSession.storage_bucket)
+              .remove([sourceStoragePath])
+              .catch(() => undefined);
           }
           return {
             id: claimedSession.id,
@@ -517,11 +541,19 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             throw new Error("처리된 이미지 파일을 찾을 수 없습니다.");
           }
           const candidateBuffer = Buffer.from(await blob.arrayBuffer());
-          await validateNormalizedImageUpload({
-            source: candidateBuffer,
-            policy: expectedPolicy,
-            expectedSha256: claimedSession.sha256,
-          });
+          try {
+            await validateNormalizedImageUpload({
+              source: candidateBuffer,
+              policy: expectedPolicy,
+              expectedSha256: claimedSession.sha256,
+            });
+          } catch (error) {
+            throw new ImageUploadError(
+              "profile_image_staging_integrity",
+              "처리된 이미지 무결성을 확인해 주세요.",
+              { cause: error },
+            );
+          }
           stagedBuffer = candidateBuffer;
           break;
         } catch (error) {
@@ -559,7 +591,11 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         }
       }
       if (finalUploadError) {
-        throw new Error("이미지를 최종 보관소로 옮기지 못했습니다.");
+        throw new ImageUploadError(
+          "profile_image_final_upload",
+          "이미지를 최종 보관소로 옮기지 못했습니다.",
+          { cause: finalUploadError instanceof Error ? finalUploadError : undefined },
+        );
       }
       const url = input.destination.isPublic
         ? getPublicUrl(supabase, input.destination.bucket, input.destination.path)
@@ -577,7 +613,11 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         .select("*")
         .maybeSingle();
       if (updateError) {
-        throw new Error("이미지 연결 상태를 저장하지 못했습니다.");
+        throw new ImageUploadError(
+          "profile_image_attach_state",
+          "이미지 연결 상태를 저장하지 못했습니다.",
+          { cause: updateError },
+        );
       }
       let attachedSession = attachedData ? asSessionRow(attachedData) : null;
       if (!attachedSession) {
@@ -600,7 +640,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       }
       await supabase.storage
         .from(claimedSession.storage_bucket)
-        .remove([claimedSession.storage_path])
+        .remove(getSessionStoragePaths(claimedSession))
         .catch(() => undefined);
       return toAttachedImage(attachedSession);
     } catch (error) {
@@ -680,7 +720,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const removals = await Promise.all([
       supabase.storage
         .from(session.storage_bucket)
-        .remove([session.storage_path]),
+        .remove(getSessionStoragePaths(session)),
       ...(session.final_bucket && session.final_path
         ? [supabase.storage.from(session.final_bucket).remove([session.final_path])]
         : []),
@@ -719,13 +759,13 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const [signedResult, sessionResult] = await Promise.all([
       supabase
         .from("image_upload_sessions")
-        .select("id,status,storage_bucket,storage_path,final_bucket,final_path,failure_code")
+        .select("id,status,storage_bucket,storage_path,source_storage_path,final_bucket,final_path,failure_code")
         .eq("status", "signed")
         .lte("signed_url_expires_at", now.toISOString())
         .limit(100),
       supabase
         .from("image_upload_sessions")
-        .select("id,status,storage_bucket,storage_path,final_bucket,final_path,failure_code")
+        .select("id,status,storage_bucket,storage_path,source_storage_path,final_bucket,final_path,failure_code")
         .in("status", ["signed", "processing", "ready", "attaching", "failed"])
         .lte("expires_at", now.toISOString())
         .limit(100),
@@ -742,13 +782,14 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       ).values(),
     ) as Array<Pick<
       ImageUploadSessionRow,
-      "id" | "status" | "storage_bucket" | "storage_path" | "final_bucket" | "final_path" | "failure_code"
+      "id" | "status" | "storage_bucket" | "storage_path" | "source_storage_path"
+      | "final_bucket" | "final_path" | "failure_code"
     >>;
     if (sessions.length === 0) return 0;
     let expiredCount = 0;
     for (const session of sessions) {
       const removals = await Promise.all([
-        supabase.storage.from(session.storage_bucket).remove([session.storage_path]),
+        supabase.storage.from(session.storage_bucket).remove(getSessionStoragePaths(session)),
         ...(session.final_bucket && session.final_path
           ? [supabase.storage.from(session.final_bucket).remove([session.final_path])]
           : []),

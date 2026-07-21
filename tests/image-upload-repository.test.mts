@@ -16,6 +16,7 @@ type ImageUploadSession = {
   role: "profile";
   storage_bucket: string;
   storage_path: string;
+  source_storage_path: string | null;
   source_content_type: string | null;
   source_size_bytes: number | null;
   content_type: string | null;
@@ -49,8 +50,11 @@ function createFakeSupabase(input: {
 }) {
   let session = cloneSession(input.session);
   let stagingBuffer = Buffer.from(input.initialStagingBuffer);
+  let processedBuffer: Buffer | null = null;
   let finalBuffer: Buffer | null = null;
   let stagingDownloadCount = 0;
+  const downloadedPaths: string[] = [];
+  const uploadedPaths: string[] = [];
   let stagingRemoved = false;
 
   function matches(filters: Filter[]) {
@@ -134,7 +138,20 @@ function createFakeSupabase(input: {
     from(bucket: string) {
       return {
         async download(path: string) {
-          if (bucket !== IMAGE_UPLOAD_STAGING_BUCKET || path !== session.storage_path) {
+          if (bucket !== IMAGE_UPLOAD_STAGING_BUCKET) {
+            return { data: null, error: new Error("unexpected download") };
+          }
+          downloadedPaths.push(path);
+          const sourcePath = session.source_storage_path ?? session.storage_path;
+          const processedPath = session.storage_path;
+          if (path === processedPath && processedPath !== sourcePath && processedBuffer) {
+            const arrayBuffer = processedBuffer.buffer.slice(
+              processedBuffer.byteOffset,
+              processedBuffer.byteOffset + processedBuffer.byteLength,
+            ) as ArrayBuffer;
+            return { data: new Blob([arrayBuffer]), error: null };
+          }
+          if (path !== sourcePath) {
             return { data: null, error: new Error("unexpected download") };
           }
           stagingDownloadCount += 1;
@@ -148,6 +165,11 @@ function createFakeSupabase(input: {
           return { data: new Blob([arrayBuffer]), error: null };
         },
         async upload(path: string, body: Buffer) {
+          uploadedPaths.push(path);
+          if (bucket === IMAGE_UPLOAD_STAGING_BUCKET && path.startsWith(`processed/${session.id}`)) {
+            processedBuffer = Buffer.from(body);
+            return { data: { path }, error: null };
+          }
           if (bucket === IMAGE_UPLOAD_STAGING_BUCKET && path === session.storage_path) {
             stagingBuffer = Buffer.from(body);
             return { data: { path }, error: null };
@@ -175,8 +197,11 @@ function createFakeSupabase(input: {
       return {
         session: cloneSession(session),
         stagingBuffer: Buffer.from(stagingBuffer),
+        processedBuffer: processedBuffer ? Buffer.from(processedBuffer) : null,
         finalBuffer: finalBuffer ? Buffer.from(finalBuffer) : null,
         stagingDownloadCount,
+        downloadedPaths: [...downloadedPaths],
+        uploadedPaths: [...uploadedPaths],
         stagingRemoved,
       };
     },
@@ -210,6 +235,7 @@ test("Mattermost WebP가 complete 이후 같은 Staging 경로에서 지연되�
       role: "profile",
       storage_bucket: IMAGE_UPLOAD_STAGING_BUCKET,
       storage_path: `staging/${uploadId}.webp`,
+      source_storage_path: `staging/${uploadId}.webp`,
       source_content_type: "image/webp",
       source_size_bytes: normalizedMattermost.buffer.length,
       content_type: null,
@@ -260,7 +286,14 @@ test("Mattermost WebP가 complete 이후 같은 Staging 경로에서 지연되�
   assert.equal(attached.height, 640);
   assert.equal(attached.sha256.length, 64);
   assert.equal(state.session.status, "attached");
+  assert.equal(state.session.source_storage_path, `staging/${uploadId}.webp`);
+  assert.equal(state.session.storage_path, `processed/${uploadId}.webp`);
+  assert.deepEqual(state.downloadedPaths, [
+    `staging/${uploadId}.webp`,
+    `processed/${uploadId}.webp`,
+  ]);
+  assert.deepEqual(state.uploadedPaths, [`processed/${uploadId}.webp`, `members/${memberId}/signup/${uploadId}.webp`]);
   assert.equal(state.stagingRemoved, true);
-  assert.equal(state.stagingDownloadCount, 3);
+  assert.equal(state.stagingDownloadCount, 1);
   assert.ok(state.finalBuffer);
 });
