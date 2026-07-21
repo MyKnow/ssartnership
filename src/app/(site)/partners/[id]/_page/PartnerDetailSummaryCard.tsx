@@ -193,7 +193,7 @@ export default function PartnerDetailSummaryCard({
                     <p className="ui-caption">이용 기간</p>
                     <div
                       aria-label={`이용 기간 ${partner.period.start}부터 ${partner.period.end}까지`}
-                      className="mt-2 inline-flex min-h-11 max-w-full items-center gap-2.5 rounded-full border border-border/80 bg-surface-inset px-3.5 py-2 text-sm font-semibold text-foreground"
+                      className="mt-2 inline-flex h-8 max-w-full items-center gap-2 rounded-full border border-border/80 bg-surface-inset px-4 py-1 text-xs font-semibold text-foreground"
                     >
                       <CalendarDaysIcon
                         className="size-4 shrink-0 text-muted-foreground"

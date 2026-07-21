@@ -54,9 +54,9 @@ export const BenefitAndInquiry: Story = {
     await expect(inquiry).not.toBeNull();
     await expect(actionGrid).toHaveClass("grid-cols-2", "gap-2");
     await expect(actionBar).toHaveClass("pb-safe-bottom-2");
-    await expect(benefit).toHaveClass("h-14", "rounded-[1rem]", "bg-primary");
+    await expect(benefit).toHaveClass("h-12", "rounded-[1rem]", "bg-primary");
     await expect(inquiry).toHaveClass(
-      "h-14",
+      "h-12",
       "rounded-[1rem]",
       "bg-surface-muted",
     );
@@ -80,7 +80,7 @@ export const InquiryOnly: Story = {
       name: "문의하기: 0507-1234-5678",
     });
 
-    await expect(inquiry).toHaveClass("h-14", "w-full", "bg-primary");
+    await expect(inquiry).toHaveClass("h-12", "w-full", "bg-primary");
   },
 };
 
@@ -93,6 +93,6 @@ export const BenefitOnly: Story = {
     const canvas = within(canvasElement);
     const benefit = canvas.getByRole("link", { name: "혜택 이용하기" });
 
-    await expect(benefit).toHaveClass("h-14", "w-full", "bg-primary");
+    await expect(benefit).toHaveClass("h-12", "w-full", "bg-primary");
   },
 };

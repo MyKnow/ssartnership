@@ -230,9 +230,9 @@ export const Default: Story = {
     ).toHaveClass("md:ml-4");
     await expect(heroInfo).toContainElement(imageCarouselButton);
     await expect(imageCarouselButton).toHaveClass("aspect-square");
-    await expect(
-      summaryCard.querySelector('[aria-label^="이용 기간"]'),
-    ).toBeInTheDocument();
+    const periodBadge = summaryCard.querySelector('[aria-label^="이용 기간"]');
+    await expect(periodBadge).toBeInTheDocument();
+    await expect(periodBadge).toHaveClass("h-8", "px-4", "py-1", "text-xs");
     await expect(
       canvas.queryByRole("link", { name: "혜택 목록으로" }),
     ).toBeNull();
