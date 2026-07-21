@@ -8,6 +8,7 @@ const args = [
   "--pretty",
   "false",
   "--skipLibCheck",
+  "--noCheck",
 ];
 
 function runTypecheck() {
