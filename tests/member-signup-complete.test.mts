@@ -74,6 +74,18 @@ test("회원가입 완료 API는 검증 세션을 사용하고 Mattermost 재조
   assert.doesNotMatch(route, /session\.getUserById/);
 });
 
+test("회원가입 프로필 이미지는 제거된 members 이미지 포인터를 갱신하지 않는다", async () => {
+  const profile = await readFile(
+    new URL("../src/lib/member-signup-profile.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(profile, /from\("member_profile_images"\)/);
+  assert.match(profile, /status: "approved"/);
+  assert.doesNotMatch(profile, /active_profile_image_id/);
+  assert.doesNotMatch(profile, /profile_photo_review_status/);
+});
+
 test("회원가입 실패는 서버 로그와 화면에 원인 단계와 요청 ID를 남긴다", async () => {
   const [route, form] = await Promise.all([
     readFile(
