@@ -1,7 +1,6 @@
 "use client";
 
 import Button from "@/components/ui/Button";
-import Container from "@/components/ui/Container";
 import { trackProductEvent } from "@/lib/product-events";
 import type { BenefitUseAction } from "@/lib/partner-links";
 import PartnerBenefitUseAction, {
@@ -82,7 +81,7 @@ export default function PartnerDetailMobileActionBar({
         data-partner-detail-mobile-action-bar
         className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface-overlay/95 pb-safe-bottom-2 shadow-overlay backdrop-blur-xl md:hidden"
       >
-        <Container className="py-2">
+        <div className="px-4 pt-2">
           <div
             data-partner-detail-mobile-action-buttons
             className={
@@ -93,7 +92,7 @@ export default function PartnerDetailMobileActionBar({
           >
             {renderBenefitAction(
               "detail_mobile_sticky",
-              "h-14 w-full min-w-0 justify-center rounded-[1rem] px-3",
+              "h-12 w-full min-w-0 justify-center rounded-[1rem] px-3",
             )}
             {inquiryAction ? (
               <Button
@@ -109,7 +108,7 @@ export default function PartnerDetailMobileActionBar({
                 variant={
                   hasBenefitAction ? "secondary" : "primary"
                 }
-                className="h-14 w-full min-w-0 justify-center rounded-[1rem] px-3"
+                className="h-12 w-full min-w-0 justify-center rounded-[1rem] px-3"
                 ariaLabel={`문의하기: ${inquiryAction.label}`}
                 onClick={() =>
                   trackProductEvent({
@@ -124,7 +123,7 @@ export default function PartnerDetailMobileActionBar({
               </Button>
             ) : null}
           </div>
-        </Container>
+        </div>
       </div>
 
       {hasBenefitAction ? (
