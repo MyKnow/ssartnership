@@ -99,7 +99,7 @@ export default function PartnerCardMeta({
         className={cn(
           "grid w-full min-w-0 gap-4 overflow-hidden @xs/card:items-start",
           compact
-            ? "grid-cols-[auto_minmax(0,1fr)] !items-stretch gap-2 sm:gap-3"
+            ? "grid-cols-[5rem_minmax(0,1fr)] !items-start gap-2 min-[390px]:grid-cols-[6rem_minmax(0,1fr)] sm:gap-3"
             : "@xs/card:grid-cols-[minmax(8rem,9rem)_minmax(0,1fr)]",
         )}
       >

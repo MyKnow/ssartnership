@@ -365,6 +365,10 @@ body {
     padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
   }
 
+  .pb-safe-bottom-2 {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+  }
+
   .min-safe-site-header {
     min-height: calc(5rem + env(safe-area-inset-top));
   }
@@ -383,6 +387,16 @@ body {
 
   .bottom-safe-bottom-20 {
     bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+
+  .bottom-safe-partner-action-bar {
+    bottom: calc(env(safe-area-inset-bottom) + 6rem);
+  }
+
+  @media (min-width: 768px) {
+    .bottom-safe-partner-action-bar {
+      bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+    }
   }
 
   .ui-grid-cards {

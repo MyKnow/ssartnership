@@ -32,10 +32,17 @@ export default function PartnerBenefitUseAction({
     }
 
     const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
     document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
 
@@ -101,7 +108,7 @@ export default function PartnerBenefitUseAction({
         ? createPortal(
             <div
               data-partner-benefit-use-dialog-root
-              className="fixed inset-0 z-50 flex min-h-full items-end justify-center overflow-y-auto bg-foreground/35 p-3 sm:items-center sm:p-6"
+              className="fixed inset-0 z-50 flex min-h-dvh items-end justify-center overflow-y-auto bg-slate-950/60 p-0 backdrop-blur-[2px] dark:bg-black/75 sm:items-center sm:p-6"
               role="presentation"
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
@@ -113,8 +120,14 @@ export default function PartnerBenefitUseAction({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={`${dialogId}-title`}
-                className="w-full max-w-lg rounded-[1.5rem] border border-border bg-surface p-5 shadow-overlay sm:p-6"
+                data-partner-benefit-use-sheet
+                className="max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-[2rem] border border-x-0 border-b-0 border-border bg-surface px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 shadow-overlay sm:max-w-lg sm:rounded-[1.5rem] sm:border sm:p-6"
               >
+                <div
+                  data-partner-benefit-use-sheet-handle
+                  className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden"
+                  aria-hidden="true"
+                />
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">

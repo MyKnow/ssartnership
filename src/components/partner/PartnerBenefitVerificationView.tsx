@@ -117,6 +117,7 @@ export default function PartnerBenefitVerificationView({
         member={member}
         initialTimestamp={initialTimestamp}
         cohortCardThemes={cohortCardThemes}
+        cardClassName="!aspect-[16/10] min-[480px]:!aspect-[16/9]"
         disableTracking
       />
 

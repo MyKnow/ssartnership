@@ -288,7 +288,7 @@ describe("mock ad package repository", () => {
       redemptionType: "code",
       status: "active",
       startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-20T23:59:59.000Z",
+      endsAt: "2026-12-31T23:59:59.000Z",
       usageLimit: 1,
       perMemberLimit: 5,
     });

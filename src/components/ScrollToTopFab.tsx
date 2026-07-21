@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ArrowUpIcon } from "@heroicons/react/24/outline";
 import { FloatingAction } from "@/components/FloatingActionGroup";
+import { cn } from "@/lib/cn";
 
 export default function ScrollToTopFab({
   threshold = 320,
 }: {
   threshold?: number;
 }) {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
+  const avoidsPartnerDetailActionBar = /^\/partners\/[^/]+\/?$/.test(pathname);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -67,7 +71,14 @@ export default function ScrollToTopFab({
   }
 
   return (
-    <FloatingAction fallbackClassName="pointer-events-none fixed bottom-safe-bottom-6 right-6 z-40">
+    <FloatingAction
+      fallbackClassName={cn(
+        "pointer-events-none fixed right-6 z-40",
+        avoidsPartnerDetailActionBar
+          ? "bottom-safe-partner-action-bar"
+          : "bottom-safe-bottom-6",
+      )}
+    >
       <div className="order-first pointer-events-none flex shrink-0 self-end translate-y-0 opacity-100 transition-all duration-200 ease-out">
         <button
           type="button"

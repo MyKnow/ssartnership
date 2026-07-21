@@ -32,11 +32,13 @@ export default function CertificationView({
   initialTimestamp,
   disableTracking = false,
   cohortCardThemes,
+  cardClassName,
 }: {
   member: Member;
   initialTimestamp: string;
   disableTracking?: boolean;
   cohortCardThemes?: readonly CohortCardTheme[] | null;
+  cardClassName?: string;
 }) {
   const [now, setNow] = useState(() => new Date(initialTimestamp));
   const [isAvatarOpen, setAvatarOpen] = useState(false);
@@ -125,6 +127,7 @@ export default function CertificationView({
   return (
     <div className="mt-6 w-full">
       <CertificationCardFrame
+        className={cardClassName}
         scheme={scheme}
         eyebrow="SSAFY 인증"
         name={name}
