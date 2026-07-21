@@ -39,7 +39,7 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
-        run: npx tsc --noEmit --pretty false
+        run: npm run typecheck:ci
 
       - name: Unit tests
         run: npm test

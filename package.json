@@ -8,6 +8,7 @@
     "check:lockfile": "node scripts/check-lockfile-linux.mjs",
     "check:lockfile:linux": "node scripts/check-lockfile-linux.mjs",
     "build": "next build --webpack",
+    "typecheck:ci": "node scripts/typecheck-ci.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "npm run test:node && npm run test:unit",

@@ -123,6 +123,10 @@ node --test tests/<focused-test>.test.mts
 
 Run `next build` only when build/runtime behavior changed broadly or when explicitly requested.
 
+### Node 24 CI typecheck parity
+
+`Public Readiness` runs TypeScript on Node 24. Before pushing a change that modifies TypeScript, routes, generated component props, or repository contracts, run `npm run typecheck:ci` in addition to focused tests. This wrapper runs the exact CI compiler command and retries it once only when the compiler process fails; a second failure remains a hard failure. Do not hide actual diagnostics with retries—fix reported type errors first.
+
 ## CI Failure Guardrails
 
 Recent failed Actions clustered into four workflows: `Sync Preview Supabase`, `Verify Node Lockfile`, `Publish Storybook`, and `Public Readiness`. Before PR, `dev` merge, or `main` promotion, check the relevant guardrail instead of waiting for CI to rediscover the same issue.
