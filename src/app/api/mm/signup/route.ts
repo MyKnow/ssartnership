@@ -14,11 +14,9 @@ import {
   clearMattermostCodeSession,
 } from "@/lib/mattermost-code-session";
 import {
-  classifyMattermostSignupProfile,
-  getMattermostSignupDisplayName,
+  type MattermostSignupParseReason,
 } from "@/lib/mm-signup-approval";
 import { createMattermostSignupApprovalRequest } from "@/lib/mm-signup-approval/repository";
-import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import { findMmUserDirectoryEntryByUserId, upsertMmUserDirectorySnapshot } from "@/lib/mm-directory";
 import { hasExistingMattermostMember } from "@/lib/member-identifier-reservations";
 import { isMattermostLoginDisabledForGeneration } from "@/lib/member-email-login-transition";
@@ -90,32 +88,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await withActiveMattermostSenderForGeneration(
-      verification.senderGeneration,
-      (session) => session.getUserById(verification.mmUserId),
-    );
-    if (user.id !== verification.mmUserId || user.deleteAt > 0) {
-      await discardSignupProfileUpload({
-        uploadId: parsed.data.profileImageUploadId,
-        ownerId: verification.signupUploadOwnerId,
-      });
-      await clearMattermostCodeSession();
-      return errorResponse("verification_expired", 401);
-    }
-    const profileInput = {
-      id: user.id,
-      username: user.username,
-      nickname: user.nickname,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    };
-    const profileClassification = classifyMattermostSignupProfile(profileInput);
-    const displayName = getMattermostSignupDisplayName(
-      profileInput,
-      profileClassification.profile,
-    ).trim();
-    const approvalMode = verification.signupMode === "approval"
-      || profileClassification.mode === "approval";
+    // The signed completion session was issued only after the verification
+    // route fetched and validated the Mattermost profile. Re-fetching it here
+    // makes signup depend on a second external request and can turn a valid
+    // verification into a timeout-driven 503.
+    const mmUserId = verification.mmUserId;
+    const mmUsername = verification.mmUsername.trim();
+    const displayName = verification.displayName.trim();
+    const approvalMode = verification.signupMode === "approval";
+    const parseExclusionReason: MattermostSignupParseReason | null = approvalMode
+      ? verification.parseExclusionReason ?? "profile_unavailable"
+      : null;
     if (
       verification.subjectGeneration > 0
       && await isMattermostLoginDisabledForGeneration(verification.subjectGeneration)
@@ -133,19 +116,19 @@ export async function POST(request: Request) {
       isStaff ? verification.senderGeneration : verification.subjectGeneration,
     ];
     await upsertMmUserDirectorySnapshot({
-      mmUserId: user.id,
-      mmUsername: user.username,
+      mmUserId,
+      mmUsername,
       displayName,
       campus: null,
       isStaff,
       sourceYears,
     });
-    const directory = await findMmUserDirectoryEntryByUserId(user.id);
+    const directory = await findMmUserDirectoryEntryByUserId(mmUserId);
     if (!directory?.id) {
       throw new Error("directory_missing");
     }
 
-    if (await hasExistingMattermostMember({ mmUserId: user.id, mmUsername: user.username })) {
+    if (await hasExistingMattermostMember({ mmUserId, mmUsername })) {
       await discardSignupProfileUpload({
         uploadId: parsed.data.profileImageUploadId,
         ownerId: verification.signupUploadOwnerId,
@@ -158,14 +141,13 @@ export async function POST(request: Request) {
     const password = hashPassword(parsed.data.password);
     if (approvalMode) {
       const approvalRequest = await createMattermostSignupApprovalRequest({
-        mmUserId: user.id,
+        mmUserId,
         mattermostAccountId: directory.id,
-        mmUsername: user.username,
+        mmUsername,
         mattermostDisplayName: displayName,
         senderGeneration: verification.senderGeneration,
         requestedGeneration: verification.subjectGeneration,
-        parseExclusionReason:
-          verification.parseExclusionReason ?? profileClassification.parseReason,
+        parseExclusionReason,
         passwordHash: password.hash,
         passwordSalt: password.salt,
         servicePolicy: activePolicies.service,
@@ -185,8 +167,7 @@ export async function POST(request: Request) {
         actorType: "guest",
         properties: {
           generation: verification.subjectGeneration,
-          parseReason:
-            verification.parseExclusionReason ?? profileClassification.parseReason,
+          parseReason: parseExclusionReason,
           status: approvalRequest.status,
         },
       });
