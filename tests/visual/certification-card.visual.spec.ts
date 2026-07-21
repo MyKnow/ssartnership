@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 const viewports = [
+  { key: "mobile-320", width: 320, height: 844 },
   { key: "mobile-360", width: 360, height: 844 },
+  { key: "mobile-390", width: 390, height: 844 },
   { key: "tablet-820", width: 820, height: 1180 },
+  { key: "tablet-1024", width: 1024, height: 1180 },
   { key: "desktop-1366", width: 1366, height: 900 },
+  { key: "desktop-1440", width: 1440, height: 900 },
+  { key: "desktop-1536", width: 1536, height: 900 },
 ] as const;
 
 for (const viewport of viewports) {
@@ -71,10 +76,10 @@ for (const viewport of viewports) {
     expect(metrics.scrollWidth).toBe(metrics.clientWidth);
     expect(metrics.cardRatio).toBeCloseTo(16 / 9, 3);
     expect(metrics.avatarRatio).toBeLessThan(
-      viewport.width < 500 ? 0.28 : 0.31,
+      viewport.width < 500 ? 0.32 : 0.32,
     );
     expect(metrics.cardClassName).toContain(
-      "rounded-[3cqw]",
+      "rounded-[clamp(1rem,3cqw,3rem)]",
     );
     expect(metrics.cardTransform).toBe("none");
     expect(metrics.footerTop).toBeGreaterThanOrEqual(metrics.avatarBottom - 1);

@@ -56,6 +56,7 @@ export default async function SignupCompletePage({ searchParams }: PageProps) {
                 mmUserId: signupSession.mmUserId,
                 mmUsername: signupSession.mmUsername,
                 displayName: signupSession.displayName,
+                campus: signupSession.campus ?? null,
                 subjectGeneration: signupSession.subjectGeneration,
                 senderGeneration: signupSession.senderGeneration,
                 signupMode: signupSession.signupMode,

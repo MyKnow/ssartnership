@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
-import { getSignedUserSession } from "@/lib/user-auth";
-import { clearUserSession } from "@/lib/user-auth";
+import { clearAdminSession } from "@/lib/auth";
+import { clearUserSession, getSignedUserSession } from "@/lib/user-auth";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export async function POST(request: Request) {
@@ -18,7 +18,10 @@ export async function POST(request: Request) {
   }
 
   const session = await getSignedUserSession();
-  await clearUserSession();
+  await Promise.all([
+    clearUserSession(),
+    clearAdminSession(),
+  ]);
   await logAuthSecurity({
     ...context,
     eventName: "member_logout",

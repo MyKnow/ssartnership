@@ -118,6 +118,7 @@ export async function POST(request: Request) {
     const mmUserId = verification.mmUserId;
     const mmUsername = verification.mmUsername.trim();
     const displayName = verification.displayName.trim();
+    const campus = verification.campus?.trim() || null;
     const approvalMode = verification.signupMode === "approval";
     const parseExclusionReason: MattermostSignupParseReason | null = approvalMode
       ? verification.parseExclusionReason ?? "profile_unavailable"
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
       mmUserId,
       mmUsername,
       displayName,
-      campus: null,
+      campus,
       isStaff,
       sourceYears,
     });
@@ -215,7 +216,7 @@ export async function POST(request: Request) {
         display_name: displayName,
         generation: verification.subjectGeneration,
         staff_source_generation: isStaff ? verification.senderGeneration : null,
-        campus: null,
+        campus,
         password_hash: password.hash,
         password_salt: password.salt,
         must_change_password: false,
