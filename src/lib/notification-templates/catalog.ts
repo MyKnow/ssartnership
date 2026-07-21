@@ -568,8 +568,8 @@ const mattermostTemplates: NotificationTemplateDefinition[] = [
     description: "회원가입 시 Mattermost DM으로 전송하는 6자리 코드입니다.",
     group: "Mattermost",
     channel: "mattermost",
-    titleTemplate: "[싸트너십] {title}",
-    bodyTemplate: "인증 코드: `{code}`\n코드는 5분 동안 한 번만 사용할 수 있습니다.\n본인이 요청하지 않았다면 이 메시지를 무시해 주세요.",
+    titleTemplate: "### [SSARTNERSHIP] {title}",
+    bodyTemplate: "아래 코드를 복사해서 입력하세요.\n\n```\n{code}\n```\n- 유효 시간: 5분\n---\n타인에게 노출하지 마세요.",
     variables: [title, code],
   }),
   defineTemplate({
@@ -578,8 +578,8 @@ const mattermostTemplates: NotificationTemplateDefinition[] = [
     description: "비밀번호 재설정 시 Mattermost DM으로 전송하는 6자리 코드입니다.",
     group: "Mattermost",
     channel: "mattermost",
-    titleTemplate: "[싸트너십] {title}",
-    bodyTemplate: "인증 코드: `{code}`\n코드는 5분 동안 한 번만 사용할 수 있습니다.\n본인이 요청하지 않았다면 이 메시지를 무시해 주세요.",
+    titleTemplate: "### [SSARTNERSHIP] {title}",
+    bodyTemplate: "아래 코드를 복사해서 입력하세요.\n\n```\n{code}\n```\n- 유효 시간: 5분\n---\n타인에게 노출하지 마세요.",
     variables: [title, code],
   }),
   defineTemplate({

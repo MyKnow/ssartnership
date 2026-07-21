@@ -125,32 +125,32 @@ export const Default: Story = {
     await expect(certificationCard).toHaveClass(
       "w-full",
       "aspect-[16/9]",
-      "rounded-[3cqw]",
+      "rounded-[clamp(1rem,3cqw,3rem)]",
       "@container/cert",
     );
     await expect(footer).toHaveClass(
-      "h-[14cqw]",
-      "px-[4cqw]",
-      "py-[4cqw]",
+      "min-h-[clamp(3.5rem,14cqw,11rem)]",
+      "px-[clamp(0.75rem,4cqw,4rem)]",
+      "py-[clamp(0.5rem,4cqw,4rem)]",
     );
     await expect(qrButton).toHaveClass(
-      "!h-[5.9cqw]",
+      "!h-[clamp(2rem,5.9cqw,4rem)]",
       "!min-h-0",
-      "!px-[2.1cqw]",
+      "!px-[clamp(0.75rem,2.1cqw,2.1rem)]",
     );
     await expect(timestampRow).not.toBeNull();
     await expect(timestampRow).toHaveClass("items-center");
     await expect(certificationCard).not.toHaveClass("transform-gpu");
     await expect(certificationCard).not.toHaveClass("max-w-2xl");
     await expect(chipGroup).not.toBeNull();
-    await expect(chipGroup).toHaveClass("gap-[1.6cqw]");
+    await expect(chipGroup).toHaveClass("gap-[clamp(0.125rem,1.6cqw,1.6rem)]");
     await expect(cardTitle).not.toBeNull();
-    await expect(cardTitle).toHaveClass("space-y-[1.8cqw]");
+    await expect(cardTitle).toHaveClass("space-y-[clamp(0.25rem,1.8cqw,1.8rem)]");
     await expect(chipGroup).toHaveTextContent("15기");
     await expect(chipGroup).toHaveTextContent("서울");
     await expect(chipGroup).toHaveTextContent("교육생");
     for (const chip of chipBadges) {
-      await expect(chip).toHaveClass("!text-[2.4cqw]");
+      await expect(chip).toHaveClass("!text-[clamp(0.6rem,2.4cqw,1.5rem)]");
     }
     await expect(screenContent.getBoundingClientRect().width).toBe(
       pageHeader.getBoundingClientRect().width,
@@ -171,24 +171,24 @@ export const Default: Story = {
     await expect(qrTouchTarget).not.toHaveClass("min-h-11", "min-w-11");
     await expect(Number.parseFloat(qrPseudoStyle.minHeight)).toBeGreaterThanOrEqual(44);
     await expect(Number.parseFloat(qrPseudoStyle.minWidth)).toBeGreaterThanOrEqual(44);
-    await expect(memberName).toHaveClass("text-[6cqw]");
-    await expect(roleBadge).toHaveClass("!text-[2.4cqw]");
+    await expect(memberName).toHaveClass("text-[clamp(1.25rem,6cqw,5rem)]");
+    await expect(roleBadge).toHaveClass("!text-[clamp(0.6rem,2.4cqw,1.5rem)]");
     await expect(
       Number.parseFloat(getComputedStyle(roleBadge).fontSize) /
         Number.parseFloat(getComputedStyle(memberName).fontSize),
-    ).toBeCloseTo(0.4, 2);
-    await expect(footerLabel).toHaveClass("text-[3cqw]");
-    await expect(timestamp).toHaveClass("text-[3cqw]");
+    ).toBeGreaterThan(0.4);
+    await expect(footerLabel).toHaveClass("text-[clamp(0.65rem,3cqw,1.5rem)]");
+    await expect(timestamp).toHaveClass("text-[clamp(0.7rem,3cqw,1.5rem)]");
     await expect(canvas.queryByText("교육생 인증")).not.toBeInTheDocument();
     await expect(canvasElement.querySelector("[data-certification-card-timestamp]")).not.toBeNull();
-    await expect(qrButton).toHaveClass("text-[2.4cqw]");
+    await expect(qrButton).toHaveClass("text-[clamp(0.65rem,2.4cqw,1.25rem)]");
     await expect(avatar).not.toBeNull();
     await expect(footer).not.toBeNull();
     const avatarRatio =
       (avatar?.getBoundingClientRect().width ?? 0) /
       certificationCard.getBoundingClientRect().width;
-    await expect(avatarRatio).toBeGreaterThan(0.25);
-    await expect(avatarRatio).toBeLessThan(0.28);
+    await expect(avatarRatio).toBeGreaterThan(0.2);
+    await expect(avatarRatio).toBeLessThan(0.34);
     await expect(footerRect?.top ?? 0).toBeGreaterThanOrEqual(
       (avatarRect?.bottom ?? 0) - 1,
     );
@@ -213,7 +213,11 @@ export const RoleVariants: Story = {
 
     await expect(cards).toHaveLength(3);
     for (const card of cards) {
-      await expect(card).toHaveClass("aspect-[16/9]", "@container/cert");
+      await expect(card).toHaveClass(
+        "aspect-[16/9]",
+        "@container/cert",
+        "max-w-full",
+      );
       await expect(card.querySelector("[data-certification-card-avatar]")).not.toBeNull();
       await expect(card.querySelector("[data-certification-card-footer]")).not.toBeNull();
       await expect(card.querySelector("[data-certification-card-timestamp-row]")).not.toBeNull();

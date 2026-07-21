@@ -18,6 +18,7 @@ export type MattermostCodeSession = {
   mmUserId: string;
   mmUsername: string;
   displayName: string;
+  campus?: string | null;
   subjectGeneration: number;
   senderGeneration: number;
   signupMode?: MattermostSignupMode;
@@ -51,6 +52,9 @@ function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null
     || !payload.mmUsername
     || typeof payload.displayName !== "string"
     || !payload.displayName
+    || (payload.campus !== undefined
+      && payload.campus !== null
+      && typeof payload.campus !== "string")
     || !Number.isSafeInteger(payload.subjectGeneration)
     || (payload.subjectGeneration as number) < 0
     || !Number.isSafeInteger(payload.senderGeneration)
@@ -78,7 +82,12 @@ function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null
     ...(signupMode ? { signupMode } : {}),
     ...(parseExclusionReason ? { parseExclusionReason } : {}),
     ...(payload.purpose === "signup"
-      ? { signupUploadOwnerId: payload.signupUploadOwnerId as string }
+      ? {
+          campus: typeof payload.campus === "string"
+            ? payload.campus.trim() || null
+            : null,
+          signupUploadOwnerId: payload.signupUploadOwnerId as string,
+        }
       : {}),
   } as SignedMattermostCodeSession;
 }

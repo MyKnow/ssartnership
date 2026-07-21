@@ -31,6 +31,7 @@ type Props = {
     mmUserId: string;
     mmUsername: string;
     displayName: string;
+    campus: string | null;
     subjectGeneration: number;
     senderGeneration: number;
     signupMode?: MattermostSignupMode;
@@ -323,7 +324,7 @@ export default function MattermostSignupCompleteForm({
 
   return (
     <div className="mt-6 flex flex-col gap-5">
-      <div className={isApprovalMode ? "grid gap-4" : "grid gap-4 sm:grid-cols-3"}>
+      <div className={isApprovalMode ? "grid gap-4" : "grid gap-4 sm:grid-cols-2 lg:grid-cols-4"}>
         <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
           MM 아이디
           <Input value={session.mmUsername} disabled aria-label="MM 아이디" />
@@ -340,6 +341,14 @@ export default function MattermostSignupCompleteForm({
                 value={formatSsafyYearLabel(session.subjectGeneration)}
                 disabled
                 aria-label="기수"
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              캠퍼스
+              <Input
+                value={session.campus ?? "미확인"}
+                disabled
+                aria-label="캠퍼스"
               />
             </label>
           </>

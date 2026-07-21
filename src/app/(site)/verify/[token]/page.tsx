@@ -121,42 +121,42 @@ export default async function CertificationVerifyPage({
                 campusLabel={campusLabel}
                 description=""
                 footer={
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-xs">
+                  <div className="min-w-0 space-y-[clamp(0.5rem,1.5cqw,1.5rem)]">
+                    <div className="flex min-w-0 items-center gap-[clamp(0.35rem,1cqw,1rem)] text-[clamp(0.65rem,1.6cqw,1rem)]">
                       <span
                         className={cn(
                           "inline-flex h-2 w-2 rounded-full",
                           scheme.accentClassName,
                         )}
                       />
-                      <span className={scheme.subduedTextClassName}>
+                      <span className={cn("min-w-0 truncate", scheme.subduedTextClassName)}>
                         QR 토큰이 유효합니다.
                       </span>
                     </div>
-                    <div className="grid gap-2 text-sm">
-                      <div className="flex items-center justify-between gap-3">
+                    <div className="grid min-w-0 gap-[clamp(0.35rem,1cqw,1rem)] text-[clamp(0.65rem,1.8cqw,1rem)]">
+                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-[clamp(0.5rem,2cqw,2rem)] gap-y-1">
                         <span
                           className={cn(
-                            "text-xs font-medium uppercase tracking-[0.16em]",
+                            "shrink-0 text-[clamp(0.6rem,1.4cqw,0.875rem)] font-medium uppercase tracking-[0.16em]",
                             scheme.mutedTextClassName,
                           )}
                         >
                           발급 시각
                         </span>
-                        <span className="whitespace-nowrap font-semibold">
+                        <span className="min-w-0 truncate text-right whitespace-nowrap font-semibold">
                           {formatDate(verification.payload.issuedAt)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-[clamp(0.5rem,2cqw,2rem)] gap-y-1">
                         <span
                           className={cn(
-                            "text-xs font-medium uppercase tracking-[0.16em]",
+                            "shrink-0 text-[clamp(0.6rem,1.4cqw,0.875rem)] font-medium uppercase tracking-[0.16em]",
                             scheme.mutedTextClassName,
                           )}
                         >
                           만료 시각
                         </span>
-                        <span className="whitespace-nowrap font-semibold">
+                        <span className="min-w-0 truncate text-right whitespace-nowrap font-semibold">
                           {formatDate(verification.payload.expiresAt)}
                         </span>
                       </div>

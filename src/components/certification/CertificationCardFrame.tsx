@@ -55,7 +55,7 @@ export default function CertificationCardFrame({
   return (
     <div
       className={cn(
-        "@container/cert relative isolate mx-auto aspect-[16/9] w-full min-w-0 overflow-hidden rounded-[3cqw] border p-[4cqw] shadow-overlay ring-1",
+        "@container/cert relative isolate mx-auto aspect-[16/9] w-full max-w-full min-w-0 overflow-hidden rounded-[clamp(1rem,3cqw,3rem)] border p-[clamp(0.75rem,4cqw,4rem)] shadow-overlay ring-1",
         onCardClick
           ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
           : null,
@@ -100,33 +100,33 @@ export default function CertificationCardFrame({
         <div className="absolute inset-x-0 bottom-0 h-[0.125cqw] bg-white/10" />
       </div>
 
-      <div className="relative grid h-full grid-cols-[minmax(0,1fr)_30cqw] grid-rows-[minmax(0,1fr)_auto] gap-x-[4cqw] gap-y-[2cqw]">
+      <div className="relative grid h-full min-h-0 grid-cols-[minmax(0,1fr)_clamp(3.75rem,28cqw,28rem)] grid-rows-[minmax(0,1fr)_minmax(clamp(3.5rem,14cqw,11rem),auto)] gap-x-[clamp(1rem,4cqw,4rem)] gap-y-[clamp(0.25rem,2cqw,2rem)]">
         <div
           data-certification-card-identity
-          className="row-start-1 col-start-1 min-w-0 space-y-[1cqw]"
+          className="row-start-1 col-start-1 min-h-0 min-w-0 space-y-[clamp(0.25rem,1cqw,1rem)] overflow-hidden"
         >
-          <div className="flex min-w-0 items-start justify-between gap-[1.5cqw]">
+          <div className="certification-card-identity-header grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-start gap-[clamp(0.25rem,1.5cqw,1.5rem)]">
             <div
               data-certification-card-title
-              className="min-w-0 flex-1 space-y-[1.8cqw]"
+              className="min-w-0 space-y-[clamp(0.25rem,1.8cqw,1.8rem)]"
             >
-              <p className={cn("text-[2.4cqw] font-semibold uppercase tracking-[0.3em]", scheme.mutedTextClassName)}>
+              <p className={cn("text-[clamp(0.6rem,2.4cqw,1.5rem)] font-semibold uppercase tracking-[0.3em]", scheme.mutedTextClassName)}>
                 {eyebrow}
               </p>
-              <h2 className="truncate break-keep text-[6cqw] font-semibold leading-[1.03]">
+              <h2 className="truncate break-keep text-[clamp(1.25rem,6cqw,5rem)] font-semibold leading-[1.03]">
                 {name}
               </h2>
             </div>
             <div
               data-certification-card-chip-group
-              className="flex shrink-0 flex-nowrap items-center justify-end gap-[1.6cqw]"
+              className="certification-card-chip-group flex min-w-0 max-w-full flex-wrap items-center justify-end gap-[clamp(0.125rem,1.6cqw,1.6rem)]"
               aria-label="기수 캠퍼스 역할"
             >
               {yearLabel ? (
                 <Badge
                   className={cn(
                     scheme.yearChipClassName,
-                    "!px-[1.5cqw] !py-[0.7cqw] !text-[2.4cqw]",
+                    "!px-[clamp(0.4rem,1.5cqw,1.5rem)] !py-[clamp(0.2rem,0.7cqw,0.7rem)] !text-[clamp(0.6rem,2.4cqw,1.5rem)]",
                   )}
                 >
                   {yearLabel}
@@ -136,7 +136,7 @@ export default function CertificationCardFrame({
                 <Badge
                   className={cn(
                     scheme.campusBadgeClassName,
-                    "min-w-0 max-w-[24cqw] truncate !px-[1.5cqw] !py-[0.7cqw] !text-[2.4cqw]",
+                    "min-w-0 max-w-[clamp(3rem,24cqw,24rem)] truncate !px-[clamp(0.4rem,1.5cqw,1.5rem)] !py-[clamp(0.2rem,0.7cqw,0.7rem)] !text-[clamp(0.6rem,2.4cqw,1.5rem)]",
                   )}
                 >
                   {campusLabel}
@@ -145,7 +145,7 @@ export default function CertificationCardFrame({
               <Badge
                 className={cn(
                   scheme.roleBadgeClassName,
-                  "!px-[1.5cqw] !py-[0.7cqw] !text-[2.4cqw]",
+                  "!px-[clamp(0.4rem,1.5cqw,1.5rem)] !py-[clamp(0.2rem,0.7cqw,0.7rem)] !text-[clamp(0.6rem,2.4cqw,1.5rem)]",
                 )}
               >
                 {roleLabel}
@@ -154,14 +154,14 @@ export default function CertificationCardFrame({
           </div>
 
           {description ? (
-            <p className={cn("max-w-[30ch] text-[1.6cqw] leading-[1.5]", scheme.subduedTextClassName)}>
+            <p className={cn("max-w-[30ch] truncate break-keep text-[clamp(0.65rem,1.6cqw,1rem)] leading-[1.5]", scheme.subduedTextClassName)}>
               {description}
             </p>
           ) : null}
         </div>
 
         <div className={cn(
-          "relative row-start-1 col-start-2 aspect-square w-full self-start overflow-hidden rounded-[3cqw] border bg-white/10 shadow-[0_3.2cqw_6.7cqw_rgba(15,23,42,0.26)] ring-1 animate-[cert-float_7s_ease-in-out_infinite] motion-reduce:animate-none",
+          "relative row-start-1 col-start-2 aspect-square w-full max-w-full self-start overflow-hidden rounded-[clamp(1rem,3cqw,3rem)] border bg-white/10 shadow-[0_3.2cqw_6.7cqw_rgba(15,23,42,0.26)] ring-1 animate-[cert-float_7s_ease-in-out_infinite] motion-reduce:animate-none",
           scheme.avatarFrameClassName,
         )}
           data-certification-card-avatar
@@ -202,7 +202,7 @@ export default function CertificationCardFrame({
         <div
           data-certification-card-footer
           className={cn(
-            "row-start-2 col-span-2 h-[14cqw] rounded-[3cqw] border px-[4cqw] py-[4cqw] shadow-[inset_0_0.125cqw_0_rgba(255,255,255,0.06)] backdrop-blur-md",
+            "row-start-2 col-span-2 min-h-[clamp(3.5rem,14cqw,11rem)] min-w-0 max-w-full overflow-hidden rounded-[clamp(1rem,3cqw,3rem)] border px-[clamp(0.75rem,4cqw,4rem)] py-[clamp(0.5rem,4cqw,4rem)] shadow-[inset_0_0.125cqw_0_rgba(255,255,255,0.06)] backdrop-blur-md",
             scheme.panelClassName,
           )}
         >

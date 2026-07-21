@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { clearAdminSession } from "@/lib/auth";
 import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
       authenticationMethod: "mattermost",
       freshAuthentication: true,
     });
+    await clearAdminSession();
     revalidatePath("/");
     revalidatePath("/auth/consent");
     revalidatePath("/auth/change-password");

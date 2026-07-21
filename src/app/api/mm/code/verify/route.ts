@@ -185,6 +185,7 @@ export async function POST(request: Request) {
         mmUserId: verified.mmUserId,
         mmUsername,
         displayName,
+        campus: profileClassification.profile.campus ?? null,
         subjectGeneration: verified.subjectGeneration,
         senderGeneration: verified.senderGeneration,
         signupMode: profileClassification.mode,
