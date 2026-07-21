@@ -19,7 +19,7 @@ export default function PartnerCardMedia({
       className={cn(
         "relative aspect-square shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-muted",
         compact
-          ? "h-full min-h-16 w-auto max-w-24 self-stretch"
+          ? "size-20 self-start min-[390px]:size-24"
           : "w-32 sm:w-36",
       )}
     >

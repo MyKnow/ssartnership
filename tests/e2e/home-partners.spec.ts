@@ -9,7 +9,7 @@ async function typeSearch(page: Page, value: string) {
 
 test.describe("public partner discovery", () => {
   test("keeps the mobile list summary compact without a separate detail action", async ({ page }) => {
-    for (const width of [320, 360]) {
+    for (const width of [320, 360, 390]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/?view=list#benefits");
       await page.waitForLoadState("networkidle");
@@ -19,6 +19,7 @@ test.describe("public partner discovery", () => {
       const detailAction = card.getByRole("link", { name: "제휴 상세 보기" });
       const titleLink = card.getByRole("link", { name: /상세 보기/ });
       const thumbnail = card.locator("[data-partner-card-media]");
+      const primaryContent = card.locator("[data-partner-card-primary-content]");
       const categoryControl = card.getByRole("button", { name: /필터 적용$/ });
       const favoriteMetric = card.getByLabel(/즐겨찾기 \d+개/);
       await expect(detailAction).toHaveCount(0);
@@ -27,12 +28,17 @@ test.describe("public partner discovery", () => {
 
       const cardBox = await card.boundingBox();
       const thumbnailBox = await thumbnail.boundingBox();
+      const primaryContentBox = await primaryContent.boundingBox();
       expect(cardBox).not.toBeNull();
       expect(thumbnailBox).not.toBeNull();
+      expect(primaryContentBox).not.toBeNull();
 
-      if (!cardBox || !thumbnailBox) {
+      if (!cardBox || !thumbnailBox || !primaryContentBox) {
         continue;
       }
+      expect(thumbnailBox.x + thumbnailBox.width + 8).toBeLessThanOrEqual(
+        primaryContentBox.x,
+      );
       await expect
         .poll(
           async () => {
@@ -282,6 +288,34 @@ test.describe("public partner discovery", () => {
 
     await expect(page).toHaveURL(/\/partners\/[^/?]+(?:\?|$)/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
+  test("keeps the scroll-to-top action above the mobile detail action bar", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#benefits");
+
+    const card = page.getByTestId("partner-card").first();
+    await expect(card).toBeVisible();
+    await card.getByRole("link", { name: /상세 보기/ }).first().click();
+
+    const actionBar = page.locator("[data-partner-detail-mobile-action-bar]");
+    await expect(actionBar).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+    const scrollToTop = page.getByRole("button", { name: "맨 위로 이동" });
+    await expect(scrollToTop).toBeVisible();
+
+    const actionBarBox = await actionBar.boundingBox();
+    const scrollToTopBox = await scrollToTop.boundingBox();
+    expect(actionBarBox).not.toBeNull();
+    expect(scrollToTopBox).not.toBeNull();
+    if (actionBarBox && scrollToTopBox) {
+      expect(scrollToTopBox.y + scrollToTopBox.height + 8).toBeLessThanOrEqual(
+        actionBarBox.y,
+      );
+    }
   });
 
   test("filters partners by search keyword and shows an empty state", async ({ page }) => {

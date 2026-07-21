@@ -60,7 +60,7 @@ export default function PartnerDetailMobileActionBar({
             : undefined
         }
         disabled={Boolean(benefitUseAction.disabled)}
-        variant={benefitUseAction.disabled ? "secondary" : "primary"}
+        variant="primary"
         className={className}
         onClick={() =>
           trackProductEvent({
@@ -80,14 +80,15 @@ export default function PartnerDetailMobileActionBar({
     <>
       <div
         data-partner-detail-mobile-action-bar
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface-overlay/95 pb-safe-bottom-4 shadow-overlay backdrop-blur-xl md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface-overlay/95 pb-safe-bottom-2 shadow-overlay backdrop-blur-xl md:hidden"
       >
-        <Container className="py-3">
+        <Container className="py-2">
           <div
+            data-partner-detail-mobile-action-buttons
             className={
               hasBenefitAction && inquiryAction
-                ? "grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-2"
-                : "grid"
+                ? "grid grid-cols-2 gap-2"
+                : "grid grid-cols-1"
             }
           >
             {renderBenefitAction(
@@ -106,11 +107,9 @@ export default function PartnerDetailMobileActionBar({
                     : undefined
                 }
                 variant={
-                  hasBenefitAction && !benefitUseAction?.disabled
-                    ? "secondary"
-                    : "primary"
+                  hasBenefitAction ? "secondary" : "primary"
                 }
-                className="min-w-0 justify-center px-3"
+                className="h-14 w-full min-w-0 justify-center rounded-[1rem] px-3"
                 ariaLabel={`문의하기: ${inquiryAction.label}`}
                 onClick={() =>
                   trackProductEvent({

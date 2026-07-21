@@ -228,12 +228,13 @@ export const CompactListFavoritable: Story = {
     );
     await expect(media).not.toBeNull();
     await expect(primaryContent).not.toBeNull();
-    await expect(media?.getBoundingClientRect().height).toBe(
-      primaryContent?.getBoundingClientRect().height,
-    );
+    await expect(media).toHaveClass("size-20", "min-[390px]:size-24");
     await expect(media?.getBoundingClientRect().width).toBe(
       media?.getBoundingClientRect().height,
     );
+    await expect(
+      (media?.getBoundingClientRect().right ?? 0) + 8,
+    ).toBeLessThanOrEqual(primaryContent?.getBoundingClientRect().left ?? 0);
   },
 };
 
@@ -266,9 +267,10 @@ export const CompactListWithoutAddress: Story = {
     await expect(locationSlot).not.toBeNull();
     await expect(locationSlot).toHaveClass("min-h-4", "sm:min-h-5");
     await expect(locationSlot).toHaveAttribute("aria-hidden", "true");
-    await expect(media?.getBoundingClientRect().height).toBe(
-      primaryContent?.getBoundingClientRect().height,
-    );
+    await expect(media).toHaveClass("size-20", "min-[390px]:size-24");
+    await expect(
+      (media?.getBoundingClientRect().right ?? 0) + 8,
+    ).toBeLessThanOrEqual(primaryContent?.getBoundingClientRect().left ?? 0);
   },
 };
 

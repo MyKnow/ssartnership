@@ -37,6 +37,18 @@ export const Default: Story = {
     const canvas = within(canvasElement);
 
     await expect(canvas.getByTestId("certification-card-frame")).toBeVisible();
+    await expect(canvas.getByTestId("certification-card-frame")).toHaveClass(
+      "!aspect-[16/10]",
+      "min-[480px]:!aspect-[16/9]",
+    );
+    const certificationCard = canvas.getByTestId("certification-card-frame");
+    const certificationFooter = certificationCard.querySelector<HTMLElement>(
+      "[data-certification-card-footer]",
+    );
+    await expect(certificationFooter).not.toBeNull();
+    await expect(certificationFooter!.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      certificationCard.getBoundingClientRect().bottom + 1,
+    );
     await expect(canvas.getByText("카페 싸피 역삼점")).toBeVisible();
     await expect(canvas.getByText("아메리카노 1+1 및 디저트 20% 할인")).toBeVisible();
     const pinInput = canvasElement.querySelector<HTMLInputElement>(
