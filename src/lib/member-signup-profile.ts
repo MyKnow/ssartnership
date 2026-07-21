@@ -114,17 +114,9 @@ export async function attachMattermostSignupProfileImage(input: {
     imageId = inserted.id as string;
   }
 
-  const { error: memberError } = await supabase
-    .from("members")
-    .update({
-      active_profile_image_id: imageId,
-      profile_photo_review_status: "approved",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.memberId)
-    .is("deleted_at", null);
-  if (memberError) {
-    throw new Error("가입 프로필 이미지를 회원 정보에 연결하지 못했습니다.");
-  }
+  // The member domain now derives the active image from the canonical
+  // member_profile_images ledger. The legacy members pointer columns were
+  // removed by the domain contract migration, so the approved ledger row is
+  // the complete attachment record for a new signup.
   return { imageId, storagePath: attached.path };
 }
