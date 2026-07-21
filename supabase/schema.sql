@@ -10408,6 +10408,7 @@ create table if not exists public.image_upload_sessions (
   role text not null,
   storage_bucket text not null default 'image-upload-staging',
   storage_path text not null unique,
+  source_storage_path text,
   source_content_type text,
   source_size_bytes integer,
   content_type text,
