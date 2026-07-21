@@ -93,6 +93,7 @@
 | GET | `/api/cron/partner-billing` | 협력사 billing batch |
 | GET | `/api/cron/push-expiring-partners` | 종료 예정 제휴 push |
 | GET | `/api/cron/rss` | RSS refresh |
+| GET | `/api/cron/purge-expired-operational-logs` | 1년 경과 운영·보안 원본 로그 정리 |
 
 ## External integrations
 
