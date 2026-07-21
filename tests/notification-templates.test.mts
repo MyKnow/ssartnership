@@ -94,9 +94,9 @@ test("Mattermost 인증 코드 템플릿은 5분 만료 문구와 운영 보정 
   for (const template of mattermostCodeTemplates) {
     assert.equal(template.titleTemplate, "### [SSARTNERSHIP] {title}");
     assert.match(template.bodyTemplate, /5분/);
-    assert.match(
+    assert.equal(
       template.bodyTemplate,
-      /아래 코드를 복사해서 입력하세요\.\n\n```\n\{code\}\n```\n- 유효 시간: 5분\n---\n타인에게 노출하지 마세요\./,
+      "아래 코드를 복사해서 입력하세요.\n\n```\n{code}\n```\n- 유효 시간: 5분\n- 타인에게 노출하지 마세요.",
     );
     assert.doesNotMatch(template.bodyTemplate, /10분/);
   }
@@ -123,6 +123,18 @@ test("Mattermost 인증 코드 템플릿은 5분 만료 문구와 운영 보정 
   assert.match(formatMigration, /### \[SSARTNERSHIP\] \{title\}/);
   assert.match(formatMigration, /아래 코드를 복사해서 입력하세요/);
   assert.match(formatMigration, /타인에게 노출하지 마세요/);
+
+  const separatorMigration = await readFile(
+    new URL(
+      "../supabase/migrations/20260721134254_remove_mattermost_code_template_separator.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(separatorMigration, /mattermost\.signup_code/);
+  assert.match(separatorMigration, /mattermost\.reset_password_code/);
+  assert.match(separatorMigration, /- 타인에게 노출하지 마세요/);
+  assert.match(separatorMigration, /body_template =/);
 });
 
 test("의미 기반 자동·운영 템플릿은 실제 이벤트 변수를 계약한다", async () => {

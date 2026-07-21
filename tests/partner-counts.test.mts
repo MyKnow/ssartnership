@@ -62,33 +62,33 @@ test("toAdminDashboardCounts normalizes nullable and string RPC values", () => {
   });
 });
 
-test("fetchPartnerEngagementCounts merges favorite and review maps", async () => {
+test("fetchPartnerEngagementCounts reads favorite and review counts in one RPC", async () => {
+  const rpcCalls: string[] = [];
   const result = await fetchPartnerEngagementCounts(
     {
-      rpc: async () => ({
+      rpc: async (name: string) => {
+        rpcCalls.push(name);
+        return {
         data: [
-          { partner_id: "partner-a", review_count: "4" },
-          { partner_id: "partner-b", review_count: 2 },
+            { partner_id: "partner-a", favorite_count: 7, review_count: "4" },
+            { partner_id: "partner-b", favorite_count: "1", review_count: 2 },
         ],
         error: null,
-      }),
+        };
+      },
     } as never,
     ["partner-a", "partner-b"],
-    async () => new Map([
-      ["partner-a", 7],
-      ["partner-b", 1],
-    ]),
   );
 
-  assert.equal(result.favoriteErrorMessage, null);
-  assert.equal(result.reviewErrorMessage, null);
+  assert.deepEqual(rpcCalls, ["get_partner_engagement_counts"]);
+  assert.equal(result.engagementErrorMessage, null);
   assert.equal(result.favoriteCounts.get("partner-a"), 7);
   assert.equal(result.favoriteCounts.get("partner-b"), 1);
   assert.equal(result.reviewCounts.get("partner-a"), 4);
   assert.equal(result.reviewCounts.get("partner-b"), 2);
 });
 
-test("fetchPartnerEngagementCounts degrades to zero maps on loader failures", async () => {
+test("fetchPartnerEngagementCounts degrades both maps to zero on RPC failures", async () => {
   const result = await fetchPartnerEngagementCounts(
     {
       rpc: async () => {
@@ -96,13 +96,9 @@ test("fetchPartnerEngagementCounts degrades to zero maps on loader failures", as
       },
     } as never,
     ["partner-a"],
-    async () => {
-      throw new Error("favorite failed");
-    },
   );
 
-  assert.equal(result.favoriteErrorMessage, "favorite failed");
-  assert.equal(result.reviewErrorMessage, "review failed");
+  assert.equal(result.engagementErrorMessage, "review failed");
   assert.equal(result.favoriteCounts.get("partner-a"), 0);
   assert.equal(result.reviewCounts.get("partner-a"), 0);
 });

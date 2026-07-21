@@ -2,7 +2,12 @@ name: Verify Node Lockfile
 
 on:
   push:
+    branches: [main, dev]
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lockfile:

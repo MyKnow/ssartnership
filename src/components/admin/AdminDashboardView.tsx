@@ -14,12 +14,14 @@ import InlineMessage from "@/components/ui/InlineMessage";
 import Skeleton from "@/components/ui/Skeleton";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Surface from "@/components/ui/Surface";
+import AdminPlatformActivityMetricsPanel from "@/components/admin/AdminPlatformActivityMetricsPanel";
 import {
   type AdminPermissionMatrix,
   type AdminPermissionResource,
   canAdmin,
 } from "@/lib/admin-permissions";
 import type { AdminDashboardCounts } from "@/lib/partner-counts";
+import type { AdminPlatformActivityMetrics } from "@/lib/platform-activity-metrics";
 
 export type AdminDashboardQueueCounts = {
   registrationPendingCount: number;
@@ -66,6 +68,8 @@ export default function AdminDashboardView({
   permissions,
   cycleMeta,
   includeGlobalTasks = true,
+  platformActivityMetrics,
+  platformActivityErrorMessage,
   state = "ready",
   errorMessage,
 }: {
@@ -74,6 +78,8 @@ export default function AdminDashboardView({
   permissions: AdminPermissionMatrix;
   cycleMeta: string;
   includeGlobalTasks?: boolean;
+  platformActivityMetrics?: AdminPlatformActivityMetrics | null;
+  platformActivityErrorMessage?: string | null;
   state?: AdminDashboardViewState;
   errorMessage?: string;
 }) {
@@ -243,6 +249,8 @@ export default function AdminDashboardView({
       (!item.globalOnly || includeGlobalTasks) &&
       canAdmin(permissions, item.permission, "read"),
   );
+  const canViewPlatformActivity =
+    includeGlobalTasks && canAdmin(permissions, "logs", "read");
 
   return (
     <div className="grid min-w-0 gap-6">
@@ -368,6 +376,18 @@ export default function AdminDashboardView({
           </p>
         </Surface>
       </section>
+
+      {canViewPlatformActivity ? (
+        platformActivityErrorMessage ? (
+          <InlineMessage
+            tone="warning"
+            title="서비스 활성 지표를 불러오지 못했습니다."
+            description="기존 로그 집계가 완료되면 이 영역에서 DAU·WAU·MAU를 확인할 수 있습니다."
+          />
+        ) : platformActivityMetrics ? (
+          <AdminPlatformActivityMetricsPanel metrics={platformActivityMetrics} />
+        ) : null
+      ) : null}
     </div>
   );
 }
