@@ -8,7 +8,6 @@ import {
 } from "./partner-metric-rollups.ts";
 import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store.ts";
 import { isPartnerPortalMock } from "./partner-portal.ts";
-import { partnerFavoriteRepository } from "./repositories/index.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 import { fetchPartnerEngagementCounts } from "./partner-counts.ts";
 
@@ -72,7 +71,6 @@ export async function getPartnerServiceMetrics(
     fetchPartnerEngagementCounts(
       supabase,
       [partnerId],
-      (partnerIds) => partnerFavoriteRepository.getFavoriteCounts(partnerIds),
     ),
   ]);
 
@@ -103,19 +101,11 @@ export async function getPartnerServiceMetrics(
     }
   }
 
-  if (engagementCounts.reviewErrorMessage) {
+  if (engagementCounts.engagementErrorMessage) {
     markPartialFailure();
-    console.error("[partner-service-metrics] review query failed", {
+    console.error("[partner-service-metrics] engagement query failed", {
       partnerId,
-      message: engagementCounts.reviewErrorMessage,
-    });
-  }
-
-  if (engagementCounts.favoriteErrorMessage) {
-    markPartialFailure();
-    console.error("[partner-service-metrics] favorite query failed", {
-      partnerId,
-      message: engagementCounts.favoriteErrorMessage,
+      message: engagementCounts.engagementErrorMessage,
     });
   }
 

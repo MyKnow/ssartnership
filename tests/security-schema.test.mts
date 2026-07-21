@@ -39,6 +39,7 @@ const sensitiveTables = [
   "push_message_logs",
   "push_delivery_logs",
   "event_logs",
+  "platform_active_identities",
   "partner_metric_rollups",
   "partner_metric_unique_visitors",
   "ad_campaigns",

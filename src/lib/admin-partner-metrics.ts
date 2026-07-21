@@ -9,7 +9,6 @@ import {
 } from "@/lib/partner-metric-rollups";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
-import { partnerFavoriteRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { fetchPartnerEngagementCounts } from "@/lib/partner-counts";
 
@@ -88,7 +87,6 @@ export async function getAdminPartnerMetrics(
     fetchPartnerEngagementCounts(
       supabase,
       uniquePartnerIds,
-      (partnerIds) => partnerFavoriteRepository.getFavoriteCounts(partnerIds),
     ),
   ]);
 
@@ -121,9 +119,9 @@ export async function getAdminPartnerMetrics(
     }
   }
 
-  if (engagementCounts.reviewErrorMessage) {
+  if (engagementCounts.engagementErrorMessage) {
     hasPartialFailure = true;
-    console.error("[admin-partner-metrics] review query failed", engagementCounts.reviewErrorMessage);
+    console.error("[admin-partner-metrics] engagement query failed", engagementCounts.engagementErrorMessage);
   } else {
     for (const [partnerId, reviewCount] of engagementCounts.reviewCounts) {
       const metrics = metricsByPartnerId.get(partnerId);
@@ -132,11 +130,6 @@ export async function getAdminPartnerMetrics(
       }
       metrics.reviewCount = reviewCount;
     }
-  }
-
-  if (engagementCounts.favoriteErrorMessage) {
-    hasPartialFailure = true;
-    console.error("[admin-partner-metrics] favorite query failed", engagementCounts.favoriteErrorMessage);
   }
 
   for (const partnerId of uniquePartnerIds) {

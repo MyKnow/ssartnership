@@ -14,9 +14,13 @@ import {
   type AdminScopeAccountLike,
 } from "@/lib/admin-scope";
 import { getAdminSession } from "@/lib/auth";
-import { createEmptyAdminPermissionMatrix } from "@/lib/admin-permissions";
+import { canAdmin, createEmptyAdminPermissionMatrix } from "@/lib/admin-permissions";
 import { collectPagedRows } from "@/lib/log-insights/paging";
 import { fetchAdminDashboardCounts } from "@/lib/partner-counts";
+import {
+  fetchAdminPlatformActivityMetrics,
+  type AdminPlatformActivityMetrics,
+} from "@/lib/platform-activity-metrics";
 import {
   getSsafyCycleOverview,
   getSsafyCycleSettings,
@@ -194,8 +198,12 @@ export default async function AdminPage() {
     : dashboardCountResult.counts;
 
   let queueCounts = EMPTY_QUEUE_COUNTS;
+  let platformActivityMetrics: AdminPlatformActivityMetrics | null = null;
+  let platformActivityErrorMessage: string | null = null;
   if (adminSession) {
     const includeGlobalTasks = !isRegionalAdminAccount(adminSession.account);
+    const canViewPlatformActivity =
+      includeGlobalTasks && canAdmin(adminSession.account.permissions, "logs", "read");
     const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
     const scopedPartnerIds = await loadScopedPartnerIds(
       supabase,
@@ -212,6 +220,7 @@ export default async function AdminPage() {
       changeRequestPendingCount,
       planRequestPendingCount,
       unreadResult,
+      platformActivityResult,
     ] = await Promise.all([
       loadPendingRegistrationCount(supabase, adminSession.account),
       loadPendingChangeRequestCount(supabase, scopedPartnerIds),
@@ -222,6 +231,9 @@ export default async function AdminPage() {
         .eq("admin_id", adminSession.adminId)
         .is("deleted_at", null)
         .is("read_at", null),
+      canViewPlatformActivity
+        ? fetchAdminPlatformActivityMetrics(supabase)
+        : Promise.resolve(null),
     ]);
 
     queueCounts = {
@@ -230,6 +242,8 @@ export default async function AdminPage() {
       planRequestPendingCount,
       unreadNotificationCount: unreadResult.error ? 0 : unreadResult.count ?? 0,
     };
+    platformActivityMetrics = platformActivityResult?.metrics ?? null;
+    platformActivityErrorMessage = platformActivityResult?.errorMessage ?? null;
   }
 
   const cycleMeta = cycleSettings.manualCurrentYear
@@ -248,6 +262,8 @@ export default async function AdminPage() {
         includeGlobalTasks={
           adminSession ? !isRegionalAdminAccount(adminSession.account) : false
         }
+        platformActivityMetrics={platformActivityMetrics}
+        platformActivityErrorMessage={platformActivityErrorMessage}
       />
     </AdminShell>
   );

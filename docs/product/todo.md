@@ -2,9 +2,22 @@
 
 정렬 기준: 영향 범위 × 위험도 × 구현 효과. 위에 있는 항목일수록 먼저 처리한다.
 
-최종 점검: 2026-07-17
+최종 점검: 2026-07-21
 
 최신화 기준: Mattermost 직접 연동과 운영자 Sender registry가 현행 인증 기준이다. 이전 SSAFY Verify 기록은 아래 역사 섹션으로 보존한다.
+
+## 스키마·API·운영 성능 정비 (Issue #181)
+
+- [x] 관리자 홈에 로그인 회원 기준 DAU·WAU·MAU와 비로그인 방문 세션을 분리해 표시한다. 원본 식별자는 일 단위 해시 projection에 저장하지 않는다.
+- [x] 기존 `event_logs`를 일괄 집계하는 멱등 백필 migration을 추가해, 배포 전 로그가 지표의 과거 구간에도 포함되게 한다.
+- [x] 제휴처 즐겨찾기/리뷰 수를 하나의 engagement RPC로 병합해 관리자·파트너 대시보드의 왕복 수를 줄인다.
+- [x] feature branch push에서 중복 실행되던 readiness/Storybook/lockfile CI를 PR 및 `main`/`dev` push로 한정하고, 같은 ref의 이전 실행은 취소한다.
+- [ ] Preview migration을 적용한 뒤 지표 RPC, 권한, 과거 백필 결과를 확인하고 Production 수동 migration gate에서 동일 검증을 수행한다.
+- [ ] `/admin/members`의 대량 Mattermost 동기화는 300초 Vercel 함수 제한을 넘길 수 있다. cursor 기반 durable job 또는 관리자 명시 배치 실행으로 분리한다.
+- [ ] 직접 PostgREST `event_logs` INSERT producer는 소유 시스템을 확인한 뒤 batch ingest/RPC 전환을 검토한다. 현재 호출자는 외부일 수 있으므로 근거 없이 차단하거나 계약을 바꾸지 않는다.
+- [ ] `get_admin_logs_summary`의 temporary write와 오래된 로그 조회 계획은 Production 관찰 기간 후 `EXPLAIN (ANALYZE, BUFFERS)`로 재측정하고, 필요하면 기간별 rollup/cursor 전략을 확정한다.
+- [ ] `mm_user_directory.legacy_ssafy_mattermost_user_id` 등 legacy 도메인 필드는 30일 query·owner inventory가 끝난 뒤에만 forward migration으로 제거한다. 현재는 참조 근거가 충분하지 않아 삭제하지 않는다.
+- [ ] 페이지네이션·mutation UX는 실제 권한별 E2E 액션을 기준으로 loading/disabled/재시도 상태를 분기별 점검한다. 정적 검색만으로 전역 일괄 변경하지 않는다.
 
 ## Mattermost 직접 연동 전환 (Issue #155)
 
