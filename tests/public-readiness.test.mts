@@ -18,7 +18,7 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "npm run check:lockfile",
     "npm run validate:migrations",
     "npm run lint",
-    "npx tsc --noEmit --pretty false",
+    "npm run typecheck:ci",
     "npm test",
     "npm audit --omit=dev",
     "npm run audit:security",
