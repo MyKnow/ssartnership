@@ -131,6 +131,28 @@ function DashboardOverviewState({
         }
         state={state}
         includeGlobalTasks={!regional}
+        platformActivityMetrics={
+          regional
+            ? null
+            : {
+                asOfDate: "2026-07-21",
+                memberDau: 48,
+                memberWau: 162,
+                memberMau: 341,
+                guestSessionDau: 67,
+                guestSessionWau: 240,
+                guestSessionMau: 592,
+                historyStartDate: "2026-06-18",
+                dailySeries: Array.from({ length: 30 }, (_, index) => {
+                  const date = new Date(Date.UTC(2026, 5, 22 + index));
+                  return {
+                    date: date.toISOString().slice(0, 10),
+                    memberActiveCount: 18 + ((index * 11) % 37),
+                    guestSessionCount: 26 + ((index * 13) % 58),
+                  };
+                }),
+              }
+        }
         errorMessage={
           state === "error"
             ? "운영 집계 서비스 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."

@@ -10,6 +10,12 @@ type PartnerReviewCountRpcRow = {
   review_count: number | string | null;
 };
 
+type PartnerEngagementCountRpcRow = {
+  partner_id: string | null;
+  favorite_count: number | string | null;
+  review_count: number | string | null;
+};
+
 type ReviewVisibilityCountRpcRow = {
   total_count: number | string | null;
   visible_count: number | string | null;
@@ -51,8 +57,7 @@ export type AdminDashboardCounts = {
 export type PartnerEngagementCounts = {
   favoriteCounts: Map<string, number>;
   reviewCounts: Map<string, number>;
-  favoriteErrorMessage: string | null;
-  reviewErrorMessage: string | null;
+  engagementErrorMessage: string | null;
 };
 
 function normalizePartnerIds(partnerIds: readonly string[]) {
@@ -182,51 +187,55 @@ export async function fetchPartnerReviewCounts(
 export async function fetchPartnerEngagementCounts(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   partnerIds: readonly string[],
-  favoriteCountLoader: (partnerIds: string[]) => Promise<Map<string, number>>,
 ): Promise<PartnerEngagementCounts> {
   const normalizedPartnerIds = normalizePartnerIds(partnerIds);
   if (normalizedPartnerIds.length === 0) {
     return {
       favoriteCounts: new Map<string, number>(),
       reviewCounts: new Map<string, number>(),
-      favoriteErrorMessage: null,
-      reviewErrorMessage: null,
+      engagementErrorMessage: null,
     };
   }
 
-  const [favoriteResult, reviewResult] = await Promise.allSettled([
-    favoriteCountLoader(normalizedPartnerIds),
-    fetchPartnerReviewCounts(supabase, normalizedPartnerIds),
-  ]);
+  try {
+    const { data, error } = await supabase.rpc("get_partner_engagement_counts", {
+      input_partner_ids: normalizedPartnerIds,
+    });
 
-  const favoriteCounts =
-    favoriteResult.status === "fulfilled"
-      ? favoriteResult.value
-      : new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0]));
-  const favoriteErrorMessage =
-    favoriteResult.status === "fulfilled"
-      ? null
-      : favoriteResult.reason instanceof Error
-        ? favoriteResult.reason.message
-        : String(favoriteResult.reason);
+    if (error) {
+      return {
+        favoriteCounts: new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0])),
+        reviewCounts: new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0])),
+        engagementErrorMessage: error.message,
+      };
+    }
 
-  const reviewCounts =
-    reviewResult.status === "fulfilled"
-      ? reviewResult.value.counts
-      : new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0]));
-  const reviewErrorMessage =
-    reviewResult.status === "fulfilled"
-      ? reviewResult.value.errorMessage
-      : reviewResult.reason instanceof Error
-        ? reviewResult.reason.message
-        : String(reviewResult.reason);
-
-  return {
-    favoriteCounts,
-    reviewCounts,
-    favoriteErrorMessage,
-    reviewErrorMessage,
-  };
+    const rows = (data ?? []) as PartnerEngagementCountRpcRow[];
+    return {
+      favoriteCounts: toPartnerCountMap(
+        normalizedPartnerIds,
+        rows.map((row) => ({
+          partner_id: row.partner_id,
+          count: row.favorite_count,
+        })),
+      ),
+      reviewCounts: toPartnerCountMap(
+        normalizedPartnerIds,
+        rows.map((row) => ({
+          partner_id: row.partner_id,
+          count: row.review_count,
+        })),
+      ),
+      engagementErrorMessage: null,
+    };
+  } catch (error) {
+    return {
+      favoriteCounts: new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0])),
+      reviewCounts: new Map(normalizedPartnerIds.map((partnerId) => [partnerId, 0])),
+      engagementErrorMessage:
+        error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export async function fetchAdminReviewCounts(
