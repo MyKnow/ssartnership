@@ -28,6 +28,16 @@ export type ImageUploadOwnerKind =
   | "guest"
   | "signup";
 
+export class ImageUploadError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ImageUploadError";
+    this.code = code;
+  }
+}
+
 export type ImageUploadActor = {
   kind: ImageUploadOwnerKind;
   id: string;
