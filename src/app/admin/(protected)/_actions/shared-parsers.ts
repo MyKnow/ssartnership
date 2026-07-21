@@ -15,6 +15,11 @@ import {
 import { normalizePartnerDetailDescription } from "../../../../lib/partner-detail-description.ts";
 import { normalizePartnerLoginId } from "../../../../lib/partner-utils.ts";
 import {
+  ONLINE_PARTNER_LOCATION,
+  getPartnerServiceMode,
+  type PartnerServiceMode,
+} from "../../../../lib/partner-service-mode.ts";
+import {
   isValidEmail,
   sanitizeHexColor,
   sanitizeHttpUrl,
@@ -232,7 +237,22 @@ export function parseSsafyCycleSettingsPayload(formData: FormData) {
 export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   const name = String(formData.get("name") || "").trim();
   const categoryId = String(formData.get("categoryId") || "").trim();
-  const location = String(formData.get("location") || "").trim();
+  const rawLocation = String(formData.get("location") || "").trim();
+  const rawServiceMode = String(formData.get("serviceMode") || "").trim();
+  let serviceMode: PartnerServiceMode;
+  if (!rawServiceMode) {
+    serviceMode = getPartnerServiceMode(rawLocation);
+  } else if (rawServiceMode === "offline" || rawServiceMode === "online") {
+    serviceMode = rawServiceMode;
+  } else {
+    throw new Error("partner_form_invalid_service_mode");
+  }
+  const location =
+    serviceMode === "online"
+      ? ONLINE_PARTNER_LOCATION
+      : rawLocation === ONLINE_PARTNER_LOCATION
+        ? ""
+        : rawLocation;
   const detailDescription = normalizePartnerDetailDescription(
     formData.get("detailDescription"),
   );
@@ -329,6 +349,7 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   return {
     name,
     categoryId,
+    serviceMode,
     location,
     detailDescription,
     campusSlugs,

@@ -198,12 +198,14 @@ export default async function PartnerDetailPage({
   const offlineBenefitAction: OfflinePartnerBenefitAction | null =
     isActive &&
     getPartnerServiceMode(partner.location) === "offline" &&
+    partner.benefitAccessStatus !== "not_eligible" &&
     partner.benefits.length > 0
       ? {
           partnerId: partner.id,
           partnerName: partner.name,
           benefits: partner.benefits,
           returnTo: partnerReturnTo,
+          requiresLogin: partner.benefitAccessStatus === "login_required",
         }
       : null;
 

@@ -1,6 +1,7 @@
 import type { CampusSlug } from "../../../../lib/campuses.ts";
 import type { PartnerBenefitVisibility } from "../../../../lib/partner-benefit-visibility.ts";
 import type { PartnerBenefitActionType } from "../../../../lib/partner-benefit-action.ts";
+import type { PartnerServiceMode } from "../../../../lib/partner-service-mode.ts";
 import type { PartnerVisibility } from "../../../../lib/types.ts";
 
 export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getSupabaseAdminClient>;
@@ -8,6 +9,7 @@ export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/serve
 export type PartnerCoreInput = {
   name: string;
   categoryId: string;
+  serviceMode: PartnerServiceMode;
   location: string;
   detailDescription: string | null;
   campusSlugs: CampusSlug[];

@@ -11,6 +11,7 @@ export type OfflinePartnerBenefitAction = {
   partnerName: string;
   benefits: string[];
   returnTo: string;
+  requiresLogin?: boolean;
 };
 
 export default function PartnerBenefitUseAction({
@@ -90,7 +91,12 @@ export default function PartnerBenefitUseAction({
       returnTo: action.returnTo,
     });
     setIsOpen(false);
-    router.push(`/partners/${encodeURIComponent(action.partnerId)}/benefit-use?${params}`);
+    const benefitUsePath = `/partners/${encodeURIComponent(action.partnerId)}/benefit-use?${params}`;
+    router.push(
+      action.requiresLogin
+        ? `/auth/login?returnTo=${encodeURIComponent(benefitUsePath)}`
+        : benefitUsePath,
+    );
   }
 
   return (

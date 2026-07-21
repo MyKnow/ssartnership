@@ -216,7 +216,8 @@ export const CompactListFavoritable: Story = {
       name: "즐겨찾기 해제",
     });
 
-    await expect(favoriteButton).toHaveClass("!px-3");
+    await expect(favoriteButton).toHaveClass("!h-11", "!px-3", "min-h-11");
+    await expect(favoriteButton.querySelector("span.h-9")).not.toBeNull();
     await expect(favoriteButton.getBoundingClientRect().width).toBeGreaterThan(
       favoriteButton.getBoundingClientRect().height,
     );

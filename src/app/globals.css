@@ -393,12 +393,6 @@ body {
     bottom: calc(env(safe-area-inset-bottom) + 6rem);
   }
 
-  @media (min-width: 768px) {
-    .bottom-safe-partner-action-bar {
-      bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
-    }
-  }
-
   .ui-grid-cards {
     display: grid;
     gap: 1rem;

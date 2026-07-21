@@ -13,7 +13,6 @@ import {
   shouldNotifyPartnerBecamePublic,
 } from "@/lib/partner-visibility";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
-import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   cleanupPartnerCompanyProvision,
@@ -155,7 +154,7 @@ export async function updatePartnerAction(formData: FormData) {
       .benefit_verification_pin_salt ?? null;
   const nextBenefitVerificationPin = payload.benefitVerificationPin
     ? await hashCouponVerificationPassword(payload.benefitVerificationPin)
-    : getPartnerServiceMode(payload.location) === "online"
+    : payload.serviceMode === "online"
       ? null
       : previousBenefitVerificationPinHash && previousBenefitVerificationPinSalt
         ? {

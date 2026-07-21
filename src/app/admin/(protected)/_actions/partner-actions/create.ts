@@ -56,10 +56,7 @@ function parseAdminPartnerBranchPayload({
   payload: ReturnType<typeof parsePartnerPayload>;
   companyName: string;
 }): AdminPartnerBranchPayload {
-  const serviceMode =
-    String(formData.get("serviceMode") || "").trim() === "online"
-      ? "online"
-      : "offline";
+  const serviceMode = payload.serviceMode;
   const requestedScopeType = normalizePartnerBranchScopeType(
     String(formData.get("branchScopeType") || "").trim(),
     serviceMode,

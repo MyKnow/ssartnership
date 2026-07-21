@@ -17,7 +17,7 @@ export default function PartnerFavoriteCountLabel({
   return (
     <span
       className={cn(
-        "inline-flex min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium leading-none text-muted-foreground",
+        "inline-flex min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium leading-none text-muted-foreground",
         reducedVerticalPadding ? "h-9 py-1" : "h-11",
         className,
       )}

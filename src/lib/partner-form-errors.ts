@@ -3,6 +3,7 @@ export const partnerFormErrorMessages: Record<string, string> = {
   partner_form_missing_name: "제휴처명을 입력해 주세요.",
   partner_form_missing_category: "카테고리를 선택해 주세요.",
   partner_form_missing_location: "위치를 입력해 주세요.",
+  partner_form_invalid_service_mode: "제휴처 운영 형태를 확인해 주세요.",
   partner_form_invalid_detail_description: "상세 설명은 1,200자 이내로 입력해 주세요.",
   partner_form_invalid_campus_slugs: "노출 캠퍼스를 하나 이상 선택해 주세요.",
   partner_form_invalid_period: "기간 입력을 확인해 주세요.",

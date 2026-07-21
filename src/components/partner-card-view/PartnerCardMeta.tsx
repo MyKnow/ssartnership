@@ -42,7 +42,7 @@ export default function PartnerCardMeta({
       }
     : null;
   const categoryBadgeClass =
-    "h-9 whitespace-nowrap px-2 py-0.5 text-xs font-medium tracking-[0.02em]";
+    "h-9 whitespace-nowrap px-2 py-0.5 text-[12px] font-medium tracking-[0.02em]";
   const categoryBadge = handleCategoryClick ? (
     <button
       type="button"
@@ -108,7 +108,7 @@ export default function PartnerCardMeta({
           data-partner-card-primary-content
           className={cn(
             "grid min-w-0 flex-1",
-            compact ? "h-full gap-1.5" : "gap-2",
+            compact ? "gap-1.5" : "gap-2",
           )}
         >
           <div

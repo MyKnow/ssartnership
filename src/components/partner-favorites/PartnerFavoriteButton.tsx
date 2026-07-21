@@ -115,7 +115,7 @@ export default function PartnerFavoriteButton({
         className={cn(
           "inline-flex items-center gap-1.5",
           reducedVerticalPadding
-            ? `h-9 min-w-11 justify-center rounded-full border px-3 py-1 text-xs font-medium leading-none ${favoriteStateClass}`
+            ? `h-9 min-w-11 justify-center rounded-full border px-3 py-1 text-[12px] font-medium leading-none ${favoriteStateClass}`
             : null,
         )}
       >
@@ -127,7 +127,7 @@ export default function PartnerFavoriteButton({
           aria-hidden="true"
         />
         {typeof count === "number" ? (
-          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+          <span className="text-[12px] font-semibold tabular-nums text-muted-foreground">
             {count.toLocaleString("ko-KR")}
           </span>
         ) : null}
