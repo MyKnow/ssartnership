@@ -1,5 +1,7 @@
 name: Apply Preview Supabase Migrations
 
+# Push-triggered runs use explicit commit markers so migration repair/apply is intentional.
+
 on:
   push:
     branches: [main]
