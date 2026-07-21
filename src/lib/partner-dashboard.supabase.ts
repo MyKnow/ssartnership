@@ -16,7 +16,6 @@ import {
   normalizePartnerPortalServiceStatus,
   sumPartnerPortalMetrics,
 } from "./partner-dashboard.ts";
-import { partnerFavoriteRepository } from "./repositories/index.ts";
 import { normalizePartnerVisibility } from "./partner-visibility.ts";
 import { normalizePartnerCompanyPlanTier } from "./partner-company-plans.ts";
 
@@ -230,12 +229,11 @@ export async function getSupabasePartnerPortalDashboard(
   const engagementCounts = await fetchPartnerEngagementCounts(
     supabase,
     serviceRows.map((serviceRow) => serviceRow.id),
-    (partnerIds) => partnerFavoriteRepository.getFavoriteCounts(partnerIds),
   );
 
-  if (engagementCounts.favoriteErrorMessage) {
+  if (engagementCounts.engagementErrorMessage) {
     markPartialFailure();
-    console.error("[partner-dashboard] favorite metric query failed", engagementCounts.favoriteErrorMessage);
+    console.error("[partner-dashboard] engagement metric query failed", engagementCounts.engagementErrorMessage);
   }
 
   const rollupResult = await fetchPartnerMetricRollupRows(supabase, {
@@ -245,13 +243,7 @@ export async function getSupabasePartnerPortalDashboard(
     granularity: "total",
   });
 
-  if (engagementCounts.reviewErrorMessage) {
-    markPartialFailure();
-    console.error(
-      "[partner-dashboard] review metric query failed",
-      engagementCounts.reviewErrorMessage,
-    );
-  } else {
+  if (!engagementCounts.engagementErrorMessage) {
     for (const [partnerId, reviewCount] of engagementCounts.reviewCounts) {
       const metrics = metricsByServiceId.get(partnerId);
       if (!metrics) {

@@ -31,20 +31,35 @@ test("public readiness CI workflow gates launch-critical checks", () => {
       new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     );
   }
+
+  assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
+  assert.match(workflow, /concurrency:\s*\n\s+group:/);
+  assert.match(workflow, /cancel-in-progress:\s+true/);
 });
 
-test("Storybook and visual baselines run on every push and pull request without Chromatic", () => {
+test("Storybook and visual baselines run for pull requests and shared branches without Chromatic", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
 
   assert.match(workflow, /name: Storybook and Visual Baselines/);
-  assert.match(workflow, /^\s+push:\s*$/m);
+  assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
   assert.match(workflow, /^\s+pull_request:\s*$/m);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /concurrency:\s*\n\s+group:/);
+  assert.match(workflow, /cancel-in-progress:\s+true/);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
   assert.match(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /npm run test:visual/);
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
+});
+
+test("lockfile verification avoids duplicate feature-branch runs while retaining pull request coverage", () => {
+  const workflow = readRepoFile(".github/workflows/lockfile-check.yml");
+
+  assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
+  assert.match(workflow, /^\s+pull_request:\s*$/m);
+  assert.match(workflow, /concurrency:\s*\n\s+group:/);
+  assert.match(workflow, /cancel-in-progress:\s+true/);
 });
 
 test("production Supabase migrations require an explicit guarded dispatch", () => {
