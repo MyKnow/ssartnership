@@ -21,7 +21,7 @@ import PartnerDetailReviews, {
   PartnerDetailReviewsFallback,
 } from "./_page/PartnerDetailReviews";
 import { sanitizeReturnTo } from "@/lib/return-to";
-import { getPartnerServiceMode } from "@/lib/partner-service-mode";
+import { getPartnerDetailBenefitMode } from "@/lib/partner-detail-benefit-action";
 import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
 
 export const dynamic = "force-dynamic";
@@ -195,11 +195,18 @@ export default async function PartnerDetailPage({
           href: `/certification?${new URLSearchParams({ returnTo: partnerReturnTo }).toString()}`,
         }
       : benefitUseAction;
-  const offlineBenefitAction: OfflinePartnerBenefitAction | null =
-    isActive &&
-    getPartnerServiceMode(partner.location) === "offline" &&
-    partner.benefitAccessStatus !== "not_eligible" &&
-    partner.benefits.length > 0
+  const visibleBenefitUseAction =
+    partner.benefitAccessStatus === "not_eligible"
+      ? null
+      : resolvedBenefitUseAction;
+  const partnerDetailBenefitMode = getPartnerDetailBenefitMode({
+    isActive,
+    actionType: visibleBenefitUseAction?.type,
+    benefitAccessStatus: partner.benefitAccessStatus,
+    benefits: partner.benefits,
+  });
+  const certificationBenefitAction: OfflinePartnerBenefitAction | null =
+    partnerDetailBenefitMode === "certification"
       ? {
           partnerId: partner.id,
           partnerName: partner.name,
@@ -309,11 +316,11 @@ export default async function PartnerDetailPage({
                 <PartnerDetailContactSection
                   isActive={isActive}
                   contactCount={contactCount}
-                  benefitUseAction={resolvedBenefitUseAction}
+                  benefitUseAction={visibleBenefitUseAction}
                   inquiryDisplay={inquiryDisplay}
                   normalizedLinks={normalizedLinks}
                   partnerId={partner.id}
-                  offlineBenefitAction={offlineBenefitAction}
+                  certificationBenefitAction={certificationBenefitAction}
                 />
               }
             />
@@ -337,8 +344,8 @@ export default async function PartnerDetailPage({
         {isActive ? (
           <PartnerDetailMobileActionBar
             partnerId={partner.id}
-            benefitUseAction={resolvedBenefitUseAction}
-            offlineBenefitAction={offlineBenefitAction}
+            benefitUseAction={visibleBenefitUseAction}
+            certificationBenefitAction={certificationBenefitAction}
             inquiryAction={
               inquiryDisplay
                 ? { href: inquiryDisplay.href, label: inquiryDisplay.label }

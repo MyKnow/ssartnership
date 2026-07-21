@@ -190,7 +190,7 @@ export async function updatePartnerAction(formData: FormData) {
   }
 
   try {
-    const { error } = await supabase
+    const { data: updatedPartner, error } = await supabase
       .from("partners")
       .update({
         company_id: nextCompanyId,
@@ -217,10 +217,15 @@ export async function updatePartnerAction(formData: FormData) {
         visibility: payload.visibility,
         benefit_visibility: payload.benefitVisibility,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id")
+      .single();
 
     if (error) {
       throw new Error(error.message);
+    }
+    if (!updatedPartner?.id) {
+      throw new Error("제휴처 저장 결과를 확인할 수 없습니다.");
     }
   } catch (error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);

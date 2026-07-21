@@ -40,7 +40,7 @@ export default function PartnerDetailContactSection({
   inquiryDisplay,
   normalizedLinks,
   partnerId,
-  offlineBenefitAction,
+  certificationBenefitAction,
   className,
   mode = "details",
 }: {
@@ -54,7 +54,7 @@ export default function PartnerDetailContactSection({
     inquiryLink: string;
   };
   partnerId: string;
-  offlineBenefitAction?: OfflinePartnerBenefitAction | null;
+  certificationBenefitAction?: OfflinePartnerBenefitAction | null;
   className?: string;
   mode?: "details" | "primary";
 }) {
@@ -72,11 +72,11 @@ export default function PartnerDetailContactSection({
   }
 
   if (mode === "primary") {
-    if (offlineBenefitAction) {
+    if (certificationBenefitAction) {
       return (
         <section className={cn("min-w-0", className)} aria-label="혜택 이용">
           <div data-primary-benefit-action className="w-full">
-            <PartnerBenefitUseAction action={offlineBenefitAction} />
+            <PartnerBenefitUseAction action={certificationBenefitAction} />
           </div>
         </section>
       );
@@ -156,7 +156,7 @@ export default function PartnerDetailContactSection({
     );
   }
 
-  if (contactCount === 0 && !offlineBenefitAction) {
+  if (contactCount === 0 && !certificationBenefitAction) {
     return (
       <div
         className={cn(

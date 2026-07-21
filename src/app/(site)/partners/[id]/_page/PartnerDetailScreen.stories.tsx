@@ -41,6 +41,12 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
     href: "/certification",
     type: "certification" as const,
   };
+  const certificationBenefitAction = {
+    partnerId: value.id,
+    partnerName: value.name,
+    benefits: value.benefits,
+    returnTo: `/partners/${value.id}`,
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -107,12 +113,14 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
               inquiryLink: "0507-1382-2343",
             }}
             partnerId={value.id}
+            certificationBenefitAction={certificationBenefitAction}
           />
         }
       />
       <PartnerDetailMobileActionBar
         partnerId={value.id}
         benefitUseAction={action}
+        certificationBenefitAction={certificationBenefitAction}
         inquiryAction={{
           label: "0507-1382-2343",
           href: "tel:050713822343",

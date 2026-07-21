@@ -15,18 +15,12 @@ test.describe("auth and partner portal operation flows", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "혜택 이용하기" }).first().click();
-    const benefitDialog = page.getByRole("dialog", { name: "혜택 이용하기" });
-    await expect(benefitDialog).toBeVisible();
-    await benefitDialog.getByRole("combobox", { name: "이용할 혜택" }).selectOption({ index: 1 });
-    await benefitDialog.getByRole("button", { name: "확인" }).click();
 
     await expect(page).toHaveURL(/\/auth\/login\?returnTo=/, { timeout: 15_000 });
     const loginUrl = new URL(page.url());
     const benefitUseReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
     const decodedReturnTo = decodeURIComponent(benefitUseReturnTo);
-    expect(decodedReturnTo).toContain("/partners/health-001/benefit-use");
-    expect(decodedReturnTo).toContain("benefit=");
-    expect(decodedReturnTo).toContain("returnTo=");
+    expect(decodedReturnTo).toBe("/partners/health-001?returnTo=/?category=health#benefits");
   });
 
   test("member login shows field-level validation before submitting", async ({ page }) => {

@@ -48,6 +48,10 @@ export default function PartnerBenefitUseAction({
   }, [isOpen]);
 
   function openDialog() {
+    if (action.requiresLogin) {
+      router.push(`/auth/login?returnTo=${encodeURIComponent(action.returnTo)}`);
+      return;
+    }
     setSelectedBenefit("");
     setIsOpen(true);
     trackProductEvent({

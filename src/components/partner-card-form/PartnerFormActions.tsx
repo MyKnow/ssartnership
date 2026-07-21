@@ -1,14 +1,12 @@
 import FormMessage from "@/components/ui/FormMessage";
 import Button from "@/components/ui/Button";
 import SubmitButton from "@/components/ui/SubmitButton";
-import { FloatingAction } from "@/components/FloatingActionGroup";
 import type { ImageUploadFormDraftStatus } from "@/components/media/useImageUploadFormDraft";
 import type { PartnerCardFormMode } from "@/components/partner-card-form/types";
 
 export default function PartnerFormActions({
   mode,
   submitLabel,
-  formId,
   formError,
   draftStatus,
   onSaveDraft,
@@ -16,7 +14,6 @@ export default function PartnerFormActions({
 }: {
   mode: PartnerCardFormMode;
   submitLabel?: string;
-  formId?: string;
   formError?: string | null;
   draftStatus?: ImageUploadFormDraftStatus;
   onSaveDraft?: () => void;
@@ -27,17 +24,14 @@ export default function PartnerFormActions({
       <>
         {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
-        <FloatingAction
-          fallbackClassName="pointer-events-none fixed bottom-safe-bottom-20 left-1/2 z-[45] flex w-full -translate-x-1/2 justify-center px-4 sm:bottom-safe-bottom-5 sm:w-auto sm:justify-end md:left-auto md:right-[5.5rem] md:translate-x-0"
-        >
+        <div className="pointer-events-none fixed bottom-safe-bottom-20 left-1/2 z-[45] flex w-full -translate-x-1/2 justify-center px-4 sm:bottom-safe-bottom-5 sm:w-auto sm:justify-end md:left-auto md:right-[5.5rem] md:translate-x-0">
           <SubmitButton
             pendingText="저장 중"
-            form={formId}
             className="order-last pointer-events-auto min-h-12 w-full max-w-sm rounded-full px-5 shadow-floating sm:w-auto"
           >
             {submitLabel ?? "제휴처 저장"}
           </SubmitButton>
-        </FloatingAction>
+        </div>
       </>
     );
   }
@@ -89,7 +83,7 @@ export default function PartnerFormActions({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <SubmitButton pendingText="저장 중" form={formId} className="w-full sm:w-auto">
+        <SubmitButton pendingText="저장 중" className="w-full sm:w-auto">
           {submitLabel ?? "제휴처 추가"}
         </SubmitButton>
       </div>

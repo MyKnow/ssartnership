@@ -615,7 +615,6 @@ export default function PartnerCardForm({
           <PartnerFormActions
             mode={mode}
             submitLabel={submitLabel}
-            formId={formId}
             formError={clientFormError ?? formError}
             draftStatus={mode === "create" ? draftStatus : undefined}
             onSaveDraft={mode === "create" ? () => void saveDraft(true) : undefined}

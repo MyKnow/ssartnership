@@ -17,15 +17,15 @@ type BenefitActionSource = "detail_mobile_sticky" | "detail_desktop_fab";
 export default function PartnerDetailMobileActionBar({
   partnerId,
   benefitUseAction,
-  offlineBenefitAction,
+  certificationBenefitAction,
   inquiryAction,
 }: {
   partnerId: string;
   benefitUseAction: BenefitUseAction | null;
-  offlineBenefitAction?: OfflinePartnerBenefitAction | null;
+  certificationBenefitAction?: OfflinePartnerBenefitAction | null;
   inquiryAction: MobileInquiryAction | null;
 }) {
-  const hasBenefitAction = Boolean(offlineBenefitAction || benefitUseAction);
+  const hasBenefitAction = Boolean(certificationBenefitAction || benefitUseAction);
   if (!hasBenefitAction && !inquiryAction) {
     return null;
   }
@@ -34,10 +34,10 @@ export default function PartnerDetailMobileActionBar({
     source: BenefitActionSource,
     className: string,
   ) => {
-    if (offlineBenefitAction) {
+    if (certificationBenefitAction) {
       return (
         <PartnerBenefitUseAction
-          action={offlineBenefitAction}
+          action={certificationBenefitAction}
           className={className}
         />
       );
@@ -70,7 +70,9 @@ export default function PartnerDetailMobileActionBar({
           })
         }
       >
-        {benefitUseAction.label}
+        {benefitUseAction.type === "external_link"
+          ? "혜택 이용하기"
+          : benefitUseAction.label}
       </Button>
     );
   };

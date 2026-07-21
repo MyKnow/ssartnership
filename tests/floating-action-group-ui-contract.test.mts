@@ -29,7 +29,7 @@ test("관리자 고정 액션은 보이지 않는 공통 그룹에서 세로로 
   );
 });
 
-test("Portal로 이동한 관리자 저장 버튼은 수정 폼과 연결된다", async () => {
+test("관리자 저장 버튼은 수정 폼 안에 남아 실제 Server Action을 제출한다", async () => {
   const [form, formActions] = await Promise.all([
     readFile(new URL("../src/components/partner-card-form/PartnerCardForm.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/partner-card-form/PartnerFormActions.tsx", import.meta.url), "utf8"),
@@ -37,7 +37,6 @@ test("Portal로 이동한 관리자 저장 버튼은 수정 폼과 연결된다"
 
   assert.match(form, /const formId = `partner-card-form-\$\{mode\}-\$\{partner\.id \?\? "new"\}`/);
   assert.match(form, /<form[\s\S]*?id=\{formId\}/);
-  assert.match(form, /formId=\{formId\}/);
-  assert.match(formActions, /formId\?: string/);
-  assert.match(formActions, /form=\{formId\}/);
+  assert.match(formActions, /pointer-events-none fixed[\s\S]*<SubmitButton/);
+  assert.doesNotMatch(formActions, /form=\{formId\}/);
 });

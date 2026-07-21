@@ -140,6 +140,7 @@ export default function AdminPlatformActivityMetricsPanel({
                 {ACTIVITY_INTENSITY_CLASSES.map((className, index) => (
                   <span
                     key={className}
+                    role="img"
                     aria-label={index === 0 ? "활동 없음" : `활동량 ${index}단계`}
                     className={`size-3 rounded-[3px] ring-1 ring-inset ring-border/60 ${className}`}
                   />
