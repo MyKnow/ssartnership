@@ -473,6 +473,10 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
     {
       "path": "/api/cron/anonymize-deleted-members",
       "schedule": "40 0 * * *"
+    },
+    {
+      "path": "/api/cron/purge-expired-operational-logs",
+      "schedule": "50 0 * * *"
     }
   ]
 }
