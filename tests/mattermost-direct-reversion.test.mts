@@ -32,8 +32,6 @@ test("environment example excludes deprecated, local-only, and compatibility con
     "ADMIN_ID",
     "ADMIN_PASSWORD",
     "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_DATA_SOURCE",
-    "NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE",
     "PREVIEW_TEST_MEMBER_USERNAME",
     "PREVIEW_TEST_MEMBER_PASSWORD",
     "DATA_GO_KR_SERVICE_KEY",
