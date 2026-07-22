@@ -1,5 +1,3 @@
--- 혜택별 RPC 전환 후 남아 있던 제휴처 단위 최대 횟수 RPC 오버로드를 제거한다.
-drop function if exists public.update_partner_immediate_fields_with_audit(
-  uuid, uuid[], text, text[], text[], text, text, integer, text, text,
-  text, text, text, text, text, text, jsonb
-);
+-- Preview Supabase에서 MCP로 이미 적용된 레거시 RPC 제거 마이그레이션의 이력 브리지다.
+-- 실제 스키마 변경은 20260722142117_add_partner_benefit_items에서 수행한다.
+select 1;
