@@ -26,6 +26,11 @@ import {
   generatePartnerPreviewLink,
   removePartnerPreviewLink,
 } from "@/app/admin/(protected)/_actions/partner-actions/preview";
+import {
+  createPartnerBenefitUsageAction,
+  deleteBenefitUsageAction,
+  updatePartnerBenefitUsageAction,
+} from "@/app/admin/(protected)/_actions/partner-benefit-usage-actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
@@ -124,6 +129,14 @@ export default async function AdminPartnerDetailPage({
   const couponSuccess = query.success
     ? couponSuccessMessages[String(query.success)] ?? null
     : null;
+  const usageSuccessMessages: Record<string, string> = {
+    "usage-created": "혜택 적용 이력을 추가했습니다.",
+    "usage-updated": "혜택 적용 이력을 수정했습니다.",
+    "usage-deleted": "혜택 적용 이력을 삭제했습니다.",
+  };
+  const usageSuccess = query.success
+    ? usageSuccessMessages[String(query.success)] ?? null
+    : null;
   const canReadCoupons = canAdmin(
     adminSession.account.permissions,
     "home_ads",
@@ -142,6 +155,21 @@ export default async function AdminPartnerDetailPage({
   const canDeleteCoupons = canAdmin(
     adminSession.account.permissions,
     "home_ads",
+    "delete",
+  );
+  const canCreateBenefitUsage = canAdmin(
+    adminSession.account.permissions,
+    "brands",
+    "create",
+  );
+  const canUpdateBenefitUsage = canAdmin(
+    adminSession.account.permissions,
+    "brands",
+    "update",
+  );
+  const canDeleteBenefitUsage = canAdmin(
+    adminSession.account.permissions,
+    "brands",
     "delete",
   );
 
@@ -327,6 +355,7 @@ export default async function AdminPartnerDetailPage({
 
         {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
         {couponSuccess ? <FormMessage variant="info">{couponSuccess}</FormMessage> : null}
+        {usageSuccess ? <FormMessage variant="info">{usageSuccess}</FormMessage> : null}
 
         <AdminPartnerPreviewLinkPanel
           partnerId={partner.id}
@@ -419,7 +448,12 @@ export default async function AdminPartnerDetailPage({
         <PartnerMetricTimeseriesPanel data={metricTimeseries} />
 
         <PartnerBenefitUsageHistory
-          benefits={partner.benefits ?? []}
+          benefits={(partner.partner_benefits ?? []).map((benefit: { id: string; title: string; max_apply_count: number | null; display_order?: number | null }) => ({
+            id: benefit.id,
+            title: benefit.title,
+            maxApplyCount: benefit.max_apply_count,
+            displayOrder: benefit.display_order ?? undefined,
+          }))}
           selectedBenefit={selectedUsageBenefit}
           history={usageHistory}
           createHref={({ benefit, page }) => {
@@ -430,6 +464,12 @@ export default async function AdminPartnerDetailPage({
             return `${detailPath}${queryString ? `?${queryString}` : ""}`;
           }}
           memberHref={(memberId) => `/admin/members/${encodeURIComponent(memberId)}`}
+          adminActions={canCreateBenefitUsage && canUpdateBenefitUsage && canDeleteBenefitUsage ? {
+            partnerId: partner.id,
+            create: createPartnerBenefitUsageAction,
+            update: updatePartnerBenefitUsageAction,
+            delete: deleteBenefitUsageAction,
+          } : undefined}
         />
 
         <AdminPartnerCouponManager

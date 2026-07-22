@@ -1,10 +1,13 @@
 import type {
+  AdminPartnerBenefitUsageInput,
+  AdminPartnerBenefitUsageUpdateInput,
   PartnerBenefitUsageRepository,
   PartnerBenefitUsageVerificationContext,
   PartnerBenefitUsageHistoryPage,
   RecordPartnerBenefitUsageInput,
   PartnerBenefitUsageRecord,
 } from "@/lib/repositories/partner-benefit-usage-repository";
+import { getEffectivePartnerBenefitMaxApplyCount } from "@/lib/partner-benefit-items";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type VerificationRow = {
@@ -33,6 +36,73 @@ type UsageRow = {
   created_at: string;
   is_new: boolean;
 };
+
+type MemberLookupRow = {
+  id: string;
+  display_name: string | null;
+  directory: { mm_username: string | null } | { mm_username: string | null }[] | null;
+};
+
+function toHistoryItem(
+  row: {
+    id: string;
+    member_id: string;
+    benefit_id: string | null;
+    benefit_snapshot: string;
+    use_count: number;
+    verified_at: string;
+  },
+  member: MemberLookupRow | null,
+) {
+  return {
+    usageId: row.id,
+    memberId: row.member_id,
+    memberDisplayName: member?.display_name ?? null,
+    memberMattermostUsername: Array.isArray(member?.directory)
+      ? member.directory[0]?.mm_username ?? null
+      : member?.directory?.mm_username ?? null,
+    benefitId: row.benefit_id,
+    benefitSnapshot: row.benefit_snapshot,
+    useCount: row.use_count,
+    verifiedAt: row.verified_at,
+  };
+}
+
+async function loadAdminUsageReferences(input: {
+  memberId: string;
+  partnerId: string;
+  benefitId: string;
+  useCount: number;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const [benefitResult, memberResult] = await Promise.all([
+    supabase
+      .from("partner_benefits")
+      .select("id,partner_id,title,max_apply_count")
+      .eq("id", input.benefitId)
+      .eq("partner_id", input.partnerId)
+      .maybeSingle(),
+    supabase
+      .from("members")
+      .select("id,display_name,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username)")
+      .eq("id", input.memberId)
+      .maybeSingle(),
+  ]);
+  if (benefitResult.error) throw new Error(benefitResult.error.message);
+  if (memberResult.error) throw new Error(memberResult.error.message);
+  if (!benefitResult.data) throw new Error("partner_benefit_usage_benefit_not_found");
+  if (!memberResult.data) throw new Error("partner_benefit_usage_member_not_found");
+  if (
+    input.useCount >
+    getEffectivePartnerBenefitMaxApplyCount(benefitResult.data.max_apply_count)
+  ) {
+    throw new Error("partner_benefit_usage_use_count_exceeded");
+  }
+  return {
+    benefit: benefitResult.data as { id: string; title: string; max_apply_count: number | null },
+    member: memberResult.data as MemberLookupRow,
+  };
+}
 
 function toVerificationContext(row: VerificationRow): PartnerBenefitUsageVerificationContext {
   return {
@@ -163,19 +233,66 @@ export class SupabasePartnerBenefitUsageRepository
     );
 
     return {
-      items: rows.map((row) => ({
-        usageId: row.id,
-        memberId: row.member_id,
-        benefitId: row.benefit_id,
-        memberDisplayName: memberById.get(row.member_id)?.displayName ?? null,
-        memberMattermostUsername: memberById.get(row.member_id)?.username ?? null,
-        benefitSnapshot: row.benefit_snapshot,
-        useCount: row.use_count,
-        verifiedAt: row.verified_at,
+      items: rows.map((row) => toHistoryItem(row, {
+        id: row.member_id,
+        display_name: memberById.get(row.member_id)?.displayName ?? null,
+        directory: { mm_username: memberById.get(row.member_id)?.username ?? null },
       })),
       total: count ?? 0,
       page: input.page,
       pageSize: input.pageSize,
     };
+  }
+
+  async createAdminUsage(input: AdminPartnerBenefitUsageInput) {
+    const { benefit, member } = await loadAdminUsageReferences(input);
+    const { data, error } = await getSupabaseAdminClient()
+      .from("partner_benefit_usages")
+      .insert({
+        partner_id: input.partnerId,
+        member_id: input.memberId,
+        benefit_id: benefit.id,
+        benefit_snapshot: benefit.title,
+        use_count: input.useCount,
+        idempotency_key: globalThis.crypto.randomUUID(),
+        verified_at: input.verifiedAt,
+        metadata: { source: "admin_manual" },
+      })
+      .select("id,member_id,benefit_id,benefit_snapshot,use_count,verified_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return toHistoryItem(data, member);
+  }
+
+  async updateAdminUsage(input: AdminPartnerBenefitUsageUpdateInput) {
+    const { benefit, member } = await loadAdminUsageReferences(input);
+    const { data, error } = await getSupabaseAdminClient()
+      .from("partner_benefit_usages")
+      .update({
+        member_id: input.memberId,
+        benefit_id: benefit.id,
+        benefit_snapshot: benefit.title,
+        use_count: input.useCount,
+        verified_at: input.verifiedAt,
+      })
+      .eq("id", input.usageId)
+      .eq("partner_id", input.partnerId)
+      .select("id,member_id,benefit_id,benefit_snapshot,use_count,verified_at")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("partner_benefit_usage_not_found");
+    return toHistoryItem(data, member);
+  }
+
+  async deleteAdminUsage(input: { partnerId: string; usageId: string }) {
+    const { data, error } = await getSupabaseAdminClient()
+      .from("partner_benefit_usages")
+      .delete()
+      .eq("id", input.usageId)
+      .eq("partner_id", input.partnerId)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("partner_benefit_usage_not_found");
   }
 }

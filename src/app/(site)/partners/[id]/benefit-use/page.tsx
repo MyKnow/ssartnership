@@ -18,9 +18,9 @@ import {
   normalizePartnerBenefitUseCount,
 } from "@/lib/partner-benefit-usage";
 import {
-  findPartnerBenefitById,
   getEffectivePartnerBenefitMaxApplyCount,
   normalizePartnerBenefitItems,
+  resolvePartnerBenefitById,
 } from "@/lib/partner-benefit-items";
 import {
   partnerBenefitUsageRepository,
@@ -109,13 +109,16 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
-  const benefitItems = partner.benefitItems?.length
-    ? partner.benefitItems
-    : normalizePartnerBenefitItems(partner.benefits.map((title, index) => ({
-        id: `legacy-benefit-${partner.id}-${index + 1}`,
-        title,
-      })));
-  const selectedBenefit = findPartnerBenefitById(benefitItems, rawBenefitId) ??
+  const verificationContext = await partnerBenefitUsageRepository.getVerificationContext(partner.id);
+  const benefitItems = verificationContext?.benefitItems.length
+    ? verificationContext.benefitItems
+    : partner.benefitItems?.length
+      ? partner.benefitItems
+      : normalizePartnerBenefitItems(partner.benefits.map((title, index) => ({
+          id: `legacy-benefit-${partner.id}-${index + 1}`,
+          title,
+        })));
+  const selectedBenefit = resolvePartnerBenefitById(benefitItems, rawBenefitId, partner.id) ??
     benefitItems.find((item) => item.title === benefit) ?? null;
   const useCount = normalizePartnerBenefitUseCount(
     rawUseCount,
@@ -127,12 +130,11 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
-  const [headerSession, member, cohortCardThemes, photoState, verificationContext] = await Promise.all([
+  const [headerSession, member, cohortCardThemes, photoState] = await Promise.all([
     getHeaderSession(session.userId),
     getMemberCanonicalProfile(session.userId),
     listCohortCardThemes(),
     getMemberProfilePhotoState(session.userId),
-    partnerBenefitUsageRepository.getVerificationContext(partner.id),
   ]);
   if (!member) {
     redirect(

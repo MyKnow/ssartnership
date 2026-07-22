@@ -97,3 +97,34 @@ export function findPartnerBenefitById(
   }
   return items.find((item) => item.id === id.trim()) ?? null;
 }
+
+export function resolvePartnerBenefitById(
+  items: readonly PartnerBenefit[],
+  id: unknown,
+  partnerId?: string,
+) {
+  const directMatch = findPartnerBenefitById(items, id);
+  if (directMatch || typeof id !== "string" || !partnerId) {
+    return directMatch;
+  }
+
+  const prefix = `legacy-benefit-${partnerId}-`;
+  const normalizedId = id.trim();
+  if (!normalizedId.startsWith(prefix)) {
+    return null;
+  }
+
+  const legacyIndex = Number(normalizedId.slice(prefix.length));
+  if (!Number.isSafeInteger(legacyIndex) || legacyIndex < 1) {
+    return null;
+  }
+
+  const orderedItems = items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) =>
+      (left.item.displayOrder ?? left.index) - (right.item.displayOrder ?? right.index),
+    )
+    .map(({ item }) => item);
+
+  return orderedItems[legacyIndex - 1] ?? null;
+}

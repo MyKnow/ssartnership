@@ -98,4 +98,88 @@ export class MockPartnerBenefitUsageRepository implements PartnerBenefitUsageRep
       pageSize: input.pageSize,
     };
   }
+
+  async createAdminUsage(input: {
+    partnerId: string;
+    memberId: string;
+    benefitId: string;
+    useCount: number;
+    verifiedAt: string;
+  }) {
+    const context = this.contexts.get(input.partnerId);
+    const benefit = context?.benefitItems.find((item) => item.id === input.benefitId);
+    if (!context) throw new Error("partner_benefit_usage_partner_not_found");
+    if (!benefit) throw new Error("partner_benefit_usage_benefit_not_found");
+    const usageId = `mock-admin-usage-${this.usages.size + 1}`;
+    const record: PartnerBenefitUsageRecord = {
+      usageId,
+      partnerId: input.partnerId,
+      memberId: input.memberId,
+      benefitId: benefit.id,
+      benefitSnapshot: benefit.title,
+      useCount: input.useCount,
+      verifiedAt: input.verifiedAt,
+      createdAt: input.verifiedAt,
+      isNew: true,
+    };
+    this.usages.set(usageId, record);
+    return {
+      usageId,
+      memberId: record.memberId,
+      memberDisplayName: record.memberId,
+      memberMattermostUsername: null,
+      benefitId: record.benefitId,
+      benefitSnapshot: record.benefitSnapshot,
+      useCount: record.useCount,
+      verifiedAt: record.verifiedAt,
+    };
+  }
+
+  async updateAdminUsage(input: {
+    usageId: string;
+    partnerId: string;
+    memberId: string;
+    benefitId: string;
+    useCount: number;
+    verifiedAt: string;
+  }) {
+    const context = this.contexts.get(input.partnerId);
+    const benefit = context?.benefitItems.find((item) => item.id === input.benefitId);
+    const existingEntry = [...this.usages.entries()].find(
+      ([, usage]) => usage.usageId === input.usageId && usage.partnerId === input.partnerId,
+    );
+    const existing = existingEntry?.[1];
+    if (!context) throw new Error("partner_benefit_usage_partner_not_found");
+    if (!benefit) throw new Error("partner_benefit_usage_benefit_not_found");
+    if (!existing) throw new Error("partner_benefit_usage_not_found");
+    const updated = {
+      ...existing,
+      memberId: input.memberId,
+      benefitId: benefit.id,
+      benefitSnapshot: benefit.title,
+      useCount: input.useCount,
+      verifiedAt: input.verifiedAt,
+    };
+    this.usages.delete(existingEntry[0]);
+    this.usages.set(existingEntry[0], updated);
+    return {
+      usageId: updated.usageId,
+      memberId: updated.memberId,
+      memberDisplayName: updated.memberId,
+      memberMattermostUsername: null,
+      benefitId: updated.benefitId,
+      benefitSnapshot: updated.benefitSnapshot,
+      useCount: updated.useCount,
+      verifiedAt: updated.verifiedAt,
+    };
+  }
+
+  async deleteAdminUsage(input: { partnerId: string; usageId: string }) {
+    const existingEntry = [...this.usages.entries()].find(
+      ([, usage]) => usage.usageId === input.usageId && usage.partnerId === input.partnerId,
+    );
+    const existing = existingEntry?.[1];
+    if (!existing) throw new Error("partner_benefit_usage_not_found");
+    this.usages.delete(existingEntry[0]);
+  }
 }

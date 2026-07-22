@@ -11,6 +11,7 @@ import {
 import { isWithinPeriod } from "@/lib/partner-utils";
 import {
   adPackageRepository,
+  partnerBenefitUsageRepository,
   partnerFavoriteRepository,
   partnerRepository,
 } from "@/lib/repositories";
@@ -114,6 +115,13 @@ function getCategoryLabel(categories: Category[], partner: Partner) {
   return categories.find((item) => item.key === partner.category)?.label ?? "제휴";
 }
 
+function hasCanonicalBenefitItems(partner: Partner) {
+  const items = partner.benefitItems ?? [];
+  return items.length > 0 && items.every(
+    (item) => !item.id.startsWith("legacy-benefit-"),
+  );
+}
+
 export async function getPartnerMetadataData(rawId: string) {
   const [categories, partner] = await Promise.all([
     getCategoriesCached(),
@@ -200,17 +208,33 @@ export async function getPartnerDetailPageData(
     return null;
   }
 
-  const category = categories.find((item) => item.key === partner.category);
+  let resolvedPartner = partner;
+  if (!hasCanonicalBenefitItems(partner)) {
+    try {
+      const verificationContext = await partnerBenefitUsageRepository.getVerificationContext(partner.id);
+      if (verificationContext?.benefitItems.length) {
+        resolvedPartner = {
+          ...partner,
+          benefitItems: verificationContext.benefitItems,
+          benefits: verificationContext.benefitItems.map((item) => item.title),
+        };
+      }
+    } catch (error) {
+      console.error("[partner-detail] canonical benefit items lookup failed", error);
+    }
+  }
+
+  const category = categories.find((item) => item.key === resolvedPartner.category);
   const categoryLabel = category?.label ?? "알 수 없음";
-  const isActive = isWithinPeriod(partner.period.start, partner.period.end);
-  const thumbnailUrl = partner.thumbnail ? getCachedImageUrl(partner.thumbnail) : "";
-  const mapLink = getMapLink(partner.mapUrl, partner.location, partner.name) ?? undefined;
+  const isActive = isWithinPeriod(resolvedPartner.period.start, resolvedPartner.period.end);
+  const thumbnailUrl = resolvedPartner.thumbnail ? getCachedImageUrl(resolvedPartner.thumbnail) : "";
+  const mapLink = getMapLink(resolvedPartner.mapUrl, resolvedPartner.location, resolvedPartner.name) ?? undefined;
   const normalizedLinks = isActive
     ? normalizeBenefitUseInquiry({
-        benefitActionType: partner.benefitActionType,
-        benefitActionLink: partner.benefitActionLink,
-        reservationLink: partner.reservationLink,
-        inquiryLink: partner.inquiryLink,
+        benefitActionType: resolvedPartner.benefitActionType,
+        benefitActionLink: resolvedPartner.benefitActionLink,
+        reservationLink: resolvedPartner.reservationLink,
+        inquiryLink: resolvedPartner.inquiryLink,
       })
     : {
         benefitActionType: "none",
@@ -220,10 +244,10 @@ export async function getPartnerDetailPageData(
       };
   const benefitUseAction = isActive
     ? getBenefitUseAction({
-        actionType: normalizedLinks.benefitActionType,
-        actionLink: normalizedLinks.benefitActionLink,
-        legacyReservationLink: normalizedLinks.reservationLink,
-        accessStatus: partner.benefitAccessStatus,
+      actionType: normalizedLinks.benefitActionType,
+      actionLink: normalizedLinks.benefitActionLink,
+      legacyReservationLink: normalizedLinks.reservationLink,
+      accessStatus: resolvedPartner.benefitAccessStatus,
       })
     : null;
   const reservationDisplay = isActive
@@ -232,15 +256,15 @@ export async function getPartnerDetailPageData(
   const inquiryDisplay = isActive
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
-  const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(partner.id)}`);
+  const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(resolvedPartner.id)}`);
   const [adCoupons, memberCoupons] = await Promise.all([
-    getActiveCouponsSafe(partner.id),
+    getActiveCouponsSafe(resolvedPartner.id),
     currentUserId
       ? getIssuedCouponsSafe(currentUserId)
       : Promise.resolve([] as AvailableAdCoupon[]),
   ]);
   const issuedAdCoupons = memberCoupons.filter(
-    (item) => item.coupon.partnerId === partner.id,
+    (item) => item.coupon.partnerId === resolvedPartner.id,
   );
   const metrics = {
     ...createEmptyPartnerServiceMetrics(),
@@ -249,7 +273,7 @@ export async function getPartnerDetailPageData(
 
   return {
     kind: "detail",
-    partner,
+    partner: resolvedPartner,
     categoryLabel,
     isActive,
     thumbnailUrl,
