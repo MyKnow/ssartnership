@@ -183,7 +183,7 @@ export default async function AdminPartnerDetailPage({
     supabase
       .from("partners")
       .select(
-        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)",
+        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,benefit_use_max_count,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)",
       )
       .eq("id", partnerId)
       .maybeSingle(),
@@ -466,6 +466,7 @@ export default async function AdminPartnerDetailPage({
                 mapUrl: partner.map_url ?? "",
                 benefitActionType: partner.benefit_action_type ?? undefined,
                 benefitActionLink: partner.benefit_action_link ?? undefined,
+                benefitUseMaxCount: partner.benefit_use_max_count ?? null,
                 benefitVerificationPinConfigured: Boolean(
                   partner.benefit_verification_pin_hash &&
                     partner.benefit_verification_pin_salt,

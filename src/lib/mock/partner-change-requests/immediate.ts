@@ -28,6 +28,8 @@ export async function updateMockPartnerImmediateFields(
     benefitActionType === "external_link"
       ? input.benefitActionLink ?? input.reservationLink
       : null;
+  const benefitUseMaxCount =
+    benefitActionType === "certification" ? input.benefitUseMaxCount ?? null : null;
 
   if (
     service.thumbnail === input.thumbnail &&
@@ -35,6 +37,7 @@ export async function updateMockPartnerImmediateFields(
     arraysEqual(service.tags, input.tags) &&
     service.benefitActionType === benefitActionType &&
     service.benefitActionLink === benefitActionLink &&
+    service.benefitUseMaxCount === benefitUseMaxCount &&
     service.reservationLink === input.reservationLink &&
     service.inquiryLink === input.inquiryLink
   ) {
@@ -49,6 +52,7 @@ export async function updateMockPartnerImmediateFields(
   service.tags = [...input.tags];
   service.benefitActionType = benefitActionType;
   service.benefitActionLink = benefitActionLink;
+  service.benefitUseMaxCount = benefitUseMaxCount;
   service.reservationLink = input.reservationLink;
   service.inquiryLink = input.inquiryLink;
 

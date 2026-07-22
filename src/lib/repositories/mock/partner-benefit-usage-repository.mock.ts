@@ -20,6 +20,7 @@ export const MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS: PartnerBenefitUsageVerificatio
       "아메리카노·콜드브루 1,000원 할인",
       "SSAFY 세트(음료+디저트) 2,000원 할인",
     ],
+    benefitUseMaxCount: 2,
     pinHash: CAFE_SSAFY_PIN_HASH,
     pinSalt: CAFE_SSAFY_PIN_SALT,
   },

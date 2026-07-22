@@ -114,6 +114,7 @@ export function normalizeServiceRecord(
     benefitActionLink: normalizeOptionalLink(
       service.benefitActionLink ?? service.reservationLink,
     ),
+    benefitUseMaxCount: service.benefitUseMaxCount ?? null,
     reservationLink: normalizeOptionalLink(service.reservationLink),
     inquiryLink: normalizeOptionalLink(service.inquiryLink),
     currentConditions: [...(service.currentConditions ?? [])],

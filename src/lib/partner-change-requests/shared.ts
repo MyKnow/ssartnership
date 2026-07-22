@@ -104,6 +104,7 @@ export type PartnerChangeRequestContext = {
   mapUrl: string | null;
   benefitActionType: PartnerBenefitActionType;
   benefitActionLink: string | null;
+  benefitUseMaxCount: number | null;
   reservationLink: string | null;
   inquiryLink: string | null;
   currentConditions: string[];
@@ -167,6 +168,7 @@ export type PartnerImmediateUpdateInput = {
   reservationLink: string | null;
   benefitActionType?: PartnerBenefitActionType;
   benefitActionLink?: string | null;
+  benefitUseMaxCount?: number | null;
   inquiryLink: string | null;
 };
 
@@ -221,6 +223,7 @@ export type PartnerRow = {
   map_url?: string | null;
   benefit_action_type?: string | null;
   benefit_action_link?: string | null;
+  benefit_use_max_count?: number | null;
   reservation_link?: string | null;
   inquiry_link?: string | null;
   period_start?: string | null;

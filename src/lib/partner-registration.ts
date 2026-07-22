@@ -31,11 +31,13 @@ import {
   IMAGE_SOURCE_ACCEPT,
   validateImageUploadSource,
 } from "@/lib/image-upload/policy";
+import { normalizePartnerBenefitUseMaxCount } from "@/lib/partner-benefit-usage";
 
 export type PartnerRegistrationFieldName =
   | "registrationMode"
   | "serviceMode"
   | "benefitActionType"
+  | "benefitUseMaxCount"
   | "branchScopeType"
   | "branchScopeNote"
   | "brandName"
@@ -103,6 +105,7 @@ export type PartnerRegistrationResolvedValues = PartnerRegistrationFormState & {
   safeMapUrl: string | null;
   safeSiteLink: string | null;
   safeBenefitActionLink: string | null;
+  benefitUseMaxCount: number | null;
   parsedBenefits: string[];
   parsedConditions: string[];
   parsedTags: string[];
@@ -124,6 +127,7 @@ export const partnerRegistrationInitialFormState: PartnerRegistrationFormState =
   registrationMode: "full_new",
   serviceMode: "offline",
   benefitActionType: "external_link",
+  benefitUseMaxCount: "",
   branchScopeType: "single_location",
   branchScopeNote: "",
   brandName: "",
@@ -153,6 +157,7 @@ export const PARTNER_REGISTRATION_FIELD_ORDER: PartnerRegistrationFieldName[] = 
   "registrationMode",
   "serviceMode",
   "benefitActionType",
+  "benefitUseMaxCount",
   "branchScopeType",
   "branchScopeNote",
   "brandName",
@@ -479,6 +484,19 @@ export function validatePartnerRegistrationInput(
   if (values.benefitActionType === "external_link" && !values.benefitActionLink) {
     fieldErrors.benefitActionLink = "외부 링크 방식은 혜택 이용 링크가 필요합니다.";
   }
+  const benefitUseMaxCount =
+    values.benefitActionType === "certification"
+      ? values.benefitUseMaxCount
+        ? normalizePartnerBenefitUseMaxCount(values.benefitUseMaxCount)
+        : null
+      : null;
+  if (
+    values.benefitActionType === "certification" &&
+    values.benefitUseMaxCount &&
+    benefitUseMaxCount === null
+  ) {
+    fieldErrors.benefitUseMaxCount = "제휴 적용 최대 횟수는 1회 이상의 정수로 입력해 주세요.";
+  }
   if (!values.benefits) {
     fieldErrors.benefits = "제공 혜택을 입력해 주세요.";
   }
@@ -611,6 +629,7 @@ export function validatePartnerRegistrationInput(
       safeMapUrl,
       safeSiteLink,
       safeBenefitActionLink,
+      benefitUseMaxCount,
       parsedBenefits: parseDelimitedInput(values.benefits),
       parsedConditions: parseDelimitedInput(values.conditions),
       parsedTags: parseDelimitedInput(values.tags),

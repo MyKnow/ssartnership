@@ -21,6 +21,7 @@ export type PartnerBenefitUsageErrorCode =
   | "pin_not_configured"
   | "pin_invalid"
   | "use_count_invalid"
+  | "use_count_exceeded"
   | "idempotency_conflict";
 
 export class PartnerBenefitUsageError extends Error {
@@ -37,6 +38,12 @@ function mapRepositoryError(error: unknown): PartnerBenefitUsageError {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("idempotency_conflict")) {
     return new PartnerBenefitUsageError("idempotency_conflict");
+  }
+  if (message.includes("use_count_exceeded")) {
+    return new PartnerBenefitUsageError("use_count_exceeded");
+  }
+  if (message.includes("use_count_invalid")) {
+    return new PartnerBenefitUsageError("use_count_invalid");
   }
   if (
     message.includes("benefit_not_found") ||
@@ -72,6 +79,17 @@ export async function recordPartnerBenefitUsage({
     throw new PartnerBenefitUsageError("partner_not_found");
   }
 
+  const normalizedUseCount = normalizePartnerBenefitUseCount(useCount);
+  if (normalizedUseCount === null) {
+    throw new PartnerBenefitUsageError("use_count_invalid");
+  }
+  if (
+    context.benefitUseMaxCount !== null &&
+    normalizedUseCount > context.benefitUseMaxCount
+  ) {
+    throw new PartnerBenefitUsageError("use_count_exceeded");
+  }
+
   if (
     !isPartnerBenefitUseAvailable({
       location: context.location,
@@ -79,7 +97,7 @@ export async function recordPartnerBenefitUsage({
       periodEnd: context.periodEnd,
     })
   ) {
-    throw new PartnerBenefitUsageError("use_count_invalid");
+    throw new PartnerBenefitUsageError("benefit_unavailable");
   }
 
   const selectedBenefit = normalizePartnerBenefitSelection(context.benefits, benefit);
@@ -93,11 +111,6 @@ export async function recordPartnerBenefitUsage({
   if (!isPartnerBenefitUsePin(pin)) {
     throw new PartnerBenefitUsageError("pin_invalid");
   }
-  const normalizedUseCount = normalizePartnerBenefitUseCount(useCount);
-  if (normalizedUseCount === null) {
-    throw new PartnerBenefitUsageError("benefit_unavailable");
-  }
-
   const isPinValid = await verifyCouponVerificationPassword(pin, {
     hash: context.pinHash,
     salt: context.pinSalt,

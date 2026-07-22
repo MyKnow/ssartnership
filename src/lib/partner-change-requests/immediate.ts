@@ -70,6 +70,7 @@ export async function updateSupabasePartnerImmediateFields(
       p_tags: input.tags,
       p_benefit_action_type: benefitActionType,
       p_benefit_action_link: benefitActionLink,
+      p_benefit_use_max_count: input.benefitUseMaxCount ?? null,
       p_reservation_link: input.reservationLink,
       p_inquiry_link: input.inquiryLink,
       ...buildAtomicAuditRpcContext(

@@ -13,6 +13,7 @@ import {
   normalizePartnerBenefitActionType,
 } from "../../../../lib/partner-benefit-action.ts";
 import { normalizePartnerDetailDescription } from "../../../../lib/partner-detail-description.ts";
+import { normalizePartnerBenefitUseMaxCount } from "../../../../lib/partner-benefit-usage.ts";
 import { normalizePartnerLoginId } from "../../../../lib/partner-utils.ts";
 import {
   ONLINE_PARTNER_LOCATION,
@@ -325,6 +326,22 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     throw new Error("partner_form_invalid_benefit_verification_pin");
   }
   const benefitVerificationPin = rawBenefitVerificationPin || null;
+  const rawBenefitUseMaxCount = String(
+    formData.get("benefitUseMaxCount") || "",
+  ).trim();
+  const benefitUseMaxCount =
+    benefitActionType === "certification"
+      ? rawBenefitUseMaxCount
+        ? normalizePartnerBenefitUseMaxCount(rawBenefitUseMaxCount)
+        : null
+      : null;
+  if (
+    benefitActionType === "certification" &&
+    rawBenefitUseMaxCount &&
+    benefitUseMaxCount === null
+  ) {
+    throw new Error("partner_form_invalid_benefit_use_max_count");
+  }
 
   const inquiryLink = parsePartnerLink(rawInquiryLink);
   if (rawInquiryLink && !inquiryLink) {
@@ -357,6 +374,7 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     benefitActionType,
     benefitActionLink,
     benefitVerificationPin,
+    benefitUseMaxCount,
     reservationLink,
     inquiryLink,
     periodStart: periodStart || null,

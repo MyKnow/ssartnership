@@ -41,7 +41,7 @@ export async function getSupabaseRequestContext(
   const { data: partner, error } = await supabase
     .from("partners")
     .select(
-      "id,company_id,created_at,name,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,plan_tier,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
+      "id,company_id,created_at,name,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,benefit_use_max_count,reservation_link,inquiry_link,period_start,period_end,plan_tier,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
     )
     .eq("id", partnerId)
     .maybeSingle();
@@ -97,6 +97,7 @@ export async function getSupabaseRequestContext(
     benefitActionLink: sanitizePartnerLinkValue(
       row.benefit_action_link ?? row.reservation_link ?? undefined,
     ),
+    benefitUseMaxCount: row.benefit_use_max_count ?? null,
     reservationLink: sanitizePartnerLinkValue(row.reservation_link ?? undefined),
     inquiryLink: sanitizePartnerLinkValue(row.inquiry_link ?? undefined),
     currentConditions: normalizeTextList(row.conditions),

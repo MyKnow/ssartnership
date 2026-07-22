@@ -118,6 +118,7 @@ const partners: Partner[] = [
     campusSlugs: ["seoul"],
     mapUrl: "https://map.naver.com/",
     benefitActionType: "certification",
+    benefitUseMaxCount: 2,
     reservationLink: "https://map.naver.com/",
     inquiryLink: "02-555-1500",
     period: { start: "2026-01-01", end: "2099-12-31" },

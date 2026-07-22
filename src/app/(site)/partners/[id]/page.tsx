@@ -211,6 +211,7 @@ export default async function PartnerDetailPage({
           partnerId: partner.id,
           partnerName: partner.name,
           benefits: partner.benefits,
+          maxUseCount: partner.benefitUseMaxCount ?? null,
           returnTo: partnerReturnTo,
           requiresLogin: partner.benefitAccessStatus === "login_required",
         }

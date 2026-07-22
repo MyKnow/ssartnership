@@ -74,6 +74,7 @@ test("idempotent benefit-use retries do not create a second aggregate record", a
       periodStart: "2026-07-01",
       periodEnd: "2026-07-31",
       benefits: ["헬스 1개월 33,000원"],
+      benefitUseMaxCount: null,
       pinHash: pin.hash,
       pinSalt: pin.salt,
     },
@@ -105,6 +106,7 @@ test("benefit-use cannot record usage when the partner PIN is not configured", a
       periodStart: "2026-07-01",
       periodEnd: "2026-07-31",
       benefits: ["헬스 1개월 33,000원"],
+      benefitUseMaxCount: null,
       pinHash: null,
       pinSalt: null,
     },
@@ -146,4 +148,64 @@ test("카페 싸피 mock fixture accepts the fixed filming PIN 0000", async () =
 
   assert.equal(result.isNew, true);
   assert.equal(result.useCount, 1);
+});
+
+test("configured benefit use maximum is enforced by the verification service", async () => {
+  const pin = await hashCouponVerificationPassword("0427");
+  const repository = new MockPartnerBenefitUsageRepository([
+    {
+      partnerId: "partner-with-limit",
+      location: "서울 강남구 테헤란로 212",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-07-31",
+      benefits: ["헬스 1개월 33,000원"],
+      benefitUseMaxCount: 2,
+      pinHash: pin.hash,
+      pinSalt: pin.salt,
+    },
+  ]);
+
+  await assert.rejects(
+    () =>
+      recordPartnerBenefitUsage({
+        repository,
+        partnerId: "partner-with-limit",
+        memberId: "member-1",
+        benefit: "헬스 1개월 33,000원",
+        useCount: 3,
+        pin: "0427",
+        idempotencyKey: "over-limit-request",
+      }),
+    (error: unknown) =>
+      error instanceof PartnerBenefitUsageError &&
+      error.code === "use_count_exceeded",
+  );
+});
+
+test("missing benefit use maximum allows a count above the previous fixed limit", async () => {
+  const pin = await hashCouponVerificationPassword("0427");
+  const repository = new MockPartnerBenefitUsageRepository([
+    {
+      partnerId: "partner-without-limit",
+      location: "서울 강남구 테헤란로 212",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-07-31",
+      benefits: ["헬스 1개월 33,000원"],
+      benefitUseMaxCount: null,
+      pinHash: pin.hash,
+      pinSalt: pin.salt,
+    },
+  ]);
+
+  const result = await recordPartnerBenefitUsage({
+    repository,
+    partnerId: "partner-without-limit",
+    memberId: "member-1",
+    benefit: "헬스 1개월 33,000원",
+    useCount: 3,
+    pin: "0427",
+    idempotencyKey: "unlimited-request",
+  });
+
+  assert.equal(result.useCount, 3);
 });

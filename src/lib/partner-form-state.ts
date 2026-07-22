@@ -10,6 +10,7 @@ export type PartnerFormField =
   | "benefitActionType"
   | "benefitActionLink"
   | "benefitVerificationPin"
+  | "benefitUseMaxCount"
   | "reservationLink"
   | "inquiryLink"
   | "visibility"

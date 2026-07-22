@@ -5,12 +5,13 @@ import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { trackProductEvent } from "@/lib/product-events";
-import { MAX_PARTNER_BENEFIT_USE_COUNT } from "@/lib/partner-benefit-usage";
+import { PARTNER_BENEFIT_USE_COUNT_STORAGE_MAX } from "@/lib/partner-benefit-usage";
 
 export type OfflinePartnerBenefitAction = {
   partnerId: string;
   partnerName: string;
   benefits: string[];
+  maxUseCount?: number | null;
   returnTo: string;
   requiresLogin?: boolean;
 };
@@ -27,6 +28,7 @@ export default function PartnerBenefitUseAction({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBenefit, setSelectedBenefit] = useState("");
   const [useCount, setUseCount] = useState(1);
+  const maxUseCount = action.maxUseCount ?? null;
   const portalRoot = typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
@@ -202,8 +204,21 @@ export default function PartnerBenefitUseAction({
                     <button
                       type="button"
                       aria-label="이용 횟수 늘리기"
-                      disabled={useCount >= MAX_PARTNER_BENEFIT_USE_COUNT}
-                      onClick={() => setUseCount((current) => Math.min(MAX_PARTNER_BENEFIT_USE_COUNT, current + 1))}
+                      disabled={
+                        maxUseCount !== null
+                          ? useCount >= maxUseCount
+                          : useCount >= PARTNER_BENEFIT_USE_COUNT_STORAGE_MAX
+                      }
+                      onClick={() =>
+                        setUseCount((current) =>
+                          maxUseCount !== null
+                            ? Math.min(maxUseCount, current + 1)
+                            : Math.min(
+                                PARTNER_BENEFIT_USE_COUNT_STORAGE_MAX,
+                                current + 1,
+                              ),
+                        )
+                      }
                       className="inline-flex size-11 items-center justify-center rounded-xl text-xl font-semibold text-foreground transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       +

@@ -33,6 +33,9 @@ export function ImmediateChangeForm({
   const allowUploadedFormSubmitRef = useRef(false);
   const isSubmittingImagesRef = useRef(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [benefitActionType, setBenefitActionType] = useState(
+    context.benefitActionType,
+  );
   const { saveDraft } = useImageUploadFormDraft({
     formKey: `partner-change-request-${context.partnerId}`,
     formRef,
@@ -113,6 +116,11 @@ export function ImmediateChangeForm({
               <Select
                 name="benefitActionType"
                 defaultValue={context.benefitActionType}
+                onChange={(event) =>
+                  setBenefitActionType(
+                    event.target.value as typeof context.benefitActionType,
+                  )
+                }
               >
                 <option value="external_link">외부 링크로 이용</option>
                 <option value="certification">싸트너십 인증으로 이용</option>
@@ -128,6 +136,20 @@ export function ImmediateChangeForm({
                 name="benefitActionLink"
                 defaultValue={context.benefitActionLink ?? context.reservationLink ?? ""}
                 placeholder="혜택 이용 링크 또는 연락처"
+              />
+            </FieldGroup>
+            <FieldGroup
+              label="제휴 적용 최대 횟수"
+              note="싸트너십 인증 방식에서만 적용됩니다. 비워 두면 횟수 제한이 없습니다."
+            >
+              <Input
+                name="benefitUseMaxCount"
+                type="number"
+                min={1}
+                inputMode="numeric"
+                defaultValue={context.benefitUseMaxCount ?? ""}
+                placeholder="제한 없음"
+                disabled={benefitActionType !== "certification"}
               />
             </FieldGroup>
             <FieldGroup

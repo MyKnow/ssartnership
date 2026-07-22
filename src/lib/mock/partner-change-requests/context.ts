@@ -57,6 +57,7 @@ export async function getMockPartnerChangeRequestContext(
     mapUrl: normalizedService.mapUrl,
     benefitActionType: normalizedService.benefitActionType,
     benefitActionLink: normalizedService.benefitActionLink,
+    benefitUseMaxCount: normalizedService.benefitUseMaxCount,
     reservationLink: normalizedService.reservationLink,
     inquiryLink: normalizedService.inquiryLink,
     currentConditions: [...normalizedService.currentConditions],

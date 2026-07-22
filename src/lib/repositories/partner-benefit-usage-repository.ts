@@ -4,6 +4,7 @@ export type PartnerBenefitUsageVerificationContext = {
   periodStart: string | null;
   periodEnd: string | null;
   benefits: string[];
+  benefitUseMaxCount: number | null;
   pinHash: string | null;
   pinSalt: string | null;
 };

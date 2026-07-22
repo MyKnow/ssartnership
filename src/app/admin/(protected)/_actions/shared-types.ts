@@ -17,6 +17,7 @@ export type PartnerCoreInput = {
   benefitActionType: PartnerBenefitActionType;
   benefitActionLink: string | null;
   benefitVerificationPin: string | null;
+  benefitUseMaxCount: number | null;
   reservationLink: string | null;
   inquiryLink: string | null;
   periodStart: string | null;

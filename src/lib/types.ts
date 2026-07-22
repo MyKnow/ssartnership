@@ -30,6 +30,7 @@ export type Partner = {
   mapUrl?: string;
   benefitActionType?: PartnerBenefitActionType;
   benefitActionLink?: string;
+  benefitUseMaxCount?: number | null;
   reservationLink?: string;
   inquiryLink?: string;
   period: {

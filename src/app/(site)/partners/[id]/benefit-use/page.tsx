@@ -75,11 +75,11 @@ export default async function PartnerBenefitUsePage({
   const rawUseCount = Array.isArray(resolvedSearchParams.useCount)
     ? resolvedSearchParams.useCount[0]
     : resolvedSearchParams.useCount;
-  const useCount = normalizePartnerBenefitUseCount(rawUseCount);
+  const requestedUseCount = normalizePartnerBenefitUseCount(rawUseCount);
 
   if (!session?.userId) {
     const requestedPath = benefit
-      ? getBenefitUsePath(partnerId, benefit, useCount ?? 1, returnTo)
+      ? getBenefitUsePath(partnerId, benefit, requestedUseCount ?? 1, returnTo)
       : detailPath;
     redirect(`/auth/login?returnTo=${encodeURIComponent(requestedPath)}`);
   }
@@ -101,6 +101,10 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
+  const useCount = normalizePartnerBenefitUseCount(
+    rawUseCount,
+    partner.benefitUseMaxCount ?? null,
+  );
   const selectedBenefit = normalizePartnerBenefitSelection(partner.benefits, benefit);
   if (!selectedBenefit || useCount === null) {
     redirect(detailPath);

@@ -16,6 +16,7 @@ import {
 } from "@/lib/partner-change-requests";
 import { createAdminOperationalNotification } from "@/lib/operational-notifications";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
+import { normalizePartnerBenefitUseMaxCount } from "@/lib/partner-benefit-usage";
 import { resolvePartnerMediaPayload } from "./media";
 import {
   getAuthorizedCompanyIdsForPartnerAction,
@@ -57,6 +58,9 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     reservationLink: rawReservationLink,
   });
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
+  const rawBenefitUseMaxCount = String(
+    formData.get("benefitUseMaxCount") || "",
+  ).trim();
   let media = null;
 
   try {
@@ -82,6 +86,22 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     const benefitActionLink =
       benefitActionType === "external_link" ? parsedBenefitActionLink : null;
     const reservationLink = benefitActionLink;
+    const benefitUseMaxCount =
+      benefitActionType === "certification"
+        ? rawBenefitUseMaxCount
+          ? normalizePartnerBenefitUseMaxCount(rawBenefitUseMaxCount)
+          : null
+        : null;
+    if (
+      benefitActionType === "certification" &&
+      rawBenefitUseMaxCount &&
+      benefitUseMaxCount === null
+    ) {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "제휴 적용 최대 횟수는 1회 이상의 정수로 입력해 주세요.",
+      );
+    }
 
     const inquiryLink = rawInquiryLink
       ? sanitizePartnerLinkValue(rawInquiryLink)
@@ -113,6 +133,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
       tags,
       benefitActionType,
       benefitActionLink,
+      benefitUseMaxCount,
       reservationLink,
       inquiryLink,
     });

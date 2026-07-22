@@ -68,7 +68,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
+      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,benefit_use_max_count,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -202,6 +202,7 @@ export async function updatePartnerAction(formData: FormData) {
         map_url: payload.mapUrl,
         benefit_action_type: payload.benefitActionType,
         benefit_action_link: payload.benefitActionLink,
+        benefit_use_max_count: payload.benefitUseMaxCount,
         benefit_verification_pin_hash: nextBenefitVerificationPin?.hash ?? null,
         benefit_verification_pin_salt: nextBenefitVerificationPin?.salt ?? null,
         reservation_link: payload.reservationLink,
@@ -334,6 +335,12 @@ export async function updatePartnerAction(formData: FormData) {
       before: previousPartner.benefit_action_link ?? previousPartner.reservation_link ?? null,
       after: payload.benefitActionLink,
       format: (value) => (value ? String(value) : "없음"),
+    },
+    {
+      label: "제휴 적용 최대 횟수",
+      before: previousPartner.benefit_use_max_count ?? null,
+      after: payload.benefitUseMaxCount,
+      format: (value) => (value == null ? "무제한" : `${value}회`),
     },
     {
       label: "문의 링크",

@@ -37,6 +37,7 @@ export type PartnerCardFormValues = {
   benefitActionType?: PartnerBenefitActionType;
   benefitActionLink?: string;
   benefitVerificationPinConfigured?: boolean;
+  benefitUseMaxCount?: number | null;
   reservationLink?: string;
   inquiryLink?: string;
   period?: {

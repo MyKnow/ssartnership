@@ -28,6 +28,7 @@ export type MockChangeRequestServiceRecord = {
   mapUrl: string | null;
   benefitActionType: PartnerBenefitActionType;
   benefitActionLink: string | null;
+  benefitUseMaxCount?: number | null;
   reservationLink: string | null;
   inquiryLink: string | null;
   currentConditions: string[];
@@ -82,6 +83,7 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     mapUrl: "https://map.naver.com/",
     benefitActionType: "external_link",
     benefitActionLink: "https://booking.naver.com/",
+    benefitUseMaxCount: null,
     reservationLink: "https://booking.naver.com/",
     inquiryLink: "02-555-8123",
     currentConditions: ["SSAFY 구성원 인증", "매장 주문 시 적용"],

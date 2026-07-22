@@ -553,6 +553,26 @@ export default function PartnerRegistrationClient({
                       </Field>
                     ) : null}
 
+                    {benefitActionType === "certification" ? (
+                      <Field
+                        label="제휴 적용 최대 횟수"
+                        name="benefitUseMaxCount"
+                        description="비워 두면 횟수 제한 없이 이용할 수 있습니다."
+                        error={fieldErrors.benefitUseMaxCount}
+                      >
+                        <FormInput
+                          name="benefitUseMaxCount"
+                          type="number"
+                          min={1}
+                          inputMode="numeric"
+                          fieldErrors={fieldErrors}
+                          inputRef={registerFieldRef("benefitUseMaxCount")}
+                          defaultValue={initialValues?.benefitUseMaxCount}
+                          placeholder="제한 없음"
+                        />
+                      </Field>
+                    ) : null}
+
                     <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                       <Field
                         label="혜택"

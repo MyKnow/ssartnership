@@ -306,6 +306,7 @@ async function createPartnerRecord(
       map_url: payload.mapUrl,
       benefit_action_type: payload.benefitActionType,
       benefit_action_link: payload.benefitActionLink,
+      benefit_use_max_count: payload.benefitUseMaxCount,
       benefit_verification_pin_hash: benefitVerificationPinHash?.hash ?? null,
       benefit_verification_pin_salt: benefitVerificationPinHash?.salt ?? null,
       reservation_link: payload.reservationLink,

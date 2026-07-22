@@ -73,6 +73,7 @@ create table if not exists partners (
   map_url text,
   benefit_action_type text not null default 'none',
   benefit_action_link text,
+  benefit_use_max_count integer,
   reservation_link text,
   inquiry_link text,
   period_start date,
@@ -101,6 +102,13 @@ create table if not exists partners (
         and char_length(benefit_verification_pin_salt) > 0
       )
     ),
+  constraint partners_benefit_use_max_count_check
+    check (
+      benefit_use_max_count is null
+      or benefit_use_max_count between 1 and 2147483647
+    ),
+  constraint partners_benefit_use_max_count_action_check
+    check (benefit_action_type = 'certification' or benefit_use_max_count is null),
   constraint partners_plan_tier_check
     check (plan_tier in ('basic', 'partner', 'boost'))
 );
@@ -279,6 +287,7 @@ alter table partners add column if not exists conditions text[] not null default
 alter table partners add column if not exists images text[] not null default '{}';
 alter table partners add column if not exists benefit_action_type text not null default 'none';
 alter table partners add column if not exists benefit_action_link text;
+alter table partners add column if not exists benefit_use_max_count integer;
 alter table partners add column if not exists reservation_link text;
 alter table partners add column if not exists inquiry_link text;
 alter table partners add column if not exists plan_tier text not null default 'basic';
@@ -332,6 +341,12 @@ alter table partners drop constraint if exists partners_benefit_action_type_chec
 alter table partners
   add constraint partners_benefit_action_type_check
   check (benefit_action_type in ('certification', 'external_link', 'onsite', 'none'));
+alter table partners drop constraint if exists partners_benefit_use_max_count_check;
+alter table partners add constraint partners_benefit_use_max_count_check
+  check (benefit_use_max_count is null or benefit_use_max_count between 1 and 2147483647);
+alter table partners drop constraint if exists partners_benefit_use_max_count_action_check;
+alter table partners add constraint partners_benefit_use_max_count_action_check
+  check (benefit_action_type = 'certification' or benefit_use_max_count is null);
 
 update partners
 set updated_at = coalesce(updated_at, created_at, now())
@@ -630,6 +645,7 @@ create table if not exists partner_registration_requests (
   registration_mode text not null default 'full_new',
   service_mode text not null,
   benefit_action_type text not null,
+  benefit_use_max_count integer,
   branch_scope_type text not null default 'single_location',
   branch_scope_note text,
   brand_name text not null,
@@ -682,6 +698,13 @@ create table if not exists partner_registration_requests (
     ),
   constraint partner_registration_requests_benefit_action_type_check
     check (benefit_action_type in ('certification', 'external_link', 'onsite', 'none')),
+  constraint partner_registration_requests_benefit_use_max_count_check
+    check (
+      benefit_use_max_count is null
+      or benefit_use_max_count between 1 and 2147483647
+    ),
+  constraint partner_registration_requests_benefit_use_max_count_action_check
+    check (benefit_action_type = 'certification' or benefit_use_max_count is null),
   constraint partner_registration_requests_detail_description_length_check
     check (
       detail_description is null
@@ -699,6 +722,7 @@ create trigger partner_registration_requests_set_updated_at
 alter table partner_registration_requests add column if not exists registration_mode text not null default 'full_new';
 alter table partner_registration_requests add column if not exists branch_scope_type text not null default 'single_location';
 alter table partner_registration_requests add column if not exists branch_scope_note text;
+alter table partner_registration_requests add column if not exists benefit_use_max_count integer;
 alter table partner_registration_requests drop constraint if exists partner_registration_requests_registration_mode_check;
 alter table partner_registration_requests add constraint partner_registration_requests_registration_mode_check
   check (registration_mode in ('full_new', 'add_benefit_group', 'add_branches'));
@@ -715,6 +739,12 @@ alter table partner_registration_requests add constraint partner_registration_re
       'online'
     )
   );
+alter table partner_registration_requests drop constraint if exists partner_registration_requests_benefit_use_max_count_check;
+alter table partner_registration_requests add constraint partner_registration_requests_benefit_use_max_count_check
+  check (benefit_use_max_count is null or benefit_use_max_count between 1 and 2147483647);
+alter table partner_registration_requests drop constraint if exists partner_registration_requests_benefit_use_max_count_action_check;
+alter table partner_registration_requests add constraint partner_registration_requests_benefit_use_max_count_action_check
+  check (benefit_action_type = 'certification' or benefit_use_max_count is null);
 
 create table if not exists partner_registration_benefit_groups (
   id uuid primary key default uuid_generate_v4(),
@@ -906,7 +936,7 @@ create table if not exists partner_benefit_usages (
   constraint partner_benefit_usages_benefit_snapshot_length_check
     check (char_length(trim(benefit_snapshot)) between 1 and 500),
   constraint partner_benefit_usages_use_count_check
-    check (use_count between 1 and 99),
+    check (use_count between 1 and 2147483647),
   constraint partner_benefit_usages_idempotency_key_length_check
     check (char_length(trim(idempotency_key)) between 16 and 128)
 );
@@ -5641,11 +5671,17 @@ begin
 end;
 $$;
 
+drop function if exists public.update_partner_immediate_fields_with_audit(
+  uuid, uuid[], text, text[], text[], text, text, text, text, text, text, text,
+  text, text, text, text, jsonb
+);
+
 create or replace function public.update_partner_immediate_fields_with_audit(
   p_partner_id uuid, p_company_ids uuid[], p_thumbnail text, p_images text[],
   p_tags text[], p_benefit_action_type text, p_benefit_action_link text,
-  p_reservation_link text, p_inquiry_link text, p_actor_type text, p_actor_id text,
-  p_request_id text, p_path text, p_user_agent text, p_ip_address text, p_properties jsonb
+  p_benefit_use_max_count integer, p_reservation_link text, p_inquiry_link text,
+  p_actor_type text, p_actor_id text, p_request_id text, p_path text,
+  p_user_agent text, p_ip_address text, p_properties jsonb
 )
 returns table (company_id uuid, previous_thumbnail text, previous_images text[])
 language plpgsql security invoker set search_path = public as $$
@@ -5656,6 +5692,8 @@ begin
   if coalesce(array_length(p_company_ids, 1), 0) = 0 then raise exception 'partner_immediate_update_missing_company_scope'; end if;
   if p_benefit_action_type not in ('certification', 'external_link', 'onsite', 'none') then raise exception 'partner_immediate_update_invalid_benefit_action_type'; end if;
   if p_benefit_action_type = 'external_link' and nullif(btrim(coalesce(p_benefit_action_link, '')), '') is null then raise exception 'partner_immediate_update_missing_benefit_action_link'; end if;
+  if p_benefit_use_max_count is not null and p_benefit_use_max_count < 1 then raise exception 'partner_immediate_update_invalid_benefit_use_max_count'; end if;
+  if p_benefit_action_type <> 'certification' and p_benefit_use_max_count is not null then raise exception 'partner_immediate_update_invalid_benefit_use_max_count'; end if;
   if jsonb_typeof(coalesce(p_properties, '{}'::jsonb)) <> 'object' then raise exception 'partner_immediate_update_invalid_audit_properties'; end if;
   select * into partner_row from public.partners where id = p_partner_id for update;
   if not found then raise exception 'partner_immediate_update_partner_not_found'; end if;
@@ -5665,11 +5703,13 @@ begin
   ) then raise exception 'partner_immediate_update_forbidden'; end if;
   if partner_row.thumbnail is not distinct from p_thumbnail and partner_row.images is not distinct from coalesce(p_images, '{}'::text[])
     and partner_row.tags is not distinct from coalesce(p_tags, '{}'::text[]) and partner_row.benefit_action_type is not distinct from p_benefit_action_type
-    and partner_row.benefit_action_link is not distinct from p_benefit_action_link and partner_row.reservation_link is not distinct from p_reservation_link
+    and partner_row.benefit_action_link is not distinct from p_benefit_action_link and partner_row.benefit_use_max_count is not distinct from p_benefit_use_max_count
+    and partner_row.reservation_link is not distinct from p_reservation_link
     and partner_row.inquiry_link is not distinct from p_inquiry_link then raise exception 'partner_immediate_update_no_changes'; end if;
   update public.partners set thumbnail = p_thumbnail, images = coalesce(p_images, '{}'::text[]), tags = coalesce(p_tags, '{}'::text[]),
     benefit_action_type = p_benefit_action_type, benefit_action_link = p_benefit_action_link,
-    reservation_link = p_reservation_link, inquiry_link = p_inquiry_link, updated_at = now()
+    benefit_use_max_count = p_benefit_use_max_count, reservation_link = p_reservation_link,
+    inquiry_link = p_inquiry_link, updated_at = now()
   where id = partner_row.id;
   insert into public.admin_audit_logs (request_id, actor_type, actor_id, action, path, target_type, target_id, properties, user_agent, ip_address)
   values (p_request_id, p_actor_type, p_actor_id, 'partner_portal_immediate_update', p_path, 'partner', partner_row.id::text, coalesce(p_properties, '{}'::jsonb), p_user_agent, p_ip_address);
@@ -5681,10 +5721,10 @@ revoke all on function public.resolve_partner_change_request_with_audit(uuid, te
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from anon;
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from authenticated;
 grant execute on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) to service_role;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, text, text, text, text, text, text, text, text, jsonb) from public;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, text, text, text, text, text, text, text, text, jsonb) from anon;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, text, text, text, text, text, text, text, text, jsonb) from authenticated;
-grant execute on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, text, text, text, text, text, text, text, text, jsonb) to service_role;
+revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from public;
+revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from anon;
+revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from authenticated;
+grant execute on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) to service_role;
 
 -- 20260715004318_add_manual_member_reissue_setup_guard.sql
 create or replace function public.reissue_manual_member_initial_setup(
@@ -11137,10 +11177,13 @@ revoke all on table public.partner_benefit_usages from public;
 revoke all on table public.partner_benefit_usages from anon;
 revoke all on table public.partner_benefit_usages from authenticated;
 
+drop function if exists public.record_partner_benefit_usage(uuid, uuid, text, text, jsonb);
+
 create or replace function public.record_partner_benefit_usage(
   p_partner_id uuid,
   p_member_id uuid,
   p_benefit text,
+  p_use_count integer,
   p_idempotency_key text,
   p_metadata jsonb default '{}'::jsonb
 )
@@ -11149,6 +11192,7 @@ returns table (
   partner_id uuid,
   member_id uuid,
   benefit_snapshot text,
+  use_count integer,
   verified_at timestamp with time zone,
   created_at timestamp with time zone,
   is_new boolean
@@ -11171,6 +11215,9 @@ begin
   if char_length(normalized_benefit) < 1 or char_length(normalized_benefit) > 500 then
     raise exception 'partner_benefit_usage_benefit_invalid';
   end if;
+  if p_use_count is null or p_use_count < 1 then
+    raise exception 'partner_benefit_usage_use_count_invalid';
+  end if;
   if char_length(normalized_idempotency_key) < 16 or char_length(normalized_idempotency_key) > 128 then
     raise exception 'partner_benefit_usage_idempotency_key_invalid';
   end if;
@@ -11185,6 +11232,10 @@ begin
   if partner_row.period_end is not null and partner_row.period_end < current_kst_date then
     raise exception 'partner_benefit_usage_period_inactive';
   end if;
+  if partner_row.benefit_use_max_count is not null
+    and p_use_count > partner_row.benefit_use_max_count then
+    raise exception 'partner_benefit_usage_use_count_exceeded';
+  end if;
   if not normalized_benefit = any(coalesce(partner_row.benefits, '{}'::text[])) then
     raise exception 'partner_benefit_usage_benefit_not_found';
   end if;
@@ -11195,37 +11246,40 @@ begin
   where idempotency_key = normalized_idempotency_key for update;
   if found then
     if usage_row.partner_id <> p_partner_id or usage_row.member_id <> p_member_id
-       or usage_row.benefit_snapshot <> normalized_benefit then
+       or usage_row.benefit_snapshot <> normalized_benefit
+       or usage_row.use_count <> p_use_count then
       raise exception 'partner_benefit_usage_idempotency_conflict';
     end if;
     return query select usage_row.id, usage_row.partner_id, usage_row.member_id,
-      usage_row.benefit_snapshot, usage_row.verified_at, usage_row.created_at, false;
+      usage_row.benefit_snapshot, usage_row.use_count, usage_row.verified_at,
+      usage_row.created_at, false;
     return;
   end if;
   insert into public.partner_benefit_usages (
-    partner_id, member_id, benefit_snapshot, idempotency_key, metadata
+    partner_id, member_id, benefit_snapshot, use_count, idempotency_key, metadata
   ) values (
-    p_partner_id, p_member_id, normalized_benefit, normalized_idempotency_key,
-    coalesce(p_metadata, '{}'::jsonb)
+    p_partner_id, p_member_id, normalized_benefit, p_use_count,
+    normalized_idempotency_key, coalesce(p_metadata, '{}'::jsonb)
   ) on conflict (idempotency_key) do nothing;
   get diagnostics inserted_count = row_count;
   select * into usage_row from public.partner_benefit_usages
   where idempotency_key = normalized_idempotency_key for update;
   if not found then raise exception 'partner_benefit_usage_record_failed'; end if;
   if usage_row.partner_id <> p_partner_id or usage_row.member_id <> p_member_id
-     or usage_row.benefit_snapshot <> normalized_benefit then
+     or usage_row.benefit_snapshot <> normalized_benefit
+     or usage_row.use_count <> p_use_count then
     raise exception 'partner_benefit_usage_idempotency_conflict';
   end if;
   return query select usage_row.id, usage_row.partner_id, usage_row.member_id,
-    usage_row.benefit_snapshot, usage_row.verified_at, usage_row.created_at,
-    inserted_count > 0;
+    usage_row.benefit_snapshot, usage_row.use_count, usage_row.verified_at,
+    usage_row.created_at, inserted_count > 0;
 end;
 $$;
 
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, text, jsonb) from public;
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, text, jsonb) from anon;
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, text, jsonb) from authenticated;
-grant execute on function public.record_partner_benefit_usage(uuid, uuid, text, text, jsonb) to service_role;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from public;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from anon;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from authenticated;
+grant execute on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) to service_role;
 
 -- 개인정보가 포함될 수 있는 운영·보안 원본 로그는 1년만 보관하고,
 -- 이미 생성된 집계 테이블은 장기 보관한다. 보안 사고·분쟁은 보존 hold로 예외 처리한다.

@@ -39,6 +39,7 @@ type PartnerRegistrationRequestRow = {
   registration_mode?: string | null;
   service_mode: string;
   benefit_action_type: string;
+  benefit_use_max_count?: number | null;
   branch_scope_type?: string | null;
   branch_scope_note?: string | null;
   brand_name: string;
@@ -309,6 +310,7 @@ async function createPartnerFromPortalRegistrationRequest({
         managed_campus_slugs: partnerCampusSlugs,
         map_url: groupBranches[0]?.map_url ?? request.map_url ?? null,
         benefit_action_type: benefitActionType,
+        benefit_use_max_count: request.benefit_use_max_count ?? null,
         benefit_action_link: benefitActionLink,
         reservation_link: null,
         inquiry_link: request.inquiry_link ?? null,

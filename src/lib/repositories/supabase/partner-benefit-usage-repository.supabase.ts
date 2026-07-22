@@ -13,6 +13,7 @@ type VerificationRow = {
   period_start: string | null;
   period_end: string | null;
   benefits: string[] | null;
+  benefit_use_max_count: number | null;
   benefit_verification_pin_hash: string | null;
   benefit_verification_pin_salt: string | null;
 };
@@ -37,6 +38,7 @@ function toVerificationContext(row: VerificationRow): PartnerBenefitUsageVerific
     benefits: (row.benefits ?? []).filter(
       (benefit): benefit is string => typeof benefit === "string" && benefit.trim().length > 0,
     ),
+    benefitUseMaxCount: row.benefit_use_max_count,
     pinHash: row.benefit_verification_pin_hash,
     pinSalt: row.benefit_verification_pin_salt,
   };
@@ -62,7 +64,7 @@ export class SupabasePartnerBenefitUsageRepository
     const { data, error } = await getSupabaseAdminClient()
       .from("partners")
       .select(
-        "id,location,period_start,period_end,benefits,benefit_verification_pin_hash,benefit_verification_pin_salt",
+        "id,location,period_start,period_end,benefits,benefit_use_max_count,benefit_verification_pin_hash,benefit_verification_pin_salt",
       )
       .eq("id", partnerId)
       .maybeSingle();
