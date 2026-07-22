@@ -221,6 +221,7 @@ export default function PartnerServiceDetailViewContent({
                   className="order-2 xl:order-2"
                   images={context.images ?? []}
                   name={context.partnerName}
+                  variant="main"
                   matchHeightSelector="[data-partner-detail-summary]"
                 />
               </div>

@@ -304,6 +304,7 @@ export default async function PartnerDetailPage({
                   key={`${carouselKey}:gallery`}
                   images={partner.images}
                   name={`${partner.name} 추가 이미지`}
+                  variant="main"
                 />
               </section>
             ) : null}

@@ -46,7 +46,7 @@ export default function PartnerImageCarousel({
   className?: string;
   matchHeightSelector?: string;
   priority?: boolean;
-  variant?: "default" | "hero";
+  variant?: "default" | "main" | "hero";
   showThumbnails?: boolean;
 }) {
   const {
@@ -93,7 +93,7 @@ export default function PartnerImageCarousel({
         type="button"
         className={cn(
           "relative w-full overflow-hidden rounded-3xl border border-border bg-surface-muted",
-          variant === "hero"
+          variant === "main" || variant === "hero"
             ? "aspect-square"
             : "aspect-[4/3]",
         )}
