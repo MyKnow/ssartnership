@@ -39,6 +39,7 @@ export default function PartnerImageCarousel({
   matchHeightSelector,
   priority = false,
   variant = "default",
+  imageFit = "cover",
   showThumbnails = true,
 }: {
   images: string[];
@@ -47,6 +48,7 @@ export default function PartnerImageCarousel({
   matchHeightSelector?: string;
   priority?: boolean;
   variant?: "default" | "main" | "hero";
+  imageFit?: "cover" | "contain";
   showThumbnails?: boolean;
 }) {
   const {
@@ -110,7 +112,7 @@ export default function PartnerImageCarousel({
             alt={name}
             fill
             sizes="(max-width: 1279px) 100vw, 50vw"
-            className="object-cover"
+            className={imageFit === "contain" ? "object-contain" : "object-cover"}
             fetchPriority={priority ? "high" : undefined}
             loading={priority ? undefined : "eager"}
             priority={priority}

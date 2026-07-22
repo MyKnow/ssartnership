@@ -270,6 +270,7 @@ export default async function PartnerDetailPage({
                   images={partner.thumbnail ? [partner.thumbnail] : []}
                   name={partner.name}
                   variant="hero"
+                  imageFit={partner.thumbnail?.toLowerCase().endsWith(".svg") ? "contain" : "cover"}
                   showThumbnails={false}
                   priority
                 />
