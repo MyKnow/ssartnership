@@ -5,7 +5,10 @@ import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import PartnerBenefitVerificationView from "@/components/partner/PartnerBenefitVerificationView";
 import { getHeaderSession } from "@/lib/header-session";
-import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
+import {
+  getMemberCanonicalProfile,
+  getMemberProfileImageUrl,
+} from "@/lib/member-profile-view";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
@@ -124,7 +127,7 @@ export default async function PartnerBenefitUsePage({
     member.activeProfileImageId &&
     member.profilePhotoReviewStatus === "approved" &&
     !member.mustChangePassword
-      ? "/api/certification/profile-image"
+      ? getMemberProfileImageUrl(member.id)
       : null;
 
   return (

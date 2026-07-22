@@ -270,6 +270,7 @@ export default async function PartnerDetailPage({
                   images={partner.thumbnail ? [partner.thumbnail] : []}
                   name={partner.name}
                   variant="hero"
+                  imageFit={partner.thumbnail?.toLowerCase().endsWith(".svg") ? "contain" : "cover"}
                   showThumbnails={false}
                   priority
                 />
@@ -304,6 +305,7 @@ export default async function PartnerDetailPage({
                   key={`${carouselKey}:gallery`}
                   images={partner.images}
                   name={`${partner.name} 추가 이미지`}
+                  variant="main"
                 />
               </section>
             ) : null}

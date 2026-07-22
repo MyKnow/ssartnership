@@ -129,7 +129,7 @@ export default function CertificationView({
       <CertificationCardFrame
         className={cardClassName}
         scheme={scheme}
-        eyebrow="SSAFY 인증"
+        eyebrow="SSAFY"
         name={name}
         roleLabel={roleLabel}
         yearLabel={yearLabel}

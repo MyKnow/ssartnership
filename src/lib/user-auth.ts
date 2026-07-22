@@ -9,6 +9,10 @@ import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
+import {
+  getMockMemberById,
+  isMockMemberAuthEnabled,
+} from "@/lib/mock/member";
 
 const COOKIE_NAME = "user_session";
 const SESSION_TTL_DAYS = 7;
@@ -150,6 +154,13 @@ export async function getSignedUserSession() {
     return null;
   }
 
+  if (isMockMemberAuthEnabled()) {
+    const member = getMockMemberById(session.userId);
+    return member?.authSessionVersion === session.authSessionVersion
+      ? session
+      : null;
+  }
+
   try {
     const supabase = getSupabaseAdminClient();
     const { data } = await supabase
@@ -178,6 +189,53 @@ export async function setUserSession(
     freshAuthentication?: boolean;
   },
 ) {
+  if (isMockMemberAuthEnabled()) {
+    const member = getMockMemberById(userId);
+    if (!member) {
+      throw new UserSessionIssueError("member_not_active");
+    }
+
+    const currentSession = (await getRawSignedUserSession()) as SignedUserSession | null;
+    const authenticationMethod = options?.authenticationMethod
+      ?? (currentSession?.userId === userId
+        ? currentSession.authenticationMethod
+        : null);
+    if (!authenticationMethod) {
+      throw new UserSessionIssueError("authentication_method_required");
+    }
+
+    const now = Date.now();
+    const resolvedPolicyConsentSnapshot =
+      options?.policyConsentSnapshot !== undefined
+        ? options.policyConsentSnapshot
+        : currentSession?.userId === userId
+          ? currentSession.policyConsentSnapshot ?? undefined
+          : undefined;
+    const persistent = options?.persistent ?? currentSession?.persistent ?? true;
+    const payload = JSON.stringify({
+      userId,
+      authSessionVersion: member.authSessionVersion,
+      authenticationMethod,
+      mustChangePassword: member.mustChangePassword,
+      persistent,
+      issuedAt: now,
+      expiresAt: now + SESSION_TTL_MS,
+      ...(resolvedPolicyConsentSnapshot !== undefined
+        ? { policyConsentSnapshot: resolvedPolicyConsentSnapshot }
+        : {}),
+    });
+    const token = signPayload(payload);
+    const store = await cookies();
+    store.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      ...(persistent ? { maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 } : {}),
+      path: "/",
+    });
+    return;
+  }
+
   const supabase = getSupabaseAdminClient();
   const currentSession = (await getRawSignedUserSession()) as SignedUserSession | null;
   const { data: member } = await supabase
@@ -251,6 +309,38 @@ export async function getUserSession() {
   const session = (await getSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
     return null;
+  }
+
+  if (isMockMemberAuthEnabled()) {
+    const member = getMockMemberById(session.userId);
+    if (!member) {
+      return null;
+    }
+
+    const activePoliciesPromise = getActiveRequiredPolicies();
+    const consentVersionsPromise = getMemberPolicyConsentVersions(session.userId);
+    const photoStatePromise = getMemberProfilePhotoState(session.userId);
+    const [activePolicies, consentVersions, photoState] = await Promise.all([
+      activePoliciesPromise,
+      consentVersionsPromise,
+      photoStatePromise,
+    ]);
+    const policyStatus = evaluateRequiredPolicyStatus(
+      consentVersions,
+      activePolicies,
+    );
+    const consentSnapshotIsFresh =
+      session.policyConsentSnapshot?.serviceVersion === activePolicies.service.version &&
+      session.policyConsentSnapshot?.privacyVersion === activePolicies.privacy.version;
+
+    return {
+      ...session,
+      mustChangePassword: member.mustChangePassword,
+      requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+      requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
+        photoState.reviewStatus,
+      ),
+    };
   }
 
   const supabase = getSupabaseAdminClient();

@@ -90,6 +90,7 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
           <PartnerImageCarousel
             images={value.images}
             name={`${value.name} 추가 이미지`}
+            variant="main"
           />
         </section>
       ) : null}

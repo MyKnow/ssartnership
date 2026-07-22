@@ -3,7 +3,7 @@ import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
-export const MAX_PARTNER_BENEFIT_USE_COUNT = 99;
+export const MAX_PARTNER_BENEFIT_USE_COUNT = 2;
 
 export type PartnerBenefitUsageAvailabilityInput = {
   location: string | null | undefined;

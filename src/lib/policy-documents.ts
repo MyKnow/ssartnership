@@ -1,4 +1,10 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  getMockMemberById,
+  getMockMemberPolicyState,
+  recordMockMarketingPolicyConsent,
+  recordMockRequiredPolicyConsent,
+} from "@/lib/mock/member";
 
 export const REQUIRED_POLICY_KINDS = ["service", "privacy"] as const;
 export const OPTIONAL_POLICY_KINDS = ["marketing"] as const;
@@ -192,6 +198,21 @@ export function getMemberPolicyConsentVersionsFromRows(
 }
 
 export async function getMemberPolicyConsentVersions(memberId: string) {
+  if (useMockPolicies) {
+    const state = getMockMemberPolicyState(memberId);
+    if (!state) {
+      throw new PolicyDocumentError(
+        "not_found",
+        "회원 정책 동의 내역을 확인하지 못했습니다.",
+      );
+    }
+    return {
+      service: state.service,
+      privacy: state.privacy,
+      marketing: state.marketing,
+    } satisfies MemberPolicyConsentVersions;
+  }
+
   const { data, error } = await getSupabaseAdminClient()
     .from("member_policy_consents")
     .select(MEMBER_POLICY_CONSENT_SELECT)
@@ -338,26 +359,31 @@ export async function getPolicyDocumentsByKind(kind: PolicyKind) {
 export async function getMemberPolicyReviewBundle(
   memberId: string,
 ): Promise<MemberPolicyReviewBundle> {
-  const supabase = getSupabaseAdminClient();
-  const [requiredPolicies, marketingPolicy, memberResult, consentVersions] = await Promise.all([
+  const [requiredPolicies, marketingPolicy, consentVersions] = await Promise.all([
     getActiveRequiredPolicies(),
     getPolicyDocumentByKind("marketing"),
-    supabase
-      .from("members")
-      .select("id")
-      .eq("id", memberId)
-      .maybeSingle(),
     getMemberPolicyConsentVersions(memberId),
   ]);
 
-  if (memberResult.error) {
-    throw wrapPolicyDocumentDbError(
-      memberResult.error,
-      "회원 정책 상태를 불러오지 못했습니다.",
-    );
-  }
-
-  if (!memberResult.data) {
+  if (!useMockPolicies) {
+    const { data: member, error } = await getSupabaseAdminClient()
+      .from("members")
+      .select("id")
+      .eq("id", memberId)
+      .maybeSingle();
+    if (error) {
+      throw wrapPolicyDocumentDbError(
+        error,
+        "회원 정책 상태를 불러오지 못했습니다.",
+      );
+    }
+    if (!member) {
+      throw new PolicyDocumentError(
+        "not_found",
+        "회원 정책 상태를 확인하지 못했습니다.",
+      );
+    }
+  } else if (!getMockMemberById(memberId)) {
     throw new PolicyDocumentError(
       "not_found",
       "회원 정책 상태를 확인하지 못했습니다.",
@@ -412,20 +438,32 @@ export function evaluateRequiredPolicyStatus(
 }
 
 export async function getMemberRequiredPolicyStatus(memberId: string) {
-  const supabase = getSupabaseAdminClient();
-  const [activePolicies, memberResult, consentVersions] = await Promise.all([
+  const [activePolicies, consentVersions] = await Promise.all([
     getActiveRequiredPolicies(),
-    supabase
-      .from("members")
-      .select("id")
-      .eq("id", memberId)
-      .maybeSingle(),
     getMemberPolicyConsentVersions(memberId),
   ]);
 
-  if (memberResult.error) {
-    throw wrapPolicyDocumentDbError(
-      memberResult.error,
+  if (!useMockPolicies) {
+    const { data: member, error } = await getSupabaseAdminClient()
+      .from("members")
+      .select("id")
+      .eq("id", memberId)
+      .maybeSingle();
+    if (error) {
+      throw wrapPolicyDocumentDbError(
+        error,
+        "회원 정책 상태를 확인하지 못했습니다.",
+      );
+    }
+    if (!member) {
+      throw new PolicyDocumentError(
+        "not_found",
+        "회원 정책 상태를 확인하지 못했습니다.",
+      );
+    }
+  } else if (!getMockMemberById(memberId)) {
+    throw new PolicyDocumentError(
+      "not_found",
       "회원 정책 상태를 확인하지 못했습니다.",
     );
   }
@@ -470,9 +508,25 @@ export async function recordMarketingPolicyConsent(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }) {
-  const supabase = getSupabaseAdminClient();
   const agreedAt = new Date().toISOString();
+
+  if (useMockPolicies) {
+    if (input.agreed && !input.activePolicy) {
+      throw new PolicyDocumentError(
+        "not_found",
+        "마케팅 정보 수신 동의의 활성 버전이 없습니다.",
+      );
+    }
+    recordMockMarketingPolicyConsent(
+      input.memberId,
+      input.activePolicy?.version ?? null,
+      input.agreed,
+    );
+    return input.agreed ? agreedAt : null;
+  }
+
   const { upsertMemberPushPreferences } = await import("@/lib/push/preferences");
+  const supabase = getSupabaseAdminClient();
 
   if (!input.agreed) {
     const pushPreferences = await upsertMemberPushPreferences(input.memberId, {
@@ -537,6 +591,14 @@ export async function recordRequiredPolicyConsent(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }) {
+  if (useMockPolicies) {
+    recordMockRequiredPolicyConsent(input.memberId, {
+      service: input.activePolicies.service.version,
+      privacy: input.activePolicies.privacy.version,
+    });
+    return new Date().toISOString();
+  }
+
   const supabase = getSupabaseAdminClient();
   const agreedAt = new Date().toISOString();
   const rows = REQUIRED_POLICY_KINDS.map((kind) => ({

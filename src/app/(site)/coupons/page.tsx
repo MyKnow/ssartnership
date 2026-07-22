@@ -7,7 +7,10 @@ import CouponPartnerVerificationView from "@/components/coupons/CouponPartnerVer
 import { adPackageRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import { getHeaderSession } from "@/lib/header-session";
-import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
+import {
+  getMemberCanonicalProfile,
+  getMemberProfileImageUrl,
+} from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 
@@ -58,7 +61,7 @@ export default async function CouponsPage({
       member.activeProfileImageId &&
       member.profilePhotoReviewStatus === "approved" &&
       !member.mustChangePassword
-        ? "/api/certification/profile-image"
+        ? getMemberProfileImageUrl(member.id)
         : null,
   };
 

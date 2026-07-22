@@ -31,6 +31,14 @@ export function LoginPageView({ returnTo }: { returnTo: string }) {
             <Button variant="secondary" href={signupHref}>
               회원가입
             </Button>
+            {process.env.NEXT_PUBLIC_DATA_SOURCE === "mock" ? (
+              <Button
+                variant="ghost"
+                href={`/auth/mock?returnTo=${encodeURIComponent(returnTo)}`}
+              >
+                촬영용 데모 시작
+              </Button>
+            ) : null}
           </div>
         </div>
       </Container>

@@ -97,6 +97,9 @@ const nextConfig: NextConfig = {
       {
         pathname: "/api/image",
       },
+      {
+        pathname: "/mock/partners/**",
+      },
     ],
   },
   async headers() {

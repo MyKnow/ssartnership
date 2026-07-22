@@ -148,6 +148,7 @@ export const Default: Story = {
     await expect(chipGroup).not.toBeNull();
     await expect(identityHeader).not.toBeNull();
     await expect(chipGroup).toHaveClass("gap-[clamp(0.125rem,1.6cqw,1.6rem)]");
+    await expect(identityHeader).not.toBeNull();
     await expect(cardTitle).not.toBeNull();
     await expect(cardTitle).toHaveClass("space-y-[clamp(0.25rem,1.8cqw,1.8rem)]");
     await expect(chipGroup).toHaveTextContent("15기");
