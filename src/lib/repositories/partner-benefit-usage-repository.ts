@@ -50,6 +50,18 @@ export type PartnerBenefitUsageHistoryPage = {
   pageSize: number;
 };
 
+export type AdminPartnerBenefitUsageInput = {
+  partnerId: string;
+  memberId: string;
+  benefitId: string;
+  useCount: number;
+  verifiedAt: string;
+};
+
+export type AdminPartnerBenefitUsageUpdateInput = AdminPartnerBenefitUsageInput & {
+  usageId: string;
+};
+
 export interface PartnerBenefitUsageRepository {
   getVerificationContext(
     partnerId: string,
@@ -63,4 +75,11 @@ export interface PartnerBenefitUsageRepository {
     page: number;
     pageSize: number;
   }): Promise<PartnerBenefitUsageHistoryPage>;
+  createAdminUsage(
+    input: AdminPartnerBenefitUsageInput,
+  ): Promise<PartnerBenefitUsageHistoryItem>;
+  updateAdminUsage(
+    input: AdminPartnerBenefitUsageUpdateInput,
+  ): Promise<PartnerBenefitUsageHistoryItem>;
+  deleteAdminUsage(input: { partnerId: string; usageId: string }): Promise<void>;
 }

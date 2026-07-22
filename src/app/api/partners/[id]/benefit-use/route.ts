@@ -51,6 +51,8 @@ function getStatusForCode(code: PartnerBenefitUsageErrorCode) {
   switch (code) {
     case "partner_not_found":
       return 404;
+    case "member_not_found":
+      return 404;
     case "pin_not_configured":
       return 503;
     case "pin_invalid":
@@ -60,6 +62,8 @@ function getStatusForCode(code: PartnerBenefitUsageErrorCode) {
     case "use_count_exceeded":
     case "idempotency_conflict":
       return 409;
+    case "service_unavailable":
+      return 503;
   }
 }
 
@@ -71,12 +75,16 @@ type PartnerBenefitUsageErrorCode =
   | "pin_invalid"
   | "use_count_invalid"
   | "use_count_exceeded"
-  | "idempotency_conflict";
+  | "idempotency_conflict"
+  | "member_not_found"
+  | "service_unavailable";
 
 function getMessageForCode(code: PartnerBenefitUsageErrorCode) {
   switch (code) {
     case "partner_not_found":
       return "제휴처를 찾을 수 없습니다.";
+    case "member_not_found":
+      return "회원 인증 정보를 확인할 수 없습니다.";
     case "benefit_unavailable":
       return "현재 이용할 수 없는 혜택입니다.";
     case "benefit_not_found":
@@ -91,6 +99,8 @@ function getMessageForCode(code: PartnerBenefitUsageErrorCode) {
       return "설정된 제휴 혜택 최대 횟수를 초과했습니다.";
     case "idempotency_conflict":
       return "이미 처리된 이용 확인 요청입니다. 화면을 새로고침해 주세요.";
+    case "service_unavailable":
+      return "혜택 이용 확인에 실패했습니다. 잠시 후 다시 시도해 주세요.";
   }
 }
 
