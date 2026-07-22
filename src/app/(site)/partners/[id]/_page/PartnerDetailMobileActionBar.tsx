@@ -131,7 +131,7 @@ export default function PartnerDetailMobileActionBar({
       {hasBenefitAction ? (
         <div
           data-partner-detail-desktop-action-fab
-          className="pointer-events-none fixed bottom-safe-bottom-6 right-[max(1.5rem,calc((100vw-72rem)/4+1.5rem))] z-30 hidden md:flex"
+          className="pointer-events-none fixed bottom-safe-bottom-6 right-6 z-30 hidden md:flex"
         >
           <div className="pointer-events-auto">
             {renderBenefitAction(

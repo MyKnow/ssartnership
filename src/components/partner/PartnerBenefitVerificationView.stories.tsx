@@ -38,10 +38,7 @@ export const Default: Story = {
     const canvas = within(canvasElement);
 
     await expect(canvas.getByTestId("certification-card-frame")).toBeVisible();
-    await expect(canvas.getByTestId("certification-card-frame")).toHaveClass(
-      "!aspect-[16/10]",
-      "md:!aspect-[16/9]",
-    );
+    await expect(canvas.getByTestId("certification-card-frame")).toHaveClass("!aspect-[16/9]");
     const certificationCard = canvas.getByTestId("certification-card-frame");
     const certificationFooter = certificationCard.querySelector<HTMLElement>(
       "[data-certification-card-footer]",

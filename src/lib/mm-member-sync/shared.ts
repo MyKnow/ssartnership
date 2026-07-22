@@ -72,6 +72,8 @@ export type MemberSyncBatchResult = {
   checked: number;
   updated: number;
   skipped: number;
+  hasMore: boolean;
+  nextCursor: string | null;
   results: MemberSyncResult[];
   photoSkipped: MemberSyncResult[];
   mattermostUnavailable: MemberMattermostUnavailableResult[];

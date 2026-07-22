@@ -36,11 +36,19 @@ export default function PartnerDetailHeroMeta({
           initialFavorited={Boolean(isFavorited)}
           favoriteCount={favoriteCount}
           compact={false}
+          className="!relative !h-8 !min-h-0 !min-w-0 !rounded-full !px-2 !text-[11px] after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
         />
       ) : (
-        <PartnerFavoriteCountLabel favoriteCount={favoriteCount} />
+        <PartnerFavoriteCountLabel
+          favoriteCount={favoriteCount}
+          className="h-8 !min-w-0 !px-2 text-[11px]"
+        />
       )}
-      <ShareLinkButton targetType="partner" targetId={partnerId} />
+      <ShareLinkButton
+        targetType="partner"
+        targetId={partnerId}
+        className="relative !h-8 !w-8 after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
+      />
     </div>
   );
 }

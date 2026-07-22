@@ -185,8 +185,8 @@ export async function deletePartnerReview(formData: FormData) {
   return deletePartnerReviewAction(formData);
 }
 
-export async function backfillMemberProfiles() {
-  return backfillMemberProfilesAction();
+export async function backfillMemberProfiles(formData: FormData) {
+  return backfillMemberProfilesAction(formData);
 }
 
 export async function syncMemberProfile(formData: FormData) {

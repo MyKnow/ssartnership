@@ -37,6 +37,11 @@ import {
   getConfiguredCurrentSsafyYear,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
+import {
+  DEFAULT_MEMBER_SYNC_BATCH_SIZE,
+  MAX_MEMBER_SYNC_BATCH_SIZE,
+  parseMemberSyncBatchOptions,
+} from "@/lib/mm-member-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +76,10 @@ type AdminMemberSearchParams = {
   photoSkipped?: string;
   failures?: string;
   mattermostUnavailable?: string;
+  hasMore?: string;
+  nextCursor?: string;
+  batchSize?: string;
+  batchError?: string;
   mmLoginTransition?: string;
   generation?: string;
   disabled?: string;
@@ -466,6 +475,11 @@ export default async function AdminMembersPage({
   });
   const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
+  const hasMoreBackfill = getOne(params, "hasMore") === "1" && Boolean(getOne(params, "nextCursor"));
+  const backfillCursor = hasMoreBackfill ? getOne(params, "nextCursor") ?? "" : "";
+  const backfillBatchSize = parseMemberSyncBatchOptions({
+    batchSize: getOne(params, "batchSize"),
+  })?.limit ?? DEFAULT_MEMBER_SYNC_BATCH_SIZE;
   const page = parsePage(getOne(params, "page"));
   const pageSize = parseAdminMemberPageSize(getOne(params, "pageSize"));
   const filters = {
@@ -805,9 +819,24 @@ export default async function AdminMembersPage({
             <div className="flex flex-wrap items-center gap-2">
               {canUpdateMembers ? (
                 <>
-                  <form action={backfillMemberProfiles}>
-                    <SubmitButton pendingText="백필 중">
-                      지금 백필 실행
+                  <form action={backfillMemberProfiles} className="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="cursor" value={backfillCursor} />
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      백필 배치
+                      <select
+                        name="batchSize"
+                        defaultValue={String(backfillBatchSize)}
+                        className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                      >
+                        {[25, DEFAULT_MEMBER_SYNC_BATCH_SIZE, MAX_MEMBER_SYNC_BATCH_SIZE].map((size) => (
+                          <option key={size} value={size}>
+                            {size}명
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <SubmitButton pendingText={hasMoreBackfill ? "다음 배치 중" : "백필 중"}>
+                      {hasMoreBackfill ? "다음 배치 실행" : "백필 실행"}
                     </SubmitButton>
                   </form>
                   {selectedGeneration !== null ? (
@@ -874,7 +903,14 @@ export default async function AdminMembersPage({
                   ? "백필 중 오류가 발생했습니다."
                   : "백필이 완료되었습니다."
             }
-            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.photoSkipped ? `사진 미처리 ${params.photoSkipped}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.mattermostUnavailable ? `MM 이용 중단 ${params.mattermostUnavailable}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}`}
+            description={`${params.checked ? `대상 ${params.checked}명 · ` : ""}${params.updated ? `변경 ${params.updated}명 · ` : ""}${params.photoSkipped ? `사진 미처리 ${params.photoSkipped}명 · ` : ""}${params.skipped ? `변경 없음 ${params.skipped}명 · ` : ""}${params.mattermostUnavailable ? `MM 이용 중단 ${params.mattermostUnavailable}명 · ` : ""}${params.failures ? `실패 ${params.failures}명` : ""}${hasMoreBackfill ? " 다음 배치를 실행하면 이어서 처리합니다." : ""}`}
+          />
+        ) : null}
+        {params.batchError === "invalid" ? (
+          <InlineMessage
+            tone="danger"
+            title="백필 배치 입력을 확인해 주세요."
+            description="배치 크기는 1~100명이어야 하며, 이어하기 cursor는 유효한 회원 ID여야 합니다."
           />
         ) : null}
         {params.mmLoginTransition === "generation" ? (

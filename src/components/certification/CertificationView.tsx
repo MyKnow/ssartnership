@@ -137,17 +137,17 @@ export default function CertificationView({
         description=""
         onCardClick={() => setQrOpen(true)}
         footer={
-          <div className="flex h-full min-w-0 flex-nowrap items-center justify-between gap-[clamp(0.5rem,2cqw,2rem)]">
+          <div className="flex h-full min-w-0 flex-nowrap items-center justify-between gap-[clamp(0px,2cqw,2rem)] leading-[clamp(0px,3cqw,1.5rem)]">
             <div
               data-certification-card-timestamp-row
               className="flex min-w-0 flex-1 items-center gap-[clamp(0.35rem,1.5cqw,1.5rem)]"
             >
-              <span className={cn("shrink-0 text-[clamp(0.65rem,3cqw,1.5rem)] font-medium uppercase tracking-[0.12em]", scheme.mutedTextClassName)}>
+              <span className={cn("shrink-0 text-[clamp(0px,3cqw,1.5rem)] font-medium uppercase tracking-[0.12em]", scheme.mutedTextClassName)}>
                 인증 시간
               </span>
               <time
                 data-certification-card-timestamp
-                className="min-w-0 truncate whitespace-nowrap text-[clamp(0.7rem,3cqw,1.5rem)] font-semibold"
+                className="min-w-0 truncate whitespace-nowrap text-[clamp(0px,3cqw,1.5rem)] font-semibold"
               >
                 {dateLabel} {timeLabel}
               </time>
@@ -162,7 +162,7 @@ export default function CertificationView({
                 onOpenChange={setQrOpen}
                 className={cn(
                   scheme.qrButtonClassName,
-                  "relative !h-[clamp(2rem,5.9cqw,4rem)] !min-h-0 !w-auto !min-w-0 !rounded-[clamp(0.75rem,2.5cqw,2.5rem)] !px-[clamp(0.75rem,2.1cqw,2.1rem)] text-[clamp(0.65rem,2.4cqw,1.25rem)] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
+                  "relative !h-[clamp(0px,5.9cqw,4rem)] !min-h-0 !w-auto !min-w-0 !rounded-[clamp(0px,2.5cqw,2.5rem)] !px-[clamp(0px,2.1cqw,2.1rem)] text-[clamp(0px,2.4cqw,1.25rem)] whitespace-nowrap after:absolute after:left-1/2 after:top-1/2 after:min-h-11 after:min-w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
                 )}
               />
             </div>
