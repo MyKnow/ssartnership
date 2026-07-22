@@ -2,6 +2,13 @@
 
 관련 이슈: [#181](https://github.com/MyKnow/ssartnership/issues/181)
 
+## 2026-07-22 구현 착수
+
+- `/admin/members` Mattermost 백필을 관리자 명시 배치로 실행하도록 바꾸고, 한 번에 최대 100명만 처리한다.
+- 회원 UUID를 오름차순 cursor로 반환해 다음 배치를 이어서 실행할 수 있게 했다.
+- 배치 크기와 cursor는 Server Action 경계에서 whitelist 검증하며, 기존 회원 동기화·감사 로그·실패 집계 계약은 유지한다.
+- 이번 단계는 durable job 전환 전의 명시적 배치 단계이며, Preview/Production 운영 검증과 장기 job 필요성 재평가는 후속으로 남긴다.
+
 ## 조사 범위와 근거
 
 - Vercel Production runtime 로그와 Supabase Production query 통계를 2026-07-21 KST에 읽기 전용으로 확인했다.

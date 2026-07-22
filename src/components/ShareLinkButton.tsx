@@ -2,13 +2,16 @@
 
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
+import { cn } from "@/lib/cn";
 
 export default function ShareLinkButton({
   targetType = "share_target",
   targetId = null,
+  className,
 }: {
   targetType?: string;
   targetId?: string | null;
+  className?: string;
 }) {
   const { notify } = useToast();
 
@@ -34,7 +37,10 @@ export default function ShareLinkButton({
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground hover:border-strong"
+      className={cn(
+        "inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground hover:border-strong",
+        className,
+      )}
       aria-label="공유 링크 복사"
       title="공유 링크 복사"
     >

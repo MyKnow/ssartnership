@@ -11,6 +11,12 @@ export {
   type MmMemberSyncErrorCode,
 } from "./mm-member-sync/shared";
 export {
+  DEFAULT_MEMBER_SYNC_BATCH_SIZE,
+  MAX_MEMBER_SYNC_BATCH_SIZE,
+  parseMemberSyncBatchOptions,
+  type MemberSyncBatchOptions,
+} from "./mm-member-sync/batch";
+export {
   fetchMemberSnapshotByUserId,
   fetchMemberSnapshotForUser,
   getMattermostDisplayName,
