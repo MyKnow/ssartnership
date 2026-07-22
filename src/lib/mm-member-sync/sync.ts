@@ -12,6 +12,10 @@ import {
   type MemberSyncResult,
   wrapMmMemberSyncDbError,
 } from "./shared";
+import {
+  DEFAULT_MEMBER_SYNC_BATCH_SIZE,
+  type MemberSyncBatchOptions,
+} from "./batch";
 
 const DATABASE_WRITE_CONCURRENCY = 8;
 
@@ -97,21 +101,33 @@ function chunk<T>(values: readonly T[], size: number) {
   return chunks;
 }
 
-async function loadBackfillMemberIds(generations: readonly number[]) {
-  const { data, error } = await getSupabaseAdminClient()
+async function loadBackfillMemberIds(
+  generations: readonly number[],
+  options: MemberSyncBatchOptions,
+) {
+  let query = getSupabaseAdminClient()
     .from("members")
     .select("id")
     .in("generation", generations)
     .is("deleted_at", null)
     .is("mattermost_login_disabled_at", null)
-    .order("generation", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("id", { ascending: true })
+    .limit(options.limit + 1);
+  if (options.cursor) {
+    query = query.gt("id", options.cursor);
+  }
+
+  const { data, error } = await query;
   if (error) {
     throw wrapMmMemberSyncDbError(error, "회원 정보를 불러오지 못했습니다.");
   }
-  return (data ?? [])
+  const ids = (data ?? [])
     .map((row) => typeof row.id === "string" ? row.id : null)
     .filter((id): id is string => id !== null);
+  return {
+    memberIds: ids.slice(0, options.limit),
+    hasMore: ids.length > options.limit,
+  };
 }
 
 function toAuditFromSyncResult(result: MemberSyncResult): MemberSyncAuditResult {
@@ -148,10 +164,15 @@ function toAuditFromUnavailable(result: MemberMattermostUnavailableResult): Memb
   };
 }
 
-export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchResult> {
+export async function syncMembersBySelectableYears(
+  options: MemberSyncBatchOptions = {
+    limit: DEFAULT_MEMBER_SYNC_BATCH_SIZE,
+    cursor: null,
+  },
+): Promise<MemberSyncBatchResult> {
   const cycleSettings = await getSsafyCycleSettings();
   const generations = getConfiguredBackfillableSsafyYears(cycleSettings);
-  const memberIds = await loadBackfillMemberIds(generations);
+  const { memberIds, hasMore } = await loadBackfillMemberIds(generations, options);
   const results: MemberSyncResult[] = [];
   const photoSkipped: MemberSyncResult[] = [];
   const mattermostUnavailable: MemberMattermostUnavailableResult[] = [];
@@ -200,6 +221,8 @@ export async function syncMembersBySelectableYears(): Promise<MemberSyncBatchRes
     checked: memberIds.length,
     updated: results.length,
     skipped,
+    hasMore,
+    nextCursor: hasMore ? memberIds.at(-1) ?? options.cursor : null,
     results,
     photoSkipped,
     mattermostUnavailable,

@@ -90,6 +90,7 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const certificationCard = canvas.getByTestId("certification-card-frame");
+    const certificationCardContainer = certificationCard.parentElement;
     const avatar = canvasElement.querySelector<HTMLElement>(
       "[data-certification-card-avatar]",
     );
@@ -128,18 +129,18 @@ export const Default: Story = {
     await expect(certificationCard).toHaveClass(
       "w-full",
       "aspect-[16/9]",
-      "rounded-[clamp(1rem,3cqw,3rem)]",
-      "@container/cert",
+      "rounded-[clamp(0px,3cqw,3rem)]",
     );
+    await expect(certificationCardContainer).toHaveClass("@container/cert");
     await expect(footer).toHaveClass(
-      "min-h-[clamp(3.5rem,14cqw,11rem)]",
-      "px-[clamp(0.75rem,4cqw,4rem)]",
-      "py-[clamp(0.5rem,4cqw,4rem)]",
+      "min-h-[clamp(0px,14cqw,11rem)]",
+      "px-[clamp(0px,4cqw,4rem)]",
+      "py-[clamp(0px,4cqw,4rem)]",
     );
     await expect(qrButton).toHaveClass(
-      "!h-[clamp(2rem,5.9cqw,4rem)]",
+      "!h-[clamp(0px,5.9cqw,4rem)]",
       "!min-h-0",
-      "!px-[clamp(0.75rem,2.1cqw,2.1rem)]",
+      "!px-[clamp(0px,2.1cqw,2.1rem)]",
     );
     await expect(timestampRow).not.toBeNull();
     await expect(timestampRow).toHaveClass("items-center");
@@ -147,10 +148,10 @@ export const Default: Story = {
     await expect(certificationCard).not.toHaveClass("max-w-2xl");
     await expect(chipGroup).not.toBeNull();
     await expect(identityHeader).not.toBeNull();
-    await expect(chipGroup).toHaveClass("gap-[clamp(0.125rem,1.6cqw,1.6rem)]");
+    await expect(chipGroup).toHaveClass("gap-[clamp(0px,1.6cqw,1.6rem)]");
     await expect(identityHeader).not.toBeNull();
     await expect(cardTitle).not.toBeNull();
-    await expect(cardTitle).toHaveClass("space-y-[clamp(0.25rem,1.8cqw,1.8rem)]");
+    await expect(cardTitle).toHaveClass("space-y-[clamp(0px,1.8cqw,1.8rem)]");
     await expect(chipGroup).toHaveTextContent("15기");
     await expect(chipGroup).toHaveTextContent("서울");
     await expect(chipGroup).toHaveTextContent("교육생");
@@ -159,7 +160,7 @@ export const Default: Story = {
       0,
     );
     for (const chip of chipBadges) {
-      await expect(chip).toHaveClass("!text-[clamp(0.6rem,2.4cqw,1.5rem)]");
+      await expect(chip).toHaveClass("!text-[clamp(0px,2.4cqw,1.5rem)]");
     }
     await expect(screenContent.getBoundingClientRect().width).toBe(
       pageHeader.getBoundingClientRect().width,
@@ -180,17 +181,17 @@ export const Default: Story = {
     await expect(qrTouchTarget).not.toHaveClass("min-h-11", "min-w-11");
     await expect(Number.parseFloat(qrPseudoStyle.minHeight)).toBeGreaterThanOrEqual(44);
     await expect(Number.parseFloat(qrPseudoStyle.minWidth)).toBeGreaterThanOrEqual(44);
-    await expect(memberName).toHaveClass("text-[clamp(1.25rem,6cqw,5rem)]");
-    await expect(roleBadge).toHaveClass("!text-[clamp(0.6rem,2.4cqw,1.5rem)]");
+    await expect(memberName).toHaveClass("text-[clamp(0px,6cqw,5rem)]");
+    await expect(roleBadge).toHaveClass("!text-[clamp(0px,2.4cqw,1.5rem)]");
     await expect(
       Number.parseFloat(getComputedStyle(roleBadge).fontSize) /
         Number.parseFloat(getComputedStyle(memberName).fontSize),
     ).toBeGreaterThan(0.4);
-    await expect(footerLabel).toHaveClass("text-[clamp(0.65rem,3cqw,1.5rem)]");
-    await expect(timestamp).toHaveClass("text-[clamp(0.7rem,3cqw,1.5rem)]");
+    await expect(footerLabel).toHaveClass("text-[clamp(0px,3cqw,1.5rem)]");
+    await expect(timestamp).toHaveClass("text-[clamp(0px,3cqw,1.5rem)]");
     await expect(canvas.queryByText("교육생 인증")).not.toBeInTheDocument();
     await expect(canvasElement.querySelector("[data-certification-card-timestamp]")).not.toBeNull();
-    await expect(qrButton).toHaveClass("text-[clamp(0.65rem,2.4cqw,1.25rem)]");
+    await expect(qrButton).toHaveClass("text-[clamp(0px,2.4cqw,1.25rem)]");
     await expect(avatar).not.toBeNull();
     await expect(footer).not.toBeNull();
     const avatarRatio =
@@ -224,9 +225,9 @@ export const RoleVariants: Story = {
     for (const card of cards) {
       await expect(card).toHaveClass(
         "aspect-[16/9]",
-        "@container/cert",
         "max-w-full",
       );
+      await expect(card.parentElement).toHaveClass("@container/cert");
       await expect(card.querySelector("[data-certification-card-avatar]")).not.toBeNull();
       await expect(card.querySelector("[data-certification-card-footer]")).not.toBeNull();
       await expect(card.querySelector("[data-certification-card-timestamp-row]")).not.toBeNull();

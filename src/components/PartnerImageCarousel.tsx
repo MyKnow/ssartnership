@@ -78,6 +78,7 @@ export default function PartnerImageCarousel({
     images,
     matchHeightSelector,
   });
+  const imageAspectClassName = variant === "hero" ? "aspect-square" : "aspect-[4/3]";
 
   return (
     <div
@@ -95,9 +96,7 @@ export default function PartnerImageCarousel({
         type="button"
         className={cn(
           "relative w-full overflow-hidden rounded-3xl border border-border bg-surface-muted",
-          variant === "main" || variant === "hero"
-            ? "aspect-square"
-            : "aspect-[4/3]",
+          imageAspectClassName,
         )}
         onClick={() => {
           if (hasImages) {

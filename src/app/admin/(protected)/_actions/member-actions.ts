@@ -11,6 +11,7 @@ import { requireAdminPermission } from "@/lib/admin-access";
 import {
   buildMemberSyncLogProperties,
   buildMemberSyncAuditLogProperties,
+  parseMemberSyncBatchOptions,
   syncMemberById,
   syncMembersBySelectableYears,
 } from "@/lib/mm-member-sync";
@@ -48,10 +49,17 @@ import {
   revalidateMemberPaths,
 } from "./shared-helpers";
 
-export async function backfillMemberProfilesAction() {
+export async function backfillMemberProfilesAction(formData: FormData) {
   const adminSession = await requireAdminPermission("members", "update", {
     path: "/admin/members",
   });
+  const batchOptions = parseMemberSyncBatchOptions({
+    batchSize: formData.get("batchSize"),
+    cursor: formData.get("cursor"),
+  });
+  if (!batchOptions) {
+    redirect("/admin/members?backfill=error&batchError=invalid");
+  }
 
   const context = await getServerActionLogContext("/admin/members");
   let status = "success";
@@ -62,10 +70,12 @@ export async function backfillMemberProfilesAction() {
     photoSkipped: 0,
     failures: 0,
     mattermostUnavailable: 0,
+    hasMore: false,
+    nextCursor: null as string | null,
   };
 
   try {
-    const result = await syncMembersBySelectableYears();
+    const result = await syncMembersBySelectableYears(batchOptions);
     const actorId = adminSession.adminId;
     summary = {
       checked: result.checked,
@@ -74,6 +84,8 @@ export async function backfillMemberProfilesAction() {
       photoSkipped: result.photoSkipped.length,
       failures: result.failures.length,
       mattermostUnavailable: result.mattermostUnavailable.length,
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
     };
 
     const auditedMemberIds = new Set(result.auditResults.map((audit) => audit.member.id));
@@ -125,7 +137,7 @@ export async function backfillMemberProfilesAction() {
   }
 
   redirect(
-    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&photoSkipped=${summary.photoSkipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}`,
+    `/admin/members?backfill=${status}&checked=${summary.checked}&updated=${summary.updated}&skipped=${summary.skipped}&photoSkipped=${summary.photoSkipped}&failures=${summary.failures}&mattermostUnavailable=${summary.mattermostUnavailable}&hasMore=${summary.hasMore ? "1" : "0"}&nextCursor=${encodeURIComponent(summary.nextCursor ?? "")}&batchSize=${batchOptions.limit}`,
   );
 }
 

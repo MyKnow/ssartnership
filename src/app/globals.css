@@ -484,13 +484,6 @@ body {
   }
 }
 
-@container cert (max-width: 34rem) {
-  .certification-card-chip-group {
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-}
-
 @keyframes cert-slide {
   0% {
     transform: translateX(-100%);
