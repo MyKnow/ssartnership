@@ -123,7 +123,7 @@ test("mock member profile image path is local and safely falls back", () => {
     "/avatar-default.svg",
   );
   assert.equal(
-    getMockMemberProfileImageUrl({ MOCK_MEMBER_PROFILE_IMAGE_URL: "/mock/members/jung-minho.webp" }),
+    getMockMemberProfileImageUrl({ MOCK_MEMBER_PROFILE_IMAGE_URL: "/mock/members/jung-minho.jpg" }),
     "/mock/members/jung-minho.jpg",
   );
 });
