@@ -13,11 +13,13 @@ function createPartnerFormData({
   location,
   benefitActionType = "none",
   benefitUseMaxCount,
+  benefitItems,
 }: {
   serviceMode?: string;
   location?: string;
   benefitActionType?: string;
   benefitUseMaxCount?: string;
+  benefitItems?: string;
 }) {
   const formData = new FormData();
   formData.set("name", "테스트 제휴처");
@@ -33,6 +35,9 @@ function createPartnerFormData({
   formData.set("benefitActionType", benefitActionType);
   if (benefitUseMaxCount !== undefined) {
     formData.set("benefitUseMaxCount", benefitUseMaxCount);
+  }
+  if (benefitItems !== undefined) {
+    formData.set("benefitItems", benefitItems);
   }
   formData.set("visibility", "public");
   formData.set("benefitVisibility", "public");
@@ -82,7 +87,7 @@ test("admin partner parser rejects an invalid service mode at the server boundar
   );
 });
 
-test("admin partner parser persists a certification maximum and rejects invalid values", async () => {
+test("admin partner parser persists per-benefit maxima and rejects invalid values", async () => {
   const { parsePartnerPayload } = await parserModulePromise;
 
   const payload = parsePartnerPayload(
@@ -90,10 +95,12 @@ test("admin partner parser persists a certification maximum and rejects invalid 
       serviceMode: "offline",
       location: "서울 강남구 테헤란로 212",
       benefitActionType: "certification",
-      benefitUseMaxCount: "12",
+      benefitItems: JSON.stringify([
+        { id: "benefit-1", title: "헬스 1개월권", maxApplyCount: "12" },
+      ]),
     }),
   );
-  assert.equal(payload.benefitUseMaxCount, 12);
+  assert.equal(payload.benefitItems[0]?.maxApplyCount, 12);
 
   assert.throws(
     () =>
@@ -102,9 +109,11 @@ test("admin partner parser persists a certification maximum and rejects invalid 
           serviceMode: "offline",
           location: "서울 강남구 테헤란로 212",
           benefitActionType: "certification",
-          benefitUseMaxCount: "0",
+          benefitItems: JSON.stringify([
+            { id: "benefit-1", title: "헬스 1개월권", maxApplyCount: "0" },
+          ]),
         }),
       ),
-    { message: "partner_form_invalid_benefit_use_max_count" },
+    { message: "partner_benefit_invalid_max_apply_count" },
   );
 });

@@ -31,13 +31,13 @@ import {
   IMAGE_SOURCE_ACCEPT,
   validateImageUploadSource,
 } from "@/lib/image-upload/policy";
-import { normalizePartnerBenefitUseMaxCount } from "@/lib/partner-benefit-usage";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 
 export type PartnerRegistrationFieldName =
   | "registrationMode"
   | "serviceMode"
   | "benefitActionType"
-  | "benefitUseMaxCount"
+  | "benefitItems"
   | "branchScopeType"
   | "branchScopeNote"
   | "brandName"
@@ -105,7 +105,7 @@ export type PartnerRegistrationResolvedValues = PartnerRegistrationFormState & {
   safeMapUrl: string | null;
   safeSiteLink: string | null;
   safeBenefitActionLink: string | null;
-  benefitUseMaxCount: number | null;
+  parsedBenefitItems: ReturnType<typeof normalizePartnerBenefitItems>;
   parsedBenefits: string[];
   parsedConditions: string[];
   parsedTags: string[];
@@ -127,7 +127,7 @@ export const partnerRegistrationInitialFormState: PartnerRegistrationFormState =
   registrationMode: "full_new",
   serviceMode: "offline",
   benefitActionType: "external_link",
-  benefitUseMaxCount: "",
+  benefitItems: "",
   branchScopeType: "single_location",
   branchScopeNote: "",
   brandName: "",
@@ -157,7 +157,7 @@ export const PARTNER_REGISTRATION_FIELD_ORDER: PartnerRegistrationFieldName[] = 
   "registrationMode",
   "serviceMode",
   "benefitActionType",
-  "benefitUseMaxCount",
+  "benefitItems",
   "branchScopeType",
   "branchScopeNote",
   "brandName",
@@ -484,20 +484,19 @@ export function validatePartnerRegistrationInput(
   if (values.benefitActionType === "external_link" && !values.benefitActionLink) {
     fieldErrors.benefitActionLink = "외부 링크 방식은 혜택 이용 링크가 필요합니다.";
   }
-  const benefitUseMaxCount =
-    values.benefitActionType === "certification"
-      ? values.benefitUseMaxCount
-        ? normalizePartnerBenefitUseMaxCount(values.benefitUseMaxCount)
-        : null
-      : null;
-  if (
-    values.benefitActionType === "certification" &&
-    values.benefitUseMaxCount &&
-    benefitUseMaxCount === null
-  ) {
-    fieldErrors.benefitUseMaxCount = "제휴 적용 최대 횟수는 1회 이상의 정수로 입력해 주세요.";
+  let parsedBenefitItems: ReturnType<typeof normalizePartnerBenefitItems> = [];
+  try {
+    const parsed = values.benefitItems
+      ? JSON.parse(values.benefitItems)
+      : parseDelimitedInput(values.benefits).map((title, index) => ({
+          id: `registration-benefit-${index + 1}`,
+          title,
+        }));
+    parsedBenefitItems = normalizePartnerBenefitItems(parsed);
+  } catch {
+    fieldErrors.benefits = "혜택명과 최대 적용 횟수를 확인해 주세요.";
   }
-  if (!values.benefits) {
+  if (!values.benefits && parsedBenefitItems.length === 0) {
     fieldErrors.benefits = "제공 혜택을 입력해 주세요.";
   }
   if (!values.conditions) {
@@ -629,7 +628,7 @@ export function validatePartnerRegistrationInput(
       safeMapUrl,
       safeSiteLink,
       safeBenefitActionLink,
-      benefitUseMaxCount,
+      parsedBenefitItems,
       parsedBenefits: parseDelimitedInput(values.benefits),
       parsedConditions: parseDelimitedInput(values.conditions),
       parsedTags: parseDelimitedInput(values.tags),

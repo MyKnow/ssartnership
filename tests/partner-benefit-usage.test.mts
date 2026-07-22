@@ -73,8 +73,7 @@ test("idempotent benefit-use retries do not create a second aggregate record", a
       location: "서울 강남구 테헤란로 212",
       periodStart: "2026-07-01",
       periodEnd: "2026-07-31",
-      benefits: ["헬스 1개월 33,000원"],
-      benefitUseMaxCount: null,
+      benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: null }],
       pinHash: pin.hash,
       pinSalt: pin.salt,
     },
@@ -84,6 +83,7 @@ test("idempotent benefit-use retries do not create a second aggregate record", a
     repository,
     partnerId: "partner-1",
     memberId: "member-1",
+    benefitId: "benefit-1",
     benefit: "헬스 1개월 33,000원",
     useCount: 1,
     pin: "0427",
@@ -105,8 +105,7 @@ test("benefit-use cannot record usage when the partner PIN is not configured", a
       location: "서울 강남구 테헤란로 212",
       periodStart: "2026-07-01",
       periodEnd: "2026-07-31",
-      benefits: ["헬스 1개월 33,000원"],
-      benefitUseMaxCount: null,
+      benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: null }],
       pinHash: null,
       pinSalt: null,
     },
@@ -118,6 +117,7 @@ test("benefit-use cannot record usage when the partner PIN is not configured", a
         repository,
         partnerId: "partner-without-pin",
         memberId: "member-1",
+        benefitId: "benefit-1",
         benefit: "헬스 1개월 33,000원",
         useCount: 1,
         pin: "0427",
@@ -140,6 +140,7 @@ test("카페 싸피 mock fixture accepts the fixed filming PIN 0000", async () =
     repository,
     partnerId: "cafe-ssafy-001",
     memberId: "mock-member-jung-minho",
+    benefitId: "cafe-benefit-americano",
     benefit: "아메리카노·콜드브루 1,000원 할인",
     useCount: 1,
     pin: "0000",
@@ -158,8 +159,7 @@ test("configured benefit use maximum is enforced by the verification service", a
       location: "서울 강남구 테헤란로 212",
       periodStart: "2026-07-01",
       periodEnd: "2026-07-31",
-      benefits: ["헬스 1개월 33,000원"],
-      benefitUseMaxCount: 2,
+      benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: 2 }],
       pinHash: pin.hash,
       pinSalt: pin.salt,
     },
@@ -171,6 +171,7 @@ test("configured benefit use maximum is enforced by the verification service", a
         repository,
         partnerId: "partner-with-limit",
         memberId: "member-1",
+        benefitId: "benefit-1",
         benefit: "헬스 1개월 33,000원",
         useCount: 3,
         pin: "0427",
@@ -182,7 +183,7 @@ test("configured benefit use maximum is enforced by the verification service", a
   );
 });
 
-test("missing benefit use maximum allows a count above the previous fixed limit", async () => {
+test("missing benefit use maximum defaults to one per confirmation", async () => {
   const pin = await hashCouponVerificationPassword("0427");
   const repository = new MockPartnerBenefitUsageRepository([
     {
@@ -190,22 +191,24 @@ test("missing benefit use maximum allows a count above the previous fixed limit"
       location: "서울 강남구 테헤란로 212",
       periodStart: "2026-07-01",
       periodEnd: "2026-07-31",
-      benefits: ["헬스 1개월 33,000원"],
-      benefitUseMaxCount: null,
+      benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: null }],
       pinHash: pin.hash,
       pinSalt: pin.salt,
     },
   ]);
 
-  const result = await recordPartnerBenefitUsage({
-    repository,
-    partnerId: "partner-without-limit",
-    memberId: "member-1",
-    benefit: "헬스 1개월 33,000원",
-    useCount: 3,
-    pin: "0427",
-    idempotencyKey: "unlimited-request",
-  });
-
-  assert.equal(result.useCount, 3);
+  await assert.rejects(
+    () => recordPartnerBenefitUsage({
+      repository,
+      partnerId: "partner-without-limit",
+      memberId: "member-1",
+      benefitId: "benefit-1",
+      benefit: "헬스 1개월 33,000원",
+      useCount: 2,
+      pin: "0427",
+      idempotencyKey: "default-one-request",
+    }),
+    (error: unknown) =>
+      error instanceof PartnerBenefitUsageError && error.code === "use_count_exceeded",
+  );
 });

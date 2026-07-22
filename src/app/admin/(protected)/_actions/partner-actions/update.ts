@@ -68,7 +68,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,benefit_use_max_count,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
+      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -202,7 +202,6 @@ export async function updatePartnerAction(formData: FormData) {
         map_url: payload.mapUrl,
         benefit_action_type: payload.benefitActionType,
         benefit_action_link: payload.benefitActionLink,
-        benefit_use_max_count: payload.benefitUseMaxCount,
         benefit_verification_pin_hash: nextBenefitVerificationPin?.hash ?? null,
         benefit_verification_pin_salt: nextBenefitVerificationPin?.salt ?? null,
         reservation_link: payload.reservationLink,
@@ -227,6 +226,26 @@ export async function updatePartnerAction(formData: FormData) {
     }
     if (!updatedPartner?.id) {
       throw new Error("제휴처 저장 결과를 확인할 수 없습니다.");
+    }
+    const { error: deleteBenefitsError } = await supabase
+      .from("partner_benefits")
+      .delete()
+      .eq("partner_id", id);
+    if (deleteBenefitsError) {
+      throw new Error(deleteBenefitsError.message);
+    }
+    if (payload.benefitItems.length > 0) {
+      const { error: benefitError } = await supabase.from("partner_benefits").insert(
+        payload.benefitItems.map((benefit, displayOrder) => ({
+          partner_id: id,
+          title: benefit.title,
+          max_apply_count: benefit.maxApplyCount ?? null,
+          display_order: displayOrder,
+        })),
+      );
+      if (benefitError) {
+        throw new Error(benefitError.message);
+      }
     }
   } catch (error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
@@ -337,10 +356,9 @@ export async function updatePartnerAction(formData: FormData) {
       format: (value) => (value ? String(value) : "없음"),
     },
     {
-      label: "제휴 적용 최대 횟수",
-      before: previousPartner.benefit_use_max_count ?? null,
-      after: payload.benefitUseMaxCount,
-      format: (value) => (value == null ? "무제한" : `${value}회`),
+      label: "혜택별 적용 횟수",
+      before: previousPartner.benefits ?? [],
+      after: payload.benefitItems.map((benefit) => `${benefit.title} (${benefit.maxApplyCount ?? 1}회)`),
     },
     {
       label: "문의 링크",

@@ -2,8 +2,11 @@ import {
   isPartnerBenefitUseAvailable,
   isPartnerBenefitUsePin,
   normalizePartnerBenefitUseCount,
-  normalizePartnerBenefitSelection,
 } from "@/lib/partner-benefit-usage";
+import {
+  findPartnerBenefitById,
+  getEffectivePartnerBenefitMaxApplyCount,
+} from "@/lib/partner-benefit-items";
 import {
   verifyCouponVerificationPassword,
   type CouponVerificationPasswordHash,
@@ -58,6 +61,7 @@ function mapRepositoryError(error: unknown): PartnerBenefitUsageError {
 export async function recordPartnerBenefitUsage({
   repository = partnerBenefitUsageRepository,
   partnerId,
+  benefitId,
   memberId,
   benefit,
   useCount,
@@ -67,6 +71,7 @@ export async function recordPartnerBenefitUsage({
 }: {
   repository?: PartnerBenefitUsageRepository;
   partnerId: string;
+  benefitId?: string;
   memberId: string;
   benefit: string;
   useCount: number;
@@ -84,13 +89,6 @@ export async function recordPartnerBenefitUsage({
     throw new PartnerBenefitUsageError("use_count_invalid");
   }
   if (
-    context.benefitUseMaxCount !== null &&
-    normalizedUseCount > context.benefitUseMaxCount
-  ) {
-    throw new PartnerBenefitUsageError("use_count_exceeded");
-  }
-
-  if (
     !isPartnerBenefitUseAvailable({
       location: context.location,
       periodStart: context.periodStart,
@@ -100,9 +98,17 @@ export async function recordPartnerBenefitUsage({
     throw new PartnerBenefitUsageError("benefit_unavailable");
   }
 
-  const selectedBenefit = normalizePartnerBenefitSelection(context.benefits, benefit);
+  const selectedBenefit = benefitId
+    ? findPartnerBenefitById(context.benefitItems, benefitId)
+    : context.benefitItems.find((item) => item.title === benefit) ?? null;
   if (!selectedBenefit) {
     throw new PartnerBenefitUsageError("benefit_not_found");
+  }
+  if (
+    normalizedUseCount >
+    getEffectivePartnerBenefitMaxApplyCount(selectedBenefit.maxApplyCount)
+  ) {
+    throw new PartnerBenefitUsageError("use_count_exceeded");
   }
 
   if (!context.pinHash || !context.pinSalt) {
@@ -123,7 +129,8 @@ export async function recordPartnerBenefitUsage({
     return await repository.recordUsage({
       partnerId,
       memberId,
-      benefit: selectedBenefit,
+      benefitId: selectedBenefit.id,
+      benefit: selectedBenefit.title,
       useCount: normalizedUseCount,
       idempotencyKey,
       metadata,

@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 import TokenChipField from "@/components/admin/TokenChipField";
 import PartnerBranchListEditor from "@/components/partner-branches/PartnerBranchListEditor";
+import PartnerBenefitItemsField from "@/components/partner-card-form/PartnerBenefitItemsField";
 import PartnerRegistrationStepProgress from "@/components/partner-registration/PartnerRegistrationStepProgress";
 import PartnerRegistrationBulkDisclosure, {
   type PartnerRegistrationExcelAction,
@@ -44,6 +45,7 @@ import {
   type PartnerRegistrationFormState,
 } from "@/lib/partner-registration";
 import type { AdminPartnerFileCategory } from "@/lib/admin-partner-file-import";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 
 function splitInitialChipValues(value?: string) {
   return value
@@ -52,6 +54,22 @@ function splitInitialChipValues(value?: string) {
         .map((item) => item.trim())
         .filter(Boolean)
     : [];
+}
+
+function getInitialBenefitItems(values?: Partial<PartnerRegistrationFormState>) {
+  try {
+    if (values?.benefitItems) {
+      return normalizePartnerBenefitItems(JSON.parse(values.benefitItems));
+    }
+  } catch {
+    // Server-side validation reports malformed restored values.
+  }
+  return normalizePartnerBenefitItems(
+    splitInitialChipValues(values?.benefits).map((title, index) => ({
+      id: `registration-benefit-${index + 1}`,
+      title,
+    })),
+  );
 }
 
 export default function PartnerRegistrationClient({
@@ -553,26 +571,6 @@ export default function PartnerRegistrationClient({
                       </Field>
                     ) : null}
 
-                    {benefitActionType === "certification" ? (
-                      <Field
-                        label="제휴 적용 최대 횟수"
-                        name="benefitUseMaxCount"
-                        description="비워 두면 횟수 제한 없이 이용할 수 있습니다."
-                        error={fieldErrors.benefitUseMaxCount}
-                      >
-                        <FormInput
-                          name="benefitUseMaxCount"
-                          type="number"
-                          min={1}
-                          inputMode="numeric"
-                          fieldErrors={fieldErrors}
-                          inputRef={registerFieldRef("benefitUseMaxCount")}
-                          defaultValue={initialValues?.benefitUseMaxCount}
-                          placeholder="제한 없음"
-                        />
-                      </Field>
-                    ) : null}
-
                     <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                       <Field
                         label="혜택"
@@ -580,15 +578,8 @@ export default function PartnerRegistrationClient({
                         required
                         error={fieldErrors.benefits}
                       >
-                        <TokenChipField
-                          id="partner-registration-benefits"
-                          name="benefits"
-                          inputRef={registerFieldRef("benefits")}
-                          initialValues={splitInitialChipValues(initialValues?.benefits)}
-                          placeholder="예: 아메리카노 10% 할인"
-                          helpText="Enter로 혜택을 하나씩 추가합니다."
-                          emptyText="등록된 혜택이 없습니다."
-                          error={fieldErrors.benefits}
+                        <PartnerBenefitItemsField
+                          initialItems={getInitialBenefitItems(initialValues)}
                         />
                       </Field>
                       <Field

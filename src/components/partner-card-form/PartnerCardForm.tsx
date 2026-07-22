@@ -21,7 +21,6 @@ import {
   validateFormCampusSlugSelection,
 } from "@/lib/campuses";
 import { isPartnerBenefitActionType } from "@/lib/partner-benefit-action";
-import { normalizePartnerBenefitUseMaxCount } from "@/lib/partner-benefit-usage";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
 import { isPartnerDetailDescriptionValid } from "@/lib/partner-detail-description";
@@ -147,8 +146,6 @@ export default function PartnerCardForm({
     setBenefitActionLinkValue,
     benefitVerificationPinValue,
     setBenefitVerificationPinValue,
-    benefitUseMaxCountValue,
-    setBenefitUseMaxCountValue,
     reservationLinkValue,
     setReservationLinkValue,
     inquiryLinkValue,
@@ -264,9 +261,6 @@ export default function PartnerCardForm({
     const benefitVerificationPin = String(
       formData.get("benefitVerificationPin") || "",
     ).trim();
-    const benefitUseMaxCount = String(
-      formData.get("benefitUseMaxCount") || "",
-    ).trim();
     const detailDescription = String(formData.get("detailDescription") || "").trim();
     const campusSlugSelection = validateFormCampusSlugSelection(
       formData.getAll("campusSlugs").map((item) => String(item).trim()),
@@ -300,22 +294,11 @@ export default function PartnerCardForm({
             message: partnerFormErrorMessages.partner_form_invalid_benefit_verification_pin,
           }
         : null;
-    const benefitUseMaxCountError =
-      benefitActionType === "certification" &&
-      benefitUseMaxCount &&
-      normalizePartnerBenefitUseMaxCount(benefitUseMaxCount) === null
-        ? {
-            field: "benefitUseMaxCount" as const,
-            message: partnerFormErrorMessages.partner_form_invalid_benefit_use_max_count,
-          }
-        : null;
-
     if (
       campusSlugSelection.ok &&
       !benefitActionError &&
       !detailDescriptionError &&
-      !benefitVerificationPinError &&
-      !benefitUseMaxCountError
+      !benefitVerificationPinError
     ) {
       const imageUploadController = imageUploadControllerRef.current;
       if (imageUploadController?.hasPendingUploads()) {
@@ -358,8 +341,7 @@ export default function PartnerCardForm({
           !current.benefitActionType &&
           !current.benefitActionLink &&
           !current.detailDescription &&
-          !current.benefitVerificationPin &&
-          !current.benefitUseMaxCount
+          !current.benefitVerificationPin
         ) {
           return current;
         }
@@ -369,7 +351,6 @@ export default function PartnerCardForm({
           benefitActionLink: _benefitActionLink,
           detailDescription: _detailDescription,
           benefitVerificationPin: _benefitVerificationPin,
-          benefitUseMaxCount: _benefitUseMaxCount,
           ...nextErrors
         } = current;
         void _campusSlugs;
@@ -377,7 +358,6 @@ export default function PartnerCardForm({
         void _benefitActionLink;
         void _detailDescription;
         void _benefitVerificationPin;
-        void _benefitUseMaxCount;
         return nextErrors;
       });
       return;
@@ -400,9 +380,6 @@ export default function PartnerCardForm({
       ...(benefitVerificationPinError
         ? { benefitVerificationPin: benefitVerificationPinError.message }
         : {}),
-      ...(benefitUseMaxCountError
-        ? { benefitUseMaxCount: benefitUseMaxCountError.message }
-        : {}),
     }));
     if (!campusSlugSelection.ok) {
       event.currentTarget
@@ -412,7 +389,7 @@ export default function PartnerCardForm({
     }
     event.currentTarget
       .querySelector<HTMLElement>(
-        `[name="${benefitActionError?.field ?? detailDescriptionError?.field ?? benefitVerificationPinError?.field ?? benefitUseMaxCountError?.field}"]`,
+        `[name="${benefitActionError?.field ?? detailDescriptionError?.field ?? benefitVerificationPinError?.field ?? "benefitItems"}"]`,
       )
       ?.focus();
   };
@@ -498,7 +475,6 @@ export default function PartnerCardForm({
               benefitActionTypeValue,
               benefitActionLinkValue,
               benefitVerificationPinValue,
-              benefitUseMaxCountValue,
               reservationLinkValue,
               inquiryLinkValue,
             }}
@@ -521,7 +497,6 @@ export default function PartnerCardForm({
               setBenefitActionTypeValue,
               setBenefitActionLinkValue,
               setBenefitVerificationPinValue,
-              setBenefitUseMaxCountValue,
               setReservationLinkValue,
               setInquiryLinkValue,
             }}

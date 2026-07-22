@@ -11,7 +11,6 @@ export const partnerFormErrorMessages: Record<string, string> = {
   partner_form_invalid_benefit_action_type: "혜택 이용 방식은 인증, 외부 링크, 현장 이용, 없음 중 하나여야 합니다.",
   partner_form_invalid_benefit_action_link: "혜택 이용 링크 형식을 확인해 주세요.",
   partner_form_invalid_benefit_verification_pin: "혜택 이용 PIN은 숫자 4자리로 입력해 주세요.",
-  partner_form_invalid_benefit_use_max_count: "제휴 적용 최대 횟수는 1회 이상의 정수로 입력해 주세요.",
   partner_form_invalid_reservation_url: "혜택 이용 링크 형식을 확인해 주세요.",
   partner_form_invalid_inquiry_url: "문의 링크 형식을 확인해 주세요.",
   partner_form_invalid_visibility: "노출 상태는 공개, 대외비, 비공개 중 하나여야 합니다.",

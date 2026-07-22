@@ -51,6 +51,7 @@ export async function updateSupabasePartnerImmediateFields(
     arraysEqual(context.tags, input.tags) &&
     context.benefitActionType === benefitActionType &&
     context.benefitActionLink === benefitActionLink &&
+    JSON.stringify(context.benefitItems) === JSON.stringify(input.benefitItems ?? context.benefitItems) &&
     context.reservationLink === input.reservationLink &&
     context.inquiryLink === input.inquiryLink
   ) {
@@ -70,7 +71,12 @@ export async function updateSupabasePartnerImmediateFields(
       p_tags: input.tags,
       p_benefit_action_type: benefitActionType,
       p_benefit_action_link: benefitActionLink,
-      p_benefit_use_max_count: input.benefitUseMaxCount ?? null,
+      p_benefit_items: (input.benefitItems ?? context.benefitItems).map((benefit, displayOrder) => ({
+        id: benefit.id,
+        title: benefit.title,
+        maxApplyCount: benefit.maxApplyCount,
+        displayOrder,
+      })),
       p_reservation_link: input.reservationLink,
       p_inquiry_link: input.inquiryLink,
       ...buildAtomicAuditRpcContext(

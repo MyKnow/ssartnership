@@ -328,7 +328,12 @@ export async function insertPartnerRegistrationRequest({
       registration_mode: values.registrationMode,
       service_mode: values.serviceMode,
       benefit_action_type: values.benefitActionType,
-      benefit_use_max_count: values.benefitUseMaxCount,
+      benefit_items: values.parsedBenefitItems.map((benefit, displayOrder) => ({
+        id: benefit.id,
+        title: benefit.title,
+        maxApplyCount: benefit.maxApplyCount,
+        displayOrder,
+      })),
       branch_scope_type: branchScopeType,
       branch_scope_note: values.branchScopeNote || null,
       brand_name: values.brandName,

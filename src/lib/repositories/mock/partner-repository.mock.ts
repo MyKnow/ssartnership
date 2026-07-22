@@ -52,6 +52,10 @@ const partners: Partner[] = [
     period: { start: "2026-03-01", end: "2026-08-31" },
     conditions: ["전 직원 SSAFY 구성원 인증"],
     benefits: ["월 이용권 20% 할인", "PT 5회 패키지 10% 할인"],
+    benefitItems: [
+      { id: "health-benefit-monthly", title: "월 이용권 20% 할인", maxApplyCount: 3 },
+      { id: "health-benefit-pt", title: "PT 5회 패키지 10% 할인", maxApplyCount: null },
+    ],
     appliesTo: ["student", "staff"],
     thumbnail: null,
     images: [],
@@ -118,7 +122,6 @@ const partners: Partner[] = [
     campusSlugs: ["seoul"],
     mapUrl: "https://map.naver.com/",
     benefitActionType: "certification",
-    benefitUseMaxCount: 2,
     reservationLink: "https://map.naver.com/",
     inquiryLink: "02-555-1500",
     period: { start: "2026-01-01", end: "2099-12-31" },
@@ -129,6 +132,10 @@ const partners: Partner[] = [
     benefits: [
       "아메리카노·콜드브루 1,000원 할인",
       "SSAFY 세트(음료+디저트) 2,000원 할인",
+    ],
+    benefitItems: [
+      { id: "cafe-benefit-americano", title: "아메리카노·콜드브루 1,000원 할인", maxApplyCount: null },
+      { id: "cafe-benefit-set", title: "SSAFY 세트(음료+디저트) 2,000원 할인", maxApplyCount: null },
     ],
     appliesTo: ["student", "staff"],
     thumbnail: "/mock/partners/cafe-ssafy/logo-mark.svg",
