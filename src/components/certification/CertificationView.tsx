@@ -125,7 +125,7 @@ export default function CertificationView({
   }, [now]);
 
   return (
-    <div className="mt-6 w-full">
+    <div className="mt-6 w-full min-w-0 max-w-full">
       <CertificationCardFrame
         className={cardClassName}
         scheme={scheme}
