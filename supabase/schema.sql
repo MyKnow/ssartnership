@@ -1596,6 +1596,27 @@ on conflict (kind, version) do update set
   effective_at = excluded.effective_at,
   updated_at = now();
 
+-- 20260723080416_sync_partner_benefit_cache.sql snapshot
+create or replace function public.bump_partner_benefits_public_cache_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.bump_public_cache_version('partners');
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists partner_benefits_bump_public_cache_version on public.partner_benefits;
+create trigger partner_benefits_bump_public_cache_version
+  after insert or update or delete on public.partner_benefits
+  for each row
+  execute function public.bump_partner_benefits_public_cache_version();
+
+select public.bump_public_cache_version('partners');
+
 -- 20260722124334_add_partner_benefit_items.sql snapshot
 create table if not exists public.partner_benefits (
   id uuid primary key default uuid_generate_v4(),

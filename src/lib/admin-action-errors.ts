@@ -69,4 +69,11 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_company_plan_payment_unconfirmed: "입금 확인 후 플랜을 승인할 수 있습니다.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",
   review_not_found: "대상을 찾을 수 없습니다.",
+  admin_usage_invalid_request: "혜택 적용 이력 입력값을 확인해 주세요.",
+  admin_usage_invalid_timestamp: "적용 시각을 확인해 주세요.",
+  admin_usage_member_not_found: "회원 정보를 찾을 수 없습니다.",
+  admin_usage_benefit_not_found: "제휴처의 혜택 정보를 찾을 수 없습니다.",
+  admin_usage_not_found: "혜택 적용 이력을 찾을 수 없습니다.",
+  admin_usage_count_exceeded: "선택한 혜택의 최대 적용 횟수를 초과했습니다.",
+  admin_usage_database_failed: "혜택 적용 이력을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 };

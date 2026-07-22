@@ -6,6 +6,11 @@ import {
   isPartnerBenefitUsePin,
   normalizePartnerBenefitSelection,
 } from "../src/lib/partner-benefit-usage.ts";
+import { resolvePartnerBenefitById } from "../src/lib/partner-benefit-items.ts";
+import {
+  normalizeAdminUsageTimestamp,
+  parseAdminPartnerBenefitUsageForm,
+} from "../src/lib/partner-benefit-usage-admin.ts";
 import { hashCouponVerificationPassword } from "../src/lib/coupon-verification-password.ts";
 import {
   PartnerBenefitUsageError,
@@ -63,6 +68,43 @@ test("partner benefit PIN is exactly four digits", () => {
   assert.equal(isPartnerBenefitUsePin("123"), false);
   assert.equal(isPartnerBenefitUsePin("12a4"), false);
   assert.equal(isPartnerBenefitUsePin("12345"), false);
+});
+
+test("legacy benefit IDs resolve to the current canonical benefit by display order", () => {
+  const items = [
+    { id: "canonical-2", title: "두 번째 혜택", maxApplyCount: null, displayOrder: 1 },
+    { id: "canonical-1", title: "첫 번째 혜택", maxApplyCount: null, displayOrder: 0 },
+  ];
+
+  assert.equal(
+    resolvePartnerBenefitById(items, "legacy-benefit-partner-1-2", "partner-1")?.id,
+    "canonical-2",
+  );
+  assert.equal(
+    resolvePartnerBenefitById(items, "legacy-benefit-partner-1-3", "partner-1"),
+    null,
+  );
+  assert.equal(
+    resolvePartnerBenefitById(items, "legacy-benefit-partner-2-2", "partner-1"),
+    null,
+  );
+});
+
+test("admin benefit usage form normalizes KST local timestamps and validates UUID fields", () => {
+  const parsed = parseAdminPartnerBenefitUsageForm({
+    partnerId: "00000000-0000-4000-8000-000000000001",
+    memberId: "00000000-0000-4000-8000-000000000002",
+    benefitId: "00000000-0000-4000-8000-000000000003",
+    useCount: "2",
+    verifiedAt: "2026-07-23T08:30",
+  });
+
+  assert.equal(parsed.useCount, 2);
+  assert.equal(parsed.verifiedAt, "2026-07-22T23:30:00.000Z");
+  assert.equal(
+    normalizeAdminUsageTimestamp("2026-07-23T08:30:15"),
+    "2026-07-22T23:30:15.000Z",
+  );
 });
 
 test("idempotent benefit-use retries do not create a second aggregate record", async () => {
@@ -181,6 +223,127 @@ test("configured benefit use maximum is enforced by the verification service", a
       error instanceof PartnerBenefitUsageError &&
       error.code === "use_count_exceeded",
   );
+});
+
+test("legacy benefit IDs are converted before recording usage", async () => {
+  const pin = await hashCouponVerificationPassword("0427");
+  const repository = new MockPartnerBenefitUsageRepository([
+    {
+      partnerId: "partner-legacy-id",
+      location: "서울 강남구 테헤란로 212",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-07-31",
+      benefitItems: [
+        { id: "canonical-1", title: "첫 번째 혜택", maxApplyCount: null },
+        { id: "canonical-2", title: "두 번째 혜택", maxApplyCount: null },
+      ],
+      pinHash: pin.hash,
+      pinSalt: pin.salt,
+    },
+  ]);
+
+  const result = await recordPartnerBenefitUsage({
+    repository,
+    partnerId: "partner-legacy-id",
+    memberId: "member-1",
+    benefitId: "legacy-benefit-partner-legacy-id-2",
+    benefit: "두 번째 혜택",
+    useCount: 1,
+    pin: "0427",
+    idempotencyKey: "legacy-benefit-retry-key",
+  });
+
+  assert.equal(result.benefitId, "canonical-2");
+  assert.equal(result.benefitSnapshot, "두 번째 혜택");
+});
+
+test("repository benefit and infrastructure errors keep distinct service codes", async () => {
+  const pin = await hashCouponVerificationPassword("0427");
+  const baseContext = {
+    partnerId: "partner-error-map",
+    location: "서울 강남구 테헤란로 212",
+    periodStart: "2026-07-01",
+    periodEnd: "2026-07-31",
+    benefitItems: [{ id: "benefit-1", title: "혜택", maxApplyCount: null }],
+    pinHash: pin.hash,
+    pinSalt: pin.salt,
+  };
+
+  for (const [repositoryMessage, expectedCode] of [
+    ["partner_benefit_usage_benefit_not_found", "benefit_not_found"],
+    ["partner_benefit_usage_member_not_found", "member_not_found"],
+    ["database_connection_failed", "service_unavailable"],
+  ] as const) {
+    const repository = {
+      getVerificationContext: async () => baseContext,
+      recordUsage: async () => {
+        throw new Error(repositoryMessage);
+      },
+      listUsageHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 25 }),
+    };
+
+    await assert.rejects(
+      () => recordPartnerBenefitUsage({
+        repository,
+        partnerId: baseContext.partnerId,
+        memberId: "member-1",
+        benefitId: "benefit-1",
+        benefit: "혜택",
+        useCount: 1,
+        pin: "0427",
+        idempotencyKey: `${repositoryMessage}-key`,
+      }),
+      (error: unknown) =>
+        error instanceof PartnerBenefitUsageError && error.code === expectedCode,
+    );
+  }
+});
+
+test("mock admin usage repository supports create, update, list, and delete", async () => {
+  const repository = new MockPartnerBenefitUsageRepository([
+    {
+      partnerId: "partner-admin-crud",
+      location: "서울 강남구 테헤란로 212",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-07-31",
+      benefitItems: [
+        { id: "benefit-1", title: "첫 번째 혜택", maxApplyCount: null },
+        { id: "benefit-2", title: "두 번째 혜택", maxApplyCount: null },
+      ],
+      pinHash: null,
+      pinSalt: null,
+    },
+  ]);
+  const baseInput = {
+    partnerId: "partner-admin-crud",
+    memberId: "member-1",
+    benefitId: "benefit-1",
+    useCount: 1,
+    verifiedAt: "2026-07-23T00:00:00.000Z",
+  };
+
+  const created = await repository.createAdminUsage(baseInput);
+  assert.equal(created.benefitSnapshot, "첫 번째 혜택");
+  const updated = await repository.updateAdminUsage({
+    ...baseInput,
+    usageId: created.usageId,
+    memberId: "member-2",
+    benefitId: "benefit-2",
+    verifiedAt: "2026-07-23T01:00:00.000Z",
+  });
+  assert.equal(updated.memberId, "member-2");
+  assert.equal(updated.benefitId, "benefit-2");
+
+  const listed = await repository.listUsageHistory({
+    partnerId: "partner-admin-crud",
+    page: 1,
+    pageSize: 25,
+  });
+  assert.equal(listed.total, 1);
+  assert.equal(listed.items[0]?.usageId, created.usageId);
+
+  await repository.deleteAdminUsage({ partnerId: "partner-admin-crud", usageId: created.usageId });
+  assert.equal((await repository.listUsageHistory({ partnerId: "partner-admin-crud", page: 1, pageSize: 25 })).total, 0);
 });
 
 test("missing benefit use maximum defaults to one per confirmation", async () => {

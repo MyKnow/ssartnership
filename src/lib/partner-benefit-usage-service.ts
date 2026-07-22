@@ -4,7 +4,7 @@ import {
   normalizePartnerBenefitUseCount,
 } from "@/lib/partner-benefit-usage";
 import {
-  findPartnerBenefitById,
+  resolvePartnerBenefitById,
   getEffectivePartnerBenefitMaxApplyCount,
 } from "@/lib/partner-benefit-items";
 import {
@@ -25,7 +25,9 @@ export type PartnerBenefitUsageErrorCode =
   | "pin_invalid"
   | "use_count_invalid"
   | "use_count_exceeded"
-  | "idempotency_conflict";
+  | "idempotency_conflict"
+  | "member_not_found"
+  | "service_unavailable";
 
 export class PartnerBenefitUsageError extends Error {
   readonly code: PartnerBenefitUsageErrorCode;
@@ -48,14 +50,19 @@ function mapRepositoryError(error: unknown): PartnerBenefitUsageError {
   if (message.includes("use_count_invalid")) {
     return new PartnerBenefitUsageError("use_count_invalid");
   }
-  if (
-    message.includes("benefit_not_found") ||
-    message.includes("period_inactive") ||
-    message.includes("online_partner")
-  ) {
+  if (message.includes("benefit_not_found")) {
+    return new PartnerBenefitUsageError("benefit_not_found");
+  }
+  if (message.includes("member_not_found")) {
+    return new PartnerBenefitUsageError("member_not_found");
+  }
+  if (message.includes("partner_not_found")) {
+    return new PartnerBenefitUsageError("partner_not_found");
+  }
+  if (message.includes("period_inactive") || message.includes("online_partner")) {
     return new PartnerBenefitUsageError("benefit_unavailable");
   }
-  return new PartnerBenefitUsageError("benefit_unavailable");
+  return new PartnerBenefitUsageError("service_unavailable");
 }
 
 export async function recordPartnerBenefitUsage({
@@ -99,7 +106,7 @@ export async function recordPartnerBenefitUsage({
   }
 
   const selectedBenefit = benefitId
-    ? findPartnerBenefitById(context.benefitItems, benefitId)
+    ? resolvePartnerBenefitById(context.benefitItems, benefitId, partnerId)
     : context.benefitItems.find((item) => item.title === benefit) ?? null;
   if (!selectedBenefit) {
     throw new PartnerBenefitUsageError("benefit_not_found");
