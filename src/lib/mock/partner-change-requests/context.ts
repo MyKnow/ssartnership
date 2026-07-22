@@ -1,6 +1,7 @@
 import type { PartnerChangeRequestContext } from "../../partner-change-requests/shared.ts";
 import { findPendingRequest, findService, getStore } from "./service-store.ts";
 import { normalizeServiceRecord, toSummary } from "./normalizers.ts";
+import { normalizePartnerBenefitItems } from "../../partner-benefit-items.ts";
 
 export async function listMockPartnerChangeRequests(
   companyIds?: string[],
@@ -57,6 +58,9 @@ export async function getMockPartnerChangeRequestContext(
     mapUrl: normalizedService.mapUrl,
     benefitActionType: normalizedService.benefitActionType,
     benefitActionLink: normalizedService.benefitActionLink,
+    benefitItems: normalizedService.benefitItems ?? normalizePartnerBenefitItems(
+      normalizedService.currentBenefits.map((title, index) => ({ id: `mock-benefit-${index + 1}`, title })),
+    ),
     reservationLink: normalizedService.reservationLink,
     inquiryLink: normalizedService.inquiryLink,
     currentConditions: [...normalizedService.currentConditions],

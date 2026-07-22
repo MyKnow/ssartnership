@@ -9,9 +9,9 @@ const meta = {
     action: {
       partnerId: "00000000-0000-4000-8000-000000000001",
       partnerName: "피치플레이헬스&필라테스 역삼점",
-      benefits: [
-        "헬스 1개월 33,000원",
-        "필라테스 3개월 내 10회 199,000원",
+      benefitItems: [
+        { id: "benefit-health", title: "헬스 1개월 33,000원", maxApplyCount: 3 },
+        { id: "benefit-pilates", title: "필라테스 3개월 내 10회 199,000원", maxApplyCount: null },
       ],
       returnTo: "/partners/00000000-0000-4000-8000-000000000001",
     },

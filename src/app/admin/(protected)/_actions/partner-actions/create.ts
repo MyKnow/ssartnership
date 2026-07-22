@@ -340,6 +340,20 @@ async function createPartnerRecord(
       createdPartner = true;
     }
 
+    if (createdPartner && payload.benefitItems.length > 0) {
+      const { error: benefitError } = await supabase.from("partner_benefits").insert(
+        payload.benefitItems.map((benefit, displayOrder) => ({
+          partner_id: partnerId,
+          title: benefit.title,
+          max_apply_count: benefit.maxApplyCount ?? null,
+          display_order: displayOrder,
+        })),
+      );
+      if (benefitError) {
+        throw new Error(benefitError.message);
+      }
+    }
+
     await persistAdminPartnerBranchLinks({
       supabase,
       partnerId,

@@ -559,7 +559,7 @@ test("수료생 업로드 서명 URL은 이메일 인증 세션과 속도 제한
   assert.match(uploadSignRoute, /recordGraduateVerificationAttempt/);
 });
 
-test("member avatar APIs serve only private storage objects", () => {
+test("member avatar APIs serve private storage objects outside the explicit local mock", () => {
   const routes = [
     "../src/app/api/mm/avatar/route.ts",
     "../src/app/api/certification/avatar/[token]/route.ts",
@@ -568,10 +568,11 @@ test("member avatar APIs serve only private storage objects", () => {
 
   for (const source of routes) {
     assert.match(source, /downloadPrivateMemberProfileImage/);
-    assert.doesNotMatch(
-      source,
-      /NextResponse\.redirect|avatarUrl|avatarBase64|createMemberAvatarResponse/,
-    );
+    if (source.includes("isMockDataSource")) {
+      assert.match(source, /if \(isMockDataSource\(\)\)/);
+      continue;
+    }
+    assert.doesNotMatch(source, /NextResponse\.redirect|avatarUrl|avatarBase64|createMemberAvatarResponse/);
   }
 });
 

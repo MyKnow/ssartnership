@@ -123,6 +123,10 @@ node --test tests/<focused-test>.test.mts
 
 Run `next build` only when build/runtime behavior changed broadly or when explicitly requested.
 
+### Node 24 CI typecheck parity
+
+`Public Readiness` and Vercel run TypeScript on Node 24. Keep the project TypeScript version pinned to the verified stable release in `package.json` (do not use a broad major-version range after a compiler internal-error incident). Before pushing a change that modifies TypeScript, routes, generated component props, or repository contracts, run `npm run typecheck:ci` and `npm run build` in addition to focused tests. This app keeps `next.config.ts`'s `typescript.ignoreBuildErrors` enabled because Next 16's embedded worker crashes on the repository's valid generic types. The CI command is intentionally a TypeScript syntax/module-resolution check (`--noCheck`) because full semantic checking crashes in the current Next/TypeScript combination; semantic confidence comes from ESLint, the production build, unit tests, route-contract tests, and E2E. `tsconfig.json` and `next-env.d.ts` intentionally exclude direct `.next` route-contract imports and the Next TypeScript plugin because the same Next worker bug crashes or hangs on them; route inventory and focused route tests cover the generated-route surface separately. Do not treat the syntax check as a substitute for fixing reported semantic type errors in future upgrades.
+
 ## CI Failure Guardrails
 
 Recent failed Actions clustered into four workflows: `Sync Preview Supabase`, `Verify Node Lockfile`, `Publish Storybook`, and `Public Readiness`. Before PR, `dev` merge, or `main` promotion, check the relevant guardrail instead of waiting for CI to rediscover the same issue.

@@ -37,6 +37,7 @@ export type PartnerCardFormValues = {
   benefitActionType?: PartnerBenefitActionType;
   benefitActionLink?: string;
   benefitVerificationPinConfigured?: boolean;
+  benefitItems?: import("@/lib/partner-benefit-items").PartnerBenefit[];
   reservationLink?: string;
   inquiryLink?: string;
   period?: {

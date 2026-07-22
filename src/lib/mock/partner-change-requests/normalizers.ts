@@ -1,6 +1,7 @@
 import { normalizePartnerAudience } from "../../partner-audience.ts";
 import { inferCampusSlugsFromLocation, normalizeCampusSlugs } from "../../campuses.ts";
 import { normalizePartnerBenefitActionType } from "../../partner-benefit-action.ts";
+import { normalizePartnerBenefitItems } from "../../partner-benefit-items.ts";
 import { sanitizeHttpUrl, sanitizePartnerLinkValue } from "../../validation.ts";
 import type {
   PartnerChangeRequestSummary,
@@ -113,6 +114,9 @@ export function normalizeServiceRecord(
     ),
     benefitActionLink: normalizeOptionalLink(
       service.benefitActionLink ?? service.reservationLink,
+    ),
+    benefitItems: service.benefitItems ?? normalizePartnerBenefitItems(
+      (service.currentBenefits ?? []).map((title, index) => ({ id: `mock-benefit-${index + 1}`, title })),
     ),
     reservationLink: normalizeOptionalLink(service.reservationLink),
     inquiryLink: normalizeOptionalLink(service.inquiryLink),

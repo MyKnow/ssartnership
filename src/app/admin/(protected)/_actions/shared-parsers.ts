@@ -13,6 +13,10 @@ import {
   normalizePartnerBenefitActionType,
 } from "../../../../lib/partner-benefit-action.ts";
 import { normalizePartnerDetailDescription } from "../../../../lib/partner-detail-description.ts";
+import {
+  normalizePartnerBenefitItems,
+  partnerBenefitItemsToTitles,
+} from "../../../../lib/partner-benefit-items.ts";
 import { normalizePartnerLoginId } from "../../../../lib/partner-utils.ts";
 import {
   ONLINE_PARTNER_LOCATION,
@@ -42,6 +46,16 @@ function parseList(value: string) {
         .map((item) => item.trim())
         .filter(Boolean),
     ),
+  );
+}
+
+function parsePartnerBenefitItems(formData: FormData, legacyBenefits: string) {
+  const rawItems = formData.get("benefitItems");
+  if (typeof rawItems === "string" && rawItems.trim()) {
+    return normalizePartnerBenefitItems(JSON.parse(rawItems));
+  }
+  return normalizePartnerBenefitItems(
+    parseList(legacyBenefits).map((title, index) => ({ id: `legacy-benefit-${index + 1}`, title })),
   );
 }
 
@@ -325,6 +339,15 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     throw new Error("partner_form_invalid_benefit_verification_pin");
   }
   const benefitVerificationPin = rawBenefitVerificationPin || null;
+  let benefitItems;
+  try {
+    benefitItems = parsePartnerBenefitItems(formData, benefits);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error("partner_form_invalid_benefit_items");
+    }
+    throw error;
+  }
 
   const inquiryLink = parsePartnerLink(rawInquiryLink);
   if (rawInquiryLink && !inquiryLink) {
@@ -362,7 +385,8 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     periodStart: periodStart || null,
     periodEnd: periodEnd || null,
     conditions: parseList(conditions),
-    benefits: parseList(benefits),
+    benefits: partnerBenefitItemsToTitles(benefitItems),
+    benefitItems,
     appliesTo: parsedAppliesTo,
     tags: parseList(tags),
     visibility: normalizePartnerVisibility(rawVisibility || "public"),

@@ -227,6 +227,26 @@ export async function updatePartnerAction(formData: FormData) {
     if (!updatedPartner?.id) {
       throw new Error("제휴처 저장 결과를 확인할 수 없습니다.");
     }
+    const { error: deleteBenefitsError } = await supabase
+      .from("partner_benefits")
+      .delete()
+      .eq("partner_id", id);
+    if (deleteBenefitsError) {
+      throw new Error(deleteBenefitsError.message);
+    }
+    if (payload.benefitItems.length > 0) {
+      const { error: benefitError } = await supabase.from("partner_benefits").insert(
+        payload.benefitItems.map((benefit, displayOrder) => ({
+          partner_id: id,
+          title: benefit.title,
+          max_apply_count: benefit.maxApplyCount ?? null,
+          display_order: displayOrder,
+        })),
+      );
+      if (benefitError) {
+        throw new Error(benefitError.message);
+      }
+    }
   } catch (error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     await cleanupPartnerCompanyProvision(supabase, companyProvision);
@@ -334,6 +354,11 @@ export async function updatePartnerAction(formData: FormData) {
       before: previousPartner.benefit_action_link ?? previousPartner.reservation_link ?? null,
       after: payload.benefitActionLink,
       format: (value) => (value ? String(value) : "없음"),
+    },
+    {
+      label: "혜택별 적용 횟수",
+      before: previousPartner.benefits ?? [],
+      after: payload.benefitItems.map((benefit) => `${benefit.title} (${benefit.maxApplyCount ?? 1}회)`),
     },
     {
       label: "문의 링크",

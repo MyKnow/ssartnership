@@ -2,8 +2,11 @@ import {
   isPartnerBenefitUseAvailable,
   isPartnerBenefitUsePin,
   normalizePartnerBenefitUseCount,
-  normalizePartnerBenefitSelection,
 } from "@/lib/partner-benefit-usage";
+import {
+  findPartnerBenefitById,
+  getEffectivePartnerBenefitMaxApplyCount,
+} from "@/lib/partner-benefit-items";
 import {
   verifyCouponVerificationPassword,
   type CouponVerificationPasswordHash,
@@ -21,6 +24,7 @@ export type PartnerBenefitUsageErrorCode =
   | "pin_not_configured"
   | "pin_invalid"
   | "use_count_invalid"
+  | "use_count_exceeded"
   | "idempotency_conflict";
 
 export class PartnerBenefitUsageError extends Error {
@@ -38,6 +42,12 @@ function mapRepositoryError(error: unknown): PartnerBenefitUsageError {
   if (message.includes("idempotency_conflict")) {
     return new PartnerBenefitUsageError("idempotency_conflict");
   }
+  if (message.includes("use_count_exceeded")) {
+    return new PartnerBenefitUsageError("use_count_exceeded");
+  }
+  if (message.includes("use_count_invalid")) {
+    return new PartnerBenefitUsageError("use_count_invalid");
+  }
   if (
     message.includes("benefit_not_found") ||
     message.includes("period_inactive") ||
@@ -51,6 +61,7 @@ function mapRepositoryError(error: unknown): PartnerBenefitUsageError {
 export async function recordPartnerBenefitUsage({
   repository = partnerBenefitUsageRepository,
   partnerId,
+  benefitId,
   memberId,
   benefit,
   useCount,
@@ -60,6 +71,7 @@ export async function recordPartnerBenefitUsage({
 }: {
   repository?: PartnerBenefitUsageRepository;
   partnerId: string;
+  benefitId?: string;
   memberId: string;
   benefit: string;
   useCount: number;
@@ -72,6 +84,10 @@ export async function recordPartnerBenefitUsage({
     throw new PartnerBenefitUsageError("partner_not_found");
   }
 
+  const normalizedUseCount = normalizePartnerBenefitUseCount(useCount);
+  if (normalizedUseCount === null) {
+    throw new PartnerBenefitUsageError("use_count_invalid");
+  }
   if (
     !isPartnerBenefitUseAvailable({
       location: context.location,
@@ -79,12 +95,20 @@ export async function recordPartnerBenefitUsage({
       periodEnd: context.periodEnd,
     })
   ) {
-    throw new PartnerBenefitUsageError("use_count_invalid");
+    throw new PartnerBenefitUsageError("benefit_unavailable");
   }
 
-  const selectedBenefit = normalizePartnerBenefitSelection(context.benefits, benefit);
+  const selectedBenefit = benefitId
+    ? findPartnerBenefitById(context.benefitItems, benefitId)
+    : context.benefitItems.find((item) => item.title === benefit) ?? null;
   if (!selectedBenefit) {
     throw new PartnerBenefitUsageError("benefit_not_found");
+  }
+  if (
+    normalizedUseCount >
+    getEffectivePartnerBenefitMaxApplyCount(selectedBenefit.maxApplyCount)
+  ) {
+    throw new PartnerBenefitUsageError("use_count_exceeded");
   }
 
   if (!context.pinHash || !context.pinSalt) {
@@ -93,11 +117,6 @@ export async function recordPartnerBenefitUsage({
   if (!isPartnerBenefitUsePin(pin)) {
     throw new PartnerBenefitUsageError("pin_invalid");
   }
-  const normalizedUseCount = normalizePartnerBenefitUseCount(useCount);
-  if (normalizedUseCount === null) {
-    throw new PartnerBenefitUsageError("benefit_unavailable");
-  }
-
   const isPinValid = await verifyCouponVerificationPassword(pin, {
     hash: context.pinHash,
     salt: context.pinSalt,
@@ -110,7 +129,8 @@ export async function recordPartnerBenefitUsage({
     return await repository.recordUsage({
       partnerId,
       memberId,
-      benefit: selectedBenefit,
+      benefitId: selectedBenefit.id,
+      benefit: selectedBenefit.title,
       useCount: normalizedUseCount,
       idempotencyKey,
       metadata,

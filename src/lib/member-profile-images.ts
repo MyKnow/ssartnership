@@ -7,6 +7,11 @@ import { storeMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { sanitizeHttpUrl } from "@/lib/validation";
 import { IMAGE_SOURCE_MIME_TYPES } from "@/lib/image-upload/policy";
+import {
+  getMockMemberById,
+  getMockMemberProfileImageUrl,
+  isMockDataSource,
+} from "@/lib/mock/member";
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set<string>(IMAGE_SOURCE_MIME_TYPES);
 
@@ -273,6 +278,21 @@ export async function getMemberProfilePhotoStates(memberIds: readonly string[]) 
     return states;
   }
 
+  if (isMockDataSource()) {
+    for (const memberId of uniqueMemberIds) {
+      if (!getMockMemberById(memberId)) {
+        continue;
+      }
+      states.set(memberId, {
+        reviewStatus: "approved",
+        activeProfileImageId: "mock-member-profile-image",
+        activeStoragePath: getMockMemberProfileImageUrl(),
+        updatedAt: null,
+      });
+    }
+    return states;
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("member_profile_images")
@@ -311,6 +331,26 @@ export async function getActiveMemberProfileImage(
   memberId: string,
   options: { requirePasswordSetup?: boolean } = {},
 ): Promise<ActiveMemberProfileImage | null> {
+  if (isMockDataSource()) {
+    const member = getMockMemberById(memberId);
+    if (!member || (options.requirePasswordSetup && member.mustChangePassword)) {
+      return null;
+    }
+    const photoState = await getMemberProfilePhotoState(memberId);
+    if (
+      photoState.reviewStatus !== "approved" ||
+      !photoState.activeProfileImageId ||
+      !photoState.activeStoragePath
+    ) {
+      return null;
+    }
+    return {
+      imageId: photoState.activeProfileImageId,
+      storagePath: photoState.activeStoragePath,
+      updatedAt: photoState.updatedAt,
+    };
+  }
+
   const supabase = getSupabaseAdminClient();
   const [memberResult, photoState] = await Promise.all([
     supabase

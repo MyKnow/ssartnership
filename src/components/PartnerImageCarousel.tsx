@@ -39,6 +39,7 @@ export default function PartnerImageCarousel({
   matchHeightSelector,
   priority = false,
   variant = "default",
+  imageFit = "cover",
   showThumbnails = true,
 }: {
   images: string[];
@@ -46,7 +47,8 @@ export default function PartnerImageCarousel({
   className?: string;
   matchHeightSelector?: string;
   priority?: boolean;
-  variant?: "default" | "hero";
+  variant?: "default" | "main" | "hero";
+  imageFit?: "cover" | "contain";
   showThumbnails?: boolean;
 }) {
   const {
@@ -93,7 +95,7 @@ export default function PartnerImageCarousel({
         type="button"
         className={cn(
           "relative w-full overflow-hidden rounded-3xl border border-border bg-surface-muted",
-          variant === "hero"
+          variant === "main" || variant === "hero"
             ? "aspect-square"
             : "aspect-[4/3]",
         )}
@@ -110,7 +112,7 @@ export default function PartnerImageCarousel({
             alt={name}
             fill
             sizes="(max-width: 1279px) 100vw, 50vw"
-            className="object-cover"
+            className={imageFit === "contain" ? "object-contain" : "object-cover"}
             fetchPriority={priority ? "high" : undefined}
             loading={priority ? undefined : "eager"}
             priority={priority}

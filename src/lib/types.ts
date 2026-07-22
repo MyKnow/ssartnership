@@ -5,6 +5,7 @@ import type {
 import type { CampusSlug } from "@/lib/campuses";
 import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
 import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
+import type { PartnerBenefit } from "@/lib/partner-benefit-items";
 
 export type CategoryKey = string;
 export type PartnerVisibility = "public" | "confidential" | "private";
@@ -30,6 +31,7 @@ export type Partner = {
   mapUrl?: string;
   benefitActionType?: PartnerBenefitActionType;
   benefitActionLink?: string;
+  benefitItems?: PartnerBenefit[];
   reservationLink?: string;
   inquiryLink?: string;
   period: {

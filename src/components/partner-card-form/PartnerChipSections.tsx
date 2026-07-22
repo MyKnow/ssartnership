@@ -1,6 +1,8 @@
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import TokenChipField from "@/components/admin/TokenChipField";
+import PartnerBenefitItemsField from "@/components/partner-card-form/PartnerBenefitItemsField";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import type { PartnerCardDraftSnapshot } from "@/lib/partner-card-form/draft";
 import { removeCouponOnlyDefaults } from "@/lib/partner-coupon-only";
 import type { PartnerCardFormValues } from "@/components/partner-card-form/types";
@@ -18,8 +20,10 @@ export default function PartnerChipSections({
     ? restoredDraftValues.conditions
     : removeCouponOnlyDefaults(partner.conditions);
   const editableBenefits = restoredDraftValues
-    ? restoredDraftValues.benefits
-    : removeCouponOnlyDefaults(partner.benefits);
+    ? normalizePartnerBenefitItems(restoredDraftValues.benefits.map((title, index) => ({ id: `draft-benefit-${index + 1}`, title })))
+    : partner.benefitItems?.length
+      ? partner.benefitItems
+      : normalizePartnerBenefitItems(removeCouponOnlyDefaults(partner.benefits).map((title, index) => ({ id: `legacy-benefit-${index + 1}`, title })));
   const tags = restoredDraftValues?.tags ?? partner.tags ?? [];
 
   return (
@@ -53,13 +57,10 @@ export default function PartnerChipSections({
               description="상세 페이지에 항상 노출할 기본 혜택을 입력합니다."
             />
             <div className="mt-6">
-              <TokenChipField
-                key={`benefits-${draftRestoreVersion}`}
-                name="benefits"
-                initialValues={editableBenefits}
-                placeholder="혜택을 입력하고 Enter"
-                helpText="Enter로 혜택을 추가합니다."
-                emptyText="아직 등록된 혜택이 없습니다."
+              <PartnerBenefitItemsField
+                key={`benefit-items-${draftRestoreVersion}`}
+                initialItems={editableBenefits}
+                draftRestoreVersion={draftRestoreVersion}
               />
             </div>
           </Card>

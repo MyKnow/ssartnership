@@ -16,6 +16,7 @@ import {
 } from "@/lib/partner-change-requests";
 import { createAdminOperationalNotification } from "@/lib/operational-notifications";
 import { sanitizePartnerLinkValue } from "@/lib/validation";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { resolvePartnerMediaPayload } from "./media";
 import {
   getAuthorizedCompanyIdsForPartnerAction,
@@ -57,6 +58,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     reservationLink: rawReservationLink,
   });
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
+  const rawBenefitItems = String(formData.get("benefitItems") || "").trim();
   let media = null;
 
   try {
@@ -82,6 +84,17 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     const benefitActionLink =
       benefitActionType === "external_link" ? parsedBenefitActionLink : null;
     const reservationLink = benefitActionLink;
+    let benefitItems;
+    try {
+      benefitItems = normalizePartnerBenefitItems(
+        rawBenefitItems ? JSON.parse(rawBenefitItems) : context.benefitItems,
+      );
+    } catch {
+      throw new PartnerChangeRequestError(
+        "invalid_request",
+        "혜택별 적용 횟수 설정을 확인해 주세요.",
+      );
+    }
 
     const inquiryLink = rawInquiryLink
       ? sanitizePartnerLinkValue(rawInquiryLink)
@@ -113,6 +126,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
       tags,
       benefitActionType,
       benefitActionLink,
+      benefitItems,
       reservationLink,
       inquiryLink,
     });

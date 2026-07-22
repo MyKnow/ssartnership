@@ -22,6 +22,7 @@ import PartnerDetailReviews, {
 } from "./_page/PartnerDetailReviews";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { getPartnerDetailBenefitMode } from "@/lib/partner-detail-benefit-action";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
 
 export const dynamic = "force-dynamic";
@@ -210,7 +211,12 @@ export default async function PartnerDetailPage({
       ? {
           partnerId: partner.id,
           partnerName: partner.name,
-          benefits: partner.benefits,
+          benefitItems: partner.benefitItems?.length
+            ? partner.benefitItems
+            : normalizePartnerBenefitItems(partner.benefits.map((title, index) => ({
+                id: `legacy-benefit-${partner.id}-${index + 1}`,
+                title,
+              }))),
           returnTo: partnerReturnTo,
           requiresLogin: partner.benefitAccessStatus === "login_required",
         }
@@ -270,6 +276,7 @@ export default async function PartnerDetailPage({
                   images={partner.thumbnail ? [partner.thumbnail] : []}
                   name={partner.name}
                   variant="hero"
+                  imageFit={partner.thumbnail?.toLowerCase().endsWith(".svg") ? "contain" : "cover"}
                   showThumbnails={false}
                   priority
                 />
@@ -304,6 +311,7 @@ export default async function PartnerDetailPage({
                   key={`${carouselKey}:gallery`}
                   images={partner.images}
                   name={`${partner.name} 추가 이미지`}
+                  variant="main"
                 />
               </section>
             ) : null}

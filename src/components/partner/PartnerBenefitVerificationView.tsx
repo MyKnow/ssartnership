@@ -32,6 +32,7 @@ function createIdempotencyKey() {
 export default function PartnerBenefitVerificationView({
   partnerId,
   partnerName,
+  benefitId,
   benefit,
   useCount,
   member,
@@ -41,6 +42,7 @@ export default function PartnerBenefitVerificationView({
 }: {
   partnerId: string;
   partnerName: string;
+  benefitId: string;
   benefit: string;
   useCount: number;
   member: VerificationMember;
@@ -80,6 +82,7 @@ export default function PartnerBenefitVerificationView({
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           body: JSON.stringify({
+            benefitId,
             benefit,
             useCount,
             pin,

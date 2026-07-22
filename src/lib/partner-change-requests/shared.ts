@@ -5,6 +5,7 @@ import type {
   PartnerVisibility,
 } from "../types.ts";
 import type { PartnerCompanyPlanTier } from "../partner-company-plans.ts";
+import type { PartnerBenefit } from "../partner-benefit-items.ts";
 import { PartnerChangeRequestError } from "../partner-change-request-errors.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import type { AtomicAuditContext } from "../audit-rpc-context.ts";
@@ -104,6 +105,7 @@ export type PartnerChangeRequestContext = {
   mapUrl: string | null;
   benefitActionType: PartnerBenefitActionType;
   benefitActionLink: string | null;
+  benefitItems: PartnerBenefit[];
   reservationLink: string | null;
   inquiryLink: string | null;
   currentConditions: string[];
@@ -167,6 +169,7 @@ export type PartnerImmediateUpdateInput = {
   reservationLink: string | null;
   benefitActionType?: PartnerBenefitActionType;
   benefitActionLink?: string | null;
+  benefitItems?: PartnerBenefit[];
   inquiryLink: string | null;
 };
 
@@ -221,6 +224,12 @@ export type PartnerRow = {
   map_url?: string | null;
   benefit_action_type?: string | null;
   benefit_action_link?: string | null;
+  partner_benefits?: Array<{
+    id: string;
+    title: string;
+    max_apply_count: number | null;
+    display_order?: number | null;
+  }> | null;
   reservation_link?: string | null;
   inquiry_link?: string | null;
   period_start?: string | null;
@@ -295,7 +304,7 @@ export type PartnerChangeRequestRow = {
 };
 
 export const REQUEST_SELECT =
-  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_detail_description,current_map_url,current_campus_slugs,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_detail_description,requested_map_url,requested_campus_slugs,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,detail_description,campus_slugs,map_url,conditions,benefits,applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
+  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_detail_description,current_map_url,current_campus_slugs,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_detail_description,requested_map_url,requested_campus_slugs,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,detail_description,campus_slugs,map_url,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
 
 export type PartnerChangeRequestSupabaseClient = ReturnType<
   typeof getSupabaseAdminClient

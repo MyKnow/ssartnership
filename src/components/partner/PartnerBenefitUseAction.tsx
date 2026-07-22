@@ -5,12 +5,15 @@ import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { trackProductEvent } from "@/lib/product-events";
-import { MAX_PARTNER_BENEFIT_USE_COUNT } from "@/lib/partner-benefit-usage";
+import {
+  getEffectivePartnerBenefitMaxApplyCount,
+  type PartnerBenefit,
+} from "@/lib/partner-benefit-items";
 
 export type OfflinePartnerBenefitAction = {
   partnerId: string;
   partnerName: string;
-  benefits: string[];
+  benefitItems: PartnerBenefit[];
   returnTo: string;
   requiresLogin?: boolean;
 };
@@ -27,6 +30,8 @@ export default function PartnerBenefitUseAction({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBenefit, setSelectedBenefit] = useState("");
   const [useCount, setUseCount] = useState(1);
+  const selectedBenefitItem = action.benefitItems.find((item) => item.id === selectedBenefit) ?? null;
+  const maxUseCount = getEffectivePartnerBenefitMaxApplyCount(selectedBenefitItem?.maxApplyCount);
   const portalRoot = typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
@@ -67,7 +72,14 @@ export default function PartnerBenefitUseAction({
 
   function handleBenefitChange(value: string) {
     setSelectedBenefit(value);
-    const benefitIndex = action.benefits.findIndex((benefit) => benefit === value);
+    const nextBenefit = action.benefitItems.find((benefit) => benefit.id === value);
+    setUseCount((current) =>
+      Math.min(
+        current,
+        getEffectivePartnerBenefitMaxApplyCount(nextBenefit?.maxApplyCount),
+      ),
+    );
+    const benefitIndex = action.benefitItems.findIndex((benefit) => benefit.id === value);
     trackProductEvent({
       eventName: "partner_benefit_use_select",
       targetType: "partner",
@@ -83,7 +95,7 @@ export default function PartnerBenefitUseAction({
     if (!selectedBenefit) {
       return;
     }
-    const benefitIndex = action.benefits.findIndex((benefit) => benefit === selectedBenefit);
+    const benefitIndex = action.benefitItems.findIndex((benefit) => benefit.id === selectedBenefit);
     trackProductEvent({
       eventName: "partner_benefit_use_confirm",
       targetType: "partner",
@@ -95,7 +107,7 @@ export default function PartnerBenefitUseAction({
       },
     });
     const params = new URLSearchParams({
-      benefit: selectedBenefit,
+      benefitId: selectedBenefit,
       useCount: String(useCount),
       returnTo: action.returnTo,
     });
@@ -173,9 +185,9 @@ export default function PartnerBenefitUseAction({
                     className="h-12 w-full min-w-0 rounded-2xl border border-border bg-surface-control px-3 text-base font-medium text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                   >
                     <option value="">혜택을 선택해 주세요</option>
-                    {action.benefits.map((benefit, index) => (
-                      <option key={`${benefit}-${index}`} value={benefit}>
-                        {benefit}
+                    {action.benefitItems.map((benefit) => (
+                      <option key={benefit.id} value={benefit.id}>
+                        {benefit.title}
                       </option>
                     ))}
                   </select>
@@ -202,8 +214,14 @@ export default function PartnerBenefitUseAction({
                     <button
                       type="button"
                       aria-label="이용 횟수 늘리기"
-                      disabled={useCount >= MAX_PARTNER_BENEFIT_USE_COUNT}
-                      onClick={() => setUseCount((current) => Math.min(MAX_PARTNER_BENEFIT_USE_COUNT, current + 1))}
+                      disabled={
+                        useCount >= maxUseCount
+                      }
+                      onClick={() =>
+                        setUseCount((current) =>
+                          Math.min(maxUseCount, current + 1),
+                        )
+                      }
                       className="inline-flex size-11 items-center justify-center rounded-xl text-xl font-semibold text-foreground transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       +

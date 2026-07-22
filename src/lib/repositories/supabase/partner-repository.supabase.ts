@@ -1,4 +1,5 @@
 import type { Category, Partner } from "@/lib/types";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { cache } from "react";
 import {
   normalizePartnerAudience,
@@ -44,6 +45,12 @@ type PartnerRow = {
   period_end?: string | null;
   conditions?: string[] | null;
   benefits?: string[] | null;
+  partner_benefits?: Array<{
+    id: string;
+    title: string;
+    max_apply_count: number | null;
+    display_order?: number | null;
+  }> | null;
   applies_to?: string[] | null;
   images?: string[] | null;
   tags?: string[] | null;
@@ -70,7 +77,7 @@ type PublicCacheVersionRow = {
 };
 
 const PARTNER_SELECT_COLUMNS =
-  "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
+  "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -218,6 +225,20 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
       row.benefit_action_link || row.reservation_link ? "external_link" : "none",
     ),
     benefitActionLink: row.benefit_action_link ?? undefined,
+    benefitItems: row.partner_benefits?.length
+      ? row.partner_benefits
+          .slice()
+          .sort((left, right) => (left.display_order ?? 0) - (right.display_order ?? 0))
+          .map((benefit) => ({
+            id: benefit.id,
+            title: benefit.title,
+            maxApplyCount: benefit.max_apply_count,
+            displayOrder: benefit.display_order ?? undefined,
+          }))
+      : normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
+          id: `legacy-benefit-${row.id}-${index + 1}`,
+          title,
+        }))),
     reservationLink: row.reservation_link ?? undefined,
     inquiryLink: row.inquiry_link ?? undefined,
     period: {

@@ -1,9 +1,11 @@
+import type { PartnerBenefit } from "@/lib/partner-benefit-items";
+
 export type PartnerBenefitUsageVerificationContext = {
   partnerId: string;
   location: string;
   periodStart: string | null;
   periodEnd: string | null;
-  benefits: string[];
+  benefitItems: PartnerBenefit[];
   pinHash: string | null;
   pinSalt: string | null;
 };
@@ -12,6 +14,7 @@ export type PartnerBenefitUsageRecord = {
   usageId: string;
   partnerId: string;
   memberId: string;
+  benefitId: string | null;
   benefitSnapshot: string;
   useCount: number;
   verifiedAt: string;
@@ -22,6 +25,7 @@ export type PartnerBenefitUsageRecord = {
 export type RecordPartnerBenefitUsageInput = {
   partnerId: string;
   memberId: string;
+  benefitId: string;
   benefit: string;
   useCount: number;
   idempotencyKey: string;
@@ -33,6 +37,7 @@ export type PartnerBenefitUsageHistoryItem = {
   memberId: string;
   memberDisplayName: string | null;
   memberMattermostUsername: string | null;
+  benefitId: string | null;
   benefitSnapshot: string;
   useCount: number;
   verifiedAt: string;

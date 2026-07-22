@@ -88,6 +88,9 @@ If build fails, STOP and fix before continuing.
 # TypeScript projects
 npx tsc --noEmit 2>&1 | head -30
 
+# Node 24 Public Readiness parity (ssartnership)
+npm run typecheck:ci
+
 # Python projects
 pyright . 2>&1 | head -30
 ```

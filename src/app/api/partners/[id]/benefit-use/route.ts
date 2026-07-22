@@ -10,6 +10,7 @@ import {
 } from "@/lib/partner-benefit-usage-service";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { isMockDataSource } from "@/lib/mock/member";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,7 @@ const UUID_PATTERN =
 const MAX_BODY_BYTES = 4 * 1024;
 
 type BenefitUseRequestBody = {
+  benefitId?: unknown;
   benefit?: unknown;
   pin?: unknown;
   idempotencyKey?: unknown;
@@ -31,6 +33,10 @@ function safeDecodeSegment(value: string) {
   } catch {
     return "";
   }
+}
+
+function isSafeMockPartnerId(value: string) {
+  return value.length <= 120 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(value);
 }
 
 function normalizeSessionId(value: unknown) {
@@ -51,6 +57,7 @@ function getStatusForCode(code: PartnerBenefitUsageErrorCode) {
     case "use_count_invalid":
     case "benefit_not_found":
     case "benefit_unavailable":
+    case "use_count_exceeded":
     case "idempotency_conflict":
       return 409;
   }
@@ -63,6 +70,7 @@ type PartnerBenefitUsageErrorCode =
   | "pin_not_configured"
   | "pin_invalid"
   | "use_count_invalid"
+  | "use_count_exceeded"
   | "idempotency_conflict";
 
 function getMessageForCode(code: PartnerBenefitUsageErrorCode) {
@@ -78,7 +86,9 @@ function getMessageForCode(code: PartnerBenefitUsageErrorCode) {
     case "pin_invalid":
       return "제휴처 확인 PIN이 올바르지 않습니다.";
     case "use_count_invalid":
-      return "혜택 횟수는 1~99회로 입력해 주세요.";
+      return "혜택 횟수는 1회 이상의 정수로 입력해 주세요.";
+    case "use_count_exceeded":
+      return "설정된 제휴 혜택 최대 횟수를 초과했습니다.";
     case "idempotency_conflict":
       return "이미 처리된 이용 확인 요청입니다. 화면을 새로고침해 주세요.";
   }
@@ -142,7 +152,7 @@ export async function POST(
   }
 
   const partnerId = safeDecodeSegment((await params).id ?? "");
-  if (!UUID_PATTERN.test(partnerId)) {
+  if (!UUID_PATTERN.test(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {
     return NextResponse.json({ ok: false, message: "제휴처 정보를 확인할 수 없습니다." }, { status: 400 });
   }
 
@@ -175,7 +185,9 @@ export async function POST(
     );
   }
 
-  if (typeof body.benefit !== "string" || body.benefit.trim().length === 0 || body.benefit.length > 500) {
+  const benefitId = typeof body.benefitId === "string" ? body.benefitId.trim() : "";
+  const benefit = typeof body.benefit === "string" ? body.benefit.trim() : "";
+  if ((!benefitId && !benefit) || benefit.length > 500 || benefitId.length > 200) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
@@ -206,7 +218,7 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "요청 식별자를 확인해 주세요." }, { status: 400 });
   }
   const useCountValue = typeof body.useCount === "number" ? body.useCount : Number.NaN;
-  if (!Number.isInteger(useCountValue) || useCountValue < 1 || useCountValue > 99) {
+  if (!Number.isSafeInteger(useCountValue) || useCountValue < 1) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
@@ -214,14 +226,21 @@ export async function POST(
       result: "failure",
       reasonCode: "use_count_invalid",
     });
-    return NextResponse.json({ ok: false, message: "혜택 횟수는 1~99회로 입력해 주세요." }, { status: 400 });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "혜택 횟수는 1회 이상의 정수로 입력해 주세요.",
+      },
+      { status: 400 },
+    );
   }
 
   try {
     const result = await recordPartnerBenefitUsage({
       partnerId,
       memberId: session.userId,
-      benefit: body.benefit,
+      benefitId: benefitId || undefined,
+      benefit,
       useCount: useCountValue,
       pin: body.pin,
       idempotencyKey: body.idempotencyKey,

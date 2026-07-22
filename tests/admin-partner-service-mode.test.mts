@@ -11,9 +11,15 @@ const parserModulePromise = import(
 function createPartnerFormData({
   serviceMode,
   location,
+  benefitActionType = "none",
+  benefitUseMaxCount,
+  benefitItems,
 }: {
   serviceMode?: string;
   location?: string;
+  benefitActionType?: string;
+  benefitUseMaxCount?: string;
+  benefitItems?: string;
 }) {
   const formData = new FormData();
   formData.set("name", "테스트 제휴처");
@@ -26,7 +32,13 @@ function createPartnerFormData({
   }
   formData.set("campusSlugs", "seoul");
   formData.set("appliesTo", "student");
-  formData.set("benefitActionType", "none");
+  formData.set("benefitActionType", benefitActionType);
+  if (benefitUseMaxCount !== undefined) {
+    formData.set("benefitUseMaxCount", benefitUseMaxCount);
+  }
+  if (benefitItems !== undefined) {
+    formData.set("benefitItems", benefitItems);
+  }
   formData.set("visibility", "public");
   formData.set("benefitVisibility", "public");
   return formData;
@@ -72,5 +84,36 @@ test("admin partner parser rejects an invalid service mode at the server boundar
         }),
       ),
     { message: "partner_form_invalid_service_mode" },
+  );
+});
+
+test("admin partner parser persists per-benefit maxima and rejects invalid values", async () => {
+  const { parsePartnerPayload } = await parserModulePromise;
+
+  const payload = parsePartnerPayload(
+    createPartnerFormData({
+      serviceMode: "offline",
+      location: "서울 강남구 테헤란로 212",
+      benefitActionType: "certification",
+      benefitItems: JSON.stringify([
+        { id: "benefit-1", title: "헬스 1개월권", maxApplyCount: "12" },
+      ]),
+    }),
+  );
+  assert.equal(payload.benefitItems[0]?.maxApplyCount, 12);
+
+  assert.throws(
+    () =>
+      parsePartnerPayload(
+        createPartnerFormData({
+          serviceMode: "offline",
+          location: "서울 강남구 테헤란로 212",
+          benefitActionType: "certification",
+          benefitItems: JSON.stringify([
+            { id: "benefit-1", title: "헬스 1개월권", maxApplyCount: "0" },
+          ]),
+        }),
+      ),
+    { message: "partner_benefit_invalid_max_apply_count" },
   );
 });

@@ -5,16 +5,23 @@ import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import PartnerBenefitVerificationView from "@/components/partner/PartnerBenefitVerificationView";
 import { getHeaderSession } from "@/lib/header-session";
-import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
+import {
+  getMemberCanonicalProfile,
+  getMemberProfileImageUrl,
+} from "@/lib/member-profile-view";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import {
   isPartnerBenefitUseAvailable,
-  normalizePartnerBenefitSelection,
   normalizePartnerBenefitUseCount,
 } from "@/lib/partner-benefit-usage";
+import {
+  findPartnerBenefitById,
+  getEffectivePartnerBenefitMaxApplyCount,
+  normalizePartnerBenefitItems,
+} from "@/lib/partner-benefit-items";
 import {
   partnerBenefitUsageRepository,
   partnerRepository,
@@ -38,11 +45,11 @@ function getPartnerPath(partnerId: string, returnTo: string) {
 
 function getBenefitUsePath(
   partnerId: string,
-  benefit: string,
+  benefitId: string,
   useCount: number,
   returnTo: string,
 ) {
-  const params = new URLSearchParams({ benefit, useCount: String(useCount), returnTo });
+  const params = new URLSearchParams({ benefitId, useCount: String(useCount), returnTo });
   return `/partners/${encodeURIComponent(partnerId)}/benefit-use?${params}`;
 }
 
@@ -53,6 +60,7 @@ export default async function PartnerBenefitUsePage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{
     benefit?: string | string[];
+    benefitId?: string | string[];
     useCount?: string | string[];
     returnTo?: string | string[];
   }>;
@@ -69,14 +77,17 @@ export default async function PartnerBenefitUsePage({
   const benefit = Array.isArray(resolvedSearchParams.benefit)
     ? resolvedSearchParams.benefit[0]
     : resolvedSearchParams.benefit;
+  const rawBenefitId = Array.isArray(resolvedSearchParams.benefitId)
+    ? resolvedSearchParams.benefitId[0]
+    : resolvedSearchParams.benefitId;
   const rawUseCount = Array.isArray(resolvedSearchParams.useCount)
     ? resolvedSearchParams.useCount[0]
     : resolvedSearchParams.useCount;
-  const useCount = normalizePartnerBenefitUseCount(rawUseCount);
+  const requestedUseCount = normalizePartnerBenefitUseCount(rawUseCount);
 
   if (!session?.userId) {
     const requestedPath = benefit
-      ? getBenefitUsePath(partnerId, benefit, useCount ?? 1, returnTo)
+      ? getBenefitUsePath(partnerId, rawBenefitId ?? benefit ?? "", requestedUseCount ?? 1, returnTo)
       : detailPath;
     redirect(`/auth/login?returnTo=${encodeURIComponent(requestedPath)}`);
   }
@@ -98,7 +109,20 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
-  const selectedBenefit = normalizePartnerBenefitSelection(partner.benefits, benefit);
+  const benefitItems = partner.benefitItems?.length
+    ? partner.benefitItems
+    : normalizePartnerBenefitItems(partner.benefits.map((title, index) => ({
+        id: `legacy-benefit-${partner.id}-${index + 1}`,
+        title,
+      })));
+  const selectedBenefit = findPartnerBenefitById(benefitItems, rawBenefitId) ??
+    benefitItems.find((item) => item.title === benefit) ?? null;
+  const useCount = normalizePartnerBenefitUseCount(
+    rawUseCount,
+    selectedBenefit
+      ? getEffectivePartnerBenefitMaxApplyCount(selectedBenefit.maxApplyCount)
+      : 1,
+  );
   if (!selectedBenefit || useCount === null) {
     redirect(detailPath);
   }
@@ -113,7 +137,7 @@ export default async function PartnerBenefitUsePage({
   if (!member) {
     redirect(
       `/auth/login?returnTo=${encodeURIComponent(
-        getBenefitUsePath(partnerId, selectedBenefit, useCount, returnTo),
+        getBenefitUsePath(partnerId, selectedBenefit.id, useCount, returnTo),
       )}`,
     );
   }
@@ -124,7 +148,7 @@ export default async function PartnerBenefitUsePage({
     member.activeProfileImageId &&
     member.profilePhotoReviewStatus === "approved" &&
     !member.mustChangePassword
-      ? "/api/certification/profile-image"
+      ? getMemberProfileImageUrl(member.id)
       : null;
 
   return (
@@ -147,7 +171,8 @@ export default async function PartnerBenefitUsePage({
             <PartnerBenefitVerificationView
               partnerId={partner.id}
               partnerName={partner.name}
-              benefit={selectedBenefit}
+              benefitId={selectedBenefit.id}
+              benefit={selectedBenefit.title}
               useCount={useCount}
               member={{
                 mattermostUsername: member.mattermostUsername,

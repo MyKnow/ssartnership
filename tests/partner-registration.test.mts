@@ -66,6 +66,46 @@ test("partner registration validation requires online site and contact email", a
   assert.equal(result.fieldErrors.contactEmail, "이메일 형식을 확인해 주세요.");
 });
 
+test("partner registration normalizes a benefit maximum and defaults blank to one", async () => {
+  const { validatePartnerRegistrationInput, hasPartnerRegistrationFieldErrors } =
+    await modulePromise;
+
+  const limited = validatePartnerRegistrationInput({
+    serviceMode: "offline",
+    benefitActionType: "certification",
+    benefitItems: JSON.stringify([
+      { id: "benefit-1", title: "필라테스 1개월 이용", maxApplyCount: "12" },
+    ]),
+    brandName: "필라테스 싸피",
+    categoryLabel: "운동",
+    location: "서울 강남구 테헤란로 212",
+    benefits: "필라테스 1개월 이용",
+    conditions: "싸트너십 인증",
+    companyName: "필라테스 싸피",
+    contactName: "김싸피",
+    contactEmail: "partner@pilates.example",
+  });
+  assert.equal(hasPartnerRegistrationFieldErrors(limited.fieldErrors), false);
+  assert.equal(limited.values.parsedBenefitItems[0]?.maxApplyCount, 12);
+
+  const unlimited = validatePartnerRegistrationInput({
+    serviceMode: "offline",
+    benefitActionType: "certification",
+    benefitItems: JSON.stringify([
+      { id: "benefit-1", title: "필라테스 1개월 이용", maxApplyCount: "" },
+    ]),
+    brandName: "필라테스 싸피",
+    categoryLabel: "운동",
+    location: "서울 강남구 테헤란로 212",
+    benefits: "필라테스 1개월 이용",
+    conditions: "싸트너십 인증",
+    companyName: "필라테스 싸피",
+    contactName: "김싸피",
+    contactEmail: "partner@pilates.example",
+  });
+  assert.equal(unlimited.values.parsedBenefitItems[0]?.maxApplyCount, null);
+});
+
 test("partner registration validation accepts coupon-only brand defaults", async () => {
   const { validatePartnerRegistrationInput, hasPartnerRegistrationFieldErrors } =
     await modulePromise;

@@ -294,7 +294,6 @@ export default function PartnerCardForm({
             message: partnerFormErrorMessages.partner_form_invalid_benefit_verification_pin,
           }
         : null;
-
     if (
       campusSlugSelection.ok &&
       !benefitActionError &&
@@ -390,7 +389,7 @@ export default function PartnerCardForm({
     }
     event.currentTarget
       .querySelector<HTMLElement>(
-        `[name="${benefitActionError?.field ?? detailDescriptionError?.field ?? benefitVerificationPinError?.field}"]`,
+        `[name="${benefitActionError?.field ?? detailDescriptionError?.field ?? benefitVerificationPinError?.field ?? "benefitItems"}"]`,
       )
       ?.focus();
   };

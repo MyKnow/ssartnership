@@ -6,6 +6,7 @@ import type {
 import type { PartnerVisibility } from "../../types.ts";
 import type { PartnerBenefitActionType } from "../../partner-benefit-action.ts";
 import type { PartnerCompanyPlanTier } from "../../partner-company-plans.ts";
+import type { PartnerBenefit } from "../../partner-benefit-items.ts";
 
 export type MockChangeRequestServiceRecord = {
   companyId: string;
@@ -28,6 +29,7 @@ export type MockChangeRequestServiceRecord = {
   mapUrl: string | null;
   benefitActionType: PartnerBenefitActionType;
   benefitActionLink: string | null;
+  benefitItems?: PartnerBenefit[];
   reservationLink: string | null;
   inquiryLink: string | null;
   currentConditions: string[];
@@ -82,6 +84,10 @@ export const seededServices: MockChangeRequestServiceRecord[] = [
     mapUrl: "https://map.naver.com/",
     benefitActionType: "external_link",
     benefitActionLink: "https://booking.naver.com/",
+    benefitItems: [
+      { id: "mock-cafe-benefit-1", title: "아메리카노 20% 할인", maxApplyCount: null },
+      { id: "mock-cafe-benefit-2", title: "디저트 세트 1,500원 할인", maxApplyCount: null },
+    ],
     reservationLink: "https://booking.naver.com/",
     inquiryLink: "02-555-8123",
     currentConditions: ["SSAFY 구성원 인증", "매장 주문 시 적용"],

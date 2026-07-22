@@ -12,7 +12,12 @@ type VerificationRow = {
   location: string | null;
   period_start: string | null;
   period_end: string | null;
-  benefits: string[] | null;
+  partner_benefits?: Array<{
+    id: string;
+    title: string;
+    max_apply_count: number | null;
+    display_order?: number | null;
+  }> | null;
   benefit_verification_pin_hash: string | null;
   benefit_verification_pin_salt: string | null;
 };
@@ -21,6 +26,7 @@ type UsageRow = {
   usage_id: string;
   partner_id: string;
   member_id: string;
+  benefit_id: string | null;
   benefit_snapshot: string;
   use_count: number;
   verified_at: string;
@@ -34,9 +40,12 @@ function toVerificationContext(row: VerificationRow): PartnerBenefitUsageVerific
     location: row.location ?? "",
     periodStart: row.period_start,
     periodEnd: row.period_end,
-    benefits: (row.benefits ?? []).filter(
-      (benefit): benefit is string => typeof benefit === "string" && benefit.trim().length > 0,
-    ),
+    benefitItems: (row.partner_benefits ?? []).map((benefit) => ({
+      id: benefit.id,
+      title: benefit.title,
+      maxApplyCount: benefit.max_apply_count,
+      displayOrder: benefit.display_order ?? undefined,
+    })),
     pinHash: row.benefit_verification_pin_hash,
     pinSalt: row.benefit_verification_pin_salt,
   };
@@ -47,6 +56,7 @@ function toUsageRecord(row: UsageRow): PartnerBenefitUsageRecord {
     usageId: row.usage_id,
     partnerId: row.partner_id,
     memberId: row.member_id,
+    benefitId: row.benefit_id,
     benefitSnapshot: row.benefit_snapshot,
     useCount: row.use_count,
     verifiedAt: row.verified_at,
@@ -62,7 +72,7 @@ export class SupabasePartnerBenefitUsageRepository
     const { data, error } = await getSupabaseAdminClient()
       .from("partners")
       .select(
-        "id,location,period_start,period_end,benefits,benefit_verification_pin_hash,benefit_verification_pin_salt",
+        "id,location,period_start,period_end,partner_benefits(id,title,max_apply_count,display_order),benefit_verification_pin_hash,benefit_verification_pin_salt",
       )
       .eq("id", partnerId)
       .maybeSingle();
@@ -81,7 +91,7 @@ export class SupabasePartnerBenefitUsageRepository
       {
         p_partner_id: input.partnerId,
         p_member_id: input.memberId,
-        p_benefit: input.benefit,
+        p_benefit_id: input.benefitId,
         p_use_count: input.useCount,
         p_idempotency_key: input.idempotencyKey,
         p_metadata: input.metadata ?? {},
@@ -107,7 +117,7 @@ export class SupabasePartnerBenefitUsageRepository
     const start = Math.max(0, (input.page - 1) * input.pageSize);
     let query = getSupabaseAdminClient()
       .from("partner_benefit_usages")
-      .select("id,member_id,benefit_snapshot,use_count,verified_at", { count: "exact" })
+      .select("id,member_id,benefit_id,benefit_snapshot,use_count,verified_at", { count: "exact" })
       .eq("partner_id", input.partnerId)
       .order("verified_at", { ascending: false })
       .range(start, start + input.pageSize - 1);
@@ -121,6 +131,7 @@ export class SupabasePartnerBenefitUsageRepository
     const rows = (data ?? []) as Array<{
       id: string;
       member_id: string;
+      benefit_id: string | null;
       benefit_snapshot: string;
       use_count: number;
       verified_at: string;
@@ -155,6 +166,7 @@ export class SupabasePartnerBenefitUsageRepository
       items: rows.map((row) => ({
         usageId: row.id,
         memberId: row.member_id,
+        benefitId: row.benefit_id,
         memberDisplayName: memberById.get(row.member_id)?.displayName ?? null,
         memberMattermostUsername: memberById.get(row.member_id)?.username ?? null,
         benefitSnapshot: row.benefit_snapshot,
