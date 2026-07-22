@@ -33,7 +33,11 @@ alter table public.partner_registration_requests
 -- 기존 문자열 혜택을 새 원장으로 옮기고, 가능한 사용 이력에는 혜택 ID를 연결한다.
 insert into public.partner_benefits (partner_id, title, display_order, max_apply_count)
 select p.id, item.title, item.display_order,
-  case when p.benefit_use_max_count is null then null else p.benefit_use_max_count end
+  case
+    when to_jsonb(p) ? 'benefit_use_max_count'
+      then nullif(to_jsonb(p)->>'benefit_use_max_count', '')::integer
+    else null
+  end
 from public.partners p
 cross join lateral unnest(coalesce(p.benefits, '{}'::text[])) with ordinality as item(title, display_order)
 where not exists (
@@ -261,3 +265,13 @@ alter table public.partners drop column if exists benefit_use_max_count;
 alter table public.partner_registration_requests drop constraint if exists partner_registration_requests_benefit_use_max_count_check;
 alter table public.partner_registration_requests drop constraint if exists partner_registration_requests_benefit_use_max_count_action_check;
 alter table public.partner_registration_requests drop column if exists benefit_use_max_count;
+
+drop function if exists public.update_partner_immediate_fields_with_audit(
+  uuid, uuid[], text, text[], text[], text, text, integer, text, text,
+  text, text, text, text, text, text, jsonb
+);
+
+drop function if exists public.update_partner_immediate_fields_with_audit(
+  uuid, uuid[], text, text[], text[], text, text, text, text,
+  text, text, text, text, text, text, jsonb
+);
