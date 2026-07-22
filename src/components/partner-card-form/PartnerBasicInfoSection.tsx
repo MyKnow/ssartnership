@@ -57,7 +57,6 @@ export default function PartnerBasicInfoSection({
     benefitActionTypeValue: PartnerBenefitActionType;
     benefitActionLinkValue: string;
     benefitVerificationPinValue: string;
-    benefitUseMaxCountValue: string;
     reservationLinkValue: string;
     inquiryLinkValue: string;
   };
@@ -75,7 +74,6 @@ export default function PartnerBasicInfoSection({
     setBenefitActionTypeValue: (value: PartnerBenefitActionType) => void;
     setBenefitActionLinkValue: (value: string) => void;
     setBenefitVerificationPinValue: (value: string) => void;
-    setBenefitUseMaxCountValue: (value: string) => void;
     setReservationLinkValue: (value: string) => void;
     setInquiryLinkValue: (value: string) => void;
   };
@@ -264,9 +262,6 @@ export default function PartnerBasicInfoSection({
                   setters.setBenefitActionLinkValue("");
                   setters.setReservationLinkValue("");
                 }
-                if (nextType !== "certification") {
-                  setters.setBenefitUseMaxCountValue("");
-                }
               }}
               autoFocus={focusField === "benefitActionType"}
               aria-invalid={Boolean(fieldErrors?.benefitActionType) || undefined}
@@ -307,31 +302,6 @@ export default function PartnerBasicInfoSection({
             </p>
           </FieldGroup>
         ) : null}
-
-        <FieldGroup label="제휴 적용 최대 횟수" error={fieldErrors?.benefitUseMaxCount}>
-          <Input
-            name="benefitUseMaxCount"
-            type="number"
-            min={1}
-            inputMode="numeric"
-            value={values.benefitUseMaxCountValue}
-            onChange={(event) =>
-              setters.setBenefitUseMaxCountValue(event.target.value.replace(/\D/g, ""))
-            }
-            autoFocus={focusField === "benefitUseMaxCount"}
-            aria-invalid={Boolean(fieldErrors?.benefitUseMaxCount) || undefined}
-            className={getPartnerCardInvalidClass(Boolean(fieldErrors?.benefitUseMaxCount))}
-            disabled={values.benefitActionTypeValue !== "certification"}
-            placeholder={
-              values.benefitActionTypeValue === "certification"
-                ? "제한 없음"
-                : "인증 방식에서만 설정합니다."
-            }
-          />
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            싸트너십 인증으로 이용할 때만 적용됩니다. 비워 두면 횟수 제한 없이 이용할 수 있습니다.
-          </p>
-        </FieldGroup>
 
         <FieldGroup
           label="혜택 이용 링크"

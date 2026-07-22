@@ -20,9 +20,9 @@ test("partner registration reaches a review-ready submit through all five steps"
   await page.getByRole("button", { name: "다음 단계" }).click();
 
   await expect(currentStep).toContainText("3");
-  const benefitInput = page.getByPlaceholder("예: 아메리카노 10% 할인");
+  await page.getByRole("button", { name: "+ 혜택 추가" }).click();
+  const benefitInput = page.getByPlaceholder("예: 헬스장 1개월 이용권");
   await benefitInput.fill("아메리카노 10% 할인");
-  await benefitInput.press("Enter");
   const conditionInput = page.getByPlaceholder("예: 싸트너십 인증");
   await conditionInput.fill("내 인증 화면 제시");
   await conditionInput.press("Enter");

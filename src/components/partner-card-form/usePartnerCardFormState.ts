@@ -43,8 +43,6 @@ export function createPartnerCardFormState(
     benefitActionTypeValue: resolvePartnerBenefitActionType(partner),
     benefitActionLinkValue: partner.benefitActionLink ?? partner.reservationLink ?? "",
     benefitVerificationPinValue: "",
-    benefitUseMaxCountValue:
-      partner.benefitUseMaxCount == null ? "" : String(partner.benefitUseMaxCount),
     reservationLinkValue: partner.reservationLink ?? "",
     inquiryLinkValue: partner.inquiryLink ?? "",
     companyNameValue: partner.company?.name ?? "",
@@ -94,9 +92,6 @@ export default function usePartnerCardFormState({
   );
   const [benefitVerificationPinValue, setBenefitVerificationPinValue] = useState(
     defaults.benefitVerificationPinValue,
-  );
-  const [benefitUseMaxCountValue, setBenefitUseMaxCountValue] = useState(
-    defaults.benefitUseMaxCountValue,
   );
   const [reservationLinkValue, setReservationLinkValue] = useState(
     defaults.reservationLinkValue,
@@ -166,8 +161,6 @@ export default function usePartnerCardFormState({
     setBenefitActionLinkValue,
     benefitVerificationPinValue,
     setBenefitVerificationPinValue,
-    benefitUseMaxCountValue,
-    setBenefitUseMaxCountValue,
     reservationLinkValue,
     setReservationLinkValue,
     inquiryLinkValue,

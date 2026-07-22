@@ -7,6 +7,7 @@ import Input from "@/components/ui/Input";
 import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
 import Select from "@/components/ui/Select";
 import TokenChipField from "@/components/admin/TokenChipField";
+import PartnerBenefitItemsField from "@/components/partner-card-form/PartnerBenefitItemsField";
 import {
   PartnerGalleryField,
   PartnerThumbnailField,
@@ -33,9 +34,6 @@ export function ImmediateChangeForm({
   const allowUploadedFormSubmitRef = useRef(false);
   const isSubmittingImagesRef = useRef(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
-  const [benefitActionType, setBenefitActionType] = useState(
-    context.benefitActionType,
-  );
   const { saveDraft } = useImageUploadFormDraft({
     formKey: `partner-change-request-${context.partnerId}`,
     formRef,
@@ -116,11 +114,6 @@ export function ImmediateChangeForm({
               <Select
                 name="benefitActionType"
                 defaultValue={context.benefitActionType}
-                onChange={(event) =>
-                  setBenefitActionType(
-                    event.target.value as typeof context.benefitActionType,
-                  )
-                }
               >
                 <option value="external_link">외부 링크로 이용</option>
                 <option value="certification">싸트너십 인증으로 이용</option>
@@ -138,20 +131,14 @@ export function ImmediateChangeForm({
                 placeholder="혜택 이용 링크 또는 연락처"
               />
             </FieldGroup>
-            <FieldGroup
-              label="제휴 적용 최대 횟수"
-              note="싸트너십 인증 방식에서만 적용됩니다. 비워 두면 횟수 제한이 없습니다."
-            >
-              <Input
-                name="benefitUseMaxCount"
-                type="number"
-                min={1}
-                inputMode="numeric"
-                defaultValue={context.benefitUseMaxCount ?? ""}
-                placeholder="제한 없음"
-                disabled={benefitActionType !== "certification"}
-              />
-            </FieldGroup>
+            <div className="sm:col-span-2">
+              <FieldGroup
+                label="혜택별 최대 적용 횟수"
+                note="각 혜택을 한 번에 적용할 횟수입니다. 미입력 시 1회로 적용됩니다."
+              >
+                <PartnerBenefitItemsField initialItems={context.benefitItems} />
+              </FieldGroup>
+            </div>
             <FieldGroup
               label="문의 링크"
               note="혜택 이용 링크와 같은 형식으로 입력할 수 있습니다."

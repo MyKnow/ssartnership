@@ -4,6 +4,7 @@ import { normalizePartnerCompanyPlanTier } from "../partner-company-plans.ts";
 import { resolvePartnerCampusSlugs } from "../campuses.ts";
 import { sanitizePartnerLinkValue } from "../validation.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
+import { normalizePartnerBenefitItems } from "../partner-benefit-items.ts";
 import {
   extractCategoryColor,
   extractCategoryLabel,
@@ -41,7 +42,7 @@ export async function getSupabaseRequestContext(
   const { data: partner, error } = await supabase
     .from("partners")
     .select(
-      "id,company_id,created_at,name,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,benefit_use_max_count,reservation_link,inquiry_link,period_start,period_end,plan_tier,conditions,benefits,applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
+      "id,company_id,created_at,name,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,plan_tier,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,categories(key,label,color),company:partner_companies(id,name,slug)",
     )
     .eq("id", partnerId)
     .maybeSingle();
@@ -97,7 +98,17 @@ export async function getSupabaseRequestContext(
     benefitActionLink: sanitizePartnerLinkValue(
       row.benefit_action_link ?? row.reservation_link ?? undefined,
     ),
-    benefitUseMaxCount: row.benefit_use_max_count ?? null,
+    benefitItems: row.partner_benefits?.length
+      ? row.partner_benefits.map((benefit) => ({
+          id: benefit.id,
+          title: benefit.title,
+          maxApplyCount: benefit.max_apply_count,
+          displayOrder: benefit.display_order ?? undefined,
+        }))
+      : normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
+          id: `legacy-benefit-${row.id}-${index + 1}`,
+          title,
+        }))),
     reservationLink: sanitizePartnerLinkValue(row.reservation_link ?? undefined),
     inquiryLink: sanitizePartnerLinkValue(row.inquiry_link ?? undefined),
     currentConditions: normalizeTextList(row.conditions),

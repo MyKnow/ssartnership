@@ -19,6 +19,7 @@ const UUID_PATTERN =
 const MAX_BODY_BYTES = 4 * 1024;
 
 type BenefitUseRequestBody = {
+  benefitId?: unknown;
   benefit?: unknown;
   pin?: unknown;
   idempotencyKey?: unknown;
@@ -56,6 +57,7 @@ function getStatusForCode(code: PartnerBenefitUsageErrorCode) {
     case "use_count_invalid":
     case "benefit_not_found":
     case "benefit_unavailable":
+    case "use_count_exceeded":
     case "idempotency_conflict":
       return 409;
   }
@@ -183,7 +185,9 @@ export async function POST(
     );
   }
 
-  if (typeof body.benefit !== "string" || body.benefit.trim().length === 0 || body.benefit.length > 500) {
+  const benefitId = typeof body.benefitId === "string" ? body.benefitId.trim() : "";
+  const benefit = typeof body.benefit === "string" ? body.benefit.trim() : "";
+  if ((!benefitId && !benefit) || benefit.length > 500 || benefitId.length > 200) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
@@ -235,7 +239,8 @@ export async function POST(
     const result = await recordPartnerBenefitUsage({
       partnerId,
       memberId: session.userId,
-      benefit: body.benefit,
+      benefitId: benefitId || undefined,
+      benefit,
       useCount: useCountValue,
       pin: body.pin,
       idempotencyKey: body.idempotencyKey,

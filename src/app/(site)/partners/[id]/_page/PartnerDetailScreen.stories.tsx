@@ -44,7 +44,11 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
   const certificationBenefitAction = {
     partnerId: value.id,
     partnerName: value.name,
-    benefits: value.benefits,
+    benefitItems: value.benefits.map((title, index) => ({
+      id: `story-benefit-${index + 1}`,
+      title,
+      maxApplyCount: null,
+    })),
     returnTo: `/partners/${value.id}`,
   };
 

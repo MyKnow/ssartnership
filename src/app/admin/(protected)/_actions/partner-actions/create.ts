@@ -306,7 +306,6 @@ async function createPartnerRecord(
       map_url: payload.mapUrl,
       benefit_action_type: payload.benefitActionType,
       benefit_action_link: payload.benefitActionLink,
-      benefit_use_max_count: payload.benefitUseMaxCount,
       benefit_verification_pin_hash: benefitVerificationPinHash?.hash ?? null,
       benefit_verification_pin_salt: benefitVerificationPinHash?.salt ?? null,
       reservation_link: payload.reservationLink,
@@ -339,6 +338,20 @@ async function createPartnerRecord(
       throw new Error(error.message);
     } else {
       createdPartner = true;
+    }
+
+    if (createdPartner && payload.benefitItems.length > 0) {
+      const { error: benefitError } = await supabase.from("partner_benefits").insert(
+        payload.benefitItems.map((benefit, displayOrder) => ({
+          partner_id: partnerId,
+          title: benefit.title,
+          max_apply_count: benefit.maxApplyCount ?? null,
+          display_order: displayOrder,
+        })),
+      );
+      if (benefitError) {
+        throw new Error(benefitError.message);
+      }
     }
 
     await persistAdminPartnerBranchLinks({

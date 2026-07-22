@@ -3,6 +3,7 @@ import type { PartnerBenefitVisibility } from "../../../../lib/partner-benefit-v
 import type { PartnerBenefitActionType } from "../../../../lib/partner-benefit-action.ts";
 import type { PartnerServiceMode } from "../../../../lib/partner-service-mode.ts";
 import type { PartnerVisibility } from "../../../../lib/types.ts";
+import type { PartnerBenefitDraft } from "../../../../lib/partner-benefit-items.ts";
 
 export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getSupabaseAdminClient>;
 
@@ -17,7 +18,7 @@ export type PartnerCoreInput = {
   benefitActionType: PartnerBenefitActionType;
   benefitActionLink: string | null;
   benefitVerificationPin: string | null;
-  benefitUseMaxCount: number | null;
+  benefitItems: PartnerBenefitDraft[];
   reservationLink: string | null;
   inquiryLink: string | null;
   periodStart: string | null;
