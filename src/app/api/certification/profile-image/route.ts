@@ -2,13 +2,19 @@ import { NextResponse } from "next/server";
 import { downloadPrivateMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getActiveMemberProfileImage } from "@/lib/member-profile-images";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { getMockMemberProfileImageUrl, isMockDataSource } from "@/lib/mock/member";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSignedUserSession();
   if (!session?.userId) {
     return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  }
+  if (isMockDataSource()) {
+    return NextResponse.redirect(
+      new URL(getMockMemberProfileImageUrl(), request.url),
+    );
   }
   const image = await getActiveMemberProfileImage(session.userId, {
     requirePasswordSetup: true,

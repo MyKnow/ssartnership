@@ -117,6 +117,9 @@ export const Default: Story = {
     const chipGroup = canvasElement.querySelector<HTMLElement>(
       "[data-certification-card-chip-group]",
     );
+    const identityHeader = canvasElement.querySelector<HTMLElement>(
+      ".certification-card-identity-header",
+    );
     const cardTitle = canvasElement.querySelector<HTMLElement>(
       "[data-certification-card-title]",
     );
@@ -144,11 +147,16 @@ export const Default: Story = {
     await expect(certificationCard).not.toHaveClass("max-w-2xl");
     await expect(chipGroup).not.toBeNull();
     await expect(chipGroup).toHaveClass("gap-[clamp(0.125rem,1.6cqw,1.6rem)]");
+    await expect(identityHeader).not.toBeNull();
     await expect(cardTitle).not.toBeNull();
     await expect(cardTitle).toHaveClass("space-y-[clamp(0.25rem,1.8cqw,1.8rem)]");
     await expect(chipGroup).toHaveTextContent("15기");
     await expect(chipGroup).toHaveTextContent("서울");
     await expect(chipGroup).toHaveTextContent("교육생");
+    await expect(chipGroup!.getBoundingClientRect().top).toBeCloseTo(
+      identityHeader!.getBoundingClientRect().top,
+      0,
+    );
     for (const chip of chipBadges) {
       await expect(chip).toHaveClass("!text-[clamp(0.6rem,2.4cqw,1.5rem)]");
     }

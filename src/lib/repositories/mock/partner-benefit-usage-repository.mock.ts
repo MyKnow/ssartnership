@@ -6,6 +6,25 @@ import type {
   RecordPartnerBenefitUsageInput,
 } from "@/lib/repositories/partner-benefit-usage-repository";
 
+const CAFE_SSAFY_PIN_HASH =
+  "QhpQoVp+QUjkiLHzWV447DLxUcOIgxFS6+Y4yC1boAA=";
+const CAFE_SSAFY_PIN_SALT = "Y2FmZS1zc2FmeS1waW4tMA==";
+
+export const MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS: PartnerBenefitUsageVerificationContext[] = [
+  {
+    partnerId: "cafe-ssafy-001",
+    location: "서울 강남구 테헤란로 212, 1층",
+    periodStart: "2026-01-01",
+    periodEnd: "2099-12-31",
+    benefits: [
+      "아메리카노·콜드브루 1,000원 할인",
+      "SSAFY 세트(음료+디저트) 2,000원 할인",
+    ],
+    pinHash: CAFE_SSAFY_PIN_HASH,
+    pinSalt: CAFE_SSAFY_PIN_SALT,
+  },
+];
+
 export class MockPartnerBenefitUsageRepository implements PartnerBenefitUsageRepository {
   private readonly contexts = new Map<string, PartnerBenefitUsageVerificationContext>();
   private readonly usages = new Map<string, PartnerBenefitUsageRecord>();

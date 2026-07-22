@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCertificationQrToken } from "@/lib/certification-qr";
 import { downloadPrivateMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getActiveMemberProfileImage } from "@/lib/member-profile-images";
+import { getMockMemberProfileImageUrl, isMockDataSource } from "@/lib/mock/member";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,12 @@ export async function GET(
     return NextResponse.json(
       { message: "유효하지 않은 QR입니다." },
       { status: verification.reason === "expired" ? 410 : 404 },
+    );
+  }
+
+  if (isMockDataSource()) {
+    return NextResponse.redirect(
+      new URL(getMockMemberProfileImageUrl(), _request.url),
     );
   }
 

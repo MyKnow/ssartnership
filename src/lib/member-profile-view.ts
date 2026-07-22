@@ -1,5 +1,10 @@
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  getMockMemberById,
+  getMockMemberProfileImageUrl,
+  isMockDataSource,
+} from "@/lib/mock/member";
 
 type MemberCanonicalRow = {
   id: string;
@@ -50,6 +55,34 @@ export type MemberCanonicalProfile = {
 export async function getMemberCanonicalProfile(
   memberId: string,
 ): Promise<MemberCanonicalProfile | null> {
+  if (isMockDataSource()) {
+    const member = getMockMemberById(memberId);
+    if (!member) {
+      return null;
+    }
+    const photoState = await getMemberProfilePhotoState(member.id);
+    return {
+      id: member.id,
+      displayName: member.displayName,
+      generation: member.generation,
+      campus: member.campus,
+      mustChangePassword: member.mustChangePassword,
+      createdAt: null,
+      updatedAt: null,
+      mattermostAccountId: member.mattermostAccountId,
+      mattermostUserId: member.mattermostUserId,
+      mattermostUsername: member.mattermostUsername,
+      manualLoginId: null,
+      email: null,
+      emailVerifiedAt: null,
+      mattermostLoginDisabledAt: null,
+      mattermostLoginDisabledReason: null,
+      activeProfileImageId: photoState.activeProfileImageId,
+      profilePhotoReviewStatus: photoState.reviewStatus,
+      graduateVerifiedAt: member.graduateVerifiedAt,
+    };
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data: memberData, error: memberError } = await supabase
     .from("members")
@@ -112,4 +145,10 @@ export async function getMemberCanonicalProfile(
     profilePhotoReviewStatus: photoState.reviewStatus,
     graduateVerifiedAt: graduateProfile?.verified_at ?? null,
   };
+}
+
+export function getMemberProfileImageUrl(memberId: string) {
+  return isMockDataSource() && getMockMemberById(memberId)
+    ? getMockMemberProfileImageUrl()
+    : "/api/certification/profile-image";
 }

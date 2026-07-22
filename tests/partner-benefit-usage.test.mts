@@ -12,6 +12,9 @@ import {
   recordPartnerBenefitUsage,
 } from "../src/lib/partner-benefit-usage-service.ts";
 import { MockPartnerBenefitUsageRepository } from "../src/lib/repositories/mock/partner-benefit-usage-repository.mock.ts";
+import {
+  MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS,
+} from "../src/lib/repositories/mock/partner-benefit-usage-repository.mock.ts";
 
 test("benefit selection accepts only an exact registered benefit", () => {
   const benefits = ["헬스 1개월 33,000원", "필라테스 10회 199,000원"];
@@ -122,4 +125,25 @@ test("benefit-use cannot record usage when the partner PIN is not configured", a
       error instanceof PartnerBenefitUsageError &&
       error.code === "pin_not_configured",
   );
+});
+
+test("카페 싸피 mock fixture accepts the fixed filming PIN 0000", async () => {
+  const [context] = MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS;
+  assert.equal(context?.partnerId, "cafe-ssafy-001");
+
+  const repository = new MockPartnerBenefitUsageRepository(
+    MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS,
+  );
+  const result = await recordPartnerBenefitUsage({
+    repository,
+    partnerId: "cafe-ssafy-001",
+    memberId: "mock-member-jung-minho",
+    benefit: "아메리카노·콜드브루 1,000원 할인",
+    useCount: 1,
+    pin: "0000",
+    idempotencyKey: "cafe-ssafy-demo-pin-0000",
+  });
+
+  assert.equal(result.isNew, true);
+  assert.equal(result.useCount, 1);
 });

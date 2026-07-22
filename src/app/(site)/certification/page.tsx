@@ -4,7 +4,10 @@ import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import { getHeaderSession } from "@/lib/header-session";
-import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
+import {
+  getMemberCanonicalProfile,
+  getMemberProfileImageUrl,
+} from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
@@ -108,7 +111,7 @@ export default async function CertificationPage({
                 profileImageUrl: member.activeProfileImageId
                   && member.profilePhotoReviewStatus === "approved"
                   && !member.mustChangePassword
-                  ? "/api/certification/profile-image"
+                  ? getMemberProfileImageUrl(member.id)
                   : null,
               } satisfies CertificationMember}
               initialTimestamp={initialTimestamp}

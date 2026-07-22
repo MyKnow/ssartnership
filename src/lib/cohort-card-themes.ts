@@ -1,4 +1,5 @@
 import { sanitizeHexColor } from "@/lib/validation";
+import { isMockDataSource } from "@/lib/mock/member";
 
 export type CohortCardTheme = {
   cohortYear: number;
@@ -164,6 +165,38 @@ async function loadSupabaseAdminClient() {
 }
 
 export async function listCohortCardThemes() {
+  if (isMockDataSource()) {
+    return [
+      {
+        ...DEFAULT_STUDENT_CARD_THEME,
+        cohortYear: 14,
+        displayName: "14기",
+        backgroundFrom: "#07120d",
+        backgroundVia: "#0a1a15",
+        backgroundTo: "#111827",
+        accentColor: "#34d399",
+      },
+      {
+        ...DEFAULT_STUDENT_CARD_THEME,
+        cohortYear: 15,
+        displayName: "15기",
+        backgroundFrom: "#110c1f",
+        backgroundVia: "#1a1430",
+        backgroundTo: "#111827",
+        accentColor: "#a78bfa",
+      },
+      {
+        ...DEFAULT_STUDENT_CARD_THEME,
+        cohortYear: 16,
+        displayName: "16기",
+        backgroundFrom: "#062a3a",
+        backgroundVia: "#0f3b66",
+        backgroundTo: "#111827",
+        accentColor: "#38bdf8",
+      },
+    ];
+  }
+
   const supabase = await loadSupabaseAdminClient();
   const { data, error } = await supabase
     .from("ssafy_cohort_card_themes")

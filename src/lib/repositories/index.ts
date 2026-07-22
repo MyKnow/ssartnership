@@ -3,7 +3,10 @@ import { MockNotificationRepository } from "@/lib/repositories/mock/notification
 import { MockPartnerFavoriteRepository } from "@/lib/repositories/mock/partner-favorite-repository.mock";
 import { MockPartnerReviewRepository } from "@/lib/repositories/mock/partner-review-repository.mock";
 import { MockAdPackageRepository } from "@/lib/repositories/mock/ad-package-repository.mock";
-import { MockPartnerBenefitUsageRepository } from "@/lib/repositories/mock/partner-benefit-usage-repository.mock";
+import {
+  MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS,
+  MockPartnerBenefitUsageRepository,
+} from "@/lib/repositories/mock/partner-benefit-usage-repository.mock";
 import { SupabasePartnerRepository } from "@/lib/repositories/supabase/partner-repository.supabase";
 import { SupabaseNotificationRepository } from "@/lib/repositories/supabase/notification-repository.supabase";
 import { SupabasePartnerFavoriteRepository } from "@/lib/repositories/supabase/partner-favorite-repository.supabase";
@@ -49,7 +52,7 @@ const activeAdPackageRepository: AdPackageRepository =
 
 const activePartnerBenefitUsageRepository: PartnerBenefitUsageRepository =
   dataSource === "mock" || !hasSupabaseEnv
-    ? new MockPartnerBenefitUsageRepository()
+    ? new MockPartnerBenefitUsageRepository(MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS)
     : new SupabasePartnerBenefitUsageRepository();
 
 export const partnerRepository = repository;

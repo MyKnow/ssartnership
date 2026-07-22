@@ -1,0 +1,10 @@
+<svg width="640" height="192" viewBox="0 0 640 192" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Cafe SSAFY</title>
+  <desc id="desc">A cobalt blue coffee bean inside a rounded square beside the Cafe SSAFY wordmark.</desc>
+  <rect x="12" y="12" width="168" height="168" rx="52" fill="#123B73"/>
+  <path d="M98.6 48.5C73.7 48.5 53.5 68.7 53.5 93.6C53.5 118.5 73.7 138.7 98.6 138.7C123.5 138.7 143.7 118.5 143.7 93.6C143.7 68.7 123.5 48.5 98.6 48.5Z" fill="#F8E6C8"/>
+  <path d="M109.9 50.3C99.8 63.6 94.7 79.1 94.7 96.8C94.7 113.7 100 129.2 110.4 137.2" stroke="#123B73" stroke-width="8" stroke-linecap="round"/>
+  <path d="M64.5 91.6H132.7" stroke="#F1B55C" stroke-width="7" stroke-linecap="round"/>
+  <text x="214" y="92" fill="#2F241F" font-family="Arial, Helvetica, sans-serif" font-size="47" font-weight="700" letter-spacing="2">CAFE</text>
+  <text x="214" y="141" fill="#123B73" font-family="Arial, Helvetica, sans-serif" font-size="47" font-weight="700" letter-spacing="2">SSAFY</text>
+</svg>

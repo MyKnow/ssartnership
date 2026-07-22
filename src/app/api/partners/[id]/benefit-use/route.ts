@@ -8,8 +8,10 @@ import {
   PartnerBenefitUsageError,
   recordPartnerBenefitUsage,
 } from "@/lib/partner-benefit-usage-service";
+import { MAX_PARTNER_BENEFIT_USE_COUNT } from "@/lib/partner-benefit-usage";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { isMockDataSource } from "@/lib/mock/member";
 
 export const runtime = "nodejs";
 
@@ -31,6 +33,10 @@ function safeDecodeSegment(value: string) {
   } catch {
     return "";
   }
+}
+
+function isSafeMockPartnerId(value: string) {
+  return value.length <= 120 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(value);
 }
 
 function normalizeSessionId(value: unknown) {
@@ -78,7 +84,7 @@ function getMessageForCode(code: PartnerBenefitUsageErrorCode) {
     case "pin_invalid":
       return "제휴처 확인 PIN이 올바르지 않습니다.";
     case "use_count_invalid":
-      return "혜택 횟수는 1~99회로 입력해 주세요.";
+      return `혜택 횟수는 1~${MAX_PARTNER_BENEFIT_USE_COUNT}회로 입력해 주세요.`;
     case "idempotency_conflict":
       return "이미 처리된 이용 확인 요청입니다. 화면을 새로고침해 주세요.";
   }
@@ -142,7 +148,7 @@ export async function POST(
   }
 
   const partnerId = safeDecodeSegment((await params).id ?? "");
-  if (!UUID_PATTERN.test(partnerId)) {
+  if (!UUID_PATTERN.test(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {
     return NextResponse.json({ ok: false, message: "제휴처 정보를 확인할 수 없습니다." }, { status: 400 });
   }
 
@@ -206,7 +212,11 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "요청 식별자를 확인해 주세요." }, { status: 400 });
   }
   const useCountValue = typeof body.useCount === "number" ? body.useCount : Number.NaN;
-  if (!Number.isInteger(useCountValue) || useCountValue < 1 || useCountValue > 99) {
+  if (
+    !Number.isInteger(useCountValue) ||
+    useCountValue < 1 ||
+    useCountValue > MAX_PARTNER_BENEFIT_USE_COUNT
+  ) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
@@ -214,7 +224,13 @@ export async function POST(
       result: "failure",
       reasonCode: "use_count_invalid",
     });
-    return NextResponse.json({ ok: false, message: "혜택 횟수는 1~99회로 입력해 주세요." }, { status: 400 });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: `혜택 횟수는 1~${MAX_PARTNER_BENEFIT_USE_COUNT}회로 입력해 주세요.`,
+      },
+      { status: 400 },
+    );
   }
 
   try {

@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "../supabase/server.ts";
+import { isMockDataSource } from "../mock/member.ts";
 import { isMissingPushTableError, wrapPushDbError } from "./config.ts";
 import {
   ACTIVE_SUBSCRIPTION_FALLBACK_PREFERENCES,
@@ -26,6 +27,10 @@ export function getPushPreferencesOrDefault(
 }
 
 export async function getMemberPushPreferences(memberId: string) {
+  if (isMockDataSource()) {
+    return getPushPreferencesOrDefault();
+  }
+
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("push_preferences")
@@ -97,6 +102,10 @@ export async function upsertMemberPushPreferences(
     mmEnabled: value.mmEnabled ?? current.mmEnabled,
     marketingEnabled: value.marketingEnabled ?? current.marketingEnabled,
   };
+  if (isMockDataSource()) {
+    return next;
+  }
+
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("push_preferences").upsert(
     {

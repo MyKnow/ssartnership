@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   getContrastRatio,
   getReadableTextColorForGradient,
+  listCohortCardThemes,
   parseCohortCardThemeDeletePayload,
   parseCohortCardThemePayload,
   type CohortCardTheme,
@@ -30,6 +31,54 @@ const year16Theme: CohortCardTheme = {
   createdAt: null,
   updatedAt: null,
 };
+
+test("mock cohort card themes mirror the database seeds", async () => {
+  const previousDataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
+  process.env.NEXT_PUBLIC_DATA_SOURCE = "mock";
+
+  try {
+    const themes = await listCohortCardThemes();
+
+    assert.deepEqual(
+      themes.map(({ cohortYear, backgroundFrom, backgroundVia, backgroundTo, accentColor }) => ({
+        cohortYear,
+        backgroundFrom,
+        backgroundVia,
+        backgroundTo,
+        accentColor,
+      })),
+      [
+        {
+          cohortYear: 14,
+          backgroundFrom: "#07120d",
+          backgroundVia: "#0a1a15",
+          backgroundTo: "#111827",
+          accentColor: "#34d399",
+        },
+        {
+          cohortYear: 15,
+          backgroundFrom: "#110c1f",
+          backgroundVia: "#1a1430",
+          backgroundTo: "#111827",
+          accentColor: "#a78bfa",
+        },
+        {
+          cohortYear: 16,
+          backgroundFrom: "#062a3a",
+          backgroundVia: "#0f3b66",
+          backgroundTo: "#111827",
+          accentColor: "#38bdf8",
+        },
+      ],
+    );
+  } finally {
+    if (previousDataSource === undefined) {
+      delete process.env.NEXT_PUBLIC_DATA_SOURCE;
+    } else {
+      process.env.NEXT_PUBLIC_DATA_SOURCE = previousDataSource;
+    }
+  }
+});
 
 test("cohort card theme payload normalizes and validates admin color input", () => {
   const payload = parseCohortCardThemePayload(
