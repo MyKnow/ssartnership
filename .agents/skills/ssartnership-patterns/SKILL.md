@@ -75,12 +75,10 @@ For a new user-facing or admin-facing feature:
 
 ## UI Patterns
 
-- Preserve the hierarchy: page background -> panel -> elevated card -> inset block -> control.
-- Avoid nested cards, redundant wrappers, arbitrary shadows, and decorative gradients.
-- Use shared primitives (`Button`, `Card`, `Surface`, `Input`, `Select`, `Tabs`, `Skeleton`, `Toast`) before local one-off styling.
-- Keep admin and partner portals information-dense but calm.
-- For loading states, use route-specific skeletons in `src/components/loading` and colocated `loading.tsx` files.
-- For forms, keep controller hooks/helpers separate when state and validation become large.
+- For any UI creation, revision, or review, use `ssartnership-ui-ux` with the relevant Codex-local frontend and Korean responsive skills.
+- Preserve the hierarchy: page background -> panel -> elevated card -> inset block -> control, and use shared primitives before local one-off styling.
+- Keep admin and partner portals information-dense but calm. Use route-specific skeletons and keep large form controllers/helpers separate.
+- For member password, consent, profile-photo, or `returnTo` gate work, use `member-required-gate-redirects` instead of recreating gate precedence.
 
 ## Security And Reliability
 
