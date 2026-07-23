@@ -121,6 +121,16 @@ test("benefit usage contract migration reasserts the canonical UUID RPC", () => 
   assert.match(migration, /drop function if exists public\.record_partner_benefit_usage\(uuid, uuid, text, integer, text, jsonb\)/);
 });
 
+test("benefit usage RPC migration qualifies partner benefit columns", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20260723103348_fix_partner_benefit_usage_rpc_ambiguity.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(migration, /from public\.partner_benefits benefit/);
+  assert.match(migration, /where benefit\.id = p_benefit_id and benefit\.partner_id = p_partner_id/);
+});
+
 test("admin benefit usage form normalizes KST local timestamps and validates UUID fields", () => {
   const parsed = parseAdminPartnerBenefitUsageForm({
     partnerId: "00000000-0000-4000-8000-000000000001",
