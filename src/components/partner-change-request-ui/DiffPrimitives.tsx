@@ -111,7 +111,7 @@ export function DiffPanel({
       : "text-emerald-700 dark:text-emerald-200";
 
   return (
-    <div className={cn("rounded-2xl border p-4", toneClass)}>
+    <div className={cn("min-w-0 rounded-2xl border p-4", toneClass)}>
       <p className={cn("text-xs font-semibold uppercase tracking-[0.18em]", labelClass)}>
         {label}
       </p>
@@ -130,12 +130,12 @@ export function DiffCard({
   requested: ReactNode;
 }) {
   return (
-    <div className="rounded-3xl border border-border bg-surface-inset/85 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="min-w-0 rounded-3xl border border-border bg-surface-inset/85 p-4">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-foreground">{label}</p>
         <Badge className="bg-primary/10 text-primary">변경됨</Badge>
       </div>
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
         <DiffPanel tone="current" label="현재">
           {current}
         </DiffPanel>

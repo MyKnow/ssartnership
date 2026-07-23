@@ -2,8 +2,8 @@
 
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
@@ -25,12 +25,12 @@ function PartnerChangeRequestCard({
   const diffItems = buildPartnerChangeRequestDiffItems(request);
 
   return (
-    <article>
-      <Surface level="inset" padding="lg" className="space-y-4">
+    <article className="min-w-0">
+      <Surface level="inset" padding="lg" className="min-w-0 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-amber-500/10 text-amber-700">승인 대기</Badge>
+            <Badge variant="warning">승인 대기</Badge>
             <Badge className="bg-surface text-foreground">{request.companyName}</Badge>
             <Badge className="bg-surface text-foreground">{request.categoryLabel}</Badge>
           </div>
@@ -53,14 +53,15 @@ function PartnerChangeRequestCard({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2 xl:grid-cols-3">
         {diffItems.map((item) => (
-          <DiffCard
-            key={item.key}
-            label={item.label}
-            current={item.current}
-            requested={item.requested}
-          />
+          <div key={item.key} className="min-w-0">
+            <DiffCard
+              label={item.label}
+              current={item.current}
+              requested={item.requested}
+            />
+          </div>
         ))}
       </div>
 
@@ -106,19 +107,25 @@ export default function PartnerChangeRequestQueue({
   canReview: boolean;
 }) {
   return (
-    <section className="grid min-w-0 gap-4">
+    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <AdminSectionHeading
         title="승인 대기 요청"
         description="변경된 항목만 현재값과 요청값으로 비교한 뒤 승인하거나 거절합니다."
       />
 
       {requests.length === 0 ? (
-        <EmptyState
+        <AdminStatePanel
+          kind="empty"
           title="승인 대기 요청이 없습니다."
           description="파트너사 담당자가 민감 정보 변경 요청을 보내면 이곳에 표시됩니다."
+          action={
+            <Button href="/admin/partners" variant="secondary">
+              제휴처 목록 보기
+            </Button>
+          }
         />
       ) : (
-        <div className="grid gap-4">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
           {requests.map((request) => (
             <PartnerChangeRequestCard
               key={request.id}

@@ -74,16 +74,16 @@ export default function AdminShellView({
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm transition-colors",
                     active
-                      ? "border-primary bg-primary text-primary-foreground shadow-raised"
+                      ? "border-strong bg-surface-elevated text-foreground shadow-flat"
                       : "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-surface-elevated hover:text-foreground",
                     expanded ? "justify-start" : "justify-center px-2.5",
                   )}
                 >
-                  <Icon className={cn("h-5 w-5 shrink-0", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground")} />
+                  <Icon className={cn("h-5 w-5 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
                   {expanded ? (
                     <span className="grid min-w-0 gap-0.5">
-                      <span className={cn("truncate font-semibold", active ? "text-primary-foreground" : "text-foreground")}>{item.label}</span>
-                      <span className={cn("truncate text-xs", active ? "text-primary-foreground/80" : "text-muted-foreground")}>{item.description}</span>
+                      <span className={cn("truncate font-semibold", active ? "text-foreground" : "text-foreground")}>{item.label}</span>
+                      <span className="truncate text-xs text-muted-foreground">{item.description}</span>
                     </span>
                   ) : (
                     <span className="sr-only">{item.label}</span>
@@ -186,17 +186,15 @@ export default function AdminShellView({
           <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-xl">
             <Container className="flex min-h-[4.75rem] items-center justify-between gap-4 py-4" size="dashboard">
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1 text-xs font-medium text-muted-foreground">
-                  <Link href="/admin" className="hover:text-foreground">
-                    관리 홈
-                  </Link>
-                  {activeNavItem?.href !== "/admin" ? (
-                    <>
-                      <ChevronRightIcon className="h-3.5 w-3.5" />
-                      <span className="truncate">{activeNavItem?.label ?? title}</span>
-                    </>
-                  ) : null}
-                </div>
+                {activeNavItem?.href !== "/admin" ? (
+                  <div className="flex flex-wrap items-center gap-1 text-xs font-medium text-muted-foreground">
+                    <Link href="/admin" className="hover:text-foreground">
+                      관리 홈
+                    </Link>
+                    <ChevronRightIcon className="h-3.5 w-3.5" />
+                    <span className="truncate">{activeNavItem?.label ?? title}</span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex shrink-0 items-center gap-2">

@@ -10,6 +10,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
+import Surface from "@/components/ui/Surface";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import StatsRow from "@/components/ui/StatsRow";
@@ -351,6 +352,7 @@ export default async function AdminPartnerDetailPage({
         <AdminPageHeader
           eyebrow="Partner Detail"
           title={partner.name}
+          description="공개 상태와 핵심 운영 지표를 먼저 확인한 뒤, 아래 정보 수정 영역에서 제휴처 정보를 저장합니다."
         />
 
         {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
@@ -365,7 +367,7 @@ export default async function AdminPartnerDetailPage({
           removeAction={removePartnerPreviewLink}
         />
 
-        <Card tone="elevated">
+        <Surface level="elevated" padding="lg">
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={getPartnerVisibilityBadgeClass(visibilityState)}>
               {getPartnerVisibilityLabel(visibilityState)}
@@ -440,10 +442,10 @@ export default async function AdminPartnerDetailPage({
               className="mt-6"
               tone="warning"
               title="제휴처 집계 일부를 불러오지 못했습니다."
-              description={metricsResult.warningMessage}
+              description="일부 최신 수치는 잠시 표시되지 않을 수 있습니다. 잠시 후 다시 확인해 주세요."
             />
           ) : null}
-        </Card>
+        </Surface>
 
         <PartnerMetricTimeseriesPanel data={metricTimeseries} />
 

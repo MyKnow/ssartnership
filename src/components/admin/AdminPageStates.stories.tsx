@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import type { ReactNode } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -356,6 +357,13 @@ export const DashboardLoading: Story = {
 
 export const DashboardError: Story = {
   render: () => <DashboardOverviewState state="error" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText("관리 홈 데이터를 불러오지 못했습니다.").length).toBeGreaterThan(0);
+    for (const link of canvas.getAllByRole("link", { name: "다시 확인" })) {
+      await expect(link).toHaveAttribute("href", "/admin");
+    }
+  },
 };
 
 export const DashboardUnauthorized: Story = {
@@ -364,6 +372,12 @@ export const DashboardUnauthorized: Story = {
 
 export const DashboardForbidden: Story = {
   render: () => <DashboardOverviewState state="forbidden" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const link of canvas.getAllByRole("link", { name: "사용자 홈으로" })) {
+      await expect(link).toHaveAttribute("href", "/");
+    }
+  },
 };
 
 export const CompanyBilling: Story = {
