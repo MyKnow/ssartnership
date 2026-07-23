@@ -8,6 +8,7 @@ import {
   PartnerBenefitUsageError,
   recordPartnerBenefitUsage,
 } from "@/lib/partner-benefit-usage-service";
+import { buildPartnerBenefitUseLogProperties } from "@/lib/partner-benefit-use-logging";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isMockDataSource } from "@/lib/mock/member";
@@ -112,8 +113,16 @@ function scheduleAttemptLog(
     sessionId: string | null;
     result: "success" | "failure";
     reasonCode?: string;
+    benefitId?: string | null;
+    benefit?: string | null;
+    useCount?: number | null;
   },
 ) {
+  const benefitProperties = buildPartnerBenefitUseLogProperties({
+    benefitId: input.benefitId,
+    benefit: input.benefit,
+    useCount: input.useCount,
+  });
   scheduleProductEventLog({
     ...context,
     actorType: "member",
@@ -124,6 +133,7 @@ function scheduleAttemptLog(
     targetId: input.partnerId,
     properties: {
       result: input.result,
+      ...benefitProperties,
       ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
     },
   });
@@ -138,6 +148,7 @@ function scheduleAttemptLog(
       targetId: input.partnerId,
       properties: {
         reasonCode: input.reasonCode ?? "unknown",
+        ...benefitProperties,
       },
     });
   }
@@ -204,6 +215,8 @@ export async function POST(
       sessionId,
       result: "failure",
       reasonCode: "benefit_invalid",
+      benefitId: benefitId || null,
+      benefit: benefit || null,
     });
     return NextResponse.json({ ok: false, message: "혜택 정보를 확인해 주세요." }, { status: 400 });
   }
@@ -214,6 +227,8 @@ export async function POST(
       sessionId,
       result: "failure",
       reasonCode: "pin_invalid_format",
+      benefitId: benefitId || null,
+      benefit: benefit || null,
     });
     return NextResponse.json({ ok: false, message: "제휴처 확인 PIN은 숫자 4자리로 입력해 주세요." }, { status: 400 });
   }
@@ -224,6 +239,8 @@ export async function POST(
       sessionId,
       result: "failure",
       reasonCode: "idempotency_key_invalid",
+      benefitId: benefitId || null,
+      benefit: benefit || null,
     });
     return NextResponse.json({ ok: false, message: "요청 식별자를 확인해 주세요." }, { status: 400 });
   }
@@ -235,6 +252,9 @@ export async function POST(
       sessionId,
       result: "failure",
       reasonCode: "use_count_invalid",
+      benefitId: benefitId || null,
+      benefit: benefit || null,
+      useCount: typeof body.useCount === "number" ? body.useCount : null,
     });
     return NextResponse.json(
       {
@@ -265,6 +285,9 @@ export async function POST(
       partnerId,
       sessionId,
       result: "success",
+      benefitId: result.benefitId,
+      benefit: result.benefitSnapshot,
+      useCount: result.useCount,
     });
     scheduleProductEventLog({
       ...context,
@@ -274,7 +297,15 @@ export async function POST(
       eventName: "partner_benefit_use_success",
       targetType: "partner",
       targetId: partnerId,
-      properties: { benefitLength: result.benefitSnapshot.length, useCount: result.useCount, verificationMethod: "pin" },
+      properties: {
+        benefitLength: result.benefitSnapshot.length,
+        ...buildPartnerBenefitUseLogProperties({
+          benefitId: result.benefitId,
+          benefit: result.benefitSnapshot,
+          useCount: result.useCount,
+        }),
+        verificationMethod: "pin",
+      },
     });
     if (result.isNew) {
       scheduleProductEventLog({
@@ -285,7 +316,15 @@ export async function POST(
         eventName: "partner_benefit_use",
         targetType: "partner",
         targetId: partnerId,
-        properties: { source: "partner_verification", useCount: result.useCount, verificationMethod: "pin" },
+        properties: {
+          source: "partner_verification",
+          ...buildPartnerBenefitUseLogProperties({
+            benefitId: result.benefitId,
+            benefit: result.benefitSnapshot,
+            useCount: result.useCount,
+          }),
+          verificationMethod: "pin",
+        },
       });
     }
 
@@ -298,6 +337,9 @@ export async function POST(
         sessionId,
         result: "failure",
         reasonCode: error.code,
+        benefitId: benefitId || null,
+        benefit: benefit || null,
+        useCount: useCountValue,
       });
       return NextResponse.json(
         { ok: false, message: getMessageForCode(error.code) },
@@ -312,6 +354,9 @@ export async function POST(
       sessionId,
       result: "failure",
       reasonCode: "service_unavailable",
+      benefitId: benefitId || null,
+      benefit: benefit || null,
+      useCount: useCountValue,
     });
     return NextResponse.json(
       { ok: false, message: "혜택 이용 확인에 실패했습니다." },
