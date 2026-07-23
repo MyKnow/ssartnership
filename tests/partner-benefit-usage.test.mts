@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -7,6 +8,9 @@ import {
   normalizePartnerBenefitSelection,
 } from "../src/lib/partner-benefit-usage.ts";
 import { resolvePartnerBenefitById } from "../src/lib/partner-benefit-items.ts";
+import {
+  buildPartnerBenefitUseLogProperties,
+} from "../src/lib/partner-benefit-use-logging.ts";
 import {
   normalizeAdminUsageTimestamp,
   parseAdminPartnerBenefitUsageForm,
@@ -88,6 +92,33 @@ test("legacy benefit IDs resolve to the current canonical benefit by display ord
     resolvePartnerBenefitById(items, "legacy-benefit-partner-2-2", "partner-1"),
     null,
   );
+});
+
+test("benefit usage logs retain the selected benefit identity and use count", () => {
+  assert.deepEqual(
+    buildPartnerBenefitUseLogProperties({
+      benefitId: "benefit-2",
+      benefit: "두 번째 혜택",
+      useCount: 2,
+    }),
+    {
+      benefitId: "benefit-2",
+      benefit: "두 번째 혜택",
+      useCount: 2,
+    },
+  );
+});
+
+test("benefit usage contract migration reasserts the canonical UUID RPC", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20260723100124_repair_partner_benefit_usage_contract.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(migration, /create or replace function public\.record_partner_benefit_usage\(/);
+  assert.match(migration, /p_benefit_id uuid/);
+  assert.match(migration, /benefit_id uuid/);
+  assert.match(migration, /drop function if exists public\.record_partner_benefit_usage\(uuid, uuid, text, integer, text, jsonb\)/);
 });
 
 test("admin benefit usage form normalizes KST local timestamps and validates UUID fields", () => {
