@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import Card from "@/components/ui/Card";
 import { ADMIN_NAV_GROUPS } from "./admin-navigation";
 import AdminShellView from "./AdminShellView";
@@ -8,14 +9,14 @@ const meta = {
   title: "Domains/Admin/AdminShell",
   component: AdminShellView,
   args: {
-    title: "관리 대시보드",
+    title: "관리 홈",
     logoutAction: async () => {},
     navGroups: ADMIN_NAV_GROUPS,
     children: (
       <div className="grid gap-4">
         <AdminPageHeader
           eyebrow="Operations"
-          title="관리 대시보드"
+          title="운영 홈"
           description="처리가 필요한 항목과 운영 현황을 확인합니다."
         />
         <Card className="grid gap-2">
@@ -39,7 +40,13 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    await expect(canvas.getByRole("heading", { level: 1 })).toHaveTextContent("운영 홈");
+  },
+};
 
 export const WithBackAction: Story = {
   args: {

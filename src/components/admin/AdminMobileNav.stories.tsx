@@ -65,6 +65,28 @@ export const EscapeClose: Story = {
   },
 };
 
+export const KeyboardFocus: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: "관리 메뉴 열기" });
+    trigger.focus();
+    await userEvent.click(trigger);
+
+    const body = within(document.body);
+    const closeButton = body.getAllByRole("button", { name: "관리 메뉴 닫기" })[1]!;
+    await expect(closeButton).toHaveFocus();
+
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expect(body.getByRole("button", { name: "로그아웃" })).toHaveFocus();
+
+    await userEvent.keyboard("{Tab}");
+    await expect(closeButton).toHaveFocus();
+
+    await userEvent.click(closeButton);
+    await expect(trigger).toHaveFocus();
+  },
+};
+
 export const WithoutBackLink: Story = {
   args: {
     backHref: undefined,

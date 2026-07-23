@@ -79,7 +79,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "사용자/권한",
+    label: "회원·검토",
     items: [
       {
         href: "/admin/members",
@@ -115,13 +115,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         description: "리뷰 검수와 공개 상태",
         iconKey: "star",
         permission: { resource: "reviews" },
-      },
-      {
-        href: "/admin/logs",
-        label: "로그 조회",
-        description: "운영 로그 탐색",
-        iconKey: "queue",
-        permission: { resource: "logs" },
       },
     ],
   },
@@ -167,7 +160,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "메시지/노출",
+    label: "메시지·노출",
     items: [
       {
         href: "/admin/notifications",
@@ -207,8 +200,15 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "설정",
+    label: "운영 기록·설정",
     items: [
+      {
+        href: "/admin/logs",
+        label: "로그 조회",
+        description: "운영 로그 탐색",
+        iconKey: "queue",
+        permission: { resource: "logs" },
+      },
       {
         href: "/admin/cycle",
         label: "기수 관리",

@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
@@ -40,24 +40,27 @@ function NavButton({
   label,
   description,
   active,
+  onNavigate,
 }: {
   href: string;
   label: string;
   description: string;
   active: boolean;
+  onNavigate: () => void;
 }) {
   return (
     <Button
-      variant={active ? "primary" : "ghost"}
+      variant="ghost"
       href={href}
       className={cn(
         "w-full justify-start rounded-2xl px-4",
-        active ? "border-primary" : null,
+        active ? "border-strong bg-surface-elevated text-foreground shadow-flat" : null,
       )}
+      onClick={onNavigate}
     >
       <span className="grid min-w-0 justify-items-start gap-0.5 text-left">
         <span className="truncate">{label}</span>
-        <span className={cn("truncate text-xs font-medium", active ? "text-primary-foreground/80" : "text-muted-foreground")}>
+        <span className="truncate text-xs font-medium text-muted-foreground">
           {description}
         </span>
       </span>
@@ -82,29 +85,73 @@ export default function AdminMobileNav({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = () => setOpen(false);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
+    const opener = menuButtonRef.current;
+    const previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+
+    const getFocusableControls = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         setOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const controls = getFocusableControls();
+      if (controls.length === 0) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+
+      const firstControl = controls[0]!;
+      const lastControl = controls.at(-1)!;
+      if (!dialogRef.current?.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastControl : firstControl).focus();
+      } else if (event.shiftKey && document.activeElement === firstControl) {
+        event.preventDefault();
+        lastControl.focus();
+      } else if (!event.shiftKey && document.activeElement === lastControl) {
+        event.preventDefault();
+        firstControl.focus();
       }
     };
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousBodyOverflow;
       window.removeEventListener("keydown", onKeyDown);
+      opener?.focus();
     };
   }, [open]);
 
   return (
     <>
       <button
+        ref={menuButtonRef}
         type="button"
         className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground"
         aria-label="관리 메뉴 열기"
@@ -134,13 +181,15 @@ export default function AdminMobileNav({
                 type="button"
                 className="absolute inset-0 z-0 bg-black/55"
                 aria-label="관리 메뉴 닫기"
-                onClick={() => setOpen(false)}
+                onClick={closeMenu}
               />
 
               <div
                 role="dialog"
                 aria-modal="true"
                 aria-label="관리자 메뉴"
+                ref={dialogRef}
+                tabIndex={-1}
                 className="fixed right-0 top-0 z-10 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay"
               >
                 <div className="flex h-full flex-col bg-surface-overlay">
@@ -165,9 +214,10 @@ export default function AdminMobileNav({
                         ) : null}
                       </div>
                       <button
+                        ref={closeButtonRef}
                         type="button"
                         className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface-control text-foreground"
-                        onClick={() => setOpen(false)}
+                        onClick={closeMenu}
                         aria-label="관리 메뉴 닫기"
                       >
                         <svg
@@ -204,6 +254,7 @@ export default function AdminMobileNav({
                                 label={item.label}
                                 description={item.description}
                                 active={isAdminNavActive(pathname, item.href)}
+                                onNavigate={closeMenu}
                               />
                             ))}
                           </div>
@@ -220,6 +271,7 @@ export default function AdminMobileNav({
                               variant="ghost"
                               href={backHref}
                               className="w-full justify-start rounded-2xl px-4"
+                              onClick={closeMenu}
                             >
                               {backLabel}
                             </Button>
@@ -228,6 +280,7 @@ export default function AdminMobileNav({
                             variant="ghost"
                             href="/"
                             className="w-full justify-start rounded-2xl px-4"
+                            onClick={closeMenu}
                           >
                             사용자 화면
                           </Button>

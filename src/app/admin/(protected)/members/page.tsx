@@ -814,53 +814,7 @@ export default async function AdminMembersPage({
         <AdminPageHeader
           eyebrow="Members"
           title="회원 계정 관리"
-          description="회원 표시 정보, 비밀번호 변경 필요 여부, 수동 추가와 백필 작업을 관리합니다."
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              {canUpdateMembers ? (
-                <>
-                  <form action={backfillMemberProfiles} className="flex flex-wrap items-center gap-2">
-                    <input type="hidden" name="cursor" value={backfillCursor} />
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      백필 배치
-                      <select
-                        name="batchSize"
-                        defaultValue={String(backfillBatchSize)}
-                        className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                      >
-                        {[25, DEFAULT_MEMBER_SYNC_BATCH_SIZE, MAX_MEMBER_SYNC_BATCH_SIZE].map((size) => (
-                          <option key={size} value={size}>
-                            {size}명
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <SubmitButton pendingText={hasMoreBackfill ? "다음 배치 중" : "백필 중"}>
-                      {hasMoreBackfill ? "다음 배치 실행" : "백필 실행"}
-                    </SubmitButton>
-                  </form>
-                  {selectedGeneration !== null ? (
-                    <form action={disableGenerationMattermostLogin} className="flex flex-wrap items-center gap-2">
-                      <input type="hidden" name="generation" value={selectedGeneration} />
-                      <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          name="confirmedGeneration"
-                          value={selectedGeneration}
-                          required
-                          className="size-4"
-                        />
-                        전체 중단 확인
-                      </label>
-                      <SubmitButton variant="danger" pendingText="전환 중">
-                        {selectedGeneration}기 MM 로그인 중단
-                      </SubmitButton>
-                    </form>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-          }
+          description="회원 상태와 인증 이력을 먼저 확인하고, 필요한 운영 작업은 목록 아래에서 실행합니다."
         />
         <StatsRow
           items={[
@@ -880,9 +834,13 @@ export default async function AdminMembersPage({
           />
         ) : null}
         {membersError ? (
-          <FormMessage variant="error">
-            회원 목록을 불러오지 못했습니다. {membersError.message}
-          </FormMessage>
+          <InlineMessage
+            tone="danger"
+            title="회원 목록을 불러오지 못했습니다."
+            description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+            actionHref="/admin/members"
+            actionLabel="다시 확인"
+          />
         ) : null}
         {memberError ? (
           <FormMessage variant="error">{memberError}</FormMessage>
@@ -923,30 +881,6 @@ export default async function AdminMembersPage({
 
         <section className="grid min-w-0 gap-4">
           <AdminSectionHeading
-            title="수동 추가"
-            description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
-          />
-          <Card tone="elevated">
-            <AdminMemberManualAddPanel
-              currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
-              canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
-            />
-          </Card>
-        </section>
-
-        <Card tone="elevated">
-          <AdminSectionHeading
-            title="운영 메모"
-            description="활성 Sender와 사진 검토 상태를 확인합니다."
-          />
-          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
-            <p>MM·이메일 알림 전송 결과가 불명확하면 자동 대체 발송하지 않습니다. 수신 여부 확인 뒤에만 새 링크를 발급합니다.</p>
-            <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
-          </div>
-        </Card>
-
-        <section className="grid min-w-0 gap-4">
-          <AdminSectionHeading
             title="회원 목록"
             description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
           />
@@ -983,6 +917,91 @@ export default async function AdminMembersPage({
             />
           </div>
         </section>
+
+        {canUpdateMembers ? (
+          <section className="grid min-w-0 gap-4">
+            <AdminSectionHeading
+              title="운영 도구"
+              description="목록 확인 후 실행하는 유지보수 작업입니다. 위험한 일괄 변경은 별도 확인이 필요합니다."
+            />
+            <Card className="grid min-w-0 gap-5">
+              <div className="grid min-w-0 gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">회원 프로필 백필</p>
+                  <p className="mt-1 text-sm text-muted-foreground">사진과 프로필 메타데이터가 필요한 회원을 배치 단위로 정비합니다.</p>
+                </div>
+                <form action={backfillMemberProfiles} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="cursor" value={backfillCursor} />
+                  <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                    백필 배치
+                    <select
+                      name="batchSize"
+                      defaultValue={String(backfillBatchSize)}
+                      className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
+                    >
+                      {[25, DEFAULT_MEMBER_SYNC_BATCH_SIZE, MAX_MEMBER_SYNC_BATCH_SIZE].map((size) => (
+                        <option key={size} value={size}>
+                          {size}명
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <SubmitButton pendingText={hasMoreBackfill ? "다음 배치 중" : "백필 중"}>
+                    {hasMoreBackfill ? "다음 배치 실행" : "백필 실행"}
+                  </SubmitButton>
+                </form>
+              </div>
+              {selectedGeneration !== null ? (
+                <div className="grid min-w-0 gap-3 border-t border-border/70 pt-5">
+                  <div>
+                    <p className="text-sm font-semibold text-danger">{selectedGeneration}기 Mattermost 로그인 중단</p>
+                    <p className="mt-1 text-sm text-muted-foreground">현재 기수 전체의 기존 Mattermost 로그인만 중단합니다. 이메일 인증 계정은 계속 사용할 수 있습니다.</p>
+                  </div>
+                  <form action={disableGenerationMattermostLogin} className="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="generation" value={selectedGeneration} />
+                    <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-foreground">
+                      <input
+                        type="checkbox"
+                        name="confirmedGeneration"
+                        value={selectedGeneration}
+                        required
+                        className="size-4"
+                      />
+                      전체 중단 확인
+                    </label>
+                    <SubmitButton variant="danger" pendingText="전환 중">
+                      {selectedGeneration}기 MM 로그인 중단
+                    </SubmitButton>
+                  </form>
+                </div>
+              ) : null}
+            </Card>
+          </section>
+        ) : null}
+
+        <section className="grid min-w-0 gap-4">
+          <AdminSectionHeading
+            title="수동 추가"
+            description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
+          />
+          <Card tone="elevated">
+            <AdminMemberManualAddPanel
+              currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
+              canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
+            />
+          </Card>
+        </section>
+
+        <Card tone="elevated">
+          <AdminSectionHeading
+            title="운영 메모"
+            description="활성 Sender와 사진 검토 상태를 확인합니다."
+          />
+          <div className="mt-4 grid gap-3 text-sm text-muted-foreground">
+            <p>MM·이메일 알림 전송 결과가 불명확하면 자동 대체 발송하지 않습니다. 수신 여부 확인 뒤에만 새 링크를 발급합니다.</p>
+            <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
+          </div>
+        </Card>
       </div>
     </AdminShell>
   );
