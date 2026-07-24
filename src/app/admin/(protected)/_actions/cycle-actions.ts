@@ -298,39 +298,6 @@ export async function testMattermostSenderCandidateAction(formData: FormData) {
     );
   }
 
-  let recipient;
-  try {
-    const testContext = await mattermostSenderRepository.getTestContext(
-      candidate.generation,
-      session.adminId,
-    );
-    recipient = resolveMattermostSenderTestRecipient({
-      generation: candidate.generation,
-      ...testContext,
-    });
-  } catch {
-    recipient = null;
-  }
-  if (!recipient) {
-    await recordMattermostSenderTestAttempt(rateLimitInput, false).catch(() => undefined);
-    await mattermostSenderRepository.recordTestFailure({
-      candidateId,
-      errorCode: "test_target_unavailable",
-      audit: {
-        context: auditContext,
-        properties: {
-          generation: candidate.generation,
-          reasonCode: "test_target_unavailable",
-        },
-      },
-    }).catch(() => undefined);
-    redirectMattermostSenderError(
-      "mattermost_sender_test_target_unavailable",
-      "mattermost_sender_test",
-      { generation: candidate.generation, reasonCode: "test_target_unavailable" },
-    );
-  }
-
   try {
     const template = await resolveNotificationTemplate("mattermost.sender_test");
     const variables = { siteName: SITE_NAME };
@@ -338,26 +305,52 @@ export async function testMattermostSenderCandidateAction(formData: FormData) {
       renderNotificationTemplate(template.titleTemplate, variables),
       renderNotificationTemplate(template.bodyTemplate, variables),
     ].join("\n\n");
-    const sender = await new MattermostClient().withAuthenticatedSender(
+    const testResult = await new MattermostClient().withAuthenticatedSender(
       candidate.credentials,
       async (mattermost) => {
+        const recipient = resolveMattermostSenderTestRecipient({
+          senderMattermostUserId: mattermost.user.id,
+        });
+        if (!recipient) return null;
         await mattermost.sendDirectMessage(
           recipient.userId,
           message,
         );
-        return mattermost.user;
+        return {
+          sender: mattermost.user,
+          recipientKind: recipient.kind,
+        };
       },
     );
+    if (!testResult) {
+      await recordMattermostSenderTestAttempt(rateLimitInput, false).catch(() => undefined);
+      await mattermostSenderRepository.recordTestFailure({
+        candidateId,
+        errorCode: "test_target_unavailable",
+        audit: {
+          context: auditContext,
+          properties: {
+            generation: candidate.generation,
+            reasonCode: "test_target_unavailable",
+          },
+        },
+      }).catch(() => undefined);
+      redirectMattermostSenderError(
+        "mattermost_sender_test_target_unavailable",
+        "mattermost_sender_test",
+        { generation: candidate.generation, reasonCode: "test_target_unavailable" },
+      );
+    }
     await mattermostSenderRepository.activateCandidate({
       candidateId,
-      senderMattermostUserId: sender.id,
-      senderUsernameHint: maskMattermostSenderIdentifier(sender.username),
-      testTargetKind: recipient.kind,
+      senderMattermostUserId: testResult.sender.id,
+      senderUsernameHint: maskMattermostSenderIdentifier(testResult.sender.username),
+      testTargetKind: testResult.recipientKind,
       audit: {
         context: auditContext,
         properties: {
           generation: candidate.generation,
-          testTargetKind: recipient.kind,
+          testTargetKind: testResult.recipientKind,
           status: "active",
         },
       },

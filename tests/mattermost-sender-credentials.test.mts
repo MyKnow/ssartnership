@@ -83,30 +83,24 @@ test("Super Admin template과 mattermost_senders 권한이 모두 있어야 Send
   );
 });
 
-test("Sender 테스트 대상은 이전 기수 Sender를 우선하고 bootstrap 때만 Super Admin을 사용한다", async () => {
+test("Sender 테스트 대상은 인증된 후보 Sender 본인이다", async () => {
   const { resolveMattermostSenderTestRecipient } = await routingModulePromise;
 
   assert.deepEqual(
     resolveMattermostSenderTestRecipient({
-      generation: 16,
-      previousGenerationSenderUserId: "sender-15-id",
-      superAdminMattermostUserId: "super-admin-id",
+      senderMattermostUserId: "sender-16-id",
     }),
-    { kind: "previous_generation_sender", userId: "sender-15-id" },
+    { kind: "self", userId: "sender-16-id" },
   );
   assert.deepEqual(
     resolveMattermostSenderTestRecipient({
-      generation: 1,
-      previousGenerationSenderUserId: null,
-      superAdminMattermostUserId: "super-admin-id",
+      senderMattermostUserId: "  sender-16-id  ",
     }),
-    { kind: "super_admin_bootstrap", userId: "super-admin-id" },
+    { kind: "self", userId: "sender-16-id" },
   );
   assert.equal(
     resolveMattermostSenderTestRecipient({
-      generation: 1,
-      previousGenerationSenderUserId: null,
-      superAdminMattermostUserId: null,
+      senderMattermostUserId: "   ",
     }),
     null,
   );

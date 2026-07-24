@@ -9552,7 +9552,7 @@ create table if not exists public.mattermost_sender_credentials (
   constraint mattermost_sender_credentials_key_version_check check (key_version is null or key_version between 1 and 99),
   constraint mattermost_sender_credentials_test_target_check check (
     last_test_target_kind is null
-    or last_test_target_kind in ('previous_generation_sender', 'super_admin_bootstrap')
+    or last_test_target_kind in ('self', 'previous_generation_sender', 'super_admin_bootstrap')
   ),
   constraint mattermost_sender_credentials_health_status_check check (health_status in ('unknown', 'healthy', 'cooldown', 'blocked')),
   constraint mattermost_sender_credentials_health_failure_count_check check (health_failure_count >= 0),
@@ -9731,7 +9731,7 @@ begin
   if not found then raise exception 'mattermost_sender_candidate_missing'; end if;
   if candidate_row.status <> 'pending' or candidate_row.expires_at is null or candidate_row.expires_at <= now() then raise exception 'mattermost_sender_candidate_not_activatable'; end if;
   if char_length(btrim(coalesce(p_sender_mm_user_id, ''))) = 0 then raise exception 'mattermost_sender_user_invalid'; end if;
-  if coalesce(p_test_target_kind, '') not in ('previous_generation_sender', 'super_admin_bootstrap') then raise exception 'mattermost_sender_test_target_invalid'; end if;
+  if coalesce(p_test_target_kind, '') not in ('self', 'previous_generation_sender', 'super_admin_bootstrap') then raise exception 'mattermost_sender_test_target_invalid'; end if;
   perform pg_advisory_xact_lock(hashtext('mattermost_sender_generation:' || candidate_row.generation::text));
   update public.mattermost_sender_credentials
   set status = 'superseded', encrypted_ciphertext = null, encrypted_nonce = null,

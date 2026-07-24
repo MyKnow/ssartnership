@@ -11,7 +11,6 @@ import {
   type ActiveMattermostSender,
   type MattermostSenderMetadata,
   type MattermostSenderSafeErrorCode,
-  type MattermostSenderTestContext,
   type MattermostSenderStatus,
 } from "./types";
 import {
@@ -96,6 +95,7 @@ function mapMetadata(row: unknown): MattermostSenderMetadata | null {
   if (
     targetKind !== null
     && targetKind !== undefined
+    && targetKind !== "self"
     && targetKind !== "previous_generation_sender"
     && targetKind !== "super_admin_bootstrap"
   ) {
@@ -126,7 +126,8 @@ function mapMetadata(row: unknown): MattermostSenderMetadata | null {
     senderUsernameHint: asNullableString(value.sender_username_hint),
     verifiedAt: asIsoString(value.verified_at),
     lastTestedAt: asIsoString(value.last_tested_at),
-    lastTestTargetKind: targetKind === "previous_generation_sender"
+    lastTestTargetKind: targetKind === "self"
+      || targetKind === "previous_generation_sender"
       || targetKind === "super_admin_bootstrap"
       ? targetKind
       : null,
@@ -380,38 +381,6 @@ export class MattermostSenderRepository {
     if (error) {
       throwRepositoryError();
     }
-  }
-
-  async getTestContext(
-    generation: number,
-    adminMemberId: string,
-  ): Promise<MattermostSenderTestContext> {
-    const { data, error } = await getSupabaseAdminClient().rpc(
-      "get_mattermost_sender_test_context",
-      {
-        p_generation: generation,
-        p_admin_member_id: adminMemberId,
-      },
-    );
-    if (error) {
-      throwRepositoryError();
-    }
-    const row = Array.isArray(data) ? data[0] : null;
-    if (!row || typeof row !== "object" || Array.isArray(row)) {
-      return {
-        previousGenerationSenderUserId: null,
-        superAdminMattermostUserId: null,
-      };
-    }
-    const value = row as Record<string, unknown>;
-    return {
-      previousGenerationSenderUserId: asNullableString(
-        value.previous_generation_sender_user_id,
-      ),
-      superAdminMattermostUserId: asNullableString(
-        value.super_admin_mattermost_user_id,
-      ),
-    };
   }
 
   async recordTestFailure(input: {
