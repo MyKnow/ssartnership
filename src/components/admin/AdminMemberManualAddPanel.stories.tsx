@@ -135,6 +135,7 @@ export const RetriesFailedRows: Story = {
               total: 1,
               success: 0,
               failed: 1,
+              alreadyExists: 0,
               retryableFailures: 1,
               items: [{
                 rowNumber: 2,
@@ -145,6 +146,7 @@ export const RetriesFailedRows: Story = {
                 deliveryChannel: null,
                 reason: "이메일 알림에 실패했습니다.",
                 retryable: true,
+                existingMemberId: null,
               }],
             }
             : {
@@ -152,6 +154,7 @@ export const RetriesFailedRows: Story = {
               total: 1,
               success: 1,
               failed: 0,
+              alreadyExists: 0,
               retryableFailures: 0,
               items: [{
                 rowNumber: 2,
@@ -162,6 +165,7 @@ export const RetriesFailedRows: Story = {
                 deliveryChannel: "email",
                 reason: null,
                 retryable: false,
+                existingMemberId: null,
               }],
             },
         });
@@ -217,6 +221,7 @@ export const StopsRetryWhenDeliveryOutcomeIsUnknown: Story = {
             total: 1,
             success: 0,
             failed: 1,
+            alreadyExists: 0,
             retryableFailures: 0,
             items: [{
               rowNumber: 2,
@@ -227,6 +232,7 @@ export const StopsRetryWhenDeliveryOutcomeIsUnknown: Story = {
               deliveryChannel: "email",
               reason: "설정 링크 전송 결과를 확인해야 하므로 자동 재시도할 수 없습니다.",
               retryable: false,
+              existingMemberId: null,
             }],
           },
         });
@@ -243,6 +249,7 @@ export const StopsRetryWhenDeliveryOutcomeIsUnknown: Story = {
             deliveryChannel: "email",
             reason: null,
             retryable: false,
+            existingMemberId: null,
           },
         });
       }
@@ -258,6 +265,71 @@ export const StopsRetryWhenDeliveryOutcomeIsUnknown: Story = {
     await expect(canvas.getByText(/기존 미사용 링크는 무효화됩니다/)).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "새 링크 발급 확인" }));
     await expect(await canvas.findByText("성공 1")).toBeVisible();
+  },
+};
+
+export const ShowsExistingMemberWithoutReissue: Story = {
+  args: {
+    canReissueManualSetup: true,
+    initialRows: [
+      {
+        rowNumber: 2,
+        generation: "16",
+        name: "김싸피",
+        campus: "서울",
+        mmId: "kim.ssafy",
+        email: "kim@example.com",
+        photoFilename: "",
+      },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    window.fetch = async (input) => {
+      const url = String(input);
+      if (url === "/api/admin/member-imports") {
+        return Response.json({
+          ok: true,
+          batchId: "batch-existing-member",
+          expiresAt: "2026-07-15T00:00:00.000Z",
+          uploads: [],
+        });
+      }
+      if (url === "/api/admin/member-imports/batch-existing-member/commit") {
+        return Response.json({
+          ok: true,
+          result: {
+            batchId: "batch-existing-member",
+            total: 1,
+            success: 0,
+            failed: 0,
+            alreadyExists: 1,
+            retryableFailures: 0,
+            items: [{
+              rowNumber: 2,
+              status: "already_exists",
+              name: "김싸피",
+              mmId: "kim.ssafy",
+              email: "kim@example.com",
+              deliveryChannel: null,
+              reason: "이미 등록된 회원입니다.",
+              retryable: false,
+              existingMemberId: "member-existing-1",
+            }],
+          },
+        });
+      }
+      return Response.json({ message: `Unhandled story fetch: ${url}` }, { status: 500 });
+    };
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "검증 및 업로드" }));
+    await userEvent.click(await canvas.findByRole("button", { name: "생성 시작" }));
+    await expect(await canvas.findByText("이미 등록됨 1")).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "기존 회원 상세" })).toHaveAttribute(
+      "href",
+      "/admin/members/member-existing-1",
+    );
+    await expect(canvas.queryByRole("button", { name: "확인 후 새 링크 발급" })).not.toBeInTheDocument();
   },
 };
 
