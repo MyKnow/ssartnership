@@ -129,7 +129,7 @@ test.describe("auth and partner portal operation flows", () => {
     await page.getByRole("button", { name: "인증 확인" }).click();
 
     await expect(page).toHaveURL(/\/auth\/login\?returnTo=%2F$/);
-    await expect(page.getByText("이미 가입된 사용자입니다. 로그인해 주세요.")).toBeVisible();
+    await expect(page.getByText("이미 가입된 회원입니다.")).toBeVisible();
   });
 
   test("offers email recovery and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {

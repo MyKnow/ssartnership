@@ -34,6 +34,7 @@ import {
   type ManualMemberImportPhotoManifestEntry,
   type ManualMemberImportRawRow,
 } from "./shared";
+import { getManualMemberImportDuplicateKind } from "./duplicate";
 
 // New import batches use the common image-upload staging bucket. This legacy
 // bucket remains readable only while already-created batches are completed.
@@ -101,13 +102,14 @@ export type ManualMemberImportPreflightResult =
 
 export type ManualMemberImportCommitItem = {
   rowNumber: number;
-  status: "success" | "failed";
+  status: "success" | "failed" | "already_exists";
   name: string | null;
   mmId: string | null;
   email: string | null;
   deliveryChannel: "mattermost" | "email" | null;
   reason: string | null;
   retryable: boolean;
+  existingMemberId: string | null;
 };
 
 export type ManualMemberImportCommitResult = {
@@ -115,6 +117,7 @@ export type ManualMemberImportCommitResult = {
   total: number;
   success: number;
   failed: number;
+  alreadyExists: number;
   retryableFailures: number;
   items: ManualMemberImportCommitItem[];
 };
@@ -219,6 +222,16 @@ function getManualMemberImportEmailMessageId(idempotencyKey: string) {
 class ManualMemberImportDeliveryOutcomeUnknownError extends Error {
   constructor() {
     super("설정 링크 전송 결과를 확인해야 하므로 자동 재시도할 수 없습니다.");
+  }
+}
+
+class ManualMemberImportExistingMemberError extends Error {
+  readonly memberId: string;
+
+  constructor(memberId: string) {
+    super("이미 등록된 회원입니다.");
+    this.name = "ManualMemberImportExistingMemberError";
+    this.memberId = memberId;
   }
 }
 
@@ -688,6 +701,56 @@ type ImportMemberCheckpoint = {
   rowLeaseVersion: string;
 };
 
+async function findExistingManualMemberImportMemberId(input: {
+  mattermostAccountId?: string | null;
+  mmUsername?: string | null;
+  emailNormalized?: string | null;
+}) {
+  const supabase = getSupabaseAdminClient();
+  let mattermostAccountId = input.mattermostAccountId ?? null;
+
+  if (!mattermostAccountId && input.mmUsername) {
+    const { data: directory, error: directoryError } = await supabase
+      .from("mm_user_directory")
+      .select("id")
+      .eq("mm_username", input.mmUsername)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (directoryError) {
+      throw new Error("기존 Mattermost 회원 정보를 불러오지 못했습니다.");
+    }
+    mattermostAccountId = typeof directory?.id === "string" ? directory.id : null;
+  }
+
+  if (mattermostAccountId) {
+    const { data: member, error: memberError } = await supabase
+      .from("members")
+      .select("id")
+      .eq("mattermost_account_id", mattermostAccountId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (memberError) {
+      throw new Error("기존 회원 정보를 불러오지 못했습니다.");
+    }
+    if (typeof member?.id === "string") return member.id;
+  }
+
+  if (input.emailNormalized) {
+    const { data: member, error: memberError } = await supabase
+      .from("members")
+      .select("id")
+      .eq("email_normalized", input.emailNormalized)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (memberError) {
+      throw new Error("기존 회원 정보를 불러오지 못했습니다.");
+    }
+    if (typeof member?.id === "string") return member.id;
+  }
+
+  return null;
+}
+
 async function claimManualMemberImportRow(row: ImportRow): Promise<ImportRowLease | null> {
   const { data, error } = await getSupabaseAdminClient()
     .from("manual_member_import_rows")
@@ -728,10 +791,25 @@ async function checkpointManualMemberImportMember(input: {
       p_email_normalized: input.row.email_normalized,
     },
   );
+  if (error) {
+    const duplicateKind = getManualMemberImportDuplicateKind(error);
+    if (duplicateKind) {
+      const existingMemberId = await findExistingManualMemberImportMemberId({
+        mattermostAccountId: duplicateKind === "mattermost"
+          ? input.mattermostAccountId
+          : null,
+        emailNormalized: duplicateKind === "email" ? input.row.email_normalized : null,
+      });
+      if (existingMemberId) {
+        throw new ManualMemberImportExistingMemberError(existingMemberId);
+      }
+    }
+    throw new Error("회원 정보를 저장하지 못했습니다.");
+  }
   const checkpoint = (
     data as Array<{ member_id: string; row_updated_at: string }> | null
   )?.[0] ?? null;
-  if (error || !checkpoint?.member_id || !checkpoint.row_updated_at) {
+  if (!checkpoint?.member_id || !checkpoint.row_updated_at) {
     throw new Error("회원 정보를 저장하지 못했습니다.");
   }
   return {
@@ -1071,15 +1149,22 @@ async function processImportRow(
       deliveryChannel: delivery.deliveryChannel,
       reason: null,
       retryable: false,
+      existingMemberId: null,
     };
   } catch (error) {
-    const reason = getSafeFailureMessage(error);
-    const retryable = !(error instanceof ManualMemberImportDeliveryOutcomeUnknownError);
+    const existingMemberId = error instanceof ManualMemberImportExistingMemberError
+      ? error.memberId
+      : null;
+    const reason = existingMemberId ? "이미 등록된 회원입니다." : getSafeFailureMessage(error);
+    const retryable = !existingMemberId
+      && !(error instanceof ManualMemberImportDeliveryOutcomeUnknownError);
     const { data: failedRow, error: failedRowError } = await supabase
       .from("manual_member_import_rows")
       .update({
         status: "failed",
-        error_code: retryable ? "member_create_failed" : "delivery_outcome_unknown",
+        error_code: existingMemberId
+          ? "already_registered"
+          : retryable ? "member_create_failed" : "delivery_outcome_unknown",
         error_message: reason,
       })
       .eq("id", row.id)
@@ -1091,7 +1176,14 @@ async function processImportRow(
     if (failedRowError || !failedRow) {
       throw new Error("회원 가져오기 행 처리 권한이 만료되었습니다.");
     }
-    return { ...item, status: "failed", deliveryChannel: row.delivery_channel, reason, retryable };
+    return {
+      ...item,
+      status: existingMemberId ? "already_exists" : "failed",
+      deliveryChannel: row.delivery_channel,
+      reason,
+      retryable,
+      existingMemberId,
+    };
   }
 }
 
@@ -1111,25 +1203,37 @@ function isRetryableManualMemberImportRow(
   row: Pick<ImportRow, "status" | "error_code">,
 ) {
   return row.status === "staged"
-    || (row.status === "failed" && row.error_code !== "delivery_outcome_unknown");
+    || (row.status === "failed"
+      && row.error_code !== "delivery_outcome_unknown"
+      && row.error_code !== "already_registered");
 }
 
-function toManualMemberImportCommitItem(
+async function toManualMemberImportCommitItem(
   row: ManualMemberImportResultRow,
-): ManualMemberImportCommitItem {
+): Promise<ManualMemberImportCommitItem> {
   const success = row.status === "created";
-  const retryable = !success && isRetryableManualMemberImportRow(row);
+  const existingMemberId = row.error_code === "already_registered"
+    ? await findExistingManualMemberImportMemberId({
+        mmUsername: row.mm_username,
+        emailNormalized: row.email_normalized,
+      })
+    : null;
+  const alreadyExists = row.error_code === "already_registered";
+  const retryable = !success && !alreadyExists && isRetryableManualMemberImportRow(row);
   return {
     rowNumber: row.row_number,
-    status: success ? "success" : "failed",
+    status: success ? "success" : alreadyExists ? "already_exists" : "failed",
     name: row.display_name,
     mmId: row.mm_username,
     email: row.email_normalized,
     deliveryChannel: row.delivery_channel,
     reason: success
       ? null
-      : row.error_message ?? (retryable ? "처리 대기 중입니다." : "전송 결과 확인이 필요합니다."),
+      : alreadyExists
+        ? "이미 등록된 회원입니다."
+        : row.error_message ?? (retryable ? "처리 대기 중입니다." : "전송 결과 확인이 필요합니다."),
     retryable,
+    existingMemberId,
   };
 }
 
@@ -1353,10 +1457,13 @@ export async function commitManualMemberImport(input: {
       .eq("batch_id", input.batchId)
       .order("row_number");
     if (resultRowsError) throw new Error("가져오기 결과를 불러오지 못했습니다.");
-    const items = ((resultRowsData ?? []) as ManualMemberImportResultRow[])
-      .map(toManualMemberImportCommitItem);
+    const items = await Promise.all(
+      ((resultRowsData ?? []) as ManualMemberImportResultRow[])
+        .map(toManualMemberImportCommitItem),
+    );
     const success = items.filter((item) => item.status === "success").length;
-    const failed = items.length - success;
+    const failed = items.filter((item) => item.status === "failed").length;
+    const alreadyExists = items.filter((item) => item.status === "already_exists").length;
     const retryableFailures = items.filter((item) => item.status === "failed" && item.retryable).length;
     const nextBatchStatus = retryableFailures > 0 ? "ready" : "completed";
     const { data: completedBatch, error: completedError } = await supabase
@@ -1379,6 +1486,7 @@ export async function commitManualMemberImport(input: {
       total: items.length,
       success,
       failed,
+      alreadyExists,
       retryableFailures,
       items,
     };
@@ -1621,6 +1729,7 @@ export async function reissueManualMemberImportSetup(input: {
       deliveryChannel: row.delivery_channel,
       reason: null,
       retryable: false,
+      existingMemberId: null,
     };
   } catch (error) {
     const reason = error instanceof ManualMemberImportDeliveryOutcomeUnknownError

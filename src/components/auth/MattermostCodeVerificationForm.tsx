@@ -181,7 +181,6 @@ export default function MattermostCodeVerificationForm({
         ? `${data.nextPath}?returnTo=${encodeURIComponent(sanitizeReturnTo(returnTo, "/"))}`
         : data.nextPath;
       router.replace(nextPath);
-      router.refresh();
     } finally {
       setPending(false);
     }

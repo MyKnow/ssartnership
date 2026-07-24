@@ -60,8 +60,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
   }
 
+  const issueStartedAt = Date.now();
   try {
-    const result = await issueMattermostVerificationCode({ purpose, request: parsed.data });
+    const { telemetry, ...result } = await issueMattermostVerificationCode({
+      purpose,
+      request: parsed.data,
+    });
     await recordMemberAuthAttempt("mattermost-code-issue", throttleContext, true);
     await logAuthSecurity({
       ...context,
@@ -72,6 +76,14 @@ export async function POST(request: Request) {
         purpose,
         phase: "issue",
         generation: parsed.data.generation,
+        deliveryStatus: telemetry.deliveryStatus,
+        deliveryErrorCode: telemetry.deliveryErrorCode,
+        targetLookupMs: telemetry.targetLookupMs,
+        templateMs: telemetry.templateMs,
+        reserveCodeMs: telemetry.reserveCodeMs,
+        sendDmMs: telemetry.sendDmMs,
+        deliveryMarkMs: telemetry.deliveryMarkMs,
+        totalMs: telemetry.totalMs,
       },
     });
     return NextResponse.json({ ok: true, ...result }, { status: 202 });
@@ -85,7 +97,12 @@ export async function POST(request: Request) {
       eventName: "member_mattermost_code",
       status: "failure",
       actorType: "guest",
-      properties: { purpose, phase: "issue", reason: rateLimited ? "rate_limit" : "unavailable" },
+      properties: {
+        purpose,
+        phase: "issue",
+        reason: rateLimited ? "rate_limit" : "unavailable",
+        totalMs: Date.now() - issueStartedAt,
+      },
     });
     return NextResponse.json(
       { ok: false, error: rateLimited ? "rate_limited" : "unavailable" },
