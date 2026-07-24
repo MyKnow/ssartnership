@@ -51,7 +51,7 @@ export default function LoginForm({
     const alreadyRegisteredFlag = sessionStorage.getItem("signup:alreadyRegistered");
     if (alreadyRegisteredFlag) {
       sessionStorage.removeItem("signup:alreadyRegistered");
-      notify("이미 가입된 사용자입니다. 로그인해 주세요.");
+      notify("이미 가입된 회원입니다.");
     }
   }, [notify]);
 

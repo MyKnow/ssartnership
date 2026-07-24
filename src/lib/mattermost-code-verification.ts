@@ -4,7 +4,11 @@ import { MATTERMOST_VERIFICATION_CODE_TTL_SECONDS } from "@/lib/mattermost-code-
 import { hashOpaqueToken, generateOpaqueToken } from "@/lib/password";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { MattermostVerificationRequest } from "@/lib/mattermost-code-input";
-import { MattermostApiError, type MattermostUser } from "@/lib/mattermost/client";
+import {
+  MattermostApiError,
+  type MattermostAuthenticatedSession,
+  type MattermostUser,
+} from "@/lib/mattermost/client";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
 import { getMattermostSenderRoutingTemplate } from "@/lib/mattermost-senders/routing";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
@@ -19,6 +23,17 @@ export type MattermostVerificationPurpose = "signup" | "reset_password";
 type MattermostVerificationTarget = {
   user: MattermostUser;
   senderGeneration: number;
+};
+
+export type MattermostVerificationIssueTelemetry = {
+  targetLookupMs: number;
+  templateMs: number | null;
+  reserveCodeMs: number;
+  sendDmMs: number | null;
+  deliveryMarkMs: number;
+  totalMs: number;
+  deliveryStatus: "sent" | "failed";
+  deliveryErrorCode: string | null;
 };
 
 const CODE_TTL_MS = MATTERMOST_VERIFICATION_CODE_TTL_SECONDS * 1_000;
@@ -70,57 +85,51 @@ function toSafeMattermostErrorCode(error: unknown) {
   return "unavailable";
 }
 
-async function findUserInGeneration(input: MattermostVerificationRequest & {
-  generation: number;
-}): Promise<MattermostVerificationTarget | null> {
-  return withActiveMattermostSenderForGeneration(input.generation, async (session) => {
-    const user = await session.getUserByUsername(input.username);
-    const template = getMattermostSenderRoutingTemplate(input.generation);
-    const team = await session.getTeamByName(template.teamName);
-    const channel = await session.getChannelByName(team.id, template.channelName);
-    const membership = await session.getChannelMember(channel.id, user.id);
-    return membership ? { user, senderGeneration: input.generation } : null;
-  });
-}
+const NO_MATTERMOST_VERIFICATION_TARGET = Symbol("no_mattermost_verification_target");
 
-async function resolveMattermostVerificationTarget(
+async function withMattermostVerificationTargetSession<T>(
   request: MattermostVerificationRequest,
-): Promise<MattermostVerificationTarget | null> {
-  if (request.generation > 0) {
-    try {
-      return await findUserInGeneration(request);
-    } catch (error) {
-      if (error instanceof MattermostApiError && error.code === "not_found") {
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  const metadata = await mattermostSenderRepository.listMetadata();
-  const activeGenerations = metadata
-    .filter((sender) => sender.status === "active")
-    .map((sender) => sender.generation)
-    .sort((left, right) => right - left);
+  operation: (
+    target: MattermostVerificationTarget | null,
+    session: MattermostAuthenticatedSession | null,
+  ) => Promise<T>,
+): Promise<T> {
+  const activeGenerations = request.generation > 0
+    ? [request.generation]
+    : (await mattermostSenderRepository.listMetadata())
+      .filter((sender) => sender.status === "active")
+      .map((sender) => sender.generation)
+      .sort((left, right) => right - left);
   if (activeGenerations.length === 0) {
     throw new MattermostSenderUnavailableError("sender_not_configured");
   }
+
   let lastUnavailable: unknown = null;
   for (const generation of activeGenerations) {
     try {
-      const target = await findUserInGeneration({ ...request, generation });
-      if (target) return target;
+      const result = await withActiveMattermostSenderForGeneration<
+        T | typeof NO_MATTERMOST_VERIFICATION_TARGET
+      >(generation, async (session) => {
+        const user = await session.getUserByUsername(request.username);
+        const template = getMattermostSenderRoutingTemplate(generation);
+        const team = await session.getTeamByName(template.teamName);
+        const channel = await session.getChannelByName(team.id, template.channelName);
+        const membership = await session.getChannelMember(channel.id, user.id);
+        if (!membership) return NO_MATTERMOST_VERIFICATION_TARGET;
+        return operation({ user, senderGeneration: generation }, session);
+      });
+      if (result !== NO_MATTERMOST_VERIFICATION_TARGET) return result;
     } catch (error) {
       if (error instanceof MattermostApiError && error.code === "not_found") {
+        if (request.generation > 0) return operation(null, null);
         continue;
       }
+      if (request.generation > 0) throw error;
       lastUnavailable = error;
     }
   }
-  if (lastUnavailable) {
-    throw lastUnavailable;
-  }
-  return null;
+  if (lastUnavailable) throw lastUnavailable;
+  return operation(null, null);
 }
 
 async function reserveCode(input: {
@@ -198,57 +207,103 @@ export async function issueMattermostVerificationCode(input: {
   purpose: MattermostVerificationPurpose;
   request: MattermostVerificationRequest;
 }) {
+  const startedAt = Date.now();
   const challenge = generateOpaqueToken(24);
   const code = generateSixDigitCode();
-  const target = await resolveMattermostVerificationTarget(input.request);
+  const templateStartedAt = Date.now();
+  const messagePromise = buildVerificationMessage(input.purpose, code).then(
+    (message) => ({ message, error: null, durationMs: Date.now() - templateStartedAt }),
+    (error: unknown) => ({ message: null, error, durationMs: Date.now() - templateStartedAt }),
+  );
+  let targetLookupMs = 0;
+  let reserveCodeMs = 0;
+  let sendDmMs: number | null = null;
+  let templateMs: number | null = null;
 
-  const reservation = await reserveCode({
-    purpose: input.purpose,
-    challenge,
-    code,
-    target,
-    requestGeneration: input.request.generation,
-    requestUsername: input.request.username,
-  });
-  if (!reservation.accepted) {
-    throw new MattermostCodeVerificationError("rate_limited");
-  }
+  const delivery = await withMattermostVerificationTargetSession(
+    input.request,
+    async (target, session) => {
+      targetLookupMs = Date.now() - startedAt;
+      const reserveStartedAt = Date.now();
+      const reservation = await reserveCode({
+        purpose: input.purpose,
+        challenge,
+        code,
+        target,
+        requestGeneration: input.request.generation,
+        requestUsername: input.request.username,
+      });
+      reserveCodeMs = Date.now() - reserveStartedAt;
+      if (!reservation.accepted) {
+        throw new MattermostCodeVerificationError("rate_limited");
+      }
+      if (!target || !session) {
+        return { codeId: reservation.codeId, sent: false, errorCode: "not_found" } as const;
+      }
 
-  if (!target) {
-    await markCodeDelivery({
-      codeId: reservation.codeId,
-      sent: false,
-      errorCode: "not_found",
-    });
-    return {
-      challenge,
-      expiresInSeconds: MATTERMOST_VERIFICATION_CODE_TTL_SECONDS,
-      retryAfterSeconds: Math.ceil(RESEND_COOLDOWN_MS / 1000),
-    };
-  }
+      const messageResult = await messagePromise;
+      templateMs = messageResult.durationMs;
+      if (messageResult.error || !messageResult.message) {
+        return {
+          codeId: reservation.codeId,
+          sent: false,
+          errorCode: toSafeMattermostErrorCode(messageResult.error),
+        } as const;
+      }
 
+      const sendStartedAt = Date.now();
+      try {
+        await session.sendDirectMessage(target.user.id, messageResult.message);
+        sendDmMs = Date.now() - sendStartedAt;
+        return { codeId: reservation.codeId, sent: true, errorCode: null } as const;
+      } catch (error) {
+        sendDmMs = Date.now() - sendStartedAt;
+        return {
+          codeId: reservation.codeId,
+          sent: false,
+          errorCode: toSafeMattermostErrorCode(error),
+        } as const;
+      }
+    },
+  );
+
+  let deliveryMarkMs = 0;
+  let deliveryStatus: "sent" | "failed" = delivery.sent ? "sent" : "failed";
+  let deliveryErrorCode = delivery.errorCode;
   try {
-    const message = await buildVerificationMessage(input.purpose, code);
-    await withActiveMattermostSenderForGeneration(
-      target.senderGeneration,
-      (session) => session.sendDirectMessage(
-        target.user.id,
-        message,
-      ),
-    );
-    await markCodeDelivery({ codeId: reservation.codeId, sent: true });
-  } catch (error) {
+    const markStartedAt = Date.now();
     await markCodeDelivery({
-      codeId: reservation.codeId,
+      codeId: delivery.codeId,
+      sent: delivery.sent,
+      errorCode: delivery.errorCode,
+    });
+    deliveryMarkMs = Date.now() - markStartedAt;
+  } catch (error) {
+    deliveryStatus = "failed";
+    deliveryErrorCode = toSafeMattermostErrorCode(error);
+    const markStartedAt = Date.now();
+    await markCodeDelivery({
+      codeId: delivery.codeId,
       sent: false,
-      errorCode: toSafeMattermostErrorCode(error),
+      errorCode: deliveryErrorCode,
     }).catch(() => undefined);
+    deliveryMarkMs = Date.now() - markStartedAt;
   }
 
   return {
     challenge,
     expiresInSeconds: MATTERMOST_VERIFICATION_CODE_TTL_SECONDS,
     retryAfterSeconds: Math.ceil(RESEND_COOLDOWN_MS / 1000),
+    telemetry: {
+      targetLookupMs,
+      templateMs,
+      reserveCodeMs,
+      sendDmMs,
+      deliveryMarkMs,
+      totalMs: Date.now() - startedAt,
+      deliveryStatus,
+      deliveryErrorCode,
+    } satisfies MattermostVerificationIssueTelemetry,
   };
 }
 
