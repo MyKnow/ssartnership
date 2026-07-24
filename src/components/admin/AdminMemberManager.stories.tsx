@@ -14,7 +14,7 @@ const members: AdminMember[] = [
     serviceConsent: true,
     privacyConsent: true,
     marketingConsent: true,
-    hasProfileImage: true,
+    hasProfileImage: false,
     updatedAt: "2026-07-10T09:30:00+09:00",
     createdAt: "2026-01-12T10:00:00+09:00",
   },

@@ -1,4 +1,5 @@
 export type MattermostSenderTestRecipientKind =
+  | "self"
   | "previous_generation_sender"
   | "super_admin_bootstrap";
 
@@ -24,33 +25,13 @@ export function getMattermostSenderRoutingTemplate(generation: number) {
 }
 
 export function resolveMattermostSenderTestRecipient(input: {
-  generation: number;
-  previousGenerationSenderUserId: string | null | undefined;
-  superAdminMattermostUserId: string | null | undefined;
+  senderMattermostUserId: string | null | undefined;
 }): MattermostSenderTestRecipient | null {
-  if (!Number.isSafeInteger(input.generation) || input.generation < 1) {
-    return null;
-  }
-
-  const previousGenerationSenderUserId = normalizeUserId(
-    input.previousGenerationSenderUserId,
-  );
-  if (previousGenerationSenderUserId) {
-    return {
-      kind: "previous_generation_sender",
-      userId: previousGenerationSenderUserId,
-    };
-  }
-
-  const superAdminMattermostUserId = normalizeUserId(
-    input.superAdminMattermostUserId,
-  );
-  if (!superAdminMattermostUserId) {
-    return null;
-  }
+  const senderMattermostUserId = normalizeUserId(input.senderMattermostUserId);
+  if (!senderMattermostUserId) return null;
 
   return {
-    kind: "super_admin_bootstrap",
-    userId: superAdminMattermostUserId,
+    kind: "self",
+    userId: senderMattermostUserId,
   };
 }

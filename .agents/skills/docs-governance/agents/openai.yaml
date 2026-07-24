@@ -2,6 +2,6 @@ interface:
   display_name: "Docs Governance"
   short_description: "Markdown placement and docs taxonomy for this repository"
   brand_color: "#0F766E"
-  default_prompt: "Place or reorganize markdown docs under docs/ with the correct category"
+  default_prompt: "Use $docs-governance to place or reorganize markdown docs under docs/ with the correct category."
 policy:
   allow_implicit_invocation: true

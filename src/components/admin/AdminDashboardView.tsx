@@ -15,6 +15,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Surface from "@/components/ui/Surface";
 import AdminPlatformActivityMetricsPanel from "@/components/admin/AdminPlatformActivityMetricsPanel";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import {
   type AdminPermissionMatrix,
   type AdminPermissionResource,
@@ -83,6 +84,10 @@ export default function AdminDashboardView({
   state?: AdminDashboardViewState;
   errorMessage?: string;
 }) {
+  const errorDescription = errorMessage
+    ? "운영 데이터를 다시 불러올 수 없습니다. 잠시 후 다시 확인해 주세요."
+    : "잠시 후 다시 시도해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요.";
+
   if (state !== "ready") {
     return (
       <div className="grid min-w-0 gap-6" aria-busy={state === "loading" || undefined}>
@@ -104,14 +109,16 @@ export default function AdminDashboardView({
             ))}
           </div>
         ) : state === "error" ? (
-          <InlineMessage
-            tone="danger"
+          <AdminStatePanel
+            kind="error"
             title="관리 홈 데이터를 불러오지 못했습니다."
-            description={errorMessage ?? "잠시 후 다시 시도해 주세요."}
+            description={errorDescription}
+            action={<Button href="/admin" variant="secondary">다시 확인</Button>}
           />
         ) : (
           <Surface level="elevated" padding="lg" className="grid gap-4">
-            <EmptyState
+            <AdminStatePanel
+              kind="forbidden"
               title={
                 state === "unauthorized"
                   ? "관리자 로그인이 필요합니다."
@@ -122,14 +129,15 @@ export default function AdminDashboardView({
                   ? "관리자 계정으로 로그인한 뒤 다시 시도해 주세요."
                   : "필요한 권한은 최고 관리자에게 요청해 주세요."
               }
+              action={
+                <Button
+                  href={state === "unauthorized" ? "/auth/login?returnTo=%2Fadmin" : "/"}
+                  variant="secondary"
+                >
+                  {state === "unauthorized" ? "관리자 로그인" : "사용자 홈으로"}
+                </Button>
+              }
             />
-            <Button
-              href={state === "unauthorized" ? "/auth/login?returnTo=%2Fadmin" : "/"}
-              variant="secondary"
-              className="justify-self-center"
-            >
-              {state === "unauthorized" ? "관리자 로그인" : "사용자 홈으로"}
-            </Button>
           </Surface>
         )}
       </div>

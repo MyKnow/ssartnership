@@ -1,0 +1,4 @@
+interface:
+  display_name: "싸트너십 UI/UX"
+  short_description: "싸트너십 웹 UI 설계·상태 전이·반응형 QA 기준"
+  default_prompt: "Use $ssartnership-ui-ux to design, implement, or review a UI change in ssartnership."

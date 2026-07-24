@@ -48,19 +48,16 @@ tests/                    Node test files for domain logic and helpers
 
 ## Skills
 
-Use the minimal relevant skill for the task:
+Use the minimal relevant skill for the task.
 
-- `ssartnership-patterns`: repository-specific Next.js, Supabase, Tailwind, Repository pattern, validation conventions
+Project-local skills, tracked with this repository:
+
+- `ssartnership-patterns`: repository-specific Next.js, Supabase, Repository, validation, CI, and release conventions
+- `ssartnership-ui-ux`: project visual system, Korean UI states, routing/error recovery, prototype promotion, and UI QA
 - `member-required-gate-redirects`: member password, consent, profile-photo, and `returnTo` gate priority/loop prevention
-- `frontend-patterns`, `frontend-design`, `design-system`: React, Next.js UI, TDS-like visual consistency
-- `backend-patterns`, `api-design`: API routes, service/repository layering, response design
-- `postgres-patterns`, `database-migrations`: Supabase/PostgreSQL schema and migration work
-- `security-review`: auth, secrets, input validation, RLS, sensitive endpoints
-- `tdd-workflow`, `e2e-testing`, `browser-qa`, `verification-loop`: tests and release verification
-- `documentation-lookup`, `nextjs-turbopack`: current framework behavior and Next.js 16+ details
-- `deployment-patterns`, `git-workflow`: Vercel release and commit/PR workflow
-- `market-research`, `deep-research`, `exa-search`, `content-engine`, `seo`: partnership research, public content, SEO work
-- `coding-standards`, `search-first`: baseline coding quality and research-before-build workflow
+- `docs-governance`: repository documentation placement and taxonomy
+
+Codex-local skills are cross-project tools and are intentionally not copied into this repository. Use them when installed: frontend, backend, data, security, testing, research, documentation, deployment, Git, and `ui-prototyping` skills. Keep a project-specific rule in a project-local skill instead of adding it to a Codex-local skill.
 
 ## Verification
 
