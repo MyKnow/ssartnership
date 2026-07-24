@@ -67,8 +67,3 @@ export type ActiveMattermostSenderHealthRecord = {
   senderMattermostUserId: string;
   senderMattermostUsername: string | null;
 };
-
-export type MattermostSenderTestContext = {
-  previousGenerationSenderUserId: string | null;
-  superAdminMattermostUserId: string | null;
-};
