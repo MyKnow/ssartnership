@@ -108,3 +108,18 @@ test("수동 초기 설정과 이메일 재설정은 토큰 해시만 서버에 
   assert.match(service, /deliveryChannel: "email"/);
   assert.match(service, /deliveryChannel: "mattermost"/);
 });
+
+test("기존 회원 중복 행은 초대 없이 비재시도 결과와 기존 회원 상세를 제공한다", async () => {
+  const [service, panel] = await Promise.all([
+    read("src/lib/member-manual-import/service.server.ts"),
+    read("src/components/admin/AdminMemberManualAddPanel.tsx"),
+  ]);
+
+  assert.match(service, /existingMemberId \? "already_exists" : "failed"/);
+  assert.match(service, /error_code: existingMemberId\s*\? "already_registered"/);
+  assert.match(service, /const retryable = !existingMemberId\s*&&/);
+  assert.match(service, /row\.error_code !== "already_registered"/);
+  assert.match(service, /existingMemberId/);
+  assert.match(panel, /이미 등록됨/);
+  assert.match(panel, /기존 회원 상세/);
+});

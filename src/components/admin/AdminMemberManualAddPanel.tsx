@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import JSZip from "jszip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -81,16 +82,18 @@ type ImportResult = {
   total: number;
   success: number;
   failed: number;
+  alreadyExists: number;
   retryableFailures: number;
   items: Array<{
     rowNumber: number;
-    status: "success" | "failed";
+    status: "success" | "failed" | "already_exists";
     name: string | null;
     mmId: string | null;
     email: string | null;
     deliveryChannel: "mattermost" | "email" | null;
     reason: string | null;
     retryable: boolean;
+    existingMemberId: string | null;
   }>;
 };
 
@@ -161,10 +164,10 @@ async function readPhotoZip(file: File) {
   return photos;
 }
 
-function resultBadge(status: "success" | "failed") {
-  return status === "success"
-    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-    : "bg-danger/15 text-danger";
+function resultBadge(status: ImportResultItem["status"]) {
+  if (status === "success") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+  if (status === "already_exists") return "bg-warning/15 text-warning";
+  return "bg-danger/15 text-danger";
 }
 
 function formatValidationErrors(errors: Array<{ rowNumber: number | null; message: string }>) {
@@ -181,11 +184,13 @@ function replaceImportResultItem(
     item.rowNumber === replacement.rowNumber ? replacement : item,
   );
   const success = items.filter((item) => item.status === "success").length;
-  const failed = items.length - success;
+  const failed = items.filter((item) => item.status === "failed").length;
+  const alreadyExists = items.filter((item) => item.status === "already_exists").length;
   return {
     ...result,
     success,
     failed,
+    alreadyExists,
     retryableFailures: items.filter((item) => item.status === "failed" && item.retryable).length,
     items,
   };
@@ -1003,14 +1008,15 @@ export default function AdminMemberManualAddPanel({
       {result ? (
         <div className="grid gap-4 rounded-3xl border border-border bg-surface-elevated p-4 shadow-flat">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="text-lg font-semibold text-foreground">가져오기 결과</h3><p className="text-sm text-muted-foreground">{result.failed === 0 ? "성공 행은 유지됩니다." : result.retryableFailures === 0 ? "전송 결과 확인이 필요한 행이 있어 자동 재시도는 중지되었습니다." : result.retryableFailures < result.failed ? "재시도 가능한 실패 행만 같은 준비 배치에서 다시 시도합니다. 전송 결과 확인이 필요한 행은 자동 재시도하지 않습니다." : "성공 행은 유지됩니다. 실패 행이 있으면 같은 준비 배치에서 실패 행만 다시 시도할 수 있습니다."}</p></div>
-            <div className="flex gap-2"><Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">성공 {result.success}</Badge><Badge className="bg-danger/15 text-danger">실패 {result.failed}</Badge></div>
+            <div><h3 className="text-lg font-semibold text-foreground">가져오기 결과</h3><p className="text-sm text-muted-foreground">{result.alreadyExists > 0 ? "이미 등록된 회원은 생성하거나 설정 링크를 전송하지 않았습니다." : result.failed === 0 ? "성공 행은 유지됩니다." : result.retryableFailures === 0 ? "전송 결과 확인이 필요한 행이 있어 자동 재시도는 중지되었습니다." : result.retryableFailures < result.failed ? "재시도 가능한 실패 행만 같은 준비 배치에서 다시 시도합니다. 전송 결과 확인이 필요한 행은 자동 재시도하지 않습니다." : "성공 행은 유지됩니다. 실패 행이 있으면 같은 준비 배치에서 실패 행만 다시 시도할 수 있습니다."}</p></div>
+            <div className="flex flex-wrap gap-2"><Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">성공 {result.success}</Badge>{result.alreadyExists > 0 ? <Badge className="bg-warning/15 text-warning">이미 등록됨 {result.alreadyExists}</Badge> : null}<Badge className="bg-danger/15 text-danger">실패 {result.failed}</Badge></div>
           </div>
           <div className="grid gap-2">
             {result.items.map((item) => (
               <div key={item.rowNumber} className="rounded-2xl border border-border bg-surface-inset px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2"><Badge className={resultBadge(item.status)}>{item.status === "success" ? "성공" : "실패"}</Badge><span className="font-medium text-foreground">{item.rowNumber}행 · {item.name ?? item.mmId ?? item.email ?? "회원"}</span>{item.deliveryChannel ? <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-300">{item.deliveryChannel === "mattermost" ? "MM 전송" : "이메일 전송"}</Badge> : null}</div>
-                <p className="mt-2 text-sm text-muted-foreground">{item.status === "success" ? "계정 설정 링크를 전송했습니다. 첨부 사진은 검토 큐에서 승인 또는 반려할 수 있습니다." : item.retryable ? item.reason ?? "처리 실패" : `자동 재시도 중지 · ${item.reason ?? "전송 결과 확인 필요"}`}</p>
+                <div className="flex flex-wrap items-center gap-2"><Badge className={resultBadge(item.status)}>{item.status === "success" ? "성공" : item.status === "already_exists" ? "이미 등록됨" : "실패"}</Badge><span className="font-medium text-foreground">{item.rowNumber}행 · {item.name ?? item.mmId ?? item.email ?? "회원"}</span>{item.deliveryChannel ? <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-300">{item.deliveryChannel === "mattermost" ? "MM 전송" : "이메일 전송"}</Badge> : null}</div>
+                <p className="mt-2 text-sm text-muted-foreground">{item.status === "success" ? "계정 설정 링크를 전송했습니다. 첨부 사진은 검토 큐에서 승인 또는 반려할 수 있습니다." : item.status === "already_exists" ? "이미 등록된 회원입니다. 새 회원과 설정 링크는 만들지 않았습니다." : item.retryable ? item.reason ?? "처리 실패" : `자동 재시도 중지 · ${item.reason ?? "전송 결과 확인 필요"}`}</p>
+                {item.status === "already_exists" && item.existingMemberId ? <Link className="mt-3 inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background" href={`/admin/members/${encodeURIComponent(item.existingMemberId)}`}>기존 회원 상세</Link> : null}
                 {canReissueManualSetup && item.status === "failed" && !item.retryable ? (
                   <div className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3">
                     {confirmationRowNumber === item.rowNumber ? (
