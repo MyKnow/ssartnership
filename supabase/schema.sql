@@ -1214,15 +1214,19 @@ as $$
       )
   ),
   numbered_rows as (
-    select id, created_at, count(*) over()::bigint as total_count
+    select
+      id,
+      created_at,
+      count(*) over()::bigint as total_count,
+      row_number() over (order by created_at desc, id desc) as row_num
     from scoped_rows
   )
   select numbered_rows.id, numbered_rows.total_count
   from numbered_rows
   cross join parameters
-  order by numbered_rows.created_at desc, numbered_rows.id desc
-  offset (parameters.page - 1) * parameters.page_size
-  limit parameters.page_size;
+  where numbered_rows.row_num > ((parameters.page - 1) * parameters.page_size)
+    and numbered_rows.row_num <= (parameters.page * parameters.page_size)
+  order by numbered_rows.row_num;
 $$;
 
 revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) from public;

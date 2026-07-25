@@ -39,6 +39,12 @@ test("제휴 등록 신청은 서버 범위 페이지 조회와 안전한 URL �
   assert.match(migrationSource, /get_admin_partner_registration_request_page/);
   assert.match(migrationSource, /input_managed_campus_slugs text\[\] default null/);
   assert.match(migrationSource, /count\(\*\) over\(\)/);
+  assert.match(migrationSource, /row_number\(\) over \(order by created_at desc, id desc\)/);
+  assert.match(
+    migrationSource,
+    /where numbered_rows\.row_num > \(\(parameters\.page - 1\) \* parameters\.page_size\)/,
+  );
+  assert.doesNotMatch(migrationSource, /offset \(parameters\.page - 1\)/i);
   assert.match(migrationSource, /security invoker/);
   assert.match(migrationSource, /grant execute on function public\.get_admin_partner_registration_request_page/);
   assert.match(schemaSource, /get_admin_partner_registration_request_page/);
