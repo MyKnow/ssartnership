@@ -1001,7 +1001,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
             ? "member_limit"
             : error.message.includes("member_daily_limit") || error.message.includes("member_weekly_limit") || error.message.includes("member_monthly_limit")
               ? "member_limit"
-              : error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
+            : error.message.includes("usage_limit") || error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
               ? error.message.includes("code_unavailable") ? "code_unavailable" : "usage_limit"
               : "invalid";
       return { ok: false, reason, message: "현재 쿠폰을 다운로드할 수 없습니다." };
