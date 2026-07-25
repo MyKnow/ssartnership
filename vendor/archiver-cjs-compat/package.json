@@ -1,0 +1,13 @@
+{
+  "name": "archiver",
+  "version": "8.0.0-cjs-compat.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.cjs",
+  "dependencies": {
+    "archiver-core": "npm:archiver@8.0.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
