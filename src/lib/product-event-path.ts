@@ -10,6 +10,22 @@ const SENSITIVE_PATH_PATTERNS: Array<readonly [RegExp, string]> = [
     /^\/api\/certification\/avatar\/[^/?#]+(?=\/|$|[?#])/,
     "/api/certification/avatar/[token]",
   ],
+  [
+    /^\/admin\/member-signup-requests\/[^/?#]+(?=\/|$|[?#])/,
+    "/admin/member-signup-requests/[requestId]",
+  ],
+  [
+    /^\/admin\/members\/(?!mock(?:[/?#]|$))[^/?#]+(?=\/|$|[?#])/,
+    "/admin/members/[memberId]",
+  ],
+  [
+    /^\/admin\/partners\/(?!new(?:[/?#]|$))[^/?#]+(?=\/|$|[?#])/,
+    "/admin/partners/[partnerId]",
+  ],
+  [
+    /^\/admin\/event\/[^/?#]+(?=\/|$|[?#])/,
+    "/admin/event/[slug]",
+  ],
 ];
 
 function sanitizeSensitivePathname(pathname: string) {

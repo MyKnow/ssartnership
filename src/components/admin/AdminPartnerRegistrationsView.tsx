@@ -22,55 +22,9 @@ import {
   type PartnerRegistrationSource,
 } from "@/lib/partner-registration";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import type { AdminPartnerRegistrationRequestDataRow } from "@/lib/admin-partner-registration-queue";
 
-export type AdminPartnerRegistrationRow = {
-  id: string;
-  status: string;
-  source?: PartnerRegistrationSource | null;
-  service_mode: "offline" | "online";
-  benefit_action_type: keyof typeof ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS;
-  branch_scope_type?: string | null;
-  branch_scope_note?: string | null;
-  brand_name: string;
-  category_id?: string | null;
-  category_label: string;
-  period_start?: string | null;
-  period_end?: string | null;
-  inquiry_link?: string | null;
-  brand_phone?: string | null;
-  detail_description?: string | null;
-  company_name: string;
-  contact_name: string;
-  contact_email: string;
-  contact_phone?: string | null;
-  company_description?: string | null;
-  benefits: string[];
-  conditions: string[];
-  tags: string[];
-  location: string;
-  map_url?: string | null;
-  site_link?: string | null;
-  thumbnail_url?: string | null;
-  image_urls?: string[] | null;
-  memo?: string | null;
-  admin_note?: string | null;
-  reviewed_at?: string | null;
-  created_at: string;
-  company?:
-    | { managed_campus_slugs?: string[] | null }
-    | Array<{ managed_campus_slugs?: string[] | null }>
-    | null;
-  branches?: Array<{
-    id: string;
-    branch_type?: string | null;
-    campus_slugs?: string[] | null;
-  }> | null;
-  benefit_groups?: Array<{
-    id: string;
-    group_key?: string | null;
-    label?: string | null;
-  }> | null;
-};
+export type AdminPartnerRegistrationRow = AdminPartnerRegistrationRequestDataRow;
 
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
@@ -148,18 +102,57 @@ function ValueList({ title, values }: { title: string; values: string[] }) {
   );
 }
 
+function buildRegistrationQueueHref(
+  returnTo: string,
+  {
+    status,
+    page,
+    pageSize,
+  }: {
+    status?: string | null;
+    page: number;
+    pageSize: number;
+  },
+) {
+  const url = new URL(returnTo, "https://admin.local");
+  if (status) {
+    url.searchParams.set("status", status);
+  } else {
+    url.searchParams.delete("status");
+  }
+  if (page > 1) {
+    url.searchParams.set("page", String(page));
+  } else {
+    url.searchParams.delete("page");
+  }
+  if (pageSize !== 12) {
+    url.searchParams.set("pageSize", String(pageSize));
+  } else {
+    url.searchParams.delete("pageSize");
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 export default function AdminPartnerRegistrationsView({
   rows,
   updateStatusAction,
   status,
   feedback,
   returnTo = "/admin/partner-registrations",
+  pagination,
+  loadError = false,
 }: {
   rows: AdminPartnerRegistrationRow[];
   updateStatusAction: AdminFormAction;
   status?: PartnerRegistrationRequestStatus | null;
   feedback?: AdminReviewQueueFeedback | null;
   returnTo?: string;
+  pagination?: {
+    totalCount: number;
+    page: number;
+    pageSize: number;
+  };
+  loadError?: boolean;
 }) {
   const counts = rows.reduce(
     (result, row) => ({
@@ -174,11 +167,19 @@ export default function AdminPartnerRegistrationsView({
       archived: 0,
     } satisfies Record<PartnerRegistrationRequestStatus, number>,
   );
+  const effectivePagination = pagination ?? {
+    totalCount: rows.length,
+    page: 1,
+    pageSize: Math.max(1, rows.length),
+  };
+  const totalPages = Math.max(1, Math.ceil(effectivePagination.totalCount / effectivePagination.pageSize));
+  const currentPage = Math.min(effectivePagination.page, totalPages);
+  const pageStart = (currentPage - 1) * effectivePagination.pageSize;
 
   return (
     <section className="grid min-w-0 gap-6">
       <AdminReviewQueueHeader
-        eyebrow="Partner Registration"
+        eyebrow="등록 신청"
         title="제휴 등록 신청 검토"
         description="공개 등록 페이지로 접수된 파트너사와 제휴처 정보를 확인하고 검토 상태를 관리합니다."
         actions={
@@ -192,10 +193,10 @@ export default function AdminPartnerRegistrationsView({
           </>
         }
         metrics={[
-          { label: "표시 건수", value: `${rows.length}건`, hint: "현재 필터 기준" },
-          { label: "접수", value: `${counts.pending}건`, hint: "아직 검토 전" },
-          { label: "검토 중", value: `${counts.in_review}건`, hint: "관리자 확인 중" },
-          { label: "등록 완료", value: `${counts.converted}건`, hint: "제휴처 등록 처리" },
+          { label: "조건 일치", value: `${effectivePagination.totalCount.toLocaleString("ko-KR")}건`, hint: "현재 상태와 권한 범위" },
+          { label: "현재 표시", value: `${rows.length.toLocaleString("ko-KR")}건`, hint: `${currentPage} / ${totalPages} 페이지` },
+          { label: "접수", value: `${counts.pending}건`, hint: "현재 페이지에서 아직 검토 전" },
+          { label: "검토 중", value: `${counts.in_review}건`, hint: "현재 페이지에서 관리자 확인 중" },
         ]}
         feedback={feedback}
         nextAction={{
@@ -210,14 +211,23 @@ export default function AdminPartnerRegistrationsView({
         }))}
         value={status}
         getHref={(nextStatus) =>
-          nextStatus
-            ? `/admin/partner-registrations?status=${encodeURIComponent(nextStatus)}`
-            : "/admin/partner-registrations"
+          buildRegistrationQueueHref(returnTo, {
+            status: nextStatus,
+            page: 1,
+            pageSize: effectivePagination.pageSize,
+          })
         }
         ariaLabel="등록 신청 상태 필터"
       />
 
-      {rows.length === 0 ? (
+      {loadError ? (
+        <AdminStatePanel
+          kind="error"
+          title="등록 신청을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          action={<Button variant="secondary" href={returnTo}>다시 확인</Button>}
+        />
+      ) : rows.length === 0 ? (
         <AdminStatePanel
           kind="empty"
           title="접수된 등록 신청이 없습니다"
@@ -226,6 +236,46 @@ export default function AdminPartnerRegistrationsView({
         />
       ) : (
         <div className="grid min-w-0 gap-4">
+          {totalPages > 1 ? (
+            <Surface level="inset" padding="sm" className="grid min-w-0 gap-3 text-sm text-muted-foreground lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
+              <p>
+                {pageStart + 1}-{Math.min(pageStart + rows.length, effectivePagination.totalCount)} / {effectivePagination.totalCount.toLocaleString("ko-KR")}
+              </p>
+              <div className="flex flex-wrap gap-1.5" aria-label="페이지당 표시 건수">
+                {[6, 12, 24].map((pageSize) => (
+                  <Button
+                    key={pageSize}
+                    href={buildRegistrationQueueHref(returnTo, { status, page: 1, pageSize })}
+                    size="sm"
+                    variant={pageSize === effectivePagination.pageSize ? "secondary" : "ghost"}
+                  >
+                    {pageSize}개씩
+                  </Button>
+                ))}
+              </div>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <Button
+                  href={buildRegistrationQueueHref(returnTo, { status, page: currentPage - 1, pageSize: effectivePagination.pageSize })}
+                  variant="secondary"
+                  size="sm"
+                  prefetch
+                  disabled={currentPage === 1}
+                >
+                  이전
+                </Button>
+                <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">{currentPage} / {totalPages}</span>
+                <Button
+                  href={buildRegistrationQueueHref(returnTo, { status, page: currentPage + 1, pageSize: effectivePagination.pageSize })}
+                  variant="secondary"
+                  size="sm"
+                  prefetch
+                  disabled={currentPage === totalPages}
+                >
+                  다음
+                </Button>
+              </div>
+            </Surface>
+          ) : null}
           {rows.map((row) => {
             const rowStatus = normalizeStatus(row.status);
             return (
@@ -239,7 +289,7 @@ export default function AdminPartnerRegistrationsView({
                       {!row.category_id ? <Badge variant="warning">신규 카테고리</Badge> : null}
                       <span className="text-xs font-semibold text-muted-foreground">{formatDateTime(row.created_at)}</span>
                     </div>
-                    <h2 className="mt-2 truncate text-xl font-semibold text-foreground">{row.brand_name}</h2>
+                    <h2 className="mt-2 text-xl font-semibold text-foreground">{row.brand_name}</h2>
                     <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
                       {row.company_name} · {row.category_label} · {ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS[row.service_mode]} · {ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS[row.benefit_action_type]}
                     </p>

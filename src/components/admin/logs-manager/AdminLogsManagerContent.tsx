@@ -31,7 +31,10 @@ export default function AdminLogsManagerContent({
 
   return (
     <>
-      <div className="grid min-w-0 gap-6 overflow-x-clip">
+      <div className="grid min-w-0 gap-6 overflow-x-clip" aria-busy={logs.isLoading}>
+        <p className="sr-only" aria-live="polite">
+          {logs.isLoading ? '로그 결과를 새로 불러오는 중입니다.' : ''}
+        </p>
         <section className="grid gap-4 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat sm:px-6 sm:py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <AdminSectionHeading

@@ -28,6 +28,7 @@ export const CLIENT_PRODUCT_EVENT_NAMES = [
   "home_banner_click",
   "coupon_view",
   "coupon_copy",
+  "admin_web_vital",
 ] as const satisfies readonly ProductEventName[];
 
 export type ClientProductEventName = (typeof CLIENT_PRODUCT_EVENT_NAMES)[number];
@@ -195,6 +196,15 @@ function parseProperties(
         })
         .strip()
         .parse(rawProperties);
+    case "admin_web_vital":
+      return z
+        .object({
+          metric: z.enum(["CLS", "FCP", "INP", "LCP", "TTFB"]),
+          rating: z.enum(["good", "needs-improvement", "poor"]),
+          value: z.number().finite().min(0).max(120_000),
+        })
+        .strip()
+        .parse(rawProperties);
     default:
       return {};
   }
@@ -340,6 +350,14 @@ function parseProductEventTarget(
       return parseFixedTarget(eventName, targetType, targetId, "ad_coupon", {
         targetId: "safe",
       });
+    case "admin_web_vital":
+      return parseFixedTarget(
+        eventName,
+        targetType,
+        targetId,
+        "admin_performance",
+        { targetId: "safe" },
+      );
   }
 }
 

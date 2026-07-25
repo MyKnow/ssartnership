@@ -465,7 +465,8 @@ export default function PromotionCarouselEditor({
       const sourceUrl = URL.createObjectURL(sourceFile);
       setPendingCrop({ slideId: id, sourceUrl, sourceFile });
     } catch (error) {
-      setError(error instanceof Error ? error.message : "이미지를 준비하지 못했습니다.");
+      void error;
+      setError("이미지를 준비하지 못했습니다.");
     }
   }
 
@@ -569,11 +570,8 @@ export default function PromotionCarouselEditor({
       allowUploadedFormSubmitRef.current = true;
       form.requestSubmit();
     } catch (uploadError) {
-      setError(
-        uploadError instanceof Error && uploadError.message
-          ? uploadError.message
-          : "광고 이미지를 업로드하지 못했습니다. 입력한 내용은 유지됩니다.",
-      );
+      void uploadError;
+      setError("광고 이미지를 업로드하지 못했습니다. 입력한 내용은 유지됩니다.");
     } finally {
       isSubmittingImagesRef.current = false;
     }

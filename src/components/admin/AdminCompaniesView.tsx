@@ -3,6 +3,8 @@ import AdminCompanyWorkspace, {
 } from "@/components/admin/AdminCompanyWorkspace";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminWorkspaceSummary from "@/components/admin/AdminWorkspaceSummary";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
+import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 
 export default function AdminCompaniesView({
@@ -14,9 +16,11 @@ export default function AdminCompaniesView({
   generatedSetupAccountId,
   initialTab,
   actions,
+  loadError = false,
 }: AdminCompanyWorkspaceProps & {
   partnerCount: number;
   errorMessage?: string | null;
+  loadError?: boolean;
 }) {
   const activeCompanyCount = companies.filter(
     (company) => company.is_active !== false,
@@ -32,15 +36,25 @@ export default function AdminCompaniesView({
   return (
     <section className="grid gap-6">
       <AdminPageHeader
-        eyebrow="Partner Companies"
+        eyebrow="데이터"
         title="파트너사와 계정 연결 관리"
         description="여러 제휴처를 보유한 회사 단위, 담당 계정, 다대다 연결을 한 화면에서 정리합니다."
       />
       {errorMessage ? (
         <FormMessage variant="error">{errorMessage}</FormMessage>
       ) : null}
+      {loadError ? (
+        <AdminStatePanel
+          kind="error"
+          title="파트너사와 계정 정보를 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+          action={<Button href="/admin/companies" variant="secondary">다시 확인</Button>}
+        />
+      ) : null}
+      {!loadError ? (
+        <>
       <AdminWorkspaceSummary
-        eyebrow="Operations"
+        eyebrow="운영"
         title="파트너사 운영 현황"
         description="처리할 회사·계정 연결을 먼저 확인하고, 아래 탭에서 한 가지 작업을 이어갑니다."
         items={[
@@ -75,6 +89,8 @@ export default function AdminCompaniesView({
         initialTab={initialTab}
         actions={actions}
       />
+        </>
+      ) : null}
     </section>
   );
 }

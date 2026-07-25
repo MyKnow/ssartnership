@@ -1,6 +1,8 @@
 export type {
   PartnerChangeRequestCancelInput,
   PartnerChangeRequestContext,
+  PartnerChangeRequestListInput,
+  PartnerChangeRequestPage,
   PartnerChangeRequestCreateInput,
   PartnerChangeRequestRepository,
   PartnerChangeRequestReviewInput,
@@ -13,6 +15,7 @@ export type {
 export {
   getPartnerChangeRequestContext,
   listPartnerChangeRequests,
+  listPartnerChangeRequestPage,
   createPartnerChangeRequest,
   cancelPartnerChangeRequest,
   approvePartnerChangeRequest,

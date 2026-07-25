@@ -84,6 +84,20 @@ export type PartnerChangeRequestSummary = {
   updatedAt: string;
 };
 
+export type PartnerChangeRequestListInput = {
+  companyIds?: string[];
+  partnerIds?: string[];
+  page: number;
+  pageSize: number;
+};
+
+export type PartnerChangeRequestPage = {
+  requests: PartnerChangeRequestSummary[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
 export type PartnerChangeRequestContext = {
   companyId: string;
   companyName: string;
@@ -187,6 +201,9 @@ export interface PartnerChangeRequestRepository {
     accountId?: string,
   ): Promise<PartnerChangeRequestContext | null>;
   listPendingRequests(companyIds?: string[]): Promise<PartnerChangeRequestSummary[]>;
+  listPendingRequestsPage(
+    input: PartnerChangeRequestListInput,
+  ): Promise<PartnerChangeRequestPage>;
   createRequest(
     input: PartnerChangeRequestCreateInput,
   ): Promise<PartnerChangeRequestSummary>;

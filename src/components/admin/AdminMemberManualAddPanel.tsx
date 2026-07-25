@@ -14,6 +14,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
+import { getSafeAdminResponseMessage } from "@/lib/admin-safe-messages";
 import {
   MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS,
   getManualMemberImportGenerationOptions,
@@ -505,8 +506,8 @@ export default function AdminMemberManualAddPanel({
         sourceFile,
         sourceUrl,
       });
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "사진을 준비하지 못했습니다.");
+    } catch {
+      setError("사진을 준비하지 못했습니다.");
     } finally {
       setPending(null);
     }
@@ -547,11 +548,18 @@ export default function AdminMemberManualAddPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok || !Array.isArray(data.rows)) {
-        throw new Error(Array.isArray(data.errors) ? data.errors.join("\n") : "XLSX 행을 읽지 못했습니다.");
+        setError(
+          getSafeAdminResponseMessage(
+            Array.isArray(data.errors) ? data.errors[0] : undefined,
+            "XLSX 행을 읽지 못했습니다.",
+          ),
+        );
+        return;
       }
       const merged = appendManualMemberImportWorkbookRows(rows, data.rows);
       if (merged.appendedCount === 0) {
-        throw new Error(`한 번에 ${MANUAL_MEMBER_IMPORT_LIMITS.maxRows}명까지만 추가할 수 있습니다.`);
+        setError(`한 번에 ${MANUAL_MEMBER_IMPORT_LIMITS.maxRows}명까지만 추가할 수 있습니다.`);
+        return;
       }
       setRows(merged.rows);
       if (merged.skippedCount > 0) {
@@ -559,8 +567,8 @@ export default function AdminMemberManualAddPanel({
       } else {
         notify(`XLSX에서 ${merged.appendedCount}행을 추가했습니다. 내용을 검토한 뒤 검증을 시작해 주세요.`);
       }
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "XLSX 행을 읽지 못했습니다.");
+    } catch {
+      setError("XLSX 행을 읽지 못했습니다.");
     } finally {
       if (xlsxRef.current) xlsxRef.current.value = "";
       setPending(null);
@@ -655,14 +663,21 @@ export default function AdminMemberManualAddPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) {
-        throw new Error(Array.isArray(data.errors) ? data.errors.join("\n") : "회원 행 검증에 실패했습니다.");
+        setBatch(null);
+        setError(
+          getSafeAdminResponseMessage(
+            Array.isArray(data.errors) ? data.errors[0] : undefined,
+            "회원 행 검증에 실패했습니다. 입력 항목을 확인한 뒤 다시 시도해 주세요.",
+          ),
+        );
+        return;
       }
       const prepared = data as PreflightSuccess;
       setBatch(prepared);
       notify("행 검증과 사진 업로드가 완료되었습니다. 생성 시작을 눌러 주세요.");
-    } catch (caught) {
+    } catch {
       setBatch(null);
-      setError(caught instanceof Error ? caught.message : "회원 행 검증에 실패했습니다.");
+      setError("회원 행 검증에 실패했습니다. 입력 항목을 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }
@@ -686,9 +701,9 @@ export default function AdminMemberManualAddPanel({
       }
       openZipPhotoCrop(zipPhotos, [], 0);
       notify(`사진 ZIP ${zipPhotos.length}장을 순서대로 확인해 주세요.`);
-    } catch (caught) {
+    } catch {
       setBatch(null);
-      setError(caught instanceof Error ? caught.message : "사진 ZIP을 준비하지 못했습니다.");
+      setError("사진 ZIP을 준비하지 못했습니다. 파일을 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }
@@ -734,7 +749,13 @@ export default function AdminMemberManualAddPanel({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok || !data.result) {
-        throw new Error(data.message ?? "회원 생성에 실패했습니다.");
+        setError(
+          getSafeAdminResponseMessage(
+            data.message,
+            "회원 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+          ),
+        );
+        return;
       }
       const nextResult = data.result as ImportResult;
       setResult(nextResult);
@@ -742,8 +763,8 @@ export default function AdminMemberManualAddPanel({
         void clearManualMemberImportDraft();
       }
       notify("회원 가져오기를 처리했습니다.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "회원 생성에 실패했습니다.");
+    } catch {
+      setError("회원 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setPending(null);
     }
@@ -772,15 +793,21 @@ export default function AdminMemberManualAddPanel({
         || data.item.rowNumber !== item.rowNumber
         || data.item.status !== "success"
       ) {
-        throw new Error(data.message ?? "새 초기 설정 링크를 발급하지 못했습니다.");
+        setError(
+          getSafeAdminResponseMessage(
+            data.message,
+            "새 초기 설정 링크를 발급하지 못했습니다. 수신 여부를 확인한 뒤 다시 시도해 주세요.",
+          ),
+        );
+        return;
       }
       setResult((current) => current
         ? replaceImportResultItem(current, data.item as ImportResultItem)
         : current);
       setConfirmationRowNumber(null);
       notify(`${item.rowNumber}행에 새 초기 설정 링크를 발급했습니다.`);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "새 초기 설정 링크를 발급하지 못했습니다.");
+    } catch {
+      setError("새 초기 설정 링크를 발급하지 못했습니다. 수신 여부를 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setReissuingRowNumber(null);
     }
@@ -935,14 +962,19 @@ export default function AdminMemberManualAddPanel({
     <span className="block">단, 이메일만 입력하면 이름과 캠퍼스도 필요합니다.</span>
   </p>
                   <div className="grid min-w-0 gap-1 text-sm font-medium text-foreground">
-                    <label htmlFor={`member-import-photo-${row.rowNumber}`}>사진 (선택 사항)</label>
+                    <label
+                      className="min-w-0"
+                      htmlFor={`member-import-photo-${row.rowNumber}`}
+                    >
+                      사진 (선택 사항)
+                    </label>
                     <Input
                       id={`member-import-photo-${row.rowNumber}`}
                       aria-label={`${row.rowNumber}행 사진 선택`}
                       data-member-import-field="photo"
                       type="file"
                       accept={MANUAL_MEMBER_IMPORT_PHOTO_ACCEPT}
-                      className="h-auto min-w-0 py-2 text-sm"
+                      className="h-auto min-w-0 max-w-full py-2 text-sm"
                       disabled={pending !== null}
                       onChange={(event) => {
                         const file = event.target.files?.[0] ?? null;
@@ -982,7 +1014,9 @@ export default function AdminMemberManualAddPanel({
                         </Button>
                       </div>
                     ) : (
-                      <p className="text-xs font-normal text-muted-foreground">JPEG·PNG·WebP·AVIF·HEIC/HEIF·GIF·BMP·TIFF·SVG, 5MB 이하</p>
+                      <p className="min-w-0 break-words text-xs font-normal text-muted-foreground">
+                        JPEG·PNG·WebP·AVIF·HEIC/HEIF·GIF·BMP·TIFF·SVG, 5MB 이하
+                      </p>
                     )}
                   </div>
                 </div>

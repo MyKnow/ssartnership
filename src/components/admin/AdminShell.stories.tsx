@@ -15,7 +15,7 @@ const meta = {
     children: (
       <div className="grid gap-4">
         <AdminPageHeader
-          eyebrow="Operations"
+          eyebrow="운영"
           title="운영 홈"
           description="처리가 필요한 항목과 운영 현황을 확인합니다."
         />
@@ -45,6 +45,9 @@ export const Default: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveTextContent("운영 홈");
+    await expect(
+      canvas.getByRole("link", { name: "주요 내용으로 건너뛰기" }),
+    ).toHaveAttribute("href", "#admin-desktop-main-content");
   },
 };
 
@@ -53,5 +56,36 @@ export const WithBackAction: Story = {
     title: "파트너사 편집",
     backHref: "/admin/partners",
     backLabel: "목록으로",
+  },
+};
+
+export const MobilePrimaryNavigation: Story = {
+  parameters: {
+    viewport: {
+      defaultViewport: "mobile1",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const navigation = canvas.getByRole("navigation", { name: "관리자 주요 탐색" });
+
+    await expect(within(navigation).getByRole("link", { name: "홈" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
+    await expect(within(navigation).getByRole("link", { name: "작업함" })).toHaveAttribute(
+      "href",
+      "/admin/tasks",
+    );
+    await expect(within(navigation).getByRole("link", { name: "데이터" })).toHaveAttribute(
+      "href",
+      "/admin/members",
+    );
+    await expect(
+      await within(navigation).findByRole("button", { name: "관리 메뉴 열기" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("link", { name: "주요 내용으로 건너뛰기" }),
+    ).toHaveAttribute("href", "#admin-mobile-main-content");
   },
 };

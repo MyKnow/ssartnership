@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/components/ui/Toast';
 import {
+  getSafeAdminMessage,
+  getSafeAdminResponseMessage,
+} from '@/lib/admin-safe-messages';
+import {
   buildUnifiedLogs,
 } from '@/components/admin/logs/selectors';
 import {
@@ -19,6 +23,8 @@ import type {
 
 const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
 const LOG_SEARCH_DEBOUNCE_MS = 350;
+const LOG_LOAD_ERROR_MESSAGE = '로그 조회에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+const LOG_EXPORT_ERROR_MESSAGE = 'CSV 다운로드에 실패했습니다. 잠시 후 다시 시도해 주세요.';
 
 function createExportGroupSelection(groups: LogGroup[]): Record<LogGroup, boolean> {
   return {
@@ -65,6 +71,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const [pageInputValue, setPageInputValue] = useState(String(initialData.list.page));
   const searchDebounceRef = useRef<number | null>(null);
   const fetchSequenceRef = useRef(0);
+  const logRequestAbortControllerRef = useRef<AbortController | null>(null);
 
   const visibleLogs = useMemo<NormalizedLog[]>(
     () =>
@@ -116,6 +123,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   useEffect(() => {
     return () => {
       clearPendingSearch();
+      logRequestAbortControllerRef.current?.abort();
     };
   }, []);
 
@@ -133,6 +141,11 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, page: safePage });
   }
 
+  function abortActiveLogRequest() {
+    logRequestAbortControllerRef.current?.abort();
+    logRequestAbortControllerRef.current = null;
+  }
+
   async function fetchLogs(params: {
     preset: LogRangePreset;
     start?: string;
@@ -146,8 +159,11 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     statusFilter?: StatusFilter;
     sortFilter?: SortFilter;
   }) {
+    abortActiveLogRequest();
     const fetchSequence = fetchSequenceRef.current + 1;
     fetchSequenceRef.current = fetchSequence;
+    const abortController = new AbortController();
+    logRequestAbortControllerRef.current = abortController;
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -189,6 +205,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
 
       const response = await fetch(`/api/admin/logs?${searchParams.toString()}`, {
         cache: 'no-store',
+        signal: abortController.signal,
       });
 
       if (!response.ok) {
@@ -196,7 +213,9 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
           | { message?: string }
           | null;
         if (fetchSequence === fetchSequenceRef.current) {
-          setErrorMessage(payload?.message ?? '로그 조회에 실패했습니다.');
+          setErrorMessage(
+            getSafeAdminResponseMessage(payload?.message, LOG_LOAD_ERROR_MESSAGE),
+          );
         }
         return;
       }
@@ -218,11 +237,15 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       );
       setPageInputValue(String(nextData.list.page));
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       if (fetchSequence === fetchSequenceRef.current) {
-        setErrorMessage(error instanceof Error ? error.message : '로그 조회에 실패했습니다.');
+        setErrorMessage(getSafeAdminMessage(error, LOG_LOAD_ERROR_MESSAGE));
       }
     } finally {
       if (fetchSequence === fetchSequenceRef.current) {
+        logRequestAbortControllerRef.current = null;
         setIsLoading(false);
       }
     }
@@ -232,6 +255,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     clearPendingSearch();
     setActivePreset(preset);
     if (preset === 'custom') {
+      abortActiveLogRequest();
       fetchSequenceRef.current += 1;
       setIsLoading(false);
       return;
@@ -331,7 +355,9 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
         const payload = (await response.json().catch(() => null)) as
           | { message?: string }
           | null;
-        setErrorMessage(payload?.message ?? 'CSV 다운로드에 실패했습니다.');
+        setErrorMessage(
+          getSafeAdminResponseMessage(payload?.message, LOG_EXPORT_ERROR_MESSAGE),
+        );
         return;
       }
 
@@ -346,7 +372,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       URL.revokeObjectURL(downloadUrl);
       setExportOpen(false);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'CSV 다운로드에 실패했습니다.');
+      setErrorMessage(getSafeAdminMessage(error, LOG_EXPORT_ERROR_MESSAGE));
     } finally {
       setIsExporting(false);
     }

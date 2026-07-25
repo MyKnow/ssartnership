@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AdminNotificationCenter from "@/components/admin/notification-center/AdminNotificationCenter";
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
@@ -59,16 +59,26 @@ export default function AdminPushManager({
   partners,
   recentLogs,
   automaticSummaries,
+  availableYearOptions,
+  availableCampusOptions,
   initialTab = "center",
 }: AdminPushManagerProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [recipientOptions, setRecipientOptions] = useState(members);
+
+  const onRecipientOptionsLoaded = useCallback((next: AdminPushManagerProps["members"]) => {
+    setRecipientOptions((current) => mergeRecipientOptions(current, next));
+  }, []);
+
   const controller = useAdminPushManager({
     pushConfigured,
-    members,
+    members: recipientOptions,
     partners,
     recentLogs,
+    availableYearOptions,
+    availableCampusOptions,
   });
   const [selectedTab, setSelectedTab] = useState<AdminPushTab>(initialTab);
   const requestedTab = searchParams.get("tab");
@@ -164,7 +174,7 @@ export default function AdminPushManager({
           campusOptions={controller.campusOptions}
           composer={controller.composer}
           partners={partners}
-          members={members}
+          members={recipientOptions}
           getMemberLabel={getMemberLabel}
           onSubmit={controller.handleSubmit}
           onConfirmSubmit={controller.confirmSubmit}
@@ -173,6 +183,7 @@ export default function AdminPushManager({
           onCloseMemberPicker={controller.closeMemberPicker}
           onToggleMember={controller.selectMember}
           onSelectAllFilteredMembers={controller.selectAllFilteredMembers}
+          onRecipientOptionsLoaded={onRecipientOptionsLoaded}
           onOpenRecipientModal={controller.openRecipientModal}
           onCloseRecipientModal={controller.closeRecipientModal}
           onCloseSendConfirm={controller.closeSendConfirm}
@@ -186,4 +197,15 @@ export default function AdminPushManager({
       )}
     </div>
   );
+}
+
+function mergeRecipientOptions(
+  current: AdminPushManagerProps["members"],
+  next: AdminPushManagerProps["members"],
+) {
+  const byId = new Map(current.map((member) => [member.id, member]));
+  for (const member of next) {
+    byId.set(member.id, member);
+  }
+  return [...byId.values()];
 }

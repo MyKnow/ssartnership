@@ -259,6 +259,22 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.dashboard.default"],
   },
   {
+    routePath: "/admin/tasks",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminTaskInboxView",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.tasks.default"],
+  },
+  {
+    routePath: "/admin/search",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminGlobalSearchResultsView",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.search"],
+  },
+  {
     routePath: "/admin/advertisement",
     surface: "admin",
     authScope: "admin",
@@ -780,6 +796,16 @@ const routeContracts = {
     routeKind: "canonical",
     screenContractId: "admin.dashboard",
     primaryTask: "처리가 필요한 운영 업무를 파악하고 바로 이동한다.",
+  },
+  "/admin/tasks": {
+    routeKind: "canonical",
+    screenContractId: "admin.task-inbox",
+    primaryTask: "권한 내에서 처리할 검토·승인·운영 작업을 열고 다음 행동으로 이동한다.",
+  },
+  "/admin/search": {
+    routeKind: "canonical",
+    screenContractId: "admin.search",
+    primaryTask: "회원 또는 제휴처를 검색해 권한 범위 안의 상세 화면을 바로 연다.",
   },
   "/admin/admins": {
     routeKind: "canonical",

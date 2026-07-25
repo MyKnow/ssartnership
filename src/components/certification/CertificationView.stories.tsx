@@ -186,7 +186,7 @@ export const Default: Story = {
     await expect(
       Number.parseFloat(getComputedStyle(roleBadge).fontSize) /
         Number.parseFloat(getComputedStyle(memberName).fontSize),
-    ).toBeGreaterThan(0.4);
+    ).toBeCloseTo(0.4, 2);
     await expect(footerLabel).toHaveClass("text-[clamp(0px,3cqw,1.5rem)]");
     await expect(timestamp).toHaveClass("text-[clamp(0px,3cqw,1.5rem)]");
     await expect(canvas.queryByText("교육생 인증")).not.toBeInTheDocument();

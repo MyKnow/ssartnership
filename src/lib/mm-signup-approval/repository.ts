@@ -182,18 +182,39 @@ export async function createMattermostSignupApprovalRequest(
   }
 }
 
-export async function listMattermostSignupApprovalRequests(
-  status: "pending" | "approved" | "rejected" = "pending",
-) {
-  const { data, error } = await getSupabaseAdminClient()
+export type MattermostSignupApprovalRequestPage = {
+  requests: MattermostSignupApprovalRequestSummary[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
+export async function listMattermostSignupApprovalRequestPage({
+  status = "pending",
+  page,
+  pageSize,
+}: {
+  status?: "pending" | "approved" | "rejected";
+  page: number;
+  pageSize: number;
+}): Promise<MattermostSignupApprovalRequestPage> {
+  const start = (page - 1) * pageSize;
+  const { data, error, count } = await getSupabaseAdminClient()
     .from("member_signup_approval_requests")
-    .select(SAFE_REQUEST_SELECT)
+    .select(SAFE_REQUEST_SELECT, { count: "exact" })
     .eq("status", status)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(start, start + pageSize - 1);
   if (error) {
     throw new MattermostSignupApprovalRepositoryError("db_error");
   }
-  return (data ?? []).map(mapSafeRow);
+  return {
+    requests: (data ?? []).map(mapSafeRow),
+    totalCount: count ?? 0,
+    page,
+    pageSize,
+  };
 }
 
 export async function getMattermostSignupApprovalRequest(id: string) {

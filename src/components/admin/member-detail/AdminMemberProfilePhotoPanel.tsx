@@ -10,6 +10,10 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import {
+  getSafeAdminMessage,
+  getSafeAdminResponseMessage,
+} from "@/lib/admin-safe-messages";
+import {
   getImageUploadSourceError,
   prepareImageUploadSource,
 } from "@/lib/image-upload/client-transform";
@@ -117,10 +121,7 @@ export default function AdminMemberProfilePhotoPanel({
       if (selectionRequestIdRef.current !== requestId) return;
       setMessage({
         variant: "error",
-        text:
-          nextError instanceof Error && nextError.message
-            ? nextError.message
-            : "사진을 안전하게 준비하지 못했습니다.",
+        text: getSafeAdminMessage(nextError, "사진을 안전하게 준비하지 못했습니다."),
       });
     } finally {
       if (selectionRequestIdRef.current === requestId) {
@@ -166,7 +167,14 @@ export default function AdminMemberProfilePhotoPanel({
       });
       const submitData = await submitResponse.json().catch(() => ({}));
       if (!submitResponse.ok || !submitData.ok) {
-        throw new Error(submitData.message ?? "사진을 변경하지 못했습니다.");
+        setMessage({
+          variant: "error",
+          text: getSafeAdminResponseMessage(
+            submitData.message,
+            "사진을 변경하지 못했습니다. 다시 선택해 주세요.",
+          ),
+        });
+        return;
       }
       setMessage({
         variant: "info",
@@ -177,7 +185,7 @@ export default function AdminMemberProfilePhotoPanel({
     } catch (error) {
       setMessage({
         variant: "error",
-        text: error instanceof Error ? error.message : "사진을 변경하지 못했습니다.",
+        text: getSafeAdminMessage(error, "사진을 변경하지 못했습니다. 다시 선택해 주세요."),
       });
     } finally {
       setPending(false);

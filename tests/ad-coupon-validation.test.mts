@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseCreateAdCouponForm } from "../src/lib/ad-package-validation.ts";
+import {
+  getSafeAdCouponFormMessage,
+  parseCreateAdCouponForm,
+} from "../src/lib/ad-package-validation.ts";
 
 function buildForm(overrides: Record<string, string> = {}) {
   const form = new FormData();
@@ -26,6 +29,17 @@ function buildForm(overrides: Record<string, string> = {}) {
 }
 
 describe("ad coupon validation", () => {
+  it("keeps authored form guidance but hides unexpected error details", () => {
+    assert.equal(
+      getSafeAdCouponFormMessage(new Error("현장 사용 비밀번호는 숫자 4자리여야 합니다.")),
+      "현장 사용 비밀번호는 숫자 4자리여야 합니다.",
+    );
+    assert.equal(
+      getSafeAdCouponFormMessage(new Error("relation ad_coupons does not exist")),
+      "입력값을 확인해 주세요.",
+    );
+  });
+
   it("parses member daily, weekly, and monthly issue limits", () => {
     const input = parseCreateAdCouponForm(
       buildForm({

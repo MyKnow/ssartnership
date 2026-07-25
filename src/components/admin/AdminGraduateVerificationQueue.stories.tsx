@@ -57,6 +57,28 @@ export const Empty: Story = {
   args: { requests: [], setupEmailRetries: [] },
 };
 
+export const Paginated: Story = {
+  args: {
+    requestPagination: {
+      totalCount: 25,
+      page: 2,
+      pageSize: 12,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "이전" })).toHaveAttribute(
+      "href",
+      "/admin/graduate-verifications",
+    );
+    await expect(canvas.getByRole("link", { name: "다음" })).toHaveAttribute(
+      "href",
+      "/admin/graduate-verifications?requestPage=3",
+    );
+    await expect(canvas.getByText("2 / 3")).toBeVisible();
+  },
+};
+
 export const MediaViewer: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

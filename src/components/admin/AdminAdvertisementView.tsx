@@ -41,7 +41,7 @@ export default function AdminAdvertisementView({
     <div className="grid gap-6">
       <PromotionCarouselDraftClearOnSuccess shouldClear={clearPromotionDraft} />
       <AdminPageHeader
-        eyebrow="Advertisement"
+        eyebrow="자동화"
         title="홈 광고 관리"
         description="홈 캐러셀 카드의 순서, 이미지, 문구, 연결 페이지, 노출 권한을 한 번에 편집합니다."
       />

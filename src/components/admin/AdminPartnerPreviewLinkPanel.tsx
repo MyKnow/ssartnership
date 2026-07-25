@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import InlineMessage from "@/components/ui/InlineMessage";
 import { useToast } from "@/components/ui/Toast";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 export type PartnerPreviewLinkActionResult = {
   previewUrl: string;
@@ -41,7 +42,7 @@ export default function AdminPartnerPreviewLinkPanel({
           notify("미리보기 링크를 생성했습니다.");
         })
         .catch((error: unknown) => {
-          setMessage(error instanceof Error ? error.message : "미리보기 링크 생성에 실패했습니다.");
+          setMessage(getSafeAdminMessage(error, "미리보기 링크 생성에 실패했습니다."));
         });
     });
   };
@@ -73,7 +74,7 @@ export default function AdminPartnerPreviewLinkPanel({
           notify("미리보기 링크를 제거했습니다.");
         })
         .catch((error: unknown) => {
-          setMessage(error instanceof Error ? error.message : "미리보기 링크 제거에 실패했습니다.");
+          setMessage(getSafeAdminMessage(error, "미리보기 링크 제거에 실패했습니다."));
         });
     });
   };

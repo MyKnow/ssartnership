@@ -1,69 +1,86 @@
-import AdminPartnerRegistrationsView, {
-  type AdminPartnerRegistrationRow,
-} from "@/components/admin/AdminPartnerRegistrationsView";
+import AdminPartnerRegistrationsView from "@/components/admin/AdminPartnerRegistrationsView";
 import { updatePartnerRegistrationRequestStatus } from "@/app/admin/(protected)/partner-registrations/actions";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
-import {
-  canAdminAccessManagedCampuses,
-  getManagedCampusFilterValues,
-} from "@/lib/admin-scope";
-import { inferCampusSlugsFromLocation } from "@/lib/campuses";
+import { getManagedCampusFilterValues } from "@/lib/admin-scope";
+import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
+import { listAdminPartnerRegistrationRequestPage } from "@/lib/admin-partner-registration-queue";
 import { isPartnerRegistrationRequestStatus } from "@/lib/partner-registration";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
+
+type PartnerRegistrationSearchParams = {
+  status?: string | string[];
+  error?: string | string[];
+  success?: string | string[];
+  page?: string | string[];
+  pageSize?: string | string[];
+};
+
+function getOneSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function buildPartnerRegistrationHref({
+  status,
+  page,
+  pageSize,
+}: {
+  status: string | null;
+  page: number;
+  pageSize: number;
+}) {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (page > 1) params.set("page", String(page));
+  if (pageSize !== 12) params.set("pageSize", String(pageSize));
+  const query = params.toString();
+  return query ? `/admin/partner-registrations?${query}` : "/admin/partner-registrations";
+}
 
 export default async function AdminPartnerRegistrationsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string; error?: string; success?: string }>;
+  searchParams?: Promise<PartnerRegistrationSearchParams>;
 }) {
   const adminSession = await requireAdminPermission("brands", "read", {
     path: "/admin/partner-registrations",
   });
   const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
   const params = (await searchParams) ?? {};
-  const status =
-    params.status && isPartnerRegistrationRequestStatus(params.status)
-      ? params.status
-      : null;
-  const feedback = getAdminReviewQueueFeedback({
-    error: params.error,
-    success: params.success,
+  const pagination = parseAdminReviewQueuePagination({
+    page: getOneSearchParam(params.page),
+    pageSize: getOneSearchParam(params.pageSize),
   });
-  const returnTo = status
-    ? `/admin/partner-registrations?status=${encodeURIComponent(status)}`
-    : "/admin/partner-registrations";
-
-  let query = getSupabaseAdminClient()
-    .from("partner_registration_requests")
-    .select(
-      "*,company:partner_companies(managed_campus_slugs),branches:partner_registration_branches(id,branch_type,campus_slugs),benefit_groups:partner_registration_benefit_groups(id,group_key,label)",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (status) {
-    query = query.eq("status", status);
+  const statusValue = getOneSearchParam(params.status);
+  const status =
+    statusValue && isPartnerRegistrationRequestStatus(statusValue)
+      ? statusValue
+      : null;
+  const requestPage = await listAdminPartnerRegistrationRequestPage({
+    status,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    managedCampusSlugs: managedCampusFilter,
+  });
+  const totalPages = Math.max(1, Math.ceil(requestPage.totalCount / pagination.pageSize));
+  if (!requestPage.loadError && requestPage.totalCount > 0 && pagination.page > totalPages) {
+    redirect(buildPartnerRegistrationHref({
+      status,
+      page: totalPages,
+      pageSize: pagination.pageSize,
+    }));
   }
-
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(`partner registration request load failed: ${error.message}`);
-  }
-
-  const rows = ((data ?? []) as AdminPartnerRegistrationRow[]).filter((row) => {
-    if (!managedCampusFilter) return true;
-    const company = Array.isArray(row.company) ? row.company[0] : row.company;
-    const managedCampusSlugs =
-      company?.managed_campus_slugs ??
-      inferCampusSlugsFromLocation(row.location);
-    return canAdminAccessManagedCampuses(
-      adminSession.account,
-      managedCampusSlugs,
-    );
+  const feedback = getAdminReviewQueueFeedback({
+    error: getOneSearchParam(params.error),
+    success: getOneSearchParam(params.success),
+  });
+  const returnTo = buildPartnerRegistrationHref({
+    status,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
   });
 
   return (
@@ -73,11 +90,17 @@ export default async function AdminPartnerRegistrationsPage({
       backLabel="제휴처"
     >
       <AdminPartnerRegistrationsView
-        rows={rows}
+        rows={requestPage.rows}
         updateStatusAction={updatePartnerRegistrationRequestStatus}
         status={status}
         feedback={feedback}
         returnTo={returnTo}
+        pagination={{
+          totalCount: requestPage.totalCount,
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+        }}
+        loadError={requestPage.loadError}
       />
     </AdminShell>
   );

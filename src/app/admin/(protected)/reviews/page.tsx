@@ -39,7 +39,7 @@ export default async function AdminReviewsPage({
     <AdminShell title="리뷰 관리" backHref="/admin" backLabel="관리 홈">
       <div className="grid gap-6">
         <AdminPageHeader
-          eyebrow="Reviews"
+          eyebrow="데이터"
           title="리뷰 관리"
           description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
         />

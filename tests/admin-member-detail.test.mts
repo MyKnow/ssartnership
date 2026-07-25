@@ -87,15 +87,27 @@ describe("admin member detail selectors", () => {
     assert.equal(overview.timeline[0]?.title, "마케팅 정보 수신 동의");
   });
 
-  it("keeps member detail queries for preferences, subscriptions, consent history, and consent activity", async () => {
-    const source = await readFile(
-      new URL("../src/app/admin/(protected)/members/[memberId]/page.tsx", import.meta.url),
-      "utf8",
-    );
+  it("delegates member detail queries and safe recovery to a server read-model", async () => {
+    const [pageSource, readModelSource] = await Promise.all([
+      readFile(
+        new URL("../src/app/admin/(protected)/members/[memberId]/page.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/lib/admin-member-detail.server.ts", import.meta.url),
+        "utf8",
+      ),
+    ]);
 
-    assert.match(source, /\.from\("push_preferences"\)/);
-    assert.match(source, /\.from\("push_subscriptions"\)/);
-    assert.match(source, /\.from\("member_policy_consents"\)/);
-    assert.match(source, /\.eq\("event_name", "member_policy_consent"\)/);
+    assert.match(pageSource, /getAdminMemberDetailReadModel/);
+    assert.doesNotMatch(pageSource, /getSupabaseAdminClient/);
+    assert.match(pageSource, /AdminStatePanel/);
+    assert.match(pageSource, /일부 회원 운영 정보를 불러오지 못했습니다/);
+    assert.match(readModelSource, /\.from\("push_preferences"\)/);
+    assert.match(readModelSource, /\.from\("push_subscriptions"\)/);
+    assert.match(readModelSource, /\.from\("member_policy_consents"\)/);
+    assert.match(readModelSource, /\.eq\("event_name", "member_policy_consent"\)/);
+    assert.match(readModelSource, /getMemberCanonicalProfile/);
+    assert.doesNotMatch(readModelSource, /Error\.message/);
   });
 });

@@ -9,6 +9,7 @@ import Textarea from "@/components/ui/Textarea";
 import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
 import {
   AD_PACKAGE_FORM_LIMITS,
+  getSafeAdCouponFormMessage,
   parseCreateAdCouponForm,
 } from "@/lib/ad-package-validation";
 import type { AdCampaignWithStats, AdCoupon } from "@/lib/repositories/ad-package-repository";
@@ -163,7 +164,7 @@ export default function AdminPartnerCouponForm({
       setFormError(null);
     } catch (error) {
       event.preventDefault();
-      setFormError(error instanceof Error ? error.message : "입력값을 확인해 주세요.");
+      setFormError(getSafeAdCouponFormMessage(error));
     }
   };
 

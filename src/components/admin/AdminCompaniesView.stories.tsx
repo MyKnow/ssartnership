@@ -78,3 +78,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const LoadError: Story = {
+  args: {
+    companies: [],
+    accounts: [],
+    partnerCount: 0,
+    loadError: true,
+  },
+};

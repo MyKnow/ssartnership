@@ -1,9 +1,10 @@
-import Link from "next/link";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
+import Surface from "@/components/ui/Surface";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
@@ -26,26 +27,73 @@ function formatDate(value: string) {
       }).format(date);
 }
 
+function buildMemberSignupQueueHref(
+  returnTo: string,
+  page: number,
+  pageSize: number,
+) {
+  const url = new URL(returnTo, "https://admin.local");
+  if (page > 1) {
+    url.searchParams.set("page", String(page));
+  } else {
+    url.searchParams.delete("page");
+  }
+  if (pageSize !== 12) {
+    url.searchParams.set("pageSize", String(pageSize));
+  } else {
+    url.searchParams.delete("pageSize");
+  }
+  return url.pathname + url.search;
+}
+
 export default function AdminMemberSignupApprovalQueue({
   requests,
   statusMessage,
   returnTo = "/admin/member-signup-requests",
   feedback,
+  pagination,
+  loadError = false,
 }: {
   requests: MattermostSignupApprovalRequestSummary[];
   statusMessage?: string | null;
   returnTo?: string;
   feedback?: AdminReviewQueueFeedback | null;
+  pagination?: {
+    totalCount: number;
+    page: number;
+    pageSize: number;
+  };
+  loadError?: boolean;
 }) {
+  const effectivePagination = pagination ?? {
+    totalCount: requests.length,
+    page: 1,
+    pageSize: Math.max(1, requests.length),
+  };
+  const totalPages = Math.max(
+    1,
+    Math.ceil(effectivePagination.totalCount / effectivePagination.pageSize),
+  );
+  const currentPage = Math.min(effectivePagination.page, totalPages);
+  const pageStart = (currentPage - 1) * effectivePagination.pageSize;
+
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       <AdminReviewQueueHeader
-        eyebrow="Member onboarding"
+        eyebrow="가입 승인"
         title="가입 승인 요청"
         description="Mattermost 닉네임을 자동으로 해석하지 못한 가입 요청을 확인하고, 부족한 회원 정보를 직접 입력해 승인합니다."
         metrics={[
-          { label: "승인 대기", value: `${requests.length}건`, hint: "현재 처리할 요청" },
-          { label: "수동 확인", value: `${requests.filter((request) => request.status === "pending").length}건`, hint: "자동 확정되지 않은 요청" },
+          {
+            label: "승인 대기",
+            value: `${effectivePagination.totalCount.toLocaleString("ko-KR")}건`,
+            hint: "현재 처리할 요청",
+          },
+          {
+            label: "현재 표시",
+            value: `${requests.length.toLocaleString("ko-KR")}건`,
+            hint: `${currentPage} / ${totalPages} 페이지`,
+          },
         ]}
         feedback={feedback}
         nextAction={{
@@ -58,14 +106,95 @@ export default function AdminMemberSignupApprovalQueue({
           {statusMessage}
         </p>
       ) : null}
-      {requests.length === 0 ? (
+      {loadError ? (
+        <AdminStatePanel
+          kind="error"
+          title="가입 승인 요청을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          action={
+            <Button href={returnTo} variant="secondary">
+              다시 확인
+            </Button>
+          }
+        />
+      ) : requests.length === 0 ? (
         <EmptyState
           title="대기 중인 가입 승인 요청이 없습니다."
           description="파싱에 실패한 Mattermost 가입 신청이 접수되면 이곳에 표시됩니다."
           action={<Button href={returnTo} variant="secondary">목록 새로고침</Button>}
         />
       ) : (
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
+          {totalPages > 1 ? (
+            <Surface
+              level="inset"
+              padding="sm"
+              className="grid min-w-0 gap-3 text-sm text-muted-foreground lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center"
+            >
+              <p>
+                {pageStart + 1}-
+                {Math.min(
+                  pageStart + requests.length,
+                  effectivePagination.totalCount,
+                )}{" "}
+                / {effectivePagination.totalCount.toLocaleString("ko-KR")}
+              </p>
+              <div
+                className="flex flex-wrap gap-1.5"
+                aria-label="페이지당 표시 건수"
+              >
+                {[6, 12, 24].map((pageSize) => (
+                  <Button
+                    key={pageSize}
+                    href={buildMemberSignupQueueHref(
+                      returnTo,
+                      1,
+                      pageSize,
+                    )}
+                    size="sm"
+                    variant={
+                      pageSize === effectivePagination.pageSize
+                        ? "secondary"
+                        : "ghost"
+                    }
+                  >
+                    {pageSize}개씩
+                  </Button>
+                ))}
+              </div>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <Button
+                  href={buildMemberSignupQueueHref(
+                    returnTo,
+                    currentPage - 1,
+                    effectivePagination.pageSize,
+                  )}
+                  variant="secondary"
+                  size="sm"
+                  prefetch
+                  disabled={currentPage === 1}
+                >
+                  이전
+                </Button>
+                <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  href={buildMemberSignupQueueHref(
+                    returnTo,
+                    currentPage + 1,
+                    effectivePagination.pageSize,
+                  )}
+                  variant="secondary"
+                  size="sm"
+                  prefetch
+                  disabled={currentPage === totalPages}
+                >
+                  다음
+                </Button>
+              </div>
+            </Surface>
+          ) : null}
           {requests.map((request) => (
             <Card key={request.id} tone="elevated" padding="md" className="grid gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -80,12 +209,17 @@ export default function AdminMemberSignupApprovalQueue({
                     Mattermost 표시 이름: {request.mattermostDisplayName}
                   </p>
                 </div>
-                <Link
-                  href={`/admin/member-signup-requests/${encodeURIComponent(request.id)}?returnTo=${encodeURIComponent(returnTo)}`}
-                  className="inline-flex min-h-11 items-center justify-center rounded-[1rem] border border-border bg-surface px-4 text-sm font-semibold text-foreground hover:bg-surface-inset"
+                <Button
+                  href={
+                    "/admin/member-signup-requests/" +
+                    encodeURIComponent(request.id) +
+                    "?returnTo=" +
+                    encodeURIComponent(returnTo)
+                  }
+                  variant="secondary"
                 >
                   검토하기
-                </Link>
+                </Button>
               </div>
               <div className="grid gap-2 rounded-card border border-border bg-surface-inset p-4 text-sm text-muted-foreground sm:grid-cols-3">
                 <p>신청 기수: <span className="font-semibold text-foreground">{formatSsafyYearLabel(request.requestedGeneration)}</span></p>

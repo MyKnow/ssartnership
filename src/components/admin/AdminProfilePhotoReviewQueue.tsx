@@ -4,6 +4,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import SubmitButton from "@/components/ui/SubmitButton";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 
@@ -70,6 +71,7 @@ export default function AdminProfilePhotoReviewQueue({
     `/api/admin/profile-photos/current/${encodeURIComponent(memberId)}`,
   feedback,
   returnTo = "/admin/profile-photos",
+  loadError = false,
 }: {
   replacements: AdminProfilePhotoReplacement[];
   currentPhotos: AdminExistingProfilePhoto[];
@@ -78,15 +80,24 @@ export default function AdminProfilePhotoReviewQueue({
   currentPhotoUrl?: (memberId: string) => string;
   feedback?: AdminReviewQueueFeedback | null;
   returnTo?: string;
+  loadError?: boolean;
 }) {
   const totalReviewCount = replacements.length + currentPhotos.length;
 
   return (
     <div className="grid min-w-0 gap-8">
       <AdminReviewQueueHeader
-        eyebrow="Profile photo review"
+        eyebrow="검토"
         title="프로필 사진 검토"
         description="새 사진 교체 요청과 현재 승인 사진 점검을 분리해, 회원 인증에 영향을 주는 작업을 안전하게 처리합니다."
+        actions={
+          <Button
+            href="#profile-photo-replacement-heading"
+            variant="secondary"
+          >
+            사진 변경 요청으로
+          </Button>
+        }
         metrics={[
           { label: "교체 요청", value: `${replacements.length}건`, hint: "새 사진 승인 대기" },
           { label: "현재 사진", value: `${currentPhotos.length}건`, hint: "최근 승인 사진 점검" },
@@ -98,9 +109,18 @@ export default function AdminProfilePhotoReviewQueue({
           description: "새 사진을 승인하기 전에는 기존 사진이 유지됩니다. 반려 사유는 회원이 이해할 수 있도록 구체적으로 남겨 주세요.",
         }}
       />
+      {loadError ? (
+        <AdminStatePanel
+          kind="error"
+          title="프로필 사진 검토 큐를 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          action={<Button href={returnTo} variant="secondary">다시 확인</Button>}
+        />
+      ) : (
+        <>
       <section className="space-y-4" aria-labelledby="profile-photo-replacement-heading">
         <div>
-          <p className="ui-kicker">Photo replacement</p>
+          <p className="ui-kicker">사진 교체</p>
           <h2 id="profile-photo-replacement-heading" className="text-xl font-semibold">
             사진 변경 요청
           </h2>
@@ -129,7 +149,7 @@ export default function AdminProfilePhotoReviewQueue({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate font-semibold">{formatMemberLabel(member)}</h3>
+                        <h3 className="font-semibold">{formatMemberLabel(member)}</h3>
                         <Badge variant="warning">검토 대기</Badge>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -173,7 +193,7 @@ export default function AdminProfilePhotoReviewQueue({
 
       <section className="space-y-4" aria-labelledby="profile-photo-current-heading">
         <div>
-          <p className="ui-kicker">Current photo review</p>
+          <p className="ui-kicker">현재 사진</p>
           <h2 id="profile-photo-current-heading" className="text-xl font-semibold">
             기존 사진 점검
           </h2>
@@ -199,7 +219,7 @@ export default function AdminProfilePhotoReviewQueue({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate font-semibold">{formatMemberLabel(member)}</h3>
+                      <h3 className="font-semibold">{formatMemberLabel(member)}</h3>
                       <Badge variant="success">승인됨</Badge>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -228,6 +248,8 @@ export default function AdminProfilePhotoReviewQueue({
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

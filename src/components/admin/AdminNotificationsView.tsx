@@ -3,6 +3,8 @@ import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminOperationalNotificationSettingsPanel from "@/components/admin/AdminOperationalNotificationSettingsPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
+import Button from "@/components/ui/Button";
 import StatsRow from "@/components/ui/StatsRow";
 import type { AdminNotificationListResult } from "@/lib/admin-notification-inbox";
 import type { AdminNotificationPreferenceState } from "@/lib/partner-notification-routing";
@@ -13,20 +15,31 @@ export default function AdminNotificationsView({
   deviceCount,
   pushConfigured,
   publicKey,
+  loadError = false,
 }: {
   notificationResult: AdminNotificationListResult;
   preferences: AdminNotificationPreferenceState;
   deviceCount: number;
   pushConfigured: boolean;
   publicKey: string;
+  loadError?: boolean;
 }) {
   return (
     <div className="grid gap-6">
       <AdminPageHeader
-        eyebrow="Admin Notifications"
+        eyebrow="업무"
         title="내 알림"
         description="관리자 계정으로 수신한 변경 요청, 종료 임박, 보안 알림을 확인합니다."
       />
+      {loadError ? (
+        <AdminStatePanel
+          kind="error"
+          title="알림을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          action={<Button href="/admin/notifications" variant="secondary">다시 확인</Button>}
+        />
+      ) : (
+        <>
       <StatsRow
         items={[
           {
@@ -91,6 +104,8 @@ export default function AdminNotificationsView({
           />
         </section>
       </div>
+        </>
+      )}
     </div>
   );
 }

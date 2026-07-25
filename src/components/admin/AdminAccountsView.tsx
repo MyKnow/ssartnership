@@ -35,7 +35,7 @@ export default function AdminAccountsView({
   return (
     <div className="grid gap-6">
       <AdminPageHeader
-        eyebrow="Admin Access"
+        eyebrow="설정"
         title="회원 관리자 권한"
         description="기존 회원 계정에 권한 ID를 부여해 관리자 화면 접근과 기능 수행 범위를 관리합니다."
       />

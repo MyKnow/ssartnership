@@ -4,11 +4,16 @@ import {
   cancelMockPartnerChangeRequest,
   createMockPartnerChangeRequest,
   getMockPartnerChangeRequestContext,
+  listMockPartnerChangeRequestPage,
   listMockPartnerChangeRequests,
   rejectMockPartnerChangeRequest,
   updateMockPartnerImmediateFields,
 } from "../mock/partner-change-requests.ts";
-import { getSupabasePendingRequests, getSupabaseRequestContext } from "./context.ts";
+import {
+  getSupabasePendingRequestPage,
+  getSupabasePendingRequests,
+  getSupabaseRequestContext,
+} from "./context.ts";
 import {
   approveSupabaseRequest,
   cancelSupabaseRequest,
@@ -19,6 +24,7 @@ import { updateSupabasePartnerImmediateFields } from "./immediate.ts";
 import type {
   PartnerChangeRequestCancelInput,
   PartnerChangeRequestCreateInput,
+  PartnerChangeRequestListInput,
   PartnerChangeRequestRepository,
   PartnerChangeRequestReviewInput,
   PartnerImmediateUpdateInput,
@@ -46,6 +52,13 @@ export const partnerChangeRequestRepository: PartnerChangeRequestRepository = {
       return listMockPartnerChangeRequests(companyIds);
     }
     return getSupabasePendingRequests(companyIds);
+  },
+
+  async listPendingRequestsPage(input: PartnerChangeRequestListInput) {
+    if (isPartnerPortalMock) {
+      return listMockPartnerChangeRequestPage(input);
+    }
+    return getSupabasePendingRequestPage(input);
   },
 
   async createRequest(input: PartnerChangeRequestCreateInput) {
@@ -91,6 +104,12 @@ export async function getPartnerChangeRequestContext(
 
 export async function listPartnerChangeRequests(companyIds?: string[]) {
   return partnerChangeRequestRepository.listPendingRequests(companyIds);
+}
+
+export async function listPartnerChangeRequestPage(
+  input: PartnerChangeRequestListInput,
+) {
+  return partnerChangeRequestRepository.listPendingRequestsPage(input);
 }
 
 export async function createPartnerChangeRequest(

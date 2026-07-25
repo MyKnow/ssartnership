@@ -25,6 +25,8 @@ export type AdminPushManagerProps = {
   mattermostConfigured: boolean;
   partners: PartnerOption[];
   members: MemberOption[];
+  availableYearOptions?: number[];
+  availableCampusOptions?: string[];
   recentLogs: AdminNotificationOperationLog[];
   initialTab?: "center" | "logs" | "send";
   automaticSummaries: Array<{

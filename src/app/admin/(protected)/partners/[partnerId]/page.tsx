@@ -4,9 +4,11 @@ import AdminPartnerReviewManager from "@/components/admin/partner-detail/AdminPa
 import AdminPartnerChangeHistory from "@/components/admin/partner-detail/AdminPartnerChangeHistory";
 import AdminPartnerCouponManager from "@/components/admin/ad-packages/AdminPartnerCouponManager";
 import AdminPartnerPreviewLinkPanel from "@/components/admin/AdminPartnerPreviewLinkPanel";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import PartnerCardForm from "@/components/PartnerCardForm";
 import CategoryColorBadge from "@/components/ui/CategoryColorBadge";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
@@ -39,29 +41,20 @@ import {
   assertAdminCanAccessManagedCampuses,
   getManagedCampusFilterValues,
 } from "@/lib/admin-scope";
-import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import {
-  getAdminReviewPageData,
   parseAdminReviewFilters,
   serializeAdminReviewFilters,
 } from "@/lib/admin-reviews";
-import { fetchPartnerReviewVisibilityCounts } from "@/lib/partner-counts";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
   getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
-import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
-import { fetchRequestSummariesForPartner } from "@/lib/partner-change-requests/summary";
 import { buildPartnerPreviewUrl } from "@/lib/partner-preview";
 import { decryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { adPackageRepository, partnerBenefitUsageRepository } from "@/lib/repositories";
-import type {
-  AdCampaignWithStats,
-  AdCoupon,
-} from "@/lib/repositories/ad-package-repository";
+import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
+import { getAdminPartnerDetailReadModel } from "@/lib/admin-partner-detail.server";
 
 export const dynamic = "force-dynamic";
 
@@ -70,37 +63,8 @@ const adminPartnerDetailErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
 
-type PartnerCompanyRow = {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  is_active?: boolean | null;
-  managed_campus_slugs?: string[] | null;
-};
-
-type PartnerCategoryRow = {
-  id: string;
-  key: string;
-  label: string;
-  color?: string | null;
-  description?: string | null;
-};
-
-function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) {
-    return null;
-  }
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
-
 function readFirstQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
-}
-
-function parseUsagePage(value: string) {
-  const page = Number.parseInt(value, 10);
-  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 export default async function AdminPartnerDetailPage({
@@ -117,6 +81,13 @@ export default async function AdminPartnerDetailPage({
   const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
   const query = (await searchParams) ?? {};
   const detailPath = `/admin/partners/${partnerId}`;
+  const searchBackHref = sanitizeAdminReturnTo(
+    readFirstQueryValue(query.returnTo),
+    "/admin/partners",
+  );
+  const searchBackLabel = searchBackHref.startsWith("/admin/search")
+    ? "검색 결과"
+    : "제휴처";
   const partnerError = query.error
     ? adminPartnerDetailErrorMessages[String(query.error)] ?? null
     : null;
@@ -174,69 +145,62 @@ export default async function AdminPartnerDetailPage({
     "delete",
   );
 
-  const supabase = getSupabaseAdminClient();
-  const couponManagementDataPromise = canReadCoupons
-    ? Promise.all([
-        adPackageRepository.listAdminCampaigns(),
-        adPackageRepository.listAdminCouponsForPartner(partnerId),
-      ])
-    : Promise.resolve<[AdCampaignWithStats[], AdCoupon[]]>([[], []]);
   const reviewFilters = {
     ...parseAdminReviewFilters(query),
     partnerId,
     companyId: "",
   };
-  let companiesQuery = supabase
-    .from("partner_companies")
-    .select("id,name,slug,description,is_active,managed_campus_slugs")
-    .order("name", { ascending: true });
-  if (managedCampusFilter) {
-    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusFilter);
+  const retryParams = new URLSearchParams(serializeAdminReviewFilters(reviewFilters));
+  const requestedUsageBenefit = readFirstQueryValue(query.usageBenefit);
+  const requestedUsagePage = readFirstQueryValue(query.usagePage);
+  if (requestedUsageBenefit) retryParams.set("usageBenefit", requestedUsageBenefit);
+  if (requestedUsagePage) retryParams.set("usagePage", requestedUsagePage);
+  if (searchBackHref !== "/admin/partners") retryParams.set("returnTo", searchBackHref);
+  const retryQueryString = retryParams.toString();
+  const retryHref = retryQueryString ? `${detailPath}?${retryQueryString}` : detailPath;
+  const detail = await getAdminPartnerDetailReadModel({
+    partnerId,
+    managedCampusSlugs: managedCampusFilter,
+    reviewFilters,
+    canReadCoupons,
+    requestedUsageBenefit,
+    usagePage: requestedUsagePage,
+  });
+
+  if (detail.status === "not_found") {
+    notFound();
+  }
+  if (detail.status === "error") {
+    return (
+      <AdminShell title="제휴처 상세" backHref={searchBackHref} backLabel={searchBackLabel}>
+        <AdminStatePanel
+          kind="error"
+          title="제휴처 정보를 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+          action={<Button href={retryHref} variant="secondary">다시 확인</Button>}
+        />
+      </AdminShell>
+    );
   }
 
-  const [
-    categoriesResult,
-    companiesResult,
-    partnerResult,
+  const {
+    partner,
+    company,
+    category,
+    categories,
+    companies,
     metricsResult,
     reviewData,
     reviewCountResult,
-    previewTokenResult,
-    couponManagementData,
-  ] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id,key,label,description,color")
-      .order("created_at", { ascending: true }),
-    companiesQuery,
-    supabase
-      .from("partners")
-      .select(
-        "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)",
-      )
-      .eq("id", partnerId)
-      .maybeSingle(),
-    getAdminPartnerMetrics([partnerId]),
-    getAdminReviewPageData(reviewFilters, {
-      includeCounts: false,
-      managedCampusSlugs: managedCampusFilter,
-    }),
-    fetchPartnerReviewVisibilityCounts(supabase, partnerId),
-    supabase
-      .from("partner_preview_tokens")
-      .select("created_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
-      .eq("partner_id", partnerId)
-      .maybeSingle(),
-    couponManagementDataPromise,
-  ]);
-
-  const [adCampaigns, adCoupons] = couponManagementData;
-
-  if (!partnerResult.data) {
-    notFound();
-  }
-
-  const partner = partnerResult.data;
+    previewToken,
+    adCampaigns,
+    adCoupons,
+    selectedUsageBenefit,
+    usageHistory,
+    metricTimeseries,
+    partnerAuditLogs,
+    partnerRequestHistory,
+  } = detail;
   try {
     assertAdminCanAccessManagedCampuses(
       adminSession.account,
@@ -245,77 +209,12 @@ export default async function AdminPartnerDetailPage({
   } catch {
     notFound();
   }
-  const company = normalizeRelation<PartnerCompanyRow>(
-    (partner as { company?: PartnerCompanyRow | PartnerCompanyRow[] | null }).company,
-  );
-  const category = normalizeRelation<PartnerCategoryRow>(
-    (partner as {
-      categories?: PartnerCategoryRow | PartnerCategoryRow[] | null;
-    }).categories,
-  );
   const metrics = metricsResult.metricsByPartnerId.get(partnerId);
-  const requestedUsageBenefit = readFirstQueryValue(query.usageBenefit);
-  const selectedUsageBenefit = (partner.benefits ?? []).includes(requestedUsageBenefit)
-    ? requestedUsageBenefit
-    : null;
-  const usageHistory = await partnerBenefitUsageRepository.listUsageHistory({
-    partnerId,
-    benefit: selectedUsageBenefit,
-    page: parseUsagePage(readFirstQueryValue(query.usagePage)),
-    pageSize: 25,
-  });
   const visibilityState = getPartnerVisibilityState(
     partner.visibility,
     partner.period_start,
     partner.period_end,
   );
-  const auditTargetIds = Array.from(
-    new Set([
-      partner.id,
-      company?.id ?? partner.company_id ?? null,
-    ].filter((value): value is string => Boolean(value))),
-  );
-  const auditActions = [
-    "partner_create",
-    "partner_update",
-    "partner_change_request_approve",
-    "partner_change_request_reject",
-    "partner_portal_immediate_update",
-    "partner_portal_change_request_submit",
-    "partner_portal_change_request_cancel",
-    "partner_company_create",
-    "partner_company_update",
-    "partner_company_delete",
-  ] as const;
-  const [metricTimeseries, partnerAuditLogsResult, partnerRequestHistory] = await Promise.all([
-    getPartnerMetricTimeseriesSnapshot(
-      partnerId,
-      partner.created_at,
-    ),
-    supabase
-      .from("admin_audit_logs")
-      .select("id,actor_id,action,target_type,target_id,properties,created_at")
-      .in("action", auditActions as unknown as string[])
-      .in("target_type", ["partner", "partner_company", "partner_change_request"])
-      .order("created_at", { ascending: false })
-      .limit(200),
-    fetchRequestSummariesForPartner(supabase, partnerId, { limit: 50 }),
-  ]);
-  const partnerAuditLogs = (partnerAuditLogsResult.data ?? []).filter((log) => {
-    const properties = log.properties && typeof log.properties === "object"
-      ? (log.properties as Record<string, unknown>)
-      : null;
-    const logPartnerId =
-      typeof properties?.partnerId === "string" ? properties.partnerId : null;
-    const logCompanyId =
-      typeof properties?.companyId === "string" ? properties.companyId : null;
-
-    return (
-      auditTargetIds.includes(log.target_id ?? "") ||
-      logPartnerId === partner.id ||
-      logCompanyId === (company?.id ?? null)
-    );
-  });
   const reviewQueryString = serializeAdminReviewFilters(reviewFilters);
   const returnTo = reviewQueryString ? `${detailPath}?${reviewQueryString}` : detailPath;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
@@ -325,7 +224,7 @@ export default async function AdminPartnerDetailPage({
   const totalReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.totalCount;
   const visibleReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.visibleCount;
   const hiddenReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.hiddenCount;
-  const previewTokenRow = previewTokenResult.data;
+  const previewTokenRow = previewToken;
   let initialPreviewUrl: string | null = null;
   if (
     previewTokenRow?.token_ciphertext
@@ -347,12 +246,15 @@ export default async function AdminPartnerDetailPage({
   }
 
   return (
-    <AdminShell title={partner.name} backHref="/admin/partners" backLabel="제휴처">
+    <AdminShell title={partner.name} backHref={searchBackHref} backLabel={searchBackLabel}>
       <section className="grid min-w-0 gap-6">
         <AdminPageHeader
-          eyebrow="Partner Detail"
+          eyebrow="제휴처"
           title={partner.name}
-          description="공개 상태와 핵심 운영 지표를 먼저 확인한 뒤, 아래 정보 수정 영역에서 제휴처 정보를 저장합니다."
+          description="기본 정보를 바로 수정하고, 운영 지표·혜택 이력·쿠폰은 아래에서 필요할 때 확인합니다."
+          actions={
+            <Button href="#partner-edit">기본 정보 수정</Button>
+          }
         />
 
         {partnerError ? <FormMessage variant="error">{partnerError}</FormMessage> : null}
@@ -394,39 +296,9 @@ export default async function AdminPartnerDetailPage({
                   hint: "상세 페이지 조회",
                 },
                 {
-                  label: "UV",
-                  value: `${metrics?.detailUv ?? 0}`,
-                  hint: "고유 세션 기준 조회",
-                },
-                {
                   label: "CTA",
                   value: `${metrics?.totalClicks ?? 0}`,
                   hint: "전체 클릭 합계",
-                },
-                {
-                  label: "카드 클릭",
-                  value: `${metrics?.cardClicks ?? 0}`,
-                  hint: "리스트 유입",
-                },
-                {
-                  label: "지도 클릭",
-                  value: `${metrics?.mapClicks ?? 0}`,
-                  hint: "위치 탐색",
-                },
-                {
-                  label: "예약 클릭",
-                  value: `${metrics?.reservationClicks ?? 0}`,
-                  hint: "예약 CTA",
-                },
-                {
-                  label: "혜택 이용",
-                  value: `${metrics?.benefitUsageCount ?? 0}`,
-                  hint: "제휴처 확인 완료",
-                },
-                {
-                  label: "문의 클릭",
-                  value: `${metrics?.inquiryClicks ?? 0}`,
-                  hint: "문의 CTA",
                 },
                 {
                   label: "리뷰",
@@ -489,7 +361,10 @@ export default async function AdminPartnerDetailPage({
           canDeleteCoupon={canDeleteCoupons}
         />
 
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">
+        <div
+          id="partner-edit"
+          className="grid scroll-mt-24 gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start"
+        >
           <div className="grid min-w-0 gap-4">
             <AdminSectionHeading
               title="제휴처 수정"
@@ -541,11 +416,11 @@ export default async function AdminPartnerDetailPage({
                     }
                   : null,
               }}
-              categoryOptions={(categoriesResult.data ?? []).map((item) => ({
+              categoryOptions={categories.map((item) => ({
                 id: item.id,
                 label: item.label,
               }))}
-              companyOptions={(companiesResult.data ?? []).map((item) => ({
+              companyOptions={companies.map((item) => ({
                 id: item.id,
                 name: item.name,
                 slug: item.slug,
