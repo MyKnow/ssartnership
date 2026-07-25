@@ -3,6 +3,10 @@ import { execFileSync } from "node:child_process";
 
 const ALLOWED_ADVISORY_URLS = new Set([
   "https://github.com/advisories/GHSA-qx2v-qp2m-jg93",
+  // This advisory remains only in dev-only minimatch@3 used by lint tooling;
+  // production dependencies use the patched brace-expansion path and are
+  // checked separately by `npm audit --omit=dev` in CI.
+  "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
 ]);
 
 function runNpmAuditJson() {
