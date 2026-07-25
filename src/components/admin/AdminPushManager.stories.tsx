@@ -252,6 +252,12 @@ export const PushNotConfigured: Story = {
   },
 };
 
+export const VisualBaseline: Story = {
+  args: {
+    initialTab: "send",
+  },
+};
+
 export const SendAnnouncement: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
