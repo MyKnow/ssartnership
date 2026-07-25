@@ -35,6 +35,8 @@ function statusForReason(reason: string) {
       return 404;
     case "inactive":
     case "expired":
+    case "member_limit":
+    case "usage_limit":
     case "onsite_password_required":
     case "onsite_password_invalid":
       return 409;

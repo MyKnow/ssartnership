@@ -22,6 +22,11 @@ export type MemberIssueRecord = {
   issuedAt: string;
 };
 
+export type CouponIssueRecord = {
+  couponId: string;
+  issuedAt: string;
+};
+
 export type MemberIssueCountSnapshot = {
   daily: CouponQuota;
   weekly: CouponQuota;
@@ -77,16 +82,15 @@ export function getKstPeriodKey(value: Date | string, period: "daily" | "weekly"
   return `${utcDate.getUTCFullYear()}-${pad(utcDate.getUTCMonth() + 1)}-${pad(utcDate.getUTCDate())}`;
 }
 
-export function getMemberIssueCountSnapshot(input: {
+export function getCouponIssueCountSnapshot(input: {
   couponId: string;
-  memberId: string;
   limits: MemberIssueLimit;
-  records: readonly MemberIssueRecord[];
+  records: readonly CouponIssueRecord[];
   now?: Date;
 }): MemberIssueCountSnapshot {
   const now = input.now ?? new Date();
   const matchingRecords = input.records.filter((record) => {
-    if (record.couponId !== input.couponId || record.memberId !== input.memberId) {
+    if (record.couponId !== input.couponId) {
       return false;
     }
     const issuedAt = new Date(record.issuedAt);
@@ -103,6 +107,21 @@ export function getMemberIssueCountSnapshot(input: {
     weekly: { limit: input.limits.weekly, issued: count("weekly") },
     monthly: { limit: input.limits.monthly, issued: count("monthly") },
   };
+}
+
+export function getMemberIssueCountSnapshot(input: {
+  couponId: string;
+  memberId: string;
+  limits: MemberIssueLimit;
+  records: readonly MemberIssueRecord[];
+  now?: Date;
+}): MemberIssueCountSnapshot {
+  return getCouponIssueCountSnapshot({
+    couponId: input.couponId,
+    limits: input.limits,
+    records: input.records.filter((record) => record.memberId === input.memberId),
+    now: input.now,
+  });
 }
 
 export function isMemberIssueLimitReached(snapshot: MemberIssueCountSnapshot) {
