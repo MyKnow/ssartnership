@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import AdminCategoryManager from "@/components/admin/AdminCategoryManager";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminWorkspaceSummary from "@/components/admin/AdminWorkspaceSummary";
 import AdminShell from "@/components/admin/AdminShell";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
-import StatsRow from "@/components/ui/StatsRow";
 import {
   createCategory,
   updateCategory,
@@ -80,13 +80,15 @@ export default async function AdminCategoriesPage({
             </Button>
           }
         />
-        <StatsRow
+        <AdminWorkspaceSummary
+          eyebrow="Catalog"
+          title="분류 운영 현황"
+          description="사용 중인 카테고리와 입력 품질을 확인한 뒤 이름·설명·색상을 저장합니다."
           items={[
-            { label: "전체", value: `${categories.length.toLocaleString("ko-KR")}개`, hint: "운영 중인 분류" },
-            { label: "설명 입력", value: `${describedCount.toLocaleString("ko-KR")}개`, hint: "사용자 안내 문구" },
-            { label: "색상 설정", value: `${coloredCount.toLocaleString("ko-KR")}개`, hint: "카테고리 강조 색상" },
+            { label: "전체", value: `${categories.length.toLocaleString("ko-KR")}개`, detail: "운영 중인 분류" },
+            { label: "설명 입력", value: `${describedCount.toLocaleString("ko-KR")}개`, detail: "사용자 안내 문구" },
+            { label: "색상 설정", value: `${coloredCount.toLocaleString("ko-KR")}개`, detail: "카테고리 강조 색상" },
           ]}
-          minItemWidth="13rem"
         />
         {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
         <AdminCategoryManager
