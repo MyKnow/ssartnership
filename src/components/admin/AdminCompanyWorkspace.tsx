@@ -81,7 +81,7 @@ export default function AdminCompanyWorkspace({
       {activeTab === "companies" ? (
         <section className="grid gap-4">
           <AdminSectionHeading
-            eyebrow="Companies"
+            eyebrow="데이터"
             title="파트너사 운영"
             description="회사 기본 정보, 연결 제휴처 수, 삭제/수정 작업을 한 영역에서 관리합니다."
           />
@@ -94,7 +94,7 @@ export default function AdminCompanyWorkspace({
       ) : activeTab === "accounts" ? (
         <section className="grid gap-4">
           <AdminSectionHeading
-            eyebrow="Accounts"
+            eyebrow="데이터"
             title="파트너 계정"
             description="담당 계정 생성, 초기 설정 링크 발급, 연결 조정을 같은 영역에서 처리합니다."
           />

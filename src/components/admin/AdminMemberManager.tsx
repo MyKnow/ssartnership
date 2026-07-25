@@ -74,6 +74,7 @@ export default function AdminMemberManager({
     sourcePage: pagination.page,
     value: String(pagination.page),
   });
+  const [requestedPage, setRequestedPage] = useState<number | null>(null);
   const [searchInputDraft, setSearchInputDraft] = useState({
     sourceValue: filters.searchValue,
     value: filters.searchValue,
@@ -86,6 +87,8 @@ export default function AdminMemberManager({
   const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
   const currentPage = Math.min(pagination.page, totalPages);
   const pageStart = (currentPage - 1) * pagination.pageSize;
+  const isPageNavigationPending = isPending && requestedPage !== null;
+  const displayedPage = isPageNavigationPending ? requestedPage : currentPage;
   const pageInputValue =
     pageInputDraft.sourcePage === pagination.page
       ? pageInputDraft.value
@@ -109,7 +112,10 @@ export default function AdminMemberManager({
     filters.mmEnabledFilter !== "all" ||
     filters.marketingEnabledFilter !== "all";
 
-  const updateQuery = (updates: Record<string, string | number | null>) => {
+  const updateQuery = (
+    updates: Record<string, string | number | null>,
+    pendingPage: number | null = null,
+  ) => {
     const next = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([key, value]) => {
       if (value === null || value === "" || value === "all") {
@@ -119,6 +125,7 @@ export default function AdminMemberManager({
       }
     });
     startTransition(() => {
+      setRequestedPage(pendingPage);
       router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     });
   };
@@ -151,8 +158,9 @@ export default function AdminMemberManager({
 
   const syncPage = (nextPage: number) => {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
+    if (safePage === currentPage) return;
     setPageInputDraft({ sourcePage: pagination.page, value: String(safePage) });
-    updateQuery({ page: safePage });
+    updateQuery({ page: safePage }, safePage);
   };
 
   if (state !== "ready") {
@@ -224,7 +232,11 @@ export default function AdminMemberManager({
         description="자주 쓰는 검색·상태·캠퍼스·기수 필터를 먼저 확인합니다."
         tone="elevated"
       >
-        <div className="grid w-full min-w-0 gap-4">
+        <fieldset
+          disabled={isPending}
+          className="m-0 grid w-full min-w-0 gap-4 border-0 p-0"
+        >
+          <legend className="sr-only">회원 목록 필터</legend>
           <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(18rem,2fr)_repeat(3,minmax(10rem,1fr))]">
             <div className="grid min-w-0 gap-1">
               <span className="ui-caption">검색</span>
@@ -249,7 +261,7 @@ export default function AdminMemberManager({
                   type="button"
                   onClick={applySearchFilter}
                   disabled={!isSearchDirty || isPending}
-                  className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   검색
                 </button>
@@ -258,7 +270,7 @@ export default function AdminMemberManager({
                     type="button"
                     onClick={resetSearchFilter}
                     disabled={isPending}
-                    className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     초기화
                   </button>
@@ -426,7 +438,7 @@ export default function AdminMemberManager({
               </div>
             </div>
           </details>
-        </div>
+        </fieldset>
       </FilterBar>
 
       <p className="text-sm text-muted-foreground">
@@ -440,7 +452,7 @@ export default function AdminMemberManager({
           description="검색어나 상태 필터를 조정해 다시 확인해 주세요."
         />
       ) : (
-        <div className="grid min-w-0 gap-4">
+        <div className="grid min-w-0 gap-4" aria-busy={isPageNavigationPending || undefined}>
           <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-muted/40 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <p>
               {pageStart + 1}-{Math.min(pageStart + normalizedMembers.length, pagination.totalCount)} /{" "}
@@ -456,6 +468,7 @@ export default function AdminMemberManager({
                     setPageInputDraft({ sourcePage: pagination.page, value: "1" });
                     updateQuery({ pageSize: nextPageSize, page: null });
                   }}
+                  disabled={isPending}
                 >
                   {ADMIN_MEMBER_PAGE_SIZE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -468,19 +481,21 @@ export default function AdminMemberManager({
                 <button
                   type="button"
                   onClick={() => syncPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={currentPage === 1 || isPending}
+                  className="min-h-11 min-w-14 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   이전
                 </button>
-                <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
-                  {currentPage} / {totalPages}
+                <span className="min-w-[5.5rem] text-center text-xs sm:text-sm" aria-live="polite">
+                  {isPageNavigationPending
+                    ? `${displayedPage}페이지 불러오는 중`
+                    : `${currentPage} / ${totalPages}`}
                 </span>
                 <button
                   type="button"
                   onClick={() => syncPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={currentPage === totalPages || isPending}
+                  className="min-h-11 min-w-14 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   다음
                 </button>
@@ -492,6 +507,7 @@ export default function AdminMemberManager({
                   min={1}
                   max={totalPages}
                   value={pageInputValue}
+                  disabled={isPending}
                   onChange={(event) => {
                     setPageInputDraft({
                       sourcePage: pagination.page,
@@ -517,12 +533,16 @@ export default function AdminMemberManager({
                       syncPage(parsed);
                     }
                   }}
-                  className="shrink-0 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground"
+                  disabled={isPending}
+                  className="min-h-11 shrink-0 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   이동
                 </button>
               </div>
             </div>
+            <p className="sr-only" aria-live="polite">
+              {isPageNavigationPending ? `${displayedPage}페이지 결과를 불러오는 중입니다.` : ""}
+            </p>
           </div>
 
           <div className="grid min-w-0 gap-3">

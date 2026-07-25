@@ -93,7 +93,17 @@ export function useAdminPushManager({
   members,
   partners,
   recentLogs,
-}: Pick<AdminPushManagerProps, "pushConfigured" | "members" | "partners" | "recentLogs">) {
+  availableYearOptions,
+  availableCampusOptions,
+}: Pick<
+  AdminPushManagerProps,
+  | "pushConfigured"
+  | "members"
+  | "partners"
+  | "recentLogs"
+  | "availableYearOptions"
+  | "availableCampusOptions"
+>) {
   const { notify } = useToast();
   const router = useRouter();
   const [logs, setLogs] = useState(recentLogs);
@@ -123,8 +133,10 @@ export function useAdminPushManager({
     );
   }, [composerFingerprint]);
 
-  const campusOptions = useMemo(() => createCampusOptions(members), [members]);
-  const yearOptions = useMemo(() => createYearOptions(members), [members]);
+  const derivedCampusOptions = useMemo(() => createCampusOptions(members), [members]);
+  const derivedYearOptions = useMemo(() => createYearOptions(members), [members]);
+  const campusOptions = availableCampusOptions ?? derivedCampusOptions;
+  const yearOptions = availableYearOptions ?? derivedYearOptions;
   const audienceYearOptions = useMemo(
     () => createAudienceYearOptions(composer.selectedYear, yearOptions),
     [composer.selectedYear, yearOptions],

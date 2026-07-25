@@ -62,15 +62,23 @@ describe("admin dashboard regional scope", () => {
     );
   });
 
-  it("filters change-request counts by scoped partner ids in the dashboard query", async () => {
-    const source = await readFile(
-      new URL("../src/app/admin/(protected)/page.tsx", import.meta.url),
-      "utf8",
-    );
+  it("delegates scoped dashboard counts to a server-side read model", async () => {
+    const [pageSource, readModelSource] = await Promise.all([
+      readFile(
+        new URL("../src/app/admin/(protected)/page.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/lib/admin-dashboard-home.server.ts", import.meta.url),
+        "utf8",
+      ),
+    ]);
 
-    assert.match(source, /getManagedCampusFilterValues/);
-    assert.match(source, /\.overlaps\("managed_campus_slugs", managedCampusFilter\)/);
-    assert.match(source, /\.in\("partner_id", scopedPartnerIds\)/);
-    assert.match(source, /partnerCount: scopedPartnerIds\.length/);
+    assert.match(pageSource, /getAdminDashboardHomeData/);
+    assert.doesNotMatch(pageSource, /getSupabaseAdminClient/);
+    assert.doesNotMatch(pageSource, /collectPagedRows/);
+    assert.doesNotMatch(pageSource, /loadScopedPartnerIds/);
+    assert.match(readModelSource, /fetchAdminDashboardHomeSnapshot/);
+    assert.match(readModelSource, /getSupabaseAdminClient/);
   });
 });

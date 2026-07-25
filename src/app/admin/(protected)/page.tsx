@@ -1,150 +1,40 @@
-import AdminDashboardView, {
-  type AdminDashboardQueueCounts,
-} from "@/components/admin/AdminDashboardView";
+import { Suspense } from "react";
+import AdminDashboardView from "@/components/admin/AdminDashboardView";
+import AdminDashboardPlatformActivitySection from "@/components/admin/AdminDashboardPlatformActivitySection";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import Card from "@/components/ui/Card";
-import {
-  countScopedAdminRegistrationRows,
-  type AdminRegistrationScopeRow,
-} from "@/lib/admin-dashboard-scope";
+import Skeleton from "@/components/ui/Skeleton";
+import Surface from "@/components/ui/Surface";
 import {
   getManagedCampusFilterValues,
   isRegionalAdminAccount,
-  type AdminScopeAccountLike,
 } from "@/lib/admin-scope";
 import { getAdminSession } from "@/lib/auth";
 import { canAdmin, createEmptyAdminPermissionMatrix } from "@/lib/admin-permissions";
-import { collectPagedRows } from "@/lib/log-insights/paging";
-import { fetchAdminDashboardCounts } from "@/lib/partner-counts";
 import {
-  fetchAdminPlatformActivityMetrics,
-  type AdminPlatformActivityMetrics,
-} from "@/lib/platform-activity-metrics";
+  toAdminDashboardHomeSnapshot,
+} from "@/lib/partner-counts";
+import { getAdminDashboardHomeData } from "@/lib/admin-dashboard-home.server";
 import {
   getSsafyCycleOverview,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-const EMPTY_QUEUE_COUNTS: AdminDashboardQueueCounts = {
-  registrationPendingCount: 0,
-  changeRequestPendingCount: 0,
-  planRequestPendingCount: 0,
-  unreadNotificationCount: 0,
-};
-
-type AdminSupabaseClient = ReturnType<typeof getSupabaseAdminClient>;
-
-async function loadPendingRegistrationCount(
-  supabase: AdminSupabaseClient,
-  account: AdminScopeAccountLike,
-) {
-  const managedCampusFilter = getManagedCampusFilterValues(account);
-  if (managedCampusFilter === null) {
-    const result = await supabase
-      .from("partner_registration_requests")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["pending", "in_review"]);
-    return result.error ? 0 : result.count ?? 0;
-  }
-  if (managedCampusFilter.length === 0) {
-    return 0;
-  }
-
-  const result = await collectPagedRows<AdminRegistrationScopeRow>(
-    null,
-    async (from, to) => {
-      const pageResult = await supabase
-        .from("partner_registration_requests")
-        .select("location,company:partner_companies(managed_campus_slugs)")
-        .in("status", ["pending", "in_review"])
-        .range(from, to);
-
-      return {
-        rows: (pageResult.data ?? []) as AdminRegistrationScopeRow[],
-        error: !!pageResult.error,
-      };
-    },
+function AdminPlatformActivityFallback() {
+  return (
+    <Surface
+      level="default"
+      padding="lg"
+      aria-busy="true"
+      aria-label="서비스 활성 지표를 불러오는 중"
+    >
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="mt-3 h-4 max-w-xl" />
+    </Surface>
   );
-
-  return result.partialFailure
-    ? 0
-    : countScopedAdminRegistrationRows(account, result.rows);
-}
-
-async function loadScopedPartnerIds(
-  supabase: AdminSupabaseClient,
-  managedCampusFilter: string[] | null,
-) {
-  if (managedCampusFilter === null) {
-    return null;
-  }
-  if (managedCampusFilter.length === 0) {
-    return [];
-  }
-
-  const partnerResult = await collectPagedRows<{ id: string }>(
-    null,
-    async (from, to) => {
-      const pageResult = await supabase
-        .from("partners")
-        .select("id")
-        .overlaps("managed_campus_slugs", managedCampusFilter)
-        .range(from, to);
-
-      return {
-        rows: pageResult.data ?? [],
-        error: !!pageResult.error,
-      };
-    },
-  );
-  if (partnerResult.partialFailure) {
-    return [];
-  }
-
-  return partnerResult.rows.map((partner) => partner.id);
-}
-
-async function loadPendingChangeRequestCount(
-  supabase: AdminSupabaseClient,
-  scopedPartnerIds: string[] | null,
-) {
-  if (scopedPartnerIds === null) {
-    const result = await supabase
-      .from("partner_change_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
-    return result.error ? 0 : result.count ?? 0;
-  }
-
-  if (scopedPartnerIds.length === 0) {
-    return 0;
-  }
-
-  const result = await supabase
-    .from("partner_change_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending")
-    .in("partner_id", scopedPartnerIds);
-  return result.error ? 0 : result.count ?? 0;
-}
-
-async function loadPendingPlanRequestCount(
-  supabase: AdminSupabaseClient,
-  includeGlobalTasks: boolean,
-) {
-  if (!includeGlobalTasks) {
-    return 0;
-  }
-
-  const result = await supabase
-    .from("partner_plan_upgrade_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending");
-  return result.error ? 0 : result.count ?? 0;
 }
 
 export default async function AdminPage() {
@@ -156,17 +46,16 @@ export default async function AdminPage() {
       <AdminShell title="관리 홈">
         <div className="grid gap-6">
           <AdminPageHeader
-            eyebrow="Operations"
+            eyebrow="운영"
             title="관리 홈"
-            description="운영 데이터를 불러오려면 서버 환경 설정이 필요합니다."
+            description="운영 정보를 준비하지 못했습니다. 잠시 후 다시 확인해 주세요."
           />
           <Card className="w-full max-w-xl text-center">
             <h2 className="text-xl font-semibold text-foreground">
-              Supabase 설정이 필요합니다.
+              운영 정보를 준비하지 못했습니다.
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`를 설정한 뒤 다시 접속해
-              주세요.
+              잠시 후 다시 시도해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요.
             </p>
           </Card>
         </div>
@@ -174,77 +63,29 @@ export default async function AdminPage() {
     );
   }
 
-  const supabase = getSupabaseAdminClient();
-  const [cycleSettings, dashboardCountResult, adminSession] = await Promise.all([
-    getSsafyCycleSettings(),
-    fetchAdminDashboardCounts(supabase),
-    getAdminSession(),
+  const cycleSettingsPromise = getSsafyCycleSettings();
+  const adminSession = await getAdminSession();
+  const dashboardSnapshotPromise = adminSession
+    ? getAdminDashboardHomeData({
+        adminId: adminSession.adminId,
+        managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
+      })
+    : Promise.resolve({
+        snapshot: toAdminDashboardHomeSnapshot(),
+        hasError: false,
+      });
+  const [cycleSettings, dashboardSnapshotResult] = await Promise.all([
+    cycleSettingsPromise,
+    dashboardSnapshotPromise,
   ]);
   const cycleOverview = getSsafyCycleOverview(cycleSettings);
-
-  let dashboardCounts = dashboardCountResult.errorMessage
-    ? {
-        memberCount: 0,
-        companyCount: 0,
-        partnerCount: 0,
-        categoryCount: 0,
-        accountCount: 0,
-        reviewCount: 0,
-        activePushSubscriptionCount: 0,
-        productLogCount: 0,
-        auditLogCount: 0,
-        securityLogCount: 0,
-      }
-    : dashboardCountResult.counts;
-
-  let queueCounts = EMPTY_QUEUE_COUNTS;
-  let platformActivityMetrics: AdminPlatformActivityMetrics | null = null;
-  let platformActivityErrorMessage: string | null = null;
-  if (adminSession) {
-    const includeGlobalTasks = !isRegionalAdminAccount(adminSession.account);
-    const canViewPlatformActivity =
-      includeGlobalTasks && canAdmin(adminSession.account.permissions, "logs", "read");
-    const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
-    const scopedPartnerIds = await loadScopedPartnerIds(
-      supabase,
-      managedCampusFilter,
-    );
-    if (scopedPartnerIds !== null) {
-      dashboardCounts = {
-        ...dashboardCounts,
-        partnerCount: scopedPartnerIds.length,
-      };
-    }
-    const [
-      registrationPendingCount,
-      changeRequestPendingCount,
-      planRequestPendingCount,
-      unreadResult,
-      platformActivityResult,
-    ] = await Promise.all([
-      loadPendingRegistrationCount(supabase, adminSession.account),
-      loadPendingChangeRequestCount(supabase, scopedPartnerIds),
-      loadPendingPlanRequestCount(supabase, includeGlobalTasks),
-      supabase
-        .from("admin_notification_recipients")
-        .select("id", { count: "exact", head: true })
-        .eq("admin_id", adminSession.adminId)
-        .is("deleted_at", null)
-        .is("read_at", null),
-      canViewPlatformActivity
-        ? fetchAdminPlatformActivityMetrics(supabase)
-        : Promise.resolve(null),
-    ]);
-
-    queueCounts = {
-      registrationPendingCount,
-      changeRequestPendingCount,
-      planRequestPendingCount,
-      unreadNotificationCount: unreadResult.error ? 0 : unreadResult.count ?? 0,
-    };
-    platformActivityMetrics = platformActivityResult?.metrics ?? null;
-    platformActivityErrorMessage = platformActivityResult?.errorMessage ?? null;
-  }
+  const includeGlobalTasks = adminSession
+    ? !isRegionalAdminAccount(adminSession.account)
+    : false;
+  const canViewPlatformActivity =
+    !!adminSession &&
+    includeGlobalTasks &&
+    canAdmin(adminSession.account.permissions, "logs", "read");
 
   const cycleMeta = cycleSettings.manualCurrentYear
     ? `${cycleOverview.currentYear}기 · 조기 시작`
@@ -253,17 +94,21 @@ export default async function AdminPage() {
   return (
     <AdminShell title="관리 홈">
       <AdminDashboardView
-        counts={dashboardCounts}
-        queueCounts={queueCounts}
+        counts={dashboardSnapshotResult.snapshot.counts}
+        queueCounts={dashboardSnapshotResult.snapshot.queueCounts}
         permissions={
           adminSession?.account.permissions ?? createEmptyAdminPermissionMatrix()
         }
         cycleMeta={cycleMeta}
-        includeGlobalTasks={
-          adminSession ? !isRegionalAdminAccount(adminSession.account) : false
+        includeGlobalTasks={includeGlobalTasks}
+        isDataUnavailable={dashboardSnapshotResult.hasError}
+        platformActivity={
+          canViewPlatformActivity ? (
+            <Suspense fallback={<AdminPlatformActivityFallback />}>
+              <AdminDashboardPlatformActivitySection />
+            </Suspense>
+          ) : null
         }
-        platformActivityMetrics={platformActivityMetrics}
-        platformActivityErrorMessage={platformActivityErrorMessage}
       />
     </AdminShell>
   );

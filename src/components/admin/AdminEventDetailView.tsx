@@ -51,7 +51,7 @@ export default function AdminEventDetailView({
   return (
     <div className="grid min-w-0 gap-6">
       <AdminPageHeader
-        eyebrow="Events"
+        eyebrow="자동화"
         title={registration ? definition.title : "이벤트 운영 등록"}
         description="공개 이벤트 본문은 코드에서 만들고, 이 화면에서는 공개 링크와 노출 대상, 기간만 관리합니다."
       />

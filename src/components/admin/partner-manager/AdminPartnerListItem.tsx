@@ -48,6 +48,12 @@ export default function AdminPartnerListItem({
   const serviceMode = getPartnerServiceMode(partner.location);
   const isOnlineService = serviceMode === "online";
   const placeLinkLabel = getPartnerPlaceLinkLabel(serviceMode);
+  const summaryMetrics = [
+    { label: "즐겨찾기", value: metrics?.favoriteCount ?? 0 },
+    { label: "PV", value: metrics?.detailViews ?? 0 },
+    { label: "CTA", value: metrics?.totalClicks ?? 0 },
+    { label: "리뷰", value: metrics?.reviewCount ?? 0 },
+  ];
 
   return (
     <article className="grid min-w-0 gap-4 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4">
@@ -68,13 +74,13 @@ export default function AdminPartnerListItem({
             <Link
               href={`/admin/partners/${partner.id}`}
               prefetch={false}
-              className="inline-flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary"
+              className="flex min-w-0 items-start gap-2 text-lg font-semibold text-foreground hover:text-primary"
             >
-              <span className="truncate">{partner.name}</span>
-              <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+              <span className="min-w-0 text-ko-title">{partner.name}</span>
+              <ChevronRightIcon className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
             </Link>
-            <div className="flex min-h-5 items-center gap-2 text-sm text-muted-foreground">
-              {!isOnlineService ? <p>{partner.location}</p> : null}
+            <div className="flex min-h-5 min-w-0 items-center gap-2 text-sm text-muted-foreground">
+              {!isOnlineService ? <p className="min-w-0">{partner.location}</p> : null}
               {isOnlineService && partner.map_url ? (
                 <a
                   href={partner.map_url}
@@ -113,14 +119,10 @@ export default function AdminPartnerListItem({
         </div>
       </div>
 
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7">
-        <MetricPill label="즐겨찾기" value={metrics?.favoriteCount ?? 0} />
-        <MetricPill label="PV" value={metrics?.detailViews ?? 0} />
-        <MetricPill label="UV" value={metrics?.detailUv ?? 0} />
-        <MetricPill label="CTA" value={metrics?.totalClicks ?? 0} />
-        <MetricPill label="예약" value={metrics?.reservationClicks ?? 0} />
-        <MetricPill label="문의" value={metrics?.inquiryClicks ?? 0} />
-        <MetricPill label="리뷰" value={metrics?.reviewCount ?? 0} />
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {summaryMetrics.map((metric) => (
+          <MetricPill key={metric.label} {...metric} />
+        ))}
       </div>
     </article>
   );

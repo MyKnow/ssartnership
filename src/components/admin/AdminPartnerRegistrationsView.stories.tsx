@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import AdminPartnerRegistrationsView from "./AdminPartnerRegistrationsView";
 
 const meta = {
@@ -63,3 +64,25 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Paginated: Story = {
+  args: {
+    pagination: {
+      totalCount: 25,
+      page: 2,
+      pageSize: 12,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "이전" })).toHaveAttribute(
+      "href",
+      "/admin/partner-registrations",
+    );
+    await expect(canvas.getByRole("link", { name: "다음" })).toHaveAttribute(
+      "href",
+      "/admin/partner-registrations?page=3",
+    );
+    await expect(canvas.getByText("2 / 3")).toBeVisible();
+  },
+};

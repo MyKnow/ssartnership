@@ -1052,6 +1052,188 @@ as $$
     ) as security_log_count;
 $$;
 
+create index if not exists partner_registration_requests_pending_company_idx
+  on public.partner_registration_requests(company_id)
+  where status in ('pending', 'in_review');
+
+create index if not exists admin_notification_recipients_unread_admin_idx
+  on public.admin_notification_recipients(admin_id)
+  where deleted_at is null and read_at is null;
+
+create or replace function public.get_admin_dashboard_home_snapshot(
+  input_admin_id uuid,
+  input_managed_campus_slugs text[] default null
+)
+returns table (
+  member_count bigint,
+  company_count bigint,
+  partner_count bigint,
+  category_count bigint,
+  account_count bigint,
+  review_count bigint,
+  active_push_subscription_count bigint,
+  product_log_count bigint,
+  audit_log_count bigint,
+  security_log_count bigint,
+  registration_pending_count bigint,
+  change_request_pending_count bigint,
+  plan_request_pending_count bigint,
+  unread_notification_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with scope as (
+    select
+      input_managed_campus_slugs is null as is_global,
+      coalesce(input_managed_campus_slugs, '{}'::text[]) as managed_campus_slugs
+  )
+  select
+    case when scope.is_global then (select count(*)::bigint from public.members) else 0::bigint end,
+    case when scope.is_global then (select count(*)::bigint from public.partner_companies) else 0::bigint end,
+    (
+      select count(*)::bigint
+      from public.partners as partner
+      where scope.is_global or partner.managed_campus_slugs && scope.managed_campus_slugs
+    ),
+    case when scope.is_global then (select count(*)::bigint from public.categories) else 0::bigint end,
+    case when scope.is_global then (select count(*)::bigint from public.partner_accounts) else 0::bigint end,
+    case when scope.is_global then (
+      select count(*)::bigint
+      from public.partner_reviews
+      where deleted_at is null
+    ) else 0::bigint end,
+    case when scope.is_global then (
+      select count(*)::bigint
+      from public.push_subscriptions
+      where is_active = true
+    ) else 0::bigint end,
+    case when scope.is_global then greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.event_logs'::regclass), 0),
+      0
+    ) else 0::bigint end,
+    case when scope.is_global then greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.admin_audit_logs'::regclass), 0),
+      0
+    ) else 0::bigint end,
+    case when scope.is_global then greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.auth_security_logs'::regclass), 0),
+      0
+    ) else 0::bigint end,
+    (
+      select count(*)::bigint
+      from public.partner_registration_requests as request
+      left join public.partner_companies as company on company.id = request.company_id
+      where request.status in ('pending', 'in_review')
+        and (
+          scope.is_global
+          or (
+            company.id is not null
+            and company.managed_campus_slugs && scope.managed_campus_slugs
+          )
+          or (
+            company.id is null
+            and request.location ~ '(전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장|서울|강남|역삼|역삼역|선릉|테헤란|봉은사|논현|구미|경북|경상북도|대전|유성|둔산|부산|울산|경남|창원|김해|양산|해운대|서면|광주|전남)'
+            and public.infer_partner_campus_slugs(request.location) && scope.managed_campus_slugs
+          )
+        )
+    ),
+    (
+      select count(*)::bigint
+      from public.partner_change_requests as request
+      join public.partners as partner on partner.id = request.partner_id
+      where request.status = 'pending'
+        and (scope.is_global or partner.managed_campus_slugs && scope.managed_campus_slugs)
+    ),
+    case when scope.is_global then (
+      select count(*)::bigint
+      from public.partner_plan_upgrade_requests
+      where status = 'pending'
+    ) else 0::bigint end,
+    (
+      select count(*)::bigint
+      from public.admin_notification_recipients
+      where admin_id = input_admin_id
+        and deleted_at is null
+        and read_at is null
+    )
+  from scope;
+$$;
+
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[]) from public;
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[]) from anon;
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[]) from authenticated;
+grant execute on function public.get_admin_dashboard_home_snapshot(uuid, text[]) to service_role;
+
+create or replace function public.get_admin_partner_registration_request_page(
+  input_status text default null,
+  input_page integer default 1,
+  input_page_size integer default 12,
+  input_managed_campus_slugs text[] default null
+)
+returns table (
+  id uuid,
+  total_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with parameters as (
+    select
+      case
+        when input_status in ('pending', 'in_review', 'converted', 'rejected', 'archived')
+          then input_status
+        else null
+      end as status_filter,
+      greatest(coalesce(input_page, 1), 1) as page,
+      least(greatest(coalesce(input_page_size, 12), 1), 24) as page_size,
+      input_managed_campus_slugs is null as is_global,
+      coalesce(input_managed_campus_slugs, '{}'::text[]) as managed_campus_slugs
+  ),
+  scoped_rows as (
+    select request.id, request.created_at
+    from public.partner_registration_requests as request
+    left join public.partner_companies as company on company.id = request.company_id
+    cross join parameters
+    where (parameters.status_filter is null or request.status = parameters.status_filter)
+      and (
+        parameters.is_global
+        or (
+          company.id is not null
+          and company.managed_campus_slugs && parameters.managed_campus_slugs
+        )
+        or (
+          company.id is null
+          and request.location ~ '(전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장|서울|강남|역삼|역삼역|선릉|테헤란|봉은사|논현|구미|경북|경상북도|대전|유성|둔산|부산|울산|경남|창원|김해|양산|해운대|서면|광주|전남)'
+          and public.infer_partner_campus_slugs(request.location) && parameters.managed_campus_slugs
+        )
+      )
+  ),
+  numbered_rows as (
+    select
+      id,
+      created_at,
+      count(*) over()::bigint as total_count,
+      row_number() over (order by created_at desc, id desc) as row_num
+    from scoped_rows
+  )
+  select numbered_rows.id, numbered_rows.total_count
+  from numbered_rows
+  cross join parameters
+  where numbered_rows.row_num > ((parameters.page - 1) * parameters.page_size)
+    and numbered_rows.row_num <= (parameters.page * parameters.page_size)
+  order by numbered_rows.row_num;
+$$;
+
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) from public;
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) from anon;
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) from authenticated;
+grant execute on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) to service_role;
+
 create or replace function public.get_admin_logs_page(
   input_start timestamp with time zone,
   input_end timestamp with time zone,
@@ -1595,6 +1777,91 @@ on conflict (kind, version) do update set
   is_active = excluded.is_active,
   effective_at = excluded.effective_at,
   updated_at = now();
+
+create or replace function public.get_admin_task_inbox_counts(
+  input_admin_id uuid,
+  input_managed_campus_slugs text[] default null,
+  input_include_brand_queues boolean default false,
+  input_include_graduate_verifications boolean default false,
+  input_include_signup_requests boolean default false,
+  input_include_profile_photos boolean default false,
+  input_include_notifications boolean default false
+)
+returns table (
+  registration_pending_count bigint,
+  change_request_pending_count bigint,
+  graduate_verification_pending_count bigint,
+  signup_request_pending_count bigint,
+  profile_photo_pending_count bigint,
+  unread_notification_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with scope as (
+    select
+      input_managed_campus_slugs is null as is_global,
+      coalesce(input_managed_campus_slugs, '{}'::text[]) as managed_campus_slugs
+  )
+  select
+    case when input_include_brand_queues then (
+      select count(*)::bigint
+      from public.partner_registration_requests as request
+      left join public.partner_companies as company on company.id = request.company_id
+      where request.status in ('pending', 'in_review')
+        and (
+          scope.is_global
+          or (
+            company.id is not null
+            and company.managed_campus_slugs && scope.managed_campus_slugs
+          )
+          or (
+            company.id is null
+            and request.location ~ '(전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장|서울|강남|역삼|역삼역|선릉|테헤란|봉은사|논현|구미|경북|경상북도|대전|유성|둔산|부산|울산|경남|창원|김해|양산|해운대|서면|광주|전남)'
+            and public.infer_partner_campus_slugs(request.location) && scope.managed_campus_slugs
+          )
+        )
+    ) else null end,
+    case when input_include_brand_queues then (
+      select count(*)::bigint
+      from public.partner_change_requests as request
+      join public.partners as partner on partner.id = request.partner_id
+      where request.status = 'pending'
+        and (scope.is_global or partner.managed_campus_slugs && scope.managed_campus_slugs)
+    ) else null end,
+    case when input_include_graduate_verifications then (
+      select count(*)::bigint
+      from public.graduate_verification_requests
+      where status in ('submitted', 'in_review')
+    ) else null end,
+    case when input_include_signup_requests then (
+      select count(*)::bigint
+      from public.member_signup_approval_requests
+      where status = 'pending'
+    ) else null end,
+    case when input_include_profile_photos then (
+      select count(*)::bigint
+      from public.member_profile_images
+      where graduate_verification_request_id is null
+        and member_id is not null
+        and status = 'pending'
+    ) else null end,
+    case when input_include_notifications then (
+      select count(*)::bigint
+      from public.admin_notification_recipients
+      where admin_id = input_admin_id
+        and deleted_at is null
+        and read_at is null
+    ) else null end
+  from scope;
+$$;
+
+revoke all on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) from public;
+revoke all on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) from anon;
+revoke all on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) from authenticated;
+grant execute on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) to service_role;
 
 -- 20260723080416_sync_partner_benefit_cache.sql snapshot
 create or replace function public.bump_partner_benefits_public_cache_version()
@@ -2949,6 +3216,48 @@ revoke all on function public.get_admin_platform_activity_metrics() from anon;
 revoke all on function public.get_admin_platform_activity_metrics() from authenticated;
 grant execute on function public.get_admin_platform_activity_metrics() to service_role;
 
+create or replace function public.get_admin_web_vitals_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  metric text,
+  sample_count bigint,
+  p75_value double precision,
+  good_count bigint,
+  needs_improvement_count bigint,
+  poor_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select
+    event_log.properties ->> 'metric' as metric,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (
+      order by (event_log.properties ->> 'value')::double precision
+    )::double precision as p75_value,
+    count(*) filter (where event_log.properties ->> 'rating' = 'good')::bigint as good_count,
+    count(*) filter (
+      where event_log.properties ->> 'rating' = 'needs-improvement'
+    )::bigint as needs_improvement_count,
+    count(*) filter (where event_log.properties ->> 'rating' = 'poor')::bigint as poor_count
+  from public.event_logs as event_log
+  where event_log.event_name = 'admin_web_vital'
+    and event_log.created_at >= input_start
+    and event_log.created_at <= input_end
+    and event_log.properties ->> 'metric' in ('INP', 'LCP', 'TTFB')
+    and event_log.properties ->> 'value' ~ '^[0-9]+(?:\.[0-9]+)?$'
+  group by event_log.properties ->> 'metric';
+$$;
+
+revoke all on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
 revoke all on function public.get_partner_engagement_counts(uuid[]) from public;
 revoke all on function public.get_partner_engagement_counts(uuid[]) from anon;
 revoke all on function public.get_partner_engagement_counts(uuid[]) from authenticated;
@@ -3418,6 +3727,8 @@ create index if not exists suggestion_attempts_identifier_idx on suggestion_atte
 create index if not exists partner_registration_attempts_identifier_idx on partner_registration_attempts(identifier);
 create index if not exists partner_registration_requests_status_created_idx
   on partner_registration_requests(status, created_at desc);
+create index if not exists partner_registration_requests_status_created_id_idx
+  on partner_registration_requests(status, created_at desc, id desc);
 create index if not exists partner_registration_requests_category_created_idx
   on partner_registration_requests(category_id, created_at desc);
 create index if not exists partner_registration_requests_source_created_idx
@@ -3576,6 +3887,9 @@ create index if not exists event_logs_created_at_id_idx
 create index if not exists event_logs_event_name_idx on event_logs(event_name);
 create index if not exists event_logs_name_created_at_idx
   on event_logs(event_name, created_at desc);
+create index if not exists event_logs_admin_web_vital_created_at_idx
+  on event_logs(created_at desc)
+  where event_name = 'admin_web_vital';
 create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
 create index if not exists event_logs_actor_type_created_at_idx
   on event_logs(actor_type, created_at desc);

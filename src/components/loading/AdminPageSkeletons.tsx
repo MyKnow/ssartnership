@@ -1,4 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminGlobalSearchSkeletonContent } from "@/components/loading/AdminGlobalSearchSkeletonContent";
 import Skeleton from "@/components/ui/Skeleton";
 import Surface from "@/components/ui/Surface";
 
@@ -154,6 +155,14 @@ export function AdminOverviewSkeleton() {
 
 export function AdminProtectedSkeleton() {
   return <AdminListSkeleton title="관리 화면" />;
+}
+
+export function AdminGlobalSearchSkeleton() {
+  return (
+    <AdminShell title="통합 검색">
+      <AdminGlobalSearchSkeletonContent />
+    </AdminShell>
+  );
 }
 
 export function AdminMembersSkeleton() {

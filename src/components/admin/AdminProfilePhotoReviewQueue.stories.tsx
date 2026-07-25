@@ -51,3 +51,9 @@ export const Default: Story = {};
 export const Empty: Story = {
   args: { replacements: [], currentPhotos: [] },
 };
+
+export const LoadError: Story = {
+  args: {
+    loadError: true,
+  },
+};

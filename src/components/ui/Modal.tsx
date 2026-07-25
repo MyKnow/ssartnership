@@ -1,9 +1,24 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+
+const focusableSelector = [
+  "a[href]",
+  "button:not([disabled]):not([tabindex='-1'])",
+  "input:not([disabled]):not([tabindex='-1'])",
+  "select:not([disabled]):not([tabindex='-1'])",
+  "textarea:not([disabled]):not([tabindex='-1'])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+    (element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true",
+  );
+}
 
 export default function Modal({
   open,
@@ -24,6 +39,15 @@ export default function Modal({
 }) {
   const shouldReduceMotion = useReducedMotion();
   const portalRoot = typeof document === "undefined" ? null : document.body;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) {
@@ -35,6 +59,65 @@ export default function Modal({
 
     return () => {
       document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = window.requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (!panel) {
+        return;
+      }
+      const [firstFocusable] = getFocusableElements(panel);
+      (firstFocusable ?? panel).focus();
+    });
+
+    function handleKeyDown(event: KeyboardEvent) {
+      const panel = panelRef.current;
+      if (!panel) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = getFocusableElements(panel);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+
+      const firstFocusable = focusableElements[0];
+      const lastFocusable = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === firstFocusable) {
+        event.preventDefault();
+        lastFocusable.focus();
+      } else if (!event.shiftKey && document.activeElement === lastFocusable) {
+        event.preventDefault();
+        firstFocusable.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKeyDown);
+      if (openerRef.current?.isConnected) {
+        openerRef.current.focus();
+      }
     };
   }, [open]);
 
@@ -50,13 +133,20 @@ export default function Modal({
             type="button"
             className="absolute inset-0 bg-slate-950/52 backdrop-blur-md"
             onClick={onClose}
-            aria-label="닫기"
+            aria-hidden="true"
+            tabIndex={-1}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: shouldReduceMotion ? 0 : 0.18 }}
           />
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={description ? descriptionId : undefined}
+            tabIndex={-1}
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 16, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 12, scale: 0.99 }}
@@ -66,15 +156,25 @@ export default function Modal({
               panelClassName,
             )}
           >
-            <div>
-              <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
-                {title}
-              </h2>
-              {description ? (
-                <p className="mt-2 ui-body">
-                  {description}
-                </p>
-              ) : null}
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id={titleId} className="text-xl font-semibold tracking-[-0.02em] text-foreground">
+                  {title}
+                </h2>
+                {description ? (
+                  <p id={descriptionId} className="mt-2 ui-body">
+                    {description}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="모달 닫기"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-control border border-border bg-surface-control px-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                닫기
+              </button>
             </div>
             <div className={cn("mt-4 min-h-0 flex-1", bodyClassName)}>
               {children}

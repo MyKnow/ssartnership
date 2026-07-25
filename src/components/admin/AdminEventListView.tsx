@@ -115,7 +115,7 @@ export default function AdminEventListView({
   return (
     <div className="grid min-w-0 gap-6">
       <AdminPageHeader
-        eyebrow="Events"
+        eyebrow="자동화"
         title="이벤트 관리"
         description="코드로 만든 이벤트 페이지를 등록하고, 공개 전·중·후 상태와 노출 대상을 확인합니다."
       />

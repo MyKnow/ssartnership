@@ -53,7 +53,7 @@ export default function AdminMemberSignupApprovalDetail({
   return (
     <div className="grid gap-6">
       <AdminPageHeader
-        eyebrow="Member onboarding"
+        eyebrow="가입 승인"
         title="가입 승인 요청 검토"
         description="Mattermost 계정은 이미 인증되었지만, 닉네임에서 이름·기수·캠퍼스를 자동 확정하지 못한 요청입니다."
         actions={

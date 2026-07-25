@@ -470,6 +470,8 @@ test("canonical admin screens expose default actual-view stories at every requir
   const matrix = buildMockCoverageMatrix();
   const expectedActualViews = new Map([
     ["/admin", "AdminDashboardView"],
+    ["/admin/tasks", "AdminTaskInboxView"],
+    ["/admin/search", "AdminGlobalSearchResultsView"],
     ["/admin/admins", "AdminAccountsView"],
     ["/admin/advertisement", "AdminAdvertisementView"],
     ["/admin/companies", "AdminCompaniesView"],

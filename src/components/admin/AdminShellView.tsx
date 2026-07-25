@@ -5,14 +5,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowTopRightOnSquareIcon,
+  Bars3Icon,
   ChevronRightIcon,
   HomeIcon,
+  QueueListIcon,
+  Squares2X2Icon,
 } from "@heroicons/react/24/outline";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import ScrollToTopFab from "@/components/ScrollToTopFab";
 import FloatingActionGroup from "@/components/FloatingActionGroup";
+import AdminQuickNavigatorProvider, {
+  AdminQuickNavigatorTrigger,
+} from "@/components/admin/AdminQuickNavigator";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
@@ -51,6 +57,21 @@ export default function AdminShellView({
       .flatMap((group) => group.items)
       .find((item) => isAdminNavActive(pathname, item.href)) ??
     findAdminNavItem(pathname);
+  const taskNavItem = navGroups
+    .flatMap((group) => group.items)
+    .find((item) => item.href === "/admin/tasks");
+  const dataGroup = navGroups.find((group) => group.label === "데이터");
+  const dataNavItem = dataGroup?.items[0];
+  const isDataActive = Boolean(
+    dataGroup?.items.some((item) => isAdminNavActive(pathname, item.href)),
+  );
+  const mobileNavItemClassName = (active: boolean) =>
+    cn(
+      "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-inset",
+      active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+    );
+  const skipLinkClassName =
+    "sr-only fixed left-4 top-4 z-[90] rounded-control border border-border bg-surface-overlay px-4 py-3 text-sm font-semibold text-foreground shadow-overlay focus:not-sr-only focus:!fixed focus:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
   const renderDesktopNav = (expanded: boolean) => (
     <nav className="grid gap-6">
@@ -98,7 +119,20 @@ export default function AdminShellView({
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <AdminQuickNavigatorProvider navGroups={navGroups}>
+      <div className="min-h-screen bg-background">
+      <a
+        href="#admin-mobile-main-content"
+        className={cn(skipLinkClassName, "md:hidden")}
+      >
+        주요 내용으로 건너뛰기
+      </a>
+      <a
+        href="#admin-desktop-main-content"
+        className={cn(skipLinkClassName, "hidden md:inline-flex")}
+      >
+        주요 내용으로 건너뛰기
+      </a>
       <div className="md:hidden">
         <div
           aria-hidden="true"
@@ -123,36 +157,77 @@ export default function AdminShellView({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  href="/admin"
-                  ariaLabel="관리 홈으로 이동"
-                  title="관리 홈"
-                >
-                  <HomeIcon className="h-5 w-5" />
-                </Button>
+                <AdminQuickNavigatorTrigger compact />
                 <ThemeToggle />
-                <AdminMobileNav
-                  title={title}
-                  backHref={backHref}
-                  backLabel={backLabel}
-                  logoutAction={logoutAction}
-                  navGroups={navGroups}
-                />
               </div>
             </Container>
           </div>
         </header>
 
-        <FloatingActionGroup>
+        <FloatingActionGroup className="!bottom-[calc(5rem+env(safe-area-inset-bottom))] md:!bottom-safe-bottom-5">
           <ScrollToTopFab />
-          <main>
-            <Container className="pb-16 pt-8" size="dashboard">
+          <main id="admin-mobile-main-content" tabIndex={-1}>
+            <Container className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-8" size="dashboard">
               {children}
             </Container>
           </main>
         </FloatingActionGroup>
+
+        <nav
+          aria-label="관리자 주요 탐색"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl"
+        >
+          <Container size="dashboard" className="flex items-stretch">
+            <Link
+              href="/admin"
+              aria-current={pathname === "/admin" ? "page" : undefined}
+              className={mobileNavItemClassName(pathname === "/admin")}
+            >
+              <HomeIcon className="h-5 w-5" aria-hidden="true" />
+              <span>홈</span>
+            </Link>
+            {taskNavItem ? (
+              <Link
+                href={taskNavItem.href}
+                aria-current={isAdminNavActive(pathname, taskNavItem.href) ? "page" : undefined}
+                className={mobileNavItemClassName(
+                  isAdminNavActive(pathname, taskNavItem.href),
+                )}
+              >
+                <QueueListIcon className="h-5 w-5" aria-hidden="true" />
+                <span>작업함</span>
+              </Link>
+            ) : null}
+            {dataNavItem ? (
+              <Link
+                href={dataNavItem.href}
+                title={dataNavItem.label}
+                aria-current={isDataActive ? "page" : undefined}
+                className={mobileNavItemClassName(isDataActive)}
+              >
+                <Squares2X2Icon className="h-5 w-5" aria-hidden="true" />
+                <span>데이터</span>
+              </Link>
+            ) : null}
+            <AdminMobileNav
+              title={title}
+              backHref={backHref}
+              backLabel={backLabel}
+              logoutAction={logoutAction}
+              navGroups={navGroups}
+              triggerClassName={cn(
+                mobileNavItemClassName(false),
+                "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
+              )}
+              triggerContent={
+                <>
+                  <Bars3Icon className="h-5 w-5" aria-hidden="true" />
+                  <span>더보기</span>
+                </>
+              }
+            />
+          </Container>
+        </nav>
       </div>
 
       <div className="hidden min-h-screen md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
@@ -171,7 +246,7 @@ export default function AdminShellView({
               </span>
               <span className="hidden min-w-0 xl:grid">
                 <span className="truncate text-sm font-semibold">{SITE_NAME}</span>
-                <span className="truncate text-xs text-muted-foreground">Admin</span>
+                <span className="truncate text-xs text-muted-foreground">관리자</span>
               </span>
             </Link>
 
@@ -198,6 +273,7 @@ export default function AdminShellView({
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
+                <AdminQuickNavigatorTrigger />
                 {backHref && backLabel ? (
                   <Button variant="secondary" href={backHref}>
                     {backLabel}
@@ -217,7 +293,7 @@ export default function AdminShellView({
 
           <FloatingActionGroup>
             <ScrollToTopFab />
-            <main>
+            <main id="admin-desktop-main-content" tabIndex={-1}>
               <Container className="pb-16 pt-8" size="dashboard">
                 {children}
               </Container>
@@ -225,6 +301,7 @@ export default function AdminShellView({
           </FloatingActionGroup>
         </div>
       </div>
-    </div>
+      </div>
+    </AdminQuickNavigatorProvider>
   );
 }

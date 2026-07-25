@@ -42,6 +42,11 @@ test("대표 검토 큐는 공통 헤더와 상태 피드백 계약을 사용한
   for (const source of sources) {
     assert.match(source, /AdminReviewQueueHeader/);
   }
+
+  const partnerRequestsPage = sources[1];
+  assert.match(partnerRequestsPage, /getAdminPartnerChangeRequestQueueReadModel/);
+  assert.match(partnerRequestsPage, /parseAdminReviewQueuePagination/);
+  assert.doesNotMatch(partnerRequestsPage, /throw new Error/);
 });
 
 test("결정 액션은 대상 항목의 제출 상태를 표시하고 목록 맥락을 보존한다", async () => {
@@ -86,6 +91,7 @@ test("결정 액션은 대상 항목의 제출 상태를 표시하고 목록 맥
 
   assert.match(partnerQueue, /<input[^>]+name="returnTo"/);
   assert.match(partnerQueue, /<SubmitButton/);
+  assert.match(partnerQueue, /buildQueuePageHref/);
   assert.match(partnerActions, /sanitizeReturnTo/);
   assert.match(signupQueue, /returnTo/);
   assert.match(signupDetail, /name="returnTo"/);

@@ -13,32 +13,28 @@ import {
   upsertNotificationTemplate,
 } from "@/lib/notification-templates/repository.server";
 import { sendNotificationTemplateTest } from "@/lib/notification-templates/test-delivery.server";
-import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 const PATH = "/admin/notification-templates";
 
-function getChannel(value: FormDataEntryValue | null): NotificationTemplateChannel {
+function getChannel(value: FormDataEntryValue | null): NotificationTemplateChannel | null {
   const channel = String(value ?? "");
   if (channel === "email" || channel === "mattermost" || channel === "push" || channel === "in_app") {
     return channel;
   }
-  throw new Error("알림 채널을 확인해 주세요.");
+  return null;
 }
 
 function getEventKey(value: FormDataEntryValue | null) {
   const eventKey = String(value ?? "").trim();
-  if (!eventKey || !getNotificationTemplateDefinition(eventKey)) {
-    throw new Error("알림 템플릿 대상을 확인해 주세요.");
-  }
-  return eventKey;
+  return eventKey && getNotificationTemplateDefinition(eventKey) ? eventKey : null;
 }
 
-function getBodyFormat(value: FormDataEntryValue | null): NotificationTemplateBodyFormat {
+function getBodyFormat(value: FormDataEntryValue | null): NotificationTemplateBodyFormat | null {
   const bodyFormat = String(value ?? "");
   if (bodyFormat === "plain" || bodyFormat === "markdown" || bodyFormat === "html") {
     return bodyFormat;
   }
-  throw new Error("이메일 본문 형식을 확인해 주세요.");
+  return null;
 }
 
 export async function updateNotificationTemplateAction(formData: FormData) {
@@ -48,6 +44,9 @@ export async function updateNotificationTemplateAction(formData: FormData) {
   const titleTemplate = String(formData.get("titleTemplate") ?? "");
   const bodyTemplate = String(formData.get("bodyTemplate") ?? "");
   const bodyFormat = getBodyFormat(formData.get("bodyFormat"));
+  if (!eventKey || !channel || !bodyFormat) {
+    redirect(`${PATH}?error=invalid_request`);
+  }
 
   try {
     await upsertNotificationTemplate({
@@ -58,9 +57,8 @@ export async function updateNotificationTemplateAction(formData: FormData) {
       bodyFormat,
       adminId: session.adminId,
     });
-  } catch (error) {
-    const message = getSafeAdminMessage(error, "알림 템플릿을 저장하지 못했습니다.");
-    redirect(`${PATH}?error=${encodeURIComponent(message)}`);
+  } catch {
+    redirect(`${PATH}?error=save_failed`);
   }
 
   await logAdminAction("notification_template_update", {
@@ -79,11 +77,13 @@ export async function resetNotificationTemplateAction(formData: FormData) {
   await requireNotificationTemplateAdmin("delete", { path: PATH });
   const eventKey = getEventKey(formData.get("eventKey"));
   const channel = getChannel(formData.get("channel"));
+  if (!eventKey || !channel) {
+    redirect(`${PATH}?error=invalid_request`);
+  }
   try {
     await resetNotificationTemplate({ eventKey, channel });
-  } catch (error) {
-    const message = getSafeAdminMessage(error, "알림 템플릿을 복원하지 못했습니다.");
-    redirect(`${PATH}?error=${encodeURIComponent(message)}`);
+  } catch {
+    redirect(`${PATH}?error=reset_failed`);
   }
 
   await logAdminAction("notification_template_reset", {
@@ -96,30 +96,7 @@ export async function resetNotificationTemplateAction(formData: FormData) {
 
 function getMemberId(value: FormDataEntryValue | null) {
   const memberId = String(value ?? "").trim();
-  if (!memberId) {
-    throw new Error("테스트 수신 회원을 선택해 주세요.");
-  }
-  return memberId;
-}
-
-function getSafeTestErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  const allowedMessages = [
-    "알림 템플릿",
-    "테스트 수신 회원",
-    "선택한 회원",
-    "이메일",
-    "Mattermost",
-    "푸시",
-    "Web Push",
-    "SMTP",
-    "코드",
-    "필수 변수",
-    "허용되지 않은 변수",
-  ];
-  return message && allowedMessages.some((value) => message.includes(value))
-    ? message
-    : "테스트 발송에 실패했습니다. 채널 설정과 수신 회원 상태를 확인해 주세요.";
+  return memberId || null;
 }
 
 export async function sendNotificationTemplateTestAction(formData: FormData) {
@@ -130,6 +107,9 @@ export async function sendNotificationTemplateTestAction(formData: FormData) {
   const titleTemplate = String(formData.get("titleTemplate") ?? "");
   const bodyTemplate = String(formData.get("bodyTemplate") ?? "");
   const bodyFormat = getBodyFormat(formData.get("bodyFormat"));
+  if (!eventKey || !channel || !memberId || !bodyFormat) {
+    redirect(`${PATH}?error=invalid_request`);
+  }
 
   try {
     await sendNotificationTemplateTest({
@@ -140,8 +120,8 @@ export async function sendNotificationTemplateTestAction(formData: FormData) {
       bodyTemplate,
       bodyFormat,
     });
-  } catch (error) {
-    redirect(`${PATH}?error=${encodeURIComponent(getSafeTestErrorMessage(error))}`);
+  } catch {
+    redirect(`${PATH}?error=test_failed`);
   }
 
   await logAdminAction("notification_template_test_send", {

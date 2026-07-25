@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   BellAlertIcon,
   QueueListIcon,
@@ -21,15 +22,17 @@ import {
   type AdminPermissionResource,
   canAdmin,
 } from "@/lib/admin-permissions";
-import type { AdminDashboardCounts } from "@/lib/partner-counts";
+import type {
+  AdminDashboardCounts,
+  AdminDashboardHomeQueueCounts,
+} from "@/lib/partner-counts";
 import type { AdminPlatformActivityMetrics } from "@/lib/platform-activity-metrics";
+import {
+  getNextAdminTaskItem,
+  prioritizeAdminTaskItems,
+} from "@/lib/admin-task-inbox";
 
-export type AdminDashboardQueueCounts = {
-  registrationPendingCount: number;
-  changeRequestPendingCount: number;
-  planRequestPendingCount: number;
-  unreadNotificationCount: number;
-};
+export type AdminDashboardQueueCounts = AdminDashboardHomeQueueCounts;
 
 export type AdminDashboardViewState =
   | "ready"
@@ -43,6 +46,7 @@ type QueueItem = {
   label: string;
   description: string;
   count: number;
+  priority: number;
   permission: AdminPermissionResource;
 };
 
@@ -71,6 +75,8 @@ export default function AdminDashboardView({
   includeGlobalTasks = true,
   platformActivityMetrics,
   platformActivityErrorMessage,
+  platformActivity,
+  isDataUnavailable = false,
   state = "ready",
   errorMessage,
 }: {
@@ -81,6 +87,8 @@ export default function AdminDashboardView({
   includeGlobalTasks?: boolean;
   platformActivityMetrics?: AdminPlatformActivityMetrics | null;
   platformActivityErrorMessage?: string | null;
+  platformActivity?: ReactNode;
+  isDataUnavailable?: boolean;
   state?: AdminDashboardViewState;
   errorMessage?: string;
 }) {
@@ -92,7 +100,7 @@ export default function AdminDashboardView({
     return (
       <div className="grid min-w-0 gap-6" aria-busy={state === "loading" || undefined}>
         <AdminPageHeader
-          eyebrow="Operations"
+          eyebrow="운영"
           title="관리 홈"
           description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
         />
@@ -150,6 +158,7 @@ export default function AdminDashboardView({
       label: "신규 제휴 접수",
       description: "공개 등록 페이지에서 접수된 신청",
       count: queueCounts.registrationPendingCount,
+      priority: 0,
       permission: "brands",
     },
     {
@@ -157,6 +166,7 @@ export default function AdminDashboardView({
       label: "제휴처 변경 요청",
       description: "파트너사 담당자가 보낸 변경 승인 요청",
       count: queueCounts.changeRequestPendingCount,
+      priority: 1,
       permission: "brands",
     },
     {
@@ -164,6 +174,7 @@ export default function AdminDashboardView({
       label: "플랜 검토",
       description: "결제 확인 또는 플랜 승인 대기",
       count: queueCounts.planRequestPendingCount,
+      priority: 2,
       permission: "brands",
     },
     {
@@ -171,6 +182,7 @@ export default function AdminDashboardView({
       label: "읽지 않은 알림",
       description: "현재 관리자 계정의 운영 수신함",
       count: queueCounts.unreadNotificationCount,
+      priority: 3,
       permission: "notifications",
     },
   ] satisfies QueueItem[]).filter(
@@ -259,19 +271,46 @@ export default function AdminDashboardView({
   );
   const canViewPlatformActivity =
     includeGlobalTasks && canAdmin(permissions, "logs", "read");
+  const queueCountsByHref = Object.fromEntries(
+    queueItems.map((item) => [item.href, item.count]),
+  );
+  const prioritizedQueueItems = prioritizeAdminTaskItems(
+    queueItems,
+    queueCountsByHref,
+  );
+  const nextQueueItem = getNextAdminTaskItem(
+    queueItems,
+    queueCountsByHref,
+  );
+  const remainingQueueItems = prioritizedQueueItems.filter(
+    (item) => item.href !== nextQueueItem?.href,
+  );
 
   return (
     <div className="grid min-w-0 gap-6">
       <AdminPageHeader
-        eyebrow="Operations"
+        eyebrow="운영"
         title="관리 홈"
         description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
         actions={
-          <Button href="/" variant="secondary">
-            사용자 홈 보기
-          </Button>
+          <>
+            <Button href="/admin/tasks">작업함 열기</Button>
+            <Button href="/" variant="secondary">
+              사용자 홈 보기
+            </Button>
+          </>
         }
       />
+
+      {isDataUnavailable ? (
+        <InlineMessage
+          tone="warning"
+          title="일부 운영 집계를 아직 확인하지 못했습니다."
+          description="대기 건수와 운영 현황을 다시 불러오려면 다시 확인하세요."
+          actionHref="/admin"
+          actionLabel="다시 확인"
+        />
+      ) : null}
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
         <Surface level="elevated" padding="lg" className="grid min-w-0 gap-4">
@@ -293,14 +332,33 @@ export default function AdminDashboardView({
             />
           ) : (
             <div className="grid min-w-0 gap-2">
-              {queueItems.map((item) => (
+              {nextQueueItem ? (
+                <Link
+                  href={nextQueueItem.href}
+                  className="grid min-w-0 gap-3 rounded-2xl border border-primary/35 bg-primary-soft/70 p-4 transition-colors hover:border-primary/60 hover:bg-primary-soft sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="ui-kicker text-primary">다음으로 처리</p>
+                    <p className="mt-1 font-semibold text-foreground">
+                      {nextQueueItem.label}
+                    </p>
+                    <p className="text-ko-pretty mt-1 text-sm text-muted-foreground">
+                      {nextQueueItem.description}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-primary">
+                    {nextQueueItem.count.toLocaleString("ko-KR")}건 검토 시작
+                  </span>
+                </Link>
+              ) : null}
+              {remainingQueueItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   className="grid min-w-0 gap-3 rounded-2xl border border-border/80 bg-surface-inset p-4 transition-colors hover:border-strong hover:bg-surface-control sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground">
+                    <p className="font-semibold text-foreground">
                       {item.label}
                     </p>
                     <p className="text-ko-pretty mt-1 line-clamp-2 text-sm text-muted-foreground">
@@ -334,10 +392,10 @@ export default function AdminDashboardView({
                     <Icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-foreground">
+                    <span className="block text-sm font-semibold text-foreground">
                       {item.label}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    <span className="text-ko-pretty mt-0.5 block text-xs text-muted-foreground">
                       {item.description}
                     </span>
                   </span>
@@ -385,17 +443,17 @@ export default function AdminDashboardView({
         </Surface>
       </section>
 
-      {canViewPlatformActivity ? (
+      {platformActivity ?? (canViewPlatformActivity ? (
         platformActivityErrorMessage ? (
           <InlineMessage
             tone="warning"
             title="서비스 활성 지표를 불러오지 못했습니다."
-            description="기존 로그 집계가 완료되면 이 영역에서 DAU·WAU·MAU를 확인할 수 있습니다."
+            description="기존 로그 집계가 완료되면 일간·주간·월간 활성 현황을 이 영역에서 확인할 수 있습니다."
           />
         ) : platformActivityMetrics ? (
           <AdminPlatformActivityMetricsPanel metrics={platformActivityMetrics} />
         ) : null
-      ) : null}
+      ) : null)}
     </div>
   );
 }

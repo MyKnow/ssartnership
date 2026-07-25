@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import PartnerChangeRequestQueue from "@/components/admin/PartnerChangeRequestQueue";
@@ -10,49 +11,58 @@ import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
-import { listPartnerChangeRequests } from "@/lib/partner-change-requests";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
+import { getAdminPartnerChangeRequestQueueReadModel } from "@/lib/admin-partner-change-request-queue.server";
 
 export const dynamic = "force-dynamic";
+
+type PartnerRequestsSearchParams = {
+  error?: string | string[];
+  success?: string | string[];
+  page?: string | string[];
+  pageSize?: string | string[];
+};
+
+function getOneSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function buildPartnerRequestQueueHref(page: number, pageSize: number) {
+  const params = new URLSearchParams();
+  if (page > 1) params.set("page", String(page));
+  if (pageSize !== 12) params.set("pageSize", String(pageSize));
+  const query = params.toString();
+  return query ? `/admin/partner-requests?${query}` : "/admin/partner-requests";
+}
 
 export default async function AdminPartnerRequestsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string; success?: string }>;
+  searchParams?: Promise<PartnerRequestsSearchParams>;
 }) {
   const adminSession = await requireAdminPermission("brands", "read", {
     path: "/admin/partner-requests",
   });
   const params = (await searchParams) ?? {};
-  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
-  const requests = await listPartnerChangeRequests();
-  let scopedRequests = requests;
-
-  if (managedCampusFilter) {
-    const supabase = getSupabaseAdminClient();
-    const partnersResult = await supabase
-      .from("partners")
-      .select("id")
-      .overlaps("managed_campus_slugs", managedCampusFilter);
-
-    if (partnersResult.error) {
-      throw new Error(`partner scope load failed: ${partnersResult.error.message}`);
-    }
-
-    const scopedPartnerIds = new Set(
-      (partnersResult.data ?? []).map((partner) => partner.id),
-    );
-    scopedRequests = requests.filter((request) =>
-      scopedPartnerIds.has(request.partnerId),
-    );
+  const pagination = parseAdminReviewQueuePagination({
+    page: getOneSearchParam(params.page),
+    pageSize: getOneSearchParam(params.pageSize),
+  });
+  const { requestPage, queueLoadError } =
+    await getAdminPartnerChangeRequestQueueReadModel({
+      managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    });
+  const totalPages = Math.max(1, Math.ceil(requestPage.totalCount / requestPage.pageSize));
+  if (!queueLoadError && requestPage.totalCount > 0 && pagination.page > totalPages) {
+    redirect(buildPartnerRequestQueueHref(totalPages, pagination.pageSize));
   }
+  const scopedRequests = requestPage.requests;
 
   const partnerCount = new Set(
     scopedRequests.map((request) => request.partnerId),
-  ).size;
-  const companyCount = new Set(
-    scopedRequests.map((request) => request.companyId),
   ).size;
   const oldestCreatedAt = scopedRequests.reduce<string | null>(
     (oldest, request) =>
@@ -62,16 +72,16 @@ export default async function AdminPartnerRequestsPage({
     null,
   );
   const feedback = getAdminReviewQueueFeedback({
-    error: params.error,
-    success: params.success,
+    error: getOneSearchParam(params.error),
+    success: getOneSearchParam(params.success),
   });
-  const returnTo = "/admin/partner-requests";
+  const returnTo = buildPartnerRequestQueueHref(pagination.page, pagination.pageSize);
 
   return (
     <AdminShell title="변경 요청" backHref="/admin/partners" backLabel="제휴처">
       <div className="grid min-w-0 gap-6">
         <AdminReviewQueueHeader
-          eyebrow="Partner Requests"
+          eyebrow="제휴 운영"
           title="제휴처 변경 요청"
           description="파트너사 담당자가 요청한 변경 항목을 현재 값과 비교해 승인하거나 거절합니다."
           actions={
@@ -80,9 +90,9 @@ export default async function AdminPartnerRequestsPage({
             </Button>
           }
           metrics={[
-            { label: "승인 대기", value: `${scopedRequests.length.toLocaleString("ko-KR")}건`, hint: "현재 처리할 요청" },
-            { label: "제휴처", value: `${partnerCount.toLocaleString("ko-KR")}개`, hint: "요청이 연결된 제휴처" },
-            { label: "파트너사", value: `${companyCount.toLocaleString("ko-KR")}개`, hint: "요청을 보낸 계약 회사" },
+            { label: "승인 대기", value: `${requestPage.totalCount.toLocaleString("ko-KR")}건`, hint: "현재 처리할 요청" },
+            { label: "현재 표시", value: `${scopedRequests.length.toLocaleString("ko-KR")}건`, hint: `${Math.min(pagination.page, totalPages)} / ${totalPages} 페이지` },
+            { label: "제휴처", value: `${partnerCount.toLocaleString("ko-KR")}개`, hint: "현재 페이지 기준" },
             { label: "가장 오래된 요청", value: oldestCreatedAt ? formatKoreanDateTimeToMinute(oldestCreatedAt) : "-", hint: "오래된 요청부터 검토" },
           ]}
           feedback={feedback}
@@ -97,6 +107,12 @@ export default async function AdminPartnerRequestsPage({
           rejectAction={rejectPartnerChangeRequest}
           canReview={canAdmin(adminSession.account.permissions, "brands", "update")}
           returnTo={returnTo}
+          pagination={{
+            totalCount: requestPage.totalCount,
+            page: pagination.page,
+            pageSize: pagination.pageSize,
+          }}
+          loadError={queueLoadError}
         />
       </div>
     </AdminShell>

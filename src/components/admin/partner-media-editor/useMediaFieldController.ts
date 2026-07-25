@@ -177,11 +177,8 @@ export default function useMediaFieldController({
           await queueFile(file, index, typeof insertAt === "number" ? insertAt + index : undefined);
         }
       } catch (error) {
-        setError(
-          error instanceof Error && error.message
-            ? error.message
-            : "이미지를 준비하지 못했습니다.",
-        );
+        void error;
+        setError("이미지를 준비하지 못했습니다.");
       } finally {
         setPreparingCount((current) => Math.max(0, current - acceptedFiles.length));
       }

@@ -254,12 +254,15 @@ test("푸시 대상과 발송 화면은 세대·MM 디렉터리 관계만 사용
   const audience = readRepoFile("src/lib/push/audience.ts");
   const send = readRepoFile("src/lib/push/send.ts");
   const adminPushPage = readRepoFile("src/app/admin/(protected)/push/page.tsx");
+  const adminPushReadModel = readRepoFile("src/lib/admin-push-read-model.server.ts");
+  const recipientSearch = readRepoFile("src/lib/admin-push-recipient-search.server.ts");
 
-  for (const source of [audience, send, adminPushPage]) {
+  for (const source of [audience, send, adminPushPage, adminPushReadModel, recipientSearch]) {
     assert.doesNotMatch(source, /\.eq\("year"|\.select\("id,display_name,mm_username,year,campus"/);
   }
   assert.match(audience, /getMmUserDirectoryEntriesByAccountIds/);
-  assert.match(adminPushPage, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(recipientSearch, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(adminPushReadModel, /generation,campus/);
   assert.match(audience, /\.eq\("generation", audience\.year\)/);
   assert.match(send, /\.eq\("generation", resolvedAudience\.year\)/);
 });
@@ -316,26 +319,43 @@ test("이벤트 보상 후보는 세대·MM 디렉터리·정책 consent ledger�
 
 test("관리자 회원 화면과 수정 액션은 정규화된 회원 관계만 사용한다", () => {
   const membersPage = readRepoFile("src/app/admin/(protected)/members/page.tsx");
+  const memberListReadModel = readRepoFile(
+    "src/lib/admin-member-list.server.ts",
+  );
   const memberDetailPage = readRepoFile(
     "src/app/admin/(protected)/members/[memberId]/page.tsx",
+  );
+  const memberDetailReadModel = readRepoFile(
+    "src/lib/admin-member-detail.server.ts",
   );
   const memberActions = readRepoFile(
     "src/app/admin/(protected)/_actions/member-actions.ts");
 
-  assert.match(membersPage, /getMmUserDirectoryEntriesByAccountIds/);
-  assert.match(membersPage, /\.from\("member_policy_consents"\)/);
-  assert.match(membersPage, /getEffectiveMarketingConsentMemberIds/);
-  assert.match(membersPage, /marketing_enabled/);
+  assert.match(membersPage, /getAdminMemberListReadModel/);
+  assert.match(memberListReadModel, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(memberListReadModel, /\.from\("member_policy_consents"\)/);
+  assert.match(memberListReadModel, /getEffectiveMarketingConsentMemberIds/);
+  assert.match(memberListReadModel, /marketing_enabled/);
   assert.match(
-    membersPage,
+    memberListReadModel,
     /mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation/,
   );
-  assert.match(membersPage, /\.eq\("generation", Number\(filters\.yearFilter\)\)/);
-  assert.match(memberDetailPage, /getMemberCanonicalProfile/);
+  assert.match(
+    memberListReadModel,
+    /\.eq\("generation", Number\(filters\.yearFilter\)\)/,
+  );
+  assert.match(memberDetailPage, /getAdminMemberDetailReadModel/);
+  assert.match(memberDetailReadModel, /getMemberCanonicalProfile/);
   assert.match(memberActions, /generation,/);
   assert.match(memberActions, /mattermost_account_id/);
 
-  for (const source of [membersPage, memberDetailPage, memberActions]) {
+  for (const source of [
+    membersPage,
+    memberListReadModel,
+    memberDetailPage,
+    memberDetailReadModel,
+    memberActions,
+  ]) {
     assert.doesNotMatch(
       source,
       /avatar_base64|avatar_content_type|avatar_url|service_policy_version|service_policy_consented_at|privacy_policy_version|privacy_policy_consented_at|marketing_policy_version|marketing_policy_consented_at|staff_source_year|\.eq\("year"|\byear,/,

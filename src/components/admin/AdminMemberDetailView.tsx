@@ -117,7 +117,7 @@ export default function AdminMemberDetailView({
   return (
     <div className="grid gap-6">
       <AdminPageHeader
-        eyebrow="Member"
+        eyebrow="회원"
         title={member.displayName}
         description="회원 프로필, 약관 상태, 활성 기기, 인증/보안 활동을 한 화면에서 확인합니다."
       />

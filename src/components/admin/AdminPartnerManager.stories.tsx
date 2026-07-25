@@ -69,6 +69,19 @@ const meta = {
   args: {
     categories,
     partners,
+    pagination: {
+      totalCount: partners.length,
+      page: 1,
+      pageSize: 24,
+    },
+    filters: {
+      searchValue: "",
+      categoryKey: "all",
+      visibility: "all",
+      sort: "recent",
+      page: 1,
+      pageSize: 24,
+    },
   },
 } satisfies Meta<typeof AdminPartnerManager>;
 
@@ -78,8 +91,67 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const Many: Story = {
+  args: {
+    partners: Array.from({ length: 24 }, (_, index) => ({
+      ...partners[index % partners.length],
+      id: `partner-${index + 1}`,
+      name: `${partners[index % partners.length].name} ${index + 1}`,
+    })),
+    pagination: {
+      totalCount: 73,
+      page: 1,
+      pageSize: 24,
+    },
+  },
+};
+
 export const Empty: Story = {
   args: {
     partners: [],
+    pagination: {
+      totalCount: 0,
+      page: 1,
+      pageSize: 24,
+    },
+  },
+};
+
+export const FilteredPage: Story = {
+  args: {
+    partners: [partners[0]],
+    pagination: {
+      totalCount: 49,
+      page: 2,
+      pageSize: 24,
+    },
+    filters: {
+      searchValue: "역삼",
+      categoryKey: "food",
+      visibility: "public",
+      sort: "endingSoon",
+      page: 2,
+      pageSize: 24,
+    },
+  },
+};
+
+export const LoadError: Story = {
+  args: {
+    loadError: true,
+  },
+};
+
+export const LongKoreanContent: Story = {
+  args: {
+    partners: [{
+      ...partners[0],
+      name: "서울 캠퍼스 구성원을 위한 긴 이름의 체형 교정과 건강 관리 전문 제휴처",
+      location: "서울특별시 강남구 테헤란로 인근에서 운영하는 예약 기반 체형 교정 및 건강 관리 서비스",
+      company: {
+        ...partners[0].company!,
+        name: "서울 캠퍼스 구성원 건강 관리 협력 운영사",
+      },
+    }],
   },
 };

@@ -1,12 +1,13 @@
-import AdminGraduateVerificationQueue, {
-  type AdminGraduateSetupEmailRetry,
-  type AdminGraduateVerificationRequest,
-} from "@/components/admin/AdminGraduateVerificationQueue";
+import AdminGraduateVerificationQueue from "@/components/admin/AdminGraduateVerificationQueue";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  getAdminGraduateVerificationQueueReadModel,
+  type AdminGraduateQueuePagination,
+} from "@/lib/admin-graduate-verification-queue.server";
+import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
-import { sanitizeReturnTo } from "@/lib/return-to";
+import { redirect } from "next/navigation";
 import {
   approveGraduateVerificationAction,
   rejectGraduateVerificationAction,
@@ -17,34 +18,94 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type GraduateVerificationSearchParams = {
+  error?: string | string[];
+  success?: string | string[];
+  requestPage?: string | string[];
+  setupEmailRetryPage?: string | string[];
+};
+
+function getOneSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function buildGraduateQueueHref({
+  requestPage,
+  setupEmailRetryPage,
+}: {
+  requestPage: number;
+  setupEmailRetryPage: number;
+}) {
+  const params = new URLSearchParams();
+  if (requestPage > 1) params.set("requestPage", String(requestPage));
+  if (setupEmailRetryPage > 1) {
+    params.set("setupEmailRetryPage", String(setupEmailRetryPage));
+  }
+  const query = params.toString();
+  return query
+    ? "/admin/graduate-verifications?" + query
+    : "/admin/graduate-verifications";
+}
+
+function getTotalPages(pagination: AdminGraduateQueuePagination) {
+  return Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
+}
+
 export default async function AdminGraduateVerificationsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string; success?: string; returnTo?: string }>;
+  searchParams?: Promise<GraduateVerificationSearchParams>;
 }) {
-  await requireAdminPermission("graduate_verifications", "read", { path: "/admin/graduate-verifications" });
-  const supabase = getSupabaseAdminClient();
-  const [requestsResult, setupEmailRetriesResult] = await Promise.all([
-    supabase.from("graduate_verification_requests").select("id,email,legal_name,education_start_year,education_start_month,education_end_year,education_end_month,inferred_generation,campus,request_kind,recovery_member_id,status,profile_image_id,created_at").in("status", ["submitted", "in_review"]).order("created_at", { ascending: false }),
-    supabase
-      .from("graduate_verification_requests")
-      .select("id,email,legal_name,setup_email_last_error_at")
-      .eq("status", "approved")
-      .not("setup_email_last_error_at", "is", null)
-      .order("setup_email_last_error_at", { ascending: false }),
-  ]);
-  if (requestsResult.error || setupEmailRetriesResult.error) throw new Error("수료생 인증 검토 큐를 불러오지 못했습니다.");
+  await requireAdminPermission("graduate_verifications", "read", {
+    path: "/admin/graduate-verifications",
+  });
   const params = (await searchParams) ?? {};
-  const returnTo = sanitizeReturnTo(
-    params.returnTo,
-    "/admin/graduate-verifications",
+  const requestPagination = parseAdminReviewQueuePagination({
+    page: getOneSearchParam(params.requestPage),
+  });
+  const setupEmailRetryPagination = parseAdminReviewQueuePagination({
+    page: getOneSearchParam(params.setupEmailRetryPage),
+  });
+  const queue = await getAdminGraduateVerificationQueueReadModel({
+    requestPage: requestPagination.page,
+    requestPageSize: requestPagination.pageSize,
+    setupEmailRetryPage: setupEmailRetryPagination.page,
+    setupEmailRetryPageSize: setupEmailRetryPagination.pageSize,
+  });
+  const { queueLoadError } = queue;
+  const resolvedRequestPagination = queue.requestPagination;
+  const resolvedSetupEmailRetryPagination = queue.setupEmailRetryPagination;
+  const requestTotalPages = getTotalPages(resolvedRequestPagination);
+  const setupEmailRetryTotalPages = getTotalPages(
+    resolvedSetupEmailRetryPagination,
   );
+
+  if (
+    !queueLoadError &&
+    (requestPagination.page > requestTotalPages ||
+      setupEmailRetryPagination.page > setupEmailRetryTotalPages)
+  ) {
+    redirect(
+      buildGraduateQueueHref({
+        requestPage: Math.min(requestPagination.page, requestTotalPages),
+        setupEmailRetryPage: Math.min(
+          setupEmailRetryPagination.page,
+          setupEmailRetryTotalPages,
+        ),
+      }),
+    );
+  }
+
+  const returnTo = buildGraduateQueueHref({
+    requestPage: requestPagination.page,
+    setupEmailRetryPage: setupEmailRetryPagination.page,
+  });
 
   return (
     <AdminShell title="수료생 인증">
       <AdminGraduateVerificationQueue
-        requests={(requestsResult.data ?? []) as AdminGraduateVerificationRequest[]}
-        setupEmailRetries={(setupEmailRetriesResult.data ?? []) as AdminGraduateSetupEmailRetry[]}
+        requests={queue.requests}
+        setupEmailRetries={queue.setupEmailRetries}
         actions={{
           startReview: startGraduateVerificationReviewAction,
           requestResubmission: requestGraduateVerificationResubmissionAction,
@@ -53,10 +114,13 @@ export default async function AdminGraduateVerificationsPage({
           resendSetupEmail: resendGraduateAccountSetupEmailAction,
         }}
         feedback={getAdminReviewQueueFeedback({
-          error: params.error,
-          success: params.success,
+          error: getOneSearchParam(params.error),
+          success: getOneSearchParam(params.success),
         })}
         returnTo={returnTo}
+        requestPagination={resolvedRequestPagination}
+        setupEmailRetryPagination={resolvedSetupEmailRetryPagination}
+        loadError={queueLoadError}
       />
     </AdminShell>
   );

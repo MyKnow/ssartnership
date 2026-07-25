@@ -1,0 +1,219 @@
+import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
+
+type PartnerCompanyRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  is_active?: boolean | null;
+  managed_campus_slugs?: string[] | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type PartnerAccountCompanyLinkRow = {
+  id: string;
+  account_id: string;
+  is_active?: boolean | null;
+  created_at?: string | null;
+  company?: PartnerCompanyRow | null;
+};
+
+type PartnerAccountCompanyLinkRowRecord = {
+  id: string;
+  account_id: string;
+  is_active?: boolean | null;
+  created_at?: string | null;
+  company?: unknown;
+};
+
+type PartnerAccountRowRecord = {
+  id: string;
+  login_id: string;
+  display_name: string;
+  email?: string | null;
+  must_change_password?: boolean | null;
+  is_active?: boolean | null;
+  email_verified_at?: string | null;
+  initial_setup_completed_at?: string | null;
+  initial_setup_link_sent_at?: string | null;
+  initial_setup_expires_at?: string | null;
+  last_login_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  links?: PartnerAccountCompanyLinkRow[] | PartnerAccountCompanyLinkRow | null;
+};
+
+function normalizePartnerCompany(value: unknown): PartnerCompanyRow | null {
+  if (!value) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return (value[0] as PartnerCompanyRow | undefined) ?? null;
+  }
+  return typeof value === "object" ? (value as PartnerCompanyRow) : null;
+}
+
+function normalizePartnerAccount(value: unknown): AdminPartnerAccount | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const row = value as PartnerAccountRowRecord;
+  const links = Array.isArray(row.links) ? row.links : row.links ? [row.links] : [];
+  return {
+    id: row.id,
+    login_id: row.login_id,
+    display_name: row.display_name,
+    email: row.email ?? null,
+    must_change_password: row.must_change_password ?? null,
+    is_active: row.is_active ?? null,
+    email_verified_at: row.email_verified_at ?? null,
+    initial_setup_completed_at: row.initial_setup_completed_at ?? null,
+    initial_setup_link_sent_at: row.initial_setup_link_sent_at ?? null,
+    initial_setup_expires_at: row.initial_setup_expires_at ?? null,
+    last_login_at: row.last_login_at ?? null,
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
+    links: links.map((link) => ({
+      id: link.id,
+      is_active: link.is_active ?? null,
+      created_at: link.created_at ?? null,
+      company: normalizePartnerCompany(link.company),
+    })),
+  };
+}
+
+function emptyReadModel() {
+  return {
+    companies: [] as Array<PartnerCompanyRow & { brandCount: number; accountCount: number }>,
+    accounts: [] as AdminPartnerAccount[],
+    partnerCount: 0,
+    loadError: true,
+  };
+}
+
+/**
+ * Server read model for partner companies and their operating accounts.
+ * It preserves regional visibility while keeping raw query failures out of
+ * the route and the browser UI.
+ */
+export async function getAdminCompanyWorkspaceReadModel({
+  managedCampusSlugs,
+}: {
+  managedCampusSlugs: readonly string[] | null;
+}) {
+  try {
+    const supabase = getSupabaseAdminClient();
+    let partnersQuery = supabase
+      .from("partners")
+      .select("id,company_id,managed_campus_slugs,company:partner_companies(id)")
+      .order("created_at", { ascending: false });
+    let companiesQuery = supabase
+      .from("partner_companies")
+      .select("id,name,slug,description,is_active,managed_campus_slugs,created_at,updated_at")
+      .order("name", { ascending: true });
+    if (managedCampusSlugs) {
+      partnersQuery = partnersQuery.overlaps("managed_campus_slugs", [
+        ...managedCampusSlugs,
+      ]);
+      companiesQuery = companiesQuery.overlaps("managed_campus_slugs", [
+        ...managedCampusSlugs,
+      ]);
+    }
+
+    const [partnersResult, companiesResult, accountsResult, accountLinksResult] =
+      await Promise.all([
+        partnersQuery,
+        companiesQuery,
+        supabase
+          .from("partner_accounts")
+          .select(
+            "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at",
+          )
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("partner_account_companies")
+          .select(
+            "id,account_id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)",
+          )
+          .order("created_at", { ascending: false }),
+      ]);
+    if (
+      partnersResult.error ||
+      companiesResult.error ||
+      accountsResult.error ||
+      accountLinksResult.error
+    ) {
+      return emptyReadModel();
+    }
+
+    const partners = (partnersResult.data ?? []).map((partner) => ({
+      ...partner,
+      company: normalizePartnerCompany((partner as { company?: unknown }).company),
+    }));
+    const companies = (companiesResult.data ?? []) as PartnerCompanyRow[];
+    const scopedCompanyIds = new Set(companies.map((company) => company.id));
+    const accountLinksByAccountId = new Map<string, PartnerAccountCompanyLinkRow[]>();
+    for (const rawLink of accountLinksResult.data ?? []) {
+      const link = rawLink as PartnerAccountCompanyLinkRowRecord;
+      const company = normalizePartnerCompany(link.company);
+      if (managedCampusSlugs && (!company || !scopedCompanyIds.has(company.id))) {
+        continue;
+      }
+      const links = accountLinksByAccountId.get(link.account_id) ?? [];
+      links.push({
+        id: link.id,
+        account_id: link.account_id,
+        is_active: link.is_active ?? null,
+        created_at: link.created_at ?? null,
+        company,
+      });
+      accountLinksByAccountId.set(link.account_id, links);
+    }
+
+    const accounts = (accountsResult.data ?? [])
+      .map((account) =>
+        normalizePartnerAccount({
+          ...account,
+          links: accountLinksByAccountId.get((account as { id: string }).id) ?? [],
+        }),
+      )
+      .filter((account): account is AdminPartnerAccount => Boolean(account))
+      .filter((account) => !managedCampusSlugs || account.links.length > 0);
+    const brandCountByCompanyId = new Map<string, number>();
+    for (const partner of partners) {
+      const companyId = partner.company_id ?? partner.company?.id ?? null;
+      if (companyId) {
+        brandCountByCompanyId.set(companyId, (brandCountByCompanyId.get(companyId) ?? 0) + 1);
+      }
+    }
+
+    const accountIdsByCompanyId = new Map<string, Set<string>>();
+    for (const account of accounts) {
+      for (const link of account.links) {
+        const companyId = link.company?.id;
+        if (!companyId) {
+          continue;
+        }
+        const accountIds = accountIdsByCompanyId.get(companyId) ?? new Set<string>();
+        accountIds.add(account.id);
+        accountIdsByCompanyId.set(companyId, accountIds);
+      }
+    }
+
+    return {
+      companies: companies.map((company) => ({
+        ...company,
+        brandCount: brandCountByCompanyId.get(company.id) ?? 0,
+        accountCount: accountIdsByCompanyId.get(company.id)?.size ?? 0,
+      })),
+      accounts,
+      partnerCount: partners.length,
+      loadError: false,
+    };
+  } catch {
+    return emptyReadModel();
+  }
+}

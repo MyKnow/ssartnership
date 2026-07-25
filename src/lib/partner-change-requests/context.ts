@@ -23,6 +23,8 @@ import {
   normalizeSupabaseCompanyIds,
   REQUEST_SELECT,
   type PartnerChangeRequestContext,
+  type PartnerChangeRequestListInput,
+  type PartnerChangeRequestPage,
   type PartnerChangeRequestRow,
   type PartnerRow,
   wrapPartnerChangeRequestDbError,
@@ -139,7 +141,7 @@ export async function getSupabasePendingRequests(companyIds?: string[]) {
     .from("partner_change_requests")
     .select(REQUEST_SELECT)
     .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
 
   const uniqueCompanyIds = normalizeSupabaseCompanyIds(companyIds ?? []);
   if (uniqueCompanyIds.length > 0) {
@@ -156,4 +158,50 @@ export async function getSupabasePendingRequests(companyIds?: string[]) {
   }
 
   return (data ?? []).map((row) => toSummary(row as PartnerChangeRequestRow));
+}
+
+export async function getSupabasePendingRequestPage(
+  input: PartnerChangeRequestListInput,
+): Promise<PartnerChangeRequestPage> {
+  const supabase = getSupabaseAdminClient();
+  const page = Math.max(1, input.page);
+  const pageSize = Math.max(1, input.pageSize);
+  let query = supabase
+    .from("partner_change_requests")
+    .select(REQUEST_SELECT, { count: "exact" })
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+
+  const uniqueCompanyIds = normalizeSupabaseCompanyIds(input.companyIds ?? []);
+  if (uniqueCompanyIds.length > 0) {
+    query = query.in("company_id", uniqueCompanyIds);
+  }
+  const partnerIds = [...new Set((input.partnerIds ?? []).map((id) => id.trim()).filter(Boolean))];
+  if (input.partnerIds !== undefined && partnerIds.length === 0) {
+    return {
+      requests: [],
+      totalCount: 0,
+      page,
+      pageSize,
+    };
+  }
+  if (partnerIds.length > 0) {
+    query = query.in("partner_id", partnerIds);
+  }
+
+  const from = (page - 1) * pageSize;
+  const { data, error, count } = await query.range(from, from + pageSize - 1);
+  if (error) {
+    throw wrapPartnerChangeRequestDbError(
+      error,
+      "변경 요청 정보를 불러오지 못했습니다.",
+    );
+  }
+
+  return {
+    requests: (data ?? []).map((row) => toSummary(row as PartnerChangeRequestRow)),
+    totalCount: count ?? 0,
+    page,
+    pageSize,
+  };
 }

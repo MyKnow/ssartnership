@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 const viewports = [
-  { key: "mobile-320", width: 320, height: 844, expectedRatio: 16 / 10 },
-  { key: "mobile-390", width: 390, height: 844, expectedRatio: 16 / 10 },
-  { key: "mobile-in-app-590", width: 590, height: 960, expectedRatio: 16 / 10 },
-  { key: "tablet-820", width: 820, height: 1180, expectedRatio: 16 / 9 },
-  { key: "desktop-1366", width: 1366, height: 900, expectedRatio: 16 / 9 },
+  { key: "mobile-320", width: 320, height: 844 },
+  { key: "mobile-390", width: 390, height: 844 },
+  { key: "mobile-in-app-590", width: 590, height: 960 },
+  { key: "tablet-820", width: 820, height: 1180 },
+  { key: "desktop-1366", width: 1366, height: 900 },
 ] as const;
 
 for (const viewport of viewports) {
@@ -67,7 +67,7 @@ for (const viewport of viewports) {
     });
 
     expect(metrics.scrollWidth).toBe(metrics.clientWidth);
-    expect(metrics.cardRatio).toBeCloseTo(viewport.expectedRatio, 2);
+    expect(metrics.cardRatio).toBeCloseTo(16 / 9, 2);
     expect(metrics.footerTop).toBeGreaterThanOrEqual(metrics.cardTop - 1);
     expect(metrics.footerBottom).toBeLessThanOrEqual(metrics.cardBottom + 1);
     expect(metrics.timestampRowBottom).toBeLessThanOrEqual(metrics.cardBottom + 1);

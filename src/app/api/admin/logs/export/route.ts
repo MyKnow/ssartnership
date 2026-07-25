@@ -79,43 +79,51 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '요청한 로그 내보내기 권한이 없습니다.' }, { status: 403 });
   }
 
-  const { filename, stream, data } = await exportAdminLogsCsv({
-    ...body,
-    groups: allowedGroups,
-    includePii: access.includePii,
-  });
-  const auditRecorded = await logAdminAudit({
-    ...getRequestLogContext(request),
-    action: 'admin_log_export_requested',
-    actorType: 'admin',
-    actorId: session.adminId,
-    targetType: 'admin_logs',
-    properties: {
-      outcome: 'initiated',
+  try {
+    const { filename, stream, data } = await exportAdminLogsCsv({
+      ...body,
       groups: allowedGroups,
-      rangePreset: body.preset,
       includePii: access.includePii,
-      exportedRows: {
-        product: data.productRows.length,
-        audit: data.auditRows.length,
-        security: data.securityRows.length,
+    });
+    const auditRecorded = await logAdminAudit({
+      ...getRequestLogContext(request),
+      action: 'admin_log_export_requested',
+      actorType: 'admin',
+      actorId: session.adminId,
+      targetType: 'admin_logs',
+      properties: {
+        outcome: 'initiated',
+        groups: allowedGroups,
+        rangePreset: body.preset,
+        includePii: access.includePii,
+        exportedRows: {
+          product: data.productRows.length,
+          audit: data.auditRows.length,
+          security: data.securityRows.length,
+        },
+        truncated: data.truncated,
       },
-      truncated: data.truncated,
-    },
-  });
-  if (!auditRecorded) {
+    });
+    if (!auditRecorded) {
+      return NextResponse.json(
+        { message: '내보내기 감사 기록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 503 },
+      );
+    }
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch (error) {
+    console.error('[admin-logs] export failed', error);
     return NextResponse.json(
-      { message: '내보내기 감사 기록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.' },
-      { status: 503 },
+      { message: 'CSV 파일을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
+      { status: 500 },
     );
   }
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-    },
-  });
 }

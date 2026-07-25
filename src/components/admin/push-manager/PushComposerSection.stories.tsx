@@ -275,7 +275,10 @@ export const InteractiveComposer: Story = {
     await expect(await body.findByText("발송 대상자 2명")).toBeInTheDocument();
     await userEvent.type(body.getByPlaceholderText("이름, Mattermost 아이디, 캠퍼스"), "ops");
     await expect(body.getByText("현재 표시 1명")).toBeInTheDocument();
-    await userEvent.click(body.getByText("닫기"));
+    const recipientDialog = within(
+      body.getByRole("dialog", { name: "발송 대상자 2명" }),
+    );
+    await userEvent.click(recipientDialog.getByRole("button", { name: "모달 닫기" }));
 
     await waitFor(
       () => {

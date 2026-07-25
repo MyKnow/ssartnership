@@ -43,6 +43,7 @@ export type AdminNavItem = {
     resource: AdminPermissionResource;
   };
   globalOnly?: boolean;
+  alwaysVisible?: boolean;
 };
 
 export type AdminNavGroup = {
@@ -67,26 +68,42 @@ export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
 
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
-    label: "개요",
+    label: "홈",
     items: [
       {
         href: "/admin",
         label: "관리 홈",
-        description: "운영 요약과 빠른 진입",
+        description: "오늘의 운영 상태와 다음 작업",
         iconKey: "home",
         permission: { resource: "members" },
+        alwaysVisible: true,
       },
     ],
   },
   {
-    label: "회원·검토",
+    label: "작업함",
     items: [
       {
-        href: "/admin/members",
-        label: "회원 관리",
-        description: "회원 검색, 수정, 추가",
-        iconKey: "users",
+        href: "/admin/tasks",
+        label: "작업함",
+        description: "처리 대기 항목을 우선순위로 확인",
+        iconKey: "queue",
         permission: { resource: "members" },
+        alwaysVisible: true,
+      },
+      {
+        href: "/admin/partner-registrations",
+        label: "등록 신청",
+        description: "공개 신청 검토 큐",
+        iconKey: "queue",
+        permission: { resource: "brands" },
+      },
+      {
+        href: "/admin/partner-requests",
+        label: "변경 요청",
+        description: "제휴처 변경 승인 큐",
+        iconKey: "queue",
+        permission: { resource: "brands" },
       },
       {
         href: "/admin/graduate-verifications",
@@ -110,29 +127,36 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "profile_images" },
       },
       {
+        href: "/admin/notifications",
+        label: "내 알림",
+        description: "운영 알림을 읽고 후속 작업으로 이동",
+        iconKey: "bell",
+        permission: { resource: "notifications" },
+      },
+    ],
+  },
+  {
+    label: "데이터",
+    items: [
+      {
+        href: "/admin/members",
+        label: "회원 관리",
+        description: "회원 검색, 수정, 추가",
+        iconKey: "users",
+        permission: { resource: "members" },
+      },
+      {
         href: "/admin/reviews",
         label: "리뷰 관리",
         description: "리뷰 검수와 공개 상태",
         iconKey: "star",
         permission: { resource: "reviews" },
       },
-    ],
-  },
-  {
-    label: "제휴 운영",
-    items: [
       {
         href: "/admin/partners",
         label: "제휴처",
         description: "노출 카드와 혜택 정보",
         iconKey: "tag",
-        permission: { resource: "brands" },
-      },
-      {
-        href: "/admin/partner-requests",
-        label: "변경 요청",
-        description: "제휴처 변경 승인 큐",
-        iconKey: "queue",
         permission: { resource: "brands" },
       },
       {
@@ -144,13 +168,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         globalOnly: true,
       },
       {
-        href: "/admin/partner-registrations",
-        label: "등록 신청",
-        description: "공개 신청 검토 큐",
-        iconKey: "queue",
-        permission: { resource: "brands" },
-      },
-      {
         href: "/admin/companies",
         label: "파트너사/계정",
         description: "회사와 담당 계정 연결",
@@ -160,15 +177,20 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "메시지·노출",
+    label: "리포트",
     items: [
       {
-        href: "/admin/notifications",
-        label: "내 알림",
-        description: "관리자 수신함과 수신 설정",
-        iconKey: "bell",
-        permission: { resource: "notifications" },
+        href: "/admin/logs",
+        label: "운영 로그",
+        description: "제품·감사·보안 기록을 탐색",
+        iconKey: "chart",
+        permission: { resource: "logs" },
       },
+    ],
+  },
+  {
+    label: "자동화",
+    items: [
       {
         href: "/admin/push",
         label: "발송 관리",
@@ -200,15 +222,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "운영 기록·설정",
+    label: "설정",
     items: [
-      {
-        href: "/admin/logs",
-        label: "로그 조회",
-        description: "운영 로그 탐색",
-        iconKey: "queue",
-        permission: { resource: "logs" },
-      },
       {
         href: "/admin/cycle",
         label: "기수 관리",
@@ -241,6 +256,22 @@ export function findAdminNavItem(pathname: string) {
   return ADMIN_NAV_ITEMS.find((item) => isAdminNavActive(pathname, item.href)) ?? null;
 }
 
+export function findAdminNavItems(query: string, groups: AdminNavGroup[]) {
+  const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
+  const items = groups.flatMap((group) => group.items);
+
+  if (!normalizedQuery) {
+    return items;
+  }
+
+  return items.filter((item) =>
+    [item.label, item.description]
+      .join(" ")
+      .toLocaleLowerCase("ko-KR")
+      .includes(normalizedQuery),
+  );
+}
+
 export function filterAdminNavGroupsByPermissions(
   groups: AdminNavGroup[],
   permissions: AdminPermissionMatrix,
@@ -254,7 +285,7 @@ export function filterAdminNavGroupsByPermissions(
       items: group.items.filter(
         (item) =>
           (includeGlobalItems || !item.globalOnly) &&
-          (item.href === "/admin" ||
+          (item.alwaysVisible ||
             canAdmin(permissions, item.permission.resource, "read")),
       ),
     }))

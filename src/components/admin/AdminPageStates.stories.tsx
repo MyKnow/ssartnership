@@ -83,10 +83,12 @@ function DashboardOverviewState({
   state = "ready",
   longKorean = false,
   regional = false,
+  dataUnavailable = false,
 }: {
   state?: AdminDashboardViewState;
   longKorean?: boolean;
   regional?: boolean;
+  dataUnavailable?: boolean;
 }) {
   const permissions = ADMIN_PERMISSION_TEMPLATES.find(
     (template) =>
@@ -132,6 +134,7 @@ function DashboardOverviewState({
         }
         state={state}
         includeGlobalTasks={!regional}
+        isDataUnavailable={dataUnavailable}
         platformActivityMetrics={
           regional
             ? null
@@ -318,6 +321,22 @@ export const DashboardOverview: Story = {
       scenarioId: "admin.dashboard.default",
     },
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "작업함 열기" })).toHaveAttribute(
+      "href",
+      "/admin/tasks",
+    );
+    expect(canvas.getAllByText("다음으로 처리").length).toBeGreaterThan(0);
+    for (const link of canvas.getAllByRole("link", {
+      name: /신규 제휴 접수.*3건 검토 시작/,
+    })) {
+      await expect(link).toHaveAttribute(
+        "href",
+        "/admin/partner-registrations?status=pending",
+      );
+    }
+  },
 };
 
 export const DashboardLongKorean: Story = {
@@ -360,6 +379,19 @@ export const DashboardError: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText("관리 홈 데이터를 불러오지 못했습니다.").length).toBeGreaterThan(0);
+    for (const link of canvas.getAllByRole("link", { name: "다시 확인" })) {
+      await expect(link).toHaveAttribute("href", "/admin");
+    }
+  },
+};
+
+export const DashboardDataUnavailable: Story = {
+  render: () => <DashboardOverviewState dataUnavailable />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(
+      canvas.getAllByText("일부 운영 집계를 아직 확인하지 못했습니다.").length,
+    ).toBeGreaterThan(0);
     for (const link of canvas.getAllByRole("link", { name: "다시 확인" })) {
       await expect(link).toHaveAttribute("href", "/admin");
     }

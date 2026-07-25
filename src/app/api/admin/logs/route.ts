@@ -23,19 +23,27 @@ export async function GET(request: NextRequest) {
   if (!isAllowedLogGroup(searchParams.get('group'), access.readGroups)) {
     return NextResponse.json({ message: '요청한 로그 그룹 조회 권한이 없습니다.' }, { status: 403 });
   }
-  const data = await getAdminLogsPageData({
-    preset: searchParams.get('preset'),
-    start: searchParams.get('start'),
-    end: searchParams.get('end'),
-    page: searchParams.get('page'),
-    pageSize: searchParams.get('pageSize'),
-    search: searchParams.get('search'),
-    group: searchParams.get('group'),
-    name: searchParams.get('name'),
-    actor: searchParams.get('actor'),
-    status: searchParams.get('status'),
-    sort: searchParams.get('sort'),
-  }, access);
+  try {
+    const data = await getAdminLogsPageData({
+      preset: searchParams.get('preset'),
+      start: searchParams.get('start'),
+      end: searchParams.get('end'),
+      page: searchParams.get('page'),
+      pageSize: searchParams.get('pageSize'),
+      search: searchParams.get('search'),
+      group: searchParams.get('group'),
+      name: searchParams.get('name'),
+      actor: searchParams.get('actor'),
+      status: searchParams.get('status'),
+      sort: searchParams.get('sort'),
+    }, access);
 
-  return NextResponse.json(data);
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('[admin-logs] page query failed', error);
+    return NextResponse.json(
+      { message: '로그를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' },
+      { status: 500 },
+    );
+  }
 }

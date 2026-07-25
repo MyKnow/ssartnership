@@ -24,6 +24,65 @@ test("admin member list defaults to 20 rows and accepts supported page sizes", a
   assert.equal(parseAdminMemberPageSize("999"), 20);
 });
 
+test("제휴처 목록 URL 상태는 서버 필터와 페이지네이션에만 허용된 값을 사용한다", async () => {
+  const {
+    ADMIN_PARTNER_PAGE_SIZE_OPTIONS,
+    DEFAULT_ADMIN_PARTNER_PAGE_SIZE,
+    parseAdminPartnerListFilters,
+  } = await adminIaModulePromise;
+
+  assert.deepStrictEqual(ADMIN_PARTNER_PAGE_SIZE_OPTIONS, [12, 24, 48]);
+  assert.equal(DEFAULT_ADMIN_PARTNER_PAGE_SIZE, 24);
+  assert.deepStrictEqual(
+    parseAdminPartnerListFilters({
+      q: "  역삼 분식랩  ",
+      category: "food",
+      visibility: "public",
+      sort: "endingSoon",
+      page: "2",
+      pageSize: "12",
+    }),
+    {
+      searchValue: "역삼 분식랩",
+      categoryKey: "food",
+      visibility: "public",
+      sort: "endingSoon",
+      page: 2,
+      pageSize: 12,
+    },
+  );
+  assert.deepStrictEqual(
+    parseAdminPartnerListFilters({ sort: "popular", page: "-1" }),
+    {
+      searchValue: "",
+      categoryKey: "all",
+      visibility: "all",
+      sort: "recent",
+      page: 1,
+      pageSize: 24,
+    },
+  );
+});
+
+test("검토 큐는 작은 서버 페이지 단위로만 URL 상태를 해석한다", async () => {
+  const {
+    ADMIN_REVIEW_QUEUE_PAGE_SIZE_OPTIONS,
+    DEFAULT_ADMIN_REVIEW_QUEUE_PAGE_SIZE,
+    parseAdminReviewQueuePagination,
+  } = await adminIaModulePromise;
+
+  assert.deepStrictEqual(ADMIN_REVIEW_QUEUE_PAGE_SIZE_OPTIONS, [6, 12, 24]);
+  assert.equal(DEFAULT_ADMIN_REVIEW_QUEUE_PAGE_SIZE, 12);
+  assert.deepStrictEqual(
+    parseAdminReviewQueuePagination({ page: "2", pageSize: "6" }),
+    { page: 2, pageSize: 6 },
+  );
+  assert.deepStrictEqual(
+    parseAdminReviewQueuePagination({ page: "-4", pageSize: "500" }),
+    { page: 1, pageSize: 12 },
+  );
+});
+
 test("legacy admin partner tabs resolve to their canonical routes", async () => {
   const { resolveAdminPartnerTabRedirect } = await adminIaModulePromise;
 
@@ -33,6 +92,19 @@ test("legacy admin partner tabs resolve to their canonical routes", async () => 
   assert.equal(resolveAdminPartnerTabRedirect("partners"), null);
   assert.equal(resolveAdminPartnerTabRedirect("plans"), null);
   assert.equal(resolveAdminPartnerTabRedirect(undefined), null);
+});
+
+test("관리자 탐색은 작업 의도 여섯 그룹과 작업함 진입점을 제공한다", async () => {
+  const { ADMIN_NAV_GROUPS, ADMIN_NAV_ITEMS } = await adminNavigationModulePromise;
+
+  assert.deepEqual(
+    ADMIN_NAV_GROUPS.map((group) => group.label),
+    ["홈", "작업함", "데이터", "리포트", "자동화", "설정"],
+  );
+
+  const taskInbox = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/tasks");
+  assert.equal(taskInbox?.label, "작업함");
+  assert.equal(taskInbox?.alwaysVisible, true);
 });
 
 test("admin navigation separates list, request, category, inbox, and send tasks", async () => {
@@ -48,4 +120,18 @@ test("admin navigation separates list, request, category, inbox, and send tasks"
   assert.equal(byHref.get("/admin/notifications")?.label, "내 알림");
   assert.equal(byHref.get("/admin/push")?.label, "발송 관리");
   assert.equal(byHref.get("/admin/push")?.permission.resource, "notifications");
+});
+
+test("관리자 빠른 찾기는 이름과 설명으로 권한 내 화면을 찾는다", async () => {
+  const { ADMIN_NAV_GROUPS, findAdminNavItems } = await adminNavigationModulePromise;
+
+  assert.deepEqual(
+    findAdminNavItems("변경 승인", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin/partner-requests"],
+  );
+  assert.deepEqual(
+    findAdminNavItems("작업", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin", "/admin/tasks", "/admin/notifications"],
+  );
+  assert.deepEqual(findAdminNavItems("존재하지 않는 화면", ADMIN_NAV_GROUPS), []);
 });

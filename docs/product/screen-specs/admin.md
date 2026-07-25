@@ -13,14 +13,32 @@
 - 반응형·분석: 모바일은 우선 큐와 2열 이하 shortcut, 데스크톱은 dense grid를 쓴다. `admin_dashboard_view`, queue open을 기록한다.
 - 수용 기준: shell/page 제목 중복이 없고 권한 없는 수치·링크를 렌더하지 않으며 핵심 작업이 첫 viewport에 있다.
 
+<!-- screen-contract: admin.task-inbox -->
+## `/admin/tasks` — 작업함
+
+- 목표·위계: 가장 자주 처리하는 검토·승인·운영 작업 → 각 작업의 안전한 상세 화면 순이다.
+- 액션·흐름: primary는 권한 내 작업을 여는 것이며, 각 큐에서 근거 확인·결정·복귀를 완료한다. 작업함은 도메인 상태를 직접 변경하지 않는다.
+- 경계·상태: 권한 필터된 task navigation만 노출한다. 기본, 빈 작업함, 권한 없음, 긴 한국어, 모바일 overflow 상태를 제공한다.
+- 반응형·분석: 모바일부터 한 열의 44px 이상 작업 target을 제공하고, 태블릿·데스크톱에서는 2열까지 확장한다. 관리 route의 Core Web Vitals는 PII·query 없이 기록한다.
+- 수용 기준: 권한 밖 작업은 렌더되지 않고, 각 작업은 기존 canonical href와 서버 권한 검사를 유지한다.
+
 <!-- screen-contract: admin.accounts -->
 ## `/admin/admins` — 관리자 계정·권한
 
 - 목표·위계: 검색/상태 → 관리자 목록 → 권한·캠퍼스 scope → 초대/변경 이력 순이다.
 - 액션·흐름: primary는 관리자 초대 또는 선택 계정 저장, 보조는 필터·비활성화다.
-- 경계·상태: admins resource permission과 permissionVersion을 검증한다. 기본, 빈 상태, 초대 중, validation error, 충돌, 권한 없음 상태를 제공한다.
+- 경계·상태: admins resource permission과 permissionVersion을 검증한다. 기본, 빈 상태, 초대 중, validation error, 충돌, 권한 없음 상태를 제공한다. 액션은 URL에 안전한 상태 코드만 남기고, DB·권한 내부 오류 원문은 화면에 표시하지 않는다.
 - 반응형·분석: 모바일 compact row와 상세 disclosure, 데스크톱 table/detail을 쓴다. 계정 생성·권한 변경을 audit log로 남긴다.
 - 수용 기준: 자기 권한 상승과 마지막 최고 관리자 제거를 방지하고 민감 setup token을 목록·로그에 노출하지 않는다.
+
+<!-- screen-contract: admin.search -->
+## `/admin/search` — 통합 대상 검색
+
+- 목표·위계: 검색어 입력 → 권한·캠퍼스 범위 결과 → 해당 회원·제휴처 상세 이동 → 검색 결과 복귀 순이다.
+- 액션·흐름: 관리자 빠른 탐색 또는 직접 URL에서 2자 이상 검색어를 제출한다. 결과는 이름·관리 ID를 가진 회원과 제휴처 이름으로 나누어 보여 주며, 상세 링크는 현재 검색 URL을 `returnTo`로 보존한다.
+- 경계·상태: `members.read`와 `brands.read`를 각각 확인한다. 검색어는 공백 정규화 후 2~80자로 제한하고, 제휴처는 기존 관리 campus scope를 적용한다. 최소 projection·항목별 8개 제한을 사용하며 내부 오류 원문을 화면에 노출하지 않는다. 초기, 로딩, 짧은 검색어, 빈 결과, 일부 소스 오류, 권한 제한 상태를 제공한다.
+- 반응형·분석: 결과 행과 제출 control은 44px 이상의 터치 목표를 유지한다. 긴 한글 이름·주소·캠퍼스 표기는 줄바꿈하고, 모바일부터 한 열 결과를 사용한다. 제품 성능 지표는 PII나 검색어 원문을 수집하지 않는다.
+- 수용 기준: 권한 밖 대상은 검색하거나 노출하지 않고, 결과와 상세 모두 기존 서버 권한 검사를 유지한다. 검색 결과에서 상세를 열고 돌아오면 동일한 검색 조건으로 복귀한다.
 
 <!-- screen-contract: admin.advertisement -->
 ## `/admin/advertisement` — 광고·프로모션 관리
@@ -101,7 +119,7 @@
 - 액션·흐름: primary는 승인 대기 신청 상세 열기이며, 목록에서는 회원 비밀번호·해시·토큰을 표시하거나 수정하지 않는다.
 - 경계·상태: `member_signup_requests.read` 권한과 Super Admin 이중 게이트를 적용한다. 기본, 빈 큐, 승인 대기, 권한 없음, 일부 조회 실패 상태를 제공한다.
 - 반응형·분석: 모바일은 신청 카드와 상세 이동을 한 열로, 데스크톱은 식별자·신청 기수·사유를 dense list로 표시한다. 목록 조회와 상세 열기를 감사 로그에 남긴다.
-- 수용 기준: 승인 요청의 안전한 메타데이터만 노출되고 저장된 비밀번호 material은 서버 내부에서도 목록·응답·로그로 반환되지 않는다.
+- 수용 기준: 승인 요청의 안전한 메타데이터만 노출되고 저장된 비밀번호 material은 서버 내부에서도 목록·응답·로그로 반환되지 않는다. 잘못된 요청 ID는 예외 화면 대신 안전한 목록 오류 상태로 복구한다.
 
 <!-- screen-contract: admin.member-signup-request-detail -->
 ## `/admin/member-signup-requests/[requestId]` — Mattermost 가입 승인 상세
@@ -135,7 +153,7 @@
 
 - 목표·위계: 채널·기능 그룹 → 기본/수정 상태 → 제목·내용 템플릿 → 허용 변수 → 저장/기본값 복원 순이다.
 - 액션·흐름: Super Admin만 이메일·Mattermost·푸시·인앱 자동 알림의 템플릿을 수정하거나 기본값으로 복원할 수 있다. 변수는 `{변수이름}` 형태로 삽입한다.
-- 경계·상태: `notification_templates` 권한과 Super Admin 이중 게이트를 적용한다. DB에는 수정본만 저장하고, 템플릿이 없거나 잘못되면 코드 기본값으로 안전하게 대체한다.
+- 경계·상태: `notification_templates` 권한과 Super Admin 이중 게이트를 적용한다. DB에는 수정본만 저장하고, 템플릿이 없거나 잘못되면 코드 기본값으로 안전하게 대체한다. validation·저장·복원·테스트 발송 실패는 안전한 상태 코드로 복구하며 raw 오류를 URL이나 UI에 전달하지 않는다.
 - 반응형·분석: 모바일은 템플릿 카드를 한 열로 표시하고 변수 삽입 컨트롤을 줄바꿈한다. 데스크톱은 그룹과 제목·내용 입력을 넓게 보여준다. 템플릿 저장·복원을 감사 로그에 남기며 실제 본문·토큰은 기록하지 않는다.
 - 수용 기준: 알 수 없는 변수와 필수 변수 누락을 서버에서 거부하고, 일반 텍스트만 허용해 HTML 주입을 막는다. 사용자 비밀번호·인증 코드·토큰 같은 실제 값은 저장하거나 미리 채우지 않는다.
 
@@ -151,17 +169,17 @@
 <!-- screen-contract: admin.partners -->
 ## `/admin/partners` — 제휴처 목록
 
-- 목표·위계: 검색/핵심 필터 → 20개 제휴처 목록 → 상태 요약 → 생성/상세 이동 순이다.
+- 목표·위계: 검색/핵심 필터 → 서버가 필터한 제휴처 목록 → 상태 요약 → 생성/상세 이동 순이다.
 - 액션·흐름: primary는 제휴처 추가, 각 행의 보조 액션은 상세 열기다. 변경 요청·카테고리 작업은 전용 화면으로 이동한다.
-- 경계·상태: brands permission과 campus scope를 적용한다. 기본, 빈 결과, 다건, filter, pagination, loading, 오류를 제공한다.
+- 경계·상태: brands permission과 campus scope를 적용한다. `q`(제휴처명), `category`, `visibility`, `sort`, `page`, `pageSize`가 목록 URL의 단일 기준이며, page size는 12·24·48 중 하나다. filter가 바뀌면 page를 1로 되돌린다. 기본, 빈 결과, 다건, filter, pagination, loading, 오류를 제공한다.
 - 반응형·분석: 모바일 compact entity row, 데스크톱 dense list를 쓴다. 조회·상세 이동·생성을 기록한다.
-- 수용 기준: `tab=requests|categories|category` 구 query는 전용 canonical route로 이동하고 목록 화면에 해당 편집 UI를 중복 렌더하지 않는다. `tab=plans`는 플랜 기능 보존용 conditional legacy 상태로만 유지한다.
+- 수용 기준: 서버가 현재 page만 조회하고, 범위를 벗어난 page는 현재 filter를 보존한 canonical URL로 정규화한다. 오류는 내부 DB 오류를 노출하지 않고 같은 filter에서 재시도할 수 있어야 한다. `tab=requests|categories|category` 구 query는 전용 canonical route로 이동하고 목록 화면에 해당 편집 UI를 중복 렌더하지 않는다. `tab=plans`는 플랜 기능 보존용 conditional legacy 상태로만 유지한다.
 
 <!-- screen-contract: admin.partner-editor -->
 ## `/admin/partners/[partnerId]` — 제휴처 편집
 
-- 목표·위계: 공개/검토 상태 → 핵심 정보·혜택 → 대상/지점 → 미디어 → 리뷰·이력 순이다.
-- 액션·흐름: primary는 저장, 보조는 미디어 편집·리뷰 조치·목록 복귀다.
+- 목표·위계: 기본 정보 수정 → 공개/검토 상태·핵심 요약 → 운영 지표·혜택 이력·쿠폰 → 리뷰·감사 이력 순이다. 헤더의 `기본 정보 수정`은 같은 화면의 편집 영역으로 이동한다.
+- 액션·흐름: primary는 저장, 보조는 기본 정보 수정으로 바로 이동, 미디어 편집·리뷰 조치·목록 복귀다.
 - 경계·상태: brands permission과 campus scope, 공용 FE/BE validation을 적용한다. 기본, not-found, validation error, 이미지 오류, 저장 중, 충돌을 제공한다.
 - 반응형·분석: 모바일 section stack과 sticky save 1개, 데스크톱 edit workspace를 쓴다. 변경을 field-level before/after로 audit한다.
 - 수용 기준: `파트너사/제휴처/지점/혜택` 용어를 구분하고 민감 링크·visibility 규칙을 server boundary에서 재검증한다.
@@ -196,11 +214,11 @@
 <!-- screen-contract: admin.partner-requests -->
 ## `/admin/partner-requests` — 제휴처 변경 요청
 
-- 목표·위계: 승인 대기 → 제휴처/파트너사 요약 → field diff → 증빙 → 승인·반려 이력 순이다.
+- 목표·위계: 오래 대기한 승인 요청 → 제휴처/파트너사 요약 → field diff → 증빙 → 승인·반려 이력 순이다.
 - 액션·흐름: primary는 승인 또는 반려 중 현재 선택한 하나이며 보조는 filter·제휴처 상세 열기다.
-- 경계·상태: brands update permission과 campus scope를 적용한다. 대기, 빈 상태, diff 없음, 파일 오류, 처리 중, 충돌, 완료를 제공한다.
+- 경계·상태: brands update permission과 campus scope를 적용한다. `page`, `pageSize`가 queue URL의 단일 기준이며 page size는 6·12·24 중 하나다. 대기 요청은 생성 시각 오름차순으로 서버에서 page 단위 조회한다. 지역 관리자에게 배정된 제휴처가 없으면 전역 queue로 넓히지 않고 빈 결과를 준다. 대기, 빈 상태, diff 없음, 파일 오류, 처리 중, 충돌, 완료를 제공한다.
 - 반응형·분석: 모바일 queue/detail 전환, 데스크톱 split diff workspace를 쓴다. 열람·승인·반려를 audit한다.
-- 수용 기준: 저장 직전 최신 원본과 diff를 재검증하고 중복 처리·권한 밖 요청을 차단하며 `/admin/partners?tab=requests`를 이곳으로 보낸다.
+- 수용 기준: 저장 직전 최신 원본과 diff를 재검증하고 중복 처리·권한 밖 요청을 차단한다. 항목 처리 뒤에는 현재 queue page를 `returnTo`로 보존하고, queue 조회 오류는 내부 오류를 노출하지 않은 채 재시도 행동을 제공한다. `/admin/partners?tab=requests`를 이곳으로 보낸다.
 
 <!-- screen-contract: admin.categories -->
 ## `/admin/categories` — 제휴처 카테고리

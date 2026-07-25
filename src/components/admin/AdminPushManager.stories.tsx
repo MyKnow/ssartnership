@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { AdminPushManagerProps } from "./push-manager/types";
 import AdminPushManager from "./AdminPushManager";
@@ -117,6 +117,36 @@ type Story = StoryObj<typeof meta>;
 function installPushFetchMock() {
   const fetchMock = fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.startsWith("/api/admin/push/recipients?")) {
+      const query = new URL(url, "https://storybook.local").searchParams.get("query") ?? "";
+      const recipients = [
+        {
+          id: "member-1",
+          display_name: "김싸피",
+          mm_username: "ssafy15",
+          year: 15,
+          campus: "서울",
+        },
+        {
+          id: "member-2",
+          display_name: "박운영",
+          mm_username: "ops15",
+          year: 15,
+          campus: "서울",
+        },
+      ].filter((member) =>
+        query
+          ? `${member.display_name} ${member.mm_username}`.toLocaleLowerCase("ko-KR").includes(
+              query.toLocaleLowerCase("ko-KR"),
+            )
+          : true,
+      );
+      return {
+        ok: true,
+        json: async () => ({ recipients }),
+      };
+    }
+
     if (url === "/api/push/admin/preview") {
       return {
         ok: true,
@@ -281,6 +311,44 @@ export const SendAnnouncement: Story = {
       "/api/push/admin/broadcast",
       expect.objectContaining({ method: "POST" }),
     );
+  },
+};
+
+export const PersonalRecipientSearch: Story = {
+  args: {
+    initialTab: "send",
+    members: [],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const fetchMock = installPushFetchMock();
+
+    await userEvent.selectOptions(canvas.getByLabelText("대상 범위"), "member");
+    await userEvent.click(canvas.getByRole("button", { name: "개인 선택" }));
+
+    const dialog = within(
+      await within(document.body).findByRole("dialog", { name: "개인 대상 선택" }),
+    );
+    const closeButton = dialog.getByRole("button", { name: "모달 닫기" });
+    await waitFor(() => {
+      expect(closeButton).toHaveFocus();
+    });
+    await expect(await dialog.findByText("김싸피")).toBeInTheDocument();
+    await userEvent.type(
+      dialog.getByPlaceholderText("이름, Mattermost 아이디, 기수, 캠퍼스"),
+      "김",
+    );
+    await expect(await dialog.findByText("검색 결과 1명")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/admin/push/recipients?limit=30&query=%EA%B9%80"),
+        expect.objectContaining({ signal: expect.anything() }),
+      );
+    });
+    await userEvent.click(closeButton);
+    await waitFor(() => {
+      expect(canvas.getByRole("button", { name: "개인 선택" })).toHaveFocus();
+    });
   },
 };
 
