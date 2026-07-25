@@ -2,7 +2,9 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import { inferCampusSlugsFromLocation, normalizeCampusSlugs } from "@/lib/campuses";
 import {
@@ -22,9 +24,11 @@ import { getPartnerVisibilityState } from "@/lib/partner-visibility";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import {
   logAdminAction,
+  redirectAdminActionError,
   revalidateAdminAndPublicPaths,
   revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 type RegistrationCompanyRelation =
   | { managed_campus_slugs?: string[] | null }
@@ -421,8 +425,12 @@ async function createPartnerFromPortalRegistrationRequest({
 }
 
 export async function updatePartnerRegistrationRequestStatus(formData: FormData) {
+  const returnTo = sanitizeReturnTo(
+    String(formData.get("returnTo") ?? ""),
+    "/admin/partner-registrations",
+  );
   const adminSession = await requireAdminPermission("brands", "update", {
-    path: "/admin/partner-registrations",
+    path: returnTo,
   });
 
   const id = String(formData.get("id") || "").trim();
@@ -430,7 +438,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   const adminNote = String(formData.get("adminNote") || "").trim();
 
   if (!id || !isPartnerRegistrationRequestStatus(status)) {
-    return;
+    redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
   const supabase = getSupabaseAdminClient();
@@ -443,7 +451,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     .maybeSingle();
 
   if (requestError || !request) {
-    return;
+    redirectAdminActionError(returnTo, "partner_form_not_found");
   }
 
   const registrationRequest = request as PartnerRegistrationRequestRow;
@@ -454,7 +462,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   try {
     assertAdminCanAccessManagedCampuses(adminSession.account, managedCampusSlugs);
   } catch {
-    return;
+    redirectAdminActionError(returnTo, "regional_admin_scope_denied");
   }
 
   const payload: {
@@ -481,7 +489,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
       "[partner-registration] status update failed",
       updateError.message,
     );
-    return;
+    redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
   if (status === "converted" && previousStatus !== "converted") {
@@ -543,4 +551,5 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   }
 
   revalidatePath("/admin/partner-registrations");
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "updated" }));
 }

@@ -16,11 +16,13 @@ function PartnerChangeRequestCard({
   approveAction,
   rejectAction,
   canReview,
+  returnTo,
 }: {
   request: PartnerChangeRequestSummary;
   approveAction: (formData: FormData) => void | Promise<void>;
   rejectAction: (formData: FormData) => void | Promise<void>;
   canReview: boolean;
+  returnTo: string;
 }) {
   const diffItems = buildPartnerChangeRequestDiffItems(request);
 
@@ -72,19 +74,24 @@ function PartnerChangeRequestCard({
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
-        <Button href={`/admin/partners/${request.partnerId}`} variant="secondary">
+        <Button
+          href={`/admin/partners/${request.partnerId}?returnTo=${encodeURIComponent(returnTo)}`}
+          variant="secondary"
+        >
           제휴처 상세
         </Button>
         {canReview ? (
           <div className="flex flex-wrap gap-2">
             <form action={rejectAction}>
               <input type="hidden" name="requestId" value={request.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <SubmitButton variant="danger" pendingText="거절 중">
                 거절
               </SubmitButton>
             </form>
             <form action={approveAction}>
               <input type="hidden" name="requestId" value={request.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <SubmitButton pendingText="승인 중">승인</SubmitButton>
             </form>
           </div>
@@ -100,11 +107,13 @@ export default function PartnerChangeRequestQueue({
   approveAction,
   rejectAction,
   canReview,
+  returnTo = "/admin/partner-requests",
 }: {
   requests: PartnerChangeRequestSummary[];
   approveAction: (formData: FormData) => void | Promise<void>;
   rejectAction: (formData: FormData) => void | Promise<void>;
   canReview: boolean;
+  returnTo?: string;
 }) {
   return (
     <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -133,6 +142,7 @@ export default function PartnerChangeRequestQueue({
               approveAction={approveAction}
               rejectAction={rejectAction}
               canReview={canReview}
+              returnTo={returnTo}
             />
           ))}
         </div>

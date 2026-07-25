@@ -6,6 +6,8 @@ import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getMemberProfilePhotoStates } from "@/lib/member-profile-images";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   approveMemberProfilePhotoAction,
   rejectMemberCurrentProfilePhotoAction,
@@ -16,7 +18,11 @@ export const dynamic = "force-dynamic";
 
 const PHOTO_QUEUE_LIMIT = 50;
 
-export default async function AdminProfilePhotosPage() {
+export default async function AdminProfilePhotosPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string; success?: string; returnTo?: string }>;
+}) {
   await requireAdminPermission("profile_images", "read", { path: "/admin/profile-photos" });
   const supabase = getSupabaseAdminClient();
   const [replacementsResult, currentPhotosResult] = await Promise.all([
@@ -78,6 +84,8 @@ export default async function AdminProfilePhotosPage() {
       updated_at: image.updated_at ?? image.created_at ?? "",
     }] as AdminExistingProfilePhoto[];
   }).slice(0, PHOTO_QUEUE_LIMIT);
+  const params = (await searchParams) ?? {};
+  const returnTo = sanitizeReturnTo(params.returnTo, "/admin/profile-photos");
 
   return (
     <AdminShell title="프로필 사진">
@@ -89,6 +97,11 @@ export default async function AdminProfilePhotosPage() {
           rejectReplacement: rejectMemberProfilePhotoAction,
           rejectCurrentPhoto: rejectMemberCurrentProfilePhotoAction,
         }}
+        feedback={getAdminReviewQueueFeedback({
+          error: params.error,
+          success: params.success,
+        })}
+        returnTo={returnTo}
       />
     </AdminShell>
   );

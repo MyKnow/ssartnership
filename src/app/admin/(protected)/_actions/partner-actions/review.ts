@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import {
   assertAdminCanAccessManagedCampuses,
   type AdminScopeAccountLike,
@@ -16,10 +17,21 @@ import {
   revalidatePartnerPortalPaths,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { createServerActionAuditContext } from "@/lib/audit-context";
+import { sanitizeReturnTo } from "@/lib/return-to";
+
+const PARTNER_REQUESTS_PATH = "/admin/partner-requests";
+
+function getReturnTo(formData: FormData) {
+  return sanitizeReturnTo(
+    String(formData.get("returnTo") ?? ""),
+    PARTNER_REQUESTS_PATH,
+  );
+}
 
 async function assertCanReviewPartnerChangeRequest(
   account: AdminScopeAccountLike,
   requestId: string,
+  returnTo: string,
 ) {
   const supabase = getSupabaseAdminClient();
   const { data: request, error: requestError } = await supabase
@@ -29,7 +41,7 @@ async function assertCanReviewPartnerChangeRequest(
     .maybeSingle();
 
   if (requestError || !request?.partner_id) {
-    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
+    redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
   const { data: partner, error: partnerError } = await supabase
@@ -39,7 +51,7 @@ async function assertCanReviewPartnerChangeRequest(
     .maybeSingle();
 
   if (partnerError || !partner) {
-    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
+    redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
   try {
@@ -48,56 +60,58 @@ async function assertCanReviewPartnerChangeRequest(
       (partner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs,
     );
   } catch {
-    redirectAdminActionError("/admin/partner-requests", "regional_admin_scope_denied");
+    redirectAdminActionError(returnTo, "regional_admin_scope_denied");
   }
 }
 
 export async function approvePartnerChangeRequestAction(formData: FormData) {
+  const returnTo = getReturnTo(formData);
   const adminSession = await requireAdminPermission("brands", "update", {
-    path: "/admin/partner-requests",
+    path: returnTo,
   });
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
-    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
+    redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
-  await assertCanReviewPartnerChangeRequest(adminSession.account, requestId);
+  await assertCanReviewPartnerChangeRequest(adminSession.account, requestId, returnTo);
 
   const request = await approvePartnerChangeRequestRecord({
     requestId,
     adminId: adminSession.adminId,
     auditContext: await createServerActionAuditContext(
       { actorType: "admin", actorId: adminSession.adminId },
-      "/admin/partner-requests",
+      returnTo,
     ),
   });
 
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(request.partnerId);
   revalidatePartnerPortalPaths(request.partnerId);
-  redirect("/admin/partner-requests");
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "approved" }));
 }
 
 export async function rejectPartnerChangeRequestAction(formData: FormData) {
+  const returnTo = getReturnTo(formData);
   const adminSession = await requireAdminPermission("brands", "update", {
-    path: "/admin/partner-requests",
+    path: returnTo,
   });
   const requestId = String(formData.get("requestId") || "").trim();
   if (!requestId) {
-    redirectAdminActionError("/admin/partner-requests", "partner_form_invalid_request");
+    redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
-  await assertCanReviewPartnerChangeRequest(adminSession.account, requestId);
+  await assertCanReviewPartnerChangeRequest(adminSession.account, requestId, returnTo);
 
   const request = await rejectPartnerChangeRequestRecord({
     requestId,
     adminId: adminSession.adminId,
     auditContext: await createServerActionAuditContext(
       { actorType: "admin", actorId: adminSession.adminId },
-      "/admin/partner-requests",
+      returnTo,
     ),
   });
 
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(request.partnerId);
   revalidatePartnerPortalPaths(request.partnerId);
-  redirect("/admin/partner-requests");
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "rejected" }));
 }
