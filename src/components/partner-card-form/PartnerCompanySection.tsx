@@ -1,7 +1,7 @@
-import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
+import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
 import FieldGroup from "@/components/partner-card-form/FieldGroup";
 import { getPartnerCardInvalidClass } from "@/components/partner-card-form/usePartnerCardFormState";
@@ -40,7 +40,7 @@ export default function PartnerCompanySection({
   };
 }) {
   return (
-    <Card className="overflow-hidden">
+    <Surface level="elevated" padding="lg" className="overflow-hidden">
       <SectionHeading
         title="파트너사 / 담당자"
         description="한 파트너사가 여러 제휴처를 운영할 수 있으니, 기존 파트너사를 연결하거나 새 파트너사를 생성합니다."
@@ -70,7 +70,7 @@ export default function PartnerCompanySection({
           </p>
         </FieldGroup>
 
-        <section className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset p-4">
+        <Surface level="inset" padding="md" className="grid gap-4">
           <div>
             <p className="text-sm font-semibold text-foreground">파트너사 정보</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -108,9 +108,9 @@ export default function PartnerCompanySection({
               />
             </FieldGroup>
           </div>
-        </section>
+        </Surface>
 
-        <section className="grid gap-4 rounded-2xl border border-border/70 bg-surface-inset p-4">
+        <Surface level="inset" padding="md" className="grid gap-4">
           <div>
             <p className="text-sm font-semibold text-foreground">담당자 정보</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -170,7 +170,7 @@ export default function PartnerCompanySection({
               )}
             />
           </FieldGroup>
-        </section>
+        </Surface>
 
         <p className="text-xs leading-5 text-muted-foreground">
           {companyFieldsLocked
@@ -178,6 +178,6 @@ export default function PartnerCompanySection({
             : "담당자 이메일은 이후 포털 로그인 아이디와 초기 설정 안내에 사용됩니다. 기존 파트너사를 연결할 때는 비워 두고 저장해도 됩니다."}
         </p>
       </div>
-    </Card>
+    </Surface>
   );
 }

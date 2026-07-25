@@ -1,11 +1,11 @@
-import Link from "next/link";
-import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminReviewQueueFilters from "@/components/admin/AdminReviewQueueFilters";
+import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import EmptyState from "@/components/ui/EmptyState";
-import StatsRow from "@/components/ui/StatsRow";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import {
@@ -21,6 +21,7 @@ import {
   type PartnerRegistrationRequestStatus,
   type PartnerRegistrationSource,
 } from "@/lib/partner-registration";
+import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 
 export type AdminPartnerRegistrationRow = {
   id: string;
@@ -128,7 +129,7 @@ function branchSummary(branches?: AdminPartnerRegistrationRow["branches"]) {
 
 function ValueList({ title, values }: { title: string; values: string[] }) {
   return (
-    <div className="min-w-0 rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3">
+    <Surface level="inset" padding="sm" className="min-w-0">
       <p className="truncate text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {title}
       </p>
@@ -143,16 +144,22 @@ function ValueList({ title, values }: { title: string; values: string[] }) {
       ) : (
         <p className="mt-2 text-sm text-muted-foreground">입력 없음</p>
       )}
-    </div>
+    </Surface>
   );
 }
 
 export default function AdminPartnerRegistrationsView({
   rows,
   updateStatusAction,
+  status,
+  feedback,
+  returnTo = "/admin/partner-registrations",
 }: {
   rows: AdminPartnerRegistrationRow[];
   updateStatusAction: AdminFormAction;
+  status?: PartnerRegistrationRequestStatus | null;
+  feedback?: AdminReviewQueueFeedback | null;
+  returnTo?: string;
 }) {
   const counts = rows.reduce(
     (result, row) => ({
@@ -170,7 +177,7 @@ export default function AdminPartnerRegistrationsView({
 
   return (
     <section className="grid min-w-0 gap-6">
-      <AdminPageHeader
+      <AdminReviewQueueHeader
         eyebrow="Partner Registration"
         title="제휴 등록 신청 검토"
         description="공개 등록 페이지로 접수된 파트너사와 제휴처 정보를 확인하고 검토 상태를 관리합니다."
@@ -184,31 +191,39 @@ export default function AdminPartnerRegistrationsView({
             </Button>
           </>
         }
-      />
-      <StatsRow
-        items={[
+        metrics={[
           { label: "표시 건수", value: `${rows.length}건`, hint: "현재 필터 기준" },
           { label: "접수", value: `${counts.pending}건`, hint: "아직 검토 전" },
           { label: "검토 중", value: `${counts.in_review}건`, hint: "관리자 확인 중" },
           { label: "등록 완료", value: `${counts.converted}건`, hint: "제휴처 등록 처리" },
         ]}
-        minItemWidth="12rem"
+        feedback={feedback}
+        nextAction={{
+          title: "접수 상태와 관리자 메모를 확인한 뒤 한 건씩 저장하세요.",
+          description: "신규 카테고리나 지점 범위가 표시된 신청부터 검토하면 후속 제휴처 등록을 빠르게 이어갈 수 있습니다.",
+        }}
       />
-      <nav className="flex min-w-0 flex-wrap gap-2" aria-label="등록 신청 상태 필터">
-        <Link href="/admin/partner-registrations" className="inline-flex min-h-10 items-center rounded-full border border-border bg-surface-control px-4 text-sm font-semibold text-foreground">
-          전체
-        </Link>
-        {PARTNER_REGISTRATION_STATUS_OPTIONS.map((option) => (
-          <Link key={option} href={`/admin/partner-registrations?status=${option}`} className="inline-flex min-h-10 items-center rounded-full border border-border bg-surface-control px-4 text-sm font-semibold text-foreground">
-            {PARTNER_REGISTRATION_STATUS_LABELS[option]}
-          </Link>
-        ))}
-      </nav>
+      <AdminReviewQueueFilters
+        options={PARTNER_REGISTRATION_STATUS_OPTIONS.map((option) => ({
+          value: option,
+          label: PARTNER_REGISTRATION_STATUS_LABELS[option],
+        }))}
+        value={status}
+        getHref={(nextStatus) =>
+          nextStatus
+            ? `/admin/partner-registrations?status=${encodeURIComponent(nextStatus)}`
+            : "/admin/partner-registrations"
+        }
+        ariaLabel="등록 신청 상태 필터"
+      />
 
       {rows.length === 0 ? (
-        <Card tone="elevated">
-          <EmptyState title="접수된 등록 신청이 없습니다" description="공개 신청 페이지에서 접수된 요청이 이곳에 표시됩니다." />
-        </Card>
+        <AdminStatePanel
+          kind="empty"
+          title="접수된 등록 신청이 없습니다"
+          description="현재 조건에 맞는 요청이 없습니다. 상태 필터를 바꾸거나 공개 신청 페이지를 확인해 주세요."
+          action={<Button variant="secondary" href="/partner-registration" target="_blank">공개 신청 페이지</Button>}
+        />
       ) : (
         <div className="grid min-w-0 gap-4">
           {rows.map((row) => {
@@ -230,7 +245,6 @@ export default function AdminPartnerRegistrationsView({
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">{branchSummary(row.branches)} · 혜택 그룹 {(row.benefit_groups ?? []).length || 1}개</p>
                   </div>
-                  <Button variant="soft" href="/admin/partners/new">제휴처 추가로 이동</Button>
                 </div>
 
                 <div className="grid min-w-0 gap-3 lg:grid-cols-3">
@@ -279,6 +293,7 @@ export default function AdminPartnerRegistrationsView({
 
                 <form action={updateStatusAction} className="grid min-w-0 gap-3 border-t border-border/70 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                   <input type="hidden" name="id" value={row.id} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
                   <div className="grid min-w-0 gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
                     <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                       처리 상태

@@ -7,6 +7,7 @@ import {
   type AdPackageMetricEvent,
 } from "@/lib/ad-packages";
 import {
+  getCouponIssueCountSnapshot,
   getMemberIssueCountSnapshot,
   isMemberIssueLimitReached,
 } from "@/lib/ad-coupon-domain";
@@ -328,6 +329,20 @@ export class MockAdPackageRepository implements AdPackageRepository {
       )
       .filter(({ coupon }) =>
         !isMemberIssueLimitReached(
+          getCouponIssueCountSnapshot({
+            couponId: coupon.id,
+            limits: {
+              daily: coupon.dailyIssueLimit,
+              weekly: coupon.weeklyIssueLimit,
+              monthly: coupon.monthlyIssueLimit,
+            },
+            records: this.issues,
+            now,
+          }),
+        ),
+      )
+      .filter(({ coupon }) =>
+        !isMemberIssueLimitReached(
           getMemberIssueCountSnapshot({
             couponId: coupon.id,
             memberId: input.memberId,
@@ -564,6 +579,23 @@ export class MockAdPackageRepository implements AdPackageRepository {
     if (this.issues.some((issue) => issue.couponId === coupon.id && issue.memberId === input.memberId && !issue.usedAt)) {
       return { ok: false, reason: "member_limit", message: "이미 보유한 쿠폰입니다." };
     }
+    const memberUsedCount = this.countCouponRedemptions(coupon.id, input.memberId);
+    if (memberUsedCount >= coupon.perMemberLimit) {
+      return { ok: false, reason: "member_limit", message: "이미 사용할 수 있는 횟수를 모두 사용했습니다." };
+    }
+    const issueLimits = getCouponIssueCountSnapshot({
+      couponId: coupon.id,
+      limits: {
+        daily: coupon.dailyIssueLimit,
+        weekly: coupon.weeklyIssueLimit,
+        monthly: coupon.monthlyIssueLimit,
+      },
+      records: this.issues,
+      now,
+    });
+    if (isMemberIssueLimitReached(issueLimits)) {
+      return { ok: false, reason: "usage_limit", message: "현재 발급할 수 없는 쿠폰입니다." };
+    }
     const memberIssueLimits = getMemberIssueCountSnapshot({
       couponId: coupon.id,
       memberId: input.memberId,
@@ -580,7 +612,6 @@ export class MockAdPackageRepository implements AdPackageRepository {
     }
     const pool = this.couponCodes.get(coupon.id);
     const pooledCode = pool ? [...pool][0] ?? null : null;
-    if (pooledCode) pool?.delete(pooledCode);
     const assignedCode = coupon.issuanceType === "partner_code_pool"
       ? pooledCode
       : coupon.redemptionType === "code"
@@ -599,10 +630,14 @@ export class MockAdPackageRepository implements AdPackageRepository {
       onsitePasswordHash: this.couponPasswords.get(coupon.id)?.hash ?? null,
       onsitePasswordSalt: this.couponPasswords.get(coupon.id)?.salt ?? null,
     };
-    const available = toAvailableCoupon(coupon, 0);
+    const available = toAvailableCoupon(
+      { ...coupon, usedCount: this.countCouponRedemptions(coupon.id) },
+      memberUsedCount,
+    );
     if (!available) {
       return { ok: false, reason: "usage_limit", message: "현재 발급할 수 없는 쿠폰입니다." };
     }
+    if (pooledCode) pool?.delete(pooledCode);
     this.issues = [issue, ...this.issues];
     return {
       ok: true,
@@ -701,6 +736,25 @@ export class MockAdPackageRepository implements AdPackageRepository {
           message: "제휴처 확인 비밀번호가 올바르지 않습니다.",
         };
       }
+    }
+
+    if (
+      typeof coupon.usageLimit === "number" &&
+      this.countCouponRedemptions(coupon.id) >= coupon.usageLimit
+    ) {
+      return {
+        ok: false,
+        reason: "usage_limit",
+        message: "현재 사용할 수 있는 쿠폰 수량이 모두 소진되었습니다.",
+      };
+    }
+
+    if (this.countCouponRedemptions(coupon.id, input.memberId) >= coupon.perMemberLimit) {
+      return {
+        ok: false,
+        reason: "member_limit",
+        message: "이미 사용할 수 있는 횟수를 모두 사용했습니다.",
+      };
     }
 
     const usedAt = isoNow();

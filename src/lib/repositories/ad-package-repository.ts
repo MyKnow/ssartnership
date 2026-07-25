@@ -257,6 +257,8 @@ export type RedeemAdCouponIssueResult =
         | "not_found"
         | "inactive"
         | "expired"
+        | "usage_limit"
+        | "member_limit"
         | "onsite_password_required"
         | "onsite_password_invalid"
         | "invalid";

@@ -6,9 +6,9 @@ import {
   ONLINE_PARTNER_LOCATION,
   type PartnerServiceMode,
 } from "@/lib/partner-service-mode";
-import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
+import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
 import SectionHeading from "@/components/ui/SectionHeading";
 import {
@@ -85,7 +85,7 @@ export default function PartnerBasicInfoSection({
     : "https://map.naver.com/...";
 
   return (
-    <Card className="overflow-hidden">
+    <Surface level="elevated" padding="lg" className="overflow-hidden">
       <SectionHeading
         title="기본 정보"
         description="상세 페이지의 왼쪽 요약 카드처럼 보이도록 핵심 정보를 정리합니다."
@@ -380,6 +380,6 @@ export default function PartnerBasicInfoSection({
           className="w-full"
         />
       </div>
-    </Card>
+    </Surface>
   );
 }

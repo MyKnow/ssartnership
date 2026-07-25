@@ -20,7 +20,7 @@ async function createCodeCoupon(
 }
 
 describe("mock ad package repository", () => {
-  it("downloads a service coupon and treats blank member periodic limits as unlimited", async () => {
+  it("keeps blank member periodic limits unlimited without bypassing the total member limit", async () => {
     const repository = new MockAdPackageRepository();
     const now = Date.now();
     const coupon = await repository.createCoupon({
@@ -57,9 +57,108 @@ describe("mock ad package repository", () => {
       couponId: coupon.id,
       memberId: "member-unlimited",
     });
+    assert.equal(second.ok, false);
+    if (!second.ok) {
+      assert.equal(second.reason, "member_limit");
+    }
+  });
+
+  it("allows a member's configured total uses and blocks the next issue", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await createCodeCoupon(repository, { perMemberLimit: 2 });
+
+    const first = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-total-limit",
+    });
+    assert.equal(first.ok, true);
+    if (!first.ok || !first.issue.issueId) return;
+
+    const firstRedemption = await repository.redeemCouponIssue({
+      issueId: first.issue.issueId,
+      memberId: "member-total-limit",
+    });
+    assert.equal(firstRedemption.ok, true);
+
+    const second = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-total-limit",
+    });
     assert.equal(second.ok, true);
-    if (second.ok) {
-      assert.equal(second.issue.assignedCode, null);
+    if (!second.ok || !second.issue.issueId) return;
+
+    const secondRedemption = await repository.redeemCouponIssue({
+      issueId: second.issue.issueId,
+      memberId: "member-total-limit",
+    });
+    assert.equal(secondRedemption.ok, true);
+
+    const third = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-total-limit",
+    });
+    assert.equal(third.ok, false);
+    if (!third.ok) {
+      assert.equal(third.reason, "member_limit");
+    }
+  });
+
+  it("enforces a global daily issue limit across members", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await repository.createCoupon({
+      partnerId: "health-001",
+      title: "전체 일 발급 제한 쿠폰",
+      status: "active",
+      redemptionType: "code",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+      dailyIssueLimit: 1,
+    });
+
+    const first = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-global-1",
+    });
+    assert.equal(first.ok, true);
+
+    const second = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-global-2",
+    });
+    assert.equal(second.ok, false);
+    if (!second.ok) {
+      assert.equal(second.reason, "usage_limit");
+    }
+  });
+
+  it("rechecks the global usage limit when redeeming an already issued coupon", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await createCodeCoupon(repository, { usageLimit: 1 });
+    const first = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-global-use-1",
+    });
+    const second = await repository.issueCoupon({
+      couponId: coupon.id,
+      memberId: "member-global-use-2",
+    });
+    assert.equal(first.ok, true);
+    assert.equal(second.ok, true);
+    if (!first.ok || !second.ok || !first.issue.issueId || !second.issue.issueId) return;
+
+    const firstRedemption = await repository.redeemCouponIssue({
+      issueId: first.issue.issueId,
+      memberId: "member-global-use-1",
+    });
+    assert.equal(firstRedemption.ok, true);
+
+    const secondRedemption = await repository.redeemCouponIssue({
+      issueId: second.issue.issueId,
+      memberId: "member-global-use-2",
+    });
+    assert.equal(secondRedemption.ok, false);
+    if (!secondRedemption.ok) {
+      assert.equal(secondRedemption.reason, "usage_limit");
     }
   });
 

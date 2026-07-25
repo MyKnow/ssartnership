@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AdminTabs from "@/components/admin/AdminTabs";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminCompanyManager from "@/components/admin/AdminCompanyManager";
 import AdminPartnerAccountManager from "@/components/admin/AdminPartnerAccountManager";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
+import {
+  buildAdminCompanyTabHref,
+  type AdminCompanyTab,
+} from "@/lib/admin-company-workspace";
 
 export type AdminCompanyWorkspaceProps = {
   companies: Array<{
@@ -26,8 +31,6 @@ export type AdminCompanyWorkspaceProps = {
   initialTab?: AdminCompanyTab;
   actions: AdminCompanyFormActions;
 };
-
-type AdminCompanyTab = "companies" | "accounts";
 
 const companyTabOptions = [
   {
@@ -51,14 +54,29 @@ export default function AdminCompanyWorkspace({
   actions,
 }: AdminCompanyWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<AdminCompanyTab>(initialTab);
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
+  const handleTabChange = (tab: AdminCompanyTab) => {
+    setActiveTab(tab);
+    router.replace(
+      buildAdminCompanyTabHref(pathname, searchParams.toString(), tab),
+      { scroll: false },
+    );
+  };
+
   return (
     <section className="grid gap-4">
-      <AdminTabs value={activeTab} onChange={setActiveTab} options={companyTabOptions} />
+      <AdminTabs<AdminCompanyTab>
+        value={activeTab}
+        onChange={handleTabChange}
+        options={companyTabOptions}
+      />
 
       {activeTab === "companies" ? (
         <section className="grid gap-4">

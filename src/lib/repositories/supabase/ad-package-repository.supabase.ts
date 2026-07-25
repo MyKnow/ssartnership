@@ -9,6 +9,7 @@ import {
   type AdCouponIssuanceType,
 } from "@/lib/ad-packages";
 import {
+  getCouponIssueCountSnapshot,
   getMemberIssueCountSnapshot,
   isMemberIssueLimitReached,
 } from "@/lib/ad-coupon-domain";
@@ -599,7 +600,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     const campaignIds = rows
       .map((row) => row.campaign_id)
       .filter((id): id is string => Boolean(id));
-    const [redemptionResult, campaignResult, memberIssueResult] = await Promise.all([
+    const [redemptionResult, campaignResult, memberIssueResult, issueResult] = await Promise.all([
       supabase
         .from("ad_coupon_redemptions")
         .select("coupon_id,member_id")
@@ -618,6 +619,10 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         .select("coupon_id,issued_at")
         .in("coupon_id", couponIds)
         .eq("member_id", input.memberId),
+      supabase
+        .from("ad_coupon_issues")
+        .select("coupon_id,issued_at")
+        .in("coupon_id", couponIds),
     ]);
     if (redemptionResult.error) {
       throw new Error(redemptionResult.error.message);
@@ -627,6 +632,9 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     }
     if (memberIssueResult.error) {
       throw new Error(memberIssueResult.error.message);
+    }
+    if (issueResult.error) {
+      throw new Error(issueResult.error.message);
     }
 
     const redemptionRows = (redemptionResult.data ?? []) as Array<{
@@ -657,6 +665,13 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         },
       ]);
     }
+    const issueRecordsByCoupon = new Map<string, Array<{ couponId: string; issuedAt: string }>>();
+    for (const row of (issueResult.data ?? []) as Array<{ coupon_id: string; issued_at: string }>) {
+      issueRecordsByCoupon.set(row.coupon_id, [
+        ...(issueRecordsByCoupon.get(row.coupon_id) ?? []),
+        { couponId: row.coupon_id, issuedAt: row.issued_at },
+      ]);
+    }
     const campaignsById = new Map(
       ((campaignResult.data ?? []) as AdCampaignRow[]).map((row) => [
         row.id,
@@ -679,6 +694,20 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
           campaign,
           now,
         }),
+      )
+      .filter(({ coupon }) =>
+        !isMemberIssueLimitReached(
+          getCouponIssueCountSnapshot({
+            couponId: coupon.id,
+            limits: {
+              daily: coupon.dailyIssueLimit,
+              weekly: coupon.weeklyIssueLimit,
+              monthly: coupon.monthlyIssueLimit,
+            },
+            records: issueRecordsByCoupon.get(coupon.id) ?? [],
+            now,
+          }),
+        ),
       )
       .filter(({ coupon }) =>
         !isMemberIssueLimitReached(
@@ -972,7 +1001,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
             ? "member_limit"
             : error.message.includes("member_daily_limit") || error.message.includes("member_weekly_limit") || error.message.includes("member_monthly_limit")
               ? "member_limit"
-              : error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
+            : error.message.includes("usage_limit") || error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
               ? error.message.includes("code_unavailable") ? "code_unavailable" : "usage_limit"
               : "invalid";
       return { ok: false, reason, message: "현재 쿠폰을 다운로드할 수 없습니다." };
@@ -1152,13 +1181,17 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     if (error) {
       const reason = error.message.includes("expired")
         ? "expired"
-        : error.message.includes("inactive")
-          ? "inactive"
-          : error.message.includes("not_found")
-            ? "not_found"
-            : error.message.includes("onsite_password")
-              ? "onsite_password_invalid"
-              : "invalid";
+        : error.message.includes("member_limit")
+          ? "member_limit"
+          : error.message.includes("usage_limit")
+            ? "usage_limit"
+            : error.message.includes("inactive")
+              ? "inactive"
+              : error.message.includes("not_found")
+                ? "not_found"
+                : error.message.includes("onsite_password")
+                  ? "onsite_password_invalid"
+                  : "invalid";
       return {
         ok: false,
         reason,

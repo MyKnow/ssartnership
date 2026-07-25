@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
   approveGraduateVerificationRequest,
@@ -13,23 +15,35 @@ import {
   hashGraduateDocumentNumber,
 } from "@/lib/graduate-verification-security";
 import { validateGraduateDocumentNumber } from "@/lib/graduate-verification";
-import { logAdminAction, scheduleAdminActionFailureLog } from "@/app/admin/(protected)/_actions/shared-helpers";
+import {
+  logAdminAction,
+  redirectAdminActionError,
+  scheduleAdminActionFailureLog,
+} from "@/app/admin/(protected)/_actions/shared-helpers";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 const ADMIN_GRADUATE_VERIFICATIONS_PATH = "/admin/graduate-verifications";
 
-function getRequiredId(formData: FormData, name: string) {
+function getReturnTo(formData: FormData) {
+  return sanitizeReturnTo(
+    String(formData.get("returnTo") ?? ""),
+    ADMIN_GRADUATE_VERIFICATIONS_PATH,
+  );
+}
+
+function getRequiredId(formData: FormData, name: string, returnTo: string) {
   const value = String(formData.get(name) ?? "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(value)) {
-    throw new Error("요청 식별자를 확인해 주세요.");
+    redirectAdminActionError(returnTo, "invalid_fields");
   }
   return value;
 }
 
-function getOptionalId(formData: FormData, name: string) {
+function getOptionalId(formData: FormData, name: string, returnTo: string) {
   const value = String(formData.get(name) ?? "").trim();
   if (!value) return null;
   if (!/^[0-9a-f-]{36}$/i.test(value)) {
-    throw new Error("기존 회원 식별자를 확인해 주세요.");
+    redirectAdminActionError(returnTo, "invalid_fields");
   }
   return value;
 }
@@ -41,9 +55,10 @@ function revalidateGraduateVerificationPaths() {
 }
 
 export async function startGraduateVerificationReviewAction(formData: FormData) {
-  const requestId = getRequiredId(formData, "requestId");
+  const returnTo = getReturnTo(formData);
+  const requestId = getRequiredId(formData, "requestId", returnTo);
   const session = await requireAdminPermission("graduate_verifications", "update", {
-    path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
+    path: returnTo,
   });
   try {
     await markGraduateVerificationInReview({ requestId, adminId: session.adminId });
@@ -58,16 +73,18 @@ export async function startGraduateVerificationReviewAction(formData: FormData) 
       targetId: requestId,
       reason: "review_start_failed",
     });
-    throw new Error("검토를 시작하지 못했습니다.");
+    redirectAdminActionError(returnTo, "review_start_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "updated" }));
 }
 
 export async function requestGraduateVerificationResubmissionAction(formData: FormData) {
-  const requestId = getRequiredId(formData, "requestId");
+  const returnTo = getReturnTo(formData);
+  const requestId = getRequiredId(formData, "requestId", returnTo);
   const targets = formData.getAll("target").map(String);
   const note = String(formData.get("note") ?? "").trim() || null;
   const session = await requireAdminPermission("graduate_verifications", "update", {
-    path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
+    path: returnTo,
   });
   try {
     const resolvedTargets = await requestGraduateVerificationResubmission({
@@ -91,21 +108,23 @@ export async function requestGraduateVerificationResubmissionAction(formData: Fo
       targetId: requestId,
       reason: "resubmission_request_failed",
     });
-    throw new Error("보완 요청을 처리하지 못했습니다.");
+    redirectAdminActionError(returnTo, "resubmission_request_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "updated" }));
 }
 
 export async function approveGraduateVerificationAction(formData: FormData) {
-  const requestId = getRequiredId(formData, "requestId");
-  const existingMemberId = getOptionalId(formData, "existingMemberId");
+  const returnTo = getReturnTo(formData);
+  const requestId = getRequiredId(formData, "requestId", returnTo);
+  const existingMemberId = getOptionalId(formData, "existingMemberId", returnTo);
   const documentNumber = validateGraduateDocumentNumber(
     String(formData.get("documentNumber") ?? ""),
   );
   if (!documentNumber) {
-    throw new Error("수료증 문서 번호를 3~160자로 입력해 주세요.");
+    redirectAdminActionError(returnTo, "invalid_fields");
   }
   const session = await requireAdminPermission("graduate_verifications", "update", {
-    path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
+    path: returnTo,
   });
   try {
     const result = await approveGraduateVerificationRequest({
@@ -126,14 +145,16 @@ export async function approveGraduateVerificationAction(formData: FormData) {
       targetId: requestId,
       reason: "approval_failed",
     });
-    throw new Error("수료생 인증을 승인하지 못했습니다.");
+    redirectAdminActionError(returnTo, "approval_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "approved" }));
 }
 
 export async function resendGraduateAccountSetupEmailAction(formData: FormData) {
-  const requestId = getRequiredId(formData, "requestId");
+  const returnTo = getReturnTo(formData);
+  const requestId = getRequiredId(formData, "requestId", returnTo);
   await requireAdminPermission("graduate_verifications", "update", {
-    path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
+    path: returnTo,
   });
   try {
     const result = await resendGraduateAccountSetupEmail({ requestId });
@@ -149,15 +170,17 @@ export async function resendGraduateAccountSetupEmailAction(formData: FormData) 
       targetId: requestId,
       reason: "setup_email_resend_failed",
     });
-    throw new Error("비밀번호 설정 메일을 다시 보내지 못했습니다.");
+    redirectAdminActionError(returnTo, "setup_email_resend_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "updated" }));
 }
 
 export async function rejectGraduateVerificationAction(formData: FormData) {
-  const requestId = getRequiredId(formData, "requestId");
+  const returnTo = getReturnTo(formData);
+  const requestId = getRequiredId(formData, "requestId", returnTo);
   const reason = String(formData.get("reason") ?? "");
   const session = await requireAdminPermission("graduate_verifications", "update", {
-    path: ADMIN_GRADUATE_VERIFICATIONS_PATH,
+    path: returnTo,
   });
   try {
     const result = await rejectGraduateVerificationRequest({ requestId, adminId: session.adminId, reason });
@@ -173,6 +196,7 @@ export async function rejectGraduateVerificationAction(formData: FormData) {
       targetId: requestId,
       reason: "rejection_failed",
     });
-    throw new Error("수료생 인증을 반려하지 못했습니다.");
+    redirectAdminActionError(returnTo, "rejection_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "rejected" }));
 }

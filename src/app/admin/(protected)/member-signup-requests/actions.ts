@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import {
   requireMemberSignupRequestAdmin,
 } from "@/lib/admin-access";
@@ -15,6 +16,7 @@ import {
   logAdminAction,
   scheduleAdminActionFailureLog,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 const QUEUE_PATH = "/admin/member-signup-requests";
 
@@ -26,13 +28,21 @@ function getRequestId(formData: FormData) {
   return requestId;
 }
 
-function detailPath(requestId: string) {
-  return `${QUEUE_PATH}/${encodeURIComponent(requestId)}`;
+function getReturnTo(formData: FormData) {
+  return sanitizeReturnTo(String(formData.get("returnTo") ?? ""), QUEUE_PATH);
+}
+
+function detailPath(requestId: string, returnTo: string) {
+  return appendAdminReviewQueueQuery(
+    `${QUEUE_PATH}/${encodeURIComponent(requestId)}`,
+    { returnTo },
+  );
 }
 
 export async function approveMemberSignupRequestAction(formData: FormData) {
   const requestId = getRequestId(formData);
-  const path = detailPath(requestId);
+  const returnTo = getReturnTo(formData);
+  const path = detailPath(requestId, returnTo);
   const session = await requireMemberSignupRequestAdmin("update", { path });
   const parsed = parseMattermostSignupApprovalDecision({
     displayName: formData.get("displayName"),
@@ -40,7 +50,7 @@ export async function approveMemberSignupRequestAction(formData: FormData) {
     campus: formData.get("campus"),
   });
   if (!parsed.ok) {
-    redirect(`${path}?error=invalid_fields`);
+    redirect(appendAdminReviewQueueQuery(path, { error: "invalid_fields" }));
   }
 
   try {
@@ -55,7 +65,7 @@ export async function approveMemberSignupRequestAction(formData: FormData) {
       targetId: requestId,
       reason: "approval_failed",
     });
-    redirect(`${path}?error=approval_failed`);
+    redirect(appendAdminReviewQueueQuery(path, { error: "approval_failed" }));
   }
 
   await logAdminAction("member_signup_approval_approve", {
@@ -67,18 +77,19 @@ export async function approveMemberSignupRequestAction(formData: FormData) {
     },
   });
   revalidatePath(QUEUE_PATH);
-  revalidatePath(path);
+  revalidatePath(`${QUEUE_PATH}/${encodeURIComponent(requestId)}`);
   revalidatePath("/admin/members");
-  redirect(`${QUEUE_PATH}?status=approved`);
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "approved" }));
 }
 
 export async function rejectMemberSignupRequestAction(formData: FormData) {
   const requestId = getRequestId(formData);
-  const path = detailPath(requestId);
+  const returnTo = getReturnTo(formData);
+  const path = detailPath(requestId, returnTo);
   const session = await requireMemberSignupRequestAdmin("update", { path });
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason || reason.length > 500) {
-    redirect(`${path}?error=invalid_reason`);
+    redirect(appendAdminReviewQueueQuery(path, { error: "invalid_reason" }));
   }
 
   try {
@@ -93,7 +104,7 @@ export async function rejectMemberSignupRequestAction(formData: FormData) {
       targetId: requestId,
       reason: "rejection_failed",
     });
-    redirect(`${path}?error=rejection_failed`);
+    redirect(appendAdminReviewQueueQuery(path, { error: "rejection_failed" }));
   }
 
   await logAdminAction("member_signup_approval_reject", {
@@ -102,6 +113,6 @@ export async function rejectMemberSignupRequestAction(formData: FormData) {
     properties: { reasonLength: reason.length },
   });
   revalidatePath(QUEUE_PATH);
-  revalidatePath(path);
-  redirect(`${QUEUE_PATH}?status=rejected`);
+  revalidatePath(`${QUEUE_PATH}/${encodeURIComponent(requestId)}`);
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "rejected" }));
 }

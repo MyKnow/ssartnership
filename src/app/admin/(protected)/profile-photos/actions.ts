@@ -1,29 +1,40 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { logAdminAction, scheduleAdminActionFailureLog } from "@/app/admin/(protected)/_actions/shared-helpers";
+import { redirect } from "next/navigation";
+import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
+import {
+  logAdminAction,
+  redirectAdminActionError,
+  scheduleAdminActionFailureLog,
+} from "@/app/admin/(protected)/_actions/shared-helpers";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
   approveMemberProfileImageReplacement,
   rejectMemberActiveProfilePhoto,
   rejectMemberProfileImageReplacement,
 } from "@/lib/graduate-verification-service";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 const PROFILE_PHOTOS_PATH = "/admin/profile-photos";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function getRequiredId(formData: FormData, name: string) {
+function getReturnTo(formData: FormData) {
+  return sanitizeReturnTo(String(formData.get("returnTo") ?? ""), PROFILE_PHOTOS_PATH);
+}
+
+function getRequiredId(formData: FormData, name: string, returnTo: string) {
   const value = String(formData.get(name) ?? "").trim();
   if (!UUID_PATTERN.test(value)) {
-    throw new Error("사진 검토 대상을 확인해 주세요.");
+    redirectAdminActionError(returnTo, "invalid_fields");
   }
   return value;
 }
 
-function getRequiredReason(formData: FormData) {
+function getRequiredReason(formData: FormData, returnTo: string) {
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason || reason.length > 500) {
-    throw new Error("반려 사유를 1~500자로 입력해 주세요.");
+    redirectAdminActionError(returnTo, "invalid_reason");
   }
   return reason;
 }
@@ -43,10 +54,11 @@ function revalidateProfilePhotoPaths(memberId?: string | null) {
 }
 
 export async function approveMemberProfilePhotoAction(formData: FormData) {
-  const imageId = getRequiredId(formData, "imageId");
+  const returnTo = getReturnTo(formData);
+  const imageId = getRequiredId(formData, "imageId", returnTo);
   const memberId = getOptionalMemberId(formData);
   const session = await requireAdminPermission("profile_images", "update", {
-    path: PROFILE_PHOTOS_PATH,
+    path: returnTo,
   });
 
   try {
@@ -62,16 +74,18 @@ export async function approveMemberProfilePhotoAction(formData: FormData) {
       targetId: imageId,
       reason: "approval_failed",
     });
-    throw new Error("본인 사진 교체를 승인하지 못했습니다.");
+    redirectAdminActionError(returnTo, "approval_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "approved" }));
 }
 
 export async function rejectMemberProfilePhotoAction(formData: FormData) {
-  const imageId = getRequiredId(formData, "imageId");
-  const reason = getRequiredReason(formData);
+  const returnTo = getReturnTo(formData);
+  const imageId = getRequiredId(formData, "imageId", returnTo);
+  const reason = getRequiredReason(formData, returnTo);
   const memberId = getOptionalMemberId(formData);
   const session = await requireAdminPermission("profile_images", "update", {
-    path: PROFILE_PHOTOS_PATH,
+    path: returnTo,
   });
 
   try {
@@ -88,15 +102,17 @@ export async function rejectMemberProfilePhotoAction(formData: FormData) {
       targetId: imageId,
       reason: "rejection_failed",
     });
-    throw new Error("본인 사진 교체를 반려하지 못했습니다.");
+    redirectAdminActionError(returnTo, "rejection_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "rejected" }));
 }
 
 export async function rejectMemberCurrentProfilePhotoAction(formData: FormData) {
-  const memberId = getRequiredId(formData, "memberId");
-  const reason = getRequiredReason(formData);
+  const returnTo = getReturnTo(formData);
+  const memberId = getRequiredId(formData, "memberId", returnTo);
+  const reason = getRequiredReason(formData, returnTo);
   const session = await requireAdminPermission("profile_images", "update", {
-    path: PROFILE_PHOTOS_PATH,
+    path: returnTo,
   });
 
   try {
@@ -113,6 +129,7 @@ export async function rejectMemberCurrentProfilePhotoAction(formData: FormData) 
       targetId: memberId,
       reason: "active_photo_rejection_failed",
     });
-    throw new Error("기존 프로필 사진을 반려하지 못했습니다.");
+    redirectAdminActionError(returnTo, "active_photo_rejection_failed");
   }
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "rejected" }));
 }

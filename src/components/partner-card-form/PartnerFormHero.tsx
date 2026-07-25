@@ -1,5 +1,5 @@
 import Badge from "@/components/ui/Badge";
-import Card from "@/components/ui/Card";
+import Surface from "@/components/ui/Surface";
 import { cn } from "@/lib/cn";
 import {
   getPartnerVisibilityBadgeClass,
@@ -34,12 +34,8 @@ export default function PartnerFormHero({
   );
 
   return (
-    <Card className="relative overflow-hidden">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.08),_transparent_42%),radial-gradient(circle_at_bottom_left,_rgba(14,165,233,0.08),_transparent_45%)]"
-      />
-      <div className="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <Surface level="inset" padding="lg" className="overflow-hidden">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="grid gap-2">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
             {mode === "create" ? "새 제휴처 추가" : "제휴처 정보 수정"}
@@ -65,6 +61,6 @@ export default function PartnerFormHero({
           </span>
         </div>
       </div>
-    </Card>
+    </Surface>
   );
 }

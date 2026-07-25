@@ -2,8 +2,8 @@ import AdminCompanyWorkspace, {
   type AdminCompanyWorkspaceProps,
 } from "@/components/admin/AdminCompanyWorkspace";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminWorkspaceSummary from "@/components/admin/AdminWorkspaceSummary";
 import FormMessage from "@/components/ui/FormMessage";
-import StatsRow from "@/components/ui/StatsRow";
 
 export default function AdminCompaniesView({
   companies,
@@ -39,30 +39,32 @@ export default function AdminCompaniesView({
       {errorMessage ? (
         <FormMessage variant="error">{errorMessage}</FormMessage>
       ) : null}
-      <StatsRow
+      <AdminWorkspaceSummary
+        eyebrow="Operations"
+        title="파트너사 운영 현황"
+        description="처리할 회사·계정 연결을 먼저 확인하고, 아래 탭에서 한 가지 작업을 이어갑니다."
         items={[
           {
             label: "파트너사",
             value: `${companies.length}개`,
-            hint: `활성 ${activeCompanyCount}개`,
+            detail: `활성 ${activeCompanyCount}개`,
           },
           {
             label: "제휴처",
             value: `${partnerCount}개`,
-            hint: "파트너사에 연결된 전체 제휴처",
+            detail: "파트너사에 연결된 전체 제휴처",
           },
           {
             label: "계정",
             value: `${accounts.length}개`,
-            hint: `활성 ${activeAccountCount}개`,
+            detail: `활성 ${activeAccountCount}개`,
           },
           {
             label: "연결",
             value: `${totalAccountLinks}건`,
-            hint: "계정과 파트너사 전체 연결 수",
+            detail: "계정과 파트너사 전체 연결 수",
           },
         ]}
-        minItemWidth="13rem"
       />
 
       <AdminCompanyWorkspace

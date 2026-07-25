@@ -1,10 +1,12 @@
 import Link from "next/link";
-import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
+import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 
 const PARSE_REASON_LABELS: Record<string, string> = {
   campus_ambiguous: "캠퍼스가 여러 개로 감지됨",
@@ -27,18 +29,31 @@ function formatDate(value: string) {
 export default function AdminMemberSignupApprovalQueue({
   requests,
   statusMessage,
+  returnTo = "/admin/member-signup-requests",
+  feedback,
 }: {
   requests: MattermostSignupApprovalRequestSummary[];
   statusMessage?: string | null;
+  returnTo?: string;
+  feedback?: AdminReviewQueueFeedback | null;
 }) {
   return (
     <div className="grid gap-6">
-      <AdminPageHeader
+      <AdminReviewQueueHeader
         eyebrow="Member onboarding"
         title="가입 승인 요청"
         description="Mattermost 닉네임을 자동으로 해석하지 못한 가입 요청을 확인하고, 부족한 회원 정보를 직접 입력해 승인합니다."
+        metrics={[
+          { label: "승인 대기", value: `${requests.length}건`, hint: "현재 처리할 요청" },
+          { label: "수동 확인", value: `${requests.filter((request) => request.status === "pending").length}건`, hint: "자동 확정되지 않은 요청" },
+        ]}
+        feedback={feedback}
+        nextAction={{
+          title: requests.length > 0 ? "표시 이름과 신청 기수를 확인한 뒤 한 건씩 검토하세요." : "새 가입 승인 요청이 들어오면 신청 정보부터 확인하세요.",
+          description: "승인 화면에서 이름·기수·캠퍼스를 보완하며, 반려할 때는 요청자가 이해할 수 있는 사유를 남깁니다.",
+        }}
       />
-      {statusMessage ? (
+      {statusMessage && !feedback ? (
         <p className="rounded-card border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
           {statusMessage}
         </p>
@@ -47,6 +62,7 @@ export default function AdminMemberSignupApprovalQueue({
         <EmptyState
           title="대기 중인 가입 승인 요청이 없습니다."
           description="파싱에 실패한 Mattermost 가입 신청이 접수되면 이곳에 표시됩니다."
+          action={<Button href={returnTo} variant="secondary">목록 새로고침</Button>}
         />
       ) : (
         <div className="grid gap-4">
@@ -65,7 +81,7 @@ export default function AdminMemberSignupApprovalQueue({
                   </p>
                 </div>
                 <Link
-                  href={`/admin/member-signup-requests/${encodeURIComponent(request.id)}`}
+                  href={`/admin/member-signup-requests/${encodeURIComponent(request.id)}?returnTo=${encodeURIComponent(returnTo)}`}
                   className="inline-flex min-h-11 items-center justify-center rounded-[1rem] border border-border bg-surface px-4 text-sm font-semibold text-foreground hover:bg-surface-inset"
                 >
                   검토하기

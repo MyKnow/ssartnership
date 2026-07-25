@@ -5,6 +5,8 @@ import AdminGraduateVerificationQueue, {
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   approveGraduateVerificationAction,
   rejectGraduateVerificationAction,
@@ -15,7 +17,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminGraduateVerificationsPage() {
+export default async function AdminGraduateVerificationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string; success?: string; returnTo?: string }>;
+}) {
   await requireAdminPermission("graduate_verifications", "read", { path: "/admin/graduate-verifications" });
   const supabase = getSupabaseAdminClient();
   const [requestsResult, setupEmailRetriesResult] = await Promise.all([
@@ -28,6 +34,11 @@ export default async function AdminGraduateVerificationsPage() {
       .order("setup_email_last_error_at", { ascending: false }),
   ]);
   if (requestsResult.error || setupEmailRetriesResult.error) throw new Error("수료생 인증 검토 큐를 불러오지 못했습니다.");
+  const params = (await searchParams) ?? {};
+  const returnTo = sanitizeReturnTo(
+    params.returnTo,
+    "/admin/graduate-verifications",
+  );
 
   return (
     <AdminShell title="수료생 인증">
@@ -41,6 +52,11 @@ export default async function AdminGraduateVerificationsPage() {
           rejectRequest: rejectGraduateVerificationAction,
           resendSetupEmail: resendGraduateAccountSetupEmailAction,
         }}
+        feedback={getAdminReviewQueueFeedback({
+          error: params.error,
+          success: params.success,
+        })}
+        returnTo={returnTo}
       />
     </AdminShell>
   );
