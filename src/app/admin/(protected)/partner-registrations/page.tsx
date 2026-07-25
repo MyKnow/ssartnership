@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin-scope";
 import { inferCampusSlugsFromLocation } from "@/lib/campuses";
 import { isPartnerRegistrationRequestStatus } from "@/lib/partner-registration";
+import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPartnerRegistrationsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; error?: string; success?: string }>;
 }) {
   const adminSession = await requireAdminPermission("brands", "read", {
     path: "/admin/partner-registrations",
@@ -28,6 +29,13 @@ export default async function AdminPartnerRegistrationsPage({
     params.status && isPartnerRegistrationRequestStatus(params.status)
       ? params.status
       : null;
+  const feedback = getAdminReviewQueueFeedback({
+    error: params.error,
+    success: params.success,
+  });
+  const returnTo = status
+    ? `/admin/partner-registrations?status=${encodeURIComponent(status)}`
+    : "/admin/partner-registrations";
 
   let query = getSupabaseAdminClient()
     .from("partner_registration_requests")
@@ -67,6 +75,9 @@ export default async function AdminPartnerRegistrationsPage({
       <AdminPartnerRegistrationsView
         rows={rows}
         updateStatusAction={updatePartnerRegistrationRequestStatus}
+        status={status}
+        feedback={feedback}
+        returnTo={returnTo}
       />
     </AdminShell>
   );

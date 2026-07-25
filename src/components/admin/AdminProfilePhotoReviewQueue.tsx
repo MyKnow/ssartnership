@@ -3,6 +3,9 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
+import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
+import SubmitButton from "@/components/ui/SubmitButton";
+import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 
 export type AdminProfilePhotoReplacement = {
   id: string;
@@ -65,15 +68,36 @@ export default function AdminProfilePhotoReviewQueue({
     `/api/admin/profile-photos/images/${encodeURIComponent(imageId)}`,
   currentPhotoUrl = (memberId) =>
     `/api/admin/profile-photos/current/${encodeURIComponent(memberId)}`,
+  feedback,
+  returnTo = "/admin/profile-photos",
 }: {
   replacements: AdminProfilePhotoReplacement[];
   currentPhotos: AdminExistingProfilePhoto[];
   actions: QueueActions;
   replacementImageUrl?: (imageId: string) => string;
   currentPhotoUrl?: (memberId: string) => string;
+  feedback?: AdminReviewQueueFeedback | null;
+  returnTo?: string;
 }) {
+  const totalReviewCount = replacements.length + currentPhotos.length;
+
   return (
-    <div className="space-y-10">
+    <div className="grid min-w-0 gap-8">
+      <AdminReviewQueueHeader
+        eyebrow="Profile photo review"
+        title="프로필 사진 검토"
+        description="새 사진 교체 요청과 현재 승인 사진 점검을 분리해, 회원 인증에 영향을 주는 작업을 안전하게 처리합니다."
+        metrics={[
+          { label: "교체 요청", value: `${replacements.length}건`, hint: "새 사진 승인 대기" },
+          { label: "현재 사진", value: `${currentPhotos.length}건`, hint: "최근 승인 사진 점검" },
+          { label: "검토 대상", value: `${totalReviewCount}건`, hint: "현재 화면 기준" },
+        ]}
+        feedback={feedback}
+        nextAction={{
+          title: replacements.length > 0 ? "새 교체 사진부터 확인하세요." : "현재 승인 사진의 상태를 점검하세요.",
+          description: "새 사진을 승인하기 전에는 기존 사진이 유지됩니다. 반려 사유는 회원이 이해할 수 있도록 구체적으로 남겨 주세요.",
+        }}
+      />
       <section className="space-y-4" aria-labelledby="profile-photo-replacement-heading">
         <div>
           <p className="ui-kicker">Photo replacement</p>
@@ -89,6 +113,7 @@ export default function AdminProfilePhotoReviewQueue({
           <EmptyState
             title="검토할 사진 변경 요청이 없습니다."
             description="회원이 새 본인 사진을 제출하면 이곳에 표시됩니다."
+            action={<Button href="/admin/profile-photos" variant="secondary">큐 새로고침</Button>}
           />
         ) : (
           <div className="grid gap-4">
@@ -119,10 +144,12 @@ export default function AdminProfilePhotoReviewQueue({
                   <div className="grid min-w-0 gap-3 border-t border-border pt-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-start">
                     <form action={actions.approveReplacement}>
                       <input type="hidden" name="imageId" value={replacement.id} />
-                      <Button type="submit">사진 승인</Button>
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <SubmitButton pendingText="승인 중">사진 승인</SubmitButton>
                     </form>
                     <form action={actions.rejectReplacement} className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                       <input type="hidden" name="imageId" value={replacement.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
                       <label className="sr-only" htmlFor={`replacement-reason-${replacement.id}`}>
                         반려 사유
                       </label>
@@ -134,7 +161,7 @@ export default function AdminProfilePhotoReviewQueue({
                         className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface px-3 text-sm"
                         placeholder="반려 사유를 입력해 주세요"
                       />
-                      <Button variant="danger" type="submit">반려</Button>
+                      <SubmitButton variant="danger" pendingText="반려 중">반려</SubmitButton>
                     </form>
                   </div>
                 </Card>
@@ -159,6 +186,7 @@ export default function AdminProfilePhotoReviewQueue({
           <EmptyState
             title="점검할 기존 사진이 없습니다."
             description="승인 상태이며 사진이 있는 회원이 표시됩니다."
+            action={<Button href="/admin/profile-photos" variant="secondary">큐 새로고침</Button>}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -181,6 +209,7 @@ export default function AdminProfilePhotoReviewQueue({
                 </div>
                 <form action={actions.rejectCurrentPhoto} className="grid min-w-0 gap-2">
                   <input type="hidden" name="memberId" value={member.id} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
                   <label className="sr-only" htmlFor={`current-photo-reason-${member.id}`}>
                     사진 반려 사유
                   </label>
@@ -192,7 +221,7 @@ export default function AdminProfilePhotoReviewQueue({
                     className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface px-3 text-sm"
                     placeholder="사진 반려 사유"
                   />
-                  <Button variant="danger" type="submit">사진 반려 및 인증 중지</Button>
+                  <SubmitButton variant="danger" pendingText="처리 중">사진 반려 및 인증 중지</SubmitButton>
                 </form>
               </Card>
             ))}

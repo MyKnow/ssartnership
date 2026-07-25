@@ -4,13 +4,14 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import FormMessage from "@/components/ui/FormMessage";
+import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS } from "@/lib/member-manual-import/options";
 import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
+import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 
 const PARSE_REASON_LABELS: Record<string, string> = {
   campus_ambiguous: "캠퍼스가 여러 개로 감지됨",
@@ -34,12 +35,14 @@ export default function AdminMemberSignupApprovalDetail({
   request,
   approveAction,
   rejectAction,
-  error,
+  returnTo = "/admin/member-signup-requests",
+  feedback,
 }: {
   request: MattermostSignupApprovalRequestSummary;
   approveAction: (formData: FormData) => Promise<void>;
   rejectAction: (formData: FormData) => Promise<void>;
-  error?: string | null;
+  returnTo?: string;
+  feedback?: AdminReviewQueueFeedback | null;
 }) {
   const generationOptions = Array.from(
     { length: Math.min(99, Math.max(1, getCurrentSsafyYear())) + 1 },
@@ -55,7 +58,7 @@ export default function AdminMemberSignupApprovalDetail({
         description="Mattermost 계정은 이미 인증되었지만, 닉네임에서 이름·기수·캠퍼스를 자동 확정하지 못한 요청입니다."
         actions={
           <Link
-            href="/admin/member-signup-requests"
+            href={returnTo}
             className="inline-flex min-h-11 items-center rounded-[1rem] border border-border bg-surface px-4 text-sm font-semibold text-foreground hover:bg-surface-inset"
           >
             목록으로
@@ -63,7 +66,13 @@ export default function AdminMemberSignupApprovalDetail({
         }
       />
 
-      {error ? <FormMessage variant="error">{error}</FormMessage> : null}
+      {feedback ? (
+        <InlineMessage
+          tone={feedback.tone}
+          title={feedback.title}
+          description={feedback.description}
+        />
+      ) : null}
 
       <Card tone="elevated" className="grid gap-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -126,6 +135,7 @@ export default function AdminMemberSignupApprovalDetail({
             </div>
             <form action={approveAction} className="grid gap-4">
               <input type="hidden" name="requestId" value={request.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 이름
                 <Input name="displayName" required maxLength={128} defaultValue={request.mattermostDisplayName} placeholder="홍길동" />
@@ -151,7 +161,7 @@ export default function AdminMemberSignupApprovalDetail({
               </div>
               <div className="flex flex-wrap gap-3">
                 <SubmitButton pendingText="승인 중">회원가입 승인</SubmitButton>
-                <Button href="/admin/member-signup-requests" variant="secondary">취소</Button>
+                <Button href={returnTo} variant="secondary">취소</Button>
               </div>
             </form>
           </Card>
@@ -163,6 +173,7 @@ export default function AdminMemberSignupApprovalDetail({
             </div>
             <form action={rejectAction} className="grid gap-3">
               <input type="hidden" name="requestId" value={request.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <textarea name="reason" required maxLength={500} className="min-h-24 rounded-card border border-border bg-surface px-3 py-2 text-sm text-foreground" placeholder="반려 사유를 입력해 주세요." />
               <SubmitButton variant="danger" pendingText="반려 중">반려</SubmitButton>
             </form>
