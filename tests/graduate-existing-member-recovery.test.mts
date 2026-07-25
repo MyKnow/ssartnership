@@ -30,5 +30,5 @@ test("복구 승인에는 운영자가 선택한 기존 회원만 연결되고 �
   assert.match(service, /p_existing_member_id/);
   assert.match(service, /기존 회원을 명시적으로 선택해 주세요/);
   assert.match(queue, /name="existingMemberId"/);
-  assert.match(actions, /getOptionalId\(formData, "existingMemberId"\)/);
+  assert.match(actions, /getOptionalId\(formData, "existingMemberId", returnTo\)/);
 });
