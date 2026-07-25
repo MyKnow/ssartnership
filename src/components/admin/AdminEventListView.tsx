@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
@@ -130,6 +131,27 @@ export default function AdminEventListView({
           },
         ]}
         minItemWidth="13rem"
+      />
+      <AdminOperationFlow
+        steps={[
+          {
+            label: "이벤트",
+            description: "공개 전·중·후 상태를 확인합니다.",
+            state: "current",
+          },
+          {
+            label: "노출 연결",
+            description: "홈 광고와 연결할 목적지를 확인합니다.",
+            href: "/admin/advertisement",
+            state: "upcoming",
+          },
+          {
+            label: "운영 기록",
+            description: "변경 결과와 이력을 확인합니다.",
+            href: "/admin/logs",
+            state: "upcoming",
+          },
+        ]}
       />
       {statusMessage ? <FormMessage variant="info">{statusMessage}</FormMessage> : null}
 

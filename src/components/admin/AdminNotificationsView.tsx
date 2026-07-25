@@ -1,4 +1,5 @@
 import AdminNotificationInbox from "@/components/admin/AdminNotificationInbox";
+import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminOperationalNotificationSettingsPanel from "@/components/admin/AdminOperationalNotificationSettingsPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
@@ -45,6 +46,28 @@ export default function AdminNotificationsView({
           },
         ]}
         minItemWidth="13rem"
+      />
+
+      <AdminOperationFlow
+        steps={[
+          {
+            label: "수신함",
+            description: "운영 알림을 확인하고 목적지로 이동합니다.",
+            state: "current",
+          },
+          {
+            label: "작성",
+            description: "필요한 안내를 대상별로 준비합니다.",
+            href: "/admin/push?tab=send",
+            state: "upcoming",
+          },
+          {
+            label: "결과",
+            description: "발송 결과와 실패 로그를 확인합니다.",
+            href: "/admin/push?tab=logs",
+            state: "upcoming",
+          },
+        ]}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,0.75fr)] xl:items-start">

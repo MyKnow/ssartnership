@@ -2,6 +2,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import Link from "next/link";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminCycleGenerationSelector from "@/components/admin/AdminCycleGenerationSelector";
+import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import MattermostSenderManager from "@/components/admin/MattermostSenderManager";
 import {
   AdminCertificationCardPreviewGrid,
@@ -116,6 +117,13 @@ export default function AdminCycleView({
           { label: "교육생 범위", value: studentLabels.join(" · "), hint: "현재 활성 교육생 구간" },
         ]}
         minItemWidth="13rem"
+      />
+      <AdminOperationFlow
+        steps={[
+          { label: "기준값", description: "기수 계산 기준을 확인합니다.", state: "current" },
+          { label: "기수별 운영", description: "Sender와 카드 설정을 관리합니다.", state: "upcoming" },
+          { label: "검증", description: "목업과 적용 상태를 확인합니다.", href: "/admin/cycle/mock", state: "upcoming" },
+        ]}
       />
 
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)] 2xl:items-start">

@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Surface from "@/components/ui/Surface";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import type { AdminAccount } from "@/lib/admin-accounts";
 import {
@@ -89,34 +90,47 @@ export default function AdminAccountsView({
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">@{account.loginId}</p>
               </div>
-              <form action={updateStatusAction}>
-                <input type="hidden" name="adminId" value={account.id} />
-                <input type="hidden" name="isActive" value="false" />
-                <SubmitButton variant="secondary" pendingText="저장 중" disabled={account.permissionId === "super_admin"}>권한 회수</SubmitButton>
-              </form>
             </div>
 
-            <form action={applyTemplateAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="adminId" value={account.id} />
-              <label className="grid min-w-52 gap-2 text-sm font-medium text-foreground">
-                권한 ID 적용
-                <select name="templateKey" className="h-11 rounded-2xl border border-border bg-surface px-3 text-sm text-foreground" defaultValue={account.permissionId}>
-                  {templates.map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}
-                </select>
-              </label>
-              <fieldset className="grid min-w-full gap-2">
-                <legend className="text-sm font-medium text-foreground">관리 캠퍼스</legend>
-                <div className="flex flex-wrap gap-2">
-                  {CAMPUS_DIRECTORY.map((campus) => (
-                    <label key={campus.slug} className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground">
-                      <input type="checkbox" name="managedCampusSlugs" value={campus.slug} defaultChecked={account.managedCampusSlugs.includes(campus.slug)} className="h-4 w-4 accent-primary" />
-                      {campus.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <SubmitButton variant="secondary" pendingText="적용 중">적용</SubmitButton>
-            </form>
+            <Surface level="inset" className="grid gap-4 p-4 sm:p-5">
+              <AdminSectionHeading
+                title="운영 도구"
+                description={
+                  account.permissionId === "super_admin"
+                    ? "최고 관리자 계정은 마지막 권한 보유자 보호를 위해 회수할 수 없습니다."
+                    : "권한 범위와 관리 캠퍼스를 변경하거나 권한을 회수합니다."
+                }
+              />
+              <div className="flex flex-wrap justify-end gap-2">
+                <form action={updateStatusAction}>
+                  <input type="hidden" name="adminId" value={account.id} />
+                  <input type="hidden" name="isActive" value="false" />
+                  <SubmitButton variant="secondary" pendingText="저장 중" disabled={account.permissionId === "super_admin"}>권한 회수</SubmitButton>
+                </form>
+              </div>
+
+              <form action={applyTemplateAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="adminId" value={account.id} />
+                <label className="grid min-w-52 gap-2 text-sm font-medium text-foreground">
+                  권한 ID 적용
+                  <select name="templateKey" className="h-11 rounded-2xl border border-border bg-surface px-3 text-sm text-foreground" defaultValue={account.permissionId}>
+                    {templates.map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}
+                  </select>
+                </label>
+                <fieldset className="grid min-w-full gap-2">
+                  <legend className="text-sm font-medium text-foreground">관리 캠퍼스</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {CAMPUS_DIRECTORY.map((campus) => (
+                      <label key={campus.slug} className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground">
+                        <input type="checkbox" name="managedCampusSlugs" value={campus.slug} defaultChecked={account.managedCampusSlugs.includes(campus.slug)} className="h-4 w-4 accent-primary" />
+                        {campus.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <SubmitButton variant="secondary" pendingText="적용 중">적용</SubmitButton>
+              </form>
+            </Surface>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2 rounded-2xl border border-border bg-surface-inset p-4">

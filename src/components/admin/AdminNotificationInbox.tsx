@@ -15,6 +15,7 @@ import {
 } from "@/lib/admin-notification-inbox";
 import { cn } from "@/lib/cn";
 import { formatKoreanDateTime } from "@/lib/datetime";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 type AdminNotificationInboxProps = {
   initialState: AdminNotificationListResult;
@@ -41,7 +42,7 @@ async function parseAdminNotificationResponse(response: Response) {
   };
 
   if (!response.ok) {
-    throw new Error(data.message ?? "관리자 알림을 처리하지 못했습니다.");
+    throw new Error("관리자 알림을 처리하지 못했습니다.");
   }
 
   return data;
@@ -112,7 +113,7 @@ export default function AdminNotificationInbox({
             : row,
         ),
       }));
-      notify(error instanceof Error ? error.message : "읽음 처리에 실패했습니다.");
+      notify(getSafeAdminMessage(error, "읽음 처리에 실패했습니다."));
     } finally {
       setPendingId(null);
     }
@@ -148,7 +149,7 @@ export default function AdminNotificationInbox({
       }
       router.push(item.targetUrl);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "알림을 열지 못했습니다.");
+      notify(getSafeAdminMessage(error, "알림을 열지 못했습니다."));
     } finally {
       setPendingId(null);
     }
@@ -186,7 +187,7 @@ export default function AdminNotificationInbox({
         unreadCount: wasUnread ? current.unreadCount + 1 : current.unreadCount,
         items: [item, ...current.items],
       }));
-      notify(error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.");
+      notify(getSafeAdminMessage(error, "알림을 삭제하지 못했습니다."));
     } finally {
       setPendingId(null);
     }
@@ -229,7 +230,7 @@ export default function AdminNotificationInbox({
       notify("관리자 알림을 모두 읽음 처리했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(error instanceof Error ? error.message : "전체 읽음 처리에 실패했습니다.");
+      notify(getSafeAdminMessage(error, "전체 읽음 처리에 실패했습니다."));
     } finally {
       setPendingAction(null);
     }
@@ -268,7 +269,7 @@ export default function AdminNotificationInbox({
       notify("관리자 알림을 모두 삭제했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(error instanceof Error ? error.message : "전체 삭제에 실패했습니다.");
+      notify(getSafeAdminMessage(error, "전체 삭제에 실패했습니다."));
     } finally {
       setPendingAction(null);
     }
@@ -292,7 +293,7 @@ export default function AdminNotificationInbox({
         hasMore: Boolean(data.hasMore),
       }));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "알림을 더 불러오지 못했습니다.");
+      notify(getSafeAdminMessage(error, "알림을 더 불러오지 못했습니다."));
     } finally {
       setLoadingMore(false);
     }

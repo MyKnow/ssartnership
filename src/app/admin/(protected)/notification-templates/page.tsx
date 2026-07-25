@@ -1,4 +1,5 @@
 import AdminNotificationTemplateManager from "@/components/admin/AdminNotificationTemplateManager";
+import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import Button from "@/components/ui/Button";
@@ -39,6 +40,27 @@ export default async function AdminNotificationTemplatesPage({
           title="알림 템플릿 관리"
           description="이메일, Mattermost, 푸시, 인앱 알림의 기본 문구를 확인하고 채널별로 수정합니다. 민감한 실제 값은 저장하지 않고 {변수이름} 자리표시자만 관리합니다."
           actions={<Button href="/admin/push" variant="secondary">발송 관리</Button>}
+        />
+        <AdminOperationFlow
+          steps={[
+            {
+              label: "템플릿",
+              description: "채널별 기본 문구와 변수를 관리합니다.",
+              state: "current",
+            },
+            {
+              label: "작성",
+              description: "필요한 대상을 정리해 메시지를 준비합니다.",
+              href: "/admin/push?tab=send",
+              state: "upcoming",
+            },
+            {
+              label: "결과",
+              description: "발송 이력과 실패 원인을 확인합니다.",
+              href: "/admin/push?tab=logs",
+              state: "upcoming",
+            },
+          ]}
         />
         <AdminNotificationTemplateManager
           templates={templates}
