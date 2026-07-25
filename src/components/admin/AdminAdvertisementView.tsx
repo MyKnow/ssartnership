@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import AdminAdPackageManager from "@/components/admin/ad-packages/AdminAdPackageManager";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import PromotionCarouselEditor from "@/components/admin/promotion-carousel-editor/PromotionCarouselEditor";
 import PromotionCarouselDraftClearOnSuccess from "@/components/admin/promotion-carousel-editor/PromotionCarouselDraftClearOnSuccess";
@@ -52,6 +53,27 @@ export default function AdminAdvertisementView({
           { label: "카탈로그", value: `${catalogSlides}개`, hint: "코드 정의 카드" },
         ]}
         minItemWidth="13rem"
+      />
+      <AdminOperationFlow
+        steps={[
+          {
+            label: "노출 구성",
+            description: "홈 카드와 노출 순서를 관리합니다.",
+            state: "current",
+          },
+          {
+            label: "이벤트 연결",
+            description: "공개 이벤트 목적지를 확인합니다.",
+            href: "/admin/event",
+            state: "upcoming",
+          },
+          {
+            label: "운영 기록",
+            description: "변경 결과와 기록을 확인합니다.",
+            href: "/admin/logs",
+            state: "upcoming",
+          },
+        ]}
       />
       {message ? <FormMessage variant="info">{message}</FormMessage> : null}
       <AdminAdPackageManager

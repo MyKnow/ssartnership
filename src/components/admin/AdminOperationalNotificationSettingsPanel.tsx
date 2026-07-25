@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import type { AdminNotificationPreferenceState } from "@/lib/partner-notification-routing";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 type AdminOperationalNotificationSettingsPanelProps = {
   pushConfigured: boolean;
@@ -29,9 +30,7 @@ async function postJson(url: string, body: Record<string, unknown>) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
-      typeof data.message === "string" ? data.message : "요청을 처리하지 못했습니다.",
-    );
+    throw new Error("요청을 처리하지 못했습니다.");
   }
   return data;
 }
@@ -68,7 +67,7 @@ export default function AdminOperationalNotificationSettingsPanel({
         setMessage("알림 설정을 저장했습니다.");
       } catch (caught) {
         setState(previousState);
-        setError(caught instanceof Error ? caught.message : "알림 설정 저장에 실패했습니다.");
+        setError(getSafeAdminMessage(caught, "알림 설정 저장에 실패했습니다."));
       }
     });
   }
@@ -98,7 +97,7 @@ export default function AdminOperationalNotificationSettingsPanel({
         }
         setMessage("이 기기에서 푸시 알림을 받습니다.");
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "푸시 구독에 실패했습니다.");
+        setError(getSafeAdminMessage(caught, "푸시 구독에 실패했습니다."));
       }
     });
   }

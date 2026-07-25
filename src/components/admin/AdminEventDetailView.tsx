@@ -1,5 +1,6 @@
 import Image from "next/image";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import EventRegistrationForm from "@/components/admin/event-management/EventRegistrationForm";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -65,6 +66,27 @@ export default function AdminEventDetailView({
           { label: "규칙", value: `${definition.conditions.length}개`, hint: "보상 조건 수" },
         ]}
         minItemWidth="13rem"
+      />
+      <AdminOperationFlow
+        steps={[
+          {
+            label: "이벤트 설정",
+            description: "기간과 노출 대상을 검토합니다.",
+            state: "current",
+          },
+          {
+            label: "노출 확인",
+            description: "홈과 공개 링크 연결을 확인합니다.",
+            href: "/admin/advertisement",
+            state: "upcoming",
+          },
+          {
+            label: "운영 기록",
+            description: "저장 결과와 변경 이력을 확인합니다.",
+            href: "/admin/logs",
+            state: "upcoming",
+          },
+        ]}
       />
       {message ? <FormMessage variant="info">{message}</FormMessage> : null}
 

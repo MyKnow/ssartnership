@@ -13,6 +13,7 @@ import {
   upsertNotificationTemplate,
 } from "@/lib/notification-templates/repository.server";
 import { sendNotificationTemplateTest } from "@/lib/notification-templates/test-delivery.server";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 const PATH = "/admin/notification-templates";
 
@@ -58,7 +59,7 @@ export async function updateNotificationTemplateAction(formData: FormData) {
       adminId: session.adminId,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알림 템플릿을 저장하지 못했습니다.";
+    const message = getSafeAdminMessage(error, "알림 템플릿을 저장하지 못했습니다.");
     redirect(`${PATH}?error=${encodeURIComponent(message)}`);
   }
 
@@ -81,7 +82,7 @@ export async function resetNotificationTemplateAction(formData: FormData) {
   try {
     await resetNotificationTemplate({ eventKey, channel });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알림 템플릿을 복원하지 못했습니다.";
+    const message = getSafeAdminMessage(error, "알림 템플릿을 복원하지 못했습니다.");
     redirect(`${PATH}?error=${encodeURIComponent(message)}`);
   }
 

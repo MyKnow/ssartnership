@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AdminNotificationCenter from "@/components/admin/notification-center/AdminNotificationCenter";
+import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminTabs from "@/components/admin/AdminTabs";
+import { buildAdminPushTabHref } from "@/lib/admin-operation-paths";
 import { getMemberLabel } from "./push-manager/constants";
 import { PushComposerSection } from "./push-manager/PushComposerSection";
 import { PushLogsSection } from "./push-manager/PushLogsSection";
@@ -58,23 +61,79 @@ export default function AdminPushManager({
   automaticSummaries,
   initialTab = "center",
 }: AdminPushManagerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const controller = useAdminPushManager({
     pushConfigured,
     members,
     partners,
     recentLogs,
   });
-  const [activeTab, setActiveTab] = useState<AdminPushTab>(initialTab);
+  const [selectedTab, setSelectedTab] = useState<AdminPushTab>(initialTab);
+  const requestedTab = searchParams.get("tab");
+  const activeTab: AdminPushTab =
+    requestedTab === "center" || requestedTab === "logs" || requestedTab === "send"
+      ? requestedTab
+      : selectedTab;
+
+  function changeTab(nextTab: AdminPushTab) {
+    setSelectedTab(nextTab);
+    if (pathname === "/admin/push") {
+      router.replace(buildAdminPushTabHref(searchParams, nextTab), { scroll: false });
+    }
+  }
+
+  const composeStepState =
+    activeTab === "send" && !controller.reviewState
+      ? "current"
+      : activeTab === "center"
+        ? "upcoming"
+        : "complete";
+  const reviewStepState =
+    activeTab === "send" && controller.reviewState ? "current" : "upcoming";
 
   return (
     <div className="grid min-w-0 gap-8 overflow-x-hidden">
-      <AdminTabs value={activeTab} onChange={setActiveTab} options={adminPushTabOptions} />
+      <AdminOperationFlow
+        steps={[
+          {
+            label: "수신함",
+            description: "운영 알림과 다음 작업을 확인합니다.",
+            href: buildAdminPushTabHref(searchParams, "center"),
+            state: activeTab === "center" ? "current" : "complete",
+          },
+          {
+            label: "대상·작성",
+            description: "수신 범위와 문구를 정리합니다.",
+            href: buildAdminPushTabHref(searchParams, "send"),
+            state: composeStepState,
+          },
+          {
+            label: "검토",
+            description: "채널별 발송 가능 대상을 확인합니다.",
+            href: buildAdminPushTabHref(searchParams, "send"),
+            state:
+              activeTab === "logs"
+                ? "complete"
+                : reviewStepState,
+          },
+          {
+            label: "결과",
+            description: "성공·실패 로그를 확인합니다.",
+            href: buildAdminPushTabHref(searchParams, "logs"),
+            state: activeTab === "logs" ? "current" : "upcoming",
+          },
+        ]}
+      />
+
+      <AdminTabs value={activeTab} onChange={changeTab} options={adminPushTabOptions} />
 
       {activeTab === "center" ? (
         <AdminNotificationCenter
           automaticSummaries={automaticSummaries}
           recentLogs={recentLogs}
-          onMoveToSend={() => setActiveTab("send")}
+          onMoveToSend={() => changeTab("send")}
         />
       ) : activeTab === "logs" ? (
         <PushLogsSection
@@ -84,7 +143,7 @@ export default function AdminPushManager({
           deletingLogId={controller.deletingLogId}
           onUpdateFilter={controller.updateFilter}
           onLoadLog={(log) => {
-            setActiveTab("send");
+            changeTab("send");
             controller.loadLog(log);
           }}
           onDeleteLog={controller.deleteLog}

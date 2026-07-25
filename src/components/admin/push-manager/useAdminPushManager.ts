@@ -22,6 +22,10 @@ import type {
   AdminPushManagerProps,
   AdminPushReviewState,
 } from "./types";
+import {
+  getSafeAdminMessage,
+  getSafeAdminResponseMessage,
+} from "@/lib/admin-safe-messages";
 
 const initialComposerState: AdminPushComposerState = {
   notificationType: "announcement",
@@ -259,7 +263,9 @@ export function useAdminPushManager({
       });
       const data = await parseAdminResponse<{ message?: string; preview?: AdminNotificationPreview }>(response);
       if (!response.ok || !data?.preview) {
-        setErrorMessage(data?.message ?? "발송 검토 정보를 불러오지 못했습니다.");
+        setErrorMessage(
+          getSafeAdminResponseMessage(data?.message, "발송 검토 정보를 불러오지 못했습니다."),
+        );
         return;
       }
       setReviewState({
@@ -270,9 +276,7 @@ export function useAdminPushManager({
       setComposer((current) => ({ ...current, confirmationText: "" }));
       notify(`발송 가능 대상 ${data.preview.eligibleMemberCount}명을 찾았습니다.`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "발송 검토 정보를 불러오지 못했습니다.",
-      );
+      setErrorMessage(getSafeAdminMessage(error, "발송 검토 정보를 불러오지 못했습니다."));
     } finally {
       setPreviewPending(false);
     }
@@ -328,7 +332,7 @@ export function useAdminPushManager({
       });
       const data = await parseAdminResponse<{ message?: string; result?: AdminNotificationSendResult }>(response);
       if (!response.ok || !data?.result) {
-        setErrorMessage(data?.message ?? "알림 발송에 실패했습니다.");
+        setErrorMessage(getSafeAdminResponseMessage(data?.message, "알림 발송에 실패했습니다."));
         return;
       }
 
@@ -347,9 +351,7 @@ export function useAdminPushManager({
         data.result.channelResults.mm.failed;
       notify(`알림 발송 완료: ${totalSent}건 성공, ${totalFailed}건 실패`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "알림 발송에 실패했습니다.",
-      );
+      setErrorMessage(getSafeAdminMessage(error, "알림 발송에 실패했습니다."));
     } finally {
       setPending(false);
     }
@@ -416,18 +418,14 @@ export function useAdminPushManager({
       const data = await parseAdminResponse<{ message?: string }>(response);
 
       if (!response.ok) {
-        setErrorMessage(data?.message ?? "발송 로그 삭제에 실패했습니다.");
+        setErrorMessage(getSafeAdminResponseMessage(data?.message, "발송 로그 삭제에 실패했습니다."));
         return;
       }
 
       setLogs((current) => current.filter((log) => log.id !== logId));
       notify("발송 로그를 삭제했습니다.");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "발송 로그 삭제에 실패했습니다.",
-      );
+      setErrorMessage(getSafeAdminMessage(error, "발송 로그 삭제에 실패했습니다."));
     } finally {
       setDeletingLogId(null);
     }
